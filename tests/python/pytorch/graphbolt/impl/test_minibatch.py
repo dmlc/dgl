@@ -39,7 +39,7 @@ def create_homo_minibatch():
     subgraphs = []
     for i in range(2):
         subgraphs.append(
-            gb.SampledSubgraphImpl(
+            gb.FusedSampledSubgraphImpl(
                 node_pairs=node_pairs[i],
                 original_column_node_ids=original_column_node_ids[i],
                 original_row_node_ids=original_row_node_ids[i],
@@ -50,6 +50,7 @@ def create_homo_minibatch():
         sampled_subgraphs=subgraphs,
         node_features=node_features,
         edge_features=edge_features,
+        input_nodes=torch.tensor([10, 11, 12, 13]),
     )
 
 
@@ -92,7 +93,7 @@ def create_hetero_minibatch():
     subgraphs = []
     for i in range(2):
         subgraphs.append(
-            gb.SampledSubgraphImpl(
+            gb.FusedSampledSubgraphImpl(
                 node_pairs=node_pairs[i],
                 original_column_node_ids=original_column_node_ids[i],
                 original_row_node_ids=original_row_node_ids[i],
@@ -103,6 +104,10 @@ def create_hetero_minibatch():
         sampled_subgraphs=subgraphs,
         node_features=node_features,
         edge_features=edge_features,
+        input_nodes={
+            "A": torch.tensor([5, 7, 9, 11]),
+            "B": torch.tensor([10, 11, 12]),
+        },
     )
 
 
@@ -137,7 +142,7 @@ def test_minibatch_representation():
     subgraphs = []
     for i in range(2):
         subgraphs.append(
-            gb.SampledSubgraphImpl(
+            gb.FusedSampledSubgraphImpl(
                 node_pairs=node_pairs[i],
                 original_column_node_ids=original_column_node_ids[i],
                 original_row_node_ids=original_row_node_ids[i],
@@ -148,8 +153,8 @@ def test_minibatch_representation():
     negative_dsts = torch.tensor([[2], [8], [8]])
     input_nodes = torch.tensor([8, 1, 6, 5, 9, 0, 2, 4])
     compacted_node_pairs = (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5]))
-    compacted_negative_srcs = torch.tensor([0, 1, 2])
-    compacted_negative_dsts = torch.tensor([6, 0, 0])
+    compacted_negative_srcs = torch.tensor([[0], [1], [2]])
+    compacted_negative_dsts = torch.tensor([[6], [0], [0]])
     labels = torch.tensor([0.0, 1.0, 2.0])
     # Test minibatch without data.
     minibatch = gb.MiniBatch()
@@ -186,11 +191,11 @@ def test_minibatch_representation():
     )
     expect_result = str(
         """MiniBatch(seed_nodes=None,
-          sampled_subgraphs=[SampledSubgraphImpl(node_pairs=(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])),
+          sampled_subgraphs=[FusedSampledSubgraphImpl(node_pairs=(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])),
                                                 original_column_node_ids=tensor([10, 11, 12, 13]),
                                                 original_edge_ids=tensor([19, 20, 21, 22, 25, 30]),
                                                 original_row_node_ids=tensor([10, 11, 12, 13]),),
-                            SampledSubgraphImpl(node_pairs=(tensor([0, 1, 2]), tensor([1, 0, 0])),
+                            FusedSampledSubgraphImpl(node_pairs=(tensor([0, 1, 2]), tensor([1, 0, 0])),
                                                 original_column_node_ids=tensor([10, 11]),
                                                 original_edge_ids=tensor([10, 15, 17]),
                                                 original_row_node_ids=tensor([10, 11, 12]),)],
@@ -212,8 +217,12 @@ def test_minibatch_representation():
                                        [8],
                                        [8]])}],
           compacted_node_pairs=(tensor([0, 1, 2]), tensor([3, 4, 5])),
-          compacted_negative_srcs=tensor([0, 1, 2]),
-          compacted_negative_dsts=tensor([6, 0, 0]),
+          compacted_negative_srcs=tensor([[0],
+                                          [1],
+                                          [2]]),
+          compacted_negative_dsts=tensor([[6],
+                                          [0],
+                                          [0]]),
        )"""
     )
     result = str(minibatch)
@@ -251,7 +260,7 @@ def test_dgl_minibatch_representation():
     subgraphs = []
     for i in range(2):
         subgraphs.append(
-            gb.SampledSubgraphImpl(
+            gb.FusedSampledSubgraphImpl(
                 node_pairs=node_pairs[i],
                 original_column_node_ids=original_column_node_ids[i],
                 original_row_node_ids=original_row_node_ids[i],
@@ -262,8 +271,8 @@ def test_dgl_minibatch_representation():
     negative_dsts = torch.tensor([[2], [8], [8]])
     input_nodes = torch.tensor([8, 1, 6, 5, 9, 0, 2, 4])
     compacted_node_pairs = (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5]))
-    compacted_negative_srcs = torch.tensor([0, 1, 2])
-    compacted_negative_dsts = torch.tensor([6, 0, 0])
+    compacted_negative_srcs = torch.tensor([[0], [1], [2]])
+    compacted_negative_dsts = torch.tensor([[6], [0], [0]])
     labels = torch.tensor([0.0, 1.0, 2.0])
     # Test dglminibatch with all attributes.
     minibatch = gb.MiniBatch(
@@ -286,7 +295,7 @@ def test_dgl_minibatch_representation():
              node_features={'x': tensor([7, 6, 2, 2])},
              negative_node_pairs=(tensor([0, 1, 2]), tensor([6, 0, 0])),
              labels=tensor([0., 1., 2.]),
-             input_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
+             input_nodes=None,
              edge_features=[{'x': tensor([[8],
                                           [1],
                                           [6]])},
@@ -354,6 +363,25 @@ def check_dgl_blocks_homo(minibatch, blocks):
     assert torch.equal(blocks[0].srcdata[dgl.NID], original_row_node_ids[0])
 
 
+def test_to_dgl_node_classification_without_feature():
+    # Arrange
+    minibatch = create_homo_minibatch()
+    minibatch.node_features = None
+    minibatch.labels = None
+    minibatch.seed_nodes = torch.tensor([10, 15])
+    # Act
+    dgl_minibatch = minibatch.to_dgl()
+
+    # Assert
+    assert len(dgl_minibatch.blocks) == 2
+    assert dgl_minibatch.node_features is None
+    assert minibatch.edge_features is dgl_minibatch.edge_features
+    assert dgl_minibatch.labels is None
+    assert minibatch.input_nodes is dgl_minibatch.input_nodes
+    assert minibatch.seed_nodes is dgl_minibatch.output_nodes
+    check_dgl_blocks_homo(minibatch, dgl_minibatch.blocks)
+
+
 def test_to_dgl_node_classification_homo():
     # Arrange
     minibatch = create_homo_minibatch()
@@ -367,7 +395,8 @@ def test_to_dgl_node_classification_homo():
     assert minibatch.node_features is dgl_minibatch.node_features
     assert minibatch.edge_features is dgl_minibatch.edge_features
     assert minibatch.labels is dgl_minibatch.labels
-    assert minibatch.seed_nodes is dgl_minibatch.output_nodes
+    assert dgl_minibatch.input_nodes is None
+    assert dgl_minibatch.output_nodes is None
     check_dgl_blocks_homo(minibatch, dgl_minibatch.blocks)
 
 
@@ -382,7 +411,8 @@ def test_to_dgl_node_classification_hetero():
     assert minibatch.node_features is dgl_minibatch.node_features
     assert minibatch.edge_features is dgl_minibatch.edge_features
     assert minibatch.labels is dgl_minibatch.labels
-    assert minibatch.seed_nodes is dgl_minibatch.output_nodes
+    assert dgl_minibatch.input_nodes is None
+    assert dgl_minibatch.output_nodes is None
     check_dgl_blocks_hetero(minibatch, dgl_minibatch.blocks)
 
 

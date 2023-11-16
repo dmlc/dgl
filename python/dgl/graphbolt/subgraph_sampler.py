@@ -45,8 +45,8 @@ class SubgraphSampler(MiniBatchTransformer):
             seeds = minibatch.seed_nodes
         else:
             raise ValueError(
-                f"Invalid minibatch {minibatch}: Either 'node_pairs' or \
-                'seed_nodes' should have a value."
+                f"Invalid minibatch {minibatch}: Either `node_pairs` or "
+                "`seed_nodes` should have a value."
             )
         (
             minibatch.input_nodes,
@@ -116,8 +116,17 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted = compacted[2:]
             if has_neg_src:
                 compacted_negative_srcs = compacted.pop(0)
+                # Since we need to calculate the neg_ratio according to the
+                # compacted_negatvie_srcs shape, we need to reshape it back.
+                compacted_negative_srcs = compacted_negative_srcs.view(
+                    neg_src.shape
+                )
             if has_neg_dst:
                 compacted_negative_dsts = compacted.pop(0)
+                # Same as above.
+                compacted_negative_dsts = compacted_negative_dsts.view(
+                    neg_dst.shape
+                )
         return (
             seeds,
             compacted_node_pairs,

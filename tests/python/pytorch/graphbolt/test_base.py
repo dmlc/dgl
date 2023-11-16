@@ -123,3 +123,30 @@ def test_etype_str_to_tuple():
         ),
     ):
         _ = gb.etype_str_to_tuple(c_etype_str)
+
+
+def test_isin():
+    elements = torch.tensor([2, 3, 5, 5, 20, 13, 11])
+    test_elements = torch.tensor([2, 5])
+    res = gb.isin(elements, test_elements)
+    expected = torch.tensor([True, False, True, True, False, False, False])
+    assert torch.equal(res, expected)
+
+
+def test_isin_big_data():
+    elements = torch.randint(0, 10000, (10000000,))
+    test_elements = torch.randint(0, 10000, (500000,))
+    res = gb.isin(elements, test_elements)
+    expected = torch.isin(elements, test_elements)
+    assert torch.equal(res, expected)
+
+
+def test_isin_non_1D_dim():
+    elements = torch.tensor([[2, 3], [5, 5], [20, 13]])
+    test_elements = torch.tensor([2, 5])
+    with pytest.raises(Exception):
+        gb.isin(elements, test_elements)
+    elements = torch.tensor([2, 3, 5, 5, 20, 13])
+    test_elements = torch.tensor([[2, 5]])
+    with pytest.raises(Exception):
+        gb.isin(elements, test_elements)

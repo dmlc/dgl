@@ -2,8 +2,10 @@
 
 from collections.abc import Mapping
 from functools import partial
-from typing import Callable, Iterator, Optional
+from typing import Callable, Iterator, Optional, Union
 
+import numpy as np
+import torch
 import torch.distributed as dist
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
@@ -77,6 +79,211 @@ def minibatcher_default(batch, names):
     return minibatch
 
 
+class ItemShufflerAndBatcher:
+    """A shuffler to shuffle items and create batches.
+
+    This class is used internally by :class:`ItemSampler` to shuffle items and
+    create batches. It is not supposed to be used directly. The intention of
+    this class is to avoid time-consuming iteration over :class:`ItemSet`. As
+    an optimization, it slices from the :class:`ItemSet` via indexing first,
+    then shuffle and create batches.
+
+    Parameters
+    ----------
+    item_set : ItemSet
+        Data to be iterated.
+    shuffle : bool
+        Option to shuffle before batching.
+    batch_size : int
+        The size of each batch.
+    drop_last : bool
+        Option to drop the last batch if it's not full.
+    buffer_size : int
+        The size of the buffer to store items sliced from the :class:`ItemSet`.
+    """
+
+    def __init__(
+        self,
+        item_set: ItemSet,
+        shuffle: bool,
+        batch_size: int,
+        drop_last: bool,
+        buffer_size: Optional[int] = 10 * 1000,
+        distributed: Optional[bool] = False,
+        drop_uneven_inputs: Optional[bool] = False,
+        world_size: Optional[int] = 1,
+        rank: Optional[int] = 0,
+    ):
+        self._item_set = item_set
+        self._shuffle = shuffle
+        self._batch_size = batch_size
+        self._drop_last = drop_last
+        self._buffer_size = max(buffer_size, 20 * batch_size)
+        # Round up the buffer size to the nearest multiple of batch size.
+        self._buffer_size = (
+            (self._buffer_size + batch_size - 1) // batch_size * batch_size
+        )
+        self._distributed = distributed
+        self._drop_uneven_inputs = drop_uneven_inputs
+        if distributed:
+            self._num_replicas = world_size
+            self._rank = rank
+
+    def _collate_batch(self, buffer, indices, offsets=None):
+        """Collate a batch from the buffer. For internal use only."""
+        if isinstance(buffer, torch.Tensor):
+            # For item set that's initialized with integer or single tensor,
+            # `buffer` is a tensor.
+            return buffer[indices]
+        elif isinstance(buffer, list) and isinstance(buffer[0], DGLGraph):
+            # For item set that's initialized with a list of
+            # DGLGraphs, `buffer` is a list of DGLGraphs.
+            return dgl_batch([buffer[idx] for idx in indices])
+        elif isinstance(buffer, tuple):
+            # For item set that's initialized with a tuple of items,
+            # `buffer` is a tuple of tensors.
+            return tuple(item[indices] for item in buffer)
+        elif isinstance(buffer, Mapping):
+            # For item set that's initialized with a dict of items,
+            # `buffer` is a dict of tensors/lists/tuples.
+            keys = list(buffer.keys())
+            key_indices = torch.searchsorted(offsets, indices, right=True) - 1
+            batch = {}
+            for j, key in enumerate(keys):
+                mask = (key_indices == j).nonzero().squeeze(1)
+                if len(mask) == 0:
+                    continue
+                batch[key] = self._collate_batch(
+                    buffer[key], indices[mask] - offsets[j]
+                )
+            return batch
+        raise TypeError(f"Unsupported buffer type {type(buffer).__name__}.")
+
+    def _calculate_offsets(self, buffer):
+        """Calculate offsets for each item in buffer. For internal use only."""
+        if not isinstance(buffer, Mapping):
+            return None
+        offsets = [0]
+        for value in buffer.values():
+            if isinstance(value, torch.Tensor):
+                offsets.append(offsets[-1] + len(value))
+            elif isinstance(value, tuple):
+                offsets.append(offsets[-1] + len(value[0]))
+            else:
+                raise TypeError(
+                    f"Unsupported buffer type {type(value).__name__}."
+                )
+        return torch.tensor(offsets)
+
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
+            num_workers = worker_info.num_workers
+            worker_id = worker_info.id
+        else:
+            num_workers = 1
+            worker_id = 0
+        buffer = None
+        if not self._distributed:
+            num_items = len(self._item_set)
+            start_offset = 0
+        else:
+            total_count = len(self._item_set)
+            big_batch_size = self._num_replicas * self._batch_size
+            big_batch_count, big_batch_remain = divmod(
+                total_count, big_batch_size
+            )
+            last_batch_count, batch_remain = divmod(
+                big_batch_remain, self._batch_size
+            )
+            if self._rank < last_batch_count:
+                last_batch = self._batch_size
+            elif self._rank == last_batch_count:
+                last_batch = batch_remain
+            else:
+                last_batch = 0
+            num_items = big_batch_count * self._batch_size + last_batch
+            start_offset = (
+                big_batch_count * self._batch_size * self._rank
+                + min(self._rank * self._batch_size, big_batch_remain)
+            )
+            if not self._drop_uneven_inputs or (
+                not self._drop_last and last_batch_count == self._num_replicas
+            ):
+                # No need to drop uneven batches.
+                num_evened_items = num_items
+                if num_workers > 1:
+                    total_batch_count = (
+                        num_items + self._batch_size - 1
+                    ) // self._batch_size
+                    split_batch_count = total_batch_count // num_workers + (
+                        worker_id < total_batch_count % num_workers
+                    )
+                    split_num_items = split_batch_count * self._batch_size
+                    num_items = (
+                        min(num_items, split_num_items * (worker_id + 1))
+                        - split_num_items * worker_id
+                    )
+                    num_evened_items = num_items
+                    start_offset = (
+                        big_batch_count * self._batch_size * self._rank
+                        + min(self._rank * self._batch_size, big_batch_remain)
+                        + self._batch_size
+                        * (
+                            total_batch_count // num_workers * worker_id
+                            + min(worker_id, total_batch_count % num_workers)
+                        )
+                    )
+            else:
+                # Needs to drop uneven batches. As many items as `last_batch`
+                # size will be dropped. It would be better not to let those
+                # dropped items come from the same worker.
+                num_evened_items = big_batch_count * self._batch_size
+                if num_workers > 1:
+                    total_batch_count = big_batch_count
+                    split_batch_count = total_batch_count // num_workers + (
+                        worker_id < total_batch_count % num_workers
+                    )
+                    split_num_items = split_batch_count * self._batch_size
+                    split_item_remain = last_batch // num_workers + (
+                        worker_id < last_batch % num_workers
+                    )
+                    num_items = split_num_items + split_item_remain
+                    num_evened_items = split_num_items
+                    start_offset = (
+                        big_batch_count * self._batch_size * self._rank
+                        + min(self._rank * self._batch_size, big_batch_remain)
+                        + self._batch_size
+                        * (
+                            total_batch_count // num_workers * worker_id
+                            + min(worker_id, total_batch_count % num_workers)
+                        )
+                        + last_batch // num_workers * worker_id
+                        + min(worker_id, last_batch % num_workers)
+                    )
+        start = 0
+        while start < num_items:
+            end = min(start + self._buffer_size, num_items)
+            buffer = self._item_set[start_offset + start : start_offset + end]
+            indices = torch.arange(end - start)
+            if self._shuffle:
+                np.random.shuffle(indices.numpy())
+            offsets = self._calculate_offsets(buffer)
+            for i in range(0, len(indices), self._batch_size):
+                if self._drop_last and i + self._batch_size > len(indices):
+                    break
+                if (
+                    self._distributed
+                    and self._drop_uneven_inputs
+                    and i >= num_evened_items
+                ):
+                    break
+                batch_indices = indices[i : i + self._batch_size]
+                yield self._collate_batch(buffer, batch_indices, offsets)
+            buffer = None
+            start = end
+
+
 class ItemSampler(IterDataPipe):
     """A sampler to iterate over input items and create subsets.
 
@@ -91,7 +298,7 @@ class ItemSampler(IterDataPipe):
 
     Parameters
     ----------
-    item_set : ItemSet or ItemSetDict
+    item_set : Union[ItemSet, ItemSetDict]
         Data to be sampled.
     batch_size : int
         The size of each batch.
@@ -282,19 +489,35 @@ class ItemSampler(IterDataPipe):
 
     def __init__(
         self,
-        item_set: ItemSet or ItemSetDict,
+        item_set: Union[ItemSet, ItemSetDict],
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
+        # [TODO][Rui] For now, it's a temporary knob to disable indexing. In
+        # the future, we will enable indexing for all the item sets.
+        use_indexing: Optional[bool] = True,
     ) -> None:
         super().__init__()
         self._names = item_set.names
-        self._item_set = IterableWrapper(item_set)
+        # Check if the item set supports indexing.
+        try:
+            item_set[0]
+        except TypeError:
+            use_indexing = False
+        self._use_indexing = use_indexing
+        self._item_set = (
+            item_set if self._use_indexing else IterableWrapper(item_set)
+        )
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
         self._shuffle = shuffle
+        self._use_indexing = use_indexing
+        self._distributed = False
+        self._drop_uneven_inputs = False
+        self._world_size = None
+        self._rank = None
 
     def _organize_items(self, data_pipe) -> None:
         # Shuffle before batch.
@@ -333,11 +556,25 @@ class ItemSampler(IterDataPipe):
         return default_collate(batch)
 
     def __iter__(self) -> Iterator:
-        # Organize items.
-        data_pipe = self._organize_items(self._item_set)
+        if self._use_indexing:
+            data_pipe = IterableWrapper(
+                ItemShufflerAndBatcher(
+                    self._item_set,
+                    self._shuffle,
+                    self._batch_size,
+                    self._drop_last,
+                    distributed=self._distributed,
+                    drop_uneven_inputs=self._drop_uneven_inputs,
+                    world_size=self._world_size,
+                    rank=self._rank,
+                )
+            )
+        else:
+            # Organize items.
+            data_pipe = self._organize_items(self._item_set)
 
-        # Collate.
-        data_pipe = data_pipe.collate(collate_fn=self._collate)
+            # Collate.
+            data_pipe = data_pipe.collate(collate_fn=self._collate)
 
         # Map to minibatch.
         data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
@@ -352,14 +589,14 @@ class DistributedItemSampler(ItemSampler):
     which can be used for training with PyTorch's Distributed Data Parallel
     (DDP). The items can be node IDs, node pairs with or without labels, node
     pairs with negative sources/destinations, DGLGraphs, or heterogeneous
-    counterparts. The original item set is sharded such that each replica
+    counterparts. The original item set is split such that each replica
     (process) receives an exclusive subset.
 
     Note: DistributedItemSampler may not work as expected when it is the last
     datapipe before the data is fetched. Please wrap a SingleProcessDataLoader
     or another datapipe on it.
 
-    Note: The items will be first sharded onto each replica, then get shuffled
+    Note: The items will be first split onto each replica, then get shuffled
     (if needed) and batched. Therefore, each replica will always get a same set
     of items.
 
@@ -370,7 +607,7 @@ class DistributedItemSampler(ItemSampler):
 
     Parameters
     ----------
-    item_set : ItemSet or ItemSetDict
+    item_set : Union[ItemSet, ItemSetDict]
         Data to be sampled.
     batch_size : int
         The size of each batch.
@@ -401,6 +638,7 @@ class DistributedItemSampler(ItemSampler):
 
     Examples
     --------
+    TODO[Kaicheng]: Modify examples here.
     0. Preparation: DistributedItemSampler needs multi-processing environment to
     work. You need to spawn subprocesses and initialize processing group before
     executing following examples. Due to randomness, the output is not always
@@ -408,7 +646,7 @@ class DistributedItemSampler(ItemSampler):
 
     >>> import torch
     >>> from dgl import graphbolt as gb
-    >>> item_set = gb.ItemSet(torch.arange(0, 13))
+    >>> item_set = gb.ItemSet(torch.arange(0, 14))
     >>> num_replicas = 4
     >>> batch_size = 2
     >>> mp.spawn(...)
@@ -496,43 +734,26 @@ class DistributedItemSampler(ItemSampler):
 
     def __init__(
         self,
-        item_set: ItemSet or ItemSetDict,
+        item_set: Union[ItemSet, ItemSetDict],
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
-        num_replicas: Optional[int] = None,
         drop_uneven_inputs: Optional[bool] = False,
     ) -> None:
-        super().__init__(item_set, batch_size, minibatcher, drop_last, shuffle)
+        super().__init__(
+            item_set,
+            batch_size,
+            minibatcher,
+            drop_last,
+            shuffle,
+            use_indexing=True,
+        )
+        self._distributed = True
         self._drop_uneven_inputs = drop_uneven_inputs
-        # Apply a sharding filter to distribute the items.
-        self._item_set = self._item_set.sharding_filter()
-        # Get world size.
-        if num_replicas is None:
-            assert (
-                dist.is_available()
-            ), "Requires distributed package to be available."
-            num_replicas = dist.get_world_size()
-        if self._drop_uneven_inputs:
-            # If the len() method of the item_set is not available, it will
-            # throw an exception.
-            total_len = len(item_set)
-            # Calculate the number of batches after dropping uneven batches for
-            # each replica.
-            self._num_evened_batches = total_len // (
-                num_replicas * batch_size
-            ) + (
-                (not drop_last)
-                and (total_len % (num_replicas * batch_size) >= num_replicas)
+        if not dist.is_available():
+            raise RuntimeError(
+                "Distributed item sampler requires distributed package."
             )
-
-    def _organize_items(self, data_pipe) -> None:
-        data_pipe = super()._organize_items(data_pipe)
-
-        # If drop_uneven_inputs is True, drop the excessive inputs by limiting
-        # the length of the datapipe.
-        if self._drop_uneven_inputs:
-            data_pipe = data_pipe.header(self._num_evened_batches)
-
-        return data_pipe
+        self._world_size = dist.get_world_size()
+        self._rank = dist.get_rank()

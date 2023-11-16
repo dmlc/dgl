@@ -1,7 +1,10 @@
+import unittest
+
+import backend as F
 import pytest
 import torch
 
-from dgl.graphbolt.impl.sampled_subgraph_impl import SampledSubgraphImpl
+from dgl.graphbolt.impl.sampled_subgraph_impl import FusedSampledSubgraphImpl
 
 
 def _assert_container_equal(lhs, rhs):
@@ -39,7 +42,7 @@ def test_exclude_edges_homo(reverse_row, reverse_column):
         original_column_node_ids = None
         dst_to_exclude = torch.tensor([4])
     original_edge_ids = torch.Tensor([5, 9, 10])
-    subgraph = SampledSubgraphImpl(
+    subgraph = FusedSampledSubgraphImpl(
         node_pairs,
         original_column_node_ids,
         original_row_node_ids,
@@ -92,7 +95,7 @@ def test_exclude_edges_hetero(reverse_row, reverse_column):
         original_column_node_ids = None
         dst_to_exclude = torch.tensor([0, 2])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
-    subgraph = SampledSubgraphImpl(
+    subgraph = FusedSampledSubgraphImpl(
         node_pairs=node_pairs,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,
@@ -132,3 +135,53 @@ def test_exclude_edges_hetero(reverse_row, reverse_column):
     )
     _assert_container_equal(result.original_row_node_ids, expected_row_node_ids)
     _assert_container_equal(result.original_edge_ids, expected_edge_ids)
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="`to` function needs GPU to test.",
+)
+def test_sampled_subgraph_to_device():
+    # Initialize data.
+    node_pairs = {
+        "A:relation:B": (
+            torch.tensor([0, 1, 2]),
+            torch.tensor([2, 1, 0]),
+        )
+    }
+    original_row_node_ids = {
+        "A": torch.tensor([13, 14, 15]),
+    }
+    src_to_exclude = torch.tensor([15, 13])
+    original_column_node_ids = {
+        "B": torch.tensor([10, 11, 12]),
+    }
+    dst_to_exclude = torch.tensor([10, 12])
+    original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
+    subgraph = FusedSampledSubgraphImpl(
+        node_pairs=node_pairs,
+        original_column_node_ids=original_column_node_ids,
+        original_row_node_ids=original_row_node_ids,
+        original_edge_ids=original_edge_ids,
+    )
+    edges_to_exclude = {
+        "A:relation:B": (
+            src_to_exclude,
+            dst_to_exclude,
+        )
+    }
+    graph = subgraph.exclude_edges(edges_to_exclude)
+
+    # Copy to device.
+    graph = graph.to("cuda")
+
+    # Check.
+    for key in graph.node_pairs:
+        assert graph.node_pairs[key][0].device.type == "cuda"
+        assert graph.node_pairs[key][1].device.type == "cuda"
+    for key in graph.original_column_node_ids:
+        assert graph.original_column_node_ids[key].device.type == "cuda"
+    for key in graph.original_row_node_ids:
+        assert graph.original_row_node_ids[key].device.type == "cuda"
+    for key in graph.original_edge_ids:
+        assert graph.original_edge_ids[key].device.type == "cuda"

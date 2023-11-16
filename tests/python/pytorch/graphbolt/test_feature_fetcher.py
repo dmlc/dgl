@@ -77,7 +77,7 @@ def test_FeatureFetcher_with_edges_homo():
         subgraphs = []
         for _ in range(3):
             subgraphs.append(
-                gb.SampledSubgraphImpl(
+                gb.FusedSampledSubgraphImpl(
                     node_pairs=(torch.tensor([]), torch.tensor([])),
                     original_edge_ids=torch.randint(
                         0, graph.total_num_edges, (10,)
@@ -119,7 +119,7 @@ def get_hetero_graph():
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
     type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     node_type_offset = torch.LongTensor([0, 2, 5])
-    return gb.from_csc(
+    return gb.from_fused_csc(
         indptr,
         indices,
         node_type_offset=node_type_offset,
@@ -168,7 +168,7 @@ def test_FeatureFetcher_with_edges_hetero():
         }
         for _ in range(3):
             subgraphs.append(
-                gb.SampledSubgraphImpl(
+                gb.FusedSampledSubgraphImpl(
                     node_pairs=(torch.tensor([]), torch.tensor([])),
                     original_edge_ids=original_edge_ids,
                 )

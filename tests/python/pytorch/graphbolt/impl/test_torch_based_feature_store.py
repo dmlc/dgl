@@ -1,5 +1,10 @@
 import os
 import tempfile
+import unittest
+from functools import reduce
+from operator import mul
+
+import backend as F
 
 import numpy as np
 import pydantic
@@ -85,6 +90,79 @@ def test_torch_based_feature(in_memory):
         # it before closing the temporary directory.
         a = b = None
         feature_a = feature_b = None
+
+        # Test loaded tensors' contiguity from C/Fortran contiguous ndarray.
+        contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="C")
+        non_contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="F")
+        assert contiguous_numpy.flags["C_CONTIGUOUS"]
+        assert non_contiguous_numpy.flags["F_CONTIGUOUS"]
+        np.save(
+            os.path.join(test_dir, "contiguous_numpy.npy"), contiguous_numpy
+        )
+        np.save(
+            os.path.join(test_dir, "non_contiguous_numpy.npy"),
+            non_contiguous_numpy,
+        )
+
+        cur_mmap_mode = None
+        if not in_memory:
+            cur_mmap_mode = "r+"
+        feature_a = gb.TorchBasedFeature(
+            torch.from_numpy(
+                np.load(
+                    os.path.join(test_dir, "contiguous_numpy.npy"),
+                    mmap_mode=cur_mmap_mode,
+                )
+            )
+        )
+        feature_b = gb.TorchBasedFeature(
+            torch.from_numpy(
+                np.load(
+                    os.path.join(test_dir, "non_contiguous_numpy.npy"),
+                    mmap_mode=cur_mmap_mode,
+                )
+            )
+        )
+        assert feature_a._tensor.is_contiguous()
+        assert feature_b._tensor.is_contiguous()
+
+        contiguous_numpy = non_contiguous_numpy = None
+        feature_a = feature_b = None
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
+@pytest.mark.parametrize(
+    "dtype", [torch.float32, torch.float64, torch.int32, torch.int64]
+)
+@pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("shape", [(2, 1), (2, 3), (2, 2, 2)])
+def test_torch_based_pinned_feature(dtype, idtype, shape):
+    tensor = torch.arange(0, reduce(mul, shape), dtype=dtype).reshape(shape)
+    test_tensor = tensor.clone().detach()
+    test_tensor_cuda = test_tensor.cuda()
+
+    feature = gb.TorchBasedFeature(tensor)
+    feature.pin_memory_()
+
+    # Test read entire pinned feature, the result should be on cuda.
+    assert torch.equal(feature.read(), test_tensor_cuda)
+    assert feature.read().is_cuda
+    assert torch.equal(
+        feature.read(torch.tensor([0], dtype=idtype).cuda()),
+        test_tensor_cuda[[0]],
+    )
+
+    # Test read pinned feature with idx on cuda, the result should be on cuda.
+    assert feature.read(torch.tensor([0], dtype=idtype).cuda()).is_cuda
+
+    # Test read pinned feature with idx on cpu, the result should be on cpu.
+    assert torch.equal(
+        feature.read(torch.tensor([0], dtype=idtype)), test_tensor[[0]]
+    )
+    assert not feature.read(torch.tensor([0], dtype=idtype)).is_cuda
 
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):

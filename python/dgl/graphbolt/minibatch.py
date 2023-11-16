@@ -314,12 +314,16 @@ class MiniBatch:
         """
         minibatch = DGLMiniBatch(
             blocks=self._to_dgl_blocks(),
-            input_nodes=self.input_nodes,
-            output_nodes=self.seed_nodes,
             node_features=self.node_features,
             edge_features=self.edge_features,
             labels=self.labels,
         )
+        # Need input nodes to fetch feature.
+        if self.node_features is None:
+            minibatch.input_nodes = self.input_nodes
+        # Need output nodes to fetch label.
+        if self.labels is None:
+            minibatch.output_nodes = self.seed_nodes
         assert (
             minibatch.blocks is not None
         ), "Sampled subgraphs for computation are missing."
@@ -449,16 +453,16 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
         if isinstance(val, list):
             if len(val) == 0:
                 val = "[]"
-            # Special handling of SampledSubgraphImpl data. Each element of
+            # Special handling of FusedSampledSubgraphImpl data. Each element of
             # the data occupies one row and is further structured.
             elif isinstance(
                 val[0],
-                dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl,
+                dgl.graphbolt.impl.sampled_subgraph_impl.FusedSampledSubgraphImpl,
             ):
                 sampledsubgraph_strs = []
                 for sampledsubgraph in val:
                     ss_attributes = _get_attributes(sampledsubgraph)
-                    sampledsubgraph_str = "SampledSubgraphImpl("
+                    sampledsubgraph_str = "FusedSampledSubgraphImpl("
                     for ss_name in ss_attributes:
                         ss_val = str(getattr(sampledsubgraph, ss_name))
                         sampledsubgraph_str = (

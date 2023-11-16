@@ -1,4 +1,4 @@
-"""Sampled subgraph for CSCSamplingGraph."""
+"""Sampled subgraph for FusedCSCSamplingGraph."""
 # pylint: disable= invalid-name
 from dataclasses import dataclass
 from typing import Dict, Tuple, Union
@@ -8,12 +8,12 @@ import torch
 from ..base import etype_str_to_tuple
 from ..sampled_subgraph import SampledSubgraph
 
-__all__ = ["SampledSubgraphImpl"]
+__all__ = ["FusedSampledSubgraphImpl"]
 
 
 @dataclass
-class SampledSubgraphImpl(SampledSubgraph):
-    r"""Sampled subgraph of CSCSamplingGraph.
+class FusedSampledSubgraphImpl(SampledSubgraph):
+    r"""Sampled subgraph of FusedCSCSamplingGraph.
 
     Examples
     --------
@@ -22,7 +22,7 @@ class SampledSubgraphImpl(SampledSubgraph):
     >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
     >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
     >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
-    >>> subgraph = gb.SampledSubgraphImpl(
+    >>> subgraph = gb.FusedSampledSubgraphImpl(
     ... node_pairs=node_pairs,
     ... original_column_node_ids=original_column_node_ids,
     ... original_row_node_ids=original_row_node_ids,

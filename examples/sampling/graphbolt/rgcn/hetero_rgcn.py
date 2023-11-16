@@ -46,6 +46,7 @@ import argparse
 import itertools
 import sys
 
+import dgl
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 
@@ -106,7 +107,7 @@ def create_dataloader(
 
     # Sample neighbors for each seed node in the mini-batch.
     # `graph`:
-    #   The graph(CSCSamplingGraph) from which to sample neighbors.
+    #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
     # `fanouts`:
     #   The number of neighbors to sample for each node in each layer.
     datapipe = datapipe.sample_neighbor(graph, fanouts=fanouts)
@@ -166,7 +167,7 @@ def rel_graph_embed(graph, embed_size):
 
     Parameters
     ----------
-    graph : CSCSamplingGraph
+    graph : FusedCSCSamplingGraph
         The graph for which to create the heterogenous embedding layer.
     embed_size : int
         The size of the embedding vectors.
@@ -428,7 +429,9 @@ class Logger(object):
 def extract_node_features(name, block, data, node_embed, device):
     """Extract the node features from embedding layer or raw features."""
     if name == "ogbn-mag":
-        input_nodes = {k: v.to(device) for k, v in data.input_nodes.items()}
+        input_nodes = {
+            k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
+        }
         # Extract node embeddings for the input nodes.
         node_features = extract_embed(node_embed, input_nodes)
         # Add the batch's raw "paper" features. Corresponds to the content
@@ -554,11 +557,11 @@ def run(
             num_workers=num_workers,
         )
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch:02d}"):
-            # Fetch the number of seed nodes in the batch.
-            num_seeds = data.output_nodes[category].shape[0]
-
             # Convert MiniBatch to DGL Blocks.
             blocks = [block.to(device) for block in data.blocks]
+
+            # Fetch the number of seed nodes in the batch.
+            num_seeds = blocks[-1].num_dst_nodes(category)
 
             # Extract the node features from embedding layer or raw features.
             node_features = extract_node_features(
@@ -631,11 +634,7 @@ def main(args):
         args.dataset
     )
 
-    # TODO: featch from ``feature store``.
-    if args.dataset == "ogbn-mag":
-        feat_size = 128
-    else:
-        feat_size = 768
+    feat_size = features.size("node", "paper", "feat")[0]
 
     # As `ogb-lsc-mag240m` is a large dataset, features of `author` and
     # `institution` are generated in advance and stored in the feature store.

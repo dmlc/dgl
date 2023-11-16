@@ -1,12 +1,12 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/csc_sampling_graph.h
+ * @file graphbolt/fused_csc_sampling_graph.h
  * @brief Header file of csc sampling graph.
  */
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
-#include <graphbolt/sampled_subgraph.h>
+#include <graphbolt/fused_sampled_subgraph.h>
 #include <graphbolt/shared_memory.h>
 #include <torch/torch.h>
 
@@ -39,18 +39,18 @@ struct SamplerArgs<SamplerType::LABOR> {
  * Suppose the graph has 3 node types, 3 edge types and 6 edges
  * auto node_type_offset = {0, 2, 4, 6}
  * auto type_per_edge = {0, 1, 0, 2, 1, 2}
- * auto graph = CSCSamplingGraph(..., ..., node_type_offset, type_per_edge)
+ * auto graph = FusedCSCSamplingGraph(..., ..., node_type_offset, type_per_edge)
  *
  * The `node_type_offset` tensor represents the offset array of node type, the
  * given array indicates that node [0, 2) has type id 0, [2, 4) has type id 1,
  * and [4, 6) has type id 2. And the `type_per_edge` tensor represents the type
  * id of each edge.
  */
-class CSCSamplingGraph : public torch::CustomClassHolder {
+class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  public:
   using EdgeAttrMap = torch::Dict<std::string, torch::Tensor>;
   /** @brief Default constructor. */
-  CSCSamplingGraph() = default;
+  FusedCSCSamplingGraph() = default;
 
   /**
    * @brief Constructor for CSC with data.
@@ -61,7 +61,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param type_per_edge A tensor representing the type of each edge, if
    * present.
    */
-  CSCSamplingGraph(
+  FusedCSCSamplingGraph(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
@@ -76,9 +76,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param type_per_edge A tensor representing the type of each edge, if
    * present.
    *
-   * @return CSCSamplingGraph
+   * @return FusedCSCSamplingGraph
    */
-  static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
+  static c10::intrusive_ptr<FusedCSCSamplingGraph> FromCSC(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
@@ -111,6 +111,30 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
     return edge_attributes_;
   }
 
+  /** @brief Set the csc index pointer tensor. */
+  inline void SetCSCIndptr(const torch::Tensor& indptr) { indptr_ = indptr; }
+
+  /** @brief Set the index tensor. */
+  inline void SetIndices(const torch::Tensor& indices) { indices_ = indices; }
+
+  /** @brief Set the node type offset tensor for a heterogeneous graph. */
+  inline void SetNodeTypeOffset(
+      const torch::optional<torch::Tensor>& node_type_offset) {
+    node_type_offset_ = node_type_offset;
+  }
+
+  /** @brief Set the edge type tensor for a heterogeneous graph. */
+  inline void SetTypePerEdge(
+      const torch::optional<torch::Tensor>& type_per_edge) {
+    type_per_edge_ = type_per_edge;
+  }
+
+  /** @brief Set the edge attributes dictionary. */
+  inline void SetEdgeAttributes(
+      const torch::optional<EdgeAttrMap>& edge_attributes) {
+    edge_attributes_ = edge_attributes;
+  }
+
   /**
    * @brief Magic number to indicate graph version in serialize/deserialize
    * stage.
@@ -131,7 +155,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
   /**
    * @brief Pickle method for deserializing.
-   * @param state The state of serialized CSCSamplingGraph.
+   * @param state The state of serialized FusedCSCSamplingGraph.
    */
   void SetState(
       const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
@@ -139,7 +163,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
   /**
    * @brief Pickle method for serializing.
-   * @returns The state of this CSCSamplingGraph.
+   * @returns The state of this FusedCSCSamplingGraph.
    */
   torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> GetState()
       const;
@@ -148,9 +172,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Return the subgraph induced on the inbound edges of the given nodes.
    * @param nodes Type agnostic node IDs to form the subgraph.
    *
-   * @return SampledSubgraph.
+   * @return FusedSampledSubgraph.
    */
-  c10::intrusive_ptr<SampledSubgraph> InSubgraph(
+  c10::intrusive_ptr<FusedSampledSubgraph> InSubgraph(
       const torch::Tensor& nodes) const;
 
   /**
@@ -184,10 +208,10 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * a 1D floating-point or boolean tensor, with the number of elements
    * equalling the total number of edges.
    *
-   * @return An intrusive pointer to a SampledSubgraph object containing the
-   * sampled graph's information.
+   * @return An intrusive pointer to a FusedSampledSubgraph object containing
+   * the sampled graph's information.
    */
-  c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
+  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
       bool replace, bool layer, bool return_eids,
       torch::optional<std::string> probs_name) const;
@@ -222,18 +246,18 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Copy the graph to shared memory.
    * @param shared_memory_name The name of the shared memory.
    *
-   * @return A new CSCSamplingGraph object on shared memory.
+   * @return A new FusedCSCSamplingGraph object on shared memory.
    */
-  c10::intrusive_ptr<CSCSamplingGraph> CopyToSharedMemory(
+  c10::intrusive_ptr<FusedCSCSamplingGraph> CopyToSharedMemory(
       const std::string& shared_memory_name);
 
   /**
    * @brief Load the graph from shared memory.
    * @param shared_memory_name The name of the shared memory.
    *
-   * @return A new CSCSamplingGraph object on shared memory.
+   * @return A new FusedCSCSamplingGraph object on shared memory.
    */
-  static c10::intrusive_ptr<CSCSamplingGraph> LoadFromSharedMemory(
+  static c10::intrusive_ptr<FusedCSCSamplingGraph> LoadFromSharedMemory(
       const std::string& shared_memory_name);
 
   /**
@@ -252,7 +276,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
  private:
   template <typename NumPickFn, typename PickFn>
-  c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
+  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
       PickFn pick_fn) const;
 
