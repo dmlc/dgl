@@ -185,21 +185,18 @@ class ItemShufflerAndBatcher:
             num_workers = 1
             worker_id = 0
         buffer = None
-        if not self._distributed:
-            num_items = len(self._item_set)
-            start_offset = 0
-        else:
-            total = len(self._item_set)
-            start_offset, num_items, evened_count = calculate_range(
-                total,
-                self._num_replicas,
-                self._rank,
-                num_workers,
-                worker_id,
-                self._batch_size,
-                self._drop_last,
-                self._drop_uneven_inputs,
-            )
+        total = len(self._item_set)
+        start_offset, num_items, evened_count = calculate_range(
+            self._distributed,
+            total,
+            self._num_replicas,
+            self._rank,
+            num_workers,
+            worker_id,
+            self._batch_size,
+            self._drop_last,
+            self._drop_uneven_inputs,
+        )
         start = 0
         while start < num_items:
             end = min(start + self._buffer_size, num_items)

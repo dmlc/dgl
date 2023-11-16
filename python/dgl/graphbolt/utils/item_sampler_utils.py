@@ -1,11 +1,5 @@
 """Utility functions for DistributedItemSampler."""
 
-import os
-import shutil
-
-import numpy as np
-import torch
-
 
 def count_split(total, num_workers, worker_id, batch_size=1):
     """Calculate the number of assigned items after splitting them by batch
@@ -29,6 +23,7 @@ def count_split(total, num_workers, worker_id, batch_size=1):
 
 
 def calculate_range(
+    distributed,
     total,
     num_replicas,
     rank,
@@ -51,7 +46,8 @@ def calculate_range(
     dropped.
 
     Args:
-        total (int): The total number of items to be distributed.
+        distributed (bool): Whether it's in distributed mode.
+        total (int): The total number of items.
         num_replicas (int): The total number of replicas.
         rank (int): The rank of the current replica.
         num_workers (int): The number of workers per replica.
@@ -70,6 +66,9 @@ def calculate_range(
             - evened_count (int): The number of items that the current worker
               will produce after dropping uneven batches.
     """
+    # Check if it's distributed mode.
+    if not distributed:
+        return (0, total, total)
     # First, equally distribute items into all replicas.
     assigned_count, start_offset = count_split(
         total, num_replicas, rank, batch_size
