@@ -39,7 +39,7 @@ class DeepWalk(nn.Module):
     neg_weight : float, optional
         Weight of the loss term for negative samples in the total loss. Default: 1.0
     negative_size : int, optional
-        Number of negative samples to use for each positive sample. Default: 1
+        Number of negative samples to use for each positive sample. Default: 5
     fast_neg : bool, optional
         If True, it samples negative node pairs within a batch of random walks. Default: True
     sparse : bool, optional
