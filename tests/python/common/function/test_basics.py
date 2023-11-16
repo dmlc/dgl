@@ -687,6 +687,7 @@ def test_local_scope(idtype):
         except TypeError:
             pass
         assert "hh" not in g.ndata
+
     foo(g)
 
 
