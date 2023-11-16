@@ -36,17 +36,17 @@ from dgl.sparse import sp_broadcast_v
 from ogb.nodeproppred import DglNodePropPredDataset
 
 
-class LADIESConv(nn.Module):
-    r"""LADIES layer from `Inductive Representation Learning on
-    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__
-    """
+class SAGEConv(nn.Module):
+    r"""LADIES layer from `Layer-Dependent Importance Sampling
+    for Training Deep and Large Graph Convolutional Networks
+    <https://arxiv.org/abs/1911.07323.pdf>`__"""
 
     def __init__(
         self,
         in_feats,
         out_feats,
     ):
-        super(LADIESConv, self).__init__()
+        super(SAGEConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = in_feats, in_feats
         self._out_feats = out_feats
 
@@ -80,9 +80,9 @@ class LADIES(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList()
         # Three-layer LADIES.
-        self.layers.append(LADIESConv(in_size, hid_size))
-        self.layers.append(LADIESConv(hid_size, hid_size))
-        self.layers.append(LADIESConv(hid_size, out_size))
+        self.layers.append(SAGEConv(in_size, hid_size))
+        self.layers.append(SAGEConv(hid_size, hid_size))
+        self.layers.append(SAGEConv(hid_size, out_size))
 
         self.dropout = nn.Dropout(0.5)
         self.hid_size = hid_size
