@@ -1777,8 +1777,12 @@ def test_sample_neighbors_hetero_csc_format(labor):
     }
     assert len(subgraph.edge_index_mappings) == 2
     for etype, pairs in expected_edge_index_mappings.items():
-        assert torch.equal(subgraph.edge_index_mappings[etype].indptr, pairs.indptr)
-        assert torch.equal(subgraph.edge_index_mappings[etype].indices, pairs.indices)
+        assert torch.equal(
+            subgraph.edge_index_mappings[etype].indptr, pairs.indptr
+        )
+        assert torch.equal(
+            subgraph.edge_index_mappings[etype].indices, pairs.indices
+        )
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -1802,8 +1806,12 @@ def test_sample_neighbors_hetero_csc_format(labor):
     }
     assert len(subgraph.edge_index_mappings) == 2
     for etype, pairs in expected_edge_index_mappings.items():
-        assert torch.equal(subgraph.edge_index_mappings[etype].indptr, pairs.indptr)
-        assert torch.equal(subgraph.edge_index_mappings[etype].indices, pairs.indices)
+        assert torch.equal(
+            subgraph.edge_index_mappings[etype].indptr, pairs.indptr
+        )
+        assert torch.equal(
+            subgraph.edge_index_mappings[etype].indices, pairs.indices
+        )
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -1933,11 +1941,13 @@ def test_sample_neighbors_replace_csc_format(
 
     # Verify in subgraph.
     assert (
-        subgraph.edge_index_mappings["n1:e1:n2"].indices.numel() == expected_sampled_num1
+        subgraph.edge_index_mappings["n1:e1:n2"].indices.numel()
+        == expected_sampled_num1
     )
     assert subgraph.edge_index_mappings["n1:e1:n2"].indptr.size(0) == 2
     assert (
-        subgraph.edge_index_mappings["n2:e2:n1"].indices.numel() == expected_sampled_num2
+        subgraph.edge_index_mappings["n2:e2:n1"].indices.numel()
+        == expected_sampled_num2
     )
     assert subgraph.edge_index_mappings["n2:e2:n1"].indptr.size(0) == 2
 
