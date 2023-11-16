@@ -683,7 +683,7 @@ def test_local_scope(idtype):
             with g.local_scope():
                 g.ndata["hh"] = F.ones((g.num_nodes(), 1))
                 # throw TypeError
-                1+'1'
+                1 + '1'
         except TypeError:
             pass
         assert "hh" not in g.ndata
