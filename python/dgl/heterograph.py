@@ -6061,9 +6061,11 @@ class DGLGraph(object):
         old_eframes = self._edge_frames
         self._node_frames = [fr.clone() for fr in self._node_frames]
         self._edge_frames = [fr.clone() for fr in self._edge_frames]
-        yield
-        self._node_frames = old_nframes
-        self._edge_frames = old_eframes
+        try:
+            yield
+        finally:
+            self._node_frames = old_nframes
+            self._edge_frames = old_eframes
 
     def formats(self, formats=None):
         r"""Get a cloned graph with the specified allowed sparse format(s) or

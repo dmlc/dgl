@@ -115,6 +115,7 @@ class NeighborSampler(SubgraphSampler):
                 self.fanouts[hop],
                 self.replace,
                 self.prob_name,
+                self.deduplicate,
             )
             if self.deduplicate:
                 (
