@@ -34,7 +34,7 @@ def test_torch_based_feature(in_memory):
             a = to_on_disk_tensor(test_dir, "a", a)
             b = to_on_disk_tensor(test_dir, "b", b)
 
-        feature_a = gb.TorchBasedFeature(a, metadata = metadata)
+        feature_a = gb.TorchBasedFeature(a, metadata=metadata)
         feature_b = gb.TorchBasedFeature(b)
 
         # Read the entire feature.
