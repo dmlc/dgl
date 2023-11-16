@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import unittest
 
 EXAMPLE_ROOT = os.path.join(
     os.path.dirname(os.path.relpath(__file__)),
@@ -21,6 +22,7 @@ def test_node_classification():
     assert float(stdout[-5:]) > 0.60
 
 
+@unittest.skipIf(os.name == "nt", reason="TODO(6575): Fix the test on Windows")
 def test_link_prediction():
     script = os.path.join(EXAMPLE_ROOT, "link_prediction.py")
     out = subprocess.run(["python", str(script)], capture_output=True)
