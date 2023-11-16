@@ -67,7 +67,7 @@ class TorchBasedFeature(Feature):
     device(type='cuda', index=0)
     """
 
-    def __init__(self, torch_feature: torch.Tensor, metadata: Dict = {}):
+    def __init__(self, torch_feature: torch.Tensor, metadata: Dict = None):
         super().__init__()
         assert isinstance(torch_feature, torch.Tensor), (
             f"torch_feature in TorchBasedFeature must be torch.Tensor, "
@@ -160,7 +160,9 @@ class TorchBasedFeature(Feature):
         Dict
             The metadata of the feature.
         """
-        return self._metadata
+        return (
+            self._metadata if self._metadata is not None else super().metadata()
+        )
 
     def pin_memory_(self):
         """In-place operation to copy the feature to pinned memory."""
