@@ -63,43 +63,50 @@ def calculate_range(
               the current worker.
             - assigned_count (int): The length of the range assigned to the
               current worker.
-            - evened_count (int): The number of items that the current worker
-              will produce after dropping uneven batches.
+            - output_count (int): The number of items that the current worker
+              will produce after dropping.
     """
     # Check if it's distributed mode.
     if not distributed:
-        return (0, total, total)
+        if not drop_last:
+            return (0, total, total)
+        else:
+            return (0, total, total // batch_size * batch_size)
     # First, equally distribute items into all replicas.
     assigned_count, start_offset = count_split(
         total, num_replicas, rank, batch_size
     )
     # Calculate the number of outputs when drop_uneven_inputs is True.
     # `assigned_count` is the number of items distributed to the current
-    # process. `evened_count` is the number of items should be output
-    # by this process after dropping uneven inputs.
+    # process. `output_count` is the number of items should be output
+    # by this process after dropping.
     if not drop_uneven_inputs:
-        evened_count = assigned_count
-    elif not drop_last:
-        min_item_count, _ = count_split(
-            total, num_replicas, num_replicas - 1, batch_size
-        )
-        min_batch_count = (min_item_count + batch_size - 1) // batch_size
-        evened_count = min(min_batch_count * batch_size, assigned_count)
+        if not drop_last:
+            output_count = assigned_count
+        else:
+            output_count = assigned_count // batch_size * batch_size
     else:
-        evened_count = total // (batch_size * num_replicas) * batch_size
+        if not drop_last:
+            min_item_count, _ = count_split(
+                total, num_replicas, num_replicas - 1, batch_size
+            )
+            min_batch_count = (min_item_count + batch_size - 1) // batch_size
+            output_count = min(min_batch_count * batch_size, assigned_count)
+        else:
+            output_count = total // (batch_size * num_replicas) * batch_size
     # If there are multiple workers, equally distribute the batches to
     # all workers.
     if num_workers > 1:
         # Equally distribute the dropped number too.
         dropped_items, prev_dropped_items = count_split(
-            assigned_count - evened_count, num_workers, worker_id
+            assigned_count - output_count, num_workers, worker_id
         )
-        evened_count, prev_evened_count = count_split(
-            evened_count,
+        output_count, prev_output_count = count_split(
+            output_count,
             num_workers,
             worker_id,
             batch_size,
         )
-        assigned_count = evened_count + dropped_items
-        start_offset += prev_evened_count + prev_dropped_items
-    return (start_offset, assigned_count, evened_count)
+        assigned_count = output_count + dropped_items
+        start_offset += prev_output_count + prev_dropped_items
+    return (start_offset, assigned_count, output_count)

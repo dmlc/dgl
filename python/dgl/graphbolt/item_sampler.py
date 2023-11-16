@@ -126,9 +126,8 @@ class ItemShufflerAndBatcher:
         )
         self._distributed = distributed
         self._drop_uneven_inputs = drop_uneven_inputs
-        if distributed:
-            self._num_replicas = world_size
-            self._rank = rank
+        self._num_replicas = world_size
+        self._rank = rank
 
     def _collate_batch(self, buffer, indices, offsets=None):
         """Collate a batch from the buffer. For internal use only."""
@@ -186,7 +185,7 @@ class ItemShufflerAndBatcher:
             worker_id = 0
         buffer = None
         total = len(self._item_set)
-        start_offset, num_items, evened_count = calculate_range(
+        start_offset, num_items, num_output = calculate_range(
             self._distributed,
             total,
             self._num_replicas,
@@ -206,15 +205,12 @@ class ItemShufflerAndBatcher:
                 np.random.shuffle(indices.numpy())
             offsets = self._calculate_offsets(buffer)
             for i in range(0, len(indices), self._batch_size):
-                if self._drop_last and i + self._batch_size > len(indices):
+                if num_output <= 0:
                     break
-                if (
-                    self._distributed
-                    and self._drop_uneven_inputs
-                    and i >= evened_count
-                ):
-                    break
-                batch_indices = indices[i : i + self._batch_size]
+                batch_indices = indices[
+                    i : i + min(self._batch_size, num_output)
+                ]
+                num_output -= self._batch_size
                 yield self._collate_batch(buffer, batch_indices, offsets)
             buffer = None
             start = end
