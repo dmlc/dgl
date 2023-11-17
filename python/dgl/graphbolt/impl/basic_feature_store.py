@@ -81,6 +81,29 @@ class BasicFeatureStore(FeatureStore):
         """
         return self._features[(domain, type_name, feature_name)].size()
 
+    def metadata(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+    ):
+        """Get the metadata of the specified feature in the feature store.
+
+        Parameters
+        ----------
+        domain : str
+            The domain of the feature such as "node", "edge" or "graph".
+        type_name : str
+            The node or edge type name.
+        feature_name : str
+            The feature name.
+        Returns
+        -------
+        Dict
+            The metadata of the feature.
+        """
+        return self._features[(domain, type_name, feature_name)].metadata()
+
     def update(
         self,
         domain: str,

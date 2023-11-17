@@ -898,7 +898,7 @@ def test_OnDiskDataset_Feature_heterograph():
         )
         assert torch.equal(
             feature_data.read("node", "paper", "labels"),
-            torch.tensor(node_data_label),
+            node_data_label.clone().detach(),
         )
 
         # Verify edge feature data.
@@ -908,7 +908,7 @@ def test_OnDiskDataset_Feature_heterograph():
         )
         assert torch.equal(
             feature_data.read("edge", "author:writes:paper", "labels"),
-            torch.tensor(edge_data_label),
+            edge_data_label.clone().detach(),
         )
 
         feature_data = None
@@ -981,7 +981,7 @@ def test_OnDiskDataset_Feature_homograph():
         )
         assert torch.equal(
             feature_data.read("node", None, "labels"),
-            torch.tensor(node_data_label),
+            node_data_label.clone().detach(),
         )
 
         # Verify edge feature data.
@@ -991,7 +991,7 @@ def test_OnDiskDataset_Feature_homograph():
         )
         assert torch.equal(
             feature_data.read("edge", None, "labels"),
-            torch.tensor(edge_data_label),
+            edge_data_label.clone().detach(),
         )
 
         feature_data = None
@@ -1334,17 +1334,17 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
               - name: node_classification
                 num_classes: {num_classes}
                 train_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set/train.npy
                 validation_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set/validation.npy
                 test_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set/test.npy
@@ -1373,17 +1373,17 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
               - name: node_classification
                 num_classes: {num_classes}
                 train_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed/set/train.npy
                 validation_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed/set/validation.npy
                 test_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed/set/test.npy
@@ -1488,17 +1488,17 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
               - name: node_classification
                 num_classes: {num_classes}
                 train_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set\\train.npy
                 validation_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set\\validation.npy
                 test_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set\\test.npy
@@ -1527,17 +1527,17 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
               - name: node_classification
                 num_classes: {num_classes}
                 train_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed\\set\\train.npy
                 validation_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed\\set\\validation.npy
                 test_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed\\set\\test.npy
@@ -1631,6 +1631,7 @@ def test_OnDiskDataset_load_feature():
         dataset = gb.OnDiskDataset(test_dir)
         # If `format` is torch and `in_memory` is False, it will
         # raise an AssertionError.
+        dataset.yaml_data["feature_data"][0]["in_memory"] = False
         dataset.yaml_data["feature_data"][0]["format"] = "torch"
         with pytest.raises(
             AssertionError,
@@ -2018,7 +2019,7 @@ def test_OnDiskDataset_load_1D_feature(fmt):
                 - name: node_classification
                   num_classes: {num_classes}
                   train_set:
-                    - type_name: null
+                    - type: null
                       data:
                         - format: {fmt}
                           path: {train_path}
@@ -2069,3 +2070,143 @@ def test_BuiltinDataset():
             match=rf"Dataset {dataset_name} is not available.*",
         ):
             _ = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
+
+
+@pytest.mark.parametrize("include_original_edge_id", [True, False])
+def test_OnDiskDataset_homogeneous(include_original_edge_id):
+    """Preprocess and instantiate OnDiskDataset for homogeneous graph."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=include_original_edge_id
+        ).load()
+
+        assert dataset.dataset_name == dataset_name
+
+        graph = dataset.graph
+        assert isinstance(graph, gb.FusedCSCSamplingGraph)
+        assert graph.total_num_nodes == num_nodes
+        assert graph.total_num_edges == num_edges
+        assert graph.edge_attributes is not None
+        assert (
+            not include_original_edge_id
+        ) or gb.ORIGINAL_EDGE_ID in graph.edge_attributes
+
+        tasks = dataset.tasks
+        assert len(tasks) == 1
+        assert isinstance(tasks[0].train_set, gb.ItemSet)
+        assert isinstance(tasks[0].validation_set, gb.ItemSet)
+        assert isinstance(tasks[0].test_set, gb.ItemSet)
+        assert tasks[0].metadata["num_classes"] == num_classes
+        assert tasks[0].metadata["name"] == "link_prediction"
+
+        assert dataset.feature.size("node", None, "feat")[0] == num_classes
+        assert dataset.feature.size("edge", None, "feat")[0] == num_classes
+
+        for itemset in [
+            tasks[0].train_set,
+            tasks[0].validation_set,
+            tasks[0].test_set,
+        ]:
+            datapipe = gb.ItemSampler(itemset, batch_size=10)
+            datapipe = datapipe.sample_neighbor(graph, [-1])
+            datapipe = datapipe.fetch_feature(
+                dataset.feature, node_feature_keys=["feat"]
+            )
+            datapipe = datapipe.to_dgl()
+            dataloader = gb.MultiProcessDataLoader(datapipe)
+            for _ in dataloader:
+                pass
+
+        graph = None
+        tasks = None
+        dataset = None
+
+
+@pytest.mark.parametrize("include_original_edge_id", [True, False])
+def test_OnDiskDataset_heterogeneous(include_original_edge_id):
+    """Preprocess and instantiate OnDiskDataset for heterogeneous graph."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        dataset_name = "OnDiskDataset_hetero"
+        num_nodes = {
+            "user": 1000,
+            "item": 2000,
+        }
+        num_edges = {
+            ("user", "follow", "user"): 10000,
+            ("user", "click", "item"): 20000,
+        }
+        num_classes = 10
+        gbt.genereate_raw_data_for_hetero_dataset(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=include_original_edge_id
+        ).load()
+
+        assert dataset.dataset_name == dataset_name
+
+        graph = dataset.graph
+        assert isinstance(graph, gb.FusedCSCSamplingGraph)
+        assert graph.total_num_nodes == sum(
+            num_nodes for num_nodes in num_nodes.values()
+        )
+        assert graph.total_num_edges == sum(
+            num_edge for num_edge in num_edges.values()
+        )
+        assert graph.edge_attributes is not None
+        assert (
+            not include_original_edge_id
+        ) or gb.ORIGINAL_EDGE_ID in graph.edge_attributes
+
+        tasks = dataset.tasks
+        assert len(tasks) == 1
+        assert isinstance(tasks[0].train_set, gb.ItemSetDict)
+        assert isinstance(tasks[0].validation_set, gb.ItemSetDict)
+        assert isinstance(tasks[0].test_set, gb.ItemSetDict)
+        assert tasks[0].metadata["num_classes"] == num_classes
+        assert tasks[0].metadata["name"] == "node_classification"
+
+        assert dataset.feature.size("node", "user", "feat")[0] == num_classes
+        assert dataset.feature.size("node", "item", "feat")[0] == num_classes
+
+        for itemset in [
+            tasks[0].train_set,
+            tasks[0].validation_set,
+            tasks[0].test_set,
+        ]:
+            datapipe = gb.ItemSampler(itemset, batch_size=10)
+            datapipe = datapipe.sample_neighbor(graph, [-1])
+            datapipe = datapipe.fetch_feature(
+                dataset.feature, node_feature_keys={"user": ["feat"]}
+            )
+            datapipe = datapipe.to_dgl()
+            dataloader = gb.MultiProcessDataLoader(datapipe)
+            for _ in dataloader:
+                pass
+
+        graph = None
+        tasks = None
+        dataset = None

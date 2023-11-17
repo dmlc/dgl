@@ -1,5 +1,7 @@
 """Base types and utilities for Graph Bolt."""
 
+from dataclasses import dataclass
+
 import torch
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
@@ -13,6 +15,7 @@ __all__ = [
     "etype_tuple_to_str",
     "CopyTo",
     "isin",
+    "CSCFormatBase",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
@@ -111,3 +114,21 @@ class CopyTo(IterDataPipe):
         for data in self.datapipe:
             data = recursive_apply(data, apply_to, self.device)
             yield data
+
+
+@dataclass
+class CSCFormatBase:
+    r"""Basic class representing data in Compressed Sparse Column (CSC) format.
+
+    Examples
+    --------
+    >>> indptr = torch.tensor([0, 1, 3])
+    >>> indices = torch.tensor([1, 4, 2])
+    >>> csc_foramt_base = CSCFormatBase(indptr=indptr, indices=indices)
+    >>> print(csc_format_base.indptr)
+    ... torch.tensor([0, 1, 3])
+    >>> print(csc_foramt_base)
+    ... torch.tensor([1, 4, 2])
+    """
+    indptr: torch.Tensor = None
+    indices: torch.Tensor = None

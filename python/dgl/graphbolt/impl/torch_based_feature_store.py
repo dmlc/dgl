@@ -1,5 +1,5 @@
 """Torch-based feature store for GraphBolt."""
-from typing import List
+from typing import Dict, List
 
 import numpy as np
 import torch
@@ -67,7 +67,7 @@ class TorchBasedFeature(Feature):
     device(type='cuda', index=0)
     """
 
-    def __init__(self, torch_feature: torch.Tensor):
+    def __init__(self, torch_feature: torch.Tensor, metadata: Dict = None):
         super().__init__()
         assert isinstance(torch_feature, torch.Tensor), (
             f"torch_feature in TorchBasedFeature must be torch.Tensor, "
@@ -79,6 +79,7 @@ class TorchBasedFeature(Feature):
         )
         # Make sure the tensor is contiguous.
         self._tensor = torch_feature.contiguous()
+        self._metadata = metadata
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -150,6 +151,18 @@ class TorchBasedFeature(Feature):
                     "supported yet."
                 )
             self._tensor[ids] = value
+
+    def metadata(self):
+        """Get the metadata of the feature.
+
+        Returns
+        -------
+        Dict
+            The metadata of the feature.
+        """
+        return (
+            self._metadata if self._metadata is not None else super().metadata()
+        )
 
     def pin_memory_(self):
         """In-place operation to copy the feature to pinned memory."""
