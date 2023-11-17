@@ -1511,7 +1511,7 @@ class DGLGraph(object):
             self._batch_num_nodes = {}
             for ty in self.ntypes:
                 bnn = F.copy_to(
-                    F.tensor([self.num_nodes(ty)], F.int64), self.device
+                    F.tensor([self.num_nodes(ty)], self.idtype), self.device
                 )
                 self._batch_num_nodes[ty] = bnn
         if ntype is None:
@@ -1601,6 +1601,7 @@ class DGLGraph(object):
         batch
         unbatch
         """
+        val = utils.prepare_tensor_or_dict(self, val, "batch_num_nodes")
         if not isinstance(val, Mapping):
             if len(self.ntypes) != 1:
                 raise DGLError(
@@ -1660,7 +1661,7 @@ class DGLGraph(object):
             self._batch_num_edges = {}
             for ty in self.canonical_etypes:
                 bne = F.copy_to(
-                    F.tensor([self.num_edges(ty)], F.int64), self.device
+                    F.tensor([self.num_edges(ty)], self.idtype), self.device
                 )
                 self._batch_num_edges[ty] = bne
         if etype is None:
@@ -1752,6 +1753,7 @@ class DGLGraph(object):
         batch
         unbatch
         """
+        val = utils.prepare_tensor_or_dict(self, val, "batch_num_edges")
         if not isinstance(val, Mapping):
             if len(self.etypes) != 1:
                 raise DGLError(
