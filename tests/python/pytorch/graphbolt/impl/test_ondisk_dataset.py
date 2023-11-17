@@ -898,7 +898,7 @@ def test_OnDiskDataset_Feature_heterograph():
         )
         assert torch.equal(
             feature_data.read("node", "paper", "labels"),
-            torch.tensor(node_data_label),
+            node_data_label.clone().detach(),
         )
 
         # Verify edge feature data.
@@ -908,7 +908,7 @@ def test_OnDiskDataset_Feature_heterograph():
         )
         assert torch.equal(
             feature_data.read("edge", "author:writes:paper", "labels"),
-            torch.tensor(edge_data_label),
+            edge_data_label.clone().detach(),
         )
 
         feature_data = None
@@ -981,7 +981,7 @@ def test_OnDiskDataset_Feature_homograph():
         )
         assert torch.equal(
             feature_data.read("node", None, "labels"),
-            torch.tensor(node_data_label),
+            node_data_label.clone().detach(),
         )
 
         # Verify edge feature data.
@@ -991,7 +991,7 @@ def test_OnDiskDataset_Feature_homograph():
         )
         assert torch.equal(
             feature_data.read("edge", None, "labels"),
-            torch.tensor(edge_data_label),
+            edge_data_label.clone().detach(),
         )
 
         feature_data = None
