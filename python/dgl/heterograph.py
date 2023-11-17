@@ -750,7 +750,7 @@ class DGLGraph(object):
                 c_etype_batch_num_edges, one_hot_removed_edges, reducer="sum"
             )
             self._batch_num_edges[c_etype] = c_etype_batch_num_edges - F.astype(
-                batch_num_removed_edges, F.int64
+                batch_num_removed_edges, self.idtype
             )
 
         sub_g = self.edge_subgraph(
@@ -890,7 +890,7 @@ class DGLGraph(object):
             self._batch_num_nodes[
                 target_ntype
             ] = c_ntype_batch_num_nodes - F.astype(
-                batch_num_removed_nodes, F.int64
+                batch_num_removed_nodes, self.idtype
             )
             # Record old num_edges to check later whether some edges were removed
             old_num_edges = {
@@ -917,7 +917,7 @@ class DGLGraph(object):
             for c_etype in canonical_etypes:
                 if self._graph.num_edges(self.get_etype_id(c_etype)) == 0:
                     self._batch_num_edges[c_etype] = F.zeros(
-                        (self.batch_size,), F.int64, self.device
+                        (self.batch_size,), self.idtype, self.device
                     )
                     continue
 
@@ -936,7 +936,7 @@ class DGLGraph(object):
                     reducer="sum",
                 )
                 self._batch_num_edges[c_etype] = F.astype(
-                    batch_num_left_edges, F.int64
+                    batch_num_left_edges, self.idtype
                 )
 
         if batched and not store_ids:
