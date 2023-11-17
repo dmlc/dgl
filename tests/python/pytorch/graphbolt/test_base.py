@@ -29,7 +29,7 @@ def test_CopyToWithMiniBatches():
     N = 16
     B = 2
     itemset = gb.ItemSet(torch.arange(N), names="seed_nodes")
-    graph = gb_test_utils.rand_csc_graph(100, 0.15)
+    graph = gb_test_utils.rand_csc_graph(100, 0.15, bidirection_edge=True)
 
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]

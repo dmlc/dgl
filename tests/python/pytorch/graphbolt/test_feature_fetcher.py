@@ -8,7 +8,7 @@ from torchdata.datapipes.iter import Mapper
 
 def test_FeatureFetcher_invoke():
     # Prepare graph and required datapipes.
-    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
         [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
     )
@@ -40,7 +40,7 @@ def test_FeatureFetcher_invoke():
 
 
 def test_FeatureFetcher_homo():
-    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
         [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
     )
@@ -65,7 +65,7 @@ def test_FeatureFetcher_homo():
 
 
 def test_FeatureFetcher_with_edges_homo():
-    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
         [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
     )

@@ -9,7 +9,7 @@ import scipy.sparse as sp
 import torch
 
 
-def rand_csc_graph(N, density, bidirection_edge=True):
+def rand_csc_graph(N, density, bidirection_edge=False):
     adj = sp.random(N, N, density)
     if bidirection_edge:
         adj = adj + adj.T

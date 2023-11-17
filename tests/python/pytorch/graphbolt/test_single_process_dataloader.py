@@ -11,7 +11,7 @@ def test_DataLoader():
     N = 32
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
-    graph = gb_test_utils.rand_csc_graph(200, 0.15)
+    graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
 
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]
