@@ -185,7 +185,7 @@ class ItemShufflerAndBatcher:
             worker_id = 0
         buffer = None
         total = len(self._item_set)
-        start_offset, num_items, num_output = calculate_range(
+        start_offset, assigned_count, output_count = calculate_range(
             self._distributed,
             total,
             self._num_replicas,
@@ -197,20 +197,20 @@ class ItemShufflerAndBatcher:
             self._drop_uneven_inputs,
         )
         start = 0
-        while start < num_items:
-            end = min(start + self._buffer_size, num_items)
+        while start < assigned_count:
+            end = min(start + self._buffer_size, assigned_count)
             buffer = self._item_set[start_offset + start : start_offset + end]
             indices = torch.arange(end - start)
             if self._shuffle:
                 np.random.shuffle(indices.numpy())
             offsets = self._calculate_offsets(buffer)
             for i in range(0, len(indices), self._batch_size):
-                if num_output <= 0:
+                if output_count <= 0:
                     break
                 batch_indices = indices[
-                    i : i + min(self._batch_size, num_output)
+                    i : i + min(self._batch_size, output_count)
                 ]
-                num_output -= self._batch_size
+                output_count -= self._batch_size
                 yield self._collate_batch(buffer, batch_indices, offsets)
             buffer = None
             start = end
