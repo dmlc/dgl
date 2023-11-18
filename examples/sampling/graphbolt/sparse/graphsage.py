@@ -102,9 +102,9 @@ class SAGE(nn.Module):
         return hidden_x
 
 
-def multilayer_sample(A, fanouts, features, device, seeds):
+def multilayer_sample(A, fanouts, minibatch):
     sampled_matrices = []
-    src = seeds.seed_nodes.to(device)
+    src = minibatch.seed_nodes
 
     #####################################################################
     # (HIGHLIGHT) Using the sparse sample operator to preform random
@@ -121,10 +121,9 @@ def multilayer_sample(A, fanouts, features, device, seeds):
         sampled_matrices.insert(0, compacted_mat)
         src = row_ids
 
-    # Features (TorchBasedFeatureStore) does not support moving to device.
-    x = features.read("node", None, "feat", src.to("cpu")).to(device)
-    y = seeds.labels.to(device)
-    return sampled_matrices, x, y
+    minibatch.input_nodes = src
+    minibatch.sampled_subgraphs = sampled_matrices
+    return minibatch
 
 
 ############################################################################
@@ -132,10 +131,12 @@ def multilayer_sample(A, fanouts, features, device, seeds):
 ############################################################################
 def create_dataloader(A, fanouts, ids, features, device):
     datapipe = gb.ItemSampler(ids, batch_size=1024)
-    datapipe = datapipe.map(
-        partial(multilayer_sample, A, fanouts, features, device)
-    )
-    dataloader = gb.MultiProcessDataLoader(datapipe)
+    # Customize graphbolt sampler by sparse.
+    datapipe = datapipe.map(partial(multilayer_sample, A, fanouts))
+    # Use grapbolt to fetch features.
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    datapipe = datapipe.copy_to(device)
+    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=4)
     return dataloader
 
 
@@ -143,10 +144,13 @@ def evaluate(model, dataloader, num_classes):
     model.eval()
     ys = []
     y_hats = []
-    for sampled_matrices, x, y in dataloader:
+    for it, data in enumerate(dataloader):
         with torch.no_grad():
+            node_feature = data.node_features["feat"].float()
+            blocks = data.sampled_subgraphs
+            y = data.labels
             ys.append(y)
-            y_hats.append(model(sampled_matrices, x))
+            y_hats.append(model(blocks, node_feature))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -182,8 +186,11 @@ def train(device, A, features, dataset, num_classes, model):
     for epoch in range(10):
         model.train()
         total_loss = 0
-        for it, (sampled_matrices, x, y) in enumerate(train_dataloader):
-            y_hat = model(sampled_matrices, x)
+        for it, data in enumerate(train_dataloader):
+            node_feature = data.node_features["feat"].float()
+            blocks = data.sampled_subgraphs
+            y = data.labels
+            y_hat = model(blocks, node_feature)
             loss = F.cross_entropy(y_hat, y)
             optimizer.zero_grad()
             loss.backward()
@@ -228,7 +235,6 @@ if __name__ == "__main__":
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
     dataset = gb.BuiltinDataset("ogbn-products").load()
     g = dataset.graph
-    g = g.to(device)
     features = dataset.feature
 
     # Create GraphSAGE model.
