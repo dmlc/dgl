@@ -7,7 +7,7 @@ def test_dgl_minibatch_converter():
     N = 32
     B = 4
     itemset = gb.ItemSet(torch.arange(N), names="seed_nodes")
-    graph = gb_test_utils.rand_csc_graph(200, 0.15)
+    graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
 
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]

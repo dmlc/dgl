@@ -22,7 +22,7 @@ def test_SubgraphSampler_invoke():
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_NeighborSampler_invoke(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
@@ -43,7 +43,7 @@ def test_NeighborSampler_invoke(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_NeighborSampler_fanouts(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
@@ -67,7 +67,7 @@ def test_NeighborSampler_fanouts(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Node(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
@@ -84,7 +84,7 @@ def to_link_batch(data):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
@@ -96,7 +96,7 @@ def test_SubgraphSampler_Link(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_With_Negative(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
