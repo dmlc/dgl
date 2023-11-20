@@ -692,6 +692,7 @@ def start_multiple_dataloaders(
 
     dgl.distributed.exit_client()
 
+
 @unittest.skip("skip temporarily due to glitch")
 @pytest.mark.parametrize("num_dataloaders", [1, 4])
 @pytest.mark.parametrize("num_workers", [0, 1, 4])
