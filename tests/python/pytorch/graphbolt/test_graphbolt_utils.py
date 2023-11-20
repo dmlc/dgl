@@ -184,7 +184,7 @@ def test_incomplete_unique_dst_nodes_():
         gb.unique_and_compact_node_pairs(node_pairs, unique_dst_nodes)
 
 
-def test_compact_node_pairs_hetero():
+def test_compact_csc_format_hetero():
     N1 = torch.randint(0, 50, (30,))
     N2 = torch.randint(0, 50, (20,))
     N3 = torch.randint(0, 50, (10,))
@@ -194,7 +194,7 @@ def test_compact_node_pairs_hetero():
         "n2": N2,
         "n3": N3,
     }
-    node_pairs = {
+    csc_formats = {
         "n1:e1:n2": gb.CSCFormatBase(
             indptr=torch.arange(0, 22, 2),
             indices=N1[:20],
@@ -209,38 +209,40 @@ def test_compact_node_pairs_hetero():
         ),
     }
     dst_nodes = {"n2": N2[:10], "n3": N3}
-    original_row_ids, compacted_node_pairs = gb.compact_node_pairs(
-        node_pairs, dst_nodes
+    original_row_ids, compacted_csc_formats = gb.compact_csc_format(
+        csc_formats, dst_nodes
     )
 
     for ntype, nodes in original_row_ids.items():
         expected_nodes = expected_original_row_ids[ntype]
         assert torch.equal(nodes, expected_nodes)
-    for etype, pair in compacted_node_pairs.items():
-        indptr = pair.indptr
-        indices = pair.indices
+    for etype, csc_format in compacted_csc_formats.items():
+        indptr = csc_format.indptr
+        indices = csc_format.indices
         src_type, _, _ = gb.etype_str_to_tuple(etype)
         indices = original_row_ids[src_type][indices]
-        expected_indptr = node_pairs[etype].indptr
-        expected_indices = node_pairs[etype].indices
+        expected_indptr = csc_formats[etype].indptr
+        expected_indices = csc_formats[etype].indices
         assert torch.equal(indptr, expected_indptr)
         assert torch.equal(indices, expected_indices)
 
 
-def test_compact_node_pairs_homo():
+def test_compact_csc_format_homo():
     N = torch.randint(0, 50, (200,))
     expected_original_row_ids = N
 
-    node_pairs = gb.CSCFormatBase(indptr=torch.arange(0, 101), indices=N[100:])
-    dst_nodes = N[:100]
-    original_row_ids, compacted_node_pairs = gb.compact_node_pairs(
-        node_pairs, dst_nodes
+    csc_formats = gb.CSCFormatBase(
+        indptr=torch.arange(0, 191, 19), indices=N[10:]
+    )
+    dst_nodes = N[:10]
+    original_row_ids, compacted_csc_formats = gb.compact_csc_format(
+        csc_formats, dst_nodes
     )
 
-    indptr = compacted_node_pairs.indptr
-    indices = N[compacted_node_pairs.indices]
-    expected_indptr = node_pairs.indptr
-    expected_indices = node_pairs.indices
+    indptr = compacted_csc_formats.indptr
+    indices = N[compacted_csc_formats.indices]
+    expected_indptr = csc_formats.indptr
+    expected_indices = csc_formats.indices
     assert torch.equal(indptr, expected_indptr)
     assert torch.equal(indices, expected_indices)
     assert torch.equal(original_row_ids, expected_original_row_ids)

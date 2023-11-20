@@ -270,32 +270,25 @@ def unique_and_compact_node_pairs(
     return unique_nodes, compacted_node_pairs
 
 
-def compact_node_pairs(
-    node_pairs: Union[
-        CSCFormatBase,
-        Dict[str, CSCFormatBase],
-    ],
-    dst_nodes: Union[
-        torch.Tensor,
-        Dict[str, torch.Tensor],
-    ],
+def compact_csc_format(
+    csc_formats: Union[CSCFormatBase, Dict[str, CSCFormatBase]],
+    dst_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
 ):
     """
-    Compact node pairs and return original_row_ids (per type).
+    Compact csc formats and return original_row_ids (per type).
 
     Parameters
     ----------
-    node_pairs : Union[CSCFormatBase,
-                    Dict(str, CSCFormatBase)]
-        Node pairs representing source-destination edges.
-        - If `node_pairs` is a CSCFormatBase: It means the graph is
+    csc_formats: Union[CSCFormatBase, Dict[str, CSCFormatBase]]
+        CSC formats representing source-destination edges.
+        - If `csc_formats` is a CSCFormatBase: It means the graph is
         homogeneous. Also, indptr and indice in it should be torch.tensor
         representing source and destination pairs in csc format. And IDs inside
         are homogeneous ids.
-        - If `node_pairs` is a Dict(str, CSCFormatBase): The keys
+        - If `csc_formats` is a Dict[str, CSCFormatBase]: The keys
         should be edge type and the values should be csc format node pairs.
         And IDs inside are heterogeneous ids.
-    dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
+    dst_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
         Nodes of all destination nodes in the node pairs.
         - If `dst_nodes` is a tensor: It means the graph is homogeneous.
         - If `dst_nodes` is a dictionary: The keys are node type and the
@@ -303,10 +296,10 @@ def compact_node_pairs(
 
     Returns
     -------
-    Tuple[original_row_node_ids, compacted_node_pairs]
-        The compacted node pairs, where node IDs are replaced with mapped node
+    Tuple[original_row_node_ids, compacted_csc_formats]
+        The compacted CSC formats, where node IDs are replaced with mapped node
         IDs, and all nodes (per type).
-        "Compacted node pairs" indicates that the node IDs in the input node
+        "Compacted CSC formats" indicates that the node IDs in the input node
         pairs are replaced with mapped node IDs, where each type of node is
         mapped to a contiguous space of IDs ranging from 0 to N.
 
@@ -315,63 +308,66 @@ def compact_node_pairs(
     >>> import dgl.graphbolt as gb
     >>> N1 = torch.LongTecnsor([1, 2, 2])
     >>> N2 = torch.LongTensor([5, 6, 5])
-    >>> node_pairs = {"n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1]),
+    >>> csc_formats = {"n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1]),
     ... indices=torch.tensor([5]))}
     >>> dst_nodes = {"n1": N1[:1]}
-    >>> original_row_node_ids, compacted_node_pairs = gb.unique_and_compact_node_pairs(
-    ...     node_pairs, dst_nodes
+    >>> original_row_node_ids, compacted_csc_formats = gb.compact_csc_format(
+    ...     csc_formats, dst_nodes
     ... )
     >>> print(original_row_node_ids)
     {'n1': tensor([1]), 'n2': tensor([5])}
-    >>> print(compacted_node_pairs)
+    >>> print(compacted_csc_formats)
     {"n2:e2:n1": CSCFormatBase(indptr=tensor([0, 1]),
     ... indices=tensor([0]))}
     """
-    is_homogeneous = not isinstance(node_pairs, dict)
-    compacted_node_pairs = {}
+    is_homogeneous = not isinstance(csc_formats, dict)
+    compacted_csc_formats = {}
     if is_homogeneous:
         if dst_nodes is not None:
             assert isinstance(
                 dst_nodes, torch.Tensor
             ), "Edge type not supported in homogeneous graph."
-            assert node_pairs.indptr[-1] == len(
-                node_pairs.indices
+            assert csc_formats.indptr[-1] == len(
+                csc_formats.indices
             ), "The last element of indptr should be the same as the length of indices."
             assert len(dst_nodes) + 1 == len(
-                node_pairs.indptr
+                csc_formats.indptr
             ), "The seed nodes should correspond to indptr."
         offset = dst_nodes.size(0)
-        original_row_ids = torch.cat((dst_nodes, node_pairs.indices))
-        compacted_node_pairs = CSCFormatBase(
-            indptr=node_pairs.indptr,
-            indices=(torch.arange(0, node_pairs.indices.size(0)) + offset),
+        original_row_ids = torch.cat((dst_nodes, csc_formats.indices))
+        compacted_csc_formats = CSCFormatBase(
+            indptr=csc_formats.indptr,
+            indices=(torch.arange(0, csc_formats.indices.size(0)) + offset),
         )
     else:
         original_row_ids = copy.deepcopy(dst_nodes)
-        for etype, pair in node_pairs.items():
-            assert pair.indptr[-1] == len(
-                pair.indices
+        for etype, csc_format in csc_formats.items():
+            assert csc_format.indptr[-1] == len(
+                csc_format.indices
             ), "The last element of indptr should be the same as the length of indices."
             src_type, _, dst_type = etype_str_to_tuple(etype)
             assert len(dst_nodes[dst_type]) + 1 == len(
-                pair.indptr
+                csc_format.indptr
             ), "The seed nodes should correspond to indptr."
             offset = original_row_ids.get(src_type, torch.tensor([])).size(0)
             original_row_ids[src_type] = torch.cat(
                 (
                     original_row_ids.get(
-                        src_type, torch.tensor([], dtype=pair.indices.dtype)
+                        src_type,
+                        torch.tensor([], dtype=csc_format.indices.dtype),
                     ),
-                    pair.indices,
+                    csc_format.indices,
                 )
             )
-            compacted_node_pairs[etype] = CSCFormatBase(
-                indptr=pair.indptr,
+            compacted_csc_formats[etype] = CSCFormatBase(
+                indptr=csc_format.indptr,
                 indices=(
                     torch.arange(
-                        0, pair.indices.size(0), dtype=pair.indices.dtype
+                        0,
+                        csc_format.indices.size(0),
+                        dtype=csc_format.indices.dtype,
                     )
                     + offset
                 ),
             )
-    return original_row_ids, compacted_node_pairs
+    return original_row_ids, compacted_csc_formats

@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import functional_datapipe
 
 from ..subgraph_sampler import SubgraphSampler
-from ..utils import compact_node_pairs, unique_and_compact_node_pairs
+from ..utils import compact_csc_format, unique_and_compact_node_pairs
 from .sampled_subgraph_impl import FusedSampledSubgraphImpl, SampledSubgraphImpl
 
 
@@ -131,10 +131,14 @@ class NeighborSampler(SubgraphSampler):
             else:
                 (
                     original_row_node_ids,
-                    compacted_node_pairs,
-                ) = compact_node_pairs(subgraph.node_pairs, seeds)
+                    compacted_csc_format,
+                ) = compact_csc_format(subgraph.node_pairs, seeds)
+                # [TODO] For node_pairs is defined in SampledSubgraph, which is
+                # SampledSubgraph's parent class, and it's still inherited by
+                # other classes, the name cannot be changed currently. This
+                # part will be cleaned up later.
                 subgraph = SampledSubgraphImpl(
-                    node_pairs=compacted_node_pairs,
+                    node_pairs=compacted_csc_format,
                     original_column_node_ids=seeds,
                     original_row_node_ids=original_row_node_ids,
                     original_edge_ids=subgraph.original_edge_ids,

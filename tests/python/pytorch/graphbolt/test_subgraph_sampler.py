@@ -307,26 +307,26 @@ def test_SubgraphSampler_without_dedpulication_Hetero(labor):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     datapipe = Sampler(item_sampler, graph, fanouts, deduplicate=False)
-    node_pairs = [
+    csc_formats = [
         {
-            "n1:e1:n2": {
-                "indptr": torch.tensor([0, 2, 4]),
-                "indices": torch.tensor([4, 5, 6, 7]),
-            },
-            "n2:e2:n1": {
-                "indptr": torch.tensor([0, 2, 4, 6, 8]),
-                "indices": torch.tensor([2, 3, 4, 5, 6, 7, 8, 9]),
-            },
+            "n1:e1:n2": gb.CSCFormatBase(
+                indptr=torch.tensor([0, 2, 4]),
+                indices=torch.tensor([4, 5, 6, 7]),
+            ),
+            "n2:e2:n1": gb.CSCFormatBase(
+                indptr=torch.tensor([0, 2, 4, 6, 8]),
+                indices=torch.tensor([2, 3, 4, 5, 6, 7, 8, 9]),
+            ),
         },
         {
-            "n1:e1:n2": {
-                "indptr": torch.tensor([0, 2, 4]),
-                "indices": torch.tensor([0, 1, 2, 3]),
-            },
-            "n2:e2:n1": {
-                "indptr": torch.tensor([0]),
-                "indices": torch.tensor([], dtype=torch.int64),
-            },
+            "n1:e1:n2": gb.CSCFormatBase(
+                indptr=torch.tensor([0, 2, 4]),
+                indices=torch.tensor([0, 1, 2, 3]),
+            ),
+            "n2:e2:n1": gb.CSCFormatBase(
+                indptr=torch.tensor([0]),
+                indices=torch.tensor([], dtype=torch.int64),
+            ),
         },
     ]
     original_column_node_ids = [
@@ -364,9 +364,9 @@ def test_SubgraphSampler_without_dedpulication_Hetero(labor):
             for etype in ["n1:e1:n2", "n2:e2:n1"]:
                 assert torch.equal(
                     sampled_subgraph.node_pairs[etype].indices,
-                    node_pairs[step][etype]["indices"],
+                    csc_formats[step][etype].indices,
                 )
                 assert torch.equal(
                     sampled_subgraph.node_pairs[etype].indptr,
-                    node_pairs[step][etype]["indptr"],
+                    csc_formats[step][etype].indptr,
                 )
