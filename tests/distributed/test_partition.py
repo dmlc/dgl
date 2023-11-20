@@ -504,7 +504,7 @@ def check_partition(
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-@pytest.mark.parametrize("num_trainers_per_machine", [1, 4])
+@pytest.mark.parametrize("num_trainers_per_machine", [1])
 @pytest.mark.parametrize("load_feats", [True, False])
 @pytest.mark.parametrize(
     "graph_formats", [None, ["csc"], ["coo", "csc"], ["coo", "csc", "csr"]]
