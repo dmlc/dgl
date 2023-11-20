@@ -71,6 +71,8 @@ def etype_str_to_tuple(c_etype):
     >>> print(c_etype)
     ("user", "like", "item")
     """
+    if isinstance(c_etype, tuple):
+        return c_etype
     ret = tuple(c_etype.split(CANONICAL_ETYPE_DELIMITER))
     assert len(ret) == 3, (
         "Passed-in canonical etype should be in format of 'str:str:str'. "

@@ -2,7 +2,6 @@ import multiprocessing as mp
 import os
 import tempfile
 import time
-import unittest
 
 import backend as F
 import dgl
@@ -311,8 +310,8 @@ def check_neg_dataloader(g, num_server, num_workers):
             assert p.exitcode == 0
 
 
-@pytest.mark.parametrize("num_server", [1])
-@pytest.mark.parametrize("num_workers", [0])
+@pytest.mark.parametrize("num_server", [3])
+@pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
 @pytest.mark.parametrize("num_groups", [1])
 def test_dist_dataloader(num_server, num_workers, drop_last, num_groups):
@@ -634,8 +633,8 @@ def create_random_hetero():
     return g
 
 
-@pytest.mark.parametrize("num_server", [1])
-@pytest.mark.parametrize("num_workers", [0])
+@pytest.mark.parametrize("num_server", [3])
+@pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
 def test_dataloader(num_server, num_workers, dataloader_type):
     reset_envs()
@@ -645,8 +644,8 @@ def test_dataloader(num_server, num_workers, dataloader_type):
     check_dataloader(g, num_server, num_workers, dataloader_type)
 
 
-@pytest.mark.parametrize("num_server", [1])
-@pytest.mark.parametrize("num_workers", [0])
+@pytest.mark.parametrize("num_server", [3])
+@pytest.mark.parametrize("num_workers", [0, 4])
 def test_neg_dataloader(num_server, num_workers):
     reset_envs()
     g = CitationGraphDataset("cora")[0]
@@ -693,7 +692,6 @@ def start_multiple_dataloaders(
     dgl.distributed.exit_client()
 
 
-@unittest.skip("skip temporarily due to glitch")
 @pytest.mark.parametrize("num_dataloaders", [1, 4])
 @pytest.mark.parametrize("num_workers", [0, 1, 4])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
