@@ -402,7 +402,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         for ntype, ids in nodes.items():
             ntype_id = self.metadata.node_type_to_id[ntype]
             homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
-        return torch.cat(homogeneous_nodes).to(self.csc_indices.dtype)
+        return torch.cat(homogeneous_nodes)
 
     def _convert_to_sampled_subgraph(
         self,
@@ -582,9 +582,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
-        assert (
-            nodes.dtype == self.csc_indptr.dtype
-        ), "Nodes dtype is expected to be same as indptr."
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
         expected_fanout_len = 1
