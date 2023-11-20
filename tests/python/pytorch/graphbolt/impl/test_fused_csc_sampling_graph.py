@@ -630,7 +630,7 @@ def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
     graph = gb.from_fused_csc(indptr, indices)
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.tensor([1, 3, 4], dtype=indptr_dtype)
+    nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts=torch.LongTensor([2]))
 

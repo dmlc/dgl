@@ -335,7 +335,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
         auto num_picked_neighbors_data_ptr =
             num_picked_neighbors_per_node.data_ptr<scalar_t>();
         num_picked_neighbors_data_ptr[0] = 0;
-        const auto nodes_data_ptr = nodes.data_ptr<scalar_t>();
+        const auto nodes_data_ptr = nodes.data_ptr<indices_.scalar_type>();
 
         // Step 1. Calculate pick number of each node.
         torch::parallel_for(
