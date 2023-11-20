@@ -87,7 +87,7 @@ def _read_graph(schema):
     g.edata["orig_id"] = g.edata[dgl.EID]
 
     # read features here.
-    for ntype in schema[constants.STR_NODE_TYPE]:
+    for ntype in schema[constants.STR_NUM_NODES_PER_TYPE]:
         if ntype in schema[constants.STR_NODE_DATA]:
             for featname, featdata in schema[constants.STR_NODE_DATA][
                 ntype
