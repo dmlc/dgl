@@ -683,8 +683,8 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
 
     # Sample on both node types.
     nodes = {
-        "n1": torch.tensor([0], dtype=indptr_dtype),
-        "n2": torch.tensor([0], dtype=indptr_dtype),
+        "n1": torch.tensor([0], dtype=indices_dtype),
+        "n2": torch.tensor([0], dtype=indices_dtype),
     }
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
