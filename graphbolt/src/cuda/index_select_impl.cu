@@ -6,6 +6,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <torch/script.h>
 
+#include <cub/cub.cuh>
 #include <numeric>
 
 #include "../index_select.h"
@@ -13,6 +14,68 @@
 
 namespace graphbolt {
 namespace ops {
+
+static bool GetEnv(const std::string& env) {
+  // Get the environment variable.
+  // If the environment variable is not set or set to 0, return false.
+  // Otherwise, return true.
+  const char* val = std::getenv(env.c_str());
+  if (val == nullptr) {
+    return false;
+  }
+  if (strcmp(val, "0") == 0) {
+    return false;
+  }
+  return true;
+}
+
+template <typename T>
+int NumberOfBits(const T& range) {
+  if (range <= 1) {
+    // ranges of 0 or 1 require no bits to store
+    return 0;
+  }
+
+  int bits = 1;
+  while (bits < static_cast<int>(sizeof(T) * 8) && (1 << bits) < range) {
+    ++bits;
+  }
+
+  return bits;
+}
+
+std::pair<torch::Tensor, torch::Tensor> Sort(
+    torch::Tensor input, int num_bits) {
+  using IdType = int64_t;
+  TORCH_CHECK(
+      input.element_size() == sizeof(IdType),
+      "Sort only supports int64_t input");
+  int64_t n_items = input.size(0);
+  auto orig_idx = torch::arange(n_items, input.options());
+  auto sorted_array = torch::empty_like(input);
+  auto sorted_idx = torch::empty_like(orig_idx);
+  const IdType* keys_in = input.data_ptr<IdType>();
+  const int64_t* values_in = orig_idx.data_ptr<int64_t>();
+  IdType* keys_out = sorted_array.data_ptr<IdType>();
+  int64_t* values_out = sorted_idx.data_ptr<int64_t>();
+  cudaStream_t stream = 0;
+  if (num_bits == 0) {
+    num_bits = sizeof(IdType) * 8;
+  }
+  size_t workspace_size = 0;
+  cub::DeviceRadixSort::SortPairs(
+      nullptr, workspace_size, keys_in, keys_out, values_in, values_out,
+      n_items, 0, num_bits, stream);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  auto temporary_storage =
+      torch::empty(workspace_size, input.options().dtype(torch::kByte));
+  void* workspace = temporary_storage.data_ptr();
+  cub::DeviceRadixSort::SortPairs(
+      workspace, workspace_size, keys_in, keys_out, values_in, values_out,
+      n_items, 0, num_bits, stream);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return std::make_pair(sorted_array, sorted_idx);
+}
 
 /** @brief Index select operator implementation for feature size 1. */
 template <typename DType, typename IdType>
@@ -109,15 +172,28 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   DType* input_ptr = input.data_ptr<DType>();
   DType* ret_ptr = ret.data_ptr<DType>();
 
-  // Sort the index to improve the memory access pattern.
-  torch::Tensor sorted_index, permutation;
-  std::tie(sorted_index, permutation) = torch::sort(index);
-  const IdType* index_sorted_ptr = sorted_index.data_ptr<IdType>();
-  const int64_t* permutation_ptr = permutation.data_ptr<int64_t>();
+  const IdType* index_sorted_ptr = index.data_ptr<IdType>();
+  const int64_t* permutation_ptr = nullptr;
+  if (GetEnv("USE_PERM")) {
+    // Sort the index to improve the memory access pattern.
+    torch::Tensor sorted_index, permutation;
+    if (GetEnv("USE_TORCH_SORT"))
+      std::tie(sorted_index, permutation) = torch::sort(index);
+    else {
+      int num_bits = NumberOfBits(input_len);
+      std::tie(sorted_index, permutation) = Sort(index, num_bits);
+    }
+    if (index.is_pinned()) {
+      sorted_index = sorted_index.pin_memory();
+      permutation = permutation.pin_memory();
+    }
+    index_sorted_ptr = sorted_index.data_ptr<IdType>();
+    permutation_ptr = permutation.data_ptr<int64_t>();
+  }
 
   cudaStream_t stream = 0;
 
-  if (feature_size == 1) {
+  if (feature_size == 1 && GetEnv("USE_SINGLE")) {
     // Use a single thread to process each output row to avoid wasting threads.
     const int num_threads = cuda::FindNumThreads(return_len);
     const int num_blocks = (return_len + num_threads - 1) / num_threads;
@@ -131,7 +207,8 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
       block.y <<= 1;
     }
     const dim3 grid((return_len + block.y - 1) / block.y);
-    if (feature_size * sizeof(DType) <= GPU_CACHE_LINE_SIZE) {
+    // if (feature_size * sizeof(DType) <= GPU_CACHE_LINE_SIZE) {
+    if (!GetEnv("USE_ALIGN")) {
       // When feature size is smaller than GPU cache line size, use unaligned
       // version for less SM usage, which is more resource efficient.
       IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
