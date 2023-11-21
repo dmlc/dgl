@@ -5661,6 +5661,9 @@ class DGLGraph(object):
         If the graph is already on the specified device, the function directly returns it.
         Otherwise, it returns a cloned graph on the specified device.
 
+        Note that data of node and edge features are not moved to the specified
+        device before being accessed or `materialize_data()` is called.
+
         Parameters
         ----------
         device : Framework-specific device context object
@@ -5751,6 +5754,21 @@ class DGLGraph(object):
         to
         """
         return self.to(F.cpu())
+
+    def materialize_data(self):
+        """Materialize the graph data on the current device.
+
+        This method is a no-op if the graph data is already materialized.
+
+        Returns
+        -------
+        DGLGraph
+            The graph on the current device.
+        """
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.data
+        return self
 
     def pin_memory_(self):
         """Pin the graph structure and node/edge data to the page-locked memory for
