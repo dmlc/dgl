@@ -29,16 +29,30 @@ To take advantage of optimizations *tcmalloc* provides, install it on your syste
 OpenMP settings
 ---------------------------
 
-During training on CPU, the training and dataloading part need to be maintained simultaneously.
-Best performance of parallelization in OpenMP
-can be achieved by setting up the optimal number of working threads and dataloading workers.
-Nodes with high number of CPU cores may benefit from higher number of dataloading workers.
-A good starting point could be setting num_threads=4 in Dataloader constructor for nodes with 32 cores or more.
-If number of cores is rather small, the best performance might be achieved with just one
-dataloader worker or even with dataloader num_threads=0 for dataloading and trainig performed
-in the same process
+As `OpenMP` is the default parallel backend, we could control performance
+including sampling and training via environment variable `OMP_NUM_THREADS` or
+`torch.set_num_threads() <https://pytorch.org/docs/stable/generated/torch.set_num_threads.html>`__.
+
+If number of OpenMP threads is not set and `num_workers` in dataloader is set
+to 0, the OpenMP runtime typically use the number of available CPU cores by
+default. This works well for most cases, and is also the default behavior in DGL.
+
+If `num_workers` in dataloader is set to greater than 0, the number of
+OpenMP threads will be set to **1** for each worker process. This is the
+default behavior in PyTorch. In this case, we can set the number of OpenMP
+threads to the number of CPU cores in the main process.
+
+Performance tuning is highly dependent on the workload and hardware
+configuration. We recommend users to try different settings and choose the
+best one for their own cases.
 
 **Dataloader CPU affinity**
+
+.. note::
+
+    This feature is available for `dgl.dataloading.DataLoader` only. Not
+    available for dataloaders in `dgl.graphbolt` yet.
+
 
 If number of dataloader workers is more than 0, please consider using **use_cpu_affinity()** method
 of DGL Dataloader class, it will generally result in significant performance improvement for training.
