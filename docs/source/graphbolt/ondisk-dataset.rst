@@ -3,9 +3,10 @@
 Prepare dataset
 ===============
 
-**GraphBolt** provides the ``OnDiskDataset`` class to help user organize graph
-strucutre, feature data and tasks. ``OnDiskDataset`` is designed to efficiently
-handle large graphs that do not fit into memory by storing them on disk.
+**GraphBolt** provides the ``OnDiskDataset`` class to help user organize plain
+data of graph strucutre, feature data and tasks. ``OnDiskDataset`` is also
+designed to efficiently handle large graphs and features that do not fit into
+memory by storing them on disk.
 
 To create an ``OnDiskDataset`` object, you need to organize all the data including
 graph structure, feature data and tasks into a directory. The directory should
@@ -29,9 +30,9 @@ the ``load`` method.
     dataset.load()
 
 The reason why we separate the ``OnDiskDataset`` object creation and data loading
-is that users may want to change some fields in the ``metadata.yaml`` file before
-loading the data. For example, users may want to change the path of the feature
-data files to point to a different directory. In this case, users can just
+is that you may want to change some fields in the ``metadata.yaml`` file before
+loading the data. For example, you may want to change the path of the feature
+data files to point to a different directory. In this case, you can just
 modify the path via ``dataset.yaml_data`` directly. Then call the ``load`` method
 again to load the data.
 
@@ -49,9 +50,9 @@ for sampling. The returned ``feature`` is a ``TorchBasedFeatureStore`` object,
 which will be used for feature lookup. The returned ``tasks`` is a list of
 ``Task`` objects, which will be used for training and evaluation.
 
-Now let's show data folder structure and ``metadata.yaml`` file for homogeneous
-graphs and heterogeneous graphs respectively. If you want to know the full YAML
-specification, please refer to the `Full YAML specification`_ section.
+The following examples show data folder structure and ``metadata.yaml`` file for
+homogeneous graphs and heterogeneous graphs respectively. If you want to know
+the full YAML specification, please refer to the `Full YAML specification`_ section.
 
 Homogeneous graph
 -----------------
@@ -511,29 +512,29 @@ and ``[num_edges, 10]`` respectively like below.
 
     user_follow_user_feat.npy
       
-      [[0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
-      [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-      [2. 2. 2. 2. 2. 2. 2. 2. 2. 2.]
-      [3. 3. 3. 3. 3. 3. 3. 3. 3. 3.]
-      [4. 4. 4. 4. 4. 4. 4. 4. 4. 4.]
-      [5. 5. 5. 5. 5. 5. 5. 5. 5. 5.]
-      [6. 6. 6. 6. 6. 6. 6. 6. 6. 6.]
-      [7. 7. 7. 7. 7. 7. 7. 7. 7. 7.]
-      [8. 8. 8. 8. 8. 8. 8. 8. 8. 8.]
-      [9. 9. 9. 9. 9. 9. 9. 9. 9. 9.]]
+    [[0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
+     [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+     [2. 2. 2. 2. 2. 2. 2. 2. 2. 2.]
+     [3. 3. 3. 3. 3. 3. 3. 3. 3. 3.]
+     [4. 4. 4. 4. 4. 4. 4. 4. 4. 4.]
+     [5. 5. 5. 5. 5. 5. 5. 5. 5. 5.]
+     [6. 6. 6. 6. 6. 6. 6. 6. 6. 6.]
+     [7. 7. 7. 7. 7. 7. 7. 7. 7. 7.]
+     [8. 8. 8. 8. 8. 8. 8. 8. 8. 8.]
+     [9. 9. 9. 9. 9. 9. 9. 9. 9. 9.]]
 
     user_click_item_feat.npy
       
-      [[0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
-      [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-      [2. 2. 2. 2. 2. 2. 2. 2. 2. 2.]
-      [3. 3. 3. 3. 3. 3. 3. 3. 3. 3.]
-      [4. 4. 4. 4. 4. 4. 4. 4. 4. 4.]
-      [5. 5. 5. 5. 5. 5. 5. 5. 5. 5.]
-      [6. 6. 6. 6. 6. 6. 6. 6. 6. 6.]
-      [7. 7. 7. 7. 7. 7. 7. 7. 7. 7.]
-      [8. 8. 8. 8. 8. 8. 8. 8. 8. 8.]
-      [9. 9. 9. 9. 9. 9. 9. 9. 9. 9.]]
+    [[0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
+     [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+     [2. 2. 2. 2. 2. 2. 2. 2. 2. 2.]
+     [3. 3. 3. 3. 3. 3. 3. 3. 3. 3.]
+     [4. 4. 4. 4. 4. 4. 4. 4. 4. 4.]
+     [5. 5. 5. 5. 5. 5. 5. 5. 5. 5.]
+     [6. 6. 6. 6. 6. 6. 6. 6. 6. 6.]
+     [7. 7. 7. 7. 7. 7. 7. 7. 7. 7.]
+     [8. 8. 8. 8. 8. 8. 8. 8. 8. 8.]
+     [9. 9. 9. 9. 9. 9. 9. 9. 9. 9.]]
 
 For the ``tasks`` field, we have two tasks: ``node_classification`` and
 ``link_prediction``. For each task, we have three sets: ``train_set``,
@@ -777,51 +778,52 @@ The ``feature_data`` field is used to specify the feature data. It is a list of
 
 The ``tasks`` field is used to specify the tasks. It is a list of ``task``
 objects. Each ``task`` object has at least three fields: ``train_set``,
-``validation_set``, ``test_set``. And users are free to add other fields
-such as ``num_classes``.
+``validation_set``, ``test_set``. And you are free to add other fields
+such as ``num_classes`` and all these fields will be passed to the
+``Task.metadata`` object.
 
  - ``name``: ``string``, optional
 
    The ``name`` field is used to specify the name of the task. It is user-defined.
-  - ``num_classes``: ``int``, optional
+ - ``num_classes``: ``int``, optional
 
     The ``num_classes`` field is used to specify the number of classes of the task.
-  - ``train_set``: ``list``
+ - ``train_set``: ``list``
 
     The ``train_set`` field is used to specify the training set. It is a list of
     ``set`` objects. Each ``set`` object has two fields: ``type`` and ``data``.
-    - ``type``: ``string``, optional
+  - ``type``: ``string``, optional
 
       The ``type`` field is used to specify the node/edge type of the set. It is
       ``null`` for homogeneous graphs. For heterogeneous graphs, it is the node
       or edge type.
-    - ``data``: ``list``
+  - ``data``: ``list``
 
       The ``data`` field is used to load ``train_set``. It is a list of ``data``
       objects. Each ``data`` object has four fields: ``name``, ``format``,
       ``in_memory`` and ``path``.
 
-      - ``name``: ``string``
+    - ``name``: ``string``
 
         The ``name`` field is used to specify the name of the data. It is mandatory
         and used to specify the data fields of ``MiniBatch`` for sampling. It can
         be either ``seed_nodes``, ``labels``, ``node_pairs``, ``negative_srcs`` or 
         ``negative_dsts``. If any other name is used, it will be added into the
         ``MiniBatch`` data fields.
-      - ``format``: ``string``
+    - ``format``: ``string``
 
         The ``format`` field is used to specify the format of the data. It can be
         either ``numpy`` or ``torch``.
-      - ``in_memory``: ``bool``, optional
+    - ``in_memory``: ``bool``, optional
 
         The ``in_memory`` field is used to specify whether the data is loaded into
         memory. It can be either ``true`` or ``false``. Default is ``true``.
-      - ``path``: ``string``
+    - ``path``: ``string``
 
         The ``path`` field is used to specify the path of the data. It is relative
         to the directory of ``metadata.yaml`` file.
-  - ``validation_set``: ``list``
-  - ``test_set``: ``list``
+ - ``validation_set``: ``list``
+ - ``test_set``: ``list``
 
     The ``validation_set`` and ``test_set`` fields are used to specify the
     validation set and test set respectively. They are similar to the
