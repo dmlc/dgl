@@ -20,6 +20,7 @@ from .sampled_subgraph import *
 from .subgraph_sampler import *
 from .utils import (
     add_reverse_edges,
+    compact_csc_format,
     exclude_seed_edges,
     unique_and_compact,
     unique_and_compact_node_pairs,
