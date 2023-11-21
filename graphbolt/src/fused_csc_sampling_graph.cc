@@ -335,13 +335,12 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
         auto num_picked_neighbors_data_ptr =
             num_picked_neighbors_per_node.data_ptr<scalar_t>();
         num_picked_neighbors_data_ptr[0] = 0;
-        const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
 
         // Step 1. Calculate pick number of each node.
         torch::parallel_for(
             0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
               for (int64_t i = begin; i < end; ++i) {
-                const auto nid = nodes_data_ptr[i];
+                const auto nid = nodes[i].item<int64_t>();
                 TORCH_CHECK(
                     nid >= 0 && nid < NumNodes(),
                     "The seed nodes' IDs should fall within the range of the "
@@ -356,7 +355,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 
         // Step 2. Calculate prefix sum to get total length and offsets of each
         // node. It's also the indptr of the generated subgraph.
-        subgraph_indptr = torch::cumsum(num_picked_neighbors_per_node, 0);
+        subgraph_indptr =
+            num_picked_neighbors_per_node.cumsum(0, indptr_.scalar_type());
 
         // Step 3. Allocate the tensor for picked neighbors.
         const auto total_length =
@@ -374,7 +374,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
         torch::parallel_for(
             0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
               for (int64_t i = begin; i < end; ++i) {
-                const auto nid = nodes_data_ptr[i];
+                const auto nid = nodes[i].item<int64_t>();
                 const auto offset = indptr_data[nid];
                 const auto num_neighbors = indptr_data[nid + 1] - offset;
                 const auto picked_number = num_picked_neighbors_data_ptr[i + 1];

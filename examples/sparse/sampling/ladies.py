@@ -1,14 +1,14 @@
 """
-This script demonstrate how to use dgl sparse library to sample on graph and 
-train model. It trains and tests a GraphSAGE model using the sparse sample and 
-compact operators to sample submatrix from the whole matrix.
+This script demonstrates how to use dgl sparse library to sample on graph and 
+train model. It trains and tests a LADIES model using the sparse power and 
+sp_broadcast_v operators to sample submatrix from the whole matrix.
 
 This flowchart describes the main functional sequence of the provided example.
 main
 │
 ├───> Load and preprocess full dataset
 │
-├───> Instantiate SAGE model
+├───> Instantiate LADIES model
 │
 ├───> train
 │     │
@@ -16,7 +16,7 @@ main
 │           │
 │           ├───> Sample submatrix
 │           │
-│           └───> SAGE.forward
+│           └───> LADIES.forward
 └───> test
       │
       ├───> Sample submatrix
@@ -32,13 +32,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
 from dgl.data import AsNodePredDataset
+from dgl.sparse import sp_broadcast_v
 from ogb.nodeproppred import DglNodePropPredDataset
 
 
 class SAGEConv(nn.Module):
-    r"""GraphSAGE layer from `Inductive Representation Learning on
-    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__
-    """
+    r"""LADIES layer from `Layer-Dependent Importance Sampling
+    for Training Deep and Large Graph Convolutional Networks
+    <https://arxiv.org/abs/1911.07323.pdf>`__"""
 
     def __init__(
         self,
@@ -74,14 +75,15 @@ class SAGEConv(nn.Module):
         return rst
 
 
-class SAGE(nn.Module):
+class LADIES(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
         self.layers = nn.ModuleList()
-        # Three-layer GraphSAGE-gcn.
+        # Three-layer LADIES.
         self.layers.append(SAGEConv(in_size, hid_size))
         self.layers.append(SAGEConv(hid_size, hid_size))
         self.layers.append(SAGEConv(hid_size, out_size))
+
         self.dropout = nn.Dropout(0.5)
         self.hid_size = hid_size
         self.out_size = out_size
@@ -102,19 +104,33 @@ def multilayer_sample(A, fanouts, seeds, ndata):
     sampled_matrices = []
     src = seeds
 
-    #####################################################################
-    # (HIGHLIGHT) Using the sparse sample operator to preform random
-    # sampling on the neighboring nodes of the seeds nodes. The sparse
-    # compact operator is then employed to compact and relabel the sampled
-    # matrix, resulting in the sampled matrix and the relabel index.
-    #####################################################################
+    #########################################################################
+    # (HIGHLIGHT) Using the sparse sample operator to preform LADIES sampling
+    # algorithm from the neighboring nodes of the seeds nodes.
+    # The sparse sp_power operator is applied to compute sample probability,
+    # and sp_broadcast_v is then employed to normalize weight by performing
+    # division operations on column.
+    #########################################################################
 
     for fanout in fanouts:
         # Sample neighbors.
-        sampled_matrix = A.sample(1, fanout, ids=src).coalesce()
-        # Compact the sampled matrix.
-        compacted_mat, row_ids = sampled_matrix.compact(0)
-        sampled_matrices.insert(0, compacted_mat)
+        sub_A = A.index_select(1, src)
+        # Compute probability weight.
+        row_probs = (sub_A**2).sum(1)
+        row_probs = row_probs / row_probs.sum(0)
+        # Layer-wise sample nodes.
+        row_ids = torch.multinomial(row_probs, fanout, replacement=False)
+        # Add self-loop.
+        row_ids = torch.cat((row_ids, src), 0).unique()
+        sampled_matrix = sub_A.index_select(0, row_ids)
+        # Normalize edge weights.
+        div_matirx = sp_broadcast_v(
+            sampled_matrix, row_probs[row_ids].reshape(-1, 1), "truediv"
+        )
+        div_matirx = sp_broadcast_v(div_matirx, div_matirx.sum(0), "truediv")
+
+        # Save the sampled matrix.
+        sampled_matrices.insert(0, div_matirx)
         src = row_ids
 
     x = ndata["feat"][src]
@@ -126,8 +142,8 @@ def evaluate(model, A, dataloader, ndata, num_classes):
     model.eval()
     ys = []
     y_hats = []
-    fanouts = [10, 10, 10]
-    for it, seeds in enumerate(dataloader):
+    fanouts = [4000, 4000, 4000]
+    for seeds in dataloader:
         with torch.no_grad():
             sampled_matrices, x, y = multilayer_sample(A, fanouts, seeds, ndata)
             ys.append(y)
@@ -160,8 +176,8 @@ def train(device, A, ndata, dataset, model):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
 
-    fanouts = [10, 10, 10]
-    for epoch in range(10):
+    fanouts = [4000, 4000, 4000]
+    for epoch in range(20):
         model.train()
         total_loss = 0
         for it, seeds in enumerate(train_dataloader):
@@ -182,7 +198,7 @@ def train(device, A, ndata, dataset, model):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="GraphSAGE")
+    parser = argparse.ArgumentParser(description="LADIESConv")
     parser.add_argument(
         "--mode",
         default="gpu",
@@ -195,13 +211,13 @@ if __name__ == "__main__":
     print(f"Training in {args.mode} mode.")
 
     #####################################################################
-    # (HIGHLIGHT) This example implements a graphSAGE algorithm by sparse
+    # (HIGHLIGHT) This example implements a LADIES algorithm by sparse
     # operators, which involves sampling a subgraph from a full graph and
     # conducting training.
     #
     # First, the whole graph is loaded onto the CPU or GPU and transformed
     # to sparse matrix. To obtain the training subgraph, it samples three
-    # submatrices by seed nodes, which contains their randomly sampled
+    # submatrices by seed nodes, which contains their layer-wise sampled
     # 1-hop, 2-hop, and 3-hop neighbors. Then, the features of the
     # subgraph are input to the network for training.
     #####################################################################
@@ -211,23 +227,30 @@ if __name__ == "__main__":
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
     dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
     g = dataset[0]
-    g = g.to(device)
 
-    # Create GraphSAGE model.
+    # Create LADIES model.
     in_size = g.ndata["feat"].shape[1]
     out_size = dataset.num_classes
-    model = SAGE(in_size, 256, out_size).to(device)
+    model = LADIES(in_size, 256, out_size).to(device)
 
     # Create sparse.
     indices = torch.stack(g.edges())
     N = g.num_nodes()
-    A = dglsp.spmatrix(indices, shape=(N, N))
+    A = dglsp.spmatrix(indices, shape=(N, N)).coalesce()
+    I = dglsp.identity(A.shape)
+
+    # Initialize laplacian matrix.
+    A_hat = A + I
+    D_hat = dglsp.diag(A_hat.sum(1)) ** -0.5
+    A_norm = D_hat @ A_hat @ D_hat
+    A_norm = A_norm.to(device)
+    g = g.to(device)
 
     # Model training.
     print("Training...")
-    train(device, A, g.ndata, dataset, model)
+    train(device, A_norm, g.ndata, dataset, model)
 
     # Test the model.
     print("Testing...")
-    acc = validate(device, A, g.ndata, dataset, model, batch_size=4096)
+    acc = validate(device, A_norm, g.ndata, dataset, model, batch_size=2048)
     print(f"Test accuracy {acc:.4f}")
