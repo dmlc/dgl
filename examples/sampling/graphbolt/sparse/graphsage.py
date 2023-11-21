@@ -127,7 +127,7 @@ def multilayer_sample(A, fanouts, minibatch):
 
 
 ############################################################################
-# (HIGHLIGHT) Create a multi process dataloader with dgl graphbolt package.
+# (HIGHLIGHT) Create a multi-process dataloader with dgl graphbolt package.
 ############################################################################
 def create_dataloader(A, fanouts, ids, features, device):
     datapipe = gb.ItemSampler(ids, batch_size=1024)
