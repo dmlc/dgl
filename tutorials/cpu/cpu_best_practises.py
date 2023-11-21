@@ -30,8 +30,7 @@ OpenMP settings
 ---------------------------
 
 As `OpenMP` is the default parallel backend, we could control performance
-including sampling and training via environment variable `OMP_NUM_THREADS` or
-`torch.set_num_threads() <https://pytorch.org/docs/stable/generated/torch.set_num_threads.html>`__.
+including sampling and training via `dgl.utils.set_num_threads()`.
 
 If number of OpenMP threads is not set and `num_workers` in dataloader is set
 to 0, the OpenMP runtime typically use the number of available CPU cores by
