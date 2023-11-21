@@ -321,7 +321,6 @@ def compact_csc_format(
     ... indices=tensor([0]))}
     """
     is_homogeneous = not isinstance(csc_formats, dict)
-    compacted_csc_formats = {}
     if is_homogeneous:
         if dst_nodes is not None:
             assert isinstance(
@@ -340,6 +339,7 @@ def compact_csc_format(
             indices=(torch.arange(0, csc_formats.indices.size(0)) + offset),
         )
     else:
+        compacted_csc_formats = {}
         original_row_ids = copy.deepcopy(dst_nodes)
         for etype, csc_format in csc_formats.items():
             assert csc_format.indptr[-1] == len(
