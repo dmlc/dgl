@@ -64,8 +64,7 @@ struct COOMatrix {
         col(carr),
         data(darr),
         row_sorted(rsorted),
-        col_sorted(csorted),
-        is_pinned(pin_memory) {
+        col_sorted(csorted) {
     CheckValidity();
   }
 
@@ -131,10 +130,13 @@ struct COOMatrix {
            aten::IsNullArray(data);
   }
 
-  inline bool IsPinned() const {
-    return (aten::IsNullArray(row) || row.IsPinned()) &&
-           (aten::IsNullArray(col) || col.IsPinned()) &&
-           (aten::IsNullArray(data) || data.IsPinned());
+  // Check and update the internal flag is_pinned.
+  // This function will initialize a cuda context.
+  inline bool CheckIfPinnedInCUDA() {
+    is_pinned = (aten::IsNullArray(row) || row.IsPinned()) &&
+                (aten::IsNullArray(col) || col.IsPinned()) &&
+                (aten::IsNullArray(data) || data.IsPinned());
+    return is_pinned;
   }
 
   /** @brief Return a copy of this matrix on the give device context. */
@@ -153,8 +155,8 @@ struct COOMatrix {
       auto new_coo = COOMatrix(
           num_rows, num_cols, row.PinMemory(), col.PinMemory(),
           aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
-          col_sorted, /*is_pinned=*/true);
-      CHECK(new_coo.IsPinned())
+          col_sorted);
+      CHECK(new_coo.CheckIfPinnedInCUDA())
           << "An internal DGL error has occured while trying to pin a COO "
              "matrix. Please file a bug at "
              "'https://github.com/dmlc/dgl/issues' "
