@@ -5767,7 +5767,7 @@ class DGLGraph(object):
         """
         for frame in itertools.chain(self._node_frames, self._edge_frames):
             for col in frame._columns.values():
-                col.data
+                col.data # pylint: disable=pointless-statement
         return self
 
     def pin_memory_(self):
