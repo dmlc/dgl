@@ -207,7 +207,7 @@ class SAGE(nn.Module):
             y = torch.empty(
                 graph.total_num_nodes,
                 self.out_size if is_last_layer else self.hidden_size,
-                dtype=torch.float64,
+                dtype=torch.float32,
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
@@ -215,7 +215,7 @@ class SAGE(nn.Module):
 
             for step, data in tqdm(enumerate(dataloader)):
                 x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x.float())  # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
@@ -274,7 +274,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
     for step, data in tqdm(enumerate(dataloader)):
         x = data.node_features["feat"]
         y.append(data.labels)
-        y_hats.append(model(data.blocks, x.float()))
+        y_hats.append(model(data.blocks, x))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -310,7 +310,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             # in the last layer's computation graph.
             y = data.labels
 
-            y_hat = model(data.blocks, x.float())
+            y_hat = model(data.blocks, x)
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)
