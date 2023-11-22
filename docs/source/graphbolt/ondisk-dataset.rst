@@ -745,8 +745,9 @@ The ``graph`` field is used to specify the graph structure. It has two fields:
 ^^^^^^^^^^^^^^^
 
 The ``feature_data`` field is used to specify the feature data. It is a list of
-``feature`` objects. Each ``feature`` object has five fields: ``domain``, ``type``,
-``name``, ``format`` and ``path``.
+``feature`` objects. Each ``feature`` object has five canonical fields: ``domain``,
+``type``, ``name``, ``format`` and ``path``. Any other fields will be passed to
+the ``Feature.metadata`` object.
 
  - ``domain``: ``string``
 
