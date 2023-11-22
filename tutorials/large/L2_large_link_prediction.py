@@ -112,6 +112,8 @@ data = next(iter(train_dataloader))
 print(f"DGLMiniBatch: {data}")
 
 
+import dgl.nn as dglnn
+
 ######################################################################
 # Defining Model for Link Prediction
 # --------------------------------------
@@ -119,7 +121,6 @@ print(f"DGLMiniBatch: {data}")
 
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl.nn as dglnn
 
 
 class SAGE(nn.Module):
@@ -200,6 +201,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 # Convert the minibatch to a training pair and a label tensor.
 #
 
+
 def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch):
     """Convert the minibatch to a training pair and a label tensor."""
     pos_src, pos_dst = data.positive_node_pairs
@@ -269,9 +271,7 @@ def compute_mrr(device, model, evaluator, node_emb, src, dst, neg_dst):
     """
     rr = torch.zeros(src.shape[0])
     # Loop over node pairs in batches.
-    for start in tqdm.trange(
-        0, src.shape[0], 4096, desc="Evaluate"
-    ):
+    for start in tqdm.trange(0, src.shape[0], 4096, desc="Evaluate"):
         end = min(start + 4096, src.shape[0])
 
         # Concatenate positive and negative destination nodes.
@@ -279,9 +279,7 @@ def compute_mrr(device, model, evaluator, node_emb, src, dst, neg_dst):
 
         # Fetch embeddings for current batch of source and destination nodes.
         h_src = node_emb[src[start:end]][:, None, :].to(device)
-        h_dst = (
-            node_emb[all_dst.view(-1)].view(*all_dst.shape, -1).to(device)
-        )
+        h_dst = node_emb[all_dst.view(-1)].view(*all_dst.shape, -1).to(device)
 
         # Compute prediction scores using the model.
         pred = model.predictor(h_src * h_dst).squeeze(-1)
@@ -298,6 +296,7 @@ def compute_mrr(device, model, evaluator, node_emb, src, dst, neg_dst):
 
 model.eval()
 from ogb.linkproppred import Evaluator
+
 evaluator = Evaluator(name="ogbl-citation2")
 
 all_nodes_set = dataset.all_nodes_set
@@ -327,8 +326,7 @@ for split in [valid_set, test_set]:
 
 valid_mrr, test_mrr = results
 print(
-    f"Validation MRR {valid_mrr.item():.4f}, "
-    f"Test MRR {test_mrr.item():.4f}"
+    f"Validation MRR {valid_mrr.item():.4f}, " f"Test MRR {test_mrr.item():.4f}"
 )
 
 
