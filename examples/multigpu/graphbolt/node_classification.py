@@ -148,10 +148,20 @@ def create_dataloader(
 
 
 @torch.no_grad()
-def evaluate(rank, model, dataloader, num_classes, device):
+def evaluate(rank, args, model, graph, features, itemset, num_classes, device):
     model.eval()
     y = []
     y_hats = []
+    dataloader = create_dataloader(
+        args,
+        graph,
+        features,
+        itemset,
+        drop_last=False,
+        shuffle=False,
+        drop_uneven_inputs=False,
+        device=device,
+    )
 
     for step, data in (
         tqdm.tqdm(enumerate(dataloader)) if rank == 0 else enumerate(dataloader)
@@ -175,13 +185,26 @@ def train(
     world_size,
     rank,
     args,
-    train_dataloader,
-    valid_dataloader,
+    graph,
+    features,
+    train_set,
+    valid_set,
     num_classes,
     model,
     device,
 ):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # Create training data loader.
+    dataloader = create_dataloader(
+        args,
+        graph,
+        features,
+        train_set,
+        device,
+        drop_last=False,
+        shuffle=True,
+        drop_uneven_inputs=False,
+    )
 
     for epoch in range(args.epochs):
         epoch_start = time.time()
@@ -204,9 +227,9 @@ def train(
         ########################################################################
         with Join([model]):
             for step, data in (
-                tqdm.tqdm(enumerate(train_dataloader))
+                tqdm.tqdm(enumerate(dataloader))
                 if rank == 0
-                else enumerate(train_dataloader)
+                else enumerate(dataloader)
             ):
                 # The input features are from the source nodes in the first
                 # layer's computation graph.
@@ -235,8 +258,11 @@ def train(
         acc = (
             evaluate(
                 rank,
+                args,
                 model,
-                valid_dataloader,
+                graph,
+                features,
+                valid_set,
                 num_classes,
                 device,
             )
@@ -279,7 +305,6 @@ def run(rank, world_size, args, devices, dataset):
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
-    test_set = dataset.tasks[0].test_set
     args.fanout = list(map(int, args.fanout.split(",")))
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
@@ -291,40 +316,6 @@ def run(rank, world_size, args, devices, dataset):
     model = SAGE(in_size, hidden_size, out_size).to(device)
     model = DDP(model)
 
-    # Create training data loader.
-    train_dataloader = create_dataloader(
-        args,
-        graph,
-        features,
-        train_set,
-        device,
-        drop_last=False,
-        shuffle=True,
-        drop_uneven_inputs=False,
-    )
-    # Create validation data loader.
-    valid_dataloader = create_dataloader(
-        args,
-        graph,
-        features,
-        valid_set,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
-        device=device,
-    )
-    # Create testing data loader.
-    test_dataloader = create_dataloader(
-        args,
-        graph,
-        features,
-        test_set,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
-        device=device,
-    )
-
     # Model training.
     if rank == 0:
         print("Training...")
@@ -332,8 +323,10 @@ def run(rank, world_size, args, devices, dataset):
         world_size,
         rank,
         args,
-        train_dataloader,
-        valid_dataloader,
+        graph,
+        features,
+        train_set,
+        valid_set,
         num_classes,
         model,
         device,
@@ -342,11 +335,15 @@ def run(rank, world_size, args, devices, dataset):
     # Test the model.
     if rank == 0:
         print("Testing...")
+    test_set = dataset.tasks[0].test_set
     test_acc = (
         evaluate(
             rank,
+            args,
             model,
-            test_dataloader,
+            graph,
+            features,
+            itemset=test_set,
             num_classes=num_classes,
             device=device,
         )
