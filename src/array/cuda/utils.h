@@ -46,11 +46,13 @@ int _NumberOfBits(const T& range) {
   }
 
   int bits = 1;
-  while (bits < static_cast<int>(sizeof(T) * 8) && (1 << bits) < range) {
+  while (bits < static_cast<int>(sizeof(T) * 8) && (1ull << bits) < range) {
     ++bits;
   }
 
-  CHECK_EQ((range - 1) >> bits, 0);
+  if (bits < static_cast<int>(sizeof(T) * 8)) {
+    CHECK_EQ((range - 1) >> bits, 0);
+  }
   CHECK_NE((range - 1) >> (bits - 1), 0);
 
   return bits;
