@@ -274,9 +274,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         default="mixed",
-        choices=["cpu", "mixed", "gpu", "compare-to-graphbolt"],
+        choices=["cpu", "mixed", "gpu"],
         help="Training mode. 'cpu' for CPU training, 'mixed' for "
         "CPU-GPU mixed training, 'gpu' for pure-GPU training.",
+    )
+    parser.add_argument(
+        "--compare-to-graphbolt",
+        default="false",
+        choices=["false", "true"],
+        help="Whether comparing to GraphBolt or not, 'false' by default.",
     )
     args = parser.parse_args()
     if not torch.cuda.is_available():
@@ -286,13 +292,15 @@ if __name__ == "__main__":
     # Load and preprocess dataset.
     print("Loading data")
     dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
+
     g = dataset[0]
-    g = g.to("cuda" if args.mode == "gpu" else "cpu")
+    if args.compare_to_graphbolt == "false":
+        g = g.to("cuda" if args.mode == "gpu" else "cpu")
     num_classes = dataset.num_classes
     # Whether use Unified Virtual Addressing (UVA) for CUDA computation.
     use_uva = args.mode == "mixed"
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
-    fused_sampling = args.mode != "compare-to-graphbolt"
+    fused_sampling = args.compare_to_graphbolt == "false"
 
     # Create GraphSAGE model.
     in_size = g.ndata["feat"].shape[1]
