@@ -41,6 +41,9 @@ class JKNet(nn.Module):
             feats = self.dropout(layer(g, feats))
             feat_lst.append(feats)
 
+        if self.mode == "lstm":
+            self.jump.lstm.flatten_parameters()
+
         g.ndata["h"] = self.jump(feat_lst)
         g.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
 
