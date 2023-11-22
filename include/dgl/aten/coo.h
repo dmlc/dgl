@@ -56,8 +56,7 @@ struct COOMatrix {
   /** @brief constructor */
   COOMatrix(
       int64_t nrows, int64_t ncols, IdArray rarr, IdArray carr,
-      IdArray darr = NullArray(), bool rsorted = false, bool csorted = false,
-      bool pin_memory = false)
+      IdArray darr = NullArray(), bool rsorted = false, bool csorted = false)
       : num_rows(nrows),
         num_cols(ncols),
         row(rarr),
