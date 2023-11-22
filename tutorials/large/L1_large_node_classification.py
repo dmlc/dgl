@@ -22,49 +22,37 @@ Sampling for GNN Training <L0_neighbor_sampling_overview>`.
 # Loading Dataset
 # ---------------
 #
-# OGB already prepared the data as DGL graph.
+# `ogbn-arxiv` is already prepared as ``BuiltinDataset`` in GraphBolt.
 #
 
 import os
 
 os.environ["DGLBACKEND"] = "pytorch"
 import dgl
+import dgl.graphbolt as gb
 import numpy as np
 import torch
-from ogb.nodeproppred import DglNodePropPredDataset
 
-dataset = DglNodePropPredDataset("ogbn-arxiv")
+dataset = gb.BuiltinDataset("ogbn-arxiv").load()
 device = "cpu"  # change to 'cuda' for GPU
 
 
 ######################################################################
-# OGB dataset is a collection of graphs and their labels. ``ogbn-arxiv``
-# dataset only contains a single graph. So you can
-# simply get the graph and its node labels like this:
+# Dataset consists of graph, feature and tasks. You can get the
+# training-validation-test set from the tasks. Seed nodes and corresponding
+# labels are already stored in each training-validation-test set. Other
+# metadata such as number of classes are also stored in the tasks. In this
+# dataset, there is only one task: `node classification``.
 #
 
-graph, node_labels = dataset[0]
-# Add reverse edges since ogbn-arxiv is unidirectional.
-graph = dgl.add_reverse_edges(graph)
-graph.ndata["label"] = node_labels[:, 0]
-print(graph)
-print(node_labels)
-
-node_features = graph.ndata["feat"]
-num_features = node_features.shape[1]
-num_classes = (node_labels.max() + 1).item()
-print("Number of classes:", num_classes)
-
-
-######################################################################
-# You can get the training-validation-test split of the nodes with
-# ``get_split_idx`` method.
-#
-
-idx_split = dataset.get_idx_split()
-train_nids = idx_split["train"]
-valid_nids = idx_split["valid"]
-test_nids = idx_split["test"]
+graph = dataset.graph
+feature = dataset.feature
+train_set = dataset.tasks[0].train_set
+valid_set = dataset.tasks[0].validation_set
+test_set = dataset.tasks[0].test_set
+task_name = dataset.tasks[0].metadata["name"]
+num_classes = dataset.tasks[0].metadata["num_classes"]
+print(f"Task: {task_name}. Number of classes: {num_classes}")
 
 
 ######################################################################
@@ -88,93 +76,58 @@ test_nids = idx_split["test"]
 # DGL provides tools to iterate over the dataset in minibatches
 # while generating the computation dependencies to compute their outputs
 # with the MFGs above. For node classification, you can use
-# ``dgl.dataloading.DataLoader`` for iterating over the dataset.
-# It accepts a sampler object to control how to generate the computation
-# dependencies in the form of MFGs.  DGL provides
-# implementations of common sampling algorithms such as
-# ``dgl.dataloading.NeighborSampler`` which randomly picks
-# a fixed number of neighbors for each node.
+# ``dgl.graphbolt.MultiProcessDataLoader`` for iterating over the dataset.
+# It accepts a data pipe that generates minibatches of nodes and their
+# labels, sample neighbors for each node, and generate the computation
+# dependencies in the form of MFGs. Feature fetching, block creation and
+# copying to target device are also supported. All these operations are
+# split into separate stages in the data pipe, so that you can customize
+# the data pipeline by inserting your own operations.
 #
 # .. note::
 #
 #    To write your own neighbor sampler, please refer to :ref:`this user
 #    guide section <guide-minibatch-customizing-neighborhood-sampler>`.
 #
-# The syntax of ``dgl.dataloading.DataLoader`` is mostly similar to a
-# PyTorch ``DataLoader``, with the addition that it needs a graph to
-# generate computation dependency from, a set of node IDs to iterate on,
-# and the neighbor sampler you defined.
 #
 # Let’s say that each node will gather messages from 4 neighbors on each
 # layer. The code defining the data loader and neighbor sampler will look
 # like the following.
 #
 
-sampler = dgl.dataloading.NeighborSampler([4, 4])
-train_dataloader = dgl.dataloading.DataLoader(
-    # The following arguments are specific to DGL's DataLoader.
-    graph,  # The graph
-    train_nids,  # The node IDs to iterate over in minibatches
-    sampler,  # The neighbor sampler
-    device=device,  # Put the sampled MFGs on CPU or GPU
-    # The following arguments are inherited from PyTorch DataLoader.
-    batch_size=1024,  # Batch size
-    shuffle=True,  # Whether to shuffle the nodes for every epoch
-    drop_last=False,  # Whether to drop the last incomplete batch
-    num_workers=0,  # Number of sampler processes
-)
+datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
+datapipe = datapipe.sample_neighbor(graph, [4, 4])
+datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
+datapipe = datapipe.to_dgl()
+datapipe = datapipe.copy_to(device)
+train_dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
 
 
 ######################################################################
 # .. note::
 #
-#    Since DGL 0.7 neighborhood sampling on GPU is supported.  Please
-#    refer to :ref:`guide-minibatch-gpu-sampling` if you are
-#    interested.
+#    In this example, neighborhood sampling runs on CPU, If you are
+#    interested in running it on GPU, please refer to
+#    :ref:`guide-minibatch-gpu-sampling`.
 #
 
 
 ######################################################################
-# You can iterate over the data loader and see what it yields.
+# You can iterate over the data loader and a ``DGLMiniBatch`` object
+# is yielded.
 #
 
-input_nodes, output_nodes, mfgs = example_minibatch = next(
-    iter(train_dataloader)
-)
-print(example_minibatch)
-print(
-    "To compute {} nodes' outputs, we need {} nodes' input features".format(
-        len(output_nodes), len(input_nodes)
-    )
-)
+data = next(iter(train_dataloader))
+print(data)
 
 
 ######################################################################
-# DGL's ``DataLoader`` gives us three items per iteration.
-#
-# -  An ID tensor for the input nodes, i.e., nodes whose input features
-#    are needed on the first GNN layer for this minibatch.
-# -  An ID tensor for the output nodes, i.e. nodes whose representations
-#    are to be computed.
-# -  A list of MFGs storing the computation dependencies
-#    for each GNN layer.
+# You can get the input node IDs from MFGs.
 #
 
-
-######################################################################
-# You can get the source and destination node IDs of the MFGs
-# and verify that the first few source nodes are always the same as the destination
-# nodes.  As we described in the :doc:`overview <L0_neighbor_sampling_overview>`,
-# destination nodes' own features from the previous layer may also be necessary in
-# the computation of the new features.
-#
-
-mfg_0_src = mfgs[0].srcdata[dgl.NID]
-mfg_0_dst = mfgs[0].dstdata[dgl.NID]
-print(mfg_0_src)
-print(mfg_0_dst)
-print(torch.equal(mfg_0_src[: mfgs[0].num_dst_nodes()], mfg_0_dst))
-
+mfgs = data.blocks
+input_nodes = mfgs[0].srcdata[dgl.NID]
+print(f"Input nodes: {input_nodes}.")
 
 ######################################################################
 # Defining Model
@@ -207,7 +160,8 @@ class Model(nn.Module):
         return h
 
 
-model = Model(num_features, 128, num_classes).to(device)
+in_size = feature.size("node", None, "feat")[0]
+model = Model(in_size, 64, num_classes).to(device)
 
 
 ######################################################################
@@ -273,16 +227,12 @@ opt = torch.optim.Adam(model.parameters())
 # loader.
 #
 
-valid_dataloader = dgl.dataloading.DataLoader(
-    graph,
-    valid_nids,
-    sampler,
-    batch_size=1024,
-    shuffle=False,
-    drop_last=False,
-    num_workers=0,
-    device=device,
-)
+datapipe = gb.ItemSampler(valid_set, batch_size=1024, shuffle=False)
+datapipe = datapipe.sample_neighbor(graph, [4, 4])
+datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
+datapipe = datapipe.to_dgl()
+datapipe = datapipe.copy_to(device)
+valid_dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
 
 
 import sklearn.metrics
@@ -300,12 +250,11 @@ for epoch in range(10):
     model.train()
 
     with tqdm.tqdm(train_dataloader) as tq:
-        for step, (input_nodes, output_nodes, mfgs) in enumerate(tq):
-            # feature copy from CPU to GPU takes place here
-            inputs = mfgs[0].srcdata["feat"]
-            labels = mfgs[-1].dstdata["label"]
+        for step, data in enumerate(tq):
+            x = data.node_features["feat"]
+            labels = data.labels
 
-            predictions = model(mfgs, inputs)
+            predictions = model(data.blocks, x)
 
             loss = F.cross_entropy(predictions, labels)
             opt.zero_grad()
@@ -327,10 +276,10 @@ for epoch in range(10):
     predictions = []
     labels = []
     with tqdm.tqdm(valid_dataloader) as tq, torch.no_grad():
-        for input_nodes, output_nodes, mfgs in tq:
-            inputs = mfgs[0].srcdata["feat"]
-            labels.append(mfgs[-1].dstdata["label"].cpu().numpy())
-            predictions.append(model(mfgs, inputs).argmax(1).cpu().numpy())
+        for data in tq:
+            x = data.node_features["feat"]
+            labels.append(data.labels.cpu().numpy())
+            predictions.append(model(data.blocks, x).argmax(1).cpu().numpy())
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
         accuracy = sklearn.metrics.accuracy_score(labels, predictions)
@@ -361,7 +310,3 @@ for epoch in range(10):
 #    please refer to the :ref:`user guide on exact offline
 #    inference <guide-minibatch-inference>`.
 #
-
-
-# Thumbnail credits: Stanford CS224W Notes
-# sphinx_gallery_thumbnail_path = '_static/blitz_1_introduction.png'
