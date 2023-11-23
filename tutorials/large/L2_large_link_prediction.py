@@ -3,9 +3,8 @@ Stochastic Training of GNN for Link Prediction
 ==============================================
 
 This tutorial will show how to train a multi-layer GraphSAGE for link
-prediction on ``ogbl-citation2`` provided by `Open Graph Benchmark
-(OGB) <https://ogb.stanford.edu/>`__. The dataset
-contains around 3 million nodes and 30 million edges.
+prediction on `CoraGraphDataset <https://data.dgl.ai/dataset/cora_v2.zip>`__.
+The dataset contains 2708 nodes and 10556 edges.
 
 By the end of this tutorial, you will be able to
 
@@ -28,18 +27,13 @@ Sampling for Node Classification <L1_large_node_classification>`.
 # existing between two nodes, necessitating different sampling strategies
 # that account for pairs of nodes and their joint neighborhoods.
 #
-# Link prediction requires the model to predict the probability of
-# existence of an edge. This tutorial does so by computing a Mean
-# Reciprocal Rank (MRR) score for each edge, which is a common metric for
-# link prediction.
-#
 
 
 ######################################################################
 # Loading Dataset
 # ---------------
 #
-# `ogbl-citation2` is already prepared as ``BuiltinDataset`` in GraphBolt.
+# `cora` is already prepared as ``BuiltinDataset`` in GraphBolt.
 #
 
 import os
@@ -50,26 +44,24 @@ import numpy as np
 import torch
 import tqdm
 
-dataset = gb.BuiltinDataset("ogbl-citation2").load()
+dataset = gb.BuiltinDataset("cora").load()
 device = torch.device("cpu")  # change to 'cuda' for GPU
 
 
 ######################################################################
 # Dataset consists of graph, feature and tasks. You can get the
 # training-validation-test set from the tasks. Seed nodes and corresponding
-# labels are already stored in each training-validation-test set. Other
-# metadata such as number of classes are also stored in the tasks. In this
-# dataset, there is only one task: `link prediction``.
+# labels are already stored in each training-validation-test set. This
+# dataset contains 2 tasks, one for node classification and the other for
+# link prediction. We will use the link prediction task.
 #
 
 graph = dataset.graph
 feature = dataset.feature
-train_set = dataset.tasks[0].train_set
-valid_set = dataset.tasks[0].validation_set
-test_set = dataset.tasks[0].test_set
-task_name = dataset.tasks[0].metadata["name"]
-num_classes = dataset.tasks[0].metadata["num_classes"]
-print(f"Task: {task_name}. Number of classes: {num_classes}")
+train_set = dataset.tasks[1].train_set
+test_set = dataset.tasks[1].test_set
+task_name = dataset.tasks[1].metadata["name"]
+print(f"Task: {task_name}.")
 
 
 ######################################################################
@@ -94,7 +86,7 @@ print(f"Task: {task_name}. Number of classes: {num_classes}")
 # the :doc:`node classification tutorial <L1_large_node_classification>`.
 #
 
-datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
+datapipe = gb.ItemSampler(train_set, batch_size=256, shuffle=True)
 datapipe = datapipe.sample_uniform_negative(graph, 5)
 datapipe = datapipe.sample_neighbor(graph, [5, 5, 5])
 datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
@@ -112,13 +104,12 @@ data = next(iter(train_dataloader))
 print(f"DGLMiniBatch: {data}")
 
 
-import dgl.nn as dglnn
-
 ######################################################################
 # Defining Model for Node Representation
 # --------------------------------------
 #
 
+import dgl.nn as dglnn
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -129,11 +120,8 @@ class SAGE(nn.Module):
         self.layers = nn.ModuleList()
         self.layers.append(dglnn.SAGEConv(in_size, hidden_size, "mean"))
         self.layers.append(dglnn.SAGEConv(hidden_size, hidden_size, "mean"))
-        self.layers.append(dglnn.SAGEConv(hidden_size, hidden_size, "mean"))
         self.hidden_size = hidden_size
         self.predictor = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, 1),
@@ -147,42 +135,6 @@ class SAGE(nn.Module):
             if not is_last_layer:
                 hidden_x = F.relu(hidden_x)
         return hidden_x
-
-    def inference(self, graph, features, dataloader, device):
-        """Conduct layer-wise inference to get all the node embeddings."""
-        feature = features.read("node", None, "feat")
-
-        buffer_device = torch.device("cpu")
-        # Enable pin_memory for faster CPU to GPU data transfer if the
-        # model is running on a GPU.
-        pin_memory = buffer_device != device
-
-        print("Start node embedding inference.")
-        for layer_idx, layer in enumerate(self.layers):
-            is_last_layer = layer_idx == len(self.layers) - 1
-
-            y = torch.empty(
-                graph.total_num_nodes,
-                self.hidden_size,
-                dtype=torch.float32,
-                device=buffer_device,
-                pin_memory=pin_memory,
-            )
-            feature = feature.to(device)
-            for step, data in tqdm.tqdm(enumerate(dataloader)):
-                x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
-                if not is_last_layer:
-                    hidden_x = F.relu(hidden_x)
-                # By design, our output nodes are contiguous.
-                y[
-                    data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device, non_blocking=True)
-                if step == 100:
-                    print("Stop inference after 100 steps.")
-                    break
-            feature = y
-        return y
 
 
 ######################################################################
@@ -221,7 +173,7 @@ def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch):
 # evaluation.
 #
 
-for epoch in range(1):
+for epoch in range(10):
     model.train()
     total_loss = 0
     for step, data in tqdm.tqdm(enumerate(train_dataloader)):
@@ -243,12 +195,9 @@ for epoch in range(1):
         loss.backward()
         optimizer.step()
 
-        if step % 20 == 0:
-            print(f"Epoch {epoch} Loss {loss.item()}")
+        total_loss += loss.item()
 
-        if step == 100:
-            print("Stop training after 100 steps.")
-            break
+    print(f"Epoch {epoch:03d} | Loss {total_loss / (step + 1):.3f}")
 
 
 ######################################################################
@@ -256,78 +205,46 @@ for epoch in range(1):
 # -------------------------------------------
 #
 
-##############################################
-# Define MRR computation function
-#
-
-
-@torch.no_grad()
-def compute_mrr(device, model, evaluator, node_emb, src, dst, neg_dst):
-    """Compute the Mean Reciprocal Rank (MRR) for given source and destination
-    nodes.
-
-    This function computes the MRR for a set of node pairs, dividing the task
-    into batches to handle potentially large graphs.
-    """
-    rr = torch.zeros(src.shape[0])
-    # Loop over node pairs in batches.
-    for start in tqdm.trange(0, src.shape[0], 4096, desc="Evaluate"):
-        end = min(start + 4096, src.shape[0])
-
-        # Concatenate positive and negative destination nodes.
-        all_dst = torch.cat([dst[start:end, None], neg_dst[start:end]], 1)
-
-        # Fetch embeddings for current batch of source and destination nodes.
-        h_src = node_emb[src[start:end]][:, None, :].to(device)
-        h_dst = node_emb[all_dst.view(-1)].view(*all_dst.shape, -1).to(device)
-
-        # Compute prediction scores using the model.
-        pred = model.predictor(h_src * h_dst).squeeze(-1)
-
-        # Evaluate the predictions to obtain MRR values.
-        input_dict = {"y_pred_pos": pred[:, 0], "y_pred_neg": pred[:, 1:]}
-        rr[start:end] = evaluator.eval(input_dict)["mrr_list"]
-    return rr.mean()
-
-
-#####################################
-# Evaluate the trained model.
-#
 
 model.eval()
-from ogb.linkproppred import Evaluator
 
-evaluator = Evaluator(name="ogbl-citation2")
-
-all_nodes_set = dataset.all_nodes_set
-datapipe = gb.ItemSampler(all_nodes_set, batch_size=4096, shuffle=False)
+datapipe = gb.ItemSampler(test_set, batch_size=256, shuffle=False)
 # Since we need to use all neghborhoods for evaluation, we set the fanout
 # to -1.
-datapipe = datapipe.sample_neighbor(graph, [-1])
+datapipe = datapipe.sample_neighbor(graph, [-1, -1])
+datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
 datapipe = datapipe.to_dgl()
 datapipe = datapipe.copy_to(device)
 eval_dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
 
-# Compute node embeddings for the entire graph.
-node_emb = model.inference(graph, feature, eval_dataloader, device)
-results = []
+logits = []
+labels = []
+for step, data in enumerate(eval_dataloader):
+    # Unpack MiniBatch.
+    compacted_pairs, label = to_binary_link_dgl_computing_pack(data)
 
-# Loop over both validation and test sets.
-for split in [valid_set, test_set]:
-    # Unpack the item set.
-    src = split._items[0][:, 0].to(node_emb.device)
-    dst = split._items[0][:, 1].to(node_emb.device)
-    neg_dst = split._items[1].to(node_emb.device)
+    # The features of sampled nodes.
+    x = data.node_features["feat"]
 
-    # Compute MRR values for the current split.
-    results.append(
-        compute_mrr(device, model, evaluator, node_emb, src, dst, neg_dst)
+    # Forward.
+    y = model(data.blocks, x)
+    logit = (
+        model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
+        .squeeze()
+        .detach()
     )
 
-valid_mrr, test_mrr = results
-print(
-    f"Validation MRR {valid_mrr.item():.4f}, " f"Test MRR {test_mrr.item():.4f}"
-)
+    logits.append(logit)
+    labels.append(label)
+
+logits = torch.cat(logits, dim=0)
+labels = torch.cat(labels, dim=0)
+
+
+# Compute the AUROC score.
+from sklearn.metrics import roc_auc_score
+auc = roc_auc_score(labels, logits)
+print("Link Prediction AUC:", auc)
 
 
 ######################################################################
