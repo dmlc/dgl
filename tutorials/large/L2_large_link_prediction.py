@@ -115,7 +115,7 @@ print(f"DGLMiniBatch: {data}")
 import dgl.nn as dglnn
 
 ######################################################################
-# Defining Model for Link Prediction
+# Defining Model for Node Representation
 # --------------------------------------
 #
 
