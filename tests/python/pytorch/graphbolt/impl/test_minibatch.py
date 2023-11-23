@@ -360,7 +360,10 @@ def test_dgl_minibatch_representation_hetero():
         )
     negative_srcs = {"B": torch.tensor([[8], [1], [6]])}
     negative_dsts = {"B": torch.tensor([[2], [8], [8]])}
-    compacted_node_pairs = {relation: (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5])), reverse_relation: (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5]))}
+    compacted_node_pairs = {
+        relation: (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5])),
+        reverse_relation: (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5])),
+    }
     compacted_negative_srcs = {relation: torch.tensor([[0], [1], [2]])}
     compacted_negative_dsts = {relation: torch.tensor([[6], [0], [0]])}
     # Test dglminibatch with all attributes.
@@ -382,7 +385,8 @@ def test_dgl_minibatch_representation_hetero():
         compacted_negative_dsts=compacted_negative_dsts,
     )
     dgl_minibatch = minibatch.to_dgl()
-    expect_result = str("""DGLMiniBatch(positive_node_pairs={'A:r:B': (tensor([0, 1, 2]), tensor([3, 4, 5])), 'B:rr:A': (tensor([0, 1, 2]), tensor([3, 4, 5]))},
+    expect_result = str(
+        """DGLMiniBatch(positive_node_pairs={'A:r:B': (tensor([0, 1, 2]), tensor([3, 4, 5])), 'B:rr:A': (tensor([0, 1, 2]), tensor([3, 4, 5]))},
              output_nodes=None,
              node_features={('A', 'x'): tensor([6, 4, 0, 1])},
              negative_node_pairs={'A:r:B': (tensor([0, 1, 2]), tensor([6, 0, 0]))},
@@ -398,7 +402,8 @@ def test_dgl_minibatch_representation_hetero():
                            num_dst_nodes={'B': 2},
                            num_edges={('A', 'r', 'B'): 2},
                            metagraph=[('A', 'B', 'r')])],
-          )""")
+          )"""
+    )
     result = str(dgl_minibatch)
     assert result == expect_result, print(result)
 
