@@ -51,7 +51,7 @@ import torch
 import tqdm
 
 dataset = gb.BuiltinDataset("ogbl-citation2").load()
-device = "cpu"  # change to 'cuda' for GPU
+device = torch.device("cpu")  # change to 'cuda' for GPU
 
 
 ######################################################################
