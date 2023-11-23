@@ -1,5 +1,5 @@
 """
-Training GNN with Neighbor Sampling for Node Classification
+Node Classification
 ===========================================================
 
 This tutorial shows how to train a multi-layer GraphSAGE for node
@@ -42,7 +42,7 @@ device = "cpu"  # change to 'cuda' for GPU
 # training-validation-test set from the tasks. Seed nodes and corresponding
 # labels are already stored in each training-validation-test set. Other
 # metadata such as number of classes are also stored in the tasks. In this
-# dataset, there is only one task: `node classification``.
+# dataset, there is only one task: `node classification`.
 #
 
 graph = dataset.graph

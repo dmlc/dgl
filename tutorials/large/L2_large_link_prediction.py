@@ -1,5 +1,5 @@
 """
-Stochastic Training of GNN for Link Prediction
+Link Prediction
 ==============================================
 
 This tutorial will show how to train a multi-layer GraphSAGE for link
