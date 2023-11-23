@@ -243,6 +243,7 @@ labels = torch.cat(labels, dim=0)
 
 # Compute the AUROC score.
 from sklearn.metrics import roc_auc_score
+
 auc = roc_auc_score(labels, logits)
 print("Link Prediction AUC:", auc)
 
