@@ -9,7 +9,7 @@ import dgl
 from dgl.heterograph import DGLBlock
 from dgl.utils import recursive_apply
 
-from .base import etype_str_to_tuple
+from .base import CSCFormatBase, etype_str_to_tuple
 from .sampled_subgraph import SampledSubgraph
 
 __all__ = ["DGLMiniBatch", "MiniBatch"]
@@ -384,10 +384,25 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
-                node_pairs = {
-                    etype_str_to_tuple(etype): v
-                    for etype, v in subgraph.node_pairs.items()
-                }
+                if isinstance(
+                    list(subgraph.node_pairs.values())[0], CSCFormatBase
+                ):
+                    node_pairs = {
+                        etype_str_to_tuple(etype): (
+                            "csc",
+                            (
+                                v.indptr,
+                                v.indices,
+                                torch.tensor([]),
+                            ),
+                        )
+                        for etype, v in subgraph.node_pairs.items()
+                    }
+                else:
+                    node_pairs = {
+                        etype_str_to_tuple(etype): v
+                        for etype, v in subgraph.node_pairs.items()
+                    }
                 num_src_nodes = {
                     ntype: nodes.size(0)
                     for ntype, nodes in original_row_node_ids.items()
@@ -398,6 +413,15 @@ class MiniBatch:
                 }
             else:
                 node_pairs = subgraph.node_pairs
+                if isinstance(subgraph.node_pairs, CSCFormatBase):
+                    node_pairs = (
+                        "csc",
+                        (
+                            node_pairs.indptr,
+                            node_pairs.indices,
+                            torch.tensor([]),
+                        ),
+                    )
                 num_src_nodes = original_row_node_ids.size(0)
                 num_dst_nodes = original_column_node_ids.size(0)
             blocks.append(
