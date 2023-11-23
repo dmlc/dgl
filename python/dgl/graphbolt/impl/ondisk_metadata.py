@@ -47,7 +47,7 @@ class ExtraMetaData(pydantic.BaseModel, extra="allow"):
         def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
             """Build extra fields."""
             for key in list(values.keys()):
-                if key not in ["train_set", "validation_set", "test_set"]:
+                if key not in cls.__fields__:
                     values["extra_fields"] = values.get("extra_fields", {})
                     values["extra_fields"][key] = values.pop(key)
             return values
