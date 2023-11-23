@@ -4,7 +4,7 @@ from torch.utils.data import functional_datapipe
 
 from torchdata.datapipes.iter import Mapper
 
-from .minibatch import MiniBatch
+from .minibatch import DGLMiniBatch, MiniBatch
 
 __all__ = [
     "MiniBatchTransformer",
@@ -37,7 +37,7 @@ class MiniBatchTransformer(Mapper):
     def _transformer(self, minibatch):
         minibatch = self.transformer(minibatch)
         assert isinstance(
-            minibatch, MiniBatch
+            minibatch, (MiniBatch, DGLMiniBatch)
         ), "The transformer output should be an instance of MiniBatch"
         return minibatch
 
