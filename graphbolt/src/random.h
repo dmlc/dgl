@@ -36,6 +36,10 @@ class RandomEngine {
   void SetSeed(uint64_t seed);
   void SetSeed(uint64_t seed, uint64_t stream);
 
+  /** @brief Manually fix the seed. */
+  static std::optional<uint64_t> manual_seed;
+  static void SetManualSeed(int64_t seed);
+
   /**
    * @brief Generate a uniform random integer in [low, high).
    */
@@ -64,13 +68,9 @@ class RandomEngine {
     return dist(rng_);
   }
 
-  static std::optional<uint64_t> manual_seed;
-
  private:
   pcg32 rng_;
 };
-
-void SetSeed(int64_t seed);
 
 namespace labor {
 

@@ -69,7 +69,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("unique_and_compact", &UniqueAndCompact);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
-  m.def("set_seed", &SetSeed);
+  m.def("set_seed", &RandomEngine::SetManualSeed);
 }
 
 }  // namespace sampling

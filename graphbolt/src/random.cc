@@ -40,6 +40,7 @@ RandomEngine::RandomEngine() {
 /** @brief Constructor with given seed. */
 RandomEngine::RandomEngine(uint64_t seed) { RandomEngine(seed, GetThreadId()); }
 
+/** @brief Constructor with given seed. */
 RandomEngine::RandomEngine(uint64_t seed, uint64_t stream) {
   SetSeed(seed, stream);
 }
@@ -52,10 +53,12 @@ RandomEngine* RandomEngine::ThreadLocal() {
 /** @brief Set the seed. */
 void RandomEngine::SetSeed(uint64_t seed) { SetSeed(seed, GetThreadId()); }
 
+/** @brief Set the seed. */
 void RandomEngine::SetSeed(uint64_t seed, uint64_t stream) {
   rng_.seed(seed, stream);
 }
 
-void SetSeed(int64_t seed) { RandomEngine::manual_seed = seed; }
+/** @brief Manually fix the seed. */
+void RandomEngine::SetManualSeed(int64_t seed) { manual_seed = seed; }
 
 }  // namespace graphbolt
