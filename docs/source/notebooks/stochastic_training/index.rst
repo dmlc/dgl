@@ -9,3 +9,4 @@ This tutorial introduces how to train GNNs with stochastic training.
 
   node_classification.nblink
   link_prediction.nblink
+  neighbor_sampling_overview.nblink
