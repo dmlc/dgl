@@ -2,7 +2,6 @@
 This example shows how to create a GraphBolt dataloader to sample and train a
 node classification model with the Cora dataset.
 """
-import dgl
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
@@ -116,10 +115,7 @@ def train(model, dataset, device):
 
 
 if __name__ == "__main__":
-    gb.seed(929292)
-    torch.manual_seed(1234)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    device = "cpu"
     print(f"Training in {device} mode.")
 
     # Load and preprocess dataset.
