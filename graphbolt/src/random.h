@@ -13,52 +13,29 @@
 #include <pcg_random.hpp>
 #include <random>
 #include <thread>
+#include <optional>
 
 namespace graphbolt {
-
-namespace {
-
-// Get a unique integer ID representing this thread.
-inline uint32_t GetThreadId() {
-  static int num_threads = 0;
-  static std::mutex mutex;
-  static thread_local int id = -1;
-
-  if (id == -1) {
-    std::lock_guard<std::mutex> guard(mutex);
-    id = num_threads;
-    num_threads++;
-  }
-  return id;
-}
-
-};  // namespace
 
 /**
  * @brief Thread-local Random Number Generator class.
  */
 class RandomEngine {
  public:
+
   /** @brief Constructor with default seed. */
-  RandomEngine() {
-    std::random_device rd;
-    SetSeed(rd());
-  }
+  RandomEngine();
 
   /** @brief Constructor with given seed. */
-  explicit RandomEngine(uint64_t seed, uint64_t stream = GetThreadId()) {
-    SetSeed(seed, stream);
-  }
+  explicit RandomEngine(uint64_t seed);
+  explicit RandomEngine(uint64_t seed, uint64_t stream);
 
   /** @brief Get the thread-local random number generator instance. */
-  static RandomEngine* ThreadLocal() {
-    return dmlc::ThreadLocalStore<RandomEngine>::Get();
-  }
+  static RandomEngine* ThreadLocal();
 
   /** @brief Set the seed. */
-  void SetSeed(uint64_t seed, uint64_t stream = GetThreadId()) {
-    rng_.seed(seed, stream);
-  }
+  void SetSeed(uint64_t seed);
+  void SetSeed(uint64_t seed, uint64_t stream);
 
   /**
    * @brief Generate a uniform random integer in [low, high).
@@ -87,6 +64,8 @@ class RandomEngine {
     std::exponential_distribution<T> dist(lambda);
     return dist(rng_);
   }
+
+  static std::optional<uint64_t> manual_seed;
 
  private:
   pcg32 rng_;

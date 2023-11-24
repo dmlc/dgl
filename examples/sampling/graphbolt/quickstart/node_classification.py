@@ -116,9 +116,8 @@ def train(model, dataset, device):
 
 
 if __name__ == "__main__":
-    gb.seed(1234)
+    gb.seed(929292)
     torch.manual_seed(1234)
-    dgl.seed(1234)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     device = "cpu"
     print(f"Training in {device} mode.")
