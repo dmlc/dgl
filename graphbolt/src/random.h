@@ -10,10 +10,10 @@
 
 #include <dmlc/thread_local.h>
 
+#include <optional>
 #include <pcg_random.hpp>
 #include <random>
 #include <thread>
-#include <optional>
 
 namespace graphbolt {
 
@@ -22,7 +22,6 @@ namespace graphbolt {
  */
 class RandomEngine {
  public:
-
   /** @brief Constructor with default seed. */
   RandomEngine();
 
