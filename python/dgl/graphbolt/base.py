@@ -134,3 +134,23 @@ class CSCFormatBase:
     """
     indptr: torch.Tensor = None
     indices: torch.Tensor = None
+
+    def __repr__(self) -> str:
+        return _csc_format_base_str(self)
+
+
+def _csc_format_base_str(csc_format_base: CSCFormatBase) -> str:
+    final_str = "CSCFormatBase("
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    final_str += (
+        f"indptr={_add_indent(str(csc_format_base.indptr), 21)},\n" + " " * 14
+    )
+    final_str += (
+        f"indices={_add_indent(str(csc_format_base.indices), 22)},\n" + ")"
+    )
+    return final_str

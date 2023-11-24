@@ -150,3 +150,16 @@ def test_isin_non_1D_dim():
     test_elements = torch.tensor([[2, 5]])
     with pytest.raises(Exception):
         gb.isin(elements, test_elements)
+
+
+def test_csc_format_base_representation():
+    csc_format_base = gb.CSCFormatBase(
+        indptr=torch.tensor([0, 2, 4]),
+        indices=torch.tensor([4, 5, 6, 7]),
+    )
+    expected_result = str(
+        """CSCFormatBase(indptr=tensor([0, 2, 4]),
+              indices=tensor([4, 5, 6, 7]),
+)"""
+    )
+    assert str(csc_format_base) == expected_result, print(csc_format_base)

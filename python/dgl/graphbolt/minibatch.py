@@ -577,35 +577,11 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
         # indentation on top of the original if the original data output has
         # line feeds.
         if isinstance(val, list):
-            if len(val) == 0:
-                val = "[]"
-            # Special handling of FusedSampledSubgraphImpl data. Each element of
-            # the data occupies one row and is further structured.
-            elif isinstance(
-                val[0],
-                dgl.graphbolt.impl.sampled_subgraph_impl.FusedSampledSubgraphImpl,
-            ):
-                sampledsubgraph_strs = []
-                for sampledsubgraph in val:
-                    ss_attributes = _get_attributes(sampledsubgraph)
-                    sampledsubgraph_str = "FusedSampledSubgraphImpl("
-                    for ss_name in ss_attributes:
-                        ss_val = str(getattr(sampledsubgraph, ss_name))
-                        sampledsubgraph_str = (
-                            sampledsubgraph_str
-                            + f"{ss_name}={_add_indent(ss_val, len(ss_name)+1)},\n"
-                            + " " * 20
-                        )
-                    sampledsubgraph_strs.append(sampledsubgraph_str[:-21] + ")")
-                val = "[" + ",\n".join(sampledsubgraph_strs) + "]"
-            else:
-                val = [
-                    _add_indent(
-                        str(val_str), len(str(val_str).split("': ")[0]) - 6
-                    )
-                    for val_str in val
-                ]
-                val = "[" + ",\n".join(val) + "]"
+            val = [str(val_str) for val_str in val]
+            val = "[" + ",\n".join(val) + "]"
+        elif isinstance(val, tuple):
+            val = [str(val_str) for val_str in val]
+            val = "(" + ",\n".join(val) + ")"
         else:
             val = str(val)
         final_str = (
