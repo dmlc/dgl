@@ -8,3 +8,4 @@ This tutorial introduces how to train GNNs with stochastic training.
   :titlesonly:
 
   node_classification.nblink
+  link_prediction.nblink
