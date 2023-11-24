@@ -112,14 +112,14 @@ def create_hetero_minibatch():
 
 
 def test_minibatch_representation_homo():
-    node_pairs = [
-        (
-            torch.tensor([0, 1, 2, 2, 2, 1]),
-            torch.tensor([0, 1, 1, 2, 3, 2]),
+    csc_formats = [
+        gb.CSCFormatBase(
+            indptr=torch.tensor([0, 1, 3, 5, 6]),
+            indices=torch.tensor([0, 1, 2, 2, 1, 2]),
         ),
-        (
-            torch.tensor([0, 1, 2]),
-            torch.tensor([1, 0, 0]),
+        gb.CSCFormatBase(
+            indptr=torch.tensor([0, 2, 3]),
+            indices=torch.tensor([1, 2, 0]),
         ),
     ]
     original_column_node_ids = [
@@ -134,16 +134,16 @@ def test_minibatch_representation_homo():
         torch.tensor([19, 20, 21, 22, 25, 30]),
         torch.tensor([10, 15, 17]),
     ]
-    node_features = {"x": torch.tensor([7, 6, 2, 2])}
+    node_features = {"x": torch.randint(0, 10, (4,))}
     edge_features = [
-        {"x": torch.tensor([[8], [1], [6]])},
-        {"x": torch.tensor([[2], [8], [8]])},
+        {"x": torch.randint(0, 10, (6,))},
+        {"x": torch.randint(0, 10, (3,))},
     ]
     subgraphs = []
     for i in range(2):
         subgraphs.append(
-            gb.FusedSampledSubgraphImpl(
-                node_pairs=node_pairs[i],
+            gb.SampledSubgraphImpl(
+                node_pairs=csc_formats[i],
                 original_column_node_ids=original_column_node_ids[i],
                 original_row_node_ids=original_row_node_ids[i],
                 original_edge_ids=original_edge_ids[i],
@@ -152,7 +152,9 @@ def test_minibatch_representation_homo():
     negative_srcs = torch.tensor([[8], [1], [6]])
     negative_dsts = torch.tensor([[2], [8], [8]])
     input_nodes = torch.tensor([8, 1, 6, 5, 9, 0, 2, 4])
-    compacted_node_pairs = (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5]))
+    compacted_csc_formats = gb.CSCFormatBase(
+        indptr=torch.tensor([0, 2, 3]), indices=torch.tensor([3, 4, 5])
+    )
     compacted_negative_srcs = torch.tensor([[0], [1], [2]])
     compacted_negative_dsts = torch.tensor([[6], [0], [0]])
     labels = torch.tensor([0.0, 1.0, 2.0])
@@ -177,33 +179,41 @@ def test_minibatch_representation_homo():
     assert result == expect_result, print(len(expect_result), len(result))
     # Test minibatch with all attributes.
     minibatch = gb.MiniBatch(
-        node_pairs=node_pairs,
+        node_pairs=csc_formats,
         sampled_subgraphs=subgraphs,
         labels=labels,
         node_features=node_features,
         edge_features=edge_features,
         negative_srcs=negative_srcs,
         negative_dsts=negative_dsts,
-        compacted_node_pairs=compacted_node_pairs,
+        compacted_node_pairs=compacted_csc_formats,
         input_nodes=input_nodes,
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
     expect_result = str(
         """MiniBatch(seed_nodes=None,
-          sampled_subgraphs=[FusedSampledSubgraphImpl(original_row_node_ids=tensor([10, 11, 12, 13]),
-                                                    original_edge_ids=tensor([19, 20, 21, 22, 25, 30]),
-                                                    original_column_node_ids=tensor([10, 11, 12, 13]),
-                                                    node_pairs=(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])),
+          sampled_subgraphs=[SampledSubgraphImpl(original_row_node_ids=tensor([10, 11, 12, 13]),
+                                               original_edge_ids=tensor([19, 20, 21, 22, 25, 30]),
+                                               original_column_node_ids=tensor([10, 11, 12, 13]),
+                                               node_pairs=CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6]),
+                                                                        indices=tensor([0, 1, 2, 2, 1, 2]),
+                                                          ),
                             ),
-                            FusedSampledSubgraphImpl(original_row_node_ids=tensor([10, 11, 12]),
-                                                    original_edge_ids=tensor([10, 15, 17]),
-                                                    original_column_node_ids=tensor([10, 11]),
-                                                    node_pairs=(tensor([0, 1, 2]), tensor([1, 0, 0])),
+                            SampledSubgraphImpl(original_row_node_ids=tensor([10, 11, 12]),
+                                               original_edge_ids=tensor([10, 15, 17]),
+                                               original_column_node_ids=tensor([10, 11]),
+                                               node_pairs=CSCFormatBase(indptr=tensor([0, 2, 3]),
+                                                                        indices=tensor([1, 2, 0]),
+                                                          ),
                             )],
-          node_pairs=[(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])),
-                     (tensor([0, 1, 2]), tensor([1, 0, 0]))],
-          node_features={'x': tensor([7, 6, 2, 2])},
+          node_pairs=[CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6]),
+                                   indices=tensor([0, 1, 2, 2, 1, 2]),
+                     ),
+                     CSCFormatBase(indptr=tensor([0, 2, 3]),
+                                   indices=tensor([1, 2, 0]),
+                     )],
+          node_features={'x': tensor([4, 9, 4, 7])},
           negative_srcs=tensor([[8],
                                 [1],
                                 [6]]),
@@ -212,14 +222,11 @@ def test_minibatch_representation_homo():
                                 [8]]),
           labels=tensor([0., 1., 2.]),
           input_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
-          edge_features=[{'x': tensor([[8],
-                                [1],
-                                [6]])},
-                        {'x': tensor([[2],
-                                [8],
-                                [8]])}],
-          compacted_node_pairs=(tensor([0, 1, 2]),
-                               tensor([3, 4, 5])),
+          edge_features=[{'x': tensor([5, 7, 0, 4, 4, 3])},
+                        {'x': tensor([4, 6, 4])}],
+          compacted_node_pairs=CSCFormatBase(indptr=tensor([0, 2, 3]),
+                                             indices=tensor([3, 4, 5]),
+                               ),
           compacted_negative_srcs=tensor([[0],
                                           [1],
                                           [2]]),
@@ -233,7 +240,7 @@ def test_minibatch_representation_homo():
 
 
 def test_minibatch_representation_hetero():
-    node_pairs = [
+    csc_formats = [
         {
             relation: gb.CSCFormatBase(
                 indptr=torch.tensor([0, 1, 2, 3]),
@@ -282,7 +289,7 @@ def test_minibatch_representation_hetero():
     for i in range(2):
         subgraphs.append(
             gb.SampledSubgraphImpl(
-                node_pairs=node_pairs[i],
+                node_pairs=csc_formats[i],
                 original_column_node_ids=original_column_node_ids[i],
                 original_row_node_ids=original_row_node_ids[i],
                 original_edge_ids=original_edge_ids[i],
@@ -290,7 +297,7 @@ def test_minibatch_representation_hetero():
         )
     negative_srcs = {"B": torch.tensor([[8], [1], [6]])}
     negative_dsts = {"B": torch.tensor([[2], [8], [8]])}
-    compacted_node_pairs = {
+    compacted_csc_formats = {
         relation: gb.CSCFormatBase(
             indptr=torch.tensor([0, 1, 2, 3]), indices=torch.tensor([3, 4, 5])
         ),
@@ -303,14 +310,14 @@ def test_minibatch_representation_hetero():
     # Test dglminibatch with all attributes.
     minibatch = gb.MiniBatch(
         seed_nodes={"B": torch.tensor([10, 15])},
-        node_pairs=node_pairs,
+        node_pairs=csc_formats,
         sampled_subgraphs=subgraphs,
         node_features=node_features,
         edge_features=edge_features,
         labels={"B": torch.tensor([2, 5])},
         negative_srcs=negative_srcs,
         negative_dsts=negative_dsts,
-        compacted_node_pairs=compacted_node_pairs,
+        compacted_node_pairs=compacted_csc_formats,
         input_nodes={
             "A": torch.tensor([5, 7, 9, 11]),
             "B": torch.tensor([10, 11, 12]),
