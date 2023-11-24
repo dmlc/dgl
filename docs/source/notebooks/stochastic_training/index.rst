@@ -1,0 +1,10 @@
+GNN Stochastic Training
+=========================
+
+This tutorial introduces how to train GNNs with stochastic training.
+
+.. toctree::
+  :maxdepth: 1
+  :titlesonly:
+
+  node_classification.nblink
