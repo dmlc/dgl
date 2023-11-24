@@ -16,10 +16,15 @@ __all__ = [
     "CopyTo",
     "isin",
     "CSCFormatBase",
+    "seed",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
 ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
+
+
+def seed(seed):
+    torch.ops.graphbolt.set_seed(seed)
 
 
 def isin(elements, test_elements):
