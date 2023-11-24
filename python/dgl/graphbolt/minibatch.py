@@ -642,25 +642,11 @@ def _dgl_minibatch_str(dglminibatch: DGLMiniBatch) -> str:
         # indentation on top of the original if the original data output has
         # line feeds.
         if isinstance(val, list):
-            if len(val) == 0:
-                val = "[]"
-            # Special handling of blocks data. Each element of list occupies
-            # one row and is further structured.
-            elif name == "blocks":
-                blocks_strs = []
-                for block in val:
-                    block_str = str(block).replace(" ", "\n")
-                    block_str = _add_indent(block_str, len("Block") + 1)
-                    blocks_strs.append(block_str)
-                val = "[" + ",\n".join(blocks_strs) + "]"
-            else:
-                val = [
-                    _add_indent(
-                        str(val_str), len(str(val_str).split("': ")[0]) + 3
-                    )
-                    for val_str in val
-                ]
-                val = "[" + ",\n".join(val) + "]"
+            val = [str(val_str) for val_str in val]
+            val = "[" + ",\n".join(val) + "]"
+        elif isinstance(val, tuple):
+            val = [str(val_str) for val_str in val]
+            val = "(" + ",\n".join(val) + ")"
         else:
             val = str(val)
         final_str = (
