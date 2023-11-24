@@ -24,6 +24,13 @@ ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
 
 
 def seed(seed):
+    """Set the random seed of Graphbolt.
+
+    Parameters
+    ----------
+    val : int
+        The seed.
+    """
     torch.ops.graphbolt.set_seed(seed)
 
 
