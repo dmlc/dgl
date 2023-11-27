@@ -1,6 +1,6 @@
 """
-Introduction of Neighbor Sampling for GNN Training
-==================================================
+Introduction of Neighbor Sampling
+=================================
 
 In :doc:`previous tutorials <../blitz/1_introduction>` you have learned how to
 train GNNs by computing the representations of all nodes on a graph.

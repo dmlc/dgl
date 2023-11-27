@@ -22,10 +22,12 @@ Welcome to Deep Graph Library Tutorials and Documentation
    :titlesonly:
    :glob:
 
+   graphbolt/index
    guide/index
    guide_cn/index
    guide_ko/index
    notebooks/sparse/index
+   notebooks/stochastic_training/index
    tutorials/large/index
    tutorials/cpu/index
    tutorials/multi/index

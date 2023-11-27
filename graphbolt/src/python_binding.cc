@@ -10,6 +10,7 @@
 #include <graphbolt/unique_and_compact.h>
 
 #include "./index_select.h"
+#include "./random.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -68,6 +69,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("unique_and_compact", &UniqueAndCompact);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
+  m.def("set_seed", &RandomEngine::SetManualSeed);
 }
 
 }  // namespace sampling

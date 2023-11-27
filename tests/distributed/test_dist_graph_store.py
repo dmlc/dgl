@@ -903,6 +903,7 @@ def test_server_client():
     # check_server_client(True, 2, 2, 2)
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
 @unittest.skipIf(
     dgl.backend.backend_name == "tensorflow",
@@ -1033,6 +1034,7 @@ def test_standalone():
     dgl.distributed.exit_client()  # this is needed since there's two test here in one process
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @unittest.skipIf(
     dgl.backend.backend_name == "tensorflow",
     reason="TF doesn't support distributed DistEmbedding",

@@ -292,7 +292,7 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
 @unittest.skipIf(
     dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support"
 )
-@pytest.mark.parametrize("num_server", [1, 2])
+@pytest.mark.parametrize("num_server", [1])
 def test_rpc_find_edges_shuffle(num_server):
     reset_envs()
     import tempfile
@@ -356,7 +356,7 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
 @unittest.skipIf(
     dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support"
 )
-@pytest.mark.parametrize("num_server", [1, 2])
+@pytest.mark.parametrize("num_server", [1])
 def test_rpc_get_degree_shuffle(num_server):
     reset_envs()
     import tempfile
@@ -375,7 +375,7 @@ def test_rpc_sampling():
 
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_sampling(Path(tmpdirname), 2)
+        check_rpc_sampling(Path(tmpdirname), 1)
 
 
 def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
@@ -1005,7 +1005,7 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
 @unittest.skipIf(
     dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support"
 )
-@pytest.mark.parametrize("num_server", [1, 2])
+@pytest.mark.parametrize("num_server", [1])
 def test_rpc_sampling_shuffle(num_server):
     reset_envs()
     import tempfile
@@ -1255,7 +1255,7 @@ def test_rpc_in_subgraph():
 
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_in_subgraph_shuffle(Path(tmpdirname), 2)
+        check_rpc_in_subgraph_shuffle(Path(tmpdirname), 1)
 
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")

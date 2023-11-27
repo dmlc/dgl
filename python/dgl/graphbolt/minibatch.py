@@ -1,7 +1,7 @@
 """Unified data structure for input and ouput of all the stages in loading process."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 
@@ -16,7 +16,53 @@ __all__ = ["DGLMiniBatch", "MiniBatch"]
 
 
 @dataclass
-class DGLMiniBatch:
+class MiniBatchBase(object):
+    """Base class for `MiniBatch` and `DGLMiniBatch`."""
+
+    def node_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        """A representation of input nodes in the outermost layer. Contains all
+        nodes in the MiniBatch.
+        - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
+        - If `input_nodes` is a dictionary: The keys should be node type and the
+          value should be corresponding heterogeneous node id.
+        """
+        raise NotImplementedError
+
+    def num_layers(self) -> int:
+        """Return the number of layers."""
+        raise NotImplementedError
+
+    def set_node_features(
+        self,
+        node_features: Union[
+            Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]
+        ],
+    ) -> None:
+        """Set node features."""
+        raise NotImplementedError
+
+    def set_edge_features(
+        self,
+        edge_features: List[
+            Union[Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]]
+        ],
+    ) -> None:
+        """Set edge features."""
+        raise NotImplementedError
+
+    def edge_ids(
+        self, layer_id: int
+    ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
+        """Get the edge ids of a layer."""
+        raise NotImplementedError
+
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy MiniBatch to the specified device."""
+        raise NotImplementedError
+
+
+@dataclass
+class DGLMiniBatch(MiniBatchBase):
     r"""A data class designed for the DGL library, encompassing all the
     necessary fields for computation using the DGL library."""
 
@@ -98,6 +144,47 @@ class DGLMiniBatch:
 
     def __repr__(self) -> str:
         return _dgl_minibatch_str(self)
+
+    def node_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        """A representation of input nodes in the outermost layer. Contains all
+        nodes in the `blocks`.
+        - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
+        - If `input_nodes` is a dictionary: The keys should be node type and the
+          value should be corresponding heterogeneous node id.
+        """
+        return self.input_nodes
+
+    def num_layers(self) -> int:
+        """Return the number of layers."""
+        if self.blocks is None:
+            return 0
+        return len(self.blocks)
+
+    def edge_ids(
+        self, layer_id: int
+    ) -> Optional[Union[Dict[str, torch.Tensor], torch.Tensor]]:
+        """Get edge ids of a layer."""
+        if dgl.EID not in self.blocks[layer_id].edata:
+            return None
+        return self.blocks[layer_id].edata[dgl.EID]
+
+    def set_node_features(
+        self,
+        node_features: Union[
+            Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]
+        ],
+    ) -> None:
+        """Set node features."""
+        self.node_features = node_features
+
+    def set_edge_features(
+        self,
+        edge_features: List[
+            Union[Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]]
+        ],
+    ) -> None:
+        """Set edge features."""
+        self.edge_features = edge_features
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `DGLMiniBatch` to the specified device using reflection."""
@@ -235,6 +322,45 @@ class MiniBatch:
 
     def __repr__(self) -> str:
         return _minibatch_str(self)
+
+    def node_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        """A representation of input nodes in the outermost layer. Contains all
+        nodes in the `sampled_subgraphs`.
+        - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
+        - If `input_nodes` is a dictionary: The keys should be node type and the
+          value should be corresponding heterogeneous node id.
+        """
+        return self.input_nodes
+
+    def num_layers(self) -> int:
+        """Return the number of layers."""
+        if self.sampled_subgraphs is None:
+            return 0
+        return len(self.sampled_subgraphs)
+
+    def edge_ids(
+        self, layer_id: int
+    ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
+        """Get the edge ids of a layer."""
+        return self.sampled_subgraphs[layer_id].original_edge_ids
+
+    def set_node_features(
+        self,
+        node_features: Union[
+            Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]
+        ],
+    ) -> None:
+        """Set node features."""
+        self.node_features = node_features
+
+    def set_edge_features(
+        self,
+        edge_features: List[
+            Union[Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]]
+        ],
+    ) -> None:
+        """Set edge features."""
+        self.edge_features = edge_features
 
     def _to_dgl_blocks(self):
         """Transforming a `MiniBatch` into DGL blocks necessitates constructing
@@ -516,25 +642,11 @@ def _dgl_minibatch_str(dglminibatch: DGLMiniBatch) -> str:
         # indentation on top of the original if the original data output has
         # line feeds.
         if isinstance(val, list):
-            if len(val) == 0:
-                val = "[]"
-            # Special handling of blocks data. Each element of list occupies
-            # one row and is further structured.
-            elif name == "blocks":
-                blocks_strs = []
-                for block in val:
-                    block_str = str(block).replace(" ", "\n")
-                    block_str = _add_indent(block_str, len("Block") + 1)
-                    blocks_strs.append(block_str)
-                val = "[" + ",\n".join(blocks_strs) + "]"
-            else:
-                val = [
-                    _add_indent(
-                        str(val_str), len(str(val_str).split("': ")[0]) + 3
-                    )
-                    for val_str in val
-                ]
-                val = "[" + ",\n".join(val) + "]"
+            val = [str(val_str) for val_str in val]
+            val = "[" + ",\n".join(val) + "]"
+        elif isinstance(val, tuple):
+            val = [str(val_str) for val_str in val]
+            val = "(" + ",\n".join(val) + ")"
         else:
             val = str(val)
         final_str = (

@@ -189,7 +189,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # to ensure that positive samples are not inadvertently included within
     # the negative samples.
     ############################################################################
-    if is_train:
+    if is_train and args.exclude_edges:
         datapipe = datapipe.transform(gb.exclude_seed_edges)
 
     ############################################################################
@@ -369,7 +369,7 @@ def parse_args():
     parser.add_argument("--neg-ratio", type=int, default=1)
     parser.add_argument("--train-batch-size", type=int, default=512)
     parser.add_argument("--eval-batch-size", type=int, default=1024)
-    parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument(
         "--early-stop",
         type=int,
@@ -381,6 +381,12 @@ def parse_args():
         type=str,
         default="15,10,5",
         help="Fan-out of neighbor sampling. Default: 15,10,5",
+    )
+    parser.add_argument(
+        "--exclude-edges",
+        type=int,
+        default=1,
+        help="Whether to exclude reverse edges during sampling. Default: 1",
     )
     parser.add_argument(
         "--device",

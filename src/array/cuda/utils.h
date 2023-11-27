@@ -11,6 +11,8 @@
 #include <dgl/runtime/ndarray.h>
 #include <dmlc/logging.h>
 
+#include <type_traits>
+
 #include "../../runtime/cuda/cuda_common.h"
 #include "dgl_cub.cuh"
 
@@ -46,11 +48,14 @@ int _NumberOfBits(const T& range) {
   }
 
   int bits = 1;
-  while (bits < static_cast<int>(sizeof(T) * 8) && (1 << bits) < range) {
+  const auto urange = static_cast<std::make_unsigned_t<T>>(range);
+  while (bits < static_cast<int>(sizeof(T) * 8) && (1ull << bits) < urange) {
     ++bits;
   }
 
-  CHECK_EQ((range - 1) >> bits, 0);
+  if (bits < static_cast<int>(sizeof(T) * 8)) {
+    CHECK_EQ((range - 1) >> bits, 0);
+  }
   CHECK_NE((range - 1) >> (bits - 1), 0);
 
   return bits;

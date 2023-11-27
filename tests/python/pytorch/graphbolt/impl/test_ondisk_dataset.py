@@ -861,6 +861,7 @@ def test_OnDiskDataset_Feature_heterograph():
                 format: numpy
                 in_memory: false
                 path: {node_data_paper_path}
+                num_categories: 10
               - domain: node
                 type: paper
                 name: labels
@@ -873,6 +874,7 @@ def test_OnDiskDataset_Feature_heterograph():
                 format: numpy
                 in_memory: false
                 path: {edge_data_writes_path}
+                num_categories: 10
               - domain: edge
                 type: "author:writes:paper"
                 name: labels
@@ -896,19 +898,34 @@ def test_OnDiskDataset_Feature_heterograph():
             feature_data.read("node", "paper", "feat"),
             torch.tensor(node_data_paper),
         )
+        assert (
+            feature_data.metadata("node", "paper", "feat")["num_categories"]
+            == 10
+        )
         assert torch.equal(
             feature_data.read("node", "paper", "labels"),
             node_data_label.clone().detach(),
         )
+        assert len(feature_data.metadata("node", "paper", "labels")) == 0
 
         # Verify edge feature data.
         assert torch.equal(
             feature_data.read("edge", "author:writes:paper", "feat"),
             torch.tensor(edge_data_writes),
         )
+        assert (
+            feature_data.metadata("edge", "author:writes:paper", "feat")[
+                "num_categories"
+            ]
+            == 10
+        )
         assert torch.equal(
             feature_data.read("edge", "author:writes:paper", "labels"),
             edge_data_label.clone().detach(),
+        )
+        assert (
+            len(feature_data.metadata("edge", "author:writes:paper", "labels"))
+            == 0
         )
 
         feature_data = None
@@ -947,6 +964,7 @@ def test_OnDiskDataset_Feature_homograph():
                 format: numpy
                 in_memory: false
                 path: {node_data_feat_path}
+                num_categories: 10
               - domain: node
                 name: labels
                 format: numpy
@@ -957,6 +975,7 @@ def test_OnDiskDataset_Feature_homograph():
                 format: numpy
                 in_memory: false
                 path: {edge_data_feat_path}
+                num_categories: 10
               - domain: edge
                 name: labels
                 format: numpy
@@ -979,20 +998,28 @@ def test_OnDiskDataset_Feature_homograph():
             feature_data.read("node", None, "feat"),
             torch.tensor(node_data_feat),
         )
+        assert (
+            feature_data.metadata("node", None, "feat")["num_categories"] == 10
+        )
         assert torch.equal(
             feature_data.read("node", None, "labels"),
             node_data_label.clone().detach(),
         )
+        assert len(feature_data.metadata("node", None, "labels")) == 0
 
         # Verify edge feature data.
         assert torch.equal(
             feature_data.read("edge", None, "feat"),
             torch.tensor(edge_data_feat),
         )
+        assert (
+            feature_data.metadata("edge", None, "feat")["num_categories"] == 10
+        )
         assert torch.equal(
             feature_data.read("edge", None, "labels"),
             edge_data_label.clone().detach(),
         )
+        assert len(feature_data.metadata("edge", None, "labels")) == 0
 
         feature_data = None
         dataset = None
