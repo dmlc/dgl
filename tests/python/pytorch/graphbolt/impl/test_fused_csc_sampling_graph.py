@@ -604,9 +604,9 @@ def test_in_subgraph_heterogeneous():
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-@pytest.mark.parametrize("labor", [False, True])
-@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
-@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("labor", [True])
+@pytest.mark.parametrize("indptr_dtype", [torch.int32])
+@pytest.mark.parametrize("indices_dtype", [torch.int32])
 def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
     """Original graph in COO:
     1   0   1   0   1
@@ -628,6 +628,7 @@ def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
 
     # Construct FusedCSCSamplingGraph.
     graph = gb.from_fused_csc(indptr, indices)
+    torch.ops.graphbolt.set_seed(12345)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)

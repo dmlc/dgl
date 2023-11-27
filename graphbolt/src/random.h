@@ -17,28 +17,54 @@
 
 namespace graphbolt {
 
+namespace {
+
+// Get a unique integer ID representing this thread.
+inline uint32_t GetThreadId() {
+  static int num_threads = 0;
+  static std::mutex mutex;
+  static thread_local int id = -1;
+
+  if (id == -1) {
+    std::lock_guard<std::mutex> guard(mutex);
+    id = num_threads;
+    num_threads++;
+  }
+  return id;
+}
+
+};  // namespace
+
 /**
  * @brief Thread-local Random Number Generator class.
  */
 class RandomEngine {
  public:
   /** @brief Constructor with default seed. */
-  RandomEngine();
+  RandomEngine() {
+    std::random_device rd;
+    uint64_t seed = manual_seed.value_or(rd());
+    SetSeed(seed);
+  }
 
   /** @brief Constructor with given seed. */
-  explicit RandomEngine(uint64_t seed);
-  explicit RandomEngine(uint64_t seed, uint64_t stream);
+  explicit RandomEngine(uint64_t seed) { RandomEngine(seed, GetThreadId()); }
+  explicit RandomEngine(uint64_t seed, uint64_t stream) {
+    SetSeed(seed, stream);
+  }
 
   /** @brief Get the thread-local random number generator instance. */
-  static RandomEngine* ThreadLocal();
+  static RandomEngine* ThreadLocal() {
+    return dmlc::ThreadLocalStore<RandomEngine>::Get();
+  }
 
   /** @brief Set the seed. */
-  void SetSeed(uint64_t seed);
-  void SetSeed(uint64_t seed, uint64_t stream);
+  void SetSeed(uint64_t seed) { SetSeed(seed, GetThreadId()); }
+  void SetSeed(uint64_t seed, uint64_t stream) { rng_.seed(seed, stream); }
 
   /** @brief Manually fix the seed. */
-  static std::optional<uint64_t> manual_seed;
-  static void SetManualSeed(int64_t seed);
+  static inline std::optional<uint64_t> manual_seed;
+  static void SetManualSeed(int64_t seed) { manual_seed = seed; }
 
   /**
    * @brief Generate a uniform random integer in [low, high).
