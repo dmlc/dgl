@@ -1,2 +1,2 @@
-Stochastic Training of GNNs
-===========================
+[Deprecated] Stochastic Training of GNNs
+========================================
