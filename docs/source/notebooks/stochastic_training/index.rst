@@ -1,5 +1,5 @@
-GNN Stochastic Training
-=========================
+Stochastic Training of GNNs
+===========================
 
 This tutorial introduces how to train GNNs with stochastic training.
 
@@ -7,6 +7,6 @@ This tutorial introduces how to train GNNs with stochastic training.
   :maxdepth: 1
   :titlesonly:
 
+  neighbor_sampling_overview.nblink
   node_classification.nblink
   link_prediction.nblink
-  neighbor_sampling_overview.nblink
