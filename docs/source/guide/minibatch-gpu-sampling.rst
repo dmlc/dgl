@@ -96,7 +96,7 @@ especially for multi-GPU training.
 
   To use UVA-based sampling in multi-GPU training, you should first materialize all the
   necessary sparse formats of the graph before spawning training processes.
-  Refer to our `GraphSAGE example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/multi_gpu_node_classification.py>`_ for more details.
+  Refer to our `GraphSAGE example <https://github.com/dmlc/dgl/blob/master/examples/multigpu/node_classification_sage.py>`_ for more details.
 
 
 UVA and GPU support for PinSAGESampler/RandomWalkNeighborSampler
