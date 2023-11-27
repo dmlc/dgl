@@ -40,6 +40,7 @@ main
 """
 
 import argparse
+import time
 
 import dgl
 import dgl.nn as dglnn
