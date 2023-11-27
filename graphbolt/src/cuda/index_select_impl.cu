@@ -4,11 +4,13 @@
  * @brief Index select operator implementation on CUDA.
  */
 #include <c10/cuda/CUDAException.h>
+#include <c10/cuda/CUDAStream.h>
 #include <torch/script.h>
 
 #include <numeric>
 
 #include "../index_select.h"
+#include "./common.h"
 #include "./utils.h"
 
 namespace graphbolt {
@@ -115,15 +117,15 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   const IdType* index_sorted_ptr = sorted_index.data_ptr<IdType>();
   const int64_t* permutation_ptr = permutation.data_ptr<int64_t>();
 
-  cudaStream_t stream = 0;
+  cudaStream_t stream = torch::cuda::getDefaultCUDAStream();
 
   if (feature_size == 1) {
     // Use a single thread to process each output row to avoid wasting threads.
     const int num_threads = cuda::FindNumThreads(return_len);
     const int num_blocks = (return_len + num_threads - 1) / num_threads;
-    IndexSelectSingleKernel<<<num_blocks, num_threads, 0, stream>>>(
-        input_ptr, input_len, index_sorted_ptr, return_len, ret_ptr,
-        permutation_ptr);
+    CUDA_KERNEL_CALL(
+        IndexSelectSingleKernel, num_blocks, num_threads, 0, stream, input_ptr,
+        input_len, index_sorted_ptr, return_len, ret_ptr, permutation_ptr);
   } else {
     dim3 block(512, 1);
     while (static_cast<int64_t>(block.x) >= 2 * feature_size) {
@@ -134,17 +136,17 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
     if (feature_size * sizeof(DType) <= GPU_CACHE_LINE_SIZE) {
       // When feature size is smaller than GPU cache line size, use unaligned
       // version for less SM usage, which is more resource efficient.
-      IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
-          input_ptr, input_len, feature_size, index_sorted_ptr, return_len,
-          ret_ptr, permutation_ptr);
+      CUDA_KERNEL_CALL(
+          IndexSelectMultiKernel, grid, block, 0, stream, input_ptr, input_len,
+          feature_size, index_sorted_ptr, return_len, ret_ptr, permutation_ptr);
     } else {
       // Use aligned version to improve the memory access pattern.
-      IndexSelectMultiKernelAligned<<<grid, block, 0, stream>>>(
-          input_ptr, input_len, feature_size, index_sorted_ptr, return_len,
-          ret_ptr, permutation_ptr);
+      CUDA_KERNEL_CALL(
+          IndexSelectMultiKernelAligned, grid, block, 0, stream, input_ptr,
+          input_len, feature_size, index_sorted_ptr, return_len, ret_ptr,
+          permutation_ptr);
     }
   }
-  C10_CUDA_KERNEL_LAUNCH_CHECK();
 
   auto return_shape = std::vector<int64_t>({return_len});
   return_shape.insert(
