@@ -30,8 +30,10 @@ models with multi-GPU with ``DistributedDataParallel``.
 #
 
 import os
+
 os.environ["DGLBACKEND"] = "pytorch"
 import time
+
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
@@ -131,7 +133,6 @@ def create_dataloader(
 #
 # The evaluation loop is almost identical to the previous tutorial.
 #
-
 
 
 @torch.no_grad()
@@ -396,4 +397,3 @@ def run(rank, world_size, args, devices, dataset):
 #             join=True,
 #         )
 #
-
