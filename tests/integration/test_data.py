@@ -211,3 +211,65 @@ def test_as_graphpred():
     assert len(new_ds) == 1000
     assert new_ds.num_tasks == 1
     assert new_ds.num_classes == 2
+
+
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="ogb only supports pytorch"
+)
+def test_as_linkpred_ogb():
+    from ogb.linkproppred import DglLinkPropPredDataset
+
+    ds = data.AsLinkPredDataset(
+        DglLinkPropPredDataset("ogbl-collab"), split_ratio=None, verbose=True
+    )
+    # original dataset has 46329 test edges
+    assert ds.test_edges[0][0].shape[0] == 46329
+    # force generate new split
+    ds = data.AsLinkPredDataset(
+        DglLinkPropPredDataset("ogbl-collab"),
+        split_ratio=[0.7, 0.2, 0.1],
+        verbose=True,
+    )
+    assert ds.test_edges[0][0].shape[0] == 235812
+
+
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="ogb only supports pytorch"
+)
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_as_nodepred_ogb():
+    from ogb.nodeproppred import DglNodePropPredDataset
+
+    ds = data.AsNodePredDataset(
+        DglNodePropPredDataset("ogbn-arxiv"), split_ratio=None, verbose=True
+    )
+    split = DglNodePropPredDataset("ogbn-arxiv").get_idx_split()
+    train_idx, val_idx, test_idx = split["train"], split["valid"], split["test"]
+    assert F.array_equal(ds.train_idx, F.tensor(train_idx))
+    assert F.array_equal(ds.val_idx, F.tensor(val_idx))
+    assert F.array_equal(ds.test_idx, F.tensor(test_idx))
+    # force generate new split
+    ds = data.AsNodePredDataset(
+        DglNodePropPredDataset("ogbn-arxiv"),
+        split_ratio=[0.7, 0.2, 0.1],
+        verbose=True,
+    )
+
+
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="ogb only supports pytorch"
+)
+def test_as_graphpred_ogb():
+    from ogb.graphproppred import DglGraphPropPredDataset
+
+    ds = data.AsGraphPredDataset(
+        DglGraphPropPredDataset("ogbg-molhiv"), split_ratio=None, verbose=True
+    )
+    assert len(ds.train_idx) == 32901
+    # force generate new split
+    ds = data.AsGraphPredDataset(
+        DglGraphPropPredDataset("ogbg-molhiv"),
+        split_ratio=[0.6, 0.2, 0.2],
+        verbose=True,
+    )
+    assert len(ds.train_idx) == 24676
