@@ -3,8 +3,9 @@
 import torch
 from torch.utils.data import functional_datapipe
 
+from ..internal import compact_csc_format, unique_and_compact_node_pairs
+
 from ..subgraph_sampler import SubgraphSampler
-from ..utils import compact_csc_format, unique_and_compact_node_pairs
 from .sampled_subgraph_impl import FusedSampledSubgraphImpl, SampledSubgraphImpl
 
 

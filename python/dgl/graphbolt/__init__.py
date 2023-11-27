@@ -18,13 +18,12 @@ from .minibatch_transformer import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
-from .utils import (
-    add_reverse_edges,
+from .internal import (
     compact_csc_format,
-    exclude_seed_edges,
     unique_and_compact,
     unique_and_compact_node_pairs,
 )
+from .utils import add_reverse_edges, exclude_seed_edges
 
 
 def load_graphbolt():

@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-import dgl.graphbolt.utils as utils
+import dgl.graphbolt.internal as internal
 import numpy as np
 import pytest
 import torch
@@ -12,7 +12,7 @@ def test_read_torch_data():
         save_tensor = torch.tensor([[1, 2, 4], [2, 5, 3]])
         file_name = os.path.join(test_dir, "save_tensor.pt")
         torch.save(save_tensor, file_name)
-        read_tensor = utils.internal._read_torch_data(file_name)
+        read_tensor = internal.utils._read_torch_data(file_name)
         assert torch.equal(save_tensor, read_tensor)
         save_tensor = read_tensor = None
 
@@ -23,7 +23,7 @@ def test_read_numpy_data(in_memory):
         save_numpy = np.array([[1, 2, 4], [2, 5, 3]])
         file_name = os.path.join(test_dir, "save_numpy.npy")
         np.save(file_name, save_numpy)
-        read_tensor = utils.internal._read_numpy_data(file_name, in_memory)
+        read_tensor = internal.utils._read_numpy_data(file_name, in_memory)
         assert torch.equal(torch.from_numpy(save_numpy), read_tensor)
         save_numpy = read_tensor = None
 
@@ -38,7 +38,7 @@ def test_read_data(fmt):
             np.save(file_name, data)
         elif fmt == "torch":
             torch.save(torch.from_numpy(data), file_name)
-        read_tensor = utils.read_data(file_name, fmt)
+        read_tensor = internal.read_data(file_name, fmt)
         assert torch.equal(torch.from_numpy(data), read_tensor)
 
 
@@ -65,9 +65,9 @@ def test_save_data(data_fmt, save_fmt, contiguous):
         save_file_name = os.path.join(test_dir, f"save_data.{type_name}")
         # Step1. Save the data.
         if data_fmt == "torch":
-            utils.save_data(tensor_data, save_file_name, save_fmt)
+            internal.save_data(tensor_data, save_file_name, save_fmt)
         elif data_fmt == "numpy":
-            utils.save_data(data, save_file_name, save_fmt)
+            internal.save_data(data, save_file_name, save_fmt)
 
         # Step2. Load the data.
         if save_fmt == "torch":
@@ -91,11 +91,11 @@ def test_get_npy_dim(fmt):
         file_name = os.path.join(test_dir, f"save_data.{type_name}")
         if fmt == "numpy":
             np.save(file_name, data)
-            assert utils.get_npy_dim(file_name) == 2
+            assert internal.get_npy_dim(file_name) == 2
         elif fmt == "torch":
             torch.save(torch.from_numpy(data), file_name)
             with pytest.raises(ValueError):
-                utils.get_npy_dim(file_name)
+                internal.get_npy_dim(file_name)
         data = None
 
 
@@ -116,7 +116,7 @@ def test_copy_or_convert_data(data_fmt, save_fmt, is_feature):
             torch.save(tensor_data, input_path)
         if save_fmt == "torch":
             with pytest.raises(AssertionError):
-                utils.copy_or_convert_data(
+                internal.copy_or_convert_data(
                     input_path,
                     output_path,
                     data_fmt,
@@ -124,7 +124,7 @@ def test_copy_or_convert_data(data_fmt, save_fmt, is_feature):
                     is_feature=is_feature,
                 )
         else:
-            utils.copy_or_convert_data(
+            internal.copy_or_convert_data(
                 input_path,
                 output_path,
                 data_fmt,

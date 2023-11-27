@@ -6,9 +6,9 @@ import torchdata.datapipes as dp
 
 from .base import CopyTo
 from .feature_fetcher import FeatureFetcher
-from .item_sampler import ItemSampler
 
-from .utils import datapipe_graph_to_adjlist
+from .internal import datapipe_graph_to_adjlist
+from .item_sampler import ItemSampler
 
 
 __all__ = [
