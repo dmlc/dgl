@@ -68,6 +68,9 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
                 isinstance(item, torch.Tensor) for item in self.node_pairs
             ), "Nodes in pairs should be of type torch.Tensor."
 
+    def __repr__(self) -> str:
+        return _sampled_subgraph_str(self, "FusedSampledSubgraphImpl")
+
 
 @dataclass
 class SampledSubgraphImpl(SampledSubgraph):
@@ -129,3 +132,38 @@ class SampledSubgraphImpl(SampledSubgraph):
             ) and isinstance(
                 self.node_pairs.indices, torch.Tensor
             ), "Nodes in pairs should be of type torch.Tensor."
+
+    def __repr__(self) -> str:
+        return _sampled_subgraph_str(self, "SampledSubgraphImpl")
+
+
+def _sampled_subgraph_str(sampled_subgraph: SampledSubgraph, classname) -> str:
+    final_str = classname + "("
+
+    def _get_attributes(_obj) -> list:
+        attributes = [
+            attribute
+            for attribute in dir(_obj)
+            if not attribute.startswith("__")
+            and not callable(getattr(_obj, attribute))
+        ]
+        return attributes
+
+    attributes = _get_attributes(sampled_subgraph)
+    attributes.reverse()
+
+    for name in attributes:
+        val = getattr(sampled_subgraph, name)
+
+        def _add_indent(_str, indent):
+            lines = _str.split("\n")
+            lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+            return "\n".join(lines)
+
+        val = str(val)
+        final_str = (
+            final_str
+            + f"{name}={_add_indent(val, len(name) + len(classname) + 1)},\n"
+            + " " * len(classname)
+        )
+    return final_str[: -len(classname)] + ")"
