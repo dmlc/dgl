@@ -3,6 +3,7 @@
  * @file cuda/index_select_impl.cu
  * @brief Index select operator implementation on CUDA.
  */
+#include <c10/core/ScalarType.h>
 #include <c10/cuda/CUDAStream.h>
 #include <torch/script.h>
 
@@ -98,17 +99,18 @@ __global__ void IndexSelectMultiKernelAligned(
 }
 
 template <typename DType, typename IdType>
-torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
+torch::Tensor UVAIndexSelectImpl_(
+    torch::Tensor input, torch::Tensor index, int64_t feature_size) {
   const int64_t input_len = input.size(0);
   const int64_t return_len = index.size(0);
-  const int64_t feature_size = std::accumulate(
+  const int64_t original_feature_size = std::accumulate(
       input.sizes().begin() + 1, input.sizes().end(), 1, std::multiplies<>());
   torch::Tensor ret = torch::empty(
-      {return_len, feature_size}, torch::TensorOptions()
-                                      .dtype(input.dtype())
-                                      .device(c10::DeviceType::CUDA));
-  DType* input_ptr = input.data_ptr<DType>();
-  DType* ret_ptr = ret.data_ptr<DType>();
+      {return_len, original_feature_size}, torch::TensorOptions()
+                                               .dtype(input.dtype())
+                                               .device(c10::DeviceType::CUDA));
+  DType* input_ptr = reinterpret_cast<DType*>(input.data_ptr());
+  DType* ret_ptr = reinterpret_cast<DType*>(ret.data_ptr());
 
   // Sort the index to improve the memory access pattern.
   torch::Tensor sorted_index, permutation;
@@ -161,14 +163,41 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
  * The supporting index types are: int, int64_t.
  */
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
-  return AT_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Int, at::ScalarType::Long, input.scalar_type(),
-      "UVAIndexSelectImpl", [&] {
-        return AT_DISPATCH_INDEX_TYPES(
-            index.scalar_type(), "UVAIndexSelectImpl", [&] {
-              return UVAIndexSelectImpl_<scalar_t, index_t>(input, index);
-            });
-      });
+  return AT_DISPATCH_INDEX_TYPES(
+      index.scalar_type(), "UVAIndexSelectImpl", ([&] {
+        const auto ptr = (size_t)input.data_ptr();
+        const int64_t feature_size = std::accumulate(
+            input.sizes().begin() + 1, input.sizes().end(), 1ll,
+            std::multiplies<>());
+        const int alignment =
+            std::gcd(16, std::gcd(ptr, input.element_size() * feature_size));
+        const auto new_feature_size =
+            input.element_size() * feature_size / alignment;
+        switch (alignment) {
+          case 1:
+            return UVAIndexSelectImpl_<uint8_t, index_t>(
+                input, index, new_feature_size);
+          case 2:
+            return UVAIndexSelectImpl_<uint16_t, index_t>(
+                input, index, new_feature_size);
+            break;
+          case 4:
+            return UVAIndexSelectImpl_<uint32_t, index_t>(
+                input, index, new_feature_size);
+            break;
+          case 8:
+            return UVAIndexSelectImpl_<uint64_t, index_t>(
+                input, index, new_feature_size);
+            break;
+          case 16:
+            return UVAIndexSelectImpl_<float4, index_t>(
+                input, index, new_feature_size);
+            break;
+          default:
+            TORCH_CHECK(false, "UVAIndexSelectImpl: Unreachable code path!");
+            return torch::Tensor{};
+        }
+      }));
 }
 
 }  //  namespace ops
