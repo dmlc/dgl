@@ -67,9 +67,9 @@ dependencies on each layer. They are called *message flow graphs* (MFGs) in DGL.
 
 .. note::
 
-   See the :doc:`Stochastic Training Tutorial
-   <notebooks/stochastic_training/neighbor_sampling_overview>` for the concept of
-   message flow graph.
+   See the `Stochastic Training Tutorial
+   <../notebooks/stochastic_training/neighbor_sampling_overview.nblink>`__
+   for the concept of message flow graph.
 
    If you wish to develop your own neighborhood sampler or you want a more
    detailed explanation of the concept of MFGs, please refer to
