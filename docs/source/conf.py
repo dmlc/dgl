@@ -211,7 +211,6 @@ from sphinx_gallery.sorting import FileNameSortKey
 
 examples_dirs = [
     "../../tutorials/blitz",
-    "../../tutorials/large",
     "../../tutorials/dist",
     "../../tutorials/models",
     "../../tutorials/multi",
@@ -219,7 +218,6 @@ examples_dirs = [
 ]  # path to find sources
 gallery_dirs = [
     "tutorials/blitz/",
-    "tutorials/large/",
     "tutorials/dist/",
     "tutorials/models/",
     "tutorials/multi/",
