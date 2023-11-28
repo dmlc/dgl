@@ -7,6 +7,7 @@
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
 
+#include "./random.h"
 namespace torch {
 
 serialize::InputArchive& operator>>(
@@ -24,6 +25,13 @@ serialize::OutputArchive& operator<<(
 }
 
 }  // namespace torch
+
+namespace {
+void dummy() {
+  std::cout << graphbolt::RandomEngine::ThreadLocal()->manual_seed.value_or(0)
+            << std::endl;
+}
+}  // namespace
 
 namespace graphbolt {
 
