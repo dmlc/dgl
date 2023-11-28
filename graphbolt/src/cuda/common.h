@@ -17,15 +17,15 @@ namespace cuda {
 
 /*
 How to use this class to get a nonblocking thrust execution policy that uses
-DGL's memory pool and the current cuda stream
+torch's memory pool and the current cuda stream:
 
 cuda::CUDAWorkspaceAllocator allocator(ctx);
 const auto stream = torch::cuda::getDefaultCUDAStream();
 const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
 
-now, one can pass exec_policy to thrust functions
+Now, one can pass exec_policy to thrust functions
 
-to get an integer array of size 1000 whose lifetime is managed by unique_ptr,
+To get an integer array of size 1000 whose lifetime is managed by unique_ptr,
 use: auto int_array = allocator.alloc_unique<int>(1000); int_array.get() gives
 the raw pointer.
 */
@@ -46,9 +46,9 @@ class CUDAWorkspaceAllocator {
   std::unique_ptr<T, CUDAWorkspaceAllocator> alloc_unique(
       std::size_t size) const {
     auto t = torch::empty(
-        size, torch::TensorOptions()
-                  .dtype(torch::kByte)
-                  .device(c10::DeviceType::CUDA));
+        sizeof(T) * size, torch::TensorOptions()
+                              .dtype(torch::kByte)
+                              .device(c10::DeviceType::CUDA));
     pointers->operator[](t.data_ptr()) = t;
     return std::unique_ptr<T, CUDAWorkspaceAllocator>(
         reinterpret_cast<T*>(t.data_ptr()), *this);
