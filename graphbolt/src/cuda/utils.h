@@ -31,6 +31,22 @@ inline int FindNumThreads(int size) {
   return ret;
 }
 
+template <typename T>
+int NumberOfBits(const T& range) {
+  if (range <= 1) {
+    // ranges of 0 or 1 require no bits to store
+    return 0;
+  }
+
+  int bits = 1;
+  const auto urange = static_cast<std::make_unsigned_t<T>>(range);
+  while (bits < static_cast<int>(sizeof(T) * 8) && (1ull << bits) < urange) {
+    ++bits;
+  }
+
+  return bits;
+}
+
 }  // namespace cuda
 }  // namespace graphbolt
 

@@ -7,14 +7,50 @@
 #include <c10/cuda/CUDAStream.h>
 #include <torch/script.h>
 
+// This should be defined in CMakeLists.txt
+// #ifndef THRUST_CUB_WRAPPED_NAMESPACE
+// static_assert(false, "THRUST_CUB_WRAPPED_NAMESPACE must be defined for
+// DGL."); #endif
+
 #include <numeric>
 
 #include "../index_select.h"
 #include "./common.h"
 #include "./utils.h"
+#include "cub/cub.cuh"
 
 namespace graphbolt {
 namespace ops {
+
+std::pair<torch::Tensor, torch::Tensor> Sort(
+    torch::Tensor input, int num_bits) {
+  int64_t n_items = input.size(0);
+  auto orig_idx = torch::arange(n_items, input.options().dtype(torch::kLong));
+  auto sorted_array = torch::empty_like(input);
+  auto sorted_idx = torch::empty_like(orig_idx);
+  cuda::CUDAWorkspaceAllocator allocator;
+  AT_DISPATCH_INDEX_TYPES(
+      input.scalar_type(), "SortImpl", ([&] {
+        using IdType = index_t;
+        const auto keys_in = input.data_ptr<index_t>();
+        const int64_t* values_in = orig_idx.data_ptr<int64_t>();
+        IdType* keys_out = sorted_array.data_ptr<index_t>();
+        int64_t* values_out = sorted_idx.data_ptr<int64_t>();
+        cudaStream_t stream = torch::cuda::getDefaultCUDAStream();
+        if (num_bits == 0) {
+          num_bits = sizeof(index_t) * 8;
+        }
+        size_t workspace_size = 0;
+        CUDA_CALL(cub::DeviceRadixSort::SortPairs(
+            nullptr, workspace_size, keys_in, keys_out, values_in, values_out,
+            n_items, 0, num_bits, stream));
+        auto temporary_storage = allocator.alloc_unique<char>(workspace_size);
+        CUDA_CALL(cub::DeviceRadixSort::SortPairs(
+            temporary_storage.get(), workspace_size, keys_in, keys_out,
+            values_in, values_out, n_items, 0, num_bits, stream));
+      }));
+  return std::make_pair(sorted_array, sorted_idx);
+}
 
 /** @brief Index select operator implementation for feature size 1. */
 template <typename DType, typename IdType>
@@ -115,7 +151,8 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
 
   // Sort the index to improve the memory access pattern.
   torch::Tensor sorted_index, permutation;
-  std::tie(sorted_index, permutation) = torch::sort(index);
+  std::tie(sorted_index, permutation) =
+      Sort(index, cuda::NumberOfBits(input_len));
   const IdType* index_sorted_ptr = sorted_index.data_ptr<IdType>();
   const int64_t* permutation_ptr = permutation.data_ptr<int64_t>();
 
