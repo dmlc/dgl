@@ -6,6 +6,7 @@ from typing import Dict, Tuple, Union
 import torch
 
 from ..base import CSCFormatBase, etype_str_to_tuple
+from ..internal import get_attributes
 from ..sampled_subgraph import SampledSubgraph
 
 __all__ = ["FusedSampledSubgraphImpl", "SampledSubgraphImpl"]
@@ -140,16 +141,7 @@ class SampledSubgraphImpl(SampledSubgraph):
 def _sampled_subgraph_str(sampled_subgraph: SampledSubgraph, classname) -> str:
     final_str = classname + "("
 
-    def _get_attributes(_obj) -> list:
-        attributes = [
-            attribute
-            for attribute in dir(_obj)
-            if not attribute.startswith("__")
-            and not callable(getattr(_obj, attribute))
-        ]
-        return attributes
-
-    attributes = _get_attributes(sampled_subgraph)
+    attributes = get_attributes(sampled_subgraph)
     attributes.reverse()
 
     for name in attributes:

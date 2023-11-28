@@ -109,3 +109,14 @@ def copy_or_convert_data(
         if is_feature and data.dim() == 1:
             data = data.reshape(-1, 1)
         save_data(data, output_path, output_format)
+
+
+def get_attributes(_obj) -> list:
+    """Get attributes of the class."""
+    attributes = [
+        attribute
+        for attribute in dir(_obj)
+        if not attribute.startswith("__")
+        and not callable(getattr(_obj, attribute))
+    ]
+    return attributes
