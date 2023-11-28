@@ -173,6 +173,8 @@ torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
         // maximum data type we use has 16 bytes. We check the alignment of the
         // pointer and the feature dimensionality to determine the largest
         // type to use for the copy to minimize the number of CUDA threads used.
+        // Alignment denotes the maximum suitable alignment and datatype size
+        // for the copies.
         const int alignment =
             std::gcd(16, std::gcd(ptr, input.element_size() * feature_size));
         const auto new_feature_size =
