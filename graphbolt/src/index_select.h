@@ -12,6 +12,14 @@ namespace graphbolt {
 namespace ops {
 
 /** @brief Implemented in the cuda directory. */
+c10::intrusive_ptr<sampling::FusedSampledSubgraph> UVAIndexSelectCSCImpl(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
+
+/** @brief Implemented in the cuda directory. */
+c10::intrusive_ptr<sampling::FusedSampledSubgraph> IndexSelectCSCImpl(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
+
+/** @brief Implemented in the cuda directory. */
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
 
 /**

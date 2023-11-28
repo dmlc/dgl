@@ -16,6 +16,8 @@
 namespace graphbolt {
 namespace ops {
 
+constexpr int BLOCK_SIZE = 128;
+
 std::pair<torch::Tensor, torch::Tensor> Sort(
     torch::Tensor input, int num_bits) {
   int64_t num_items = input.size(0);
@@ -46,6 +48,93 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
             sorted_values, num_items, 0, num_bits, stream));
       }));
   return std::make_pair(sorted_array, sorted_idx);
+}
+
+template <typename indptr_t, typename indices_t>
+__global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
+    const indptr_t hop_size, const indices_t num_rows,
+    const indptr_t* const indptr, const indptr_t* const subindptr,
+    const indptr_t* const subindptr_aligned, const indices_t* const indices,
+    indices_t* const hop, const int64_t* const perm) {
+  indptr_t tx = static_cast<indptr_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+
+  while (tx < hop_size) {
+    const auto rpos_ = cuda::UpperBound(subindptr_aligned, num_rows, tx) - 1;
+    const indices_t rpos = perm ? perm[rpos_] : rpos_;
+    const auto out_row = subindptr[rpos];
+    const auto d = subindptr[rpos + 1] - out_row;
+    const int offset =
+        ((uint64_t)(indices + indptr[rpos] - subindptr_aligned[rpos_]) %
+         CACHE_LINE_SIZE) /
+        sizeof(IdType);
+    const IdType rofs = tx - subindptr_aligned[rpos_] - offset;
+    if (rofs >= 0 && rofs < d) {
+      const auto in_idx = indptr[rpos] + rofs;
+      assert((uint64_t)(indices + in_idx - tx) % GPU_CACHE_LINE_SIZE == 0);
+      const auto u = indices[in_idx];
+      hop[out_row + rofs] = u;
+    }
+    tx += stride_x;
+  }
+}
+
+template <typename IdType>
+struct AlignmentFunc {
+  static_assert(GPU_CACHE_LINE_SIZE % sizeof(IdType) == 0);
+  const IdType* in_deg;
+  const int64_t* perm;
+  IdType num_rows;
+  __host__ __device__ auto operator()(IdType row) {
+    constexpr int num_elements = CACHE_LINE_SIZE / sizeof(IdType);
+    return in_deg[perm ? perm[row % num_rows] : row] + num_elements - 1;
+  }
+};
+
+c10::intrusive_ptr<sampling::FusedSampledSubgraph> UVAIndexSelectCSCImpl(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index) {
+  const auto [sorted, perm_tensor] =
+      Sort(index, cuda::NumberOfBits(indptr.size(0) - 1));
+  const auto perm = perm_tensor.data_ptr<int64_t>();
+
+  cuda::CUDAWorkspaceAllocator allocator;
+
+  AT_DISPATCH_INTEGRAL_TYPES(
+      indptr_.scalar_type(), "UVAIndexSelectCSCIndptr", ([&] {
+        using indptr_t = scalar_t;
+        AT_DISPATCH_INTEGRAL_TYPES(
+            indices.scalar_type(), "UVAIndexSelectCSCIndices", ([&] {
+              using indices_t = scalar_t;
+              const indices_t num_rows = index.size(0);
+
+              indptr_t hop_size;
+              auto subindptr_aligned =
+                  allocator.AllocateStorage<indptr_t>(num_rows + 1);
+              {
+                auto modified_in_deg = thrust::make_transform_iterator(
+                    iota, AlignmentFunc<IdType>{in_deg.get(), perm, num_rows});
+                size_t prefix_temp_size = 0;
+                CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+                    nullptr, prefix_temp_size, modified_in_deg,
+                    subindptr_aligned.get(), num_rows + 1, stream));
+                auto temp = allocator.AllocateStorage<char>(prefix_temp_size);
+                CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+                    temp.get(), prefix_temp_size, modified_in_deg,
+                    subindptr_aligned.get(), num_rows + 1, stream));
+
+                device->CopyDataFromTo(
+                    subindptr_aligned.get(), num_rows * sizeof(hop_size),
+                    &hop_size, 0, sizeof(hop_size), ctx, DGLContext{kDGLCPU, 0},
+                    mat.indptr->dtype);
+              }
+              const dim3 block(BLOCK_SIZE);
+              const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
+              CUDA_KERNEL_CALL(
+                  (_CSRRowWiseOneHopExtractorAlignedKernel<IdType>), grid,
+                  block, 0, stream, hop_size, num_rows, indptr.get(), subindptr,
+                  subindptr_aligned.get(), indices_, hop_1, perm);
+            }));
+      }));
 }
 
 /** @brief Index select operator implementation for feature size 1. */
