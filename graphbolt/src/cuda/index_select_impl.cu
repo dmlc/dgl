@@ -180,19 +180,15 @@ torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
           case 2:
             return UVAIndexSelectImpl_<uint16_t, index_t>(
                 input, index, new_feature_size);
-            break;
           case 4:
             return UVAIndexSelectImpl_<uint32_t, index_t>(
                 input, index, new_feature_size);
-            break;
           case 8:
             return UVAIndexSelectImpl_<uint64_t, index_t>(
                 input, index, new_feature_size);
-            break;
           case 16:
             return UVAIndexSelectImpl_<float4, index_t>(
                 input, index, new_feature_size);
-            break;
           default:
             TORCH_CHECK(false, "UVAIndexSelectImpl: Unreachable code path!");
             return torch::Tensor{};
