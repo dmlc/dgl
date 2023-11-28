@@ -6,6 +6,7 @@
 #ifndef GRAPHBOLT_CUDA_COMMON_H_
 #define GRAPHBOLT_CUDA_COMMON_H_
 
+#include <c10/cuda/CUDAException.h>
 #include <cuda_runtime.h>
 
 namespace graphbolt {
@@ -26,9 +27,7 @@ inline bool is_zero<dim3>(dim3 size) {
     if (!graphbolt::cuda::is_zero((nblks)) &&                         \
         !graphbolt::cuda::is_zero((nthrs))) {                         \
       (kernel)<<<(nblks), (nthrs), (shmem), (stream)>>>(__VA_ARGS__); \
-      cudaError_t e = cudaGetLastError();                             \
-      CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)        \
-          << "CUDA kernel launch error: " << cudaGetErrorString(e);   \
+      C10_CUDA_KERNEL_LAUNCH_CHECK();                                 \
     }                                                                 \
   }
 

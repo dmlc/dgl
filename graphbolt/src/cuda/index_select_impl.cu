@@ -3,7 +3,6 @@
  * @file cuda/index_select_impl.cu
  * @brief Index select operator implementation on CUDA.
  */
-#include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAStream.h>
 #include <torch/script.h>
 
