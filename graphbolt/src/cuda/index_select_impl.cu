@@ -7,11 +7,6 @@
 #include <c10/cuda/CUDAStream.h>
 #include <torch/script.h>
 
-// This should be defined in CMakeLists.txt
-// #ifndef THRUST_CUB_WRAPPED_NAMESPACE
-// static_assert(false, "THRUST_CUB_WRAPPED_NAMESPACE must be defined for
-// DGL."); #endif
-
 #include <numeric>
 
 #include "../index_select.h"
