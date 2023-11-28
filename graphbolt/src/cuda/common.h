@@ -21,23 +21,6 @@ inline bool is_zero<dim3>(dim3 size) {
   return size.x == 0 || size.y == 0 || size.z == 0;
 }
 
-#define CUDA_DRIVER_CALL(x)                                             \
-  {                                                                     \
-    CUresult result = x;                                                \
-    if (result != CUDA_SUCCESS && result != CUDA_ERROR_DEINITIALIZED) { \
-      const char* msg;                                                  \
-      cuGetErrorName(result, &msg);                                     \
-      LOG(FATAL) << "CUDAError: " #x " failed with error: " << msg;     \
-    }                                                                   \
-  }
-
-#define CUDA_CALL(func)                                      \
-  {                                                          \
-    cudaError_t e = (func);                                  \
-    CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading) \
-        << "CUDA: " << cudaGetErrorString(e);                \
-  }
-
 #define CUDA_KERNEL_CALL(kernel, nblks, nthrs, shmem, stream, ...)    \
   {                                                                   \
     if (!graphbolt::cuda::is_zero((nblks)) &&                         \
