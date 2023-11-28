@@ -556,7 +556,7 @@ def run(
         model.train()
 
         total_loss = 0
-        
+
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch:02d}"):
             # Convert MiniBatch to DGL Blocks.
             blocks = [block.to(device) for block in data.blocks]
