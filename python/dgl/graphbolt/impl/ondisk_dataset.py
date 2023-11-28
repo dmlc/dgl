@@ -14,9 +14,9 @@ from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
+from ..internal import copy_or_convert_data, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from ..utils import copy_or_convert_data, read_data
 from .fused_csc_sampling_graph import (
     from_dglgraph,
     FusedCSCSamplingGraph,

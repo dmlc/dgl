@@ -865,7 +865,7 @@ def test_RangeCalculation(params):
     sum = 0
     for rank in range(num_replicas):
         for worker_id in range(max(num_workers, 1)):
-            result = gb.utils.calculate_range(
+            result = gb.internal.calculate_range(
                 True,
                 total,
                 num_replicas,
