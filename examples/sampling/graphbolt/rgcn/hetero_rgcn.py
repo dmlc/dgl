@@ -537,6 +537,18 @@ def run(
     print("start to run...")
     category = "paper"
 
+    data_loader = create_dataloader(
+        name,
+        g,
+        features,
+        train_set,
+        device,
+        batch_size=1024,
+        fanouts=[25, 10],
+        shuffle=True,
+        num_workers=num_workers,
+    )
+
     # Typically, the best Validation performance is obtained after
     # the 1st or 2nd epoch. This is why the max epoch is set to 3.
     for epoch in range(3):
@@ -545,17 +557,6 @@ def run(
 
         total_loss = 0
 
-        data_loader = create_dataloader(
-            name,
-            g,
-            features,
-            train_set,
-            device,
-            batch_size=1024,
-            fanouts=[25, 10],
-            shuffle=True,
-            num_workers=num_workers,
-        )
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch:02d}"):
             # Convert MiniBatch to DGL Blocks.
             blocks = [block.to(device) for block in data.blocks]
