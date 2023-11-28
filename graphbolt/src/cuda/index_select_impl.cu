@@ -159,7 +159,7 @@ torch::Tensor UVAIndexSelectImpl_(
 /**
  * @brief UVA index select operator implementation on CUDA.
  *
- * The supporting input types are: float, double, int, int64_t.
+ * All basic torch types are supported for input.
  * The supporting index types are: int, int64_t.
  */
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
@@ -169,6 +169,10 @@ torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
         const int64_t feature_size = std::accumulate(
             input.sizes().begin() + 1, input.sizes().end(), 1ll,
             std::multiplies<>());
+        // We perform the copy with datatype of size powers of 2, and the
+        // maximum data type we use has 16 bytes. We check the alignment of the
+        // pointer and the feature dimensionality to determine the largest
+        // type to use for the copy to minimize the number of CUDA threads used.
         const int alignment =
             std::gcd(16, std::gcd(ptr, input.element_size() * feature_size));
         const auto new_feature_size =
