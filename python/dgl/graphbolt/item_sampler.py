@@ -14,9 +14,9 @@ from ..base import dgl_warning
 
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
+from .internal import calculate_range
 from .itemset import ItemSet, ItemSetDict
 from .minibatch import MiniBatch
-from .utils import calculate_range
 
 __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 
