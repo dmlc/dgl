@@ -10,6 +10,7 @@ from dgl.heterograph import DGLBlock
 from dgl.utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple
+from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
 __all__ = ["DGLMiniBatch", "MiniBatch"]
@@ -574,17 +575,7 @@ class MiniBatch:
 def _minibatch_str(minibatch: MiniBatch) -> str:
     final_str = ""
     # Get all attributes in the class except methods.
-
-    def _get_attributes(_obj) -> list:
-        attributes = [
-            attribute
-            for attribute in dir(_obj)
-            if not attribute.startswith("__")
-            and not callable(getattr(_obj, attribute))
-        ]
-        return attributes
-
-    attributes = _get_attributes(minibatch)
+    attributes = get_attributes(minibatch)
     attributes.reverse()
     # Insert key with its value into the string.
     for name in attributes:
@@ -617,17 +608,7 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
 def _dgl_minibatch_str(dglminibatch: DGLMiniBatch) -> str:
     final_str = ""
     # Get all attributes in the class except methods.
-
-    def _get_attributes(_obj) -> list:
-        attributes = [
-            attribute
-            for attribute in dir(_obj)
-            if not attribute.startswith("__")
-            and not callable(getattr(_obj, attribute))
-        ]
-        return attributes
-
-    attributes = _get_attributes(dglminibatch)
+    attributes = get_attributes(dglminibatch)
     attributes.reverse()
     # Insert key with its value into the string.
     for name in attributes:
