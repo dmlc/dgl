@@ -1,6 +1,6 @@
 /**
  *  Copyright (c) 2017-2023 by Contributors
- * @file cuda_common.h
+ * @file cuda/common.h
  * @brief Common utilities for CUDA
  */
 #ifndef GRAPHBOLT_CUDA_COMMON_H_
