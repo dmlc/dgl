@@ -141,13 +141,25 @@ def test_torch_based_feature(in_memory):
     reason="Tests for pinned memory are only meaningful on GPU.",
 )
 @pytest.mark.parametrize(
-    "dtype", [torch.float32, torch.float64, torch.int32, torch.int64, torch.int8, torch.float16, torch.complex128]
+    "dtype",
+    [
+        torch.float32,
+        torch.float64,
+        torch.int32,
+        torch.int64,
+        torch.int8,
+        torch.float16,
+        torch.complex128,
+    ],
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("shape", [(2, 1), (2, 3), (2, 2, 2), (137, 13, 3)])
 def test_torch_based_pinned_feature(dtype, idtype, shape):
     if dtype == torch.complex128:
-        tensor = torch.complex(torch.randint(0, 13, shape, dtype=torch.float64), torch.randint(0, 13, shape, dtype=torch.float64))
+        tensor = torch.complex(
+            torch.randint(0, 13, shape, dtype=torch.float64),
+            torch.randint(0, 13, shape, dtype=torch.float64),
+        )
     else:
         tensor = torch.randint(0, 13, shape, dtype=dtype)
     test_tensor = tensor.clone().detach()
