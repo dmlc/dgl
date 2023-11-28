@@ -450,7 +450,6 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
-  std::cout << RandomEngine::ThreadLocal()->manual_seed.value() << std::endl;
   torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
   if (probs_name.has_value() && !probs_name.value().empty()) {
     probs_or_mask = edge_attributes_.value().at(probs_name.value());
