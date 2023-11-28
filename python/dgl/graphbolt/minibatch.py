@@ -10,8 +10,8 @@ from dgl.heterograph import DGLBlock
 from dgl.utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple
-from .sampled_subgraph import SampledSubgraph
 from .internal import get_attributes
+from .sampled_subgraph import SampledSubgraph
 
 __all__ = ["DGLMiniBatch", "MiniBatch"]
 

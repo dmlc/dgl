@@ -6,8 +6,8 @@ from typing import Dict, Tuple, Union
 import torch
 
 from ..base import CSCFormatBase, etype_str_to_tuple
-from ..sampled_subgraph import SampledSubgraph
 from ..internal import get_attributes
+from ..sampled_subgraph import SampledSubgraph
 
 __all__ = ["FusedSampledSubgraphImpl", "SampledSubgraphImpl"]
 
