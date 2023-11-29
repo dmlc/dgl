@@ -39,10 +39,10 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
         CUDA_CALL(cub::DeviceRadixSort::SortPairs(
             nullptr, workspace_size, keys_in, keys_out, values_in, values_out,
             n_items, 0, num_bits, stream));
-        auto temporary_storage = allocator.alloc_unique<char>(workspace_size);
+        auto temp = allocator.AllocateStorage<char>(workspace_size);
         CUDA_CALL(cub::DeviceRadixSort::SortPairs(
-            temporary_storage.get(), workspace_size, keys_in, keys_out,
-            values_in, values_out, n_items, 0, num_bits, stream));
+            temp.get(), workspace_size, keys_in, keys_out, values_in,
+            values_out, n_items, 0, num_bits, stream));
       }));
   return std::make_pair(sorted_array, sorted_idx);
 }

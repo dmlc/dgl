@@ -19,7 +19,7 @@ namespace cuda {
 How to use this class to get a nonblocking thrust execution policy that uses
 torch's memory pool and the current cuda stream:
 
-cuda::CUDAWorkspaceAllocator allocator(ctx);
+cuda::CUDAWorkspaceAllocator allocator;
 const auto stream = torch::cuda::getDefaultCUDAStream();
 const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
 
@@ -43,7 +43,7 @@ class CUDAWorkspaceAllocator {
   CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
 
   template <typename T>
-  std::unique_ptr<T, CUDAWorkspaceAllocator> alloc_unique(
+  std::unique_ptr<T, CUDAWorkspaceAllocator> AllocateStorage(
       std::size_t size) const {
     auto t = torch::empty(
         sizeof(T) * size, torch::TensorOptions()

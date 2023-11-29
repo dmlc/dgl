@@ -31,6 +31,11 @@ inline int FindNumThreads(int size) {
   return ret;
 }
 
+/**
+ * @brief Calculate the smallest number of bits needed to represent a given
+ * range of integers [0, range).
+ *
+ */
 template <typename T>
 int NumberOfBits(const T& range) {
   if (range <= 1) {
