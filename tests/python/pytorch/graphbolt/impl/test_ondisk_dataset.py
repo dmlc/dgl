@@ -1,10 +1,10 @@
 import os
 import pickle
-import warnings
 import random
 import re
 import tempfile
 import unittest
+import warnings
 
 import gb_test_utils as gbt
 import numpy as np
@@ -16,20 +16,24 @@ import yaml
 
 from dgl import graphbolt as gb
 
+
 def write_yaml_file(yaml_content, dir):
     os.makedirs(os.path.join(dir, "preprocessed"), exist_ok=True)
     yaml_file = os.path.join(dir, "preprocessed/metadata.yaml")
     with open(yaml_file, "w") as f:
         f.write(yaml_content)
 
+
 def load_dataset(dataset):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         return dataset.load()
 
+
 def loadDataset(yaml_content, dir):
     write_yaml_file(yaml_content, dir)
     return load_dataset(gb.OnDiskDataset(dir))
+
 
 def test_OnDiskDataset_TVTSet_exceptions():
     """Test excpetions thrown when parsing TVTSet."""
