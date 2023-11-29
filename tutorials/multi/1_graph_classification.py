@@ -251,17 +251,17 @@ def main(rank, world_size, dataset, seed=0):
 ###############################################################################
 # Finally we load the dataset and launch the processes.
 #
-# .. code:: python
-#
-#    if __name__ == '__main__':
-#        import torch.multiprocessing as mp
-#
-#        from dgl.data import GINDataset
-#
-#        num_gpus = 4
-#        procs = []
-#        dataset = GINDataset(name='IMDBBINARY', self_loop=False)
-#        mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
 
-# Thumbnail credits: DGL
-# sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'
+import torch.multiprocessing as mp
+from dgl.data import GINDataset
+
+if __name__ == '__main__':
+    if not torch.cuda.is_available():
+        print("No GPU found!")
+        exit(0)
+
+    num_gpus = torch.cuda.device_count()
+    procs = []
+    dataset = GINDataset(name='IMDBBINARY', self_loop=False)
+    mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
+

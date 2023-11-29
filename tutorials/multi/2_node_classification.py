@@ -361,39 +361,37 @@ def run(rank, world_size, args, devices, dataset):
 # The following code spawns a process for each GPU and calls the ``run``
 # function defined above.
 #
-# .. code:: python
-#
-#     # Say you have four GPUs.
-#     if __name__ == '__main__':
-#         if not torch.cuda.is_available():
-#             print(f"Multi-gpu training needs to be in gpu mode.")
-#             exit(0)
-#
-#         args = {
-#             "gpus": '0,1,2,3',
-#             "epochs": 5,
-#             "lr": 0.01,
-#             "batch_size": 1024,
-#             "fanout": '10,10,10',
-#             "num_workers": 0,
-#         }
-#
-#         devices = list(map(int, args.gpu.split(",")))
-#         world_size = len(devices)
-#
-#         print(f"Training with {world_size} gpus.")
-#
-#         # Load and preprocess dataset.
-#         dataset = gb.BuiltinDataset("ogbn-arxiv").load()
-#
-#         # Thread limiting to avoid resource competition.
-#         os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // world_size)
-#
-#         mp.set_sharing_strategy("file_system")
-#         mp.spawn(
-#             run,
-#             args=(world_size, args, devices, dataset),
-#             nprocs=world_size,
-#             join=True,
-#         )
-#
+
+
+if __name__ == '__main__':
+    if not torch.cuda.is_available():
+        print("No GPU found!")
+        exit(0)
+
+    args = {
+        "epochs": 5,
+        "lr": 0.01,
+        "batch_size": 1024,
+        "fanout": '10,10,10',
+        "num_workers": 0,
+    }
+
+    devices = torch.arange(torch.cuda.device_count())
+    world_size = len(devices)
+
+    print(f"Training with {world_size} gpus.")
+
+    # Load and preprocess dataset.
+    dataset = gb.BuiltinDataset("ogbn-arxiv").load()
+
+    # Thread limiting to avoid resource competition.
+    os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // world_size)
+
+    mp.set_sharing_strategy("file_system")
+    mp.spawn(
+        run,
+        args=(world_size, args, devices, dataset),
+        nprocs=world_size,
+        join=True,
+    )
+
