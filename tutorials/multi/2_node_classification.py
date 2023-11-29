@@ -363,7 +363,7 @@ def run(rank, world_size, args, devices, dataset):
 #
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if not torch.cuda.is_available():
         print("No GPU found!")
         exit(0)
@@ -372,7 +372,7 @@ if __name__ == '__main__':
         "epochs": 5,
         "lr": 0.01,
         "batch_size": 1024,
-        "fanout": '10,10,10',
+        "fanout": "10,10,10",
         "num_workers": 0,
     }
 
@@ -394,4 +394,3 @@ if __name__ == '__main__':
         nprocs=world_size,
         join=True,
     )
-

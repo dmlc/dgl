@@ -255,13 +255,12 @@ def main(rank, world_size, dataset, seed=0):
 import torch.multiprocessing as mp
 from dgl.data import GINDataset
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if not torch.cuda.is_available():
         print("No GPU found!")
         exit(0)
 
     num_gpus = torch.cuda.device_count()
     procs = []
-    dataset = GINDataset(name='IMDBBINARY', self_loop=False)
+    dataset = GINDataset(name="IMDBBINARY", self_loop=False)
     mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
-
