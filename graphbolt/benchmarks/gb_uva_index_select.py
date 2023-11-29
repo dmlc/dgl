@@ -28,7 +28,9 @@ def get_ogbn_graph_test_indices(name):
     ret_indices = []
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
         ret_indices.append(input_nodes)
-    feature = torch.randint(0, 13, (g.number_of_nodes(), g.ndata["feat"].shape[1]))
+    feature = torch.randint(
+        0, 13, (g.number_of_nodes(), g.ndata["feat"].shape[1])
+    )
     return feature, ret_indices
 
 
@@ -80,24 +82,43 @@ keys = [
     "indices_device",
 ]
 
+
 def _print_result(runtime, throughput):
-    print(f"Runtime in us: {int(runtime * 1000000)}, Throughput in MB/s: {int(throughput / (2 ** 20))}")
+    print(
+        f"Runtime in us: {int(runtime * 1000000)}, Throughput in MB/s: {int(throughput / (2 ** 20))}"
+    )
     print("")
     print("")
 
+
 def test_random():
-    for rows, size, feature_device, dtype in itertools.product(n_rows, feat_size, feature_devices, dtypes):
+    for rows, size, feature_device, dtype in itertools.product(
+        n_rows, feat_size, feature_devices, dtypes
+    ):
         feature = torch.randint(0, 13, size=[rows, size], dtype=dtype)
         feature = (
-            feature.cuda() if feature_device == Device.GPU else feature.pin_memory()
+            feature.cuda()
+            if feature_device == Device.GPU
+            else feature.pin_memory()
         )
-        for indices_size, indices_device in itertools.product(num_indices, indices_devices):
+        for indices_size, indices_device in itertools.product(
+            num_indices, indices_devices
+        ):
             indices = gen_random_indices(rows, indices_size)
             indices = [
-                index.cuda() if indices_device == Device.GPU else index.pin_memory()
+                index.cuda()
+                if indices_device == Device.GPU
+                else index.pin_memory()
                 for index in indices
             ]
-            params = (rows, size, dtype, indices_size, feature_device, indices_device)
+            params = (
+                rows,
+                size,
+                dtype,
+                indices_size,
+                feature_device,
+                indices_device,
+            )
             print(
                 "* params: ",
                 ", ".join([f"{k}={v}" for k, v in zip(keys, params)]),
@@ -116,11 +137,15 @@ def test_ogb(name):
     for feature_device, dtype in zip(feature_devices, dtypes):
         feature = original_feature.to(dtype)
         feature = (
-            feature.cuda() if feature_device == Device.GPU else feature.pin_memory()
+            feature.cuda()
+            if feature_device == Device.GPU
+            else feature.pin_memory()
         )
         for indices_device in indices_devices:
             indices = [
-                index.cuda() if indices_device == Device.GPU else index.pin_memory()
+                index.cuda()
+                if indices_device == Device.GPU
+                else index.pin_memory()
                 for index in original_indices
             ]
             print(
