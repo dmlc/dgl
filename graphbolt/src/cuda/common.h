@@ -76,12 +76,7 @@ inline bool is_zero<dim3>(dim3 size) {
   return size.x == 0 || size.y == 0 || size.z == 0;
 }
 
-#define CUDA_CALL(func)                                      \
-  {                                                          \
-    cudaError_t e = (func);                                  \
-    CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading) \
-        << "CUDA: " << cudaGetErrorString(e);                \
-  }
+#define CUDA_CALL(func) C10_CUDA_CHECK((func))
 
 #define CUDA_KERNEL_CALL(kernel, nblks, nthrs, shmem, stream, ...)    \
   {                                                                   \
