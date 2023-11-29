@@ -82,6 +82,8 @@ keys = [
     "indices_device",
 ]
 
+sum_of_runtimes = 0
+
 
 def _print_result(runtime, throughput):
     print(
@@ -89,6 +91,8 @@ def _print_result(runtime, throughput):
     )
     print("")
     print("")
+    global sum_of_runtimes
+    sum_of_runtimes += runtime
 
 
 def test_random():
@@ -164,3 +168,4 @@ def test_ogb(name):
 
 test_ogb("ogbn-products")
 test_random()
+print("Total runtimes in us: ", int(sum_of_runtimes * 1000000))
