@@ -3,6 +3,7 @@ project(graphbolt C CXX)
 set (CMAKE_CXX_STANDARD 17)
 
 if(USE_CUDA)
+  message(STATUS "Build graphbolt with CUDA support")
   enable_language(CUDA)
   add_definitions(-DGRAPHBOLT_USE_CUDA)
 endif()
@@ -59,6 +60,13 @@ target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 
 if(USE_CUDA)
   set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 17)
+  message(STATUS "Use external CUB/Thrust library for a consistent API and performance for graphbolt.")
+  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE CUB_WRAPPED_NAMESPACE=graphbolt)
+  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE THRUST_NS_QUALIFIER=thrust)
+  target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
+                             "../third_party/thrust"
+                             "../third_party/thrust/dependencies/cub"
+                             "../third_party/thrust/dependencies/libcudacxx/include")
 endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when
