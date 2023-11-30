@@ -8,6 +8,7 @@
 
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime.h>
+#include <torch/script.h>
 
 #include <memory>
 #include <unordered_map>
@@ -19,55 +20,59 @@ namespace cuda {
  * @brief This class is designed to allocate workspace storage
  * and to get a nonblocking thrust execution policy
  * that uses torch's CUDA memory pool and the current cuda stream:
- *
+
  * cuda::CUDAWorkspaceAllocator allocator;
  * const auto stream = torch::cuda::getDefaultCUDAStream();
  * const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
- *
+
  * Now, one can pass exec_policy to thrust functions
- *
+
  * To get an integer array of size 1000 whose lifetime is managed by unique_ptr,
  * use:
- *
+
  * auto int_array = allocator.AllocateStorage<int>(1000);
- *
+
  * int_array.get() gives the raw pointer.
  */
 class CUDAWorkspaceAllocator {
-  using ptr_map_t = std::unordered_map<void*, torch::Tensor>;
-  std::shared_ptr<ptr_map_t> pointers;
+  using TensorPtrMapType = std::unordered_map<void*, torch::Tensor>;
+  std::shared_ptr<TensorPtrMapType> ptr_map_;
 
  public:
+  // Required by thrust to satisfy allocator requirements.
   using value_type = char;
 
-  void operator()(void* ptr) const { pointers->erase(ptr); }
-
-  explicit CUDAWorkspaceAllocator() : pointers(std::make_shared<ptr_map_t>()) {}
+  explicit CUDAWorkspaceAllocator()
+      : ptr_map_(std::make_shared<TensorPtrMapType>()) {}
 
   CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
+
+  void operator()(void* ptr) const { ptr_map_->erase(ptr); }
 
   template <typename T>
   std::unique_ptr<T, CUDAWorkspaceAllocator> AllocateStorage(
       std::size_t size) const {
-    auto t = torch::empty(
+    auto tensor = torch::empty(
         sizeof(T) * size, torch::TensorOptions()
                               .dtype(torch::kByte)
                               .device(c10::DeviceType::CUDA));
-    pointers->operator[](t.data_ptr()) = t;
+    ptr_map_->operator[](tensor.data_ptr()) = tensor;
     return std::unique_ptr<T, CUDAWorkspaceAllocator>(
-        reinterpret_cast<T*>(t.data_ptr()), *this);
+        reinterpret_cast<T*>(tensor.data_ptr()), *this);
   }
 
-  char* allocate(std::ptrdiff_t size) const {
-    auto t = torch::empty(
+  // Required by thrust to satisfy allocator requirements.
+  value_type* allocate(std::ptrdiff_t size) const {
+    auto tensor = torch::empty(
         size, torch::TensorOptions()
                   .dtype(torch::kByte)
                   .device(c10::DeviceType::CUDA));
-    pointers->operator[](t.data_ptr()) = t;
-    return reinterpret_cast<char*>(t.data_ptr());
+    ptr_map_->operator[](tensor.data_ptr()) = tensor;
+    return reinterpret_cast<value_type*>(tensor.data_ptr());
   }
 
-  void deallocate(char* ptr, std::size_t) const { pointers->erase(ptr); }
+  // Required by thrust to satisfy allocator requirements.
+  void deallocate(value_type* ptr, std::size_t) const { operator()(ptr); }
 };
 
 template <typename T>
