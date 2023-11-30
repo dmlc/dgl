@@ -20,18 +20,18 @@ namespace cuda {
  * @brief This class is designed to allocate workspace storage
  * and to get a nonblocking thrust execution policy
  * that uses torch's CUDA memory pool and the current cuda stream:
-
+ *
  * cuda::CUDAWorkspaceAllocator allocator;
  * const auto stream = torch::cuda::getDefaultCUDAStream();
  * const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
-
+ *
  * Now, one can pass exec_policy to thrust functions
-
+ *
  * To get an integer array of size 1000 whose lifetime is managed by unique_ptr,
  * use:
-
+ *
  * auto int_array = allocator.AllocateStorage<int>(1000);
-
+ *
  * int_array.get() gives the raw pointer.
  */
 class CUDAWorkspaceAllocator {
