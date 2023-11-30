@@ -30,7 +30,7 @@ def load_dataset(dataset):
         return dataset.load()
 
 
-def loadDataset(yaml_content, dir):
+def write_yaml_and_load_dataset(yaml_content, dir):
     write_yaml_file(yaml_content, dir)
     return load_dataset(gb.OnDiskDataset(dir))
 
@@ -120,7 +120,7 @@ def test_OnDiskDataset_multiple_tasks():
                         in_memory: true
                         path: {train_labels_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         assert len(dataset.tasks) == 2
 
         for task_id in range(2):
@@ -170,7 +170,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_names():
                         in_memory: true
                         path: {train_labels_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify train set.
         train_set = dataset.tasks[0].train_set
@@ -212,7 +212,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_names():
                         in_memory: true
                         path: {train_labels_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify train set.
         train_set = dataset.tasks[0].train_set
@@ -293,7 +293,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
                         in_memory: true
                         path: {test_labels_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify tasks.
         assert len(dataset.tasks) == 1
@@ -341,7 +341,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
                       - format: numpy
                         path: {train_ids_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         assert dataset.tasks[0].train_set is not None
         assert dataset.tasks[0].validation_set is None
         assert dataset.tasks[0].test_set is None
@@ -410,7 +410,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels():
                         in_memory: true
                         path: {test_labels_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify train set.
         train_set = dataset.tasks[0].train_set
@@ -513,7 +513,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_negs():
                         in_memory: true
                         path: {test_neg_dst_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify train set.
         train_set = dataset.tasks[0].train_set
@@ -610,7 +610,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
                         format: numpy
                         path: {test_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify train set.
         train_set = dataset.tasks[0].train_set
@@ -746,7 +746,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
                         in_memory: true
                         path: {test_labels_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify train set.
         train_set = dataset.tasks[0].train_set
@@ -851,7 +851,7 @@ def test_OnDiskDataset_Feature_heterograph():
                 in_memory: true
                 path: {edge_data_label_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify feature data storage.
         feature_data = dataset.feature
@@ -946,7 +946,7 @@ def test_OnDiskDataset_Feature_homograph():
                 in_memory: true
                 path: {edge_data_label_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify feature data storage.
         feature_data = dataset.feature
@@ -1016,7 +1016,7 @@ def test_OnDiskDataset_Graph_homogeneous():
               type: FusedCSCSamplingGraph
               path: {graph_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         graph2 = dataset.graph
 
         assert graph.total_num_nodes == graph2.total_num_nodes
@@ -1054,7 +1054,7 @@ def test_OnDiskDataset_Graph_heterogeneous():
               type: FusedCSCSamplingGraph
               path: {graph_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         graph2 = dataset.graph
 
         assert graph.total_num_nodes == graph2.total_num_nodes
@@ -1076,14 +1076,14 @@ def test_OnDiskDataset_Metadata():
         yaml_content = f"""
             dataset_name: {dataset_name}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         assert dataset.dataset_name == dataset_name
 
         # Only dataset_name is specified.
         yaml_content = f"""
             dataset_name: {dataset_name}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         assert dataset.dataset_name == dataset_name
 
 
@@ -1844,7 +1844,7 @@ def test_OnDiskDataset_all_nodes_set_homo():
               type: FusedCSCSamplingGraph
               path: {graph_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         all_nodes_set = dataset.all_nodes_set
         assert isinstance(all_nodes_set, gb.ItemSet)
         assert all_nodes_set.names == ("seed_nodes",)
@@ -1881,7 +1881,7 @@ def test_OnDiskDataset_all_nodes_set_hetero():
               type: FusedCSCSamplingGraph
               path: {graph_path}
         """
-        dataset = loadDataset(yaml_content, test_dir)
+        dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         all_nodes_set = dataset.all_nodes_set
         assert isinstance(all_nodes_set, gb.ItemSetDict)
         assert all_nodes_set.names == ("seed_nodes",)
