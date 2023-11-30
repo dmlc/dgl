@@ -49,18 +49,6 @@ class CUDAWorkspaceAllocator {
 
   void operator()(void* ptr) const { ptr_map_->erase(ptr); }
 
-  template <typename T>
-  std::unique_ptr<T, CUDAWorkspaceAllocator> AllocateStorage(
-      std::size_t size) const {
-    auto tensor = torch::empty(
-        sizeof(T) * size, torch::TensorOptions()
-                              .dtype(torch::kByte)
-                              .device(c10::DeviceType::CUDA));
-    ptr_map_->operator[](tensor.data_ptr()) = tensor;
-    return std::unique_ptr<T, CUDAWorkspaceAllocator>(
-        reinterpret_cast<T*>(tensor.data_ptr()), *this);
-  }
-
   // Required by thrust to satisfy allocator requirements.
   value_type* allocate(std::ptrdiff_t size) const {
     auto tensor = torch::empty(
@@ -73,6 +61,13 @@ class CUDAWorkspaceAllocator {
 
   // Required by thrust to satisfy allocator requirements.
   void deallocate(value_type* ptr, std::size_t) const { operator()(ptr); }
+
+  template <typename T>
+  std::unique_ptr<T, CUDAWorkspaceAllocator> AllocateStorage(
+      std::size_t size) const {
+    return std::unique_ptr<T, CUDAWorkspaceAllocator>(
+        reinterpret_cast<T*>(allocate(sizeof(T) * size)), *this);
+  }
 };
 
 template <typename T>
