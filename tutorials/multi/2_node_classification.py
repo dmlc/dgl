@@ -101,7 +101,6 @@ class SAGE(nn.Module):
 
 
 def create_dataloader(
-    args,
     graph,
     features,
     itemset,
@@ -112,18 +111,16 @@ def create_dataloader(
 ):
     datapipe = gb.DistributedItemSampler(
         item_set=itemset,
-        batch_size=args.batch_size,
+        batch_size=1024,
         drop_last=drop_last,
         shuffle=shuffle,
         drop_uneven_inputs=drop_uneven_inputs,
     )
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(graph, [10, 10, 10])
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(
-        datapipe, num_workers=args.num_workers
-    )
+    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
     return dataloader
 
 
@@ -136,12 +133,11 @@ def create_dataloader(
 
 
 @torch.no_grad()
-def evaluate(rank, args, model, graph, features, itemset, num_classes, device):
+def evaluate(rank, model, graph, features, itemset, num_classes, device):
     model.eval()
     y = []
     y_hats = []
     dataloader = create_dataloader(
-        args,
         graph,
         features,
         itemset,
@@ -186,7 +182,6 @@ def evaluate(rank, args, model, graph, features, itemset, num_classes, device):
 def train(
     world_size,
     rank,
-    args,
     graph,
     features,
     train_set,
@@ -195,10 +190,9 @@ def train(
     model,
     device,
 ):
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     # Create training data loader.
     dataloader = create_dataloader(
-        args,
         graph,
         features,
         train_set,
@@ -208,7 +202,7 @@ def train(
         drop_uneven_inputs=False,
     )
 
-    for epoch in range(args.epochs):
+    for epoch in range(5):
         epoch_start = time.time()
 
         model.train()
@@ -246,7 +240,6 @@ def train(
         acc = (
             evaluate(
                 rank,
-                args,
                 model,
                 graph,
                 features,
@@ -289,7 +282,7 @@ def train(
 #
 
 
-def run(rank, world_size, args, devices, dataset):
+def run(rank, world_size, devices, dataset):
     # Set up multiprocessing environment.
     device = devices[rank]
     torch.cuda.set_device(device)
@@ -304,7 +297,6 @@ def run(rank, world_size, args, devices, dataset):
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
-    args.fanout = list(map(int, args.fanout.split(",")))
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
     in_size = features.size("node", None, "feat")[0]
@@ -321,7 +313,6 @@ def run(rank, world_size, args, devices, dataset):
     train(
         world_size,
         rank,
-        args,
         graph,
         features,
         train_set,
@@ -338,7 +329,6 @@ def run(rank, world_size, args, devices, dataset):
     test_acc = (
         evaluate(
             rank,
-            args,
             model,
             graph,
             features,
@@ -363,20 +353,14 @@ def run(rank, world_size, args, devices, dataset):
 #
 
 
-if __name__ == "__main__":
+def main():
     if not torch.cuda.is_available():
         print("No GPU found!")
-        exit(0)
+        return
 
-    args = {
-        "epochs": 5,
-        "lr": 0.01,
-        "batch_size": 1024,
-        "fanout": "10,10,10",
-        "num_workers": 0,
-    }
-
-    devices = torch.arange(torch.cuda.device_count())
+    devices = [
+        torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())
+    ]
     world_size = len(devices)
 
     print(f"Training with {world_size} gpus.")
@@ -390,7 +374,11 @@ if __name__ == "__main__":
     mp.set_sharing_strategy("file_system")
     mp.spawn(
         run,
-        args=(world_size, args, devices, dataset),
+        args=(world_size, devices, dataset),
         nprocs=world_size,
         join=True,
     )
+
+
+if __name__ == "__main__":
+    main()
