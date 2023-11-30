@@ -145,8 +145,7 @@ class SampledSubgraph:
             assume_num_node_within_int32
         ), "Values > int32 are not supported yet."
         assert (
-            isinstance(self.node_pairs, tuple)
-            or isinstance(self.node_pairs, CSCFormatBase)
+            isinstance(self.node_pairs, (CSCFormatBase, tuple))
         ) == isinstance(edges, tuple), (
             "The sampled subgraph and the edges to exclude should be both "
             "homogeneous or both heterogeneous."
@@ -316,22 +315,22 @@ def _slice_subgraph_csc_format(subgraph: SampledSubgraph, index: torch.Tensor):
         if isinstance(obj, CSCFormatBase):
             indptr = obj.indptr
             indices = obj.indices
-            # point to indptr
+            # Point to indptr.
             k = 1
             new_indptr = [0]
             new_indices = []
-            # count for the sample number of each seed node
+            # Count for the sample number of each seed node.
             count = 0
-            # point to index
-            id = 0
+            # Point to index.
+            index_id = 0
             for i, indice in enumerate(indices):
                 while i >= indptr[k]:
                     new_indptr.append(new_indptr[-1] + count)
                     count = 0
                     k += 1
-                if id < len(index) and i == index[id]:
+                if index_id < len(index) and i == index[index_id]:
                     count += 1
-                    id += 1
+                    index_id += 1
                     new_indices.append(indice)
             new_indptr.append(new_indptr[-1] + count)
             return CSCFormatBase(
