@@ -200,13 +200,13 @@ def evaluate(model, dataloader, device):
 
 
 ###############################################################################
-# Define the main function for each process.
+# Define the run function for each process.
 #
 
 from torch.optim import Adam
 
 
-def main(rank, world_size, dataset, seed=0):
+def run(rank, world_size, dataset, seed=0):
     init_process_group(world_size, rank)
     if torch.cuda.is_available():
         device = torch.device("cuda:{:d}".format(rank))
@@ -255,12 +255,16 @@ def main(rank, world_size, dataset, seed=0):
 import torch.multiprocessing as mp
 from dgl.data import GINDataset
 
-if __name__ == "__main__":
+
+def main():
     if not torch.cuda.is_available():
         print("No GPU found!")
-        exit(0)
+        return
 
     num_gpus = torch.cuda.device_count()
-    procs = []
     dataset = GINDataset(name="IMDBBINARY", self_loop=False)
-    mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
+    mp.spawn(run, args=(num_gpus, dataset), nprocs=num_gpus)
+
+
+if __name__ == "__main__":
+    main()
