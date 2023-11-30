@@ -8,13 +8,13 @@
 #ifndef GRAPHBOLT_CUDA_UTILS_H_
 #define GRAPHBOLT_CUDA_UTILS_H_
 
-namespace graphbolt {
-namespace cuda {
-
 // The cache line size of GPU.
 constexpr int GPU_CACHE_LINE_SIZE = 128;
 // The max number of threads per block.
 constexpr int CUDA_MAX_NUM_THREADS = 1024;
+
+namespace graphbolt {
+namespace cuda {
 
 /**
  * @brief Calculate the number of threads needed given the size of the dimension

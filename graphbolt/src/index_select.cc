@@ -28,10 +28,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> IndexSelectCSC(
       (index.is_pinned() || index.device().type() == c10::DeviceType::CUDA)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "UVAIndexSelectCSC", {
-          const auto [indptr, indices, nodes] =
+          const auto [subindptr, subindices] =
               UVAIndexSelectCSCImpl(indptr, indices, index);
-          return c10::make_intrusive<FusedSampledSubgraph>(
-              indptr, indices, nodes);
+          return c10::make_intrusive<sampling::FusedSampledSubgraph>(
+              subindptr, subindices, index);
         });
   } else if (
       indptr.device().type() == c10::DeviceType::CUDA &&
@@ -39,13 +39,15 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> IndexSelectCSC(
       index.device().type() == c10::DeviceType::CUDA) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "IndexSelectCSC", {
-          const auto [indptr, indices, nodes] =
+          const auto [subindptr, subindices] =
               IndexSelectCSCImpl(indptr, indices, index);
-          return c10::make_intrusive<FusedSampledSubgraph>(
-              indptr, indices, nodes);
+          return c10::make_intrusive<sampling::FusedSampledSubgraph>(
+              subindptr, subindices, index);
         });
   }
-  sampling::FusedCSCSamplingGraph g(indptr, indices);
+  torch::optional<torch::Tensor> temp;
+  torch::optional<sampling::FusedCSCSamplingGraph::EdgeAttrMap> temp2;
+  sampling::FusedCSCSamplingGraph g(indptr, indices, temp, temp, temp2);
   return g.InSubgraph(index);
 }
 

@@ -5,13 +5,16 @@
  */
 #include <c10/core/ScalarType.h>
 #include <c10/cuda/CUDAStream.h>
+#include <thrust/execution_policy.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
 
+#include <cub/cub.cuh>
 #include <numeric>
 
 #include "../index_select.h"
 #include "./common.h"
 #include "./utils.h"
-#include "cub/cub.cuh"
 
 namespace graphbolt {
 namespace ops {
@@ -27,14 +30,13 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
   auto sorted_array = torch::empty_like(input);
   auto sorted_idx = torch::empty_like(original_idx);
   cuda::CUDAWorkspaceAllocator allocator;
+  auto stream = torch::cuda::getDefaultCUDAStream();
   AT_DISPATCH_INDEX_TYPES(
       input.scalar_type(), "SortImpl", ([&] {
-        using IdType = index_t;
         const auto input_keys = input.data_ptr<index_t>();
         const int64_t* input_values = original_idx.data_ptr<int64_t>();
-        IdType* sorted_keys = sorted_array.data_ptr<index_t>();
+        index_t* sorted_keys = sorted_array.data_ptr<index_t>();
         int64_t* sorted_values = sorted_idx.data_ptr<int64_t>();
-        cudaStream_t stream = torch::cuda::getDefaultCUDAStream();
         if (num_bits == 0) {
           num_bits = sizeof(index_t) * 8;
         }
@@ -79,40 +81,77 @@ __global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
   }
 }
 
-template <typename IdType>
-struct AlignmentFunc {
-  static_assert(GPU_CACHE_LINE_SIZE % sizeof(IdType) == 0);
-  const IdType* in_deg;
-  const int64_t* perm;
-  IdType num_rows;
-  __host__ __device__ auto operator()(IdType row) {
-    constexpr int num_elements = CACHE_LINE_SIZE / sizeof(IdType);
-    return in_deg[perm ? perm[row % num_rows] : row] + num_elements - 1;
+template <typename indptr_t, typename index_t>
+struct DegreeFunc {
+  const index_t* rows;
+  const indptr_t* indptr;
+  indptr_t* in_deg;
+  indptr_t* inrow_indptr;
+  __host__ __device__ auto operator()(int64_t tIdx) {
+    const auto out_row = rows[tIdx];
+    const auto indptr_val = indptr[out_row];
+    const auto degree = indptr[out_row + 1] - indptr_val;
+    in_deg[tIdx] = degree;
+    inrow_indptr[tIdx] = indptr_val;
   }
 };
 
-c10::intrusive_ptr<sampling::FusedSampledSubgraph> UVAIndexSelectCSCImpl(
+template <typename indptr_t, typename indices_t>
+struct AlignmentFunc {
+  static_assert(GPU_CACHE_LINE_SIZE % sizeof(indices_t) == 0);
+  const indptr_t* indptr;
+  const int64_t* perm;
+  int64_t num_rows;
+  __host__ __device__ auto operator()(int64_t row) {
+    constexpr int num_elements = GPU_CACHE_LINE_SIZE / sizeof(indices_t);
+    const auto idx = perm ? perm[row % num_rows] : row;
+    const auto in_degree = indptr[idx + 1] - indptr[idx];
+    return in_degree + num_elements - 1;
+  }
+};
+
+std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor index) {
   const auto [sorted, perm_tensor] =
       Sort(index, cuda::NumberOfBits(indptr.size(0) - 1));
   const auto perm = perm_tensor.data_ptr<int64_t>();
 
   cuda::CUDAWorkspaceAllocator allocator;
+  auto stream = torch::cuda::getDefaultCUDAStream();
+  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
+
+  const int64_t num_rows = index.size(0);
+
+  // Read indptr only once in case it is pinned and access is slow.
+  auto sliced_indptr = allocator.alloc_unique<IdType>(num_rows);
+  // compute in-degrees
+  auto in_deg = allocator.alloc_unique<IdType>(num_rows + 1);
 
   AT_DISPATCH_INTEGRAL_TYPES(
-      indptr_.scalar_type(), "UVAIndexSelectCSCIndptr", ([&] {
+      indptr.scalar_type(), "UVAIndexSelectCSCIndptr", ([&] {
         using indptr_t = scalar_t;
+        AT_DISPATCH_INDEX_TYPES(
+            index.scalar_type(), "UVAIndexSelectCSCIndex", ([&] {
+              thrust::counting_iterator<int64_t> iota(0);
+              thrust::for_each(
+                  exec_policy, iota, iota + num_rows,
+                  DegreeFunc<indptr_t, index_t>{
+                      index.data_ptr<index_t>(), indptr.data_ptr<indptr_t>(),
+                      in_deg.get(), sliced_indptr.get()});
+            }));
         AT_DISPATCH_INTEGRAL_TYPES(
             indices.scalar_type(), "UVAIndexSelectCSCIndices", ([&] {
               using indices_t = scalar_t;
-              const indices_t num_rows = index.size(0);
+              const int64_t num_rows = index.size(0);
 
               indptr_t hop_size;
               auto subindptr_aligned =
                   allocator.AllocateStorage<indptr_t>(num_rows + 1);
               {
+                thrust::counting_iterator<int64_t> iota(0);
                 auto modified_in_deg = thrust::make_transform_iterator(
-                    iota, AlignmentFunc<IdType>{in_deg.get(), perm, num_rows});
+                    iota, AlignmentFunc<indptr_t, indices_t>{
+                              indptr.data_ptr<indptr_t>(), perm, num_rows});
                 size_t prefix_temp_size = 0;
                 CUDA_CALL(cub::DeviceScan::ExclusiveSum(
                     nullptr, prefix_temp_size, modified_in_deg,
@@ -122,17 +161,19 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> UVAIndexSelectCSCImpl(
                     temp.get(), prefix_temp_size, modified_in_deg,
                     subindptr_aligned.get(), num_rows + 1, stream));
 
-                device->CopyDataFromTo(
-                    subindptr_aligned.get(), num_rows * sizeof(hop_size),
-                    &hop_size, 0, sizeof(hop_size), ctx, DGLContext{kDGLCPU, 0},
-                    mat.indptr->dtype);
+                CUDA_CALL(cudaMemcpy(
+                    &hop_size,
+                    subindptr_aligned.get() + num_rows * sizeof(hop_size),
+                    sizeof(hop_size), cudaMemcpyDeviceToHost));
               }
               const dim3 block(BLOCK_SIZE);
               const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
               CUDA_KERNEL_CALL(
-                  (_CSRRowWiseOneHopExtractorAlignedKernel<IdType>), grid,
-                  block, 0, stream, hop_size, num_rows, indptr.get(), subindptr,
-                  subindptr_aligned.get(), indices_, hop_1, perm);
+                  (_CSRRowWiseOneHopExtractorAlignedKernel<
+                      indptr_t, indices_t>),
+                  grid, block, 0, stream, hop_size, num_rows,
+                  sliced_indptr.get(), subindptr, subindptr_aligned.get(),
+                  indices_, hop_1, perm);
             }));
       }));
 }

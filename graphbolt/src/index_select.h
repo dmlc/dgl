@@ -6,17 +6,21 @@
 #ifndef GRAPHBOLT_INDEX_SELECT_H_
 #define GRAPHBOLT_INDEX_SELECT_H_
 
+#include <graphbolt/fused_sampled_subgraph.h>
 #include <torch/script.h>
 
 namespace graphbolt {
 namespace ops {
 
 /** @brief Implemented in the cuda directory. */
-c10::intrusive_ptr<sampling::FusedSampledSubgraph> UVAIndexSelectCSCImpl(
+std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
 
 /** @brief Implemented in the cuda directory. */
-c10::intrusive_ptr<sampling::FusedSampledSubgraph> IndexSelectCSCImpl(
+std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
+
+c10::intrusive_ptr<sampling::FusedSampledSubgraph> IndexSelectCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
 
 /** @brief Implemented in the cuda directory. */
