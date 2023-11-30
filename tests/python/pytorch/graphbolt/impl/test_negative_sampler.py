@@ -32,7 +32,7 @@ def test_NegativeSampler_invoke():
 
 def test_UniformNegativeSampler_invoke():
     # Instantiate graph and required datapipes.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05)
+    graph = gb_test_utils.rand_csc_graph(100, 0.05, bidirection_edge=True)
     num_seeds = 30
     item_set = gb.ItemSet(
         torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
@@ -69,7 +69,7 @@ def test_UniformNegativeSampler_invoke():
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
 def test_Uniform_NegativeSampler(negative_ratio):
     # Construct FusedCSCSamplingGraph.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05)
+    graph = gb_test_utils.rand_csc_graph(100, 0.05, bidirection_edge=True)
     num_seeds = 30
     item_set = gb.ItemSet(
         torch.arange(0, num_seeds * 2).reshape(-1, 2), names="node_pairs"

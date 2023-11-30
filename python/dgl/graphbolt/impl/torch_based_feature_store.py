@@ -208,16 +208,20 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         features = {}
         for spec in feat_data:
             key = (spec.domain, spec.type, spec.name)
+            metadata = spec.extra_fields
             if spec.format == "torch":
                 assert spec.in_memory, (
                     f"Pytorch tensor can only be loaded in memory, "
                     f"but the feature {key} is loaded on disk."
                 )
-                features[key] = TorchBasedFeature(torch.load(spec.path))
+                features[key] = TorchBasedFeature(
+                    torch.load(spec.path), metadata=metadata
+                )
             elif spec.format == "numpy":
                 mmap_mode = "r+" if not spec.in_memory else None
                 features[key] = TorchBasedFeature(
-                    torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode))
+                    torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
+                    metadata=metadata,
                 )
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")

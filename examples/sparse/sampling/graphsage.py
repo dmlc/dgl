@@ -42,15 +42,15 @@ class SAGEConv(nn.Module):
 
     def __init__(
         self,
-        in_feats,
-        out_feats,
+        in_size,
+        out_size,
     ):
         super(SAGEConv, self).__init__()
-        self._in_src_feats, self._in_dst_feats = in_feats, in_feats
-        self._out_feats = out_feats
+        self._in_src_feats, self._in_dst_feats = in_size, in_size
+        self._out_size = out_size
 
-        self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=False)
-        self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=True)
+        self.fc_neigh = nn.Linear(self._in_src_feats, out_size, bias=False)
+        self.fc_self = nn.Linear(self._in_dst_feats, out_size, bias=True)
         self.reset_parameters()
 
     def reset_parameters(self):
