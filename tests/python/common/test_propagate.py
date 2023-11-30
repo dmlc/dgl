@@ -102,9 +102,10 @@ def test_prop_nodes_topo(idtype):
     tree.nodes[[1, 3, 4]].data["x"] = F.ones((3, 2))
 
     # Filtering DGLWarning:
-    #   "The input graph for the user-defined edge 
-    #    function does not contain valid edges"
+    #    The input graph for the user-defined edge
+    #    function does not contain valid edges
     import warnings
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         dgl.prop_nodes_topo(
