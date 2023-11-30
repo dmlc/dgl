@@ -1,8 +1,60 @@
 import dgl.graphbolt as gb
 import gb_test_utils
+import unittest
 import pytest
 import torch
 
+import backend as F
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
+@pytest.mark.parametrize(
+    "indptr_dtype",
+    [torch.int32, torch.int64],
+)
+@pytest.mark.parametrize(
+    "indices_dtype",
+    [torch.int32, torch.int64],
+)
+@pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("is_pinned", [False, True])
+def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
+    """Original graph in COO:
+    1   0   1   0   1   0
+    1   0   0   1   0   1
+    0   1   0   1   0   0
+    0   1   0   0   1   0
+    1   0   0   0   0   1
+    0   0   1   0   1   0
+    """
+    indptr = torch.tensor([0, 3, 5, 7, 9, 12, 14], dtype=indptr_dtype)
+    indices = torch.tensor([0, 1, 4, 2, 3, 0, 5, 1, 2, 0, 3, 5, 1, 4], dtype=indices_dtype)
+    index = torch.tensor([0, 5, 3], dtype=idtype)
+
+    res_cpu = torch.ops.graphbolt.index_select_csc(indptr, indices, index)
+    if is_pinned:
+        indptr = indptr.pin_memory()
+        indices = indices.pin_memory()
+    else:
+        indptr = indptr.cuda()
+        indices = indices.cuda()
+    index = index.cuda()
+
+    res_gpu = torch.ops.graphbolt.index_select_csc(indptr, indices, index)
+
+    assert not res_cpu.indptr.is_cuda
+    assert not res_cpu.indices.is_cuda
+    assert not res_cpu.original_column_node_ids.is_cuda
+
+    assert res_gpu.indptr.is_cuda
+    assert res_gpu.indices.is_cuda
+    assert res_gpu.original_column_node_ids.is_cuda
+
+    assert torch.equal(res_cpu.indptr, res_gpu.indptr.cpu())
+    assert torch.equal(res_cpu.indices, res_gpu.indices.cpu())
+    assert torch.equal(res_cpu.original_column_node_ids, res_gpu.original_column_node_ids.cpu())
 
 def test_InSubgraphSampler_homo():
     """Original graph in COO:

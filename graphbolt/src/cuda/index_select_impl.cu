@@ -30,7 +30,7 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
   auto sorted_array = torch::empty_like(input);
   auto sorted_idx = torch::empty_like(original_idx);
   cuda::CUDAWorkspaceAllocator allocator;
-  auto stream = torch::cuda::getDefaultCUDAStream();
+  auto stream = c10::cuda::getDefaultCUDAStream();
   AT_DISPATCH_INDEX_TYPES(
       input.scalar_type(), "SortImpl", ([&] {
         const auto input_keys = input.data_ptr<index_t>();
@@ -53,8 +53,22 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
 }
 
 template <typename indptr_t, typename indices_t>
+struct AlignmentFunc {
+  static_assert(GPU_CACHE_LINE_SIZE % sizeof(indices_t) == 0);
+  const indptr_t* in_degree;
+  const int64_t* perm;
+  int64_t num_rows;
+  __host__ __device__ auto operator()(int64_t row) {
+    constexpr int num_elements = GPU_CACHE_LINE_SIZE / sizeof(indices_t);
+    return thrust::make_tuple(
+        in_degree[row],
+        (indptr_t)(in_degree[perm ? perm[row % num_rows] : row] + num_elements - 1));
+  }
+};
+
+template <typename indptr_t, typename indices_t>
 __global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
-    const indptr_t hop_size, const indices_t num_rows,
+    const indptr_t hop_size, const int64_t num_rows,
     const indptr_t* const indptr, const indptr_t* const subindptr,
     const indptr_t* const subindptr_aligned, const indices_t* const indices,
     indices_t* const hop, const int64_t* const perm) {
@@ -63,17 +77,17 @@ __global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
 
   while (tx < hop_size) {
     const auto rpos_ = cuda::UpperBound(subindptr_aligned, num_rows, tx) - 1;
-    const indices_t rpos = perm ? perm[rpos_] : rpos_;
+    const auto rpos = perm ? perm[rpos_] : rpos_;
     const auto out_row = subindptr[rpos];
     const auto d = subindptr[rpos + 1] - out_row;
     const int offset =
-        ((uint64_t)(indices + indptr[rpos] - subindptr_aligned[rpos_]) %
-         CACHE_LINE_SIZE) /
-        sizeof(IdType);
-    const IdType rofs = tx - subindptr_aligned[rpos_] - offset;
+        ((size_t)(indices + indptr[rpos] - subindptr_aligned[rpos_]) %
+         GPU_CACHE_LINE_SIZE) /
+        sizeof(indices_t);
+    const auto rofs = tx - subindptr_aligned[rpos_] - offset;
     if (rofs >= 0 && rofs < d) {
       const auto in_idx = indptr[rpos] + rofs;
-      assert((uint64_t)(indices + in_idx - tx) % GPU_CACHE_LINE_SIZE == 0);
+      assert((size_t)(indices + in_idx - tx) % GPU_CACHE_LINE_SIZE == 0);
       const auto u = indices[in_idx];
       hop[out_row + rofs] = u;
     }
@@ -96,18 +110,15 @@ struct DegreeFunc {
   }
 };
 
-template <typename indptr_t, typename indices_t>
-struct AlignmentFunc {
-  static_assert(GPU_CACHE_LINE_SIZE % sizeof(indices_t) == 0);
-  const indptr_t* indptr;
-  const int64_t* perm;
-  int64_t num_rows;
-  __host__ __device__ auto operator()(int64_t row) {
-    constexpr int num_elements = GPU_CACHE_LINE_SIZE / sizeof(indices_t);
-    const auto idx = perm ? perm[row % num_rows] : row;
-    const auto in_degree = indptr[idx + 1] - indptr[idx];
-    return in_degree + num_elements - 1;
-  }
+struct PairSum {
+  template <typename indptr_t>
+  __host__ __device__ auto operator()(
+      thrust::tuple<indptr_t, indptr_t> a,
+      thrust::tuple<indptr_t, indptr_t> b) {
+    return thrust::make_tuple(
+        thrust::get<0>(a) + thrust::get<0>(b),
+        thrust::get<1>(a) + thrust::get<1>(b));
+  };
 };
 
 std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
@@ -117,19 +128,22 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
   const auto perm = perm_tensor.data_ptr<int64_t>();
 
   cuda::CUDAWorkspaceAllocator allocator;
-  auto stream = torch::cuda::getDefaultCUDAStream();
+  auto stream = c10::cuda::getDefaultCUDAStream();
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
 
   const int64_t num_rows = index.size(0);
 
-  // Read indptr only once in case it is pinned and access is slow.
-  auto sliced_indptr = allocator.alloc_unique<IdType>(num_rows);
-  // compute in-degrees
-  auto in_deg = allocator.alloc_unique<IdType>(num_rows + 1);
+  auto subindptr =
+      torch::empty(num_rows + 1, index.options().dtype(indptr.scalar_type()));
+  torch::Tensor subindices;
 
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "UVAIndexSelectCSCIndptr", ([&] {
         using indptr_t = scalar_t;
+        // Read indptr only once in case it is pinned and access is slow.
+        auto sliced_indptr = allocator.AllocateStorage<indptr_t>(num_rows);
+        // compute in-degrees
+        auto in_deg = allocator.AllocateStorage<indptr_t>(num_rows + 1);
         AT_DISPATCH_INDEX_TYPES(
             index.scalar_type(), "UVAIndexSelectCSCIndex", ([&] {
               thrust::counting_iterator<int64_t> iota(0);
@@ -142,40 +156,138 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
         AT_DISPATCH_INTEGRAL_TYPES(
             indices.scalar_type(), "UVAIndexSelectCSCIndices", ([&] {
               using indices_t = scalar_t;
-              const int64_t num_rows = index.size(0);
 
-              indptr_t hop_size;
+              indptr_t hop_size, hop_size_aligned;
               auto subindptr_aligned =
                   allocator.AllocateStorage<indptr_t>(num_rows + 1);
               {
                 thrust::counting_iterator<int64_t> iota(0);
                 auto modified_in_deg = thrust::make_transform_iterator(
                     iota, AlignmentFunc<indptr_t, indices_t>{
-                              indptr.data_ptr<indptr_t>(), perm, num_rows});
-                size_t prefix_temp_size = 0;
-                CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-                    nullptr, prefix_temp_size, modified_in_deg,
-                    subindptr_aligned.get(), num_rows + 1, stream));
-                auto temp = allocator.AllocateStorage<char>(prefix_temp_size);
-                CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-                    temp.get(), prefix_temp_size, modified_in_deg,
-                    subindptr_aligned.get(), num_rows + 1, stream));
-
-                CUDA_CALL(cudaMemcpy(
-                    &hop_size,
-                    subindptr_aligned.get() + num_rows * sizeof(hop_size),
-                    sizeof(hop_size), cudaMemcpyDeviceToHost));
+                              in_deg.get(), perm, num_rows});
+                auto subindptr_pair = thrust::make_zip_iterator(
+                    subindptr.data_ptr<indptr_t>(), subindptr_aligned.get());
+                thrust::tuple<indptr_t, indptr_t> zero_value{};
+                size_t workspace_size = 0;
+                CUDA_CALL(cub::DeviceScan::ExclusiveScan(
+                    nullptr, workspace_size, modified_in_deg, subindptr_pair,
+                    PairSum{}, zero_value, num_rows + 1, stream));
+                auto temp = allocator.AllocateStorage<char>(workspace_size);
+                CUDA_CALL(cub::DeviceScan::ExclusiveScan(
+                    temp.get(), workspace_size, modified_in_deg, subindptr_pair,
+                    PairSum{}, zero_value, num_rows + 1, stream));
               }
+              CUDA_CALL(cudaMemcpyAsync(
+                  &hop_size_aligned, subindptr_aligned.get() + num_rows,
+                  sizeof(hop_size_aligned), cudaMemcpyDeviceToHost, stream));
+              // synchronizes here, we can read hop_size and hop_size_aligned
+              CUDA_CALL(cudaMemcpy(
+                  &hop_size, subindptr.data_ptr<indptr_t>() + num_rows,
+                  sizeof(hop_size), cudaMemcpyDeviceToHost));
+              subindices = torch::empty(
+                  hop_size, index.options().dtype(indices.scalar_type()));
               const dim3 block(BLOCK_SIZE);
-              const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
+              const dim3 grid((hop_size_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
               CUDA_KERNEL_CALL(
-                  (_CSRRowWiseOneHopExtractorAlignedKernel<
-                      indptr_t, indices_t>),
-                  grid, block, 0, stream, hop_size, num_rows,
-                  sliced_indptr.get(), subindptr, subindptr_aligned.get(),
-                  indices_, hop_1, perm);
+                  _CSRRowWiseOneHopExtractorAlignedKernel, grid, block, 0,
+                  stream, hop_size_aligned, num_rows, sliced_indptr.get(),
+                  subindptr.data_ptr<indptr_t>(), subindptr_aligned.get(),
+                  indices.data_ptr<indices_t>(),
+                  subindices.data_ptr<indices_t>(), perm);
             }));
       }));
+  return std::make_tuple(subindptr, subindices);
+}
+
+template <typename indptr_t, typename indices_t>
+struct IteratorFunc {
+  indptr_t* indptr;
+  indices_t* indices;
+  __host__ __device__ auto operator()(int64_t i) { return indices + indptr[i]; }
+};
+
+template <typename indptr_t, typename indices_t>
+struct ConvertToBytes {
+  indptr_t* in_degree;
+  __host__ __device__ indptr_t operator()(int64_t i) {
+    return in_degree[i] * sizeof(indices_t);
+  }
+};
+
+std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index) {
+  cuda::CUDAWorkspaceAllocator allocator;
+  auto stream = c10::cuda::getDefaultCUDAStream();
+  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
+
+  const int64_t num_rows = index.size(0);
+
+  auto subindptr =
+      torch::empty(num_rows + 1, index.options().dtype(indptr.scalar_type()));
+  torch::Tensor subindices;
+  thrust::counting_iterator<int64_t> iota(0);
+
+  AT_DISPATCH_INTEGRAL_TYPES(
+      indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
+        using indptr_t = scalar_t;
+        // Read indptr only once in case it is pinned and access is slow.
+        auto sliced_indptr = allocator.AllocateStorage<indptr_t>(num_rows);
+        // compute in-degrees
+        auto in_deg = allocator.AllocateStorage<indptr_t>(num_rows + 1);
+        indptr_t hop_size;
+        AT_DISPATCH_INDEX_TYPES(
+            index.scalar_type(), "IndexSelectCSCIndex", ([&] {
+              thrust::counting_iterator<int64_t> iota(0);
+              thrust::for_each(
+                  exec_policy, iota, iota + num_rows,
+                  DegreeFunc<indptr_t, index_t>{
+                      index.data_ptr<index_t>(), indptr.data_ptr<indptr_t>(),
+                      in_deg.get(), sliced_indptr.get()});
+            }));
+        size_t workspace_size = 0;
+        CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+            nullptr, workspace_size, in_deg.get(),
+            subindptr.data_ptr<indptr_t>(), num_rows + 1, stream));
+        auto temp = allocator.AllocateStorage<char>(workspace_size);
+        CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+            temp.get(), workspace_size, in_deg.get(),
+            subindptr.data_ptr<indptr_t>(), num_rows + 1, stream));
+        // blocking read of hop_size
+        CUDA_CALL(cudaMemcpy(
+            &hop_size, subindptr.data_ptr<indptr_t>() + num_rows,
+            sizeof(hop_size), cudaMemcpyDeviceToHost));
+        subindices = torch::empty(
+            hop_size, index.options().dtype(indices.scalar_type()));
+        AT_DISPATCH_INTEGRAL_TYPES(
+            indices.scalar_type(), "IndexSelectCSCIndices", ([&] {
+              using indices_t = scalar_t;
+              auto input_buffer_it = thrust::make_transform_iterator(
+                  iota,
+                  IteratorFunc<indptr_t, indices_t>{
+                      sliced_indptr.get(), indices.data_ptr<indices_t>()});
+              auto output_buffer_it = thrust::make_transform_iterator(
+                  iota, IteratorFunc<indptr_t, indices_t>{
+                            subindptr.data_ptr<indptr_t>(),
+                            subindices.data_ptr<indices_t>()});
+              auto buffer_sizes = thrust::make_transform_iterator(
+                  iota, ConvertToBytes<indptr_t, indices_t>{in_deg.get()});
+              constexpr int64_t max_copy_at_once =
+                  std::numeric_limits<int32_t>::max();
+              for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
+                size_t workspace_size = 0;
+                CUDA_CALL(cub::DeviceMemcpy::Batched(
+                    nullptr, workspace_size, input_buffer_it + i,
+                    output_buffer_it + i, buffer_sizes + i,
+                    std::min(num_rows - i, max_copy_at_once), stream));
+                auto temp = allocator.AllocateStorage<char>(workspace_size);
+                CUDA_CALL(cub::DeviceMemcpy::Batched(
+                    temp.get(), workspace_size, input_buffer_it + i,
+                    output_buffer_it + i, buffer_sizes + i,
+                    std::min(num_rows - i, max_copy_at_once), stream));
+              }
+            }));
+      }));
+  return std::make_tuple(subindptr, subindices);
 }
 
 /** @brief Index select operator implementation for feature size 1. */
@@ -282,7 +394,7 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   const IdType* index_sorted_ptr = sorted_index.data_ptr<IdType>();
   const int64_t* permutation_ptr = permutation.data_ptr<int64_t>();
 
-  cudaStream_t stream = torch::cuda::getDefaultCUDAStream();
+  cudaStream_t stream = c10::cuda::getDefaultCUDAStream();
 
   if (aligned_feature_size == 1) {
     // Use a single thread to process each output row to avoid wasting threads.
