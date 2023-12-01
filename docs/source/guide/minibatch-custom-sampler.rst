@@ -126,5 +126,10 @@ do so, we need to add an additional datapipe right after sampling as follows:
 Please check the API page of :func:`~dgl.graphbolt.exclude_seed_edges` for more
 details.
 
+The above API is based on :meth:`~dgl.graphbolt.SampledSubgrahp.exclude_edges`.
+If you want to exclude edges from the sampled subgraph based on some other
+criteria, you could write your own transform function. Please check the method
+for reference.
+
 You could also refer to examples in
 `Link Prediction <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/link_prediction.py>`__.
