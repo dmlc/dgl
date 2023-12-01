@@ -3,6 +3,10 @@
 6.7 Using GPU for Neighborhood Sampling
 ---------------------------------------
 
+.. note::
+  GraphBolt does not support GPU-based neighborhood sampling. So this guide is
+  utilizing :class:`~dgl.dataloading.DataLoader` for illustration.
+
 DGL since 0.7 has been supporting GPU-based neighborhood sampling, which has a significant
 speed advantage over CPU-based neighborhood sampling.  If you estimate that your graph 
 can fit onto GPU and your model does not take a lot of GPU memory, then it is best to
