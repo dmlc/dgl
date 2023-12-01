@@ -34,9 +34,10 @@ chaining different data pipes together. For example, if we want to sample
 negative items for each seed from graph, we can simply chain the
 :class:`~dgl.graphbolt.NegativeSampler` after the :class:`~dgl.graphbolt.ItemSampler`.
 
-But simply chaining data pipes together incurs performance overheads. Considering
-the fact that some stages are computationally intensive while others are I/O intensive,
-we can parallelize the data loading process to improve the performance.
+But simply chaining data pipes together incurs performance overheads as various
+hardware resources such as CPU, GPU, PCIe, etc. are utilized by different stages.
+As a result, the data loading mechanism is optimized to minimize the overheads
+and achieve the best performance.
 
 In specific, GraphBolt wraps the data pipes before ``fetch_feature`` with
 multiprocessing which enables multiple processes to run in parallel. As for
