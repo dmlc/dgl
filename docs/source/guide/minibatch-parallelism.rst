@@ -27,7 +27,8 @@ generate a minibatch, including:
 
 All these stages are implemented in separate
 `IterableDataPipe <https://pytorch.org/data/main/torchdata.datapipes.iter.html>`__
-and stacked together with `PyTorch DataLoader <https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader>`__.
+and stacked together with `PyTorch DataLoader <https://pytorch.org/docs/stable/data
+.html#torch.utils.data.DataLoader>`__.
 This design allows us to easily customize the data loading process by
 chaining different data pipes together. For example, if we want to sample
 negative items for each seed from graph, we can simply chain the
