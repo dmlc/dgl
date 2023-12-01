@@ -3,143 +3,128 @@
 6.4 Implementing Custom Graph Samplers
 ----------------------------------------------
 
-Implementing custom samplers involves subclassing the :class:`dgl.dataloading.Sampler`
-base class and implementing its abstract :attr:`sample` method.  The :attr:`sample`
-method should take in two arguments:
+Implementing custom samplers involves subclassing the
+:class:`dgl.graphbolt.SubgraphSampler` base class and implementing its abstract
+:attr:`_sample_subgraphs` method. The :attr:`_sample_subgraphs` method should
+take in seed nodes which are the nodes to sample neighbors from:
 
 .. code:: python
 
-   def sample(self, g, indices):
-       pass
+    def _sample_subgraphs(self, seed_nodes):
+        return input_nodes, sampled_subgraphs
 
-The first argument :attr:`g` is the original graph to sample from while
-the second argument :attr:`indices` is the indices of the current mini-batch
--- it generally could be anything depending on what indices are given to the
-accompanied :class:`~dgl.dataloading.DataLoader` but are typically seed node
-or seed edge IDs. The function returns the mini-batch of samples for
-the current iteration.
+The method should return the input node IDs list and a list of subgraphs. Each
+subgraph is a :class:`~dgl.graphbolt.SampledSubgraph` object.
 
-.. note::
 
-    The design here is similar to PyTorch's ``torch.utils.data.DataLoader``,
-    which is an iterator of dataset. Users can customize how to batch samples
-    using its ``collate_fn`` argument. Here in DGL, ``dgl.dataloading.DataLoader``
-    is an iterator of ``indices`` (e.g., training node IDs) while ``Sampler``
-    converts a batch of indices into a batch of graph- or tensor-type samples.
-
+Any other data that are required during sampling such as the graph structure,
+fanout size, etc. should be passed to the sampler via the constructor.
 
 The code below implements a classical neighbor sampler:
 
 .. code:: python
 
-   class NeighborSampler(dgl.dataloading.Sampler):
-       def __init__(self, fanouts : list[int]):
-           super().__init__()
+    @functional_datapipe("customized_sample_neighbor")
+    class CustomizedNeighborSampler(dgl.graphbolt.SubgraphSampler):
+       def __init__(self, datapipe, graph, fanouts):
+           super().__init__(datapipe)
+           self.graph = graph
            self.fanouts = fanouts
 
-       def sample(self, g, seed_nodes):
-           output_nodes = seed_nodes
+       def _sample_subgraphs(self, seed_nodes):
            subgs = []
            for fanout in reversed(self.fanouts):
                # Sample a fixed number of neighbors of the current seed nodes.
-               sg = g.sample_neighbors(seed_nodes, fanout)
-               # Convert this subgraph to a message flow graph.
-               sg = dgl.to_block(sg, seed_nodes)
-               seed_nodes = sg.srcdata[NID]
+               input_nodes, sg = g.sample_neighbors(seed_nodes, fanout)
                subgs.insert(0, sg)
-               input_nodes = seed_nodes
-           return input_nodes, output_nodes, subgs
+               seed_nodes = input_nodes
+           return input_nodes, subgs
 
-To use this sampler with ``DataLoader``:
+To use this sampler with :class:`~dgl.graphbolt.MultiProcessDataLoader`:
 
 .. code:: python
 
-    graph = ...  # the graph to be sampled from
-    train_nids = ...  # an 1-D tensor of training node IDs
-    sampler = NeighborSampler([10, 15])  # create a sampler
-    dataloader = dgl.dataloading.DataLoader(
-        graph,
-        train_nids,
-        sampler,
-        batch_size=32,    # batch_size decides how many IDs are passed to sampler at once
-        ...               # other arguments
-    )
-    for i, mini_batch in enumerate(dataloader):
-        # unpack the mini batch
-        input_nodes, output_nodes, subgs = mini_batch
-        train(input_nodes, output_nodes, subgs)
+    datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
+    datapipe = datapipe.customized_sample_neighbor(g, [10, 10]) # 2 layers.
+    datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
+    datapipe = datapipe.to_dgl()
+    datapipe = datapipe.copy_to(device)
+    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
+
+    for data in dataloader:
+        input_features = data.node_features["feat"]
+        output_labels = data.labels
+        output_predictions = model(data.blocks, input_features)
+        loss = compute_loss(output_labels, output_predictions)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+
 
 Sampler for Heterogeneous Graphs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To write a sampler for heterogeneous graphs, one needs to be aware that
-the argument ``g`` will be a heterogeneous graph while ``indices`` could be a
+the argument `graph` is a heterogeneous graph while `seeds` could be a
 dictionary of ID tensors. Most of DGL's graph sampling operators (e.g.,
 the ``sample_neighbors`` and ``to_block`` functions in the above example) can
 work on heterogeneous graph natively, so many samplers are automatically
-ready for heterogeneous graph. For example, the above ``NeighborSampler``
+ready for heterogeneous graph. For example, the above ``CustomizedNeighborSampler``
 can be used on heterogeneous graphs:
 
 .. code:: python
 
-    hg = dgl.heterograph({
-        ('user', 'like', 'movie') : ...,
-        ('user', 'follow', 'user') : ...,
-        ('movie', 'liked-by', 'user') : ...,
-    })
-    train_nids = {'user' : ..., 'movie' : ...}  # training IDs of 'user' and 'movie' nodes
-    sampler = NeighborSampler([10, 15])  # create a sampler
-    dataloader = dgl.dataloading.DataLoader(
-        hg,
-        train_nids,
-        sampler,
-        batch_size=32,    # batch_size decides how many IDs are passed to sampler at once
-        ...               # other arguments
+    import dgl.graphbolt as gb
+    hg = gb.FusedCSCSamplingGraph()
+    train_set = item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(
+                (torch.arange(0, 5), torch.arange(5, 10)),
+                names=("seed_nodes", "labels"),
+            ),
+            "item": gb.ItemSet(
+                (torch.arange(5, 10), torch.arange(10, 15)),
+                names=("seed_nodes", "labels"),
+            ),
+        }
     )
-    for i, mini_batch in enumerate(dataloader):
-        # unpack the mini batch
-        # input_nodes and output_nodes are dictionary while subgs are a list of
-        # heterogeneous graphs
-        input_nodes, output_nodes, subgs = mini_batch
-        train(input_nodes, output_nodes, subgs)
+    datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
+    datapipe = datapipe.customized_sample_neighbor(g, [10, 10]) # 2 layers.
+    datapipe = datapipe.fetch_feature(
+        feature, node_feature_keys={"user": ["feat"], "item": ["feat"]}
+    )
+    datapipe = datapipe.to_dgl()
+    datapipe = datapipe.copy_to(device)
+    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
 
-Exclude Edges During Sampling
+    for data in dataloader:
+        input_features = {
+            ntype: data.node_features[(ntype, "feat")]
+            for ntype in data.blocks[0].srctypes
+        }
+        output_labels = data.labels["user"]
+        output_predictions = model(data.blocks, input_features)["user"]
+        loss = compute_loss(output_labels, output_predictions)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+
+
+Exclude Edges After Sampling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The examples above all belong to *node-wise sampler* because the ``indices`` argument
-to the ``sample`` method represents a batch of seed node IDs. Another common type of
-samplers is *edge-wise sampler* which, as name suggested, takes in a batch of seed
-edge IDs to construct mini-batch data. DGL provides a utility
-:func:`dgl.dataloading.as_edge_prediction_sampler` to turn a node-wise sampler to
-an edge-wise sampler. To prevent information leakge, it requires the node-wise sampler
-to have an additional third argument ``exclude_eids``. The code below modifies
-the ``NeighborSampler`` we just defined to properly exclude edges from the sampled
-subgraph:
+In some cases, we may want to exclude seed edges from the sampled subgraph. For
+example, in link prediction tasks, we want to exclude the edges in the
+training set from the sampled subgraph to prevent information leakage. To
+do so, we need to add an additional datapipe right after sampling as follows:
 
 .. code:: python
 
-   class NeighborSampler(Sampler):
-       def __init__(self, fanouts):
-           super().__init__()
-           self.fanouts = fanouts
+    datapipe = datapipe.customized_sample_neighbor(g, [10, 10]) # 2 layers.
+    datapipe = datapipe.transform(gb.exclude_seed_edges)
 
-       # NOTE: There is an additional third argument. For homogeneous graphs,
-       #   it is an 1-D tensor of integer IDs. For heterogeneous graphs, it
-       #   is a dictionary of ID tensors. We usually set its default value to be None.
-       def sample(self, g, seed_nodes, exclude_eids=None):
-           output_nodes = seed_nodes
-           subgs = []
-           for fanout in reversed(self.fanouts):
-               # Sample a fixed number of neighbors of the current seed nodes.
-               sg = g.sample_neighbors(seed_nodes, fanout, exclude_edges=exclude_eids)
-               # Convert this subgraph to a message flow graph.
-               sg = dgl.to_block(sg, seed_nodes)
-               seed_nodes = sg.srcdata[NID]
-               subgs.insert(0, sg)
-               input_nodes = seed_nodes
-           return input_nodes, output_nodes, subgs
+Please check the API page of :func:`~dgl.graphbolt.exclude_seed_edges` for more
+details.
 
-Further Readings
-~~~~~~~~~~~~~~~~~~
-See :ref:`guide-minibatch-prefetching` for how to write a custom graph sampler
-with feature prefetching.
+You could also refer to examples in
+`Link Prediction <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/link_prediction.py>`__.
