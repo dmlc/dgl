@@ -23,7 +23,7 @@ generate a minibatch, including:
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe, num_workers=0)
 
 All these stages are implemented in separate
 `IterableDataPipe <https://pytorch.org/data/main/torchdata.datapipes.iter.html>`__
@@ -52,5 +52,5 @@ which prefetches elements from previous data pipes and puts them into a buffer.
 Such prefetching is totally transparent to users and requires no extra code. It
 brings a significant performance boost to minibatch training of GNNs.
 
-Please refer to the source code of :class:`~dgl.graphbolt.MultiProcessDataLoader`
+Please refer to the source code of :class:`~dgl.graphbolt.DataLoader`
 for more details.

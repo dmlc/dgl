@@ -136,7 +136,7 @@ def create_dataloader(A, fanouts, ids, features, device):
     # Use grapbolt to fetch features.
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=4)
+    dataloader = gb.DataLoader(datapipe, num_workers=4)
     return dataloader
 
 

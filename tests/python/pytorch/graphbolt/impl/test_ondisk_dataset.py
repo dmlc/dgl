@@ -2085,7 +2085,7 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
                 dataset.feature, node_feature_keys=["feat"]
             )
             datapipe = datapipe.to_dgl()
-            dataloader = gb.MultiProcessDataLoader(datapipe)
+            dataloader = gb.DataLoader(datapipe)
             for _ in dataloader:
                 pass
 
@@ -2157,7 +2157,7 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
                 dataset.feature, node_feature_keys={"user": ["feat"]}
             )
             datapipe = datapipe.to_dgl()
-            dataloader = gb.MultiProcessDataLoader(datapipe)
+            dataloader = gb.DataLoader(datapipe)
             for _ in dataloader:
                 pass
 

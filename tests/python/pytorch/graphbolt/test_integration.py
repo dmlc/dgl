@@ -56,7 +56,7 @@ def test_integration_link_prediction():
         feature_store, node_feature_keys=["feat"], edge_feature_keys=["feat"]
     )
     datapipe = datapipe.to_dgl()
-    dataloader = gb.SingleProcessDataLoader(
+    dataloader = gb.DataLoader(
         datapipe,
     )
     expected = [
@@ -172,7 +172,7 @@ def test_integration_node_classification():
         feature_store, node_feature_keys=["feat"], edge_feature_keys=["feat"]
     )
     datapipe = datapipe.to_dgl()
-    dataloader = gb.SingleProcessDataLoader(
+    dataloader = gb.DataLoader(
         datapipe,
     )
     expected = [

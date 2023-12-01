@@ -32,7 +32,7 @@ def create_dataloader(dateset, itemset, device):
     datapipe = datapipe.copy_to(device)
 
     # Initiate the dataloader for the datapipe.
-    return gb.SingleProcessDataLoader(datapipe)
+    return gb.DataLoader(datapipe)
 
 
 class GCN(nn.Module):

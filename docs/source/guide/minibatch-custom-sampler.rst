@@ -40,7 +40,7 @@ The code below implements a classical neighbor sampler:
                seed_nodes = input_nodes
            return input_nodes, subgs
 
-To use this sampler with :class:`~dgl.graphbolt.MultiProcessDataLoader`:
+To use this sampler with :class:`~dgl.graphbolt.DataLoader`:
 
 .. code:: python
 
@@ -49,7 +49,7 @@ To use this sampler with :class:`~dgl.graphbolt.MultiProcessDataLoader`:
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     for data in dataloader:
         input_features = data.node_features["feat"]
@@ -95,7 +95,7 @@ can be used on heterogeneous graphs:
     )
     datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     for data in dataloader:
         input_features = {

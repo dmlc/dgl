@@ -759,7 +759,7 @@ def distributed_item_sampler_subprocess(
         gb.BasicFeatureStore({}),
         [],
     )
-    data_loader = gb.MultiProcessDataLoader(
+    data_loader = gb.DataLoader(
         feature_fetcher, num_workers=num_workers
     )
 
