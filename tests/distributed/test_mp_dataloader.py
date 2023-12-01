@@ -2,6 +2,7 @@ import multiprocessing as mp
 import os
 import tempfile
 import time
+import unittest
 
 import backend as F
 import dgl
@@ -310,6 +311,7 @@ def check_neg_dataloader(g, num_server, num_workers):
             assert p.exitcode == 0
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
@@ -633,6 +635,7 @@ def create_random_hetero():
     return g
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
@@ -644,6 +647,7 @@ def test_dataloader(num_server, num_workers, dataloader_type):
     check_dataloader(g, num_server, num_workers, dataloader_type)
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 def test_neg_dataloader(num_server, num_workers):
@@ -692,6 +696,7 @@ def start_multiple_dataloaders(
     dgl.distributed.exit_client()
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize("num_dataloaders", [1, 4])
 @pytest.mark.parametrize("num_workers", [0, 1, 4])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])

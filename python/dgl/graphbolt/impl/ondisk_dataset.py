@@ -14,9 +14,9 @@ from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
+from ..internal import copy_or_convert_data, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from ..utils import copy_or_convert_data, read_data
 from .fused_csc_sampling_graph import (
     from_dglgraph,
     FusedCSCSamplingGraph,
@@ -521,6 +521,16 @@ class BuiltinDataset(OnDiskDataset):
             Reverse edges are added to the original graph and duplicated
             edges are removed.
 
+    **ogbn-arxiv**
+        The ogbn-arxiv dataset is a directed graph, representing the citation
+        network between all Computer Science (CS) arXiv papers indexed by MAG.
+        See more details in `ogbn-arxiv
+        https://ogb.stanford.edu/docs/nodeprop/#ogbn-arxiv>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
     **ogbn-products**
         The ogbn-products dataset is an undirected and unweighted graph,
         representing an Amazon product co-purchasing network. See more details
@@ -558,6 +568,7 @@ class BuiltinDataset(OnDiskDataset):
         "ogbn-mag",
         "ogbl-citation2",
         "ogbn-products",
+        "ogbn-arxiv",
     ]
     _large_datasets = ["ogb-lsc-mag240m"]
     _all_datasets = _datasets + _large_datasets

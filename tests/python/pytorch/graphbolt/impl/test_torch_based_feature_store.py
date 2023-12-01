@@ -29,11 +29,12 @@ def test_torch_based_feature(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 3], [4, 5, 6]])
         b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
+        metadata = {"max_value": 3}
         if not in_memory:
             a = to_on_disk_tensor(test_dir, "a", a)
             b = to_on_disk_tensor(test_dir, "b", b)
 
-        feature_a = gb.TorchBasedFeature(a)
+        feature_a = gb.TorchBasedFeature(a, metadata=metadata)
         feature_b = gb.TorchBasedFeature(b)
 
         # Read the entire feature.
@@ -83,6 +84,11 @@ def test_torch_based_feature(in_memory):
         # Test get the size of the entire feature.
         assert feature_a.size() == torch.Size([3])
         assert feature_b.size() == torch.Size([2, 2])
+
+        # Test get metadata of the feature.
+        assert feature_a.metadata() == metadata
+        assert feature_b.metadata() == {}
+
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
@@ -135,12 +141,27 @@ def test_torch_based_feature(in_memory):
     reason="Tests for pinned memory are only meaningful on GPU.",
 )
 @pytest.mark.parametrize(
-    "dtype", [torch.float32, torch.float64, torch.int32, torch.int64]
+    "dtype",
+    [
+        torch.float32,
+        torch.float64,
+        torch.int32,
+        torch.int64,
+        torch.int8,
+        torch.float16,
+        torch.complex128,
+    ],
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
-@pytest.mark.parametrize("shape", [(2, 1), (2, 3), (2, 2, 2)])
+@pytest.mark.parametrize("shape", [(2, 1), (2, 3), (2, 2, 2), (137, 13, 3)])
 def test_torch_based_pinned_feature(dtype, idtype, shape):
-    tensor = torch.arange(0, reduce(mul, shape), dtype=dtype).reshape(shape)
+    if dtype == torch.complex128:
+        tensor = torch.complex(
+            torch.randint(0, 13, shape, dtype=torch.float64),
+            torch.randint(0, 13, shape, dtype=torch.float64),
+        )
+    else:
+        tensor = torch.randint(0, 13, shape, dtype=dtype)
     test_tensor = tensor.clone().detach()
     test_tensor_cuda = test_tensor.cuda()
 

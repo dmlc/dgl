@@ -60,11 +60,6 @@ struct CSRMatrix {
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
-    if (!IsEmpty()) {
-      is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
-                  (aten::IsNullArray(indices) || indices.IsPinned()) &&
-                  (aten::IsNullArray(data) || data.IsPinned());
-    }
     CheckValidity();
   }
 
@@ -128,6 +123,15 @@ struct CSRMatrix {
            aten::IsNullArray(data);
   }
 
+  // Check and update the internal flag is_pinned.
+  // This function will initialize a cuda context.
+  inline bool CheckIfPinnedInCUDA() {
+    is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
+                (aten::IsNullArray(indices) || indices.IsPinned()) &&
+                (aten::IsNullArray(data) || data.IsPinned());
+    return is_pinned;
+  }
+
   /** @brief Return a copy of this matrix on the give device context. */
   inline CSRMatrix CopyTo(const DGLContext& ctx) const {
     if (ctx == indptr->ctx) return *this;
@@ -143,7 +147,7 @@ struct CSRMatrix {
       auto new_csr = CSRMatrix(
           num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
           aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
-      CHECK(new_csr.is_pinned)
+      CHECK(new_csr.CheckIfPinnedInCUDA())
           << "An internal DGL error has occured while trying to pin a CSR "
              "matrix. Please file a bug at "
              "'https://github.com/dmlc/dgl/issues' "
