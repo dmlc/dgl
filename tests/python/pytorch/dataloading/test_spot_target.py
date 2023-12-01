@@ -30,7 +30,8 @@ def _find_edges_to_exclude(g, pair_eids, degree_threshold):
 
 @pytest.mark.parametrize("degree_threshold", [1, 2, 3, 4, 5])
 @pytest.mark.parametrize("batch_size", [1, 10, 50])
-def test_spot_target_excludes(degree_threshold, batch_size):
+@pytest.mark.parametrize("num_workers", [1, 4])
+def test_spot_target_excludes(degree_threshold, batch_size, num_workers):
     g, reverse_eids, seed_edges = _create_homogeneous()
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
     low_degree_excluder = dgl.dataloading.SpotTarget(
@@ -45,38 +46,39 @@ def test_spot_target_excludes(degree_threshold, batch_size):
         negative_sampler=dgl.dataloading.negative_sampler.Uniform(1),
     )
     dataloader = dgl.dataloading.DataLoader(
-        g, seed_edges, sampler, batch_size=batch_size
+        g, seed_edges, sampler, batch_size=batch_size, num_workers=num_workers,
     )
+    
+    with dataloader.enable_cpu_affinity():
+        for i, (input_nodes, pair_graph, neg_pair_graph, blocks) in enumerate(
+            dataloader
+        ):
+            if isinstance(blocks, list):
+                subg = blocks[0]
+            else:
+                subg = blocks
+            pair_eids = pair_graph.edata[dgl.EID]
+            block_eids = subg.edata[dgl.EID]
+            edges_to_exclude = _find_edges_to_exclude(
+                g, pair_eids, degree_threshold
+            )
+            if edges_to_exclude is None:
+                continue
+            edges_to_exclude = dgl.utils.recursive_apply(
+                edges_to_exclude, lambda x: x.cpu().numpy()
+            )
+            block_eids = dgl.utils.recursive_apply(
+                block_eids, lambda x: x.cpu().numpy()
+            )
 
-    for i, (input_nodes, pair_graph, neg_pair_graph, blocks) in enumerate(
-        dataloader
-    ):
-        if isinstance(blocks, list):
-            subg = blocks[0]
-        else:
-            subg = blocks
-        pair_eids = pair_graph.edata[dgl.EID]
-        block_eids = subg.edata[dgl.EID]
-        edges_to_exclude = _find_edges_to_exclude(
-            g, pair_eids, degree_threshold
-        )
-        if edges_to_exclude is None:
-            continue
-        edges_to_exclude = dgl.utils.recursive_apply(
-            edges_to_exclude, lambda x: x.cpu().numpy()
-        )
-        block_eids = dgl.utils.recursive_apply(
-            block_eids, lambda x: x.cpu().numpy()
-        )
+            if isinstance(edges_to_exclude, Mapping):
+                for k in edges_to_exclude.keys():
+                    assert not np.isin(edges_to_exclude[k], block_eids[k]).any()
+            else:
+                assert not np.isin(edges_to_exclude, block_eids).any()
 
-        if isinstance(edges_to_exclude, Mapping):
-            for k in edges_to_exclude.keys():
-                assert not np.isin(edges_to_exclude[k], block_eids[k]).any()
-        else:
-            assert not np.isin(edges_to_exclude, block_eids).any()
-
-        if i == 10:
-            break
+            if i == 10:
+                break
 
 
 if __name__ == "__main__":
