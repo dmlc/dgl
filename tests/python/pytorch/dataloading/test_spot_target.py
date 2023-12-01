@@ -46,9 +46,13 @@ def test_spot_target_excludes(degree_threshold, batch_size, num_workers):
         negative_sampler=dgl.dataloading.negative_sampler.Uniform(1),
     )
     dataloader = dgl.dataloading.DataLoader(
-        g, seed_edges, sampler, batch_size=batch_size, num_workers=num_workers,
+        g,
+        seed_edges,
+        sampler,
+        batch_size=batch_size,
+        num_workers=num_workers,
     )
-    
+
     with dataloader.enable_cpu_affinity():
         for i, (input_nodes, pair_graph, neg_pair_graph, blocks) in enumerate(
             dataloader
