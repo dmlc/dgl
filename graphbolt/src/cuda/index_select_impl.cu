@@ -181,9 +181,10 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
                   &hop_size_aligned, subindptr_aligned.get() + num_rows,
                   sizeof(hop_size_aligned), cudaMemcpyDeviceToHost, stream));
               // synchronizes here, we can read hop_size and hop_size_aligned
-              CUDA_CALL(cudaMemcpy(
+              CUDA_CALL(cudaMemcpyAsync(
                   &hop_size, subindptr.data_ptr<indptr_t>() + num_rows,
-                  sizeof(hop_size), cudaMemcpyDeviceToHost));
+                  sizeof(hop_size), cudaMemcpyDeviceToHost, stream));
+              cudaStreamSynchronize(stream);
               subindices = torch::empty(
                   hop_size, index.options().dtype(indices.scalar_type()));
               const dim3 block(BLOCK_SIZE);
@@ -253,9 +254,10 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
             temp.get(), workspace_size, in_deg.get(),
             subindptr.data_ptr<indptr_t>(), num_rows + 1, stream));
         // blocking read of hop_size
-        CUDA_CALL(cudaMemcpy(
+        CUDA_CALL(cudaMemcpyAsync(
             &hop_size, subindptr.data_ptr<indptr_t>() + num_rows,
-            sizeof(hop_size), cudaMemcpyDeviceToHost));
+            sizeof(hop_size), cudaMemcpyDeviceToHost, stream));
+        cudaStreamSynchronize(stream);
         subindices = torch::empty(
             hop_size, index.options().dtype(indices.scalar_type()));
         AT_DISPATCH_INTEGRAL_TYPES(
