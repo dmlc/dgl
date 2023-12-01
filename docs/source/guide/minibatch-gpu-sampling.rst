@@ -4,7 +4,7 @@
 ---------------------------------------
 
 .. note::
-  GraphBolt does not support GPU-based neighborhood sampling. So this guide is
+  GraphBolt does not support GPU-based neighborhood sampling yet. So this guide is
   utilizing :class:`~dgl.dataloading.DataLoader` for illustration.
 
 DGL since 0.7 has been supporting GPU-based neighborhood sampling, which has a significant
