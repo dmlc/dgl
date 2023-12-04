@@ -17,7 +17,7 @@ import torch
 )
 @pytest.mark.parametrize(
     "indices_dtype",
-    [torch.int32, torch.int64],
+    [torch.int8, torch.int16, torch.int32, torch.int64],
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("is_pinned", [False, True])
@@ -36,7 +36,7 @@ def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
     )
     index = torch.tensor([0, 5, 3], dtype=idtype)
 
-    res_cpu = torch.ops.graphbolt.index_select_csc(indptr, indices, index)
+    cpu_indptr, cpu_indices = torch.ops.graphbolt.index_select_csc(indptr, indices, index)
     if is_pinned:
         indptr = indptr.pin_memory()
         indices = indices.pin_memory()
@@ -45,21 +45,16 @@ def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
         indices = indices.cuda()
     index = index.cuda()
 
-    res_gpu = torch.ops.graphbolt.index_select_csc(indptr, indices, index)
+    gpu_indptr, gpu_indices = torch.ops.graphbolt.index_select_csc(indptr, indices, index)
 
-    assert not res_cpu.indptr.is_cuda
-    assert not res_cpu.indices.is_cuda
-    assert not res_cpu.original_column_node_ids.is_cuda
+    assert not cpu_indptr.is_cuda
+    assert not cpu_indices.is_cuda
 
-    assert res_gpu.indptr.is_cuda
-    assert res_gpu.indices.is_cuda
-    assert res_gpu.original_column_node_ids.is_cuda
+    assert gpu_indptr.is_cuda
+    assert gpu_indices.is_cuda
 
-    assert torch.equal(res_cpu.indptr, res_gpu.indptr.cpu())
-    assert torch.equal(res_cpu.indices, res_gpu.indices.cpu())
-    assert torch.equal(
-        res_cpu.original_column_node_ids, res_gpu.original_column_node_ids.cpu()
-    )
+    assert torch.equal(cpu_indptr, gpu_indptr.cpu())
+    assert torch.equal(cpu_indices, gpu_indices.cpu())
 
 
 def test_InSubgraphSampler_homo():

@@ -20,7 +20,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
 
-c10::intrusive_ptr<sampling::FusedSampledSubgraph> IndexSelectCSC(
+std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
 
 /** @brief Implemented in the cuda directory. */

@@ -22,34 +22,30 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
   return input.index({index.to(torch::kLong)});
 }
 
-c10::intrusive_ptr<sampling::FusedSampledSubgraph> IndexSelectCSC(
+std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor index) {
+  TORCH_CHECK(
+      indices.sizes().size() == 1, "IndexSelectCSC only supports 1d tensors");
   if ((indptr.is_pinned() || indptr.device().type() == c10::DeviceType::CUDA) &&
       indices.is_pinned() &&
       (index.is_pinned() || index.device().type() == c10::DeviceType::CUDA)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "UVAIndexSelectCSC", {
-          const auto [subindptr, subindices] =
-              UVAIndexSelectCSCImpl(indptr, indices, index);
-          return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-              subindptr, subindices, index);
-        });
+        c10::DeviceType::CUDA, "UVAIndexSelectCSC",
+        { return UVAIndexSelectCSCImpl(indptr, indices, index); });
   } else if (
       indptr.device().type() == c10::DeviceType::CUDA &&
       indices.device().type() == c10::DeviceType::CUDA &&
       index.device().type() == c10::DeviceType::CUDA) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "IndexSelectCSC", {
-          const auto [subindptr, subindices] =
-              IndexSelectCSCImpl(indptr, indices, index);
-          return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-              subindptr, subindices, index);
-        });
+        c10::DeviceType::CUDA, "IndexSelectCSC",
+        { return IndexSelectCSCImpl(indptr, indices, index); });
   }
+  // For testing purposes, to compare with CPU implementation
   torch::optional<torch::Tensor> temp;
   torch::optional<sampling::FusedCSCSamplingGraph::EdgeAttrMap> temp2;
   sampling::FusedCSCSamplingGraph g(indptr, indices, temp, temp, temp2);
-  return g.InSubgraph(index);
+  const auto res = g.InSubgraph(index);
+  return std::make_tuple(res->indptr, res->indices);
 }
 
 }  // namespace ops

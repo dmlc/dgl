@@ -153,49 +153,60 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
                       index.data_ptr<index_t>(), indptr.data_ptr<indptr_t>(),
                       in_deg.get(), sliced_indptr.get()});
             }));
-        AT_DISPATCH_INTEGRAL_TYPES(
-            indices.scalar_type(), "UVAIndexSelectCSCIndices", ([&] {
-              using indices_t = scalar_t;
+        auto copy_indices_fun = [&](auto indices_type_variable) {
+          using indices_t = decltype(indices_type_variable);
 
-              indptr_t hop_size, hop_size_aligned;
-              auto subindptr_aligned =
-                  allocator.AllocateStorage<indptr_t>(num_rows + 1);
-              {
-                thrust::counting_iterator<int64_t> iota(0);
-                auto modified_in_deg = thrust::make_transform_iterator(
-                    iota, AlignmentFunc<indptr_t, indices_t>{
-                              in_deg.get(), perm, num_rows});
-                auto subindptr_pair = thrust::make_zip_iterator(
-                    subindptr.data_ptr<indptr_t>(), subindptr_aligned.get());
-                thrust::tuple<indptr_t, indptr_t> zero_value{};
-                size_t workspace_size = 0;
-                CUDA_CALL(cub::DeviceScan::ExclusiveScan(
-                    nullptr, workspace_size, modified_in_deg, subindptr_pair,
-                    PairSum{}, zero_value, num_rows + 1, stream));
-                auto temp = allocator.AllocateStorage<char>(workspace_size);
-                CUDA_CALL(cub::DeviceScan::ExclusiveScan(
-                    temp.get(), workspace_size, modified_in_deg, subindptr_pair,
-                    PairSum{}, zero_value, num_rows + 1, stream));
-              }
-              CUDA_CALL(cudaMemcpyAsync(
-                  &hop_size_aligned, subindptr_aligned.get() + num_rows,
-                  sizeof(hop_size_aligned), cudaMemcpyDeviceToHost, stream));
-              // synchronizes here, we can read hop_size and hop_size_aligned
-              CUDA_CALL(cudaMemcpyAsync(
-                  &hop_size, subindptr.data_ptr<indptr_t>() + num_rows,
-                  sizeof(hop_size), cudaMemcpyDeviceToHost, stream));
-              cudaStreamSynchronize(stream);
-              subindices = torch::empty(
-                  hop_size, index.options().dtype(indices.scalar_type()));
-              const dim3 block(BLOCK_SIZE);
-              const dim3 grid((hop_size_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
-              CUDA_KERNEL_CALL(
-                  _CSRRowWiseOneHopExtractorAlignedKernel, grid, block, 0,
-                  stream, hop_size_aligned, num_rows, sliced_indptr.get(),
-                  subindptr.data_ptr<indptr_t>(), subindptr_aligned.get(),
-                  indices.data_ptr<indices_t>(),
-                  subindices.data_ptr<indices_t>(), perm);
-            }));
+          indptr_t hop_size, hop_size_aligned;
+          auto subindptr_aligned =
+              allocator.AllocateStorage<indptr_t>(num_rows + 1);
+          {
+            thrust::counting_iterator<int64_t> iota(0);
+            auto modified_in_deg = thrust::make_transform_iterator(
+                iota, AlignmentFunc<indptr_t, indices_t>{
+                          in_deg.get(), perm, num_rows});
+            auto subindptr_pair = thrust::make_zip_iterator(
+                subindptr.data_ptr<indptr_t>(), subindptr_aligned.get());
+            thrust::tuple<indptr_t, indptr_t> zero_value{};
+            size_t workspace_size = 0;
+            CUDA_CALL(cub::DeviceScan::ExclusiveScan(
+                nullptr, workspace_size, modified_in_deg, subindptr_pair,
+                PairSum{}, zero_value, num_rows + 1, stream));
+            auto temp = allocator.AllocateStorage<char>(workspace_size);
+            CUDA_CALL(cub::DeviceScan::ExclusiveScan(
+                temp.get(), workspace_size, modified_in_deg, subindptr_pair,
+                PairSum{}, zero_value, num_rows + 1, stream));
+          }
+          CUDA_CALL(cudaMemcpyAsync(
+              &hop_size_aligned, subindptr_aligned.get() + num_rows,
+              sizeof(hop_size_aligned), cudaMemcpyDeviceToHost, stream));
+          CUDA_CALL(cudaMemcpyAsync(
+              &hop_size, subindptr.data_ptr<indptr_t>() + num_rows,
+              sizeof(hop_size), cudaMemcpyDeviceToHost, stream));
+          // synchronizes here, we can read hop_size and hop_size_aligned
+          cudaStreamSynchronize(stream);
+          subindices = torch::empty(
+              hop_size, index.options().dtype(indices.scalar_type()));
+          const dim3 block(BLOCK_SIZE);
+          const dim3 grid((hop_size_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
+          CUDA_KERNEL_CALL(
+              _CSRRowWiseOneHopExtractorAlignedKernel, grid, block, 0, stream,
+              hop_size_aligned, num_rows, sliced_indptr.get(),
+              subindptr.data_ptr<indptr_t>(), subindptr_aligned.get(),
+              reinterpret_cast<indices_t*>(indices.data_ptr()),
+              reinterpret_cast<indices_t*>(subindices.data_ptr()), perm);
+        };
+        switch (indices.element_size()) {
+          case 1:
+            return copy_indices_fun(uint8_t{});
+          case 2:
+            return copy_indices_fun(uint16_t{});
+          case 4:
+            return copy_indices_fun(uint32_t{});
+          case 8:
+            return copy_indices_fun(uint64_t{});
+          case 16:
+            return copy_indices_fun(float4{});
+        }
       }));
   return std::make_tuple(subindptr, subindices);
 }
@@ -260,34 +271,45 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
         cudaStreamSynchronize(stream);
         subindices = torch::empty(
             hop_size, index.options().dtype(indices.scalar_type()));
-        AT_DISPATCH_INTEGRAL_TYPES(
-            indices.scalar_type(), "IndexSelectCSCIndices", ([&] {
-              using indices_t = scalar_t;
-              auto input_buffer_it = thrust::make_transform_iterator(
-                  iota,
-                  IteratorFunc<indptr_t, indices_t>{
-                      sliced_indptr.get(), indices.data_ptr<indices_t>()});
-              auto output_buffer_it = thrust::make_transform_iterator(
-                  iota, IteratorFunc<indptr_t, indices_t>{
-                            subindptr.data_ptr<indptr_t>(),
-                            subindices.data_ptr<indices_t>()});
-              auto buffer_sizes = thrust::make_transform_iterator(
-                  iota, ConvertToBytes<indptr_t, indices_t>{in_deg.get()});
-              constexpr int64_t max_copy_at_once =
-                  std::numeric_limits<int32_t>::max();
-              for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
-                size_t workspace_size = 0;
-                CUDA_CALL(cub::DeviceMemcpy::Batched(
-                    nullptr, workspace_size, input_buffer_it + i,
-                    output_buffer_it + i, buffer_sizes + i,
-                    std::min(num_rows - i, max_copy_at_once), stream));
-                auto temp = allocator.AllocateStorage<char>(workspace_size);
-                CUDA_CALL(cub::DeviceMemcpy::Batched(
-                    temp.get(), workspace_size, input_buffer_it + i,
-                    output_buffer_it + i, buffer_sizes + i,
-                    std::min(num_rows - i, max_copy_at_once), stream));
-              }
-            }));
+        auto copy_indices_fun = [&](auto indices_type_variable) {
+          using indices_t = decltype(indices_type_variable);
+          auto input_buffer_it = thrust::make_transform_iterator(
+              iota, IteratorFunc<indptr_t, indices_t>{
+                        sliced_indptr.get(),
+                        reinterpret_cast<indices_t*>(indices.data_ptr())});
+          auto output_buffer_it = thrust::make_transform_iterator(
+              iota, IteratorFunc<indptr_t, indices_t>{
+                        subindptr.data_ptr<indptr_t>(),
+                        reinterpret_cast<indices_t*>(subindices.data_ptr())});
+          auto buffer_sizes = thrust::make_transform_iterator(
+              iota, ConvertToBytes<indptr_t, indices_t>{in_deg.get()});
+          constexpr int64_t max_copy_at_once =
+              std::numeric_limits<int32_t>::max();
+          for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
+            size_t workspace_size = 0;
+            CUDA_CALL(cub::DeviceMemcpy::Batched(
+                nullptr, workspace_size, input_buffer_it + i,
+                output_buffer_it + i, buffer_sizes + i,
+                std::min(num_rows - i, max_copy_at_once), stream));
+            auto temp = allocator.AllocateStorage<char>(workspace_size);
+            CUDA_CALL(cub::DeviceMemcpy::Batched(
+                temp.get(), workspace_size, input_buffer_it + i,
+                output_buffer_it + i, buffer_sizes + i,
+                std::min(num_rows - i, max_copy_at_once), stream));
+          }
+        };
+        switch (indices.element_size()) {
+          case 1:
+            return copy_indices_fun(uint8_t{});
+          case 2:
+            return copy_indices_fun(uint16_t{});
+          case 4:
+            return copy_indices_fun(uint32_t{});
+          case 8:
+            return copy_indices_fun(uint64_t{});
+          case 16:
+            return copy_indices_fun(float4{});
+        }
       }));
   return std::make_tuple(subindptr, subindices);
 }
