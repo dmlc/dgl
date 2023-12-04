@@ -15,6 +15,7 @@ APIs
     :nosignatures:
     :template: graphbolt_classtemplate.rst
 
+    DataLoader
     Dataset
     Task
     ItemSet
@@ -34,17 +35,6 @@ APIs
     FeatureFetcher
     CopyTo
 
-
-DataLoaders
------------
-
-.. autosummary::
-    :toctree: ../../generated/
-    :nosignatures:
-    :template: graphbolt_classtemplate.rst
-
-    SingleProcessDataLoader
-    MultiProcessDataLoader
 
 Standard Implementations
 -------------------------

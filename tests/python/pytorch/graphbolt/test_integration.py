@@ -56,7 +56,7 @@ def test_integration_link_prediction():
         feature_store, node_feature_keys=["feat"], edge_feature_keys=["feat"]
     )
     datapipe = datapipe.to_dgl()
-    dataloader = gb.SingleProcessDataLoader(
+    dataloader = gb.DataLoader(
         datapipe,
     )
     expected = [
@@ -71,13 +71,13 @@ def test_integration_link_prediction():
                                     [0.9634, 0.2294],
                                     [0.5503, 0.8223]])},
              negative_node_pairs=(tensor([0, 1, 1, 1]),
-                                  tensor([0, 3, 4, 5])),
+                                  tensor([4, 4, 1, 4])),
              labels=None,
              input_nodes=None,
              edge_features=[{},
                             {}],
              blocks=[Block(num_src_nodes=6, num_dst_nodes=6, num_edges=2),
-                     Block(num_src_nodes=6, num_dst_nodes=6, num_edges=2)],
+                     Block(num_src_nodes=6, num_dst_nodes=5, num_edges=1)],
           )"""
         ),
         str(
@@ -90,7 +90,7 @@ def test_integration_link_prediction():
                                     [0.5160, 0.2486],
                                     [0.6172, 0.7865]])},
              negative_node_pairs=(tensor([0, 1, 1, 2]),
-                                  tensor([1, 3, 4, 1])),
+                                  tensor([1, 1, 3, 4])),
              labels=None,
              input_nodes=None,
              edge_features=[{},
@@ -104,17 +104,15 @@ def test_integration_link_prediction():
                                   tensor([0, 0])),
              output_nodes=None,
              node_features={'feat': tensor([[0.5160, 0.2486],
-                                    [0.5503, 0.8223],
-                                    [0.8672, 0.2276],
-                                    [0.9634, 0.2294]])},
+                                    [0.5503, 0.8223]])},
              negative_node_pairs=(tensor([0, 1]),
-                                  tensor([1, 2])),
+                                  tensor([0, 0])),
              labels=None,
              input_nodes=None,
              edge_features=[{},
                             {}],
-             blocks=[Block(num_src_nodes=4, num_dst_nodes=4, num_edges=2),
-                     Block(num_src_nodes=4, num_dst_nodes=3, num_edges=2)],
+             blocks=[Block(num_src_nodes=2, num_dst_nodes=2, num_edges=1),
+                     Block(num_src_nodes=2, num_dst_nodes=2, num_edges=1)],
           )"""
         ),
     ]
@@ -172,7 +170,7 @@ def test_integration_node_classification():
         feature_store, node_feature_keys=["feat"], edge_feature_keys=["feat"]
     )
     datapipe = datapipe.to_dgl()
-    dataloader = gb.SingleProcessDataLoader(
+    dataloader = gb.DataLoader(
         datapipe,
     )
     expected = [
@@ -184,15 +182,14 @@ def test_integration_node_classification():
                                     [0.8672, 0.2276],
                                     [0.6172, 0.7865],
                                     [0.2109, 0.1089],
-                                    [0.5503, 0.8223],
-                                    [0.9634, 0.2294]])},
+                                    [0.5503, 0.8223]])},
              negative_node_pairs=None,
              labels=None,
              input_nodes=None,
              edge_features=[{},
                             {}],
-             blocks=[Block(num_src_nodes=6, num_dst_nodes=5, num_edges=5),
-                     Block(num_src_nodes=5, num_dst_nodes=4, num_edges=4)],
+             blocks=[Block(num_src_nodes=5, num_dst_nodes=4, num_edges=4),
+                     Block(num_src_nodes=4, num_dst_nodes=4, num_edges=4)],
           )"""
         ),
         str(

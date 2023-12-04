@@ -8,4 +8,5 @@ framework for GNN with high flexibility and scalability.
   :maxdepth: 2
   :titlesonly:
 
+  walkthrough.nblink
   ondisk-dataset
