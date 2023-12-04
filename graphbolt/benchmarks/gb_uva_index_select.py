@@ -68,7 +68,7 @@ def test_index_select_throughput(feature, indices):
 
 
 available_RAM = 10 * (2**30)  ## 10 GiB
-n_rows = [2000000, 20000000, 200000000]
+n_rows = [2000000 * factor for factor in [1, 10, 100, 1000]]
 feat_size = [1, 4, 47, 256, 353]
 num_indices = [1, 1000, 100000, 1000000]
 dtypes = [torch.float32, torch.int8]
