@@ -36,7 +36,9 @@ def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
     )
     index = torch.tensor([0, 5, 3], dtype=idtype)
 
-    cpu_indptr, cpu_indices = torch.ops.graphbolt.index_select_csc(indptr, indices, index)
+    cpu_indptr, cpu_indices = torch.ops.graphbolt.index_select_csc(
+        indptr, indices, index
+    )
     if is_pinned:
         indptr = indptr.pin_memory()
         indices = indices.pin_memory()
@@ -45,7 +47,9 @@ def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
         indices = indices.cuda()
     index = index.cuda()
 
-    gpu_indptr, gpu_indices = torch.ops.graphbolt.index_select_csc(indptr, indices, index)
+    gpu_indptr, gpu_indices = torch.ops.graphbolt.index_select_csc(
+        indptr, indices, index
+    )
 
     assert not cpu_indptr.is_cuda
     assert not cpu_indices.is_cuda
