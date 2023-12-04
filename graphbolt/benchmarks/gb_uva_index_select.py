@@ -67,7 +67,8 @@ def test_index_select_throughput(feature, indices):
     return average_time, selected_size / average_time
 
 
-n_rows = [2000000, 100000000]
+available_RAM = 10 * (2**30)  ## 10 GiB
+n_rows = [2000000, 20000000, 200000000]
 feat_size = [1, 4, 47, 256, 353]
 num_indices = [1, 1000, 100000, 1000000]
 dtypes = [torch.float32, torch.int8]
@@ -99,6 +100,11 @@ def test_random():
     for rows, size, feature_device, dtype in itertools.product(
         n_rows, feat_size, feature_devices, dtypes
     ):
+        if (
+            rows * size * torch.tensor([], dtype=dtype).element_size()
+            >= available_RAM
+        ):
+            continue
         feature = torch.randint(0, 13, size=[rows, size], dtype=dtype)
         feature = (
             feature.cuda()
