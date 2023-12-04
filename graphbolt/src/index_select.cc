@@ -8,6 +8,7 @@
 #include <graphbolt/fused_csc_sampling_graph.h>
 
 #include "./macro.h"
+#include "./utils.h"
 
 namespace graphbolt {
 namespace ops {
@@ -26,16 +27,14 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor index) {
   TORCH_CHECK(
       indices.sizes().size() == 1, "IndexSelectCSC only supports 1d tensors");
-  if ((indptr.is_pinned() || indptr.device().type() == c10::DeviceType::CUDA) &&
-      indices.is_pinned() &&
-      (index.is_pinned() || index.device().type() == c10::DeviceType::CUDA)) {
+  if (indices.is_pinned() && cuda::is_accessible(indptr) &&
+      cuda::is_accessible(index)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "UVAIndexSelectCSC",
         { return UVAIndexSelectCSCImpl(indptr, indices, index); });
   } else if (
-      indptr.device().type() == c10::DeviceType::CUDA &&
       indices.device().type() == c10::DeviceType::CUDA &&
-      index.device().type() == c10::DeviceType::CUDA) {
+      cuda::is_accessible(indptr) && cuda::is_accessible(index)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "IndexSelectCSC",
         { return IndexSelectCSCImpl(indptr, indices, index); });
