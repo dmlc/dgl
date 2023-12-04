@@ -59,7 +59,7 @@ class PPIDataset(DGLBuiltinDataset):
     Examples
     --------
     >>> dataset = PPIDataset(mode='valid')
-    >>> num_labels = dataset.num_labels
+    >>> num_classes = dataset.num_classes
     >>> for g in dataset:
     ....    feat = g.ndata['feat']
     ....    label = g.ndata['label']
@@ -171,6 +171,10 @@ class PPIDataset(DGLBuiltinDataset):
 
     @property
     def num_labels(self):
+        return 121
+
+    @property
+    def num_classes(self):
         return 121
 
     def __len__(self):
