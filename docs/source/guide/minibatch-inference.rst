@@ -49,7 +49,7 @@ only one layer at a time.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe, num_workers=0)
 
 
 Note that offline inference is implemented as a method of the GNN module

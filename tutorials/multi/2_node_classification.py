@@ -120,7 +120,7 @@ def create_dataloader(
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe, num_workers=0)
     return dataloader
 
 
