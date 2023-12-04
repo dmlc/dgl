@@ -148,16 +148,16 @@ def create_dataloader(
 
     ############################################################################
     # [Step-6]:
-    # gb.MultiProcessDataLoader()
+    # gb.DataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
     # 'num_workers': The number of processes to be used for data loading.
     # [Output]:
-    # A MultiProcessDataLoader object to handle data loading.
+    # A DataLoader object to handle data loading.
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=num_workers)
+    dataloader = gb.DataLoader(datapipe, num_workers=num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader

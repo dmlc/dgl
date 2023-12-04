@@ -34,7 +34,7 @@ def test_DataLoader():
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
-    dataloader = dgl.graphbolt.MultiProcessDataLoader(
+    dataloader = dgl.graphbolt.DataLoader(
         device_transferrer,
         num_workers=4,
     )
