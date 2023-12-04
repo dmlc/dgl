@@ -139,9 +139,7 @@ def create_dataloader(
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(
-        datapipe, num_workers=args.num_workers
-    )
+    dataloader = gb.DataLoader(datapipe, num_workers=args.num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader

@@ -6,6 +6,7 @@
 #ifndef GRAPHBOLT_CUDA_COMMON_H_
 #define GRAPHBOLT_CUDA_COMMON_H_
 
+#include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime.h>
 #include <torch/script.h>
@@ -34,29 +35,22 @@ namespace cuda {
 
  * int_array.get() gives the raw pointer.
  */
-class CUDAWorkspaceAllocator {
-  using TensorPtrMapType = std::unordered_map<void*, torch::Tensor>;
-  std::shared_ptr<TensorPtrMapType> ptr_map_;
-
- public:
+struct CUDAWorkspaceAllocator {
   // Required by thrust to satisfy allocator requirements.
   using value_type = char;
 
-  explicit CUDAWorkspaceAllocator()
-      : ptr_map_(std::make_shared<TensorPtrMapType>()) {}
+  explicit CUDAWorkspaceAllocator() { at::globalContext().lazyInitCUDA(); }
 
   CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
 
-  void operator()(void* ptr) const { ptr_map_->erase(ptr); }
+  void operator()(void* ptr) const {
+    c10::cuda::CUDACachingAllocator::raw_delete(ptr);
+  }
 
   // Required by thrust to satisfy allocator requirements.
   value_type* allocate(std::ptrdiff_t size) const {
-    auto tensor = torch::empty(
-        size, torch::TensorOptions()
-                  .dtype(torch::kByte)
-                  .device(c10::DeviceType::CUDA));
-    ptr_map_->operator[](tensor.data_ptr()) = tensor;
-    return reinterpret_cast<value_type*>(tensor.data_ptr());
+    return reinterpret_cast<value_type*>(
+        c10::cuda::CUDACachingAllocator::raw_alloc(size));
   }
 
   // Required by thrust to satisfy allocator requirements.
