@@ -24,7 +24,8 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
 
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> IndexSelectCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor index) {
-  if (indptr.is_pinned() && indices.is_pinned() &&
+  if ((indptr.is_pinned() || indptr.device().type() == c10::DeviceType::CUDA) &&
+      indices.is_pinned() &&
       (index.is_pinned() || index.device().type() == c10::DeviceType::CUDA)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "UVAIndexSelectCSC", {
