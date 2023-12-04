@@ -137,7 +137,7 @@ def create_dataloader(
     # Create a DataLoader from the datapipe.
     # `num_workers`:
     #   The number of worker processes to use for data loading.
-    return gb.MultiProcessDataLoader(datapipe, num_workers=num_workers)
+    return gb.DataLoader(datapipe, num_workers=num_workers)
 
 
 def extract_embed(node_embed, input_nodes):

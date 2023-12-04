@@ -232,11 +232,11 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # 'datapipe': The datapipe object to be used for data loading.
     # 'args.num_workers': The number of processes to be used for data loading.
     # [Output]:
-    # A MultiProcessDataLoader object to handle data loading.
+    # A DataLoader object to handle data loading.
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(
+    dataloader = gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
     )
