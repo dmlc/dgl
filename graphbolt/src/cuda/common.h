@@ -1,5 +1,6 @@
 /**
  *  Copyright (c) 2017-2023 by Contributors
+ *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  * @file cuda/common.h
  * @brief Common utilities for CUDA
  */
