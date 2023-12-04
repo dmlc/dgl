@@ -158,6 +158,16 @@ class SampledSubgraph:
         # 2. Exclude the edges and get the index of the edges to keep.
         # 3. Slice the subgraph according to the index.
         if isinstance(self.node_pairs, tuple):
+            reverse_edges = _to_reverse_ids_node_pairs(
+                self.node_pairs,
+                self.original_row_node_ids,
+                self.original_column_node_ids,
+            )
+            index = _exclude_homo_edges(
+                reverse_edges, edges, assume_num_node_within_int32
+            )
+            return calling_class(*_slice_subgraph_node_pairs(self, index))
+        elif isinstance(self.node_pairs, CSCFormatBase):
             reverse_edges = _to_reverse_ids(
                 self.node_pairs,
                 self.original_row_node_ids,
@@ -167,16 +177,6 @@ class SampledSubgraph:
                 reverse_edges, edges, assume_num_node_within_int32
             )
             return calling_class(*_slice_subgraph(self, index))
-        elif isinstance(self.node_pairs, CSCFormatBase):
-            reverse_edges = _to_reverse_ids_csc_format(
-                self.node_pairs,
-                self.original_row_node_ids,
-                self.original_column_node_ids,
-            )
-            index = _exclude_homo_edges(
-                reverse_edges, edges, assume_num_node_within_int32
-            )
-            return calling_class(*_slice_subgraph_csc_format(self, index))
         else:
             index = {}
             is_cscformat = 0
@@ -194,13 +194,13 @@ class SampledSubgraph:
                 )
                 if isinstance(pair, CSCFormatBase):
                     is_cscformat = 1
-                    reverse_edges = _to_reverse_ids_csc_format(
+                    reverse_edges = _to_reverse_ids(
                         pair,
                         original_row_node_ids,
                         original_column_node_ids,
                     )
                 else:
-                    reverse_edges = _to_reverse_ids(
+                    reverse_edges = _to_reverse_ids_node_pairs(
                         pair,
                         original_row_node_ids,
                         original_column_node_ids,
@@ -211,9 +211,9 @@ class SampledSubgraph:
                     assume_num_node_within_int32,
                 )
             if is_cscformat:
-                return calling_class(*_slice_subgraph_csc_format(self, index))
-            else:
                 return calling_class(*_slice_subgraph(self, index))
+            else:
+                return calling_class(*_slice_subgraph_node_pairs(self, index))
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `SampledSubgraph` to the specified device using reflection."""
@@ -232,7 +232,9 @@ class SampledSubgraph:
         return self
 
 
-def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
+def _to_reverse_ids_node_pairs(
+    node_pair, original_row_node_ids, original_column_node_ids
+):
     u, v = node_pair
     if original_row_node_ids is not None:
         u = original_row_node_ids[u]
@@ -241,9 +243,7 @@ def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
     return (u, v)
 
 
-def _to_reverse_ids_csc_format(
-    node_pair, original_row_node_ids, original_column_node_ids
-):
+def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
     indptr = node_pair.indptr
     indices = node_pair.indices
     if original_row_node_ids is not None:
@@ -280,7 +280,7 @@ def _exclude_homo_edges(edges, edges_to_exclude, assume_num_node_within_int32):
     return torch.nonzero(mask, as_tuple=True)[0]
 
 
-def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
+def _slice_subgraph_node_pairs(subgraph: SampledSubgraph, index: torch.Tensor):
     """Slice the subgraph according to the index."""
 
     def _index_select(obj, index):
@@ -306,7 +306,7 @@ def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
     )
 
 
-def _slice_subgraph_csc_format(subgraph: SampledSubgraph, index: torch.Tensor):
+def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
     """Slice the subgraph according to the index."""
 
     def _index_select(obj, index):
