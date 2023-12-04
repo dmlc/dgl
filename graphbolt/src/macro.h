@@ -15,7 +15,7 @@ namespace graphbolt {
 #ifdef GRAPHBOLT_USE_CUDA
 #define GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(device_type, name, ...) \
   if (device_type == c10::DeviceType::CUDA) {                       \
-    const auto XPU = c10::DeviceType::CUDA;                         \
+    [[maybe_unused]] const auto XPU = c10::DeviceType::CUDA;        \
     __VA_ARGS__                                                     \
   } else {                                                          \
     TORCH_CHECK(false, name, " is only available on CUDA device."); \
