@@ -28,7 +28,7 @@ def load_dataset(name):
 
             data = CitationGraphDataset("cora")
             g = data[0]
-        n_classes = data.num_labels
+        n_classes = data.num_classes
         train_mask = g.ndata["train_mask"]
         val_mask = g.ndata["val_mask"]
         test_mask = g.ndata["test_mask"]
