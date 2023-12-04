@@ -313,29 +313,11 @@ def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
         if obj is None:
             return None
         if isinstance(obj, CSCFormatBase):
-            indptr = obj.indptr
-            indices = obj.indices
-            # Point to indptr.
-            k = 1
-            new_indptr = [0]
-            new_indices = []
-            # Count for the sample number of each seed node.
-            count = 0
-            # Point to index.
-            index_id = 0
-            for i, indice in enumerate(indices):
-                while i >= indptr[k]:
-                    new_indptr.append(new_indptr[-1] + count)
-                    count = 0
-                    k += 1
-                if index_id < len(index) and i == index[index_id]:
-                    count += 1
-                    index_id += 1
-                    new_indices.append(indice)
-            new_indptr.append(new_indptr[-1] + count)
+            new_indices = obj.indices[index]
+            new_indptr = torch.searchsorted(index, obj.indptr)
             return CSCFormatBase(
-                indptr=torch.tensor(new_indptr),
-                indices=torch.tensor(new_indices),
+                indptr=new_indptr,
+                indices=new_indices,
             )
         if isinstance(obj, torch.Tensor):
             return obj[index]
