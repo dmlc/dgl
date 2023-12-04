@@ -36,7 +36,7 @@ def _assert_container_equal(lhs, rhs):
 
 @pytest.mark.parametrize("reverse_row", [True, False])
 @pytest.mark.parametrize("reverse_column", [True, False])
-def test_exclude_edges_homo(reverse_row, reverse_column):
+def test_exclude_edges_homo_node_pairs(reverse_row, reverse_column):
     node_pairs = (torch.tensor([0, 2, 3]), torch.tensor([1, 4, 2]))
     if reverse_row:
         original_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
@@ -81,7 +81,7 @@ def test_exclude_edges_homo(reverse_row, reverse_column):
 
 @pytest.mark.parametrize("reverse_row", [True, False])
 @pytest.mark.parametrize("reverse_column", [True, False])
-def test_exclude_edges_hetero(reverse_row, reverse_column):
+def test_exclude_edges_hetero_node_pairs(reverse_row, reverse_column):
     node_pairs = {
         "A:relation:B": (
             torch.tensor([0, 1, 2]),
@@ -149,8 +149,8 @@ def test_exclude_edges_hetero(reverse_row, reverse_column):
 
 @pytest.mark.parametrize("reverse_row", [True, False])
 @pytest.mark.parametrize("reverse_column", [True, False])
-def test_exclude_edges_homo_csc_format(reverse_row, reverse_column):
-    node_pairs = gb.CSCFormatBase(
+def test_exclude_edges_homo_deduplicated(reverse_row, reverse_column):
+    csc_formats = gb.CSCFormatBase(
         indptr=torch.tensor([0, 0, 1, 2, 2, 3]), indices=torch.tensor([0, 3, 2])
     )
     if reverse_row:
@@ -168,14 +168,14 @@ def test_exclude_edges_homo_csc_format(reverse_row, reverse_column):
         dst_to_exclude = torch.tensor([4])
     original_edge_ids = torch.Tensor([5, 9, 10])
     subgraph = SampledSubgraphImpl(
-        node_pairs,
+        csc_formats,
         original_column_node_ids,
         original_row_node_ids,
         original_edge_ids,
     )
     edges_to_exclude = (src_to_exclude, dst_to_exclude)
     result = subgraph.exclude_edges(edges_to_exclude)
-    expected_node_pairs = gb.CSCFormatBase(
+    expected_csc_formats = gb.CSCFormatBase(
         indptr=torch.tensor([0, 0, 1, 2, 2, 2]), indices=torch.tensor([0, 3])
     )
     if reverse_row:
@@ -188,7 +188,7 @@ def test_exclude_edges_homo_csc_format(reverse_row, reverse_column):
         expected_column_node_ids = None
     expected_edge_ids = torch.Tensor([5, 9])
 
-    _assert_container_equal(result.node_pairs, expected_node_pairs)
+    _assert_container_equal(result.node_pairs, expected_csc_formats)
     _assert_container_equal(
         result.original_column_node_ids, expected_column_node_ids
     )
@@ -198,8 +198,57 @@ def test_exclude_edges_homo_csc_format(reverse_row, reverse_column):
 
 @pytest.mark.parametrize("reverse_row", [True, False])
 @pytest.mark.parametrize("reverse_column", [True, False])
-def test_exclude_edges_hetero_csc_format(reverse_row, reverse_column):
-    node_pairs = {
+def test_exclude_edges_homo_duplicated(reverse_row, reverse_column):
+    csc_formats = gb.CSCFormatBase(
+        indptr=torch.tensor([0, 0, 1, 3, 3, 5]),
+        indices=torch.tensor([0, 3, 3, 2, 2]),
+    )
+    if reverse_row:
+        original_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
+        src_to_exclude = torch.tensor([24])
+    else:
+        original_row_node_ids = None
+        src_to_exclude = torch.tensor([3])
+
+    if reverse_column:
+        original_column_node_ids = torch.tensor([10, 15, 11, 24, 9])
+        dst_to_exclude = torch.tensor([11])
+    else:
+        original_column_node_ids = None
+        dst_to_exclude = torch.tensor([2])
+    original_edge_ids = torch.Tensor([5, 9, 9, 10, 10])
+    subgraph = SampledSubgraphImpl(
+        csc_formats,
+        original_column_node_ids,
+        original_row_node_ids,
+        original_edge_ids,
+    )
+    edges_to_exclude = (src_to_exclude, dst_to_exclude)
+    result = subgraph.exclude_edges(edges_to_exclude)
+    expected_csc_formats = gb.CSCFormatBase(
+        indptr=torch.tensor([0, 0, 1, 1, 1, 3]), indices=torch.tensor([0, 2, 2])
+    )
+    if reverse_row:
+        expected_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
+    else:
+        expected_row_node_ids = None
+    if reverse_column:
+        expected_column_node_ids = torch.tensor([10, 15, 11, 24, 9])
+    else:
+        expected_column_node_ids = None
+    expected_edge_ids = torch.Tensor([5, 10, 10])
+    _assert_container_equal(result.node_pairs, expected_csc_formats)
+    _assert_container_equal(
+        result.original_column_node_ids, expected_column_node_ids
+    )
+    _assert_container_equal(result.original_row_node_ids, expected_row_node_ids)
+    _assert_container_equal(result.original_edge_ids, expected_edge_ids)
+
+
+@pytest.mark.parametrize("reverse_row", [True, False])
+@pytest.mark.parametrize("reverse_column", [True, False])
+def test_exclude_edges_hetero_deduplicated(reverse_row, reverse_column):
+    csc_formats = {
         "A:relation:B": gb.CSCFormatBase(
             indptr=torch.tensor([0, 1, 2, 3]),
             indices=torch.tensor([2, 1, 0]),
@@ -223,7 +272,7 @@ def test_exclude_edges_hetero_csc_format(reverse_row, reverse_column):
         dst_to_exclude = torch.tensor([0, 2])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     subgraph = SampledSubgraphImpl(
-        node_pairs=node_pairs,
+        node_pairs=csc_formats,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,
         original_edge_ids=original_edge_ids,
@@ -236,7 +285,7 @@ def test_exclude_edges_hetero_csc_format(reverse_row, reverse_column):
         )
     }
     result = subgraph.exclude_edges(edges_to_exclude)
-    expected_node_pairs = {
+    expected_csc_formats = {
         "A:relation:B": gb.CSCFormatBase(
             indptr=torch.tensor([0, 0, 1, 1]),
             indices=torch.tensor([1]),
@@ -256,7 +305,75 @@ def test_exclude_edges_hetero_csc_format(reverse_row, reverse_column):
         expected_column_node_ids = None
     expected_edge_ids = {"A:relation:B": torch.tensor([20])}
 
-    _assert_container_equal(result.node_pairs, expected_node_pairs)
+    _assert_container_equal(result.node_pairs, expected_csc_formats)
+    _assert_container_equal(
+        result.original_column_node_ids, expected_column_node_ids
+    )
+    _assert_container_equal(result.original_row_node_ids, expected_row_node_ids)
+    _assert_container_equal(result.original_edge_ids, expected_edge_ids)
+
+
+@pytest.mark.parametrize("reverse_row", [True, False])
+@pytest.mark.parametrize("reverse_column", [True, False])
+def test_exclude_edges_hetero_duplicated(reverse_row, reverse_column):
+    csc_formats = {
+        "A:relation:B": gb.CSCFormatBase(
+            indptr=torch.tensor([0, 2, 4, 5]),
+            indices=torch.tensor([2, 2, 1, 1, 0]),
+        )
+    }
+    if reverse_row:
+        original_row_node_ids = {
+            "A": torch.tensor([13, 14, 15]),
+        }
+        src_to_exclude = torch.tensor([15, 13])
+    else:
+        original_row_node_ids = None
+        src_to_exclude = torch.tensor([2, 0])
+    if reverse_column:
+        original_column_node_ids = {
+            "B": torch.tensor([10, 11, 12]),
+        }
+        dst_to_exclude = torch.tensor([10, 12])
+    else:
+        original_column_node_ids = None
+        dst_to_exclude = torch.tensor([0, 2])
+    original_edge_ids = {"A:relation:B": torch.tensor([19, 19, 20, 20, 21])}
+    subgraph = SampledSubgraphImpl(
+        node_pairs=csc_formats,
+        original_column_node_ids=original_column_node_ids,
+        original_row_node_ids=original_row_node_ids,
+        original_edge_ids=original_edge_ids,
+    )
+
+    edges_to_exclude = {
+        "A:relation:B": (
+            src_to_exclude,
+            dst_to_exclude,
+        )
+    }
+    result = subgraph.exclude_edges(edges_to_exclude)
+    expected_csc_formats = {
+        "A:relation:B": gb.CSCFormatBase(
+            indptr=torch.tensor([0, 0, 2, 2]),
+            indices=torch.tensor([1, 1]),
+        )
+    }
+    if reverse_row:
+        expected_row_node_ids = {
+            "A": torch.tensor([13, 14, 15]),
+        }
+    else:
+        expected_row_node_ids = None
+    if reverse_column:
+        expected_column_node_ids = {
+            "B": torch.tensor([10, 11, 12]),
+        }
+    else:
+        expected_column_node_ids = None
+    expected_edge_ids = {"A:relation:B": torch.tensor([20, 20])}
+
+    _assert_container_equal(result.node_pairs, expected_csc_formats)
     _assert_container_equal(
         result.original_column_node_ids, expected_column_node_ids
     )
