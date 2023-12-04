@@ -8,8 +8,8 @@ import torch
 from collections import defaultdict
 
 class FixedSampler(Sampler):
-    """Subgraph sampler that heterogeneous sampler that sets an upper 
-    bound on the number of nodes included in each layer of the sampled subgraph.
+    """Subgraph sampler that sets an upper bound on the number of nodes included in 
+    each layer of the sampled subgraph.
     
     At each layer, the frontier is randomly subsampled. Rare node types can also be 
     upsampled by taking the scaled square root of the sampling probabilities.
