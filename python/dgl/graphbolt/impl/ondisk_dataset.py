@@ -439,7 +439,7 @@ class OnDiskDataset(Dataset):
             )
         return ret
 
-    def _check_loaded():
+    def _check_loaded(self):
         assert self._loaded, (
             "Please ensure that you have called the OnDiskDataset.load() method"
             + " to properly load the data."
