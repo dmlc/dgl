@@ -1,5 +1,6 @@
 """Implementation of GraphBolt."""
 from .basic_feature_store import *
+from .dgl_dataset import *
 from .fused_csc_sampling_graph import *
 from .gpu_cached_feature import *
 from .in_subgraph_sampler import *
