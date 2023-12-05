@@ -1,23 +1,31 @@
 """Graphbolt dataset from DGLDataset."""
 from typing import Dict, List, Union
+
 from dgl.data import AsNodePredDataset
+from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from ..dataset import Dataset, Task
-from .fused_csc_sampling_graph import (
-    from_dglgraph,
-    FusedCSCSamplingGraph)
 from .basic_feature_store import BasicFeatureStore
+from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
 from .torch_based_feature_store import TorchBasedFeature
+
 
 class DGLGraphboltTask(Task):
     def __init__(self, dgl_dataset: AsNodePredDataset):
         train_labels = dgl_dataset[0].ndata["label"][dgl_dataset.train_idx]
         validation_labels = dgl_dataset[0].ndata["label"][dgl_dataset.val_idx]
         test_labels = dgl_dataset[0].ndata["label"][dgl_dataset.test_idx]
-        self._train_set = ItemSet((dgl_dataset.train_idx, train_labels), names=("seed_nodes", "labels"))
-        self._validation_set = ItemSet((dgl_dataset.val_idx, validation_labels), names=("seed_nodes", "labels"))
-        self._test_set = ItemSet((dgl_dataset.test_idx, test_labels), names=("seed_nodes", "labels"))
+        self._train_set = ItemSet(
+            (dgl_dataset.train_idx, train_labels),
+            names=("seed_nodes", "labels"),
+        )
+        self._validation_set = ItemSet(
+            (dgl_dataset.val_idx, validation_labels),
+            names=("seed_nodes", "labels"),
+        )
+        self._test_set = ItemSet(
+            (dgl_dataset.test_idx, test_labels), names=("seed_nodes", "labels")
+        )
         self._metadata = {"num_classes": dgl_dataset.num_classes}
 
     @property
@@ -39,6 +47,7 @@ class DGLGraphboltTask(Task):
     def test_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the test set."""
         return self._test_set
+
 
 class DGLGraphboltDataset(Dataset):
     def __init__(self, dgl_dataset: AsNodePredDataset):
