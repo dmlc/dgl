@@ -23,20 +23,21 @@ def edge_label_informativeness(graph, y, eps=1e-8):
     r"""Label informativeness (:math:`\mathrm{LI}`) is a characteristic of
     labeled graphs proposed in the `Characterizing Graph Datasets for Node
     Classification: Homophily-Heterophily Dichotomy and Beyond
-    <https://arxiv.org/abs/2209.06177>`__ paper. It shows how much information
-    about a node's label we get from knowing its neighbor's label. Formally,
-    assume that we sample an edge :math:`(\xi,\eta) \in E`. The class labels of
-    nodes :math:`\xi` and :math:`\eta` are then random variables :math:`y_\xi`
-    and :math:`y_\eta`. We want to measure the amount of knowledge the label
-    :math:`y_\eta` gives for predicting :math:`y_\xi`. The entropy
-    :math:`H(y_\xi)` measures the `hardness' of predicting the label of
-    :math:`\xi` without knowing :math:`y_\eta`. Given :math:`y_\eta`, this
-    value is reduced to the conditional entropy :math:`H(y_\xi|y_\eta)`. In
-    other words, :math:`y_\eta` reveals
-    :math:`I(y_\xi,y_\eta) = H(y_\xi) - H(y_\xi|y_\eta)` information about the
-    label. To make the obtained quantity comparable across different datasets,
-    label informativeness is defined as the normalized mutual information of
-    :math:`y_{\xi}` and :math:`y_{\eta}`:
+    <https://arxiv.org/abs/2209.06177>`__
+
+    It shows how much information about a node's label we get from knowing its
+    neighbor's label. Formally, assume that we sample an edge
+    :math:`(\xi,\eta) \in E`. The class labels of nodes :math:`\xi` and
+    :math:`\eta` are then random variables :math:`y_\xi` and :math:`y_\eta`.
+    We want to measure the amount of knowledge the label :math:`y_\eta` gives
+    for predicting :math:`y_\xi`. The entropy :math:`H(y_\xi)` measures the
+    `hardness' of predicting the label of :math:`\xi` without knowing
+    :math:`y_\eta`. Given :math:`y_\eta`, this value is reduced to the
+    conditional entropy :math:`H(y_\xi|y_\eta)`. In other words, :math:`y_\eta`
+    reveals :math:`I(y_\xi,y_\eta) = H(y_\xi) - H(y_\xi|y_\eta)` information
+    about the label. To make the obtained quantity comparable across different
+    datasets, label informativeness is defined as the normalized mutual
+    information of :math:`y_{\xi}` and :math:`y_{\eta}`:
 
     .. math::
       \mathrm{LI} = \frac{I(y_\xi,y_\eta)}{H(y_\xi)}
@@ -113,20 +114,21 @@ def node_label_informativeness(graph, y, eps=1e-8):
     r"""Label informativeness (:math:`\mathrm{LI}`) is a characteristic of
     labeled graphs proposed in the `Characterizing Graph Datasets for Node
     Classification: Homophily-Heterophily Dichotomy and Beyond
-    <https://arxiv.org/abs/2209.06177>`__ paper. It shows how much information
-    about a node's label we get from knowing its neighbor's label. Formally,
-    assume that we sample an edge :math:`(\xi,\eta) \in E`. The class labels of
-    nodes :math:`\xi` and :math:`\eta` are then random variables :math:`y_\xi`
-    and :math:`y_\eta`. We want to measure the amount of knowledge the label
-    :math:`y_\eta` gives for predicting :math:`y_\xi`. The entropy
-    :math:`H(y_\xi)` measures the `hardness' of predicting the label of
-    :math:`\xi` without knowing :math:`y_\eta`. Given :math:`y_\eta`, this
-    value is reduced to the conditional entropy :math:`H(y_\xi|y_\eta)`. In
-    other words, :math:`y_\eta` reveals
-    :math:`I(y_\xi,y_\eta) = H(y_\xi) - H(y_\xi|y_\eta)` information about the
-    label. To make the obtained quantity comparable across different datasets,
-    label informativeness is defined as the normalized mutual information of
-    :math:`y_{\xi}` and :math:`y_{\eta}`:
+    <https://arxiv.org/abs/2209.06177>`__
+
+    It shows how much information about a node's label we get from knowing its
+    neighbor's label. Formally, assume that we sample an edge
+    :math:`(\xi,\eta) \in E`. The class labels of nodes :math:`\xi` and
+    :math:`\eta` are then random variables :math:`y_\xi` and :math:`y_\eta`.
+    We want to measure the amount of knowledge the label :math:`y_\eta` gives
+    for predicting :math:`y_\xi`. The entropy :math:`H(y_\xi)` measures the
+    `hardness' of predicting the label of :math:`\xi` without knowing
+    :math:`y_\eta`. Given :math:`y_\eta`, this value is reduced to the
+    conditional entropy :math:`H(y_\xi|y_\eta)`. In other words, :math:`y_\eta`
+    reveals :math:`I(y_\xi,y_\eta) = H(y_\xi) - H(y_\xi|y_\eta)` information
+    about the label. To make the obtained quantity comparable across different
+    datasets, label informativeness is defined as the normalized mutual
+    information of :math:`y_{\xi}` and :math:`y_{\eta}`:
 
     .. math::
       \mathrm{LI} = \frac{I(y_\xi,y_\eta)}{H(y_\xi)}
