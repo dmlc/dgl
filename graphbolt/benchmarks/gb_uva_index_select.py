@@ -105,6 +105,7 @@ def test_random():
             >= available_RAM
         ):
             continue
+        torch.cuda.empty_cache()
         feature = torch.randint(0, 13, size=[rows, size], dtype=dtype)
         feature = (
             feature.cuda()
