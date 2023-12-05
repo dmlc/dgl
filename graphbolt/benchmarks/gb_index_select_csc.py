@@ -101,7 +101,7 @@ def test_index_select_csc_throughput(graph, indices):
 
 available_RAM = 10 * (2**30)  ## 10 GiB
 n_rows = [2000000 * factor for factor in [1, 10, 100, 1000]]
-avg_degrees = [8, 64]
+avg_degrees = [8, 64, 256]
 num_indices = [1000, 100000, 1000000]
 indptr_dtypes = [torch.int64]
 tensor_dtypes = [torch.int32, torch.int64]
@@ -157,6 +157,7 @@ def test_random():
             [], dtype=tensor_dtype
         ).element_size() >= available_RAM:
             continue
+        torch.cuda.empty_cache()
         graph = gen_random_graph(
             rows,
             avg_degree,
