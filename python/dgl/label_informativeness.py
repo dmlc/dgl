@@ -78,7 +78,7 @@ def edge_label_informativeness(graph, y, eps=1e-8):
     >>> graph = dgl.graph(([0, 1, 2, 2, 3, 4], [1, 2, 0, 3, 4, 5]))
     >>> y = torch.tensor([0, 0, 0, 0, 1, 1])
     >>> dgl.edge_label_informativeness(graph, y)
-    0.2517760099956565
+    0.25177597999572754
     """
     check_pytorch()
 
@@ -169,7 +169,7 @@ def node_label_informativeness(graph, y, eps=1e-8):
     >>> graph = dgl.graph(([0, 1, 2, 2, 3, 4], [1, 2, 0, 3, 4, 5]))
     >>> y = torch.tensor([0, 0, 0, 0, 1, 1])
     >>> dgl.node_label_informativeness(graph, y)
-    0.3381873621927896
+    0.3381872773170471
     """
     check_pytorch()
 
