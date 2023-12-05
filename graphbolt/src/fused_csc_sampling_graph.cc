@@ -28,11 +28,15 @@ FusedCSCSamplingGraph::FusedCSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+    const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
     const torch::optional<EdgeAttrMap>& edge_attributes)
     : indptr_(indptr),
       indices_(indices),
       node_type_offset_(node_type_offset),
       type_per_edge_(type_per_edge),
+      node_type_to_id_(node_type_to_id),
+      edge_type_to_id_(edge_type_to_id),
       edge_attributes_(edge_attributes) {
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
@@ -43,14 +47,21 @@ c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::FromCSC(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+    const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
     const torch::optional<EdgeAttrMap>& edge_attributes) {
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
     TORCH_CHECK(offset.dim() == 1);
+    TORCH_CHECK(node_type_to_id.has_value());
+    TORCH_CHECK(
+        offset.size(0) ==
+        static_cast<int64_t>(node_type_to_id.value().size() + 1));
   }
   if (type_per_edge.has_value()) {
     TORCH_CHECK(type_per_edge.value().dim() == 1);
     TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
+    TORCH_CHECK(edge_type_to_id.has_value());
   }
   if (edge_attributes.has_value()) {
     for (const auto& pair : edge_attributes.value()) {
@@ -58,7 +69,8 @@ c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::FromCSC(
     }
   }
   return c10::make_intrusive<FusedCSCSamplingGraph>(
-      indptr, indices, node_type_offset, type_per_edge, edge_attributes);
+      indptr, indices, node_type_offset, type_per_edge, node_type_to_id,
+      edge_type_to_id, edge_attributes);
 }
 
 void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
@@ -82,6 +94,34 @@ void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
     type_per_edge_ =
         read_from_archive(archive, "FusedCSCSamplingGraph/type_per_edge")
             .toTensor();
+  }
+
+  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_node_type_to_id")
+          .toBool()) {
+    torch::Dict<torch::IValue, torch::IValue> generic_dict =
+        read_from_archive(archive, "FusedCSCSamplingGraph/node_type_to_id")
+            .toGenericDict();
+    NodeTypeToIDMap node_type_to_id;
+    for (const auto& pair : generic_dict) {
+      std::string key = pair.key().toStringRef();
+      int64_t value = pair.value().toInt();
+      node_type_to_id.insert(std::move(key), value);
+    }
+    node_type_to_id_ = std::move(node_type_to_id);
+  }
+
+  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_edge_type_to_id")
+          .toBool()) {
+    torch::Dict<torch::IValue, torch::IValue> generic_dict =
+        read_from_archive(archive, "FusedCSCSamplingGraph/edge_type_to_id")
+            .toGenericDict();
+    EdgeTypeToIDMap edge_type_to_id;
+    for (const auto& pair : generic_dict) {
+      std::string key = pair.key().toStringRef();
+      int64_t value = pair.value().toInt();
+      edge_type_to_id.insert(std::move(key), value);
+    }
+    edge_type_to_id_ = std::move(edge_type_to_id);
   }
 
   // Optional edge attributes.
@@ -122,6 +162,20 @@ void FusedCSCSamplingGraph::Save(
   if (type_per_edge_) {
     archive.write(
         "FusedCSCSamplingGraph/type_per_edge", type_per_edge_.value());
+  }
+  archive.write(
+      "FusedCSCSamplingGraph/has_node_type_to_id",
+      node_type_to_id_.has_value());
+  if (node_type_to_id_) {
+    archive.write(
+        "FusedCSCSamplingGraph/node_type_to_id", node_type_to_id_.value());
+  }
+  archive.write(
+      "FusedCSCSamplingGraph/has_edge_type_to_id",
+      edge_type_to_id_.has_value());
+  if (edge_type_to_id_) {
+    archive.write(
+        "FusedCSCSamplingGraph/edge_type_to_id", edge_type_to_id_.value());
   }
   archive.write(
       "FusedCSCSamplingGraph/has_edge_attributes",
@@ -505,7 +559,7 @@ BuildGraphFromSharedMemoryHelper(SharedMemoryHelper&& helper) {
   auto edge_attributes = helper.ReadTorchTensorDict();
   auto graph = c10::make_intrusive<FusedCSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
-      edge_attributes);
+      torch::nullopt, torch::nullopt, edge_attributes);
   auto shared_memory = helper.ReleaseSharedMemory();
   graph->HoldSharedMemoryObject(
       std::move(shared_memory.first), std::move(shared_memory.second));

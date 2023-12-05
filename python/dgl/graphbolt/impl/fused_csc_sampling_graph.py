@@ -456,7 +456,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
                 node_edge_type[dst_ntype_id].append((etype, etype_id))
             # construct subgraphs
-            for (i, seed) in enumerate(column):
+            for i, seed in enumerate(column):
                 l = indptr[i].item()
                 r = indptr[i + 1].item()
                 node_type = (
@@ -465,7 +465,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     ).item()
                     - 1
                 )
-                for (etype, etype_id) in node_edge_type[node_type]:
+                for etype, etype_id in node_edge_type[node_type]:
                     src_ntype, _, _ = etype_str_to_tuple(etype)
                     src_ntype_id = self.metadata.node_type_to_id[src_ntype]
                     num_edges = torch.searchsorted(
@@ -925,12 +925,16 @@ def from_fused_csc(
         assert len(metadata.node_type_to_id) + 1 == node_type_offset.size(
             0
         ), "node_type_offset length should be |ntypes| + 1."
+    node_type_to_id = metadata.node_type_to_id if metadata else None
+    edge_type_to_id = metadata.edge_type_to_id if metadata else None
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.from_fused_csc(
             csc_indptr,
             indices,
             node_type_offset,
             type_per_edge,
+            node_type_to_id,
+            edge_type_to_id,
             edge_attributes,
         ),
         metadata,
@@ -1046,7 +1050,11 @@ def from_dglgraph(
     # Obtain CSC matrix.
     indptr, indices, edge_ids = homo_g.adj_tensors("csc")
     ntype_count.insert(0, 0)
-    node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
+    node_type_offset = (
+        None
+        if is_homogeneous
+        else torch.cumsum(torch.LongTensor(ntype_count), 0)
+    )
 
     # Assign edge type according to the order of CSC matrix.
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
@@ -1056,12 +1064,16 @@ def from_dglgraph(
         # Assign edge attributes according to the original eids mapping.
         edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
 
+    node_type_to_id = metadata.node_type_to_id if metadata else None
+    edge_type_to_id = metadata.edge_type_to_id if metadata else None
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.from_fused_csc(
             indptr,
             indices,
             node_type_offset,
             type_per_edge,
+            node_type_to_id,
+            edge_type_to_id,
             edge_attributes,
         ),
         metadata,
