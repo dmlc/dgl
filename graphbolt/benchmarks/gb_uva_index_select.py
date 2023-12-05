@@ -70,7 +70,7 @@ def test_index_select_throughput(feature, indices):
 available_RAM = 10 * (2**30)  ## 10 GiB
 n_rows = [2000000 * factor for factor in [1, 10, 100, 1000]]
 feat_size = [1, 4, 47, 256, 353]
-num_indices = [1, 1000, 100000, 1000000]
+num_indices = [1000, 100000, 1000000]
 dtypes = [torch.float32, torch.int8]
 feature_devices = [Device.Pinned]
 indices_devices = [Device.GPU]
@@ -88,7 +88,7 @@ sum_of_runtimes = 0
 
 def _print_result(runtime, throughput):
     print(
-        f"Runtime in us: {int(runtime * 1000000)}, Throughput in MB/s: {int(throughput / (2 ** 20))}"
+        f"Runtime in us: {int(runtime * 1000000)}, Throughput in MiB/s: {int(throughput / (2 ** 20))}"
     )
     print("")
     print("")
