@@ -21,7 +21,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
 /**
- * @brief Select rows from indices according to nodes tensor.
+ * @brief Select rows from indptr and indices according to nodes tensor.
  *
  * NOTE:
  * 1. The shape of all tensors must be 1-D.
