@@ -54,7 +54,7 @@ def create_dataloader(dateset, device, is_train=True):
     datapipe = datapipe.copy_to(device)
 
     # Initiate the dataloader for the datapipe.
-    return gb.SingleProcessDataLoader(datapipe)
+    return gb.DataLoader(datapipe)
 
 
 class GraphSAGE(nn.Module):

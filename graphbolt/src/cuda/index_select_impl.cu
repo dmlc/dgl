@@ -6,12 +6,12 @@
 #include <c10/core/ScalarType.h>
 #include <c10/cuda/CUDAStream.h>
 
+#include <cub/cub.cuh>
 #include <numeric>
 
 #include "../index_select.h"
 #include "./common.h"
 #include "./utils.h"
-#include "cub/cub.cuh"
 
 namespace graphbolt {
 namespace ops {

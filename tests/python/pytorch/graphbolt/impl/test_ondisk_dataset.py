@@ -1999,8 +1999,8 @@ def test_BuiltinDataset():
     """Test BuiltinDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # Case 1: download from DGL S3 storage.
-        dataset_name = "test-only"
-        # Add test-only dataset to the builtin dataset list for testing only.
+        dataset_name = "test-dataset-231204"
+        # Add dataset to the builtin dataset list for testing only.
         gb.BuiltinDataset._all_datasets.append(dataset_name)
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
         assert dataset.graph is not None
@@ -2085,7 +2085,7 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
                 dataset.feature, node_feature_keys=["feat"]
             )
             datapipe = datapipe.to_dgl()
-            dataloader = gb.MultiProcessDataLoader(datapipe)
+            dataloader = gb.DataLoader(datapipe)
             for _ in dataloader:
                 pass
 
@@ -2157,7 +2157,7 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
                 dataset.feature, node_feature_keys={"user": ["feat"]}
             )
             datapipe = datapipe.to_dgl()
-            dataloader = gb.MultiProcessDataLoader(datapipe)
+            dataloader = gb.DataLoader(datapipe)
             for _ in dataloader:
                 pass
 

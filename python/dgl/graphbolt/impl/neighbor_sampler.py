@@ -86,6 +86,8 @@ class NeighborSampler(SubgraphSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
     ):
         super().__init__(datapipe)
         self.graph = graph
@@ -98,6 +100,7 @@ class NeighborSampler(SubgraphSampler):
         self.replace = replace
         self.prob_name = prob_name
         self.deduplicate = deduplicate
+        self.output_cscformat = output_cscformat
         self.sampler = graph.sample_neighbors
 
     def _sample_subgraphs(self, seeds):
@@ -116,9 +119,11 @@ class NeighborSampler(SubgraphSampler):
                 self.fanouts[hop],
                 self.replace,
                 self.prob_name,
-                self.deduplicate,
+                not self.deduplicate or self.output_cscformat,
             )
             if self.deduplicate:
+                if self.output_cscformat:
+                    raise RuntimeError("Not implemented yet.")
                 (
                     original_row_node_ids,
                     compacted_node_pairs,
@@ -235,8 +240,16 @@ class LayerNeighborSampler(NeighborSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
     ):
         super().__init__(
-            datapipe, graph, fanouts, replace, prob_name, deduplicate
+            datapipe,
+            graph,
+            fanouts,
+            replace,
+            prob_name,
+            deduplicate,
+            output_cscformat,
         )
         self.sampler = graph.sample_layer_neighbors
