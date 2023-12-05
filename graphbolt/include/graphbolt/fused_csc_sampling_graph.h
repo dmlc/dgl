@@ -64,8 +64,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param node_type_to_id A dictionary mapping node type names to type IDs, if
    * present.
-   * @param edge_type_to_id A dictionary mapping edge type names to type IDs,
-   * if present.
+   * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
+   * present.
    * @param edge_attributes A dictionary of edge attributes, if present.
    *
    */
@@ -87,8 +87,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param node_type_to_id A dictionary mapping node type names to type IDs, if
    * present.
-   * @param edge_type_to_id A dictionary mapping edge type names to type IDs,
-   * if present.
+   * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
+   * present.
    * @param edge_attributes A dictionary of edge attributes, if present.
    *
    * @return FusedCSCSamplingGraph
