@@ -506,6 +506,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         deduplicate=True,
+        is_cscformat=False,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -577,6 +578,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             nodes, fanouts, replace, probs_name
         )
         if deduplicate is True:
+            if is_cscformat:
+                raise RuntimeError("Not implemented yet.")
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
@@ -687,6 +690,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         deduplicate=True,
+        is_cscformat=False,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
@@ -771,6 +775,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         )
 
         if deduplicate:
+            if is_cscformat:
+                raise RuntimeError("Not implemented yet.")
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
