@@ -88,35 +88,35 @@ inline bool is_zero<dim3>(dim3 size) {
     }                                                                 \
   }
 
-#define GRAPHBOLT_DISPATCH_ELEMENT_SIZES(element_size, name, ...)           \
-  switch (element_size) {                                                   \
-    case 1: {                                                               \
-      [[maybe_unused]] constexpr int element_size_v = 1;                    \
-      using element_size_t = uint8_t;                                       \
-      return __VA_ARGS__();                                                 \
-    }                                                                       \
-    case 2: {                                                               \
-      [[maybe_unused]] constexpr int element_size_v = 2;                    \
-      using element_size_t = uint16_t;                                      \
-      return __VA_ARGS__();                                                 \
-    }                                                                       \
-    case 4: {                                                               \
-      [[maybe_unused]] constexpr int element_size_v = 4;                    \
-      using element_size_t = uint32_t;                                      \
-      return __VA_ARGS__();                                                 \
-    }                                                                       \
-    case 8: {                                                               \
-      [[maybe_unused]] constexpr int element_size_v = 8;                    \
-      using element_size_t = uint64_t;                                      \
-      return __VA_ARGS__();                                                 \
-    }                                                                       \
-    case 16: {                                                              \
-      [[maybe_unused]] int element_size_v = 16;                             \
-      using element_size_t = float4;                                        \
-      return __VA_ARGS__();                                                 \
-    }                                                                       \
-    default:                                                                \
-      TORCH_CHECK(false, name, " with the element_size is not supported!"); \
+#define GRAPHBOLT_DISPATCH_ELEMENT_SIZES(element_size, name, ...)              \
+  switch (element_size) {                                                      \
+    case 1: {                                                                  \
+      using element_size_t = uint8_t;                                          \
+      [[maybe_unused]] constexpr auto element_size_v = sizeof(element_size_t); \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case 2: {                                                                  \
+      using element_size_t = uint16_t;                                         \
+      [[maybe_unused]] constexpr auto element_size_v = sizeof(element_size_t); \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case 4: {                                                                  \
+      using element_size_t = uint32_t;                                         \
+      [[maybe_unused]] constexpr auto element_size_v = sizeof(element_size_t); \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case 8: {                                                                  \
+      using element_size_t = uint64_t;                                         \
+      [[maybe_unused]] constexpr auto element_size_v = sizeof(element_size_t); \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case 16: {                                                                 \
+      using element_size_t = float4;                                           \
+      [[maybe_unused]] constexpr auto element_size_v = sizeof(element_size_t); \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    default:                                                                   \
+      TORCH_CHECK(false, name, " with the element_size is not supported!");    \
   }
 
 }  // namespace cuda
