@@ -295,7 +295,7 @@ void LibraVertexCut(
   for (int64_t c = 0; c < nc; c++) printf("%ld ", community_edges[c]);
   printf("\n");
 
-  delete community_edges;
+  delete[] community_edges;
   fclose(fp);
 }
 
