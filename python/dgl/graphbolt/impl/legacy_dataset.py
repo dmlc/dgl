@@ -55,7 +55,7 @@ class LegacyDataset(Dataset):
         tasks = []
         tasks.append(LegacyTask(input))
         self._tasks = tasks
-        num_nodes = input[0].num_nodes
+        num_nodes = input[0].num_nodes()
         self._all_nodes_set = ItemSet(num_nodes, names="seed_nodes")
         features = {}
         for name in input[0].ndata.keys():
