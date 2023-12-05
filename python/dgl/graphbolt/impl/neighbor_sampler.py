@@ -240,8 +240,16 @@ class LayerNeighborSampler(NeighborSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
     ):
         super().__init__(
-            datapipe, graph, fanouts, replace, prob_name, deduplicate
+            datapipe,
+            graph,
+            fanouts,
+            replace,
+            prob_name,
+            deduplicate,
+            output_cscformat,
         )
         self.sampler = graph.sample_layer_neighbors
