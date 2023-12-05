@@ -199,7 +199,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
               &hop_size, sub_indptr.data_ptr<indptr_t>() + num_rows,
               sizeof(hop_size), cudaMemcpyDeviceToHost, stream));
           // synchronizes here, we can read hop_size and hop_size_aligned
-          cudaStreamSynchronize(stream);
+          CUDA_CALL(cudaStreamSynchronize(stream));
           // Allocate output array with actual number of edges.
           sub_indices = torch::empty(
               hop_size, nodes.options().dtype(indices.scalar_type()));
@@ -292,7 +292,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
             &hop_size, sub_indptr.data_ptr<indptr_t>() + num_rows,
             sizeof(hop_size), cudaMemcpyDeviceToHost, stream));
         // blocking read of hop_size
-        cudaStreamSynchronize(stream);
+        CUDA_CALL(cudaStreamSynchronize(stream));
         // Allocate output array of size number of copied edges.
         sub_indices = torch::empty(
             hop_size, nodes.options().dtype(indices.scalar_type()));
