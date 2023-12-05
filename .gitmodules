@@ -22,9 +22,9 @@
 [submodule "third_party/tensorpipe"]
 	path = third_party/tensorpipe
 	url = https://github.com/pytorch/tensorpipe
-[submodule "third_party/thrust"]
-	path = third_party/thrust
-	url = https://github.com/NVIDIA/thrust.git
 [submodule "third_party/pcg"]
 	path = third_party/pcg
 	url = https://github.com/imneme/pcg-cpp.git
+[submodule "third_party/cccl"]
+	path = third_party/cccl
+	url = https://github.com/NVIDIA/cccl.git
