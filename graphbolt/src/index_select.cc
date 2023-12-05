@@ -42,8 +42,11 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
   }
   // For testing purposes, to compare with CPU implementation
   torch::optional<torch::Tensor> temp;
-  torch::optional<sampling::FusedCSCSamplingGraph::EdgeAttrMap> temp2;
-  sampling::FusedCSCSamplingGraph g(indptr, indices, temp, temp, temp2);
+  torch::optional<sampling::FusedCSCSamplingGraph::NodeTypeToIDMap> temp2;
+  torch::optional<sampling::FusedCSCSamplingGraph::EdgeTypeToIDMap> temp3;
+  torch::optional<sampling::FusedCSCSamplingGraph::EdgeAttrMap> temp4;
+  sampling::FusedCSCSamplingGraph g(
+      indptr, indices, temp, temp, temp2, temp3, temp4);
   const auto res = g.InSubgraph(nodes);
   return std::make_tuple(res->indptr, res->indices);
 }
