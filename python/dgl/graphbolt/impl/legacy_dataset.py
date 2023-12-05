@@ -16,10 +16,12 @@ class LegacyTask(Task):
         validation_labels = input[0].ndata["label"][input.val_idx]
         test_labels = input[0].ndata["label"][input.test_idx]
         self._train_set = ItemSet(
-            (input.train_idx, train_labels), names=("seed_nodes", "labels"),
+            (input.train_idx, train_labels),
+            names=("seed_nodes", "labels"),
         )
         self._validation_set = ItemSet(
-            (input.val_idx, validation_labels), names=("seed_nodes", "labels"),
+            (input.val_idx, validation_labels),
+            names=("seed_nodes", "labels"),
         )
         self._test_set = ItemSet(
             (input.test_idx, test_labels), names=("seed_nodes", "labels")
