@@ -34,9 +34,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-from dgl.data import AsNodePredDataset
-from ogb.nodeproppred import DglNodePropPredDataset
-from torchdata.datapipes.iter import IterableWrapper
+from dgl.graphbolt.subgraph_sampler import SubgraphSampler
+from torch.utils.data import functional_datapipe
 
 
 class SAGEConv(nn.Module):
@@ -102,28 +101,37 @@ class SAGE(nn.Module):
         return hidden_x
 
 
-def multilayer_sample(A, fanouts, minibatch):
-    sampled_matrices = []
-    src = minibatch.seed_nodes
+@functional_datapipe("sample_sparse_neighbor")
+class SparseNeighborSampler(SubgraphSampler):
+    def __init__(self, datapipe, matrix, fanouts):
+        super().__init__(datapipe)
+        self.matrix = matrix
+        # Convert fanouts to a list of tensors.
+        self.fanouts = []
+        for fanout in fanouts:
+            if not isinstance(fanout, torch.Tensor):
+                fanout = torch.LongTensor([int(fanout)])
+            self.fanouts.insert(0, fanout)
 
-    #####################################################################
-    # (HIGHLIGHT) Using the sparse sample operator to preform random
-    # sampling on the neighboring nodes of the seeds nodes. The sparse
-    # compact operator is then employed to compact and relabel the sampled
-    # matrix, resulting in the sampled matrix and the relabel index.
-    #####################################################################
+    def _sample_subgraphs(self, seeds):
+        sampled_matrices = []
+        src = seeds
 
-    for fanout in fanouts:
-        # Sample neighbors.
-        sampled_matrix = A.sample(1, fanout, ids=src).coalesce()
-        # Compact the sampled matrix.
-        compacted_mat, row_ids = sampled_matrix.compact(0)
-        sampled_matrices.insert(0, compacted_mat)
-        src = row_ids
+        #####################################################################
+        # (HIGHLIGHT) Using the sparse sample operator to preform random
+        # sampling on the neighboring nodes of the seeds nodes. The sparse
+        # compact operator is then employed to compact and relabel the sampled
+        # matrix, resulting in the sampled matrix and the relabel index.
+        #####################################################################
+        for fanout in self.fanouts:
+            # Sample neighbors.
+            sampled_matrix = self.matrix.sample(1, fanout, ids=src).coalesce()
+            # Compact the sampled matrix.
+            compacted_mat, row_ids = sampled_matrix.compact(0)
+            sampled_matrices.insert(0, compacted_mat)
+            src = row_ids
 
-    minibatch.input_nodes = src
-    minibatch.sampled_subgraphs = sampled_matrices
-    return minibatch
+        return src, sampled_matrices
 
 
 ############################################################################
@@ -132,11 +140,11 @@ def multilayer_sample(A, fanouts, minibatch):
 def create_dataloader(A, fanouts, ids, features, device):
     datapipe = gb.ItemSampler(ids, batch_size=1024)
     # Customize graphbolt sampler by sparse.
-    datapipe = datapipe.map(partial(multilayer_sample, A, fanouts))
+    datapipe = datapipe.sample_sparse_neighbor(A, fanouts)
     # Use grapbolt to fetch features.
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=4)
+    dataloader = gb.DataLoader(datapipe)
     return dataloader
 
 
