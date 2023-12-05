@@ -1,6 +1,5 @@
 """Utils for computing graph label informativeness"""
-import networkx as nx
-import numpy as np
+from . import to_bidirected
 
 try:
     import torch
@@ -82,49 +81,32 @@ def edge_label_informativeness(graph, y, eps=1e-8):
     """
     check_pytorch()
 
-    num_nodes = graph.num_nodes()
-    edges = torch.vstack(graph.edges()).T.cpu().numpy()
+    graph = to_bidirected(graph)
 
-    graph = nx.Graph()
-    graph.add_nodes_from(range(num_nodes))
-    graph.add_edges_from(edges)
-
-    labels = y.cpu().numpy()
-
-    # Convert labels to consecutive integers.
-    unique_labels = np.unique(labels)
-    labels_map = {label: i for i, label in enumerate(unique_labels)}
-    labels = np.array([labels_map[label] for label in labels])
-
-    num_classes = len(unique_labels)
-
-    class_degree_weighted_probs = np.array(
-        [0 for _ in range(num_classes)], dtype=float
-    )
-    for u in graph.nodes:
-        label = labels[u]
-        class_degree_weighted_probs[label] += graph.degree(u)
-
+    degrees = graph.in_degrees().float()
+    num_classes = y.max() + 1
+    class_degree_weighted_probs = torch.zeros(num_classes)
+    class_degree_weighted_probs.index_add_(dim=0, index=y, source=degrees)
     class_degree_weighted_probs /= class_degree_weighted_probs.sum()
 
-    edge_probs = np.zeros((num_classes, num_classes))
-    for u, v in graph.edges:
-        label_u = labels[u]
-        label_v = labels[v]
-        edge_probs[label_u, label_v] += 1
-        edge_probs[label_v, label_u] += 1
-
+    edge_probs = torch.zeros(num_classes, num_classes)
+    labels_u = y[graph.edges()[0]]
+    labels_v = y[graph.edges()[1]]
+    edge_probs.index_put_(
+        indices=(labels_u, labels_v),
+        values=torch.ones(graph.num_edges()),
+        accumulate=True,
+    )
     edge_probs /= edge_probs.sum()
-
     edge_probs += eps
 
-    numerator = (edge_probs * np.log(edge_probs)).sum()
+    numerator = (edge_probs * torch.log(edge_probs)).sum()
     denominator = (
-        class_degree_weighted_probs * np.log(class_degree_weighted_probs)
+        class_degree_weighted_probs * torch.log(class_degree_weighted_probs)
     ).sum()
     li_edge = 2 - numerator / denominator
 
-    return li_edge
+    return li_edge.item()
 
 
 def node_label_informativeness(graph, y, eps=1e-8):
@@ -189,62 +171,38 @@ def node_label_informativeness(graph, y, eps=1e-8):
     """
     check_pytorch()
 
-    num_nodes = graph.num_nodes()
-    edges = torch.vstack(graph.edges()).T.cpu().numpy()
+    graph = to_bidirected(graph)
 
-    graph = nx.Graph()
-    graph.add_nodes_from(range(num_nodes))
-    graph.add_edges_from(edges)
+    degrees = graph.in_degrees().float()
+    num_classes = y.max() + 1
 
-    labels = y.cpu().numpy()
-
-    # Convert labels to consecutive integers.
-    unique_labels = np.unique(labels)
-    labels_map = {label: i for i, label in enumerate(unique_labels)}
-    labels = np.array([labels_map[label] for label in labels])
-
-    num_classes = len(unique_labels)
-
-    class_probs = np.array([0 for _ in range(num_classes)], dtype=float)
-    class_degree_weighted_probs = np.array(
-        [0 for _ in range(num_classes)], dtype=float
-    )
-    num_zero_degree_nodes = 0
-    for u in graph.nodes:
-        if graph.degree(u) == 0:
-            num_zero_degree_nodes += 1
-            continue
-
-        label = labels[u]
-        class_probs[label] += 1
-        class_degree_weighted_probs[label] += graph.degree(u)
-
+    class_probs = torch.zeros(num_classes)
+    class_probs.index_add_(dim=0, index=y, source=torch.ones(graph.num_nodes()))
     class_probs /= class_probs.sum()
+
+    class_degree_weighted_probs = torch.zeros(num_classes)
+    class_degree_weighted_probs.index_add_(dim=0, index=y, source=degrees)
     class_degree_weighted_probs /= class_degree_weighted_probs.sum()
-    num_nonzero_degree_nodes = len(graph.nodes) - num_zero_degree_nodes
 
-    edge_probs = np.zeros((num_classes, num_classes))
-    for u, v in graph.edges:
-        label_u = labels[u]
-        label_v = labels[v]
-        edge_probs[label_u, label_v] += 1 / (
-            num_nonzero_degree_nodes * graph.degree(u)
-        )
-        edge_probs[label_v, label_u] += 1 / (
-            num_nonzero_degree_nodes * graph.degree(v)
-        )
+    num_nonzero_degree_nodes = (degrees > 0).sum()
 
+    edge_probs = torch.zeros(num_classes, num_classes)
+    labels_u = y[graph.edges()[0]]
+    labels_v = y[graph.edges()[1]]
+    degrees_u = degrees[graph.edges()[0]]
+    edge_probs.index_put_(
+        indices=(labels_u, labels_v),
+        values=1 / (num_nonzero_degree_nodes * degrees_u),
+        accumulate=True,
+    )
     edge_probs += eps
 
-    log = np.log(
+    log = torch.log(
         edge_probs
-        / (
-            class_probs.reshape(-1, 1)
-            * class_degree_weighted_probs.reshape(1, -1)
-        )
+        / (class_probs[:, None] * class_degree_weighted_probs[None, :])
     )
     numerator = (edge_probs * log).sum()
-    denominator = (class_probs * np.log(class_probs)).sum()
+    denominator = (class_probs * torch.log(class_probs)).sum()
     li_node = -numerator / denominator
 
-    return li_node
+    return li_node.item()
