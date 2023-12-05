@@ -48,6 +48,8 @@ struct SamplerArgs<SamplerType::LABOR> {
  */
 class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  public:
+  using NodeTypeToIDMap = torch::Dict<std::string, int64_t>;
+  using EdgeTypeToIDMap = torch::Dict<std::string, int64_t>;
   using EdgeAttrMap = torch::Dict<std::string, torch::Tensor>;
   /** @brief Default constructor. */
   FusedCSCSamplingGraph() = default;
@@ -60,11 +62,19 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param type_per_edge A tensor representing the type of each edge, if
    * present.
+   * @param node_type_to_id A dictionary mapping node type names to type IDs, if
+   * present.
+   * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
+   * present.
+   * @param edge_attributes A dictionary of edge attributes, if present.
+   *
    */
   FusedCSCSamplingGraph(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /**
@@ -75,6 +85,11 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param type_per_edge A tensor representing the type of each edge, if
    * present.
+   * @param node_type_to_id A dictionary mapping node type names to type IDs, if
+   * present.
+   * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
+   * present.
+   * @param edge_attributes A dictionary of edge attributes, if present.
    *
    * @return FusedCSCSamplingGraph
    */
@@ -82,6 +97,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /** @brief Get the number of nodes. */
@@ -106,6 +123,22 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
     return type_per_edge_;
   }
 
+  /**
+   * @brief Get the node type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping node type names to type IDs.
+   */
+  inline const torch::optional<NodeTypeToIDMap> NodeTypeToID() const {
+    return node_type_to_id_;
+  }
+
+  /**
+   * @brief Get the edge type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping edge type names to type IDs.
+   */
+  inline const torch::optional<EdgeTypeToIDMap> EdgeTypeToID() const {
+    return edge_type_to_id_;
+  }
+
   /** @brief Get the edge attributes dictionary. */
   inline const torch::optional<EdgeAttrMap> EdgeAttributes() const {
     return edge_attributes_;
@@ -127,6 +160,24 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   inline void SetTypePerEdge(
       const torch::optional<torch::Tensor>& type_per_edge) {
     type_per_edge_ = type_per_edge;
+  }
+
+  /**
+   * @brief Set the node type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping node type names to type IDs.
+   */
+  inline void SetNodeTypeToID(
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id) {
+    node_type_to_id_ = node_type_to_id;
+  }
+
+  /**
+   * @brief Set the edge type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping edge type names to type IDs.
+   */
+  inline void SetEdgeTypeToID(
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id) {
+    edge_type_to_id_ = edge_type_to_id;
   }
 
   /** @brief Set the edge attributes dictionary. */
@@ -301,6 +352,20 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * edge types. The length of it is equal to the number of edges.
    */
   torch::optional<torch::Tensor> type_per_edge_;
+
+  /**
+   * @brief A dictionary mapping node type names to type IDs. The length of it
+   * is equal to the number of node types. The key is the node type name, and
+   * the value is the corresponding type ID.
+   */
+  torch::optional<NodeTypeToIDMap> node_type_to_id_;
+
+  /**
+   * @brief A dictionary mapping edge type names to type IDs. The length of it
+   * is equal to the number of edge types. The key is the edge type name, and
+   * the value is the corresponding type ID.
+   */
+  torch::optional<EdgeTypeToIDMap> edge_type_to_id_;
 
   /**
    * @brief A dictionary of edge attributes. Each key represents the attribute's
