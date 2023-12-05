@@ -6,7 +6,7 @@ from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
 from .basic_feature_store import BasicFeatureStore
-from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
+from .fused_csc_sampling_graph import from_dglgraph
 from .torch_based_feature_store import TorchBasedFeature
 
 
