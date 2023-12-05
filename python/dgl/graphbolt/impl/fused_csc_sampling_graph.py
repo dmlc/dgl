@@ -577,9 +577,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-        if deduplicate is True:
-            if is_cscformat:
-                raise RuntimeError("Not implemented yet.")
+        if deduplicate and not is_cscformat:
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
@@ -774,9 +772,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             probs_name,
         )
 
-        if deduplicate:
-            if is_cscformat:
-                raise RuntimeError("Not implemented yet.")
+        if deduplicate and not is_cscformat:
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
