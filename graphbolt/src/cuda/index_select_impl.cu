@@ -252,11 +252,40 @@ struct IteratorFunc {
 
 template <typename indptr_t, typename indices_t>
 struct ConvertToBytes {
-  indptr_t* in_degree;
+  const indptr_t* in_degree;
   __host__ __device__ indptr_t operator()(int64_t i) {
     return in_degree[i] * sizeof(indices_t);
   }
 };
+
+template <typename indptr_t, typename indices_t>
+void IndexSelectCSCIndices(
+    const int64_t num_nodes, indices_t* const indices,
+    indptr_t* const sliced_indptr, indptr_t* const sub_indptr,
+    const indptr_t* const in_deg, indices_t* const sub_indices,
+    cudaStream_t stream) {
+  auto allocator = cuda::BuildAllocator();
+  thrust::counting_iterator<int64_t> iota(0);
+
+  auto input_buffer_it = thrust::make_transform_iterator(
+      iota, IteratorFunc<indptr_t, indices_t>{sliced_indptr, indices});
+  auto output_buffer_it = thrust::make_transform_iterator(
+      iota, IteratorFunc<indptr_t, indices_t>{sub_indptr, sub_indices});
+  auto buffer_sizes = thrust::make_transform_iterator(
+      iota, ConvertToBytes<indptr_t, indices_t>{in_deg});
+  constexpr int64_t max_copy_at_once = std::numeric_limits<int32_t>::max();
+  // Performs the copy from indices into sub_indices.
+  for (int64_t i = 0; i < num_nodes; i += max_copy_at_once) {
+    size_t workspace_size = 0;
+    CUDA_CALL(cub::DeviceMemcpy::Batched(
+        nullptr, workspace_size, input_buffer_it + i, output_buffer_it + i,
+        buffer_sizes + i, std::min(num_nodes - i, max_copy_at_once), stream));
+    auto temp = allocator.AllocateStorage<char>(workspace_size);
+    CUDA_CALL(cub::DeviceMemcpy::Batched(
+        temp.get(), workspace_size, input_buffer_it + i, output_buffer_it + i,
+        buffer_sizes + i, std::min(num_nodes - i, max_copy_at_once), stream));
+  }
+}
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
@@ -269,7 +298,6 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
   torch::Tensor sub_indptr =
       torch::empty(num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
   torch::Tensor sub_indices;
-  thrust::counting_iterator<int64_t> iota(0);
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
         using indptr_t = scalar_t;
@@ -298,35 +326,12 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
         sub_indices = torch::empty(
             hop_size, nodes.options().dtype(indices.scalar_type()));
         GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
-            indices.element_size(), "UVAIndexSelectCSCIndices", ([&] {
+            indices.element_size(), "IndexSelectCSCIndices", ([&] {
               using indices_t = element_size_t;
-
-              auto input_buffer_it = thrust::make_transform_iterator(
-                  iota, IteratorFunc<indptr_t, indices_t>{
-                            sliced_indptr,
-                            reinterpret_cast<indices_t*>(indices.data_ptr())});
-              auto output_buffer_it = thrust::make_transform_iterator(
-                  iota,
-                  IteratorFunc<indptr_t, indices_t>{
-                      sub_indptr.data_ptr<indptr_t>(),
-                      reinterpret_cast<indices_t*>(sub_indices.data_ptr())});
-              auto buffer_sizes = thrust::make_transform_iterator(
-                  iota, ConvertToBytes<indptr_t, indices_t>{in_deg});
-              constexpr int64_t max_copy_at_once =
-                  std::numeric_limits<int32_t>::max();
-              // Performs the copy from indices into sub_indices.
-              for (int64_t i = 0; i < num_nodes; i += max_copy_at_once) {
-                size_t workspace_size = 0;
-                CUDA_CALL(cub::DeviceMemcpy::Batched(
-                    nullptr, workspace_size, input_buffer_it + i,
-                    output_buffer_it + i, buffer_sizes + i,
-                    std::min(num_nodes - i, max_copy_at_once), stream));
-                auto temp = allocator.AllocateStorage<char>(workspace_size);
-                CUDA_CALL(cub::DeviceMemcpy::Batched(
-                    temp.get(), workspace_size, input_buffer_it + i,
-                    output_buffer_it + i, buffer_sizes + i,
-                    std::min(num_nodes - i, max_copy_at_once), stream));
-              }
+              IndexSelectCSCIndices<indptr_t, indices_t>(
+                  num_nodes, reinterpret_cast<indices_t*>(indices.data_ptr()),
+                  sliced_indptr, sub_indptr.data_ptr<indptr_t>(), in_deg,
+                  reinterpret_cast<indices_t*>(sub_indices.data_ptr()), stream);
             }));
       }));
   return {sub_indptr, sub_indices};
