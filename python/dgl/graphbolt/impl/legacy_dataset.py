@@ -1,4 +1,4 @@
-"""Graphbolt dataset from DGLDataset."""
+"""Graphbolt dataset for legacy DGLDataset."""
 from typing import Dict, List, Union
 
 from dgl.data import AsNodePredDataset
@@ -10,23 +10,21 @@ from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
 from .torch_based_feature_store import TorchBasedFeature
 
 
-class DGLGraphboltTask(Task):
-    def __init__(self, dgl_dataset: AsNodePredDataset):
-        train_labels = dgl_dataset[0].ndata["label"][dgl_dataset.train_idx]
-        validation_labels = dgl_dataset[0].ndata["label"][dgl_dataset.val_idx]
-        test_labels = dgl_dataset[0].ndata["label"][dgl_dataset.test_idx]
+class LegacyTask(Task):
+    def __init__(self, input: AsNodePredDataset):
+        train_labels = input[0].ndata["label"][input.train_idx]
+        validation_labels = input[0].ndata["label"][input.val_idx]
+        test_labels = input[0].ndata["label"][input.test_idx]
         self._train_set = ItemSet(
-            (dgl_dataset.train_idx, train_labels),
-            names=("seed_nodes", "labels"),
+            (input.train_idx, train_labels), names=("seed_nodes", "labels"),
         )
         self._validation_set = ItemSet(
-            (dgl_dataset.val_idx, validation_labels),
-            names=("seed_nodes", "labels"),
+            (input.val_idx, validation_labels), names=("seed_nodes", "labels"),
         )
         self._test_set = ItemSet(
-            (dgl_dataset.test_idx, test_labels), names=("seed_nodes", "labels")
+            (input.test_idx, test_labels), names=("seed_nodes", "labels")
         )
-        self._metadata = {"num_classes": dgl_dataset.num_classes}
+        self._metadata = {"num_classes": input.num_classes}
 
     @property
     def metadata(self) -> Dict:
@@ -49,22 +47,22 @@ class DGLGraphboltTask(Task):
         return self._test_set
 
 
-class DGLGraphboltDataset(Dataset):
-    def __init__(self, dgl_dataset: AsNodePredDataset):
-        assert len(dgl_dataset) == 1
+class LegacyDataset(Dataset):
+    def __init__(self, input: AsNodePredDataset):
+        assert len(input) == 1
         tasks = []
-        tasks.append(DGLGraphboltTask(dgl_dataset))
+        tasks.append(LegacyTask(input))
         self._tasks = tasks
-        num_nodes = dgl_dataset[0].num_nodes
+        num_nodes = input[0].num_nodes
         self._all_nodes_set = ItemSet(num_nodes, names="seed_nodes")
         features = {}
-        for name in dgl_dataset[0].ndata.keys():
-            tensor = dgl_dataset[0].ndata[name]
+        for name in input[0].ndata.keys():
+            tensor = input[0].ndata[name]
             if tensor.dim() == 1:
                 tensor = tensor.view(-1, 1)
             features[("node", None, name)] = TorchBasedFeature(tensor)
         self._feature = BasicFeatureStore(features)
-        self._graph = from_dglgraph(dgl_dataset[0], is_homogeneous=True)
+        self._graph = from_dglgraph(input[0], is_homogeneous=True)
         self._dataset_name = ""
 
     @property
