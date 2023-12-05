@@ -32,7 +32,7 @@ def test_NegativeSampler_invoke():
 
 def test_UniformNegativeSampler_invoke():
     # Instantiate graph and required datapipes.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05)
+    graph = gb_test_utils.rand_csc_graph(100, 0.05, bidirection_edge=True)
     num_seeds = 30
     item_set = gb.ItemSet(
         torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
@@ -68,8 +68,8 @@ def test_UniformNegativeSampler_invoke():
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
 def test_Uniform_NegativeSampler(negative_ratio):
-    # Construct CSCSamplingGraph.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05)
+    # Construct FusedCSCSamplingGraph.
+    graph = gb_test_utils.rand_csc_graph(100, 0.05, bidirection_edge=True)
     num_seeds = 30
     item_set = gb.ItemSet(
         torch.arange(0, num_seeds * 2).reshape(-1, 2), names="node_pairs"
@@ -110,7 +110,7 @@ def get_hetero_graph():
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
     type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     node_type_offset = torch.LongTensor([0, 2, 5])
-    return gb.from_csc(
+    return gb.from_fused_csc(
         indptr,
         indices,
         node_type_offset=node_type_offset,

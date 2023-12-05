@@ -14,14 +14,14 @@ from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
+from ..internal import copy_or_convert_data, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from ..utils import copy_or_convert_data, read_data
-from .csc_sampling_graph import (
-    CSCSamplingGraph,
+from .fused_csc_sampling_graph import (
     from_dglgraph,
-    load_csc_sampling_graph,
-    save_csc_sampling_graph,
+    FusedCSCSamplingGraph,
+    load_fused_csc_sampling_graph,
+    save_fused_csc_sampling_graph,
 )
 from .ondisk_metadata import (
     OnDiskGraphTopology,
@@ -45,7 +45,7 @@ def preprocess_ondisk_dataset(
     dataset_dir : str
         The path to the dataset directory.
     include_original_edge_id : bool, optional
-        Whether to include the original edge id in the CSCSamplingGraph.
+        Whether to include the original edge id in the FusedCSCSamplingGraph.
 
     Returns
     -------
@@ -138,20 +138,20 @@ def preprocess_ondisk_dataset(
                 )
                 g.edata[graph_feature["name"]] = edge_data
 
-    # 4. Convert the DGLGraph to a CSCSamplingGraph.
-    csc_sampling_graph = from_dglgraph(
+    # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
+    fused_csc_sampling_graph = from_dglgraph(
         g, is_homogeneous, include_original_edge_id
     )
 
-    # 5. Save the CSCSamplingGraph and modify the output_config.
+    # 5. Save the FusedCSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
-    output_config["graph_topology"]["type"] = "CSCSamplingGraph"
+    output_config["graph_topology"]["type"] = "FusedCSCSamplingGraph"
     output_config["graph_topology"]["path"] = os.path.join(
-        processed_dir_prefix, "csc_sampling_graph.tar"
+        processed_dir_prefix, "fused_csc_sampling_graph.tar"
     )
 
-    save_csc_sampling_graph(
-        csc_sampling_graph,
+    save_fused_csc_sampling_graph(
+        fused_csc_sampling_graph,
         os.path.join(
             dataset_dir,
             output_config["graph_topology"]["path"],
@@ -283,8 +283,8 @@ class OnDiskDataset(Dataset):
 
         dataset_name: graphbolt_test
         graph_topology:
-          type: CSCSamplingGraph
-          path: graph_topology/csc_sampling_graph.tar
+          type: FusedCSCSamplingGraph
+          path: graph_topology/fused_csc_sampling_graph.tar
         feature_data:
           - domain: node
             type: paper
@@ -340,7 +340,7 @@ class OnDiskDataset(Dataset):
     path: str
         The YAML file path.
     include_original_edge_id: bool, optional
-        Whether to include the original edge id in the CSCSamplingGraph.
+        Whether to include the original edge id in the FusedCSCSamplingGraph.
     """
 
     def __init__(
@@ -434,12 +434,12 @@ class OnDiskDataset(Dataset):
 
     def _load_graph(
         self, graph_topology: OnDiskGraphTopology
-    ) -> CSCSamplingGraph:
+    ) -> FusedCSCSamplingGraph:
         """Load the graph topology."""
         if graph_topology is None:
             return None
-        if graph_topology.type == "CSCSamplingGraph":
-            return load_csc_sampling_graph(graph_topology.path)
+        if graph_topology.type == "FusedCSCSamplingGraph":
+            return load_fused_csc_sampling_graph(graph_topology.path)
         raise NotImplementedError(
             f"Graph topology type {graph_topology.type} is not supported."
         )
@@ -498,6 +498,10 @@ class BuiltinDataset(OnDiskDataset):
 
     Available built-in datasets include:
 
+    **cora**
+        The cora dataset is a homogeneous citation network dataset, which is
+        designed for the node classification task.
+
     **ogbn-mag**
         The ogbn-mag dataset is a heterogeneous network composed of a subset of
         the Microsoft Academic Graph (MAG). See more details in
@@ -517,6 +521,16 @@ class BuiltinDataset(OnDiskDataset):
             Reverse edges are added to the original graph and duplicated
             edges are removed.
 
+    **ogbn-arxiv**
+        The ogbn-arxiv dataset is a directed graph, representing the citation
+        network between all Computer Science (CS) arXiv papers indexed by MAG.
+        See more details in `ogbn-arxiv
+        https://ogb.stanford.edu/docs/nodeprop/#ogbn-arxiv>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
     **ogbn-products**
         The ogbn-products dataset is an undirected and unweighted graph,
         representing an Amazon product co-purchasing network. See more details
@@ -525,6 +539,7 @@ class BuiltinDataset(OnDiskDataset):
 
         .. note::
             Reverse edges are added to the original graph.
+            Node features are stored as float32.
 
     **ogb-lsc-mag240m**
         The ogb-lsc-mag240m dataset is a heterogeneous academic graph extracted
@@ -549,9 +564,11 @@ class BuiltinDataset(OnDiskDataset):
         "https://dgl-data.s3-accelerate.amazonaws.com/dataset/graphbolt/"
     )
     _datasets = [
+        "cora",
         "ogbn-mag",
         "ogbl-citation2",
         "ogbn-products",
+        "ogbn-arxiv",
     ]
     _large_datasets = ["ogb-lsc-mag240m"]
     _all_datasets = _datasets + _large_datasets

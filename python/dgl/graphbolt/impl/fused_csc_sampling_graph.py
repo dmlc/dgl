@@ -15,16 +15,20 @@ from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
 from ..sampling_graph import SamplingGraph
-from .sampled_subgraph_impl import SampledSubgraphImpl
+from .sampled_subgraph_impl import (
+    CSCFormatBase,
+    FusedSampledSubgraphImpl,
+    SampledSubgraphImpl,
+)
 
 
 __all__ = [
     "GraphMetadata",
-    "CSCSamplingGraph",
-    "from_csc",
+    "FusedCSCSamplingGraph",
+    "from_fused_csc",
     "load_from_shared_memory",
-    "load_csc_sampling_graph",
-    "save_csc_sampling_graph",
+    "load_fused_csc_sampling_graph",
+    "save_fused_csc_sampling_graph",
     "from_dglgraph",
 ]
 
@@ -88,7 +92,7 @@ class GraphMetadata:
         self.edge_type_to_id = edge_type_to_id
 
 
-class CSCSamplingGraph(SamplingGraph):
+class FusedCSCSamplingGraph(SamplingGraph):
     r"""A sampling graph in CSC format."""
 
     def __repr__(self):
@@ -143,15 +147,15 @@ class CSCSamplingGraph(SamplingGraph):
         >>> total_num_edges = 12
         >>> ntypes = {"N0": 0, "N1": 1}
         >>> etypes = {"N0:R0:N0": 0, "N0:R1:N1": 1,
-        ... "N1:R2:N0": 2, "N1:R3:N1": 3}
+        ...     "N1:R2:N0": 2, "N1:R3:N1": 3}
         >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
         >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor(
-        ... [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
         >>> metadata = gb.GraphMetadata(ntypes, etypes)
-        >>> graph = gb.from_csc(indptr, indices, node_type_offset,
-        ... type_per_edge, None, metadata)
+        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
+        ...     type_per_edge, None, metadata)
         >>> print(graph.num_nodes)
         {'N0': 2, 'N1': 3}
         """
@@ -283,37 +287,73 @@ class CSCSamplingGraph(SamplingGraph):
         """
         return self._metadata
 
-    def in_subgraph(self, nodes: torch.Tensor) -> torch.ScriptObject:
+    def in_subgraph(
+        self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    ) -> FusedSampledSubgraphImpl:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
         An in subgraph is equivalent to creating a new graph using the incoming
-        edges of the given nodes.
+        edges of the given nodes. Subgraph is compacted according to the order
+        of passed-in `nodes`.
 
         Parameters
         ----------
-        nodes : torch.Tensor
-            The nodes to form the subgraph which are type agnostic.
+        nodes: torch.Tensor or Dict[str, torch.Tensor]
+            IDs of the given seed nodes.
+              - If `nodes` is a tensor: It means the graph is homogeneous
+                graph, and ids inside are homogeneous ids.
+              - If `nodes` is a dictionary: The keys should be node type and
+                ids inside are heterogeneous ids.
 
         Returns
         -------
-        torch.classes.graphbolt.SampledSubgraph
+        FusedSampledSubgraphImpl
             The in subgraph.
+
+        Examples
+        --------
+        >>> import dgl.graphbolt as gb
+        >>> import torch
+        >>> total_num_nodes = 5
+        >>> total_num_edges = 12
+        >>> ntypes = {"N0": 0, "N1": 1}
+        >>> etypes = {
+        ...     "N0:R0:N0": 0, "N0:R1:N1": 1, "N1:R2:N0": 2, "N1:R3:N1": 3}
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor(
+        ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
+        ...     type_per_edge, None, metadata)
+        >>> nodes = {"N0":torch.LongTensor([1]), "N1":torch.LongTensor([1, 2])}
+        >>> in_subgraph = graph.in_subgraph(nodes)
+        >>> print(in_subgraph.node_pairs)
+        defaultdict(<class 'list'>, {
+            'N0:R0:N0': (tensor([]), tensor([])),
+            'N0:R1:N1': (tensor([1, 0]), tensor([1, 2])),
+            'N1:R2:N0': (tensor([0, 1]), tensor([1, 1])),
+            'N1:R3:N1': (tensor([0, 1, 2]), tensor([1, 2, 2]))}
         """
+        if isinstance(nodes, dict):
+            nodes = self._convert_to_homogeneous_nodes(nodes)
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         # Ensure that there are no duplicate nodes.
         assert len(torch.unique(nodes)) == len(
             nodes
         ), "Nodes cannot have duplicate values."
-        # TODO: change the result to 'SampledSubgraphImpl'.
-        return self._c_csc_graph.in_subgraph(nodes)
 
-    def _convert_to_sampled_subgraph(
+        _in_subgraph = self._c_csc_graph.in_subgraph(nodes)
+        return self._convert_to_fused_sampled_subgraph(_in_subgraph)
+
+    def _convert_to_fused_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
     ):
         """An internal function used to convert a fused homogeneous sampled
-        subgraph to general struct 'SampledSubgraphImpl'."""
+        subgraph to general struct 'FusedSampledSubgraphImpl'."""
         column_num = (
             C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
         )
@@ -353,7 +393,7 @@ class CSCSamplingGraph(SamplingGraph):
                     original_hetero_edge_ids[etype] = original_edge_ids[mask]
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
-        return SampledSubgraphImpl(
+        return FusedSampledSubgraphImpl(
             node_pairs=node_pairs, original_edge_ids=original_edge_ids
         )
 
@@ -364,13 +404,110 @@ class CSCSamplingGraph(SamplingGraph):
             homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
         return torch.cat(homogeneous_nodes)
 
+    def _convert_to_sampled_subgraph(
+        self,
+        C_sampled_subgraph: torch.ScriptObject,
+    ) -> SampledSubgraphImpl:
+        """An internal function used to convert a fused homogeneous sampled
+        subgraph to general struct 'SampledSubgraphImpl'."""
+        indptr = C_sampled_subgraph.indptr
+        indices = C_sampled_subgraph.indices
+        type_per_edge = C_sampled_subgraph.type_per_edge
+        column = C_sampled_subgraph.original_column_node_ids
+        original_edge_ids = C_sampled_subgraph.original_edge_ids
+
+        has_original_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
+        if has_original_eids:
+            original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
+                original_edge_ids
+            ]
+        if type_per_edge is None:
+            # The sampled graph is already a homogeneous graph.
+            node_pairs = CSCFormatBase(indptr=indptr, indices=indices)
+        else:
+            # The sampled graph is a fused homogenized graph, which need to be
+            # converted to heterogeneous graphs.
+            # Pre-calculate the number of each etype
+            num = {}
+            for etype in type_per_edge:
+                num[etype.item()] = num.get(etype.item(), 0) + 1
+            # Preallocate
+            subgraph_indice_position = {}
+            subgraph_indice = {}
+            subgraph_indptr = {}
+            node_edge_type = defaultdict(list)
+            original_hetero_edge_ids = {}
+            for etype, etype_id in self.metadata.edge_type_to_id.items():
+                subgraph_indice[etype] = torch.empty(
+                    (num.get(etype_id, 0),), dtype=indices.dtype
+                )
+                if has_original_eids:
+                    original_hetero_edge_ids[etype] = torch.empty(
+                        (num.get(etype_id, 0),), dtype=original_edge_ids.dtype
+                    )
+                subgraph_indptr[etype] = [0]
+                subgraph_indice_position[etype] = 0
+                # Preprocessing saves the type of seed_nodes as the edge type
+                # of dst_ntype.
+                _, _, dst_ntype = etype_str_to_tuple(etype)
+                dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
+                node_edge_type[dst_ntype_id].append((etype, etype_id))
+            # construct subgraphs
+            for i, seed in enumerate(column):
+                l = indptr[i].item()
+                r = indptr[i + 1].item()
+                node_type = (
+                    torch.searchsorted(
+                        self.node_type_offset, seed, right=True
+                    ).item()
+                    - 1
+                )
+                for etype, etype_id in node_edge_type[node_type]:
+                    src_ntype, _, _ = etype_str_to_tuple(etype)
+                    src_ntype_id = self.metadata.node_type_to_id[src_ntype]
+                    num_edges = torch.searchsorted(
+                        type_per_edge[l:r], etype_id, right=True
+                    ).item()
+                    end = num_edges + l
+                    subgraph_indptr[etype].append(
+                        subgraph_indptr[etype][-1] + num_edges
+                    )
+                    offset = subgraph_indice_position[etype]
+                    subgraph_indice_position[etype] += num_edges
+                    subgraph_indice[etype][offset : offset + num_edges] = (
+                        indices[l:end] - self.node_type_offset[src_ntype_id]
+                    )
+                    if has_original_eids:
+                        original_hetero_edge_ids[etype][
+                            offset : offset + num_edges
+                        ] = original_edge_ids[l:end]
+                    l = end
+            if has_original_eids:
+                original_edge_ids = original_hetero_edge_ids
+            node_pairs = {
+                etype: CSCFormatBase(
+                    indptr=torch.tensor(subgraph_indptr[etype]),
+                    indices=subgraph_indice[etype],
+                )
+                for etype in self.metadata.edge_type_to_id.keys()
+            }
+        return SampledSubgraphImpl(
+            node_pairs=node_pairs,
+            original_edge_ids=original_edge_ids,
+        )
+
     def sample_neighbors(
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-    ) -> SampledSubgraphImpl:
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
+    ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
 
@@ -411,7 +548,7 @@ class CSCSamplingGraph(SamplingGraph):
             equalling the total number of edges.
         Returns
         -------
-        SampledSubgraphImpl
+        FusedSampledSubgraphImpl
             The sampled subgraph.
 
         Examples
@@ -425,7 +562,7 @@ class CSCSamplingGraph(SamplingGraph):
         >>> indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
-        >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge,
+        >>> graph = gb.from_fused_csc(indptr, indices, type_per_edge=type_per_edge,
         ...     node_type_offset=node_type_offset, metadata=metadata)
         >>> nodes = {'n1': torch.LongTensor([0]), 'n2': torch.LongTensor([0])}
         >>> fanouts = torch.tensor([1, 1])
@@ -440,8 +577,10 @@ class CSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        if not output_cscformat:
+            return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
+        else:
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -548,7 +687,9 @@ class CSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-    ) -> SampledSubgraphImpl:
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
+    ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
         `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
@@ -591,7 +732,7 @@ class CSCSamplingGraph(SamplingGraph):
             equalling the total number of edges.
         Returns
         -------
-        SampledSubgraphImpl
+        FusedSampledSubgraphImpl
             The sampled subgraph.
 
         Examples
@@ -605,7 +746,7 @@ class CSCSamplingGraph(SamplingGraph):
         >>> indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
-        >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge,
+        >>> graph = gb.from_fused_csc(indptr, indices, type_per_edge=type_per_edge,
         ...     node_type_offset=node_type_offset, metadata=metadata)
         >>> nodes = {'n1': torch.LongTensor([0]), 'n2': torch.LongTensor([0])}
         >>> fanouts = torch.tensor([1, 1])
@@ -631,7 +772,10 @@ class CSCSamplingGraph(SamplingGraph):
             probs_name,
         )
 
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        if not output_cscformat:
+            return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
+        else:
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
@@ -697,16 +841,16 @@ class CSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        CSCSamplingGraph
-            The copied CSCSamplingGraph object on shared memory.
+        FusedCSCSamplingGraph
+            The copied FusedCSCSamplingGraph object on shared memory.
         """
-        return CSCSamplingGraph(
+        return FusedCSCSamplingGraph(
             self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
             self._metadata,
         )
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
-        """Copy `CSCSamplingGraph` to the specified device."""
+        """Copy `FusedCSCSamplingGraph` to the specified device."""
 
         def _to(x, device):
             return x.to(device) if hasattr(x, "to") else x
@@ -728,15 +872,15 @@ class CSCSamplingGraph(SamplingGraph):
         return self
 
 
-def from_csc(
+def from_fused_csc(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,
     node_type_offset: Optional[torch.tensor] = None,
     type_per_edge: Optional[torch.tensor] = None,
     edge_attributes: Optional[Dict[str, torch.tensor]] = None,
     metadata: Optional[GraphMetadata] = None,
-) -> CSCSamplingGraph:
-    """Create a CSCSamplingGraph object from a CSC representation.
+) -> FusedCSCSamplingGraph:
+    """Create a FusedCSCSamplingGraph object from a CSC representation.
 
     Parameters
     ----------
@@ -756,8 +900,8 @@ def from_csc(
         Metadata of the graph, by default None.
     Returns
     -------
-    CSCSamplingGraph
-        The created CSCSamplingGraph object.
+    FusedCSCSamplingGraph
+        The created FusedCSCSamplingGraph object.
 
     Examples
     --------
@@ -768,13 +912,12 @@ def from_csc(
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
-    >>> graph = graphbolt.from_csc(csc_indptr, indices,
+    >>> graph = graphbolt.from_fused_csc(csc_indptr, indices,
     ...             node_type_offset=node_type_offset,
     ...             type_per_edge=type_per_edge,
     ...             edge_attributes=None, metadata=metadata)
-    None, metadata)
     >>> print(graph)
-    CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
+    FusedCSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
                      total_num_nodes=3, total_num_edges=7)
     """
@@ -782,12 +925,16 @@ def from_csc(
         assert len(metadata.node_type_to_id) + 1 == node_type_offset.size(
             0
         ), "node_type_offset length should be |ntypes| + 1."
-    return CSCSamplingGraph(
-        torch.ops.graphbolt.from_csc(
+    node_type_to_id = metadata.node_type_to_id if metadata else None
+    edge_type_to_id = metadata.edge_type_to_id if metadata else None
+    return FusedCSCSamplingGraph(
+        torch.ops.graphbolt.from_fused_csc(
             csc_indptr,
             indices,
             node_type_offset,
             type_per_edge,
+            node_type_to_id,
+            edge_type_to_id,
             edge_attributes,
         ),
         metadata,
@@ -797,8 +944,8 @@ def from_csc(
 def load_from_shared_memory(
     shared_memory_name: str,
     metadata: Optional[GraphMetadata] = None,
-) -> CSCSamplingGraph:
-    """Load a CSCSamplingGraph object from shared memory.
+) -> FusedCSCSamplingGraph:
+    """Load a FusedCSCSamplingGraph object from shared memory.
 
     Parameters
     ----------
@@ -807,16 +954,16 @@ def load_from_shared_memory(
 
     Returns
     -------
-    CSCSamplingGraph
-        The loaded CSCSamplingGraph object on shared memory.
+    FusedCSCSamplingGraph
+        The loaded FusedCSCSamplingGraph object on shared memory.
     """
-    return CSCSamplingGraph(
+    return FusedCSCSamplingGraph(
         torch.ops.graphbolt.load_from_shared_memory(shared_memory_name),
         metadata,
     )
 
 
-def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
+def _csc_sampling_graph_str(graph: FusedCSCSamplingGraph) -> str:
     """Internal function for converting a csc sampling graph to string
     representation.
     """
@@ -848,24 +995,24 @@ def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
     return final_str
 
 
-def load_csc_sampling_graph(filename):
-    """Load CSCSamplingGraph from tar file."""
+def load_fused_csc_sampling_graph(filename):
+    """Load FusedCSCSamplingGraph from tar file."""
     with tempfile.TemporaryDirectory() as temp_dir:
         with tarfile.open(filename, "r") as archive:
             archive.extractall(temp_dir)
-        graph_filename = os.path.join(temp_dir, "csc_sampling_graph.pt")
+        graph_filename = os.path.join(temp_dir, "fused_csc_sampling_graph.pt")
         metadata_filename = os.path.join(temp_dir, "metadata.pt")
-        return CSCSamplingGraph(
-            torch.ops.graphbolt.load_csc_sampling_graph(graph_filename),
+        return FusedCSCSamplingGraph(
+            torch.ops.graphbolt.load_fused_csc_sampling_graph(graph_filename),
             torch.load(metadata_filename),
         )
 
 
-def save_csc_sampling_graph(graph, filename):
-    """Save CSCSamplingGraph to tar file."""
+def save_fused_csc_sampling_graph(graph, filename):
+    """Save FusedCSCSamplingGraph to tar file."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        graph_filename = os.path.join(temp_dir, "csc_sampling_graph.pt")
-        torch.ops.graphbolt.save_csc_sampling_graph(
+        graph_filename = os.path.join(temp_dir, "fused_csc_sampling_graph.pt")
+        torch.ops.graphbolt.save_fused_csc_sampling_graph(
             graph._c_csc_graph, graph_filename
         )
         metadata_filename = os.path.join(temp_dir, "metadata.pt")
@@ -877,15 +1024,15 @@ def save_csc_sampling_graph(graph, filename):
             archive.add(
                 metadata_filename, arcname=os.path.basename(metadata_filename)
             )
-    print(f"CSCSamplingGraph has been saved to {filename}.")
+    print(f"FusedCSCSamplingGraph has been saved to {filename}.")
 
 
 def from_dglgraph(
     g: DGLGraph,
     is_homogeneous: bool = False,
     include_original_edge_id: bool = False,
-) -> CSCSamplingGraph:
-    """Convert a DGLGraph to CSCSamplingGraph."""
+) -> FusedCSCSamplingGraph:
+    """Convert a DGLGraph to FusedCSCSamplingGraph."""
 
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
 
@@ -903,7 +1050,11 @@ def from_dglgraph(
     # Obtain CSC matrix.
     indptr, indices, edge_ids = homo_g.adj_tensors("csc")
     ntype_count.insert(0, 0)
-    node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
+    node_type_offset = (
+        None
+        if is_homogeneous
+        else torch.cumsum(torch.LongTensor(ntype_count), 0)
+    )
 
     # Assign edge type according to the order of CSC matrix.
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
@@ -913,12 +1064,16 @@ def from_dglgraph(
         # Assign edge attributes according to the original eids mapping.
         edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
 
-    return CSCSamplingGraph(
-        torch.ops.graphbolt.from_csc(
+    node_type_to_id = metadata.node_type_to_id if metadata else None
+    edge_type_to_id = metadata.edge_type_to_id if metadata else None
+    return FusedCSCSamplingGraph(
+        torch.ops.graphbolt.from_fused_csc(
             indptr,
             indices,
             node_type_offset,
             type_per_edge,
+            node_type_to_id,
+            edge_type_to_id,
             edge_attributes,
         ),
         metadata,

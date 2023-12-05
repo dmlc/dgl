@@ -728,8 +728,8 @@ def distributed_item_sampler_subprocess(
     nprocs,
     item_set,
     num_ids,
+    num_workers,
     batch_size,
-    shuffle,
     drop_last,
     drop_uneven_inputs,
 ):
@@ -750,7 +750,7 @@ def distributed_item_sampler_subprocess(
     item_sampler = gb.DistributedItemSampler(
         item_set,
         batch_size=batch_size,
-        shuffle=shuffle,
+        shuffle=True,
         drop_last=drop_last,
         drop_uneven_inputs=drop_uneven_inputs,
     )
@@ -759,7 +759,7 @@ def distributed_item_sampler_subprocess(
         gb.BasicFeatureStore({}),
         [],
     )
-    data_loader = gb.SingleProcessDataLoader(feature_fetcher)
+    data_loader = gb.DataLoader(feature_fetcher, num_workers=num_workers)
 
     # Count the numbers of items and batches.
     num_items = 0
@@ -767,31 +767,12 @@ def distributed_item_sampler_subprocess(
     for i in data_loader:
         # Count how many times each item is sampled.
         sampled_count[i.seed_nodes] += 1
+        if drop_last:
+            assert i.seed_nodes.size(0) == batch_size
         num_items += i.seed_nodes.size(0)
     num_batches = len(list(item_sampler))
 
-    # Calculate expected numbers of items and batches.
-    expected_num_items = num_ids // nprocs + (num_ids % nprocs > proc_id)
-    if drop_last and expected_num_items % batch_size > 0:
-        expected_num_items -= expected_num_items % batch_size
-    expected_num_batches = expected_num_items // batch_size + (
-        (not drop_last) and (expected_num_items % batch_size > 0)
-    )
     if drop_uneven_inputs:
-        if (
-            (not drop_last)
-            and (num_ids % (nprocs * batch_size) < nprocs)
-            and (num_ids % (nprocs * batch_size) > proc_id)
-        ):
-            expected_num_batches -= 1
-            expected_num_items -= 1
-        elif (
-            drop_last
-            and (nprocs * batch_size - num_ids % (nprocs * batch_size) < nprocs)
-            and (num_ids % nprocs > proc_id)
-        ):
-            expected_num_batches -= 1
-            expected_num_items -= batch_size
         num_batches_tensor = torch.tensor(num_batches)
         dist.broadcast(num_batches_tensor, 0)
         # Test if the number of batches are the same for all processes.
@@ -801,22 +782,110 @@ def distributed_item_sampler_subprocess(
     dist.reduce(sampled_count, 0)
 
     try:
-        # Check if the numbers are as expected.
-        assert num_items == expected_num_items
-        assert num_batches == expected_num_batches
-
         # Make sure no item is sampled more than once.
         assert sampled_count.max() <= 1
     finally:
         dist.destroy_process_group()
 
 
+@pytest.mark.parametrize(
+    "params",
+    [
+        ((24, 4, 0, 4, False, False), [(8, 8), (8, 8), (4, 4), (4, 4)]),
+        ((30, 4, 0, 4, False, False), [(8, 8), (8, 8), (8, 8), (6, 6)]),
+        ((30, 4, 0, 4, True, False), [(8, 8), (8, 8), (8, 8), (6, 4)]),
+        ((30, 4, 0, 4, False, True), [(8, 8), (8, 8), (8, 8), (6, 6)]),
+        ((30, 4, 0, 4, True, True), [(8, 4), (8, 4), (8, 4), (6, 4)]),
+        (
+            (53, 4, 2, 4, False, False),
+            [(8, 8), (8, 8), (8, 8), (5, 5), (8, 8), (4, 4), (8, 8), (4, 4)],
+        ),
+        (
+            (53, 4, 2, 4, True, False),
+            [(8, 8), (8, 8), (9, 8), (4, 4), (8, 8), (4, 4), (8, 8), (4, 4)],
+        ),
+        (
+            (53, 4, 2, 4, False, True),
+            [(10, 8), (6, 4), (9, 8), (4, 4), (8, 8), (4, 4), (8, 8), (4, 4)],
+        ),
+        (
+            (53, 4, 2, 4, True, True),
+            [(10, 8), (6, 4), (9, 8), (4, 4), (8, 8), (4, 4), (8, 8), (4, 4)],
+        ),
+        (
+            (63, 4, 2, 4, False, False),
+            [(8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (7, 7)],
+        ),
+        (
+            (63, 4, 2, 4, True, False),
+            [(8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (10, 8), (5, 4)],
+        ),
+        (
+            (63, 4, 2, 4, False, True),
+            [(8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (7, 7)],
+        ),
+        (
+            (63, 4, 2, 4, True, True),
+            [
+                (10, 8),
+                (6, 4),
+                (10, 8),
+                (6, 4),
+                (10, 8),
+                (6, 4),
+                (10, 8),
+                (5, 4),
+            ],
+        ),
+        (
+            (65, 4, 2, 4, False, False),
+            [(9, 9), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8)],
+        ),
+        (
+            (65, 4, 2, 4, True, True),
+            [(9, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8)],
+        ),
+    ],
+)
+def test_RangeCalculation(params):
+    (
+        (
+            total,
+            num_replicas,
+            num_workers,
+            batch_size,
+            drop_last,
+            drop_uneven_inputs,
+        ),
+        key,
+    ) = params
+    answer = []
+    sum = 0
+    for rank in range(num_replicas):
+        for worker_id in range(max(num_workers, 1)):
+            result = gb.internal.calculate_range(
+                True,
+                total,
+                num_replicas,
+                rank,
+                num_workers,
+                worker_id,
+                batch_size,
+                drop_last,
+                drop_uneven_inputs,
+            )
+            assert sum == result[0]
+            sum += result[1]
+            answer.append((result[1], result[2]))
+    assert key == answer
+
+
 @pytest.mark.parametrize("num_ids", [24, 30, 32, 34, 36])
-@pytest.mark.parametrize("shuffle", [False, True])
+@pytest.mark.parametrize("num_workers", [0, 2])
 @pytest.mark.parametrize("drop_last", [False, True])
 @pytest.mark.parametrize("drop_uneven_inputs", [False, True])
 def test_DistributedItemSampler(
-    num_ids, shuffle, drop_last, drop_uneven_inputs
+    num_ids, num_workers, drop_last, drop_uneven_inputs
 ):
     nprocs = 4
     batch_size = 4
@@ -836,8 +905,8 @@ def test_DistributedItemSampler(
             nprocs,
             item_set,
             num_ids,
+            num_workers,
             batch_size,
-            shuffle,
             drop_last,
             drop_uneven_inputs,
         ),

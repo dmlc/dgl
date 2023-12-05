@@ -95,7 +95,7 @@ class ShaDowKHopSampler(Sampler):
         Parameters
         ----------
         g : DGLGraph
-            The graph to sampler from.
+            The graph to sample nodes from.
         seed_nodes : Tensor or dict[str, Tensor]
             The nodes sampled in the current minibatch.
         exclude_eids : Tensor or dict[etype, Tensor], optional

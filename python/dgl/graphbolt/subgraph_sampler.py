@@ -6,8 +6,8 @@ from typing import Dict
 from torch.utils.data import functional_datapipe
 
 from .base import etype_str_to_tuple
+from .internal import unique_and_compact
 from .minibatch_transformer import MiniBatchTransformer
-from .utils import unique_and_compact
 
 __all__ = [
     "SubgraphSampler",
@@ -116,8 +116,17 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted = compacted[2:]
             if has_neg_src:
                 compacted_negative_srcs = compacted.pop(0)
+                # Since we need to calculate the neg_ratio according to the
+                # compacted_negatvie_srcs shape, we need to reshape it back.
+                compacted_negative_srcs = compacted_negative_srcs.view(
+                    neg_src.shape
+                )
             if has_neg_dst:
                 compacted_negative_dsts = compacted.pop(0)
+                # Same as above.
+                compacted_negative_dsts = compacted_negative_dsts.view(
+                    neg_dst.shape
+                )
         return (
             seeds,
             compacted_node_pairs,
@@ -126,4 +135,20 @@ class SubgraphSampler(MiniBatchTransformer):
         )
 
     def _sample_subgraphs(self, seeds):
+        """Sample subgraphs from the given seeds.
+
+        Any subclass of SubgraphSampler should implement this method.
+
+        Parameters
+        ----------
+        seeds : Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The seed nodes.
+
+        Returns
+        -------
+        Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The input nodes.
+        SampledSubgraph
+            The sampled subgraphs.
+        """
         raise NotImplementedError

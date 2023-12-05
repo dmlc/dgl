@@ -7,7 +7,7 @@ def test_dgl_minibatch_converter():
     N = 32
     B = 4
     itemset = gb.ItemSet(torch.arange(N), names="seed_nodes")
-    graph = gb_test_utils.rand_csc_graph(200, 0.15)
+    graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
 
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]
@@ -27,7 +27,7 @@ def test_dgl_minibatch_converter():
         ["a"],
     )
     dgl_converter = gb.DGLMiniBatchConverter(feature_fetcher)
-    dataloader = gb.SingleProcessDataLoader(dgl_converter)
+    dataloader = gb.DataLoader(dgl_converter)
     assert len(list(dataloader)) == N // B
     minibatch = next(iter(dataloader))
     assert isinstance(minibatch, gb.DGLMiniBatch)

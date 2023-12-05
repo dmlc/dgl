@@ -48,7 +48,7 @@ def main(args):
     val_mask = g.ndata["val_mask"]
     test_mask = g.ndata["test_mask"]
     in_feats = features.shape[1]
-    n_classes = data.num_labels
+    n_classes = data.num_classes
     n_edges = data.graph.number_of_edges()
     print(
         """----Data statistics------'

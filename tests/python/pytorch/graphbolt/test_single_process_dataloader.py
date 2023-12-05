@@ -11,7 +11,7 @@ def test_DataLoader():
     N = 32
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
-    graph = gb_test_utils.rand_csc_graph(200, 0.15)
+    graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
 
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]
@@ -32,5 +32,5 @@ def test_DataLoader():
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
-    dataloader = dgl.graphbolt.SingleProcessDataLoader(device_transferrer)
+    dataloader = dgl.graphbolt.DataLoader(device_transferrer)
     assert len(list(dataloader)) == N // B

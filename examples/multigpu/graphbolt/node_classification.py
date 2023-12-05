@@ -38,6 +38,7 @@ main
 """
 import argparse
 import os
+import time
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
@@ -138,33 +139,23 @@ def create_dataloader(
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.SingleProcessDataLoader(datapipe)
+    dataloader = gb.DataLoader(datapipe, num_workers=args.num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
 
 
 @torch.no_grad()
-def evaluate(rank, args, model, graph, features, itemset, num_classes, device):
+def evaluate(rank, model, dataloader, num_classes, device):
     model.eval()
     y = []
     y_hats = []
-    dataloader = create_dataloader(
-        args,
-        graph,
-        features,
-        itemset,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
-        device=device,
-    )
 
     for step, data in (
         tqdm.tqdm(enumerate(dataloader)) if rank == 0 else enumerate(dataloader)
     ):
         blocks = data.blocks
-        x = data.node_features["feat"].float()
+        x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model.module(blocks, x))
 
@@ -182,28 +173,17 @@ def train(
     world_size,
     rank,
     args,
-    graph,
-    features,
-    train_set,
-    valid_set,
+    train_dataloader,
+    valid_dataloader,
     num_classes,
     model,
     device,
 ):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    # Create training data loader.
-    dataloader = create_dataloader(
-        args,
-        graph,
-        features,
-        train_set,
-        device,
-        drop_last=False,
-        shuffle=True,
-        drop_uneven_inputs=False,
-    )
 
     for epoch in range(args.epochs):
+        epoch_start = time.time()
+
         model.train()
         total_loss = torch.tensor(0, dtype=torch.float).to(device)
         ########################################################################
@@ -222,13 +202,13 @@ def train(
         ########################################################################
         with Join([model]):
             for step, data in (
-                tqdm.tqdm(enumerate(dataloader))
+                tqdm.tqdm(enumerate(train_dataloader))
                 if rank == 0
-                else enumerate(dataloader)
+                else enumerate(train_dataloader)
             ):
                 # The input features are from the source nodes in the first
                 # layer's computation graph.
-                x = data.node_features["feat"].float()
+                x = data.node_features["feat"]
 
                 # The ground truth labels are from the destination nodes
                 # in the last layer's computation graph.
@@ -253,11 +233,8 @@ def train(
         acc = (
             evaluate(
                 rank,
-                args,
                 model,
-                graph,
-                features,
-                valid_set,
+                valid_dataloader,
                 num_classes,
                 device,
             )
@@ -273,11 +250,15 @@ def train(
         dist.reduce(tensor=acc, dst=0)
         total_loss /= step + 1
         dist.reduce(tensor=total_loss, dst=0)
+        dist.barrier()
+
+        epoch_end = time.time()
         if rank == 0:
             print(
                 f"Epoch {epoch:05d} | "
                 f"Average Loss {total_loss.item() / world_size:.4f} | "
-                f"Accuracy {acc.item():.4f} "
+                f"Accuracy {acc.item():.4f} | "
+                f"Time {epoch_end - epoch_start:.4f}"
             )
 
 
@@ -296,6 +277,7 @@ def run(rank, world_size, args, devices, dataset):
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
+    test_set = dataset.tasks[0].test_set
     args.fanout = list(map(int, args.fanout.split(",")))
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
@@ -307,6 +289,38 @@ def run(rank, world_size, args, devices, dataset):
     model = SAGE(in_size, hidden_size, out_size).to(device)
     model = DDP(model)
 
+    # Create data loaders.
+    train_dataloader = create_dataloader(
+        args,
+        graph,
+        features,
+        train_set,
+        device,
+        drop_last=False,
+        shuffle=True,
+        drop_uneven_inputs=False,
+    )
+    valid_dataloader = create_dataloader(
+        args,
+        graph,
+        features,
+        valid_set,
+        device,
+        drop_last=False,
+        shuffle=False,
+        drop_uneven_inputs=False,
+    )
+    test_dataloader = create_dataloader(
+        args,
+        graph,
+        features,
+        test_set,
+        device,
+        drop_last=False,
+        shuffle=False,
+        drop_uneven_inputs=False,
+    )
+
     # Model training.
     if rank == 0:
         print("Training...")
@@ -314,10 +328,8 @@ def run(rank, world_size, args, devices, dataset):
         world_size,
         rank,
         args,
-        graph,
-        features,
-        train_set,
-        valid_set,
+        train_dataloader,
+        valid_dataloader,
         num_classes,
         model,
         device,
@@ -326,23 +338,20 @@ def run(rank, world_size, args, devices, dataset):
     # Test the model.
     if rank == 0:
         print("Testing...")
-    test_set = dataset.tasks[0].test_set
     test_acc = (
         evaluate(
             rank,
-            args,
             model,
-            graph,
-            features,
-            itemset=test_set,
-            num_classes=num_classes,
-            device=device,
+            test_dataloader,
+            num_classes,
+            device,
         )
         / world_size
     )
     dist.reduce(tensor=test_acc, dst=0)
+    dist.barrier()
     if rank == 0:
-        print(f"Test Accuracy is {test_acc.item():.4f}")
+        print(f"Test Accuracy {test_acc.item():.4f}")
 
 
 def parse_args():
@@ -376,6 +385,9 @@ def parse_args():
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
         " identical with the number of layers in your model. Default: 15,10,5",
     )
+    parser.add_argument(
+        "--num-workers", type=int, default=0, help="The number of processes."
+    )
     return parser.parse_args()
 
 
@@ -392,6 +404,9 @@ if __name__ == "__main__":
 
     # Load and preprocess dataset.
     dataset = gb.BuiltinDataset("ogbn-products").load()
+
+    # Thread limiting to avoid resource competition.
+    os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // world_size)
 
     mp.set_sharing_strategy("file_system")
     mp.spawn(

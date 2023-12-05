@@ -1,6 +1,8 @@
 import os
 import tempfile
 import unittest
+from functools import reduce
+from operator import mul
 
 import backend as F
 
@@ -27,11 +29,12 @@ def test_torch_based_feature(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 3], [4, 5, 6]])
         b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
+        metadata = {"max_value": 3}
         if not in_memory:
             a = to_on_disk_tensor(test_dir, "a", a)
             b = to_on_disk_tensor(test_dir, "b", b)
 
-        feature_a = gb.TorchBasedFeature(a)
+        feature_a = gb.TorchBasedFeature(a, metadata=metadata)
         feature_b = gb.TorchBasedFeature(b)
 
         # Read the entire feature.
@@ -81,6 +84,11 @@ def test_torch_based_feature(in_memory):
         # Test get the size of the entire feature.
         assert feature_a.size() == torch.Size([3])
         assert feature_b.size() == torch.Size([2, 2])
+
+        # Test get metadata of the feature.
+        assert feature_a.metadata() == metadata
+        assert feature_b.metadata() == {}
+
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
@@ -133,47 +141,49 @@ def test_torch_based_feature(in_memory):
     reason="Tests for pinned memory are only meaningful on GPU.",
 )
 @pytest.mark.parametrize(
-    "dtype", [torch.float32, torch.float64, torch.int32, torch.int64]
+    "dtype",
+    [
+        torch.float32,
+        torch.float64,
+        torch.int32,
+        torch.int64,
+        torch.int8,
+        torch.float16,
+        torch.complex128,
+    ],
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
-def test_torch_based_pinned_feature(dtype, idtype):
-    a = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).pin_memory()
-    b = torch.tensor(
-        [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype
-    ).pin_memory()
-    c = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).pin_memory()
+@pytest.mark.parametrize("shape", [(2, 1), (2, 3), (2, 2, 2), (137, 13, 3)])
+def test_torch_based_pinned_feature(dtype, idtype, shape):
+    if dtype == torch.complex128:
+        tensor = torch.complex(
+            torch.randint(0, 13, shape, dtype=torch.float64),
+            torch.randint(0, 13, shape, dtype=torch.float64),
+        )
+    else:
+        tensor = torch.randint(0, 13, shape, dtype=dtype)
+    test_tensor = tensor.clone().detach()
+    test_tensor_cuda = test_tensor.cuda()
 
-    feature_a = gb.TorchBasedFeature(a)
-    feature_b = gb.TorchBasedFeature(b)
-    feature_c = gb.TorchBasedFeature(c)
+    feature = gb.TorchBasedFeature(tensor)
+    feature.pin_memory_()
 
+    # Test read entire pinned feature, the result should be on cuda.
+    assert torch.equal(feature.read(), test_tensor_cuda)
+    assert feature.read().is_cuda
     assert torch.equal(
-        feature_a.read(),
-        torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).cuda(),
+        feature.read(torch.tensor([0], dtype=idtype).cuda()),
+        test_tensor_cuda[[0]],
     )
-    assert feature_a.read().is_cuda
-    assert torch.equal(
-        feature_b.read(),
-        torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype).cuda(),
-    )
-    assert feature_b.read().is_cuda
-    assert torch.equal(
-        feature_a.read(torch.tensor([0], dtype=idtype).cuda()),
-        torch.tensor([[1, 2, 3]], dtype=dtype).cuda(),
-    )
-    assert feature_a.read(torch.tensor([0], dtype=idtype).cuda()).is_cuda
-    assert torch.equal(
-        feature_b.read(torch.tensor([1], dtype=idtype).cuda()),
-        torch.tensor([[[4, 5], [6, 7]]], dtype=dtype).cuda(),
-    )
-    assert feature_b.read(torch.tensor([1], dtype=idtype).cuda()).is_cuda
 
-    assert feature_c.read().is_cuda
+    # Test read pinned feature with idx on cuda, the result should be on cuda.
+    assert feature.read(torch.tensor([0], dtype=idtype).cuda()).is_cuda
+
+    # Test read pinned feature with idx on cpu, the result should be on cpu.
     assert torch.equal(
-        feature_c.read(torch.tensor([0], dtype=idtype)),
-        torch.tensor([[1, 2, 3]], dtype=dtype),
+        feature.read(torch.tensor([0], dtype=idtype)), test_tensor[[0]]
     )
-    assert not feature_c.read(torch.tensor([0], dtype=idtype)).is_cuda
+    assert not feature.read(torch.tensor([0], dtype=idtype)).is_cuda
 
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):

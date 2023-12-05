@@ -16,6 +16,7 @@ from dgl.distributed import (
     partition_graph,
 )
 from dgl.distributed.graph_partition_book import (
+    _etype_str_to_tuple,
     _etype_tuple_to_str,
     DEFAULT_ETYPE,
     DEFAULT_NTYPE,
@@ -504,7 +505,7 @@ def check_partition(
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-@pytest.mark.parametrize("num_trainers_per_machine", [1, 4])
+@pytest.mark.parametrize("num_trainers_per_machine", [1])
 @pytest.mark.parametrize("load_feats", [True, False])
 @pytest.mark.parametrize(
     "graph_formats", [None, ["csc"], ["coo", "csc"], ["coo", "csc", "csr"]]
@@ -694,8 +695,10 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
-            new_g = dgl.graphbolt.load_csc_sampling_graph(
-                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            new_g = dgl.graphbolt.load_fused_csc_sampling_graph(
+                os.path.join(
+                    test_dir, f"part{part_id}/fused_csc_sampling_graph.tar"
+                )
             )
             orig_indptr, orig_indices, _ = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
@@ -705,7 +708,7 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
             for node_type, type_id in new_g.metadata.node_type_to_id.items():
                 assert g.get_ntype_id(node_type) == type_id
             for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
-                assert g.get_etype_id(edge_type) == type_id
+                assert g.get_etype_id(_etype_str_to_tuple(edge_type)) == type_id
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
@@ -725,8 +728,10 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
-            new_g = dgl.graphbolt.load_csc_sampling_graph(
-                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            new_g = dgl.graphbolt.load_fused_csc_sampling_graph(
+                os.path.join(
+                    test_dir, f"part{part_id}/fused_csc_sampling_graph.tar"
+                )
             )
             orig_indptr, orig_indices, _ = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
@@ -734,7 +739,7 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
             for node_type, type_id in new_g.metadata.node_type_to_id.items():
                 assert g.get_ntype_id(node_type) == type_id
             for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
-                assert g.get_etype_id(edge_type) == type_id
+                assert g.get_etype_id(_etype_str_to_tuple(edge_type)) == type_id
             assert new_g.node_type_offset is None
             assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
 

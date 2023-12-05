@@ -1,10 +1,10 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file csc_sampling_graph.cc
+ * @file fused_csc_sampling_graph.cc
  * @brief Source file of sampling graph.
  */
 
-#include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
 
@@ -24,70 +24,113 @@ namespace sampling {
 
 static const int kPickleVersion = 6199;
 
-CSCSamplingGraph::CSCSamplingGraph(
+FusedCSCSamplingGraph::FusedCSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+    const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
     const torch::optional<EdgeAttrMap>& edge_attributes)
     : indptr_(indptr),
       indices_(indices),
       node_type_offset_(node_type_offset),
       type_per_edge_(type_per_edge),
+      node_type_to_id_(node_type_to_id),
+      edge_type_to_id_(edge_type_to_id),
       edge_attributes_(edge_attributes) {
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
   TORCH_CHECK(indptr.device() == indices.device());
 }
 
-c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
+c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::FromCSC(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+    const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
     const torch::optional<EdgeAttrMap>& edge_attributes) {
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
     TORCH_CHECK(offset.dim() == 1);
+    TORCH_CHECK(node_type_to_id.has_value());
+    TORCH_CHECK(
+        offset.size(0) ==
+        static_cast<int64_t>(node_type_to_id.value().size() + 1));
   }
   if (type_per_edge.has_value()) {
     TORCH_CHECK(type_per_edge.value().dim() == 1);
     TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
+    TORCH_CHECK(edge_type_to_id.has_value());
   }
   if (edge_attributes.has_value()) {
     for (const auto& pair : edge_attributes.value()) {
       TORCH_CHECK(pair.value().size(0) == indices.size(0));
     }
   }
-  return c10::make_intrusive<CSCSamplingGraph>(
-      indptr, indices, node_type_offset, type_per_edge, edge_attributes);
+  return c10::make_intrusive<FusedCSCSamplingGraph>(
+      indptr, indices, node_type_offset, type_per_edge, node_type_to_id,
+      edge_type_to_id, edge_attributes);
 }
 
-void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
+void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   const int64_t magic_num =
-      read_from_archive(archive, "CSCSamplingGraph/magic_num").toInt();
+      read_from_archive(archive, "FusedCSCSamplingGraph/magic_num").toInt();
   TORCH_CHECK(
       magic_num == kCSCSamplingGraphSerializeMagic,
-      "Magic numbers mismatch when loading CSCSamplingGraph.");
-  indptr_ = read_from_archive(archive, "CSCSamplingGraph/indptr").toTensor();
-  indices_ = read_from_archive(archive, "CSCSamplingGraph/indices").toTensor();
-  if (read_from_archive(archive, "CSCSamplingGraph/has_node_type_offset")
+      "Magic numbers mismatch when loading FusedCSCSamplingGraph.");
+  indptr_ =
+      read_from_archive(archive, "FusedCSCSamplingGraph/indptr").toTensor();
+  indices_ =
+      read_from_archive(archive, "FusedCSCSamplingGraph/indices").toTensor();
+  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_node_type_offset")
           .toBool()) {
     node_type_offset_ =
-        read_from_archive(archive, "CSCSamplingGraph/node_type_offset")
+        read_from_archive(archive, "FusedCSCSamplingGraph/node_type_offset")
             .toTensor();
   }
-  if (read_from_archive(archive, "CSCSamplingGraph/has_type_per_edge")
+  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_type_per_edge")
           .toBool()) {
     type_per_edge_ =
-        read_from_archive(archive, "CSCSamplingGraph/type_per_edge").toTensor();
+        read_from_archive(archive, "FusedCSCSamplingGraph/type_per_edge")
+            .toTensor();
+  }
+
+  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_node_type_to_id")
+          .toBool()) {
+    torch::Dict<torch::IValue, torch::IValue> generic_dict =
+        read_from_archive(archive, "FusedCSCSamplingGraph/node_type_to_id")
+            .toGenericDict();
+    NodeTypeToIDMap node_type_to_id;
+    for (const auto& pair : generic_dict) {
+      std::string key = pair.key().toStringRef();
+      int64_t value = pair.value().toInt();
+      node_type_to_id.insert(std::move(key), value);
+    }
+    node_type_to_id_ = std::move(node_type_to_id);
+  }
+
+  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_edge_type_to_id")
+          .toBool()) {
+    torch::Dict<torch::IValue, torch::IValue> generic_dict =
+        read_from_archive(archive, "FusedCSCSamplingGraph/edge_type_to_id")
+            .toGenericDict();
+    EdgeTypeToIDMap edge_type_to_id;
+    for (const auto& pair : generic_dict) {
+      std::string key = pair.key().toStringRef();
+      int64_t value = pair.value().toInt();
+      edge_type_to_id.insert(std::move(key), value);
+    }
+    edge_type_to_id_ = std::move(edge_type_to_id);
   }
 
   // Optional edge attributes.
   torch::IValue has_edge_attributes;
   if (archive.try_read(
-          "CSCSamplingGraph/has_edge_attributes", has_edge_attributes) &&
+          "FusedCSCSamplingGraph/has_edge_attributes", has_edge_attributes) &&
       has_edge_attributes.toBool()) {
     torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "CSCSamplingGraph/edge_attributes")
+        read_from_archive(archive, "FusedCSCSamplingGraph/edge_attributes")
             .toGenericDict();
     EdgeAttrMap target_dict;
     for (const auto& pair : generic_dict) {
@@ -101,29 +144,49 @@ void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   }
 }
 
-void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
-  archive.write("CSCSamplingGraph/magic_num", kCSCSamplingGraphSerializeMagic);
-  archive.write("CSCSamplingGraph/indptr", indptr_);
-  archive.write("CSCSamplingGraph/indices", indices_);
+void FusedCSCSamplingGraph::Save(
+    torch::serialize::OutputArchive& archive) const {
   archive.write(
-      "CSCSamplingGraph/has_node_type_offset", node_type_offset_.has_value());
+      "FusedCSCSamplingGraph/magic_num", kCSCSamplingGraphSerializeMagic);
+  archive.write("FusedCSCSamplingGraph/indptr", indptr_);
+  archive.write("FusedCSCSamplingGraph/indices", indices_);
+  archive.write(
+      "FusedCSCSamplingGraph/has_node_type_offset",
+      node_type_offset_.has_value());
   if (node_type_offset_) {
     archive.write(
-        "CSCSamplingGraph/node_type_offset", node_type_offset_.value());
+        "FusedCSCSamplingGraph/node_type_offset", node_type_offset_.value());
   }
   archive.write(
-      "CSCSamplingGraph/has_type_per_edge", type_per_edge_.has_value());
+      "FusedCSCSamplingGraph/has_type_per_edge", type_per_edge_.has_value());
   if (type_per_edge_) {
-    archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
+    archive.write(
+        "FusedCSCSamplingGraph/type_per_edge", type_per_edge_.value());
   }
   archive.write(
-      "CSCSamplingGraph/has_edge_attributes", edge_attributes_.has_value());
+      "FusedCSCSamplingGraph/has_node_type_to_id",
+      node_type_to_id_.has_value());
+  if (node_type_to_id_) {
+    archive.write(
+        "FusedCSCSamplingGraph/node_type_to_id", node_type_to_id_.value());
+  }
+  archive.write(
+      "FusedCSCSamplingGraph/has_edge_type_to_id",
+      edge_type_to_id_.has_value());
+  if (edge_type_to_id_) {
+    archive.write(
+        "FusedCSCSamplingGraph/edge_type_to_id", edge_type_to_id_.value());
+  }
+  archive.write(
+      "FusedCSCSamplingGraph/has_edge_attributes",
+      edge_attributes_.has_value());
   if (edge_attributes_) {
-    archive.write("CSCSamplingGraph/edge_attributes", edge_attributes_.value());
+    archive.write(
+        "FusedCSCSamplingGraph/edge_attributes", edge_attributes_.value());
   }
 }
 
-void CSCSamplingGraph::SetState(
+void FusedCSCSamplingGraph::SetState(
     const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
         state) {
   // State is a dict of dicts. The tensor-type attributes are stored in the dict
@@ -133,7 +196,7 @@ void CSCSamplingGraph::SetState(
   TORCH_CHECK(
       independent_tensors.at("version_number")
           .equal(torch::tensor({kPickleVersion})),
-      "Version number mismatches when loading pickled CSCSamplingGraph.")
+      "Version number mismatches when loading pickled FusedCSCSamplingGraph.")
   indptr_ = independent_tensors.at("indptr");
   indices_ = independent_tensors.at("indices");
   if (independent_tensors.find("node_type_offset") !=
@@ -149,7 +212,7 @@ void CSCSamplingGraph::SetState(
 }
 
 torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
-CSCSamplingGraph::GetState() const {
+FusedCSCSamplingGraph::GetState() const {
   // State is a dict of dicts. The tensor-type attributes are stored in the dict
   // with key "independent_tensors". The dict-type attributes (edge_attributes)
   // are stored directly with the their name as the key.
@@ -173,37 +236,40 @@ CSCSamplingGraph::GetState() const {
   return state;
 }
 
-c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
+c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
   using namespace torch::indexing;
   const int32_t kDefaultGrainSize = 100;
-  torch::Tensor indptr = torch::zeros_like(indptr_);
-  const size_t num_seeds = nodes.size(0);
+  const auto num_seeds = nodes.size(0);
+  torch::Tensor indptr = torch::zeros({num_seeds + 1}, indptr_.dtype());
   std::vector<torch::Tensor> indices_arr(num_seeds);
+  torch::Tensor original_column_node_ids =
+      torch::zeros({num_seeds}, indptr_.dtype());
   std::vector<torch::Tensor> edge_ids_arr(num_seeds);
   std::vector<torch::Tensor> type_per_edge_arr(num_seeds);
-  torch::parallel_for(
-      0, num_seeds, kDefaultGrainSize, [&](size_t start, size_t end) {
-        for (size_t i = start; i < end; ++i) {
-          const int64_t node_id = nodes[i].item<int64_t>();
-          const int64_t start_idx = indptr_[node_id].item<int64_t>();
-          const int64_t end_idx = indptr_[node_id + 1].item<int64_t>();
-          indptr[node_id + 1] = end_idx - start_idx;
-          indices_arr[i] = indices_.slice(0, start_idx, end_idx);
-          edge_ids_arr[i] = torch::arange(start_idx, end_idx);
-          if (type_per_edge_) {
-            type_per_edge_arr[i] =
-                type_per_edge_.value().slice(0, start_idx, end_idx);
-          }
-        }
-      });
 
-  const auto& nonzero_idx = torch::nonzero(indptr).reshape(-1);
-  torch::Tensor compact_indptr =
-      torch::zeros({nonzero_idx.size(0) + 1}, indptr_.dtype());
-  compact_indptr.index_put_({Slice(1, None)}, indptr.index({nonzero_idx}));
-  return c10::make_intrusive<SampledSubgraph>(
-      compact_indptr.cumsum(0), torch::cat(indices_arr), nonzero_idx - 1,
+  AT_DISPATCH_INTEGRAL_TYPES(
+      indptr_.scalar_type(), "InSubgraph", ([&] {
+        torch::parallel_for(
+            0, num_seeds, kDefaultGrainSize, [&](size_t start, size_t end) {
+              for (size_t i = start; i < end; ++i) {
+                const auto node_id = nodes[i].item<scalar_t>();
+                const auto start_idx = indptr_[node_id].item<scalar_t>();
+                const auto end_idx = indptr_[node_id + 1].item<scalar_t>();
+                indptr[i + 1] = end_idx - start_idx;
+                original_column_node_ids[i] = node_id;
+                indices_arr[i] = indices_.slice(0, start_idx, end_idx);
+                edge_ids_arr[i] = torch::arange(start_idx, end_idx);
+                if (type_per_edge_) {
+                  type_per_edge_arr[i] =
+                      type_per_edge_.value().slice(0, start_idx, end_idx);
+                }
+              }
+            });
+      }));
+
+  return c10::make_intrusive<FusedSampledSubgraph>(
+      indptr.cumsum(0), torch::cat(indices_arr), original_column_node_ids,
       torch::arange(0, NumNodes()), torch::cat(edge_ids_arr),
       type_per_edge_
           ? torch::optional<torch::Tensor>{torch::cat(type_per_edge_arr)}
@@ -288,15 +354,20 @@ auto GetPickFn(
           offset, num_neighbors, fanouts, replace, options,
           type_per_edge.value(), probs_or_mask, args, picked_data_ptr);
     } else {
-      return Pick(
+      int64_t num_sampled = Pick(
           offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
           args, picked_data_ptr);
+      if (type_per_edge) {
+        std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
+      }
+      return num_sampled;
     }
   };
 }
 
 template <typename NumPickFn, typename PickFn>
-c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
+c10::intrusive_ptr<FusedSampledSubgraph>
+FusedCSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
     PickFn pick_fn) const {
   const int64_t num_nodes = nodes.size(0);
@@ -313,107 +384,123 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
   torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
 
   AT_DISPATCH_INTEGRAL_TYPES(
-      indptr_.scalar_type(), "SampleNeighborsImpl", ([&] {
-        const scalar_t* indptr_data = indptr_.data_ptr<scalar_t>();
-        auto num_picked_neighbors_data_ptr =
-            num_picked_neighbors_per_node.data_ptr<scalar_t>();
-        num_picked_neighbors_data_ptr[0] = 0;
-        const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
+      indptr_.scalar_type(), "SampleNeighborsImplWrappedWithIndptr", ([&] {
+        using indptr_t = scalar_t;
+        AT_DISPATCH_INTEGRAL_TYPES(
+            nodes.scalar_type(), "SampleNeighborsImplWrappedWithNodes", ([&] {
+              using nodes_t = scalar_t;
+              const auto indptr_data = indptr_.data_ptr<indptr_t>();
+              auto num_picked_neighbors_data_ptr =
+                  num_picked_neighbors_per_node.data_ptr<indptr_t>();
+              num_picked_neighbors_data_ptr[0] = 0;
+              const auto nodes_data_ptr = nodes.data_ptr<nodes_t>();
 
-        // Step 1. Calculate pick number of each node.
-        torch::parallel_for(
-            0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
-              for (int64_t i = begin; i < end; ++i) {
-                const auto nid = nodes_data_ptr[i];
-                TORCH_CHECK(
-                    nid >= 0 && nid < NumNodes(),
-                    "The seed nodes' IDs should fall within the range of the "
-                    "graph's node IDs.");
-                const auto offset = indptr_data[nid];
-                const auto num_neighbors = indptr_data[nid + 1] - offset;
+              // Step 1. Calculate pick number of each node.
+              torch::parallel_for(
+                  0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
+                    for (int64_t i = begin; i < end; ++i) {
+                      const auto nid = nodes_data_ptr[i];
+                      TORCH_CHECK(
+                          nid >= 0 && nid < NumNodes(),
+                          "The seed nodes' IDs should fall within the range of "
+                          "the "
+                          "graph's node IDs.");
+                      const auto offset = indptr_data[nid];
+                      const auto num_neighbors = indptr_data[nid + 1] - offset;
 
-                num_picked_neighbors_data_ptr[i + 1] =
-                    num_neighbors == 0 ? 0 : num_pick_fn(offset, num_neighbors);
+                      num_picked_neighbors_data_ptr[i + 1] =
+                          num_neighbors == 0
+                              ? 0
+                              : num_pick_fn(offset, num_neighbors);
+                    }
+                  });
+
+              // Step 2. Calculate prefix sum to get total length and offsets of
+              // each node. It's also the indptr of the generated subgraph.
+              subgraph_indptr = num_picked_neighbors_per_node.cumsum(
+                  0, indptr_.scalar_type());
+
+              // Step 3. Allocate the tensor for picked neighbors.
+              const auto total_length =
+                  subgraph_indptr.data_ptr<indptr_t>()[num_nodes];
+              picked_eids = torch::empty({total_length}, indptr_options);
+              subgraph_indices =
+                  torch::empty({total_length}, indices_.options());
+              if (type_per_edge_.has_value()) {
+                subgraph_type_per_edge = torch::empty(
+                    {total_length}, type_per_edge_.value().options());
               }
-            });
 
-        // Step 2. Calculate prefix sum to get total length and offsets of each
-        // node. It's also the indptr of the generated subgraph.
-        subgraph_indptr = torch::cumsum(num_picked_neighbors_per_node, 0);
+              // Step 4. Pick neighbors for each node.
+              auto picked_eids_data_ptr = picked_eids.data_ptr<indptr_t>();
+              auto subgraph_indptr_data_ptr =
+                  subgraph_indptr.data_ptr<indptr_t>();
+              torch::parallel_for(
+                  0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
+                    for (int64_t i = begin; i < end; ++i) {
+                      const auto nid = nodes_data_ptr[i];
+                      const auto offset = indptr_data[nid];
+                      const auto num_neighbors = indptr_data[nid + 1] - offset;
+                      const auto picked_number =
+                          num_picked_neighbors_data_ptr[i + 1];
+                      const auto picked_offset = subgraph_indptr_data_ptr[i];
+                      if (picked_number > 0) {
+                        auto actual_picked_count = pick_fn(
+                            offset, num_neighbors,
+                            picked_eids_data_ptr + picked_offset);
+                        TORCH_CHECK(
+                            actual_picked_count == picked_number,
+                            "Actual picked count doesn't match the calculated "
+                            "pick "
+                            "number.");
 
-        // Step 3. Allocate the tensor for picked neighbors.
-        const auto total_length =
-            subgraph_indptr.data_ptr<scalar_t>()[num_nodes];
-        picked_eids = torch::empty({total_length}, indptr_options);
-        subgraph_indices = torch::empty({total_length}, indices_.options());
-        if (type_per_edge_.has_value()) {
-          subgraph_type_per_edge =
-              torch::empty({total_length}, type_per_edge_.value().options());
-        }
-
-        // Step 4. Pick neighbors for each node.
-        auto picked_eids_data_ptr = picked_eids.data_ptr<scalar_t>();
-        auto subgraph_indptr_data_ptr = subgraph_indptr.data_ptr<scalar_t>();
-        torch::parallel_for(
-            0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
-              for (int64_t i = begin; i < end; ++i) {
-                const auto nid = nodes_data_ptr[i];
-                const auto offset = indptr_data[nid];
-                const auto num_neighbors = indptr_data[nid + 1] - offset;
-                const auto picked_number = num_picked_neighbors_data_ptr[i + 1];
-                const auto picked_offset = subgraph_indptr_data_ptr[i];
-                if (picked_number > 0) {
-                  auto actual_picked_count = pick_fn(
-                      offset, num_neighbors,
-                      picked_eids_data_ptr + picked_offset);
-                  TORCH_CHECK(
-                      actual_picked_count == picked_number,
-                      "Actual picked count doesn't match the calculated pick "
-                      "number.");
-
-                  // Step 5. Calculate other attributes and return the subgraph.
-                  AT_DISPATCH_INTEGRAL_TYPES(
-                      subgraph_indices.scalar_type(),
-                      "IndexSelectSubgraphIndices", ([&] {
-                        auto subgraph_indices_data_ptr =
-                            subgraph_indices.data_ptr<scalar_t>();
-                        auto indices_data_ptr = indices_.data_ptr<scalar_t>();
-                        for (auto i = picked_offset;
-                             i < picked_offset + picked_number; ++i) {
-                          subgraph_indices_data_ptr[i] =
-                              indices_data_ptr[picked_eids_data_ptr[i]];
+                        // Step 5. Calculate other attributes and return the
+                        // subgraph.
+                        AT_DISPATCH_INTEGRAL_TYPES(
+                            subgraph_indices.scalar_type(),
+                            "IndexSelectSubgraphIndices", ([&] {
+                              auto subgraph_indices_data_ptr =
+                                  subgraph_indices.data_ptr<scalar_t>();
+                              auto indices_data_ptr =
+                                  indices_.data_ptr<scalar_t>();
+                              for (auto i = picked_offset;
+                                   i < picked_offset + picked_number; ++i) {
+                                subgraph_indices_data_ptr[i] =
+                                    indices_data_ptr[picked_eids_data_ptr[i]];
+                              }
+                            }));
+                        if (type_per_edge_.has_value()) {
+                          AT_DISPATCH_INTEGRAL_TYPES(
+                              subgraph_type_per_edge.value().scalar_type(),
+                              "IndexSelectTypePerEdge", ([&] {
+                                auto subgraph_type_per_edge_data_ptr =
+                                    subgraph_type_per_edge.value()
+                                        .data_ptr<scalar_t>();
+                                auto type_per_edge_data_ptr =
+                                    type_per_edge_.value().data_ptr<scalar_t>();
+                                for (auto i = picked_offset;
+                                     i < picked_offset + picked_number; ++i) {
+                                  subgraph_type_per_edge_data_ptr[i] =
+                                      type_per_edge_data_ptr
+                                          [picked_eids_data_ptr[i]];
+                                }
+                              }));
                         }
-                      }));
-                  if (type_per_edge_.has_value()) {
-                    AT_DISPATCH_INTEGRAL_TYPES(
-                        subgraph_type_per_edge.value().scalar_type(),
-                        "IndexSelectTypePerEdge", ([&] {
-                          auto subgraph_type_per_edge_data_ptr =
-                              subgraph_type_per_edge.value()
-                                  .data_ptr<scalar_t>();
-                          auto type_per_edge_data_ptr =
-                              type_per_edge_.value().data_ptr<scalar_t>();
-                          for (auto i = picked_offset;
-                               i < picked_offset + picked_number; ++i) {
-                            subgraph_type_per_edge_data_ptr[i] =
-                                type_per_edge_data_ptr[picked_eids_data_ptr[i]];
-                          }
-                        }));
-                  }
-                }
-              }
-            });
+                      }
+                    }
+                  });
+            }));
       }));
 
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 
-  return c10::make_intrusive<SampledSubgraph>(
+  return c10::make_intrusive<FusedSampledSubgraph>(
       subgraph_indptr, subgraph_indices, nodes, torch::nullopt,
       subgraph_reverse_edge_ids, subgraph_type_per_edge);
 }
 
-c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
+c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
@@ -451,7 +538,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
 }
 
 std::tuple<torch::Tensor, torch::Tensor>
-CSCSamplingGraph::SampleNegativeEdgesUniform(
+FusedCSCSamplingGraph::SampleNegativeEdgesUniform(
     const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
     int64_t negative_ratio, int64_t max_node_id) const {
   torch::Tensor pos_src;
@@ -462,24 +549,25 @@ CSCSamplingGraph::SampleNegativeEdgesUniform(
   return std::make_tuple(neg_src, neg_dst);
 }
 
-static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
-    SharedMemoryHelper&& helper) {
+static c10::intrusive_ptr<FusedCSCSamplingGraph>
+BuildGraphFromSharedMemoryHelper(SharedMemoryHelper&& helper) {
   helper.InitializeRead();
   auto indptr = helper.ReadTorchTensor();
   auto indices = helper.ReadTorchTensor();
   auto node_type_offset = helper.ReadTorchTensor();
   auto type_per_edge = helper.ReadTorchTensor();
   auto edge_attributes = helper.ReadTorchTensorDict();
-  auto graph = c10::make_intrusive<CSCSamplingGraph>(
+  auto graph = c10::make_intrusive<FusedCSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
-      edge_attributes);
+      torch::nullopt, torch::nullopt, edge_attributes);
   auto shared_memory = helper.ReleaseSharedMemory();
   graph->HoldSharedMemoryObject(
       std::move(shared_memory.first), std::move(shared_memory.second));
   return graph;
 }
 
-c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
+c10::intrusive_ptr<FusedCSCSamplingGraph>
+FusedCSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
   SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
   helper.WriteTorchTensor(indptr_);
@@ -491,13 +579,14 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
-c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
+c10::intrusive_ptr<FusedCSCSamplingGraph>
+FusedCSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
   SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
-void CSCSamplingGraph::HoldSharedMemoryObject(
+void FusedCSCSamplingGraph::HoldSharedMemoryObject(
     SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm) {
   tensor_metadata_shm_ = std::move(tensor_metadata_shm);
   tensor_data_shm_ = std::move(tensor_data_shm);

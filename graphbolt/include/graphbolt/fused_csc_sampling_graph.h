@@ -1,12 +1,12 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/csc_sampling_graph.h
+ * @file graphbolt/fused_csc_sampling_graph.h
  * @brief Header file of csc sampling graph.
  */
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
-#include <graphbolt/sampled_subgraph.h>
+#include <graphbolt/fused_sampled_subgraph.h>
 #include <graphbolt/shared_memory.h>
 #include <torch/torch.h>
 
@@ -39,18 +39,20 @@ struct SamplerArgs<SamplerType::LABOR> {
  * Suppose the graph has 3 node types, 3 edge types and 6 edges
  * auto node_type_offset = {0, 2, 4, 6}
  * auto type_per_edge = {0, 1, 0, 2, 1, 2}
- * auto graph = CSCSamplingGraph(..., ..., node_type_offset, type_per_edge)
+ * auto graph = FusedCSCSamplingGraph(..., ..., node_type_offset, type_per_edge)
  *
  * The `node_type_offset` tensor represents the offset array of node type, the
  * given array indicates that node [0, 2) has type id 0, [2, 4) has type id 1,
  * and [4, 6) has type id 2. And the `type_per_edge` tensor represents the type
  * id of each edge.
  */
-class CSCSamplingGraph : public torch::CustomClassHolder {
+class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  public:
+  using NodeTypeToIDMap = torch::Dict<std::string, int64_t>;
+  using EdgeTypeToIDMap = torch::Dict<std::string, int64_t>;
   using EdgeAttrMap = torch::Dict<std::string, torch::Tensor>;
   /** @brief Default constructor. */
-  CSCSamplingGraph() = default;
+  FusedCSCSamplingGraph() = default;
 
   /**
    * @brief Constructor for CSC with data.
@@ -60,11 +62,19 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param type_per_edge A tensor representing the type of each edge, if
    * present.
+   * @param node_type_to_id A dictionary mapping node type names to type IDs, if
+   * present.
+   * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
+   * present.
+   * @param edge_attributes A dictionary of edge attributes, if present.
+   *
    */
-  CSCSamplingGraph(
+  FusedCSCSamplingGraph(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /**
@@ -75,13 +85,20 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param type_per_edge A tensor representing the type of each edge, if
    * present.
+   * @param node_type_to_id A dictionary mapping node type names to type IDs, if
+   * present.
+   * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
+   * present.
+   * @param edge_attributes A dictionary of edge attributes, if present.
    *
-   * @return CSCSamplingGraph
+   * @return FusedCSCSamplingGraph
    */
-  static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
+  static c10::intrusive_ptr<FusedCSCSamplingGraph> FromCSC(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /** @brief Get the number of nodes. */
@@ -106,6 +123,22 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
     return type_per_edge_;
   }
 
+  /**
+   * @brief Get the node type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping node type names to type IDs.
+   */
+  inline const torch::optional<NodeTypeToIDMap> NodeTypeToID() const {
+    return node_type_to_id_;
+  }
+
+  /**
+   * @brief Get the edge type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping edge type names to type IDs.
+   */
+  inline const torch::optional<EdgeTypeToIDMap> EdgeTypeToID() const {
+    return edge_type_to_id_;
+  }
+
   /** @brief Get the edge attributes dictionary. */
   inline const torch::optional<EdgeAttrMap> EdgeAttributes() const {
     return edge_attributes_;
@@ -127,6 +160,24 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   inline void SetTypePerEdge(
       const torch::optional<torch::Tensor>& type_per_edge) {
     type_per_edge_ = type_per_edge;
+  }
+
+  /**
+   * @brief Set the node type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping node type names to type IDs.
+   */
+  inline void SetNodeTypeToID(
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id) {
+    node_type_to_id_ = node_type_to_id;
+  }
+
+  /**
+   * @brief Set the edge type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping edge type names to type IDs.
+   */
+  inline void SetEdgeTypeToID(
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id) {
+    edge_type_to_id_ = edge_type_to_id;
   }
 
   /** @brief Set the edge attributes dictionary. */
@@ -155,7 +206,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
   /**
    * @brief Pickle method for deserializing.
-   * @param state The state of serialized CSCSamplingGraph.
+   * @param state The state of serialized FusedCSCSamplingGraph.
    */
   void SetState(
       const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
@@ -163,7 +214,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
   /**
    * @brief Pickle method for serializing.
-   * @returns The state of this CSCSamplingGraph.
+   * @returns The state of this FusedCSCSamplingGraph.
    */
   torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> GetState()
       const;
@@ -172,9 +223,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Return the subgraph induced on the inbound edges of the given nodes.
    * @param nodes Type agnostic node IDs to form the subgraph.
    *
-   * @return SampledSubgraph.
+   * @return FusedSampledSubgraph.
    */
-  c10::intrusive_ptr<SampledSubgraph> InSubgraph(
+  c10::intrusive_ptr<FusedSampledSubgraph> InSubgraph(
       const torch::Tensor& nodes) const;
 
   /**
@@ -208,10 +259,10 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * a 1D floating-point or boolean tensor, with the number of elements
    * equalling the total number of edges.
    *
-   * @return An intrusive pointer to a SampledSubgraph object containing the
-   * sampled graph's information.
+   * @return An intrusive pointer to a FusedSampledSubgraph object containing
+   * the sampled graph's information.
    */
-  c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
+  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
       bool replace, bool layer, bool return_eids,
       torch::optional<std::string> probs_name) const;
@@ -246,18 +297,18 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Copy the graph to shared memory.
    * @param shared_memory_name The name of the shared memory.
    *
-   * @return A new CSCSamplingGraph object on shared memory.
+   * @return A new FusedCSCSamplingGraph object on shared memory.
    */
-  c10::intrusive_ptr<CSCSamplingGraph> CopyToSharedMemory(
+  c10::intrusive_ptr<FusedCSCSamplingGraph> CopyToSharedMemory(
       const std::string& shared_memory_name);
 
   /**
    * @brief Load the graph from shared memory.
    * @param shared_memory_name The name of the shared memory.
    *
-   * @return A new CSCSamplingGraph object on shared memory.
+   * @return A new FusedCSCSamplingGraph object on shared memory.
    */
-  static c10::intrusive_ptr<CSCSamplingGraph> LoadFromSharedMemory(
+  static c10::intrusive_ptr<FusedCSCSamplingGraph> LoadFromSharedMemory(
       const std::string& shared_memory_name);
 
   /**
@@ -276,7 +327,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
  private:
   template <typename NumPickFn, typename PickFn>
-  c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
+  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
       PickFn pick_fn) const;
 
@@ -301,6 +352,20 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * edge types. The length of it is equal to the number of edges.
    */
   torch::optional<torch::Tensor> type_per_edge_;
+
+  /**
+   * @brief A dictionary mapping node type names to type IDs. The length of it
+   * is equal to the number of node types. The key is the node type name, and
+   * the value is the corresponding type ID.
+   */
+  torch::optional<NodeTypeToIDMap> node_type_to_id_;
+
+  /**
+   * @brief A dictionary mapping edge type names to type IDs. The length of it
+   * is equal to the number of edge types. The key is the edge type name, and
+   * the value is the corresponding type ID.
+   */
+  torch::optional<EdgeTypeToIDMap> edge_type_to_id_;
 
   /**
    * @brief A dictionary of edge attributes. Each key represents the attribute's

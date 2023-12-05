@@ -1,5 +1,7 @@
 """Base types and utilities for Graph Bolt."""
 
+from dataclasses import dataclass
+
 import torch
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
@@ -13,10 +15,23 @@ __all__ = [
     "etype_tuple_to_str",
     "CopyTo",
     "isin",
+    "CSCFormatBase",
+    "seed",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
 ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
+
+
+def seed(val):
+    """Set the random seed of Graphbolt.
+
+    Parameters
+    ----------
+    val : int
+        The seed.
+    """
+    torch.ops.graphbolt.set_seed(val)
 
 
 def isin(elements, test_elements):
@@ -68,6 +83,8 @@ def etype_str_to_tuple(c_etype):
     >>> print(c_etype)
     ("user", "like", "item")
     """
+    if isinstance(c_etype, tuple):
+        return c_etype
     ret = tuple(c_etype.split(CANONICAL_ETYPE_DELIMITER))
     assert len(ret) == 3, (
         "Passed-in canonical etype should be in format of 'str:str:str'. "
@@ -111,3 +128,41 @@ class CopyTo(IterDataPipe):
         for data in self.datapipe:
             data = recursive_apply(data, apply_to, self.device)
             yield data
+
+
+@dataclass
+class CSCFormatBase:
+    r"""Basic class representing data in Compressed Sparse Column (CSC) format.
+
+    Examples
+    --------
+    >>> indptr = torch.tensor([0, 1, 3])
+    >>> indices = torch.tensor([1, 4, 2])
+    >>> csc_foramt_base = CSCFormatBase(indptr=indptr, indices=indices)
+    >>> print(csc_format_base.indptr)
+    ... torch.tensor([0, 1, 3])
+    >>> print(csc_foramt_base)
+    ... torch.tensor([1, 4, 2])
+    """
+    indptr: torch.Tensor = None
+    indices: torch.Tensor = None
+
+    def __repr__(self) -> str:
+        return _csc_format_base_str(self)
+
+
+def _csc_format_base_str(csc_format_base: CSCFormatBase) -> str:
+    final_str = "CSCFormatBase("
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    final_str += (
+        f"indptr={_add_indent(str(csc_format_base.indptr), 21)},\n" + " " * 14
+    )
+    final_str += (
+        f"indices={_add_indent(str(csc_format_base.indices), 22)},\n" + ")"
+    )
+    return final_str

@@ -14,7 +14,7 @@ def test_DataLoader():
     N = 40
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
-    graph = gb_test_utils.rand_csc_graph(200, 0.15)
+    graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]
     features[keys[0]] = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
@@ -34,7 +34,7 @@ def test_DataLoader():
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
-    dataloader = dgl.graphbolt.MultiProcessDataLoader(
+    dataloader = dgl.graphbolt.DataLoader(
         device_transferrer,
         num_workers=4,
     )

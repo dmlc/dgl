@@ -52,6 +52,16 @@ class Feature:
         """
         raise NotImplementedError
 
+    def metadata(self):
+        """Get the metadata of the feature.
+
+        Returns
+        -------
+        Dict
+            The metadata of the feature.
+        """
+        return {}
+
 
 class FeatureStore:
     r"""A store to manage multiple features for access."""
@@ -107,6 +117,29 @@ class FeatureStore:
         -------
         torch.Size
             The size of the specified feature in the feature store.
+        """
+        raise NotImplementedError
+
+    def metadata(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+    ):
+        """Get the metadata of the specified feature in the feature store.
+
+        Parameters
+        ----------
+        domain : str
+            The domain of the feature such as "node", "edge" or "graph".
+        type_name : str
+            The node or edge type name.
+        feature_name : str
+            The feature name.
+        Returns
+        -------
+        Dict
+            The metadata of the feature.
         """
         raise NotImplementedError
 
