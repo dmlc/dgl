@@ -30,7 +30,7 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
       torch::arange(num_items, input.options().dtype(torch::kLong));
   auto sorted_array = torch::empty_like(input);
   auto sorted_idx = torch::empty_like(original_idx);
-  cuda::CUDAWorkspaceAllocator allocator;
+  auto allocator = cuda::BuildAllocator();
   auto stream = c10::cuda::getDefaultCUDAStream();
   AT_DISPATCH_INDEX_TYPES(
       input.scalar_type(), "SortImpl", ([&] {
@@ -138,7 +138,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
       Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1));
   const auto perm = perm_tensor.data_ptr<int64_t>();
 
-  cuda::CUDAWorkspaceAllocator allocator;
+  auto allocator = cuda::BuildAllocator();
   auto stream = c10::cuda::getDefaultCUDAStream();
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
 
@@ -240,7 +240,7 @@ struct ConvertToBytes {
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
-  cuda::CUDAWorkspaceAllocator allocator;
+  auto allocator = cuda::BuildAllocator();
   auto stream = c10::cuda::getDefaultCUDAStream();
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
 

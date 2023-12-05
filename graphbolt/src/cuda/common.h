@@ -65,6 +65,8 @@ struct CUDAWorkspaceAllocator {
   }
 };
 
+auto BuildAllocator() { return CUDAWorkspaceAllocator{}; }
+
 template <typename T>
 inline bool is_zero(T size) {
   return size == 0;
