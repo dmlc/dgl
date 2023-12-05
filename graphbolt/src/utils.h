@@ -10,17 +10,16 @@
 #include <torch/script.h>
 
 namespace graphbolt {
-namespace cuda {
+namespace utils {
 
 /**
  * @brief Checks whether the tensor is stored on the GPU or the pinned memory.
  */
-inline bool is_accessible(torch::Tensor tensor) {
+inline bool is_accessible_from_gpu(torch::Tensor tensor) {
   return tensor.is_pinned() || tensor.device().type() == c10::DeviceType::CUDA;
 }
 
-}  // namespace cuda
-
+}  // namespace utils
 }  // namespace graphbolt
 
 #endif  // GRAPHBOLT_UTILS_H_

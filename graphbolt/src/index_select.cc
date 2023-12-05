@@ -24,26 +24,27 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
 }
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index) {
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
   TORCH_CHECK(
       indices.sizes().size() == 1, "IndexSelectCSC only supports 1d tensors");
-  if (indices.is_pinned() && cuda::is_accessible(indptr) &&
-      cuda::is_accessible(index)) {
+  if (indices.is_pinned() && utils::is_accessible_from_gpu(indptr) &&
+      utils::is_accessible_from_gpu(nodes)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "UVAIndexSelectCSC",
-        { return UVAIndexSelectCSCImpl(indptr, indices, index); });
+        { return UVAIndexSelectCSCImpl(indptr, indices, nodes); });
   } else if (
       indices.device().type() == c10::DeviceType::CUDA &&
-      cuda::is_accessible(indptr) && cuda::is_accessible(index)) {
+      utils::is_accessible_from_gpu(indptr) &&
+      utils::is_accessible_from_gpu(nodes)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "IndexSelectCSC",
-        { return IndexSelectCSCImpl(indptr, indices, index); });
+        c10::DeviceType::CUDA, "nodesSelectCSC",
+        { return IndexSelectCSCImpl(indptr, indices, nodes); });
   }
   // For testing purposes, to compare with CPU implementation
   torch::optional<torch::Tensor> temp;
   torch::optional<sampling::FusedCSCSamplingGraph::EdgeAttrMap> temp2;
   sampling::FusedCSCSamplingGraph g(indptr, indices, temp, temp, temp2);
-  const auto res = g.InSubgraph(index);
+  const auto res = g.InSubgraph(nodes);
   return std::make_tuple(res->indptr, res->indices);
 }
 

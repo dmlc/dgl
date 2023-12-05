@@ -14,17 +14,33 @@ namespace ops {
 
 /** @brief Implemented in the cuda directory. */
 std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
 /** @brief Implemented in the cuda directory. */
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
+/**
+ * @brief Select rows from indices according to nodes tensor.
+ *
+ * NOTE:
+ * 1. The shape of all tensors must be 1-D.
+ * 2. If indices is on pinned memory and nodes is on pinned memory or GPU
+ * memory, then UVAIndexSelectCSCImpl will be called. If indices is on GPU
+ * memory, then IndexSelectCSCImpl will be called. Otherwise,
+ * FusedCSCSamplingGraph::InSubgraph will be called.
+ *
+ * @param indptr Indptr tensor containing offsets with shape (N,).
+ * @param indices Indices tensor with edge information of shape (indptr[N],).
+ * @param nodes Nodes tensor with shape (M,).
+ * @return (torch::Tensor, torch::Tensor) Output indptr and indices tensors of
+ * shapes (M + 1,) and ((indptr[nodes + 1] - indptr[nodes]).sum(),).
+ */
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor index);
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
 /** @brief Implemented in the cuda directory. */
-torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
+torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor nodes);
 
 /**
  * @brief Select rows from input tensor according to index tensor.
