@@ -1,6 +1,6 @@
 """Utils for tracking graph homophily and heterophily"""
 # pylint: disable=W0611
-from . import function as fn
+from . import function as fn, to_bidirected
 
 try:
     import torch
@@ -248,43 +248,21 @@ def adjusted_homophily(graph, y):
     >>> graph = dgl.graph(([1, 2, 0, 4], [0, 1, 2, 3]))
     >>> y = torch.tensor([0, 0, 0, 0, 1])
     >>> dgl.adjusted_homophily(graph, y)
-    -0.14285714285714285
+    -0.1428571492433548
     """
-    import networkx as nx
-    import numpy as np
-
     check_pytorch()
 
-    num_nodes = graph.num_nodes()
-    edges = torch.vstack(graph.edges()).T.cpu().numpy()
+    graph = to_bidirected(graph)
 
-    graph = nx.Graph()
-    graph.add_nodes_from(range(num_nodes))
-    graph.add_edges_from(edges)
+    h_edge = edge_homophily(graph, y)
 
-    labels = y.cpu().numpy()
+    degrees = graph.in_degrees().float()
+    num_classes = y.max().item() + 1
+    degree_sums = torch.zeros(num_classes)
+    degree_sums.index_add_(dim=0, index=y, source=degrees)
 
-    # Convert labels to consecutive integers.
-    unique_labels = np.unique(labels)
-    labels_map = {label: i for i, label in enumerate(unique_labels)}
-    labels = np.array([labels_map[label] for label in labels])
-
-    edges_with_same_label = 0
-    for u, v in graph.edges:
-        if labels[u] == labels[v]:
-            edges_with_same_label += 1
-
-    h_edge = edges_with_same_label / len(graph.edges)
-
-    num_classes = len(unique_labels)
-
-    degree_sums = np.zeros((num_classes,))
-    for u in graph.nodes:
-        label = labels[u]
-        degree_sums[label] += graph.degree(u)
-
-    adjust = (degree_sums**2 / (len(graph.edges) * 2) ** 2).sum()
+    adjust = (degree_sums**2).sum() / graph.num_edges() ** 2
 
     h_adj = (h_edge - adjust) / (1 - adjust)
 
-    return h_adj
+    return h_adj.item()

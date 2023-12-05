@@ -65,4 +65,4 @@ def test_adjusted_homophily(idtype):
         ([1, 2, 0, 4], [0, 1, 2, 3]), idtype=idtype, device=device
     )
     y = F.tensor([0, 0, 0, 0, 1])
-    assert math.isclose(dgl.adjusted_homophily(graph, y), -0.14285714285714285)
+    assert math.isclose(dgl.adjusted_homophily(graph, y), -0.1428571492433548)
