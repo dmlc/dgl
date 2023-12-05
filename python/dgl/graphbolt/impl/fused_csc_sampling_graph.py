@@ -505,8 +505,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        # TODO: clean up once the migration is done.
         deduplicate=True,
-        is_cscformat=False,
+        output_cscformat=False,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -577,7 +578,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-        if deduplicate and not is_cscformat:
+        if deduplicate and not output_cscformat:
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
@@ -687,8 +688,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        # TODO: clean up once the migration is done.
         deduplicate=True,
-        is_cscformat=False,
+        output_cscformat=False,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
@@ -772,7 +774,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             probs_name,
         )
 
-        if deduplicate and not is_cscformat:
+        if deduplicate and not output_cscformat:
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
