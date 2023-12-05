@@ -125,9 +125,10 @@ if(USE_CUDA)
   # see https://github.com/NVIDIA/thrust/issues/1401
   add_definitions(-DTHRUST_CUB_WRAPPED_NAMESPACE=dgl)
   include(cmake/modules/CUDA.cmake)
-  message(STATUS "Use external CUB/Thrust library for a consistent API and performance.")
-  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
-  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/cub")
+  message(STATUS "Use external CCCL library for a consistent API and performance.")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/thrust")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/cub")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/libcudacxx/include")
 endif(USE_CUDA)
 
 # initial variables
