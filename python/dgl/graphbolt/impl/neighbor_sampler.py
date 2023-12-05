@@ -119,8 +119,7 @@ class NeighborSampler(SubgraphSampler):
                 self.fanouts[hop],
                 self.replace,
                 self.prob_name,
-                self.deduplicate,
-                self.output_cscformat,
+                not self.deduplicate or self.output_cscformat,
             )
             if self.deduplicate:
                 if self.output_cscformat:

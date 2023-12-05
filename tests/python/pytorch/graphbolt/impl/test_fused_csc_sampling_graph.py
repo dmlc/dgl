@@ -1720,7 +1720,7 @@ def test_sample_neighbors_homo_csc_format():
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
     subgraph = graph.sample_neighbors(
-        nodes, fanouts=torch.LongTensor([2]), deduplicate=False
+        nodes, fanouts=torch.LongTensor([2]), output_cscformat=True
     )
 
     # Verify in subgraph.
@@ -1774,7 +1774,7 @@ def test_sample_neighbors_hetero_csc_format(labor):
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts, deduplicate=False)
+    subgraph = sampler(nodes, fanouts, output_cscformat=True)
 
     # Verify in subgraph.
     expected_node_pairs = {
@@ -1799,7 +1799,7 @@ def test_sample_neighbors_hetero_csc_format(labor):
     nodes = {"n1": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts, deduplicate=False)
+    subgraph = sampler(nodes, fanouts, output_cscformat=True)
 
     # Verify in subgraph.
     expected_node_pairs = {
@@ -1879,7 +1879,7 @@ def test_sample_neighbors_fanouts_csc_format(
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.LongTensor(fanouts)
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts, deduplicate=False)
+    subgraph = sampler(nodes, fanouts, output_cscformat=True)
 
     # Verify in subgraph.
     assert (
@@ -1940,7 +1940,7 @@ def test_sample_neighbors_replace_csc_format(
 
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     subgraph = graph.sample_neighbors(
-        nodes, torch.LongTensor([4]), replace=replace, deduplicate=False
+        nodes, torch.LongTensor([4]), replace=replace, output_cscformat=True
     )
 
     # Verify in subgraph.
@@ -1984,7 +1984,7 @@ def test_sample_neighbors_return_eids_homo_csc_format(labor):
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts=torch.LongTensor([-1]), deduplicate=False)
+    subgraph = sampler(nodes, fanouts=torch.LongTensor([-1]), output_cscformat=True)
 
     # Verify in subgraph.
     expected_reverse_edge_ids = edge_attributes[gb.ORIGINAL_EDGE_ID][
@@ -2041,7 +2041,7 @@ def test_sample_neighbors_return_eids_hetero_csc_format(labor):
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts, deduplicate=False)
+    subgraph = sampler(nodes, fanouts, output_cscformat=True)
 
     # Verify in subgraph.
     expected_reverse_edge_ids = {
@@ -2098,7 +2098,7 @@ def test_sample_neighbors_probs_csc_format(replace, labor, probs_name):
         fanouts=torch.tensor([2]),
         replace=replace,
         probs_name=probs_name,
-        deduplicate=False,
+        output_cscformat=True,
     )
 
     # Verify in subgraph.
@@ -2145,7 +2145,7 @@ def test_sample_neighbors_zero_probs_csc_format(replace, labor, probs_or_mask):
         fanouts=torch.tensor([5]),
         replace=replace,
         probs_name="probs_or_mask",
-        deduplicate=False,
+        output_cscformat=True,
     )
 
     # Verify in subgraph.
@@ -2216,7 +2216,7 @@ def test_sample_neighbors_homo_pick_number_csc_format(
         fanouts=torch.LongTensor(fanouts),
         replace=replace,
         probs_name=probs_name if probs_name != "none" else None,
-        deduplicate=False,
+        output_cscformat=True,
     )
     sampled_num = subgraph.node_pairs.indices.size(0)
     assert subgraph.node_pairs.indptr.size(0) == 3
@@ -2308,7 +2308,7 @@ def test_sample_neighbors_hetero_pick_number_csc_format(
         fanouts=torch.LongTensor(fanouts),
         replace=replace,
         probs_name=probs_name if probs_name != "none" else None,
-        deduplicate=False,
+        output_cscformat=True,
     )
     print(subgraph)
     if probs_name == "none":
