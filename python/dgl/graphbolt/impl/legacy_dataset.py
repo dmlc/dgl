@@ -1,6 +1,8 @@
 """Graphbolt dataset for legacy DGLDataset."""
 from typing import List, Union
 
+import torch
+
 from dgl.data import AsLinkPredDataset, AsNodePredDataset, DGLDataset
 from ..base import etype_tuple_to_str
 from ..dataset import Dataset, Task
@@ -132,8 +134,6 @@ class LegacyDataset(Dataset):
         self._dataset_name = legacy.name
 
     def _init_as_homogeneous_link_pred(self, legacy: DGLDataset):
-        assert legacy.is_homogeneous
-
         legacy = AsLinkPredDataset(legacy)
 
         # Initialize tasks.
@@ -151,7 +151,7 @@ class LegacyDataset(Dataset):
             negative_dst = negative_dst.view(num_edges, -1)
             return ItemSet(
                 (node_pairs, negative_src, negative_dst),
-                name=("node_pairs", "negative_srcs", "negative_dsts"),
+                names=("node_pairs", "negative_srcs", "negative_dsts"),
             )
 
         validation_set = _init_item_set_with_neg(legacy.val_edges)
