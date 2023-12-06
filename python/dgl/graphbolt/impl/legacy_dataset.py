@@ -38,6 +38,7 @@ class LegacyDataset(Dataset):
                 item_set_dict[key] = item_set
             return ItemSetDict(item_set_dict)
 
+        # OGB Dataset has the idx split.
         if hasattr(legacy, "get_idx_split"):
             graph, labels = legacy[0]
             split_idx = legacy.get_idx_split()
@@ -80,6 +81,10 @@ class LegacyDataset(Dataset):
             self._feature = BasicFeatureStore(features)
             self._graph = from_dglgraph(graph, is_homogeneous=False)
             self._dataset_name = legacy.name
+        else:
+            raise NotImplementedError(
+                "Only support heterogeneous ogn node pred dataset"
+            )
 
     def _init_as_homogeneous_node_pred(self, legacy: DGLDataset):
         legacy = AsNodePredDataset(legacy)
