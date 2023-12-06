@@ -2,63 +2,97 @@
 from typing import Dict, List, Union
 
 from dgl.data import AsNodePredDataset, DGLDataset
+from ..base import etype_tuple_to_str
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
 from .basic_feature_store import BasicFeatureStore
 from .fused_csc_sampling_graph import from_dglgraph
+from .ondisk_dataset import OnDiskTask
 from .torch_based_feature_store import TorchBasedFeature
-
-
-class LegacyTask(Task):
-    """A Graphbolt task for legacy DGLDataset."""
-
-    def __init__(self, legacy: AsNodePredDataset):
-        train_labels = legacy[0].ndata["label"][legacy.train_idx]
-        validation_labels = legacy[0].ndata["label"][legacy.val_idx]
-        test_labels = legacy[0].ndata["label"][legacy.test_idx]
-        self._train_set = ItemSet(
-            (legacy.train_idx, train_labels),
-            names=("seed_nodes", "labels"),
-        )
-        self._validation_set = ItemSet(
-            (legacy.val_idx, validation_labels),
-            names=("seed_nodes", "labels"),
-        )
-        self._test_set = ItemSet(
-            (legacy.test_idx, test_labels), names=("seed_nodes", "labels")
-        )
-        self._metadata = {"num_classes": legacy.num_classes}
-
-    @property
-    def metadata(self) -> Dict:
-        """Return the task metadata."""
-        return self._metadata
-
-    @property
-    def train_set(self) -> Union[ItemSet, ItemSetDict]:
-        """Return the training set."""
-        return self._train_set
-
-    @property
-    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
-        """Return the validation set."""
-        return self._validation_set
-
-    @property
-    def test_set(self) -> Union[ItemSet, ItemSetDict]:
-        """Return the test set."""
-        return self._test_set
 
 
 class LegacyDataset(Dataset):
     """A Graphbolt dataset for legacy DGLDataset."""
 
-    def __init__(self, legacy: AsNodePredDataset):
+    def __init__(self, legacy: DGLDataset, is_homogeneous: bool):
+        if is_homogeneous:
+            self._init_as_homogeneous_node_pred(legacy)
+        else:
+            self._init_as_heterogeneous_node_pred(legacy)
+
+    def _init_as_heterogeneous_node_pred(self, legacy: DGLDataset):
+        def _init_item_set_dict(idx, labels):
+            item_set_dict = {}
+            for key in idx.keys():
+                item_set = ItemSet((idx[key], labels[key][idx[key]]), names=("seed_nodes", "labels"))
+                item_set_dict[key] = item_set
+            return ItemSetDict(item_set_dict)
+
+        if hasattr(legacy, "get_idx_split"):
+            assert len(legacy) == 1
+            graph, labels = legacy[0]
+            split_idx = legacy.get_idx_split()
+
+            # Initialize tasks.
+            tasks = []
+            metadata = {"num_classes": legacy.num_classes, "name": "node_classification"}
+            train_set = _init_item_set_dict(split_idx["train"], labels)
+            validation_set = _init_item_set_dict(split_idx["valid"], labels)
+            test_set = _init_item_set_dict(split_idx["test"], labels)
+            task = OnDiskTask(metadata, train_set, validation_set, test_set)
+            tasks.append(task)
+            self._tasks = tasks
+
+            item_set_dict = {}
+            for ntype in graph.ntypes:
+                item_set = ItemSet(graph.num_nodes(ntype), names="seed_nodes")
+                item_set_dict[ntype] = item_set
+            self._all_nodes_set = ItemSetDict(item_set_dict)
+
+            features = {}
+            for ntype in graph.ntypes:
+                for key in graph.nodes[ntype].data.keys():
+                    tensor = graph.nodes[ntype].data[key]
+                    if tensor.dim() == 1:
+                        tensor = tensor.view(-1, 1)
+                    features[("node", ntype, key)] = TorchBasedFeature(tensor)
+            for etype in graph.canonical_etypes:
+                for key in graph.edges[etype].data.keys():
+                    tensor = graph.edges[etype].data[key]
+                    if tensor.dim() == 1:
+                        tensor = tensor.view(-1, 1)
+                    gb_etype = etype_tuple_to_str(etype)
+                    features[("edge", gb_etype, key)] = TorchBasedFeature(tensor)
+            self._feature = BasicFeatureStore(features)
+            self._graph = from_dglgraph(graph, is_homogeneous=False)
+            self._dataset_name = ""
+
+    def _init_as_homogeneous_node_pred(self, legacy: DGLDataset):
+        legacy = AsNodePredDataset(legacy)
         assert len(legacy) == 1
+
+        # Initialize tasks.
         tasks = []
-        tasks.append(LegacyTask(legacy))
+        metadata = {"num_classes": legacy.num_classes, "name": "node_classification"}
+        train_labels = legacy[0].ndata["label"][legacy.train_idx]
+        validation_labels = legacy[0].ndata["label"][legacy.val_idx]
+        test_labels = legacy[0].ndata["label"][legacy.test_idx]
+        train_set = ItemSet(
+            (legacy.train_idx, train_labels),
+            names=("seed_nodes", "labels"),
+        )
+        validation_set = ItemSet(
+            (legacy.val_idx, validation_labels),
+            names=("seed_nodes", "labels"),
+        )
+        test_set = ItemSet(
+            (legacy.test_idx, test_labels), names=("seed_nodes", "labels")
+        )
+        task = OnDiskTask(metadata, train_set, validation_set, test_set)
+        tasks.append(task)
         self._tasks = tasks
+
         num_nodes = legacy[0].num_nodes()
         self._all_nodes_set = ItemSet(num_nodes, names="seed_nodes")
         features = {}
