@@ -86,10 +86,6 @@ class SharedMemoryHelper {
   torch::optional<torch::Dict<std::string, torch::Tensor>>
   ReadTorchTensorDict();
 
-  void WriteTorchDict(
-      torch::optional<torch::Dict<std::string, int64_t>> dict,
-      const std::string& name);
-
   /** @brief Flush the data structures to the shared memory. */
   void Flush();
 

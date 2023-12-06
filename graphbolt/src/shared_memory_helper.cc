@@ -51,15 +51,10 @@ void SharedMemoryHelper::InitializeRead() {
         std::make_unique<SharedMemory>(GetSharedMemoryMetadataName(name_));
     metadata_shared_memory_->Open();
     metadata_size_ = metadata_shared_memory_->GetSize();
-    auto archive = this->ReadTorchArchive();
     data_shared_memory_ =
         std::make_unique<SharedMemory>(GetSharedMemoryDataName(name_));
     data_shared_memory_->Open();
     data_size_ = data_shared_memory_->GetSize();
-  } else {
-    // Writer process already has the shared memory.
-    // Skip the first archive recording data size before read.
-    this->ReadTorchArchive();
   }
 }
 
@@ -147,20 +142,6 @@ SharedMemoryHelper::ReadTorchTensorDict() {
   return tensor_dict;
 }
 
-void SharedMemoryHelper::WriteTorchDict(
-    torch::optional<torch::Dict<std::string, int64_t>> dict,
-    const std::string& name) {
-  torch::serialize::OutputArchive archive;
-  if (!dict.has_value()) {
-    archive.write(name + "_has_value", false);
-    this->WriteTorchArchive(std::move(archive));
-    return;
-  }
-  archive.write(name + "_has_value", true);
-  archive.write(name + "_data", dict.value());
-  this->WriteTorchArchive(std::move(archive));
-}
-
 void SharedMemoryHelper::SerializeMetadata() {
   for (auto& archive : metadata_to_write_) {
     std::stringstream serialized;
@@ -196,8 +177,6 @@ void SharedMemoryHelper::WriteTorchTensorInternal(
 }
 
 void SharedMemoryHelper::Flush() {
-  // The first archive records the size of the tensor data.
-  torch::serialize::OutputArchive archive;
   size_t data_size = 0;
   for (auto tensor : tensors_to_write_) {
     if (tensor.has_value()) {
@@ -205,8 +184,6 @@ void SharedMemoryHelper::Flush() {
       data_size += GetRoundedSize(tensor_size);
     }
   }
-  archive.write("data_size", static_cast<int64_t>(data_size));
-  metadata_to_write_.insert(metadata_to_write_.begin(), std::move(archive));
 
   // Serialize the metadata archives.
   SerializeMetadata();
@@ -222,8 +199,8 @@ void SharedMemoryHelper::Flush() {
   metadata_shared_memory_->Create(metadata_size);
   metadata_size_ = metadata_size;
 
+  // Write the metadata and tensor data to the shared memory.
   WriteMetadataToSharedMemory();
-
   data_shared_memory_ =
       std::make_unique<SharedMemory>(GetSharedMemoryDataName(name_));
   data_shared_memory_->Create(data_size);

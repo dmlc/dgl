@@ -79,7 +79,7 @@ void* SharedMemory::Open() {
       "Failed to get the size of shared memory: ", GetLastError());
   size_ = fileInfo.EndOfFile.QuadPart;
 
-  ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size);
+  ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size_);
   TORCH_CHECK(
       ptr_ != nullptr, "Memory mapping failed, Win32 error: ", GetLastError());
   return ptr_;
