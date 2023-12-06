@@ -1,5 +1,5 @@
 """Graphbolt dataset for legacy DGLDataset."""
-from typing import Dict, List, Union
+from typing import List, Union
 
 from dgl.data import AsNodePredDataset, DGLDataset
 from ..base import etype_tuple_to_str
