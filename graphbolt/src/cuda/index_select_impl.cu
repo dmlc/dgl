@@ -154,7 +154,7 @@ auto ComputeDegree(
 }
 
 template <typename indptr_t, typename indices_t>
-std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCIndices(
+std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
     torch::Tensor indices, const indptr_t* const sliced_indptr,
     const int64_t num_nodes, const indptr_t* const in_degree,
     const int64_t* const perm, torch::TensorOptions nodes_options,
@@ -230,8 +230,8 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
         auto in_degree = in_degree_ptr.get();
         auto sliced_indptr = sliced_indptr_ptr.get();
         return GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
-            indices.element_size(), "UVAIndexSelectCSCIndices", ([&] {
-              return UVAIndexSelectCSCIndices<indptr_t, element_size_t>(
+            indices.element_size(), "UVAIndexSelectCSCCopyIndices", ([&] {
+              return UVAIndexSelectCSCCopyIndices<indptr_t, element_size_t>(
                   indices, sliced_indptr, num_nodes, in_degree,
                   perm_tensor.data_ptr<int64_t>(), nodes.options(),
                   indptr.scalar_type(), stream);
@@ -255,7 +255,7 @@ struct ConvertToBytes {
 };
 
 template <typename indptr_t, typename indices_t>
-void IndexSelectCSCIndices(
+void IndexSelectCSCCopyIndices(
     const int64_t num_nodes, indices_t* const indices,
     indptr_t* const sliced_indptr, indptr_t* const sub_indptr,
     const indptr_t* const in_degree, indices_t* const sub_indices,
@@ -319,9 +319,9 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
         torch::Tensor sub_indices = torch::empty(
             hop_size, nodes.options().dtype(indices.scalar_type()));
         GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
-            indices.element_size(), "IndexSelectCSCIndices", ([&] {
+            indices.element_size(), "IndexSelectCSCCopyIndices", ([&] {
               using indices_t = element_size_t;
-              IndexSelectCSCIndices<indptr_t, indices_t>(
+              IndexSelectCSCCopyIndices<indptr_t, indices_t>(
                   num_nodes, reinterpret_cast<indices_t*>(indices.data_ptr()),
                   sliced_indptr, sub_indptr.data_ptr<indptr_t>(), in_degree,
                   reinterpret_cast<indices_t*>(sub_indices.data_ptr()), stream);
