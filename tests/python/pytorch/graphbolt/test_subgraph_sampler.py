@@ -409,7 +409,6 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
     seeds = [torch.tensor([0, 3, 4, 5, 2]), torch.tensor([0, 3, 4])]
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            print(sampled_subgraph)
             assert torch.equal(
                 sampled_subgraph.original_row_node_ids,
                 original_row_node_ids[step],
@@ -485,7 +484,6 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
 
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            print(sampled_subgraph)
             for ntype in ["n1", "n2"]:
                 assert torch.equal(
                     sampled_subgraph.original_row_node_ids[ntype],
