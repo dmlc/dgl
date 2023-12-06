@@ -261,7 +261,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        Dict[str, torch.Tensor or None
+        Dict[str, torch.Tensor] or None
             If present, returns a dictionary of edge attributes. Each key
             represents the attribute's name, while the corresponding value
             holds the attribute's specific value. The length of each value
