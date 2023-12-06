@@ -1138,9 +1138,11 @@ def test_homo_graph_on_shared_memory(
 )
 @pytest.mark.parametrize(
     "total_num_nodes, total_num_edges",
-    [(1, 1), (100, 1), (10, 50), (1000, 50000)],
+    [(1, 1), (100, 1), (10, 50), (1000, 50 * 1000), (10 * 1000, 100 * 1000)],
 )
-@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+@pytest.mark.parametrize(
+    "num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1), (1000, 1000)]
+)
 @pytest.mark.parametrize("test_edge_attrs", [True, False])
 def test_hetero_graph_on_shared_memory(
     total_num_nodes, total_num_edges, num_ntypes, num_etypes, test_edge_attrs

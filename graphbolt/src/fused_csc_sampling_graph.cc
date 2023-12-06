@@ -597,7 +597,7 @@ BuildGraphFromSharedMemoryHelper(SharedMemoryHelper&& helper) {
 c10::intrusive_ptr<FusedCSCSamplingGraph>
 FusedCSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
-  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  SharedMemoryHelper helper(shared_memory_name);
   helper.WriteTorchTensor(indptr_);
   helper.WriteTorchTensor(indices_);
   helper.WriteTorchTensor(node_type_offset_);
@@ -612,7 +612,7 @@ FusedCSCSamplingGraph::CopyToSharedMemory(
 c10::intrusive_ptr<FusedCSCSamplingGraph>
 FusedCSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
-  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  SharedMemoryHelper helper(shared_memory_name);
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
