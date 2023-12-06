@@ -124,10 +124,9 @@ def get_attributes(_obj) -> list:
 
 def convert_coo_to_csc_homo(src, dst, include_original_edge_id: bool = False):
     """Convert COO format data (homogenious) to CSC format."""
-    assert (
-        len(src) == len(dst),
-        "COO data incorrect: Amount of src and dst incompactable.",
-    )
+    assert len(src) == len(
+        dst
+    ), "COO data incorrect: Amount of src and dst incompactable."
     indices = torch.tensor([src, dst])
     eid = torch.arange(0, len(src))
     coo = torch.sparse_coo_tensor(indices, values=eid)
