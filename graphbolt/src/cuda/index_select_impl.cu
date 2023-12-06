@@ -220,11 +220,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
   const auto [sorted, perm_tensor] =
       Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1));
   const auto perm = perm_tensor.data_ptr<int64_t>();
-
-  auto allocator = cuda::BuildAllocator();
   auto stream = c10::cuda::getDefaultCUDAStream();
-  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
-
   const int64_t num_nodes = nodes.size(0);
 
   return AT_DISPATCH_INTEGRAL_TYPES(
@@ -289,27 +285,24 @@ void IndexSelectCSCIndices(
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
-  auto allocator = cuda::BuildAllocator();
   auto stream = c10::cuda::getDefaultCUDAStream();
-
   const int64_t num_nodes = nodes.size(0);
-
-  // Output indptr for the slice indexed by nodes.
-  torch::Tensor sub_indptr =
-      torch::empty(num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
-  torch::Tensor sub_indices;
-  AT_DISPATCH_INTEGRAL_TYPES(
+  return AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
         using indptr_t = scalar_t;
         auto [in_deg_ptr, sliced_indptr_ptr] =
             ComputeDegree(indptr.data_ptr<indptr_t>(), nodes, stream);
         auto in_deg = in_deg_ptr.get();
         auto sliced_indptr = sliced_indptr_ptr.get();
+        // Output indptr for the slice indexed by nodes.
+        torch::Tensor sub_indptr = torch::empty(
+            num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
         {  // Compute the output indptr, sub_indptr.
           size_t workspace_size = 0;
           CUDA_CALL(cub::DeviceScan::ExclusiveSum(
               nullptr, workspace_size, in_deg, sub_indptr.data_ptr<indptr_t>(),
               num_nodes + 1, stream));
+          auto allocator = cuda::BuildAllocator();
           auto temp = allocator.AllocateStorage<char>(workspace_size);
           CUDA_CALL(cub::DeviceScan::ExclusiveSum(
               temp.get(), workspace_size, in_deg,
@@ -323,7 +316,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
         // blocking read of hop_size
         CUDA_CALL(cudaStreamSynchronize(stream));
         // Allocate output array of size number of copied edges.
-        sub_indices = torch::empty(
+        torch::Tensor sub_indices = torch::empty(
             hop_size, nodes.options().dtype(indices.scalar_type()));
         GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
             indices.element_size(), "IndexSelectCSCIndices", ([&] {
@@ -333,8 +326,8 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
                   sliced_indptr, sub_indptr.data_ptr<indptr_t>(), in_deg,
                   reinterpret_cast<indices_t*>(sub_indices.data_ptr()), stream);
             }));
+        return std::make_tuple(sub_indptr, sub_indices);
       }));
-  return {sub_indptr, sub_indices};
 }
 
 /** @brief Index select operator implementation for feature size 1. */
