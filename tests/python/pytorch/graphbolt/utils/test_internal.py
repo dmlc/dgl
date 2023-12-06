@@ -146,7 +146,7 @@ def test_copy_or_convert_data(data_fmt, save_fmt, is_feature):
 def test_convert_coo_to_csc_homo():
     src = [0, 0, 1, 1, 2, 2, 2, 2, 3, 5]
     dst = [1, 3, 0, 4, 1, 2, 3, 5, 5, 4]
-    indptr, indices, edge_id = internal.utils.convert_coo_to_csc_homo(
+    indptr, indices, edge_ids = internal.utils.convert_coo_to_csc_homo(
         src, dst, include_original_edge_id=True
     )
     assert torch.equal(indptr, torch.LongTensor([0, 1, 3, 4, 6, 8, 10]))
@@ -154,5 +154,5 @@ def test_convert_coo_to_csc_homo():
         indices, torch.LongTensor([1, 0, 2, 2, 0, 2, 1, 5, 2, 3])
     )
     assert torch.equal(
-        edge_id, torch.LongTensor([2, 0, 4, 5, 1, 6, 3, 9, 7, 8])
+        edge_ids, torch.LongTensor([2, 0, 4, 5, 1, 6, 3, 9, 7, 8])
     )
