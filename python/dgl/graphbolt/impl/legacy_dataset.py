@@ -15,8 +15,11 @@ from .torch_based_feature_store import TorchBasedFeature
 class LegacyDataset(Dataset):
     """A Graphbolt dataset for legacy DGLDataset."""
 
-    def __init__(self, legacy: DGLDataset, is_homogeneous: bool):
-        if is_homogeneous:
+    def __init__(self, legacy: DGLDataset):
+        graph = legacy[0]
+        if isinstance(graph, tuple):
+            graph, _ = graph
+        if graph.is_homogeneous:
             self._init_as_homogeneous_node_pred(legacy)
         else:
             self._init_as_heterogeneous_node_pred(legacy)
