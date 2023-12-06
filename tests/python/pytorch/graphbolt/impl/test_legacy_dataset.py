@@ -7,8 +7,8 @@ from dgl.data import AsNodePredDataset, CoraGraphDataset
 
 def test_LegacyDataset_homo_node_pred():
     cora = CoraGraphDataset(transform=AddSelfLoop())
-    input = AsNodePredDataset(cora)
-    dataset = gb.LegacyDataset(input)
+    cora = AsNodePredDataset(cora)
+    dataset = gb.LegacyDataset(cora)
 
     # Check tasks.
     assert len(dataset.tasks) == 1

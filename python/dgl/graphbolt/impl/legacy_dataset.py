@@ -11,22 +11,22 @@ from .torch_based_feature_store import TorchBasedFeature
 
 
 class LegacyTask(Task):
-    def __init__(self, input: AsNodePredDataset):
-        train_labels = input[0].ndata["label"][input.train_idx]
-        validation_labels = input[0].ndata["label"][input.val_idx]
-        test_labels = input[0].ndata["label"][input.test_idx]
+    def __init__(self, legacy: AsNodePredDataset):
+        train_labels = legacy[0].ndata["label"][legacy.train_idx]
+        validation_labels = legacy[0].ndata["label"][legacy.val_idx]
+        test_labels = legacy[0].ndata["label"][legacy.test_idx]
         self._train_set = ItemSet(
-            (input.train_idx, train_labels),
+            (legacy.train_idx, train_labels),
             names=("seed_nodes", "labels"),
         )
         self._validation_set = ItemSet(
-            (input.val_idx, validation_labels),
+            (legacy.val_idx, validation_labels),
             names=("seed_nodes", "labels"),
         )
         self._test_set = ItemSet(
-            (input.test_idx, test_labels), names=("seed_nodes", "labels")
+            (legacy.test_idx, test_labels), names=("seed_nodes", "labels")
         )
-        self._metadata = {"num_classes": input.num_classes}
+        self._metadata = {"num_classes": legacy.num_classes}
 
     @property
     def metadata(self) -> Dict:
@@ -50,21 +50,21 @@ class LegacyTask(Task):
 
 
 class LegacyDataset(Dataset):
-    def __init__(self, input: AsNodePredDataset):
-        assert len(input) == 1
+    def __init__(self, legacy: AsNodePredDataset):
+        assert len(legacy) == 1
         tasks = []
-        tasks.append(LegacyTask(input))
+        tasks.append(LegacyTask(legacy))
         self._tasks = tasks
-        num_nodes = input[0].num_nodes()
+        num_nodes = legacy[0].num_nodes()
         self._all_nodes_set = ItemSet(num_nodes, names="seed_nodes")
         features = {}
-        for name in input[0].ndata.keys():
-            tensor = input[0].ndata[name]
+        for name in legacy[0].ndata.keys():
+            tensor = legacy[0].ndata[name]
             if tensor.dim() == 1:
                 tensor = tensor.view(-1, 1)
             features[("node", None, name)] = TorchBasedFeature(tensor)
         self._feature = BasicFeatureStore(features)
-        self._graph = from_dglgraph(input[0], is_homogeneous=True)
+        self._graph = from_dglgraph(legacy[0], is_homogeneous=True)
         self._dataset_name = ""
 
     @property
