@@ -79,7 +79,7 @@ class LegacyDataset(Dataset):
                     )
             self._feature = BasicFeatureStore(features)
             self._graph = from_dglgraph(graph, is_homogeneous=False)
-            self._dataset_name = ""
+            self._dataset_name = legacy.name
 
     def _init_as_homogeneous_node_pred(self, legacy: DGLDataset):
         legacy = AsNodePredDataset(legacy)
@@ -123,7 +123,7 @@ class LegacyDataset(Dataset):
             features[("edge", None, name)] = TorchBasedFeature(tensor)
         self._feature = BasicFeatureStore(features)
         self._graph = from_dglgraph(legacy[0], is_homogeneous=True)
-        self._dataset_name = ""
+        self._dataset_name = legacy.name
 
     @property
     def tasks(self) -> List[Task]:
