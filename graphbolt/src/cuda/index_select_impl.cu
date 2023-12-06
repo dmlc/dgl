@@ -217,9 +217,8 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCIndices(
 std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
   // Sorting nodes so that accesses over PCI-e are more regular.
-  const auto [sorted, perm_tensor] =
-      Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1));
-  const auto perm = perm_tensor.data_ptr<int64_t>();
+  const auto perm_tensor =
+      Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1)).second;
   auto stream = c10::cuda::getDefaultCUDAStream();
   const int64_t num_nodes = nodes.size(0);
 
@@ -233,8 +232,9 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
         return GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
             indices.element_size(), "UVAIndexSelectCSCIndices", ([&] {
               return UVAIndexSelectCSCIndices<indptr_t, element_size_t>(
-                  indices, sliced_indptr, num_nodes, in_deg, perm,
-                  nodes.options(), indptr.scalar_type(), stream);
+                  indices, sliced_indptr, num_nodes, in_deg,
+                  perm_tensor.data_ptr<int64_t>(), nodes.options(),
+                  indptr.scalar_type(), stream);
             }));
       }));
 }
