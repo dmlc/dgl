@@ -25,7 +25,10 @@ class LegacyDataset(Dataset):
         def _init_item_set_dict(idx, labels):
             item_set_dict = {}
             for key in idx.keys():
-                item_set = ItemSet((idx[key], labels[key][idx[key]]), names=("seed_nodes", "labels"))
+                item_set = ItemSet(
+                    (idx[key], labels[key][idx[key]]),
+                    names=("seed_nodes", "labels"),
+                )
                 item_set_dict[key] = item_set
             return ItemSetDict(item_set_dict)
 
@@ -36,7 +39,10 @@ class LegacyDataset(Dataset):
 
             # Initialize tasks.
             tasks = []
-            metadata = {"num_classes": legacy.num_classes, "name": "node_classification"}
+            metadata = {
+                "num_classes": legacy.num_classes,
+                "name": "node_classification",
+            }
             train_set = _init_item_set_dict(split_idx["train"], labels)
             validation_set = _init_item_set_dict(split_idx["valid"], labels)
             test_set = _init_item_set_dict(split_idx["test"], labels)
@@ -63,7 +69,9 @@ class LegacyDataset(Dataset):
                     if tensor.dim() == 1:
                         tensor = tensor.view(-1, 1)
                     gb_etype = etype_tuple_to_str(etype)
-                    features[("edge", gb_etype, name)] = TorchBasedFeature(tensor)
+                    features[("edge", gb_etype, name)] = TorchBasedFeature(
+                        tensor
+                    )
             self._feature = BasicFeatureStore(features)
             self._graph = from_dglgraph(graph, is_homogeneous=False)
             self._dataset_name = ""
@@ -74,7 +82,10 @@ class LegacyDataset(Dataset):
 
         # Initialize tasks.
         tasks = []
-        metadata = {"num_classes": legacy.num_classes, "name": "node_classification"}
+        metadata = {
+            "num_classes": legacy.num_classes,
+            "name": "node_classification",
+        }
         train_labels = legacy[0].ndata["label"][legacy.train_idx]
         validation_labels = legacy[0].ndata["label"][legacy.val_idx]
         test_labels = legacy[0].ndata["label"][legacy.test_idx]
