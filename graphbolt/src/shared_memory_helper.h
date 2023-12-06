@@ -29,8 +29,8 @@ namespace sampling {
  * solve this problem, we use two shared memory objects: one for storing the
  * metadata and the other for storing the binary buffer. The metadata includes
  * the metadata of data structures such as size and shape. The size of the
- * metadata is decided by the user via `max_metadata_size`. The size of the
- * binary buffer is decided by the size of the data structures.
+ * metadata is decided by the size of metadata. The size of the binary buffer is
+ * decided by the size of the data structures.
  *
  * To avoid repeated shared memory allocation, this helper class uses lazy data
  * structure writing. The data structures are written to the shared memory only
