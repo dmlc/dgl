@@ -52,18 +52,18 @@ class LegacyDataset(Dataset):
 
             features = {}
             for ntype in graph.ntypes:
-                for key in graph.nodes[ntype].data.keys():
-                    tensor = graph.nodes[ntype].data[key]
+                for name in graph.nodes[ntype].data.keys():
+                    tensor = graph.nodes[ntype].data[name]
                     if tensor.dim() == 1:
                         tensor = tensor.view(-1, 1)
-                    features[("node", ntype, key)] = TorchBasedFeature(tensor)
+                    features[("node", ntype, name)] = TorchBasedFeature(tensor)
             for etype in graph.canonical_etypes:
-                for key in graph.edges[etype].data.keys():
-                    tensor = graph.edges[etype].data[key]
+                for name in graph.edges[etype].data.keys():
+                    tensor = graph.edges[etype].data[name]
                     if tensor.dim() == 1:
                         tensor = tensor.view(-1, 1)
                     gb_etype = etype_tuple_to_str(etype)
-                    features[("edge", gb_etype, key)] = TorchBasedFeature(tensor)
+                    features[("edge", gb_etype, name)] = TorchBasedFeature(tensor)
             self._feature = BasicFeatureStore(features)
             self._graph = from_dglgraph(graph, is_homogeneous=False)
             self._dataset_name = ""
@@ -101,6 +101,11 @@ class LegacyDataset(Dataset):
             if tensor.dim() == 1:
                 tensor = tensor.view(-1, 1)
             features[("node", None, name)] = TorchBasedFeature(tensor)
+        for name in legacy[0].edata.keys():
+            tensor = legacy[0].edata[name]
+            if tensor.dim() == 1:
+                tensor = tensor.view(-1, 1)
+            features[("edge", None, name)] = TorchBasedFeature(tensor)
         self._feature = BasicFeatureStore(features)
         self._graph = from_dglgraph(legacy[0], is_homogeneous=True)
         self._dataset_name = ""
