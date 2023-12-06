@@ -378,7 +378,6 @@ class OnDiskDataset(Dataset):
 
     def load(self):
         """Load the dataset."""
-        self._loaded = True
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
@@ -386,6 +385,7 @@ class OnDiskDataset(Dataset):
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
+        self._loaded = True
         return self
 
     @property
