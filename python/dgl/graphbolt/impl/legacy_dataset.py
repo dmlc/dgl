@@ -11,6 +11,7 @@ from .torch_based_feature_store import TorchBasedFeature
 
 
 class LegacyTask(Task):
+    """A Graphbolt task for legacy DGLDataset."""
     def __init__(self, legacy: AsNodePredDataset):
         train_labels = legacy[0].ndata["label"][legacy.train_idx]
         validation_labels = legacy[0].ndata["label"][legacy.val_idx]
@@ -50,6 +51,7 @@ class LegacyTask(Task):
 
 
 class LegacyDataset(Dataset):
+    """A Graphbolt dataset for legacy DGLDataset."""
     def __init__(self, legacy: AsNodePredDataset):
         assert len(legacy) == 1
         tasks = []
