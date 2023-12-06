@@ -18,6 +18,8 @@ class LegacyDataset(Dataset):
     """A Graphbolt dataset for legacy DGLDataset."""
 
     def __init__(self, legacy: DGLDataset):
+        self._init_as_homogeneous_link_pred(legacy)
+        return
         # Only supports single graph cases.
         assert len(legacy) == 1
         graph = legacy[0]
