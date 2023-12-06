@@ -352,6 +352,7 @@ class OnDiskDataset(Dataset):
         yaml_path = preprocess_ondisk_dataset(path, include_original_edge_id)
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+        self._loaded = False
 
     def _convert_yaml_path_to_absolute_path(self):
         """Convert the path in YAML file to absolute path."""
@@ -384,6 +385,7 @@ class OnDiskDataset(Dataset):
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
+        self._loaded = True
         return self
 
     @property
@@ -394,26 +396,31 @@ class OnDiskDataset(Dataset):
     @property
     def tasks(self) -> List[Task]:
         """Return the tasks."""
+        self._check_loaded()
         return self._tasks
 
     @property
     def graph(self) -> SamplingGraph:
         """Return the graph."""
+        self._check_loaded()
         return self._graph
 
     @property
     def feature(self) -> TorchBasedFeatureStore:
         """Return the feature."""
+        self._check_loaded()
         return self._feature
 
     @property
     def dataset_name(self) -> str:
         """Return the dataset name."""
+        self._check_loaded()
         return self._dataset_name
 
     @property
     def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the itemset containing all nodes."""
+        self._check_loaded()
         return self._all_nodes_set
 
     def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
@@ -431,6 +438,12 @@ class OnDiskDataset(Dataset):
                 )
             )
         return ret
+
+    def _check_loaded(self):
+        assert self._loaded, (
+            "Please ensure that you have called the OnDiskDataset.load() method"
+            + " to properly load the data."
+        )
 
     def _load_graph(
         self, graph_topology: OnDiskGraphTopology
