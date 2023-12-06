@@ -17,6 +17,7 @@ class LegacyDataset(Dataset):
 
     def __init__(self, legacy: DGLDataset):
         graph = legacy[0]
+        # Handle OGB Dataset.
         if isinstance(graph, tuple):
             graph, _ = graph
         if graph.is_homogeneous:
