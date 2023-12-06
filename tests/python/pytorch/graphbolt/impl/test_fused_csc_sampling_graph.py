@@ -376,9 +376,11 @@ def test_pickle_homo_graph(total_num_nodes, total_num_edges):
     assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
     assert torch.equal(graph.indices, graph2.indices)
 
-    assert graph.metadata is None and graph2.metadata is None
     assert graph.node_type_offset is None and graph2.node_type_offset is None
     assert graph.type_per_edge is None and graph2.type_per_edge is None
+    assert graph.node_type_to_id is None and graph2.node_type_to_id is None
+    assert graph.edge_type_to_id is None and graph2.edge_type_to_id is None
+    assert graph.edge_attributes is None and graph2.edge_attributes is None
 
 
 @unittest.skipIf(
@@ -425,8 +427,12 @@ def test_pickle_hetero_graph(
     assert torch.equal(graph.indices, graph2.indices)
     assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
     assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
-    assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
-    assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+    assert graph.node_type_to_id.keys() == graph2.node_type_to_id.keys()
+    for i in graph.node_type_to_id.keys():
+        assert graph.node_type_to_id[i] == graph2.node_type_to_id[i]
+    assert graph.edge_type_to_id.keys() == graph2.edge_type_to_id.keys()
+    for i in graph.edge_type_to_id.keys():
+        assert graph.edge_type_to_id[i] == graph2.edge_type_to_id[i]
     assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
     for i in graph.edge_attributes.keys():
         assert torch.equal(graph.edge_attributes[i], graph2.edge_attributes[i])
