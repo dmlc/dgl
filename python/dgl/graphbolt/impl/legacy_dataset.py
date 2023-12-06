@@ -16,6 +16,8 @@ class LegacyDataset(Dataset):
     """A Graphbolt dataset for legacy DGLDataset."""
 
     def __init__(self, legacy: DGLDataset):
+        # Only supports single graph cases.
+        assert len(legacy) == 1
         graph = legacy[0]
         # Handle OGB Dataset.
         if isinstance(graph, tuple):
@@ -37,7 +39,6 @@ class LegacyDataset(Dataset):
             return ItemSetDict(item_set_dict)
 
         if hasattr(legacy, "get_idx_split"):
-            assert len(legacy) == 1
             graph, labels = legacy[0]
             split_idx = legacy.get_idx_split()
 
@@ -82,7 +83,6 @@ class LegacyDataset(Dataset):
 
     def _init_as_homogeneous_node_pred(self, legacy: DGLDataset):
         legacy = AsNodePredDataset(legacy)
-        assert len(legacy) == 1
 
         # Initialize tasks.
         tasks = []
