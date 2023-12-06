@@ -19,6 +19,32 @@
 #include "./random.h"
 #include "./shared_memory_helper.h"
 
+namespace {
+torch::optional<torch::Dict<std::string, torch::Tensor>> TensorizeDict(
+    const torch::optional<torch::Dict<std::string, int64_t>>& dict) {
+  if (!dict.has_value()) {
+    return torch::nullopt;
+  }
+  torch::Dict<std::string, torch::Tensor> result;
+  for (const auto& pair : dict.value()) {
+    result.insert(pair.key(), torch::tensor(pair.value(), torch::kInt64));
+  }
+  return result;
+}
+
+torch::optional<torch::Dict<std::string, int64_t>> DetensorizeDict(
+    const torch::optional<torch::Dict<std::string, torch::Tensor>>& dict) {
+  if (!dict.has_value()) {
+    return torch::nullopt;
+  }
+  torch::Dict<std::string, int64_t> result;
+  for (const auto& pair : dict.value()) {
+    result.insert(pair.key(), pair.value().item<int64_t>());
+  }
+  return result;
+}
+}  // namespace
+
 namespace graphbolt {
 namespace sampling {
 
@@ -556,10 +582,12 @@ BuildGraphFromSharedMemoryHelper(SharedMemoryHelper&& helper) {
   auto indices = helper.ReadTorchTensor();
   auto node_type_offset = helper.ReadTorchTensor();
   auto type_per_edge = helper.ReadTorchTensor();
+  auto node_type_to_id = DetensorizeDict(helper.ReadTorchTensorDict());
+  auto edge_type_to_id = DetensorizeDict(helper.ReadTorchTensorDict());
   auto edge_attributes = helper.ReadTorchTensorDict();
   auto graph = c10::make_intrusive<FusedCSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
-      torch::nullopt, torch::nullopt, edge_attributes);
+      node_type_to_id, edge_type_to_id, edge_attributes);
   auto shared_memory = helper.ReleaseSharedMemory();
   graph->HoldSharedMemoryObject(
       std::move(shared_memory.first), std::move(shared_memory.second));
@@ -574,6 +602,8 @@ FusedCSCSamplingGraph::CopyToSharedMemory(
   helper.WriteTorchTensor(indices_);
   helper.WriteTorchTensor(node_type_offset_);
   helper.WriteTorchTensor(type_per_edge_);
+  helper.WriteTorchTensorDict(TensorizeDict(node_type_to_id_));
+  helper.WriteTorchTensorDict(TensorizeDict(edge_type_to_id_));
   helper.WriteTorchTensorDict(edge_attributes_);
   helper.Flush();
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
