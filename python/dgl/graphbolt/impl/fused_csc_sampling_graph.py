@@ -1,8 +1,5 @@
 """CSC format sampling graph."""
 # pylint: disable= invalid-name
-import os
-import tarfile
-import tempfile
 from collections import defaultdict
 from typing import Dict, Optional, Union
 
@@ -27,8 +24,6 @@ __all__ = [
     "FusedCSCSamplingGraph",
     "from_fused_csc",
     "load_from_shared_memory",
-    "load_fused_csc_sampling_graph",
-    "save_fused_csc_sampling_graph",
     "from_dglgraph",
 ]
 
@@ -99,11 +94,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return _csc_sampling_graph_str(self)
 
     def __init__(
-        self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
+        self,
+        c_csc_graph: torch.ScriptObject,
     ):
         super().__init__()
         self._c_csc_graph = c_csc_graph
-        self._metadata = metadata
 
     @property
     def total_num_nodes(self) -> int:
@@ -318,12 +313,16 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def metadata(self) -> Optional[GraphMetadata]:
         """Returns the metadata of the graph.
 
+        [TODO][Rui] This API needs to be updated.
+
         Returns
         -------
         GraphMetadata or None
             If present, returns the metadata of the graph.
         """
-        return self._metadata
+        if self.node_type_to_id is None or self.edge_type_to_id is None:
+            return None
+        return GraphMetadata(self.node_type_to_id, self.edge_type_to_id)
 
     def in_subgraph(
         self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
@@ -884,7 +883,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         return FusedCSCSamplingGraph(
             self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
-            self._metadata,
         )
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
@@ -975,7 +973,6 @@ def from_fused_csc(
             edge_type_to_id,
             edge_attributes,
         ),
-        metadata,
     )
 
 
@@ -997,7 +994,6 @@ def load_from_shared_memory(
     """
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.load_from_shared_memory(shared_memory_name),
-        metadata,
     )
 
 
@@ -1031,38 +1027,6 @@ def _csc_sampling_graph_str(graph: FusedCSCSamplingGraph) -> str:
 
     final_str = prefix + _add_indent(final_str, len(prefix))
     return final_str
-
-
-def load_fused_csc_sampling_graph(filename):
-    """Load FusedCSCSamplingGraph from tar file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with tarfile.open(filename, "r") as archive:
-            archive.extractall(temp_dir)
-        graph_filename = os.path.join(temp_dir, "fused_csc_sampling_graph.pt")
-        metadata_filename = os.path.join(temp_dir, "metadata.pt")
-        return FusedCSCSamplingGraph(
-            torch.ops.graphbolt.load_fused_csc_sampling_graph(graph_filename),
-            torch.load(metadata_filename),
-        )
-
-
-def save_fused_csc_sampling_graph(graph, filename):
-    """Save FusedCSCSamplingGraph to tar file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        graph_filename = os.path.join(temp_dir, "fused_csc_sampling_graph.pt")
-        torch.ops.graphbolt.save_fused_csc_sampling_graph(
-            graph._c_csc_graph, graph_filename
-        )
-        metadata_filename = os.path.join(temp_dir, "metadata.pt")
-        torch.save(graph.metadata, metadata_filename)
-        with tarfile.open(filename, "w") as archive:
-            archive.add(
-                graph_filename, arcname=os.path.basename(graph_filename)
-            )
-            archive.add(
-                metadata_filename, arcname=os.path.basename(metadata_filename)
-            )
-    print(f"FusedCSCSamplingGraph has been saved to {filename}.")
 
 
 def from_dglgraph(
@@ -1114,5 +1078,4 @@ def from_dglgraph(
             edge_type_to_id,
             edge_attributes,
         ),
-        metadata,
     )

@@ -297,9 +297,9 @@ def test_load_save_homo_graph(total_num_nodes, total_num_edges):
     graph = gb.from_fused_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
-        filename = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, filename)
-        graph2 = gb.load_fused_csc_sampling_graph(filename)
+        filename = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, filename)
+        graph2 = torch.load(filename)
 
     assert graph.total_num_nodes == graph2.total_num_nodes
     assert graph.total_num_edges == graph2.total_num_edges
@@ -338,9 +338,9 @@ def test_load_save_hetero_graph(
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
-        filename = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, filename)
-        graph2 = gb.load_fused_csc_sampling_graph(filename)
+        filename = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, filename)
+        graph2 = torch.load(filename)
 
     assert graph.total_num_nodes == graph2.total_num_nodes
     assert graph.total_num_edges == graph2.total_num_edges
