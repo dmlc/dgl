@@ -6,6 +6,7 @@
 #ifndef _WIN32
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif  // !_WIN32
 
@@ -63,18 +64,24 @@ void* SharedMemory::Create(size_t size) {
   return ptr_;
 }
 
-void* SharedMemory::Open(size_t size) {
-  size_ = size;
-
+void* SharedMemory::Open() {
   std::string decorated_name = DecorateName(name_);
   handle_ = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, decorated_name.c_str());
   TORCH_CHECK(
       handle_ != nullptr, "Failed to open ", decorated_name,
       ", Win32 Error: ", GetLastError());
 
-  ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size);
+  ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, 0);
   TORCH_CHECK(
       ptr_ != nullptr, "Memory mapping failed, Win32 error: ", GetLastError());
+
+  // Obtain the size of the memory-mapped file.
+  MEMORY_BASIC_INFORMATION memInfo;
+  TORCH_CHECK(
+      VirtualQuery(ptr_, &memInfo, sizeof(memInfo)) != 0,
+      "Failed to get the size of shared memory: ", GetLastError());
+  size_ = static_cast<size_t>(memInfo.RegionSize);
+
   return ptr_;
 }
 
@@ -121,9 +128,7 @@ void *SharedMemory::Create(size_t size) {
   return ptr_;
 }
 
-void *SharedMemory::Open(size_t size) {
-  size_ = size;
-
+void *SharedMemory::Open() {
   std::string decorated_name = DecorateName(name_);
   file_descriptor_ =
       shm_open(decorated_name.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
@@ -131,8 +136,14 @@ void *SharedMemory::Open(size_t size) {
       file_descriptor_ != -1, "Failed to open ", decorated_name, ": ",
       strerror(errno));
 
-  ptr_ =
-      mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, file_descriptor_, 0);
+  struct stat shm_stat;
+  TORCH_CHECK(
+      fstat(file_descriptor_, &shm_stat) == 0,
+      "Failed to get the size of shared memory: ", strerror(errno));
+  size_ = shm_stat.st_size;
+
+  ptr_ = mmap(
+      NULL, size_, PROT_READ | PROT_WRITE, MAP_SHARED, file_descriptor_, 0);
   TORCH_CHECK(
       ptr_ != MAP_FAILED,
       "Failed to map shared memory, mmap failed with error: ", strerror(errno));
