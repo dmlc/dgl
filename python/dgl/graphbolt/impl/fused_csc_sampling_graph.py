@@ -256,6 +256,44 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._c_csc_graph.set_type_per_edge(type_per_edge)
 
     @property
+    def node_type_to_id(self) -> Optional[Dict[str, int]]:
+        """Returns the node type to id dictionary if present.
+
+        Returns
+        -------
+        Dict[str, int] or None
+            If present, returns a dictionary mapping node type to node type
+            id.
+        """
+        return self._c_csc_graph.node_type_to_id()
+
+    @node_type_to_id.setter
+    def node_type_to_id(
+        self, node_type_to_id: Optional[Dict[str, int]]
+    ) -> None:
+        """Sets the node type to id dictionary if present."""
+        self._c_csc_graph.set_node_type_to_id(node_type_to_id)
+
+    @property
+    def edge_type_to_id(self) -> Optional[Dict[str, int]]:
+        """Returns the edge type to id dictionary if present.
+
+        Returns
+        -------
+        Dict[str, int] or None
+            If present, returns a dictionary mapping edge type to edge type
+            id.
+        """
+        return self._c_csc_graph.edge_type_to_id()
+
+    @edge_type_to_id.setter
+    def edge_type_to_id(
+        self, edge_type_to_id: Optional[Dict[str, int]]
+    ) -> None:
+        """Sets the edge type to id dictionary if present."""
+        self._c_csc_graph.set_edge_type_to_id(edge_type_to_id)
+
+    @property
     def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
         """Returns the edge attributes dictionary.
 
