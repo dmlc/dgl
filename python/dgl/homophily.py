@@ -199,9 +199,10 @@ def adjusted_homophily(graph, y):
     Node Classification: Homophily-Heterophily Dichotomy and Beyond
     <https://arxiv.org/abs/2209.06177>`__
 
-    It is edge homophily adjusted for the expected number of edges connecting
-    nodes with the same class label (taking into account the number of classes,
-    their sizes, and the distribution of node degrees among them).
+    Adjusted homophily is edge homophily adjusted for the expected number of
+    edges connecting nodes with the same class label (taking into account the
+    number of classes, their sizes, and the distribution of node degrees among
+    them).
 
     Mathematically it is defined as follows:
 

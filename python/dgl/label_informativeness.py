@@ -25,9 +25,9 @@ def edge_label_informativeness(graph, y, eps=1e-8):
     Classification: Homophily-Heterophily Dichotomy and Beyond
     <https://arxiv.org/abs/2209.06177>`__
 
-    It shows how much information about a node's label we get from knowing its
-    neighbor's label. Formally, assume that we sample an edge
-    :math:`(\xi,\eta) \in E`. The class labels of nodes :math:`\xi` and
+    Label informativeness shows how much information about a node's label we
+    get from knowing its neighbor's label. Formally, assume that we sample an
+    edge :math:`(\xi,\eta) \in E`. The class labels of nodes :math:`\xi` and
     :math:`\eta` are then random variables :math:`y_\xi` and :math:`y_\eta`.
     We want to measure the amount of knowledge the label :math:`y_\eta` gives
     for predicting :math:`y_\xi`. The entropy :math:`H(y_\xi)` measures the
@@ -116,9 +116,9 @@ def node_label_informativeness(graph, y, eps=1e-8):
     Classification: Homophily-Heterophily Dichotomy and Beyond
     <https://arxiv.org/abs/2209.06177>`__
 
-    It shows how much information about a node's label we get from knowing its
-    neighbor's label. Formally, assume that we sample an edge
-    :math:`(\xi,\eta) \in E`. The class labels of nodes :math:`\xi` and
+    Label informativeness shows how much information about a node's label we
+    get from knowing its neighbor's label. Formally, assume that we sample an
+    edge :math:`(\xi,\eta) \in E`. The class labels of nodes :math:`\xi` and
     :math:`\eta` are then random variables :math:`y_\xi` and :math:`y_\eta`.
     We want to measure the amount of knowledge the label :math:`y_\eta` gives
     for predicting :math:`y_\xi`. The entropy :math:`H(y_\xi)` measures the
