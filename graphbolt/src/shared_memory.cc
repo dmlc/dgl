@@ -72,11 +72,11 @@ void* SharedMemory::Open() {
       ", Win32 Error: ", GetLastError());
 
   // Obtain the size of the memory-mapped file.
-  LARGE_INTEGER large_integer;
+  MEMORY_BASIC_INFORMATION memInfo;
   TORCH_CHECK(
-      GetFileSizeEx(handle_, &large_integer),
+      VirtualQuery(handle_, &memInfo, sizeof(memInfo)) != 0,
       "Failed to get the size of shared memory: ", GetLastError());
-  size_ = static_cast<size_t>(large_integer.QuadPart);
+  size_ = static_cast<size_t>(memInfo.RegionSize);
 
   ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size_);
   TORCH_CHECK(
