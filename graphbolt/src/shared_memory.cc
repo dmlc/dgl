@@ -71,16 +71,17 @@ void* SharedMemory::Open() {
       handle_ != nullptr, "Failed to open ", decorated_name,
       ", Win32 Error: ", GetLastError());
 
+  ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+  TORCH_CHECK(
+      ptr_ != nullptr, "Memory mapping failed, Win32 error: ", GetLastError());
+
   // Obtain the size of the memory-mapped file.
   MEMORY_BASIC_INFORMATION memInfo;
   TORCH_CHECK(
-      VirtualQuery(handle_, &memInfo, sizeof(memInfo)) != 0,
+      VirtualQuery(ptr_, &memInfo, sizeof(memInfo)) != 0,
       "Failed to get the size of shared memory: ", GetLastError());
   size_ = static_cast<size_t>(memInfo.RegionSize);
 
-  ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size_);
-  TORCH_CHECK(
-      ptr_ != nullptr, "Memory mapping failed, Win32 error: ", GetLastError());
   return ptr_;
 }
 
