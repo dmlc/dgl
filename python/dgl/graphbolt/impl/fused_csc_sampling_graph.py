@@ -978,7 +978,6 @@ def from_fused_csc(
 
 def load_from_shared_memory(
     shared_memory_name: str,
-    metadata: Optional[GraphMetadata] = None,
 ) -> FusedCSCSamplingGraph:
     """Load a FusedCSCSamplingGraph object from shared memory.
 
