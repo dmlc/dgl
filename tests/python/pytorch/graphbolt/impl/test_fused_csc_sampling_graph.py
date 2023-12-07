@@ -1103,7 +1103,7 @@ def test_homo_graph_on_shared_memory(
 
     shm_name = "test_homo_g"
     graph1 = graph.copy_to_shared_memory(shm_name)
-    graph2 = gb.load_from_shared_memory(shm_name, graph.metadata)
+    graph2 = gb.load_from_shared_memory(shm_name)
 
     assert graph1.total_num_nodes == total_num_nodes
     assert graph1.total_num_nodes == total_num_nodes
@@ -1181,7 +1181,7 @@ def test_hetero_graph_on_shared_memory(
 
     shm_name = "test_hetero_g"
     graph1 = graph.copy_to_shared_memory(shm_name)
-    graph2 = gb.load_from_shared_memory(shm_name, graph.metadata)
+    graph2 = gb.load_from_shared_memory(shm_name)
 
     assert graph1.total_num_nodes == total_num_nodes
     assert graph1.total_num_nodes == total_num_nodes
