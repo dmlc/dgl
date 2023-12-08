@@ -76,7 +76,6 @@ def test_InSubgraphSampler_hetero():
         "N1:R2:N0": 2,
         "N1:R3:N1": 3,
     }
-    metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12, 14])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 5, 1, 2, 0, 3, 5, 1, 4])
     node_type_offset = torch.LongTensor([0, 3, 6])
@@ -86,7 +85,8 @@ def test_InSubgraphSampler_hetero():
         indices=indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     item_set = gb.ItemSetDict(
