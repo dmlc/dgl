@@ -25,3 +25,6 @@
 [submodule "third_party/cccl"]
 	path = third_party/cccl
 	url = https://github.com/NVIDIA/cccl.git
+[submodule "third_party/graphbolt_src_cuda"]
+	path = third_party/graphbolt_src_cuda
+	url = https://github.com/mfbalin/graphbolt_src_cuda.git
