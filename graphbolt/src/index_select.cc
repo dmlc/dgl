@@ -5,6 +5,7 @@
  */
 #include "./index_select.h"
 
+#include <gnndlp/ops.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 
 #include "./macro.h"
@@ -14,11 +15,10 @@ namespace graphbolt {
 namespace ops {
 
 torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
-  if (input.is_pinned() &&
-      (index.is_pinned() || index.device().type() == c10::DeviceType::CUDA)) {
+  if (input.is_pinned() && utils::is_accessible_from_gpu(index)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "UVAIndexSelect",
-        { return UVAIndexSelectImpl(input, index); });
+        { return gnndlp::cuda::ops::UVAIndexSelect(input, index); });
   }
   return input.index({index.to(torch::kLong)});
 }
@@ -30,15 +30,16 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
   if (indices.is_pinned() && utils::is_accessible_from_gpu(indptr) &&
       utils::is_accessible_from_gpu(nodes)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "UVAIndexSelectCSC",
-        { return UVAIndexSelectCSCImpl(indptr, indices, nodes); });
+        c10::DeviceType::CUDA, "UVAIndexSelectCSC", {
+          return gnndlp::cuda::ops::UVAIndexSelectCSC(indptr, indices, nodes);
+        });
   } else if (
       indices.device().type() == c10::DeviceType::CUDA &&
       utils::is_accessible_from_gpu(indptr) &&
       utils::is_accessible_from_gpu(nodes)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "nodesSelectCSC",
-        { return IndexSelectCSCImpl(indptr, indices, nodes); });
+        { return gnndlp::cuda::ops::IndexSelectCSC(indptr, indices, nodes); });
   }
   // For testing purposes, to compare with CPU implementation
   torch::optional<torch::Tensor> temp;

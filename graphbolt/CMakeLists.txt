@@ -44,10 +44,9 @@ set(BOLT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(BOLT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 file(GLOB BOLT_HEADERS ${BOLT_INCLUDE})
 file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
-
 if(USE_CUDA)
   file(GLOB BOLT_CUDA_SRC
-  "../third_party/graphbolt_src_cuda/cuda/*.cu"
+  "../third_party/gnndlp/src/cuda/*.cu"
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
 endif()
@@ -56,14 +55,13 @@ add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            ${BOLT_HEADERS}
                            "../third_party/dmlc-core/include"
-                           "../third_party/pcg/include")
+                           "../third_party/pcg/include"
+                           "../third_party/gnndlp/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 
 if(USE_CUDA)
   set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 17)
   message(STATUS "Use external CCCL library for a consistent API and performance for graphbolt.")
-  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE CUB_WRAPPED_NAMESPACE=graphbolt)
-  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE THRUST_NS_QUALIFIER=thrust)
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
