@@ -232,6 +232,12 @@ void FusedCSCSamplingGraph::SetState(
   if (independent_tensors.find("type_per_edge") != independent_tensors.end()) {
     type_per_edge_ = independent_tensors.at("type_per_edge");
   }
+  if (state.find("node_type_to_id") != state.end()) {
+    node_type_to_id_ = DetensorizeDict(state.at("node_type_to_id"));
+  }
+  if (state.find("edge_type_to_id") != state.end()) {
+    edge_type_to_id_ = DetensorizeDict(state.at("edge_type_to_id"));
+  }
   if (state.find("edge_attributes") != state.end()) {
     edge_attributes_ = state.at("edge_attributes");
   }
@@ -256,6 +262,12 @@ FusedCSCSamplingGraph::GetState() const {
     independent_tensors.insert("type_per_edge", type_per_edge_.value());
   }
   state.insert("independent_tensors", independent_tensors);
+  if (node_type_to_id_.has_value()) {
+    state.insert("node_type_to_id", TensorizeDict(node_type_to_id_).value());
+  }
+  if (edge_type_to_id_.has_value()) {
+    state.insert("edge_type_to_id", TensorizeDict(edge_type_to_id_).value());
+  }
   if (edge_attributes_.has_value()) {
     state.insert("edge_attributes", edge_attributes_.value());
   }
@@ -597,7 +609,7 @@ BuildGraphFromSharedMemoryHelper(SharedMemoryHelper&& helper) {
 c10::intrusive_ptr<FusedCSCSamplingGraph>
 FusedCSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
-  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  SharedMemoryHelper helper(shared_memory_name);
   helper.WriteTorchTensor(indptr_);
   helper.WriteTorchTensor(indices_);
   helper.WriteTorchTensor(node_type_offset_);
@@ -612,7 +624,7 @@ FusedCSCSamplingGraph::CopyToSharedMemory(
 c10::intrusive_ptr<FusedCSCSamplingGraph>
 FusedCSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
-  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  SharedMemoryHelper helper(shared_memory_name);
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 

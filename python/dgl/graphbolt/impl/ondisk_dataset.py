@@ -17,12 +17,7 @@ from ..dataset import Dataset, Task
 from ..internal import copy_or_convert_data, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from .fused_csc_sampling_graph import (
-    from_dglgraph,
-    FusedCSCSamplingGraph,
-    load_fused_csc_sampling_graph,
-    save_fused_csc_sampling_graph,
-)
+from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
 from .ondisk_metadata import (
     OnDiskGraphTopology,
     OnDiskMetaData,
@@ -147,10 +142,10 @@ def preprocess_ondisk_dataset(
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "FusedCSCSamplingGraph"
     output_config["graph_topology"]["path"] = os.path.join(
-        processed_dir_prefix, "fused_csc_sampling_graph.tar"
+        processed_dir_prefix, "fused_csc_sampling_graph.pt"
     )
 
-    save_fused_csc_sampling_graph(
+    torch.save(
         fused_csc_sampling_graph,
         os.path.join(
             dataset_dir,
@@ -452,7 +447,7 @@ class OnDiskDataset(Dataset):
         if graph_topology is None:
             return None
         if graph_topology.type == "FusedCSCSamplingGraph":
-            return load_fused_csc_sampling_graph(graph_topology.path)
+            return torch.load(graph_topology.path)
         raise NotImplementedError(
             f"Graph topology type {graph_topology.type} is not supported."
         )

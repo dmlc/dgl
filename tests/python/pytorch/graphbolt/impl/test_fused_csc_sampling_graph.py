@@ -297,9 +297,9 @@ def test_load_save_homo_graph(total_num_nodes, total_num_edges):
     graph = gb.from_fused_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
-        filename = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, filename)
-        graph2 = gb.load_fused_csc_sampling_graph(filename)
+        filename = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, filename)
+        graph2 = torch.load(filename)
 
     assert graph.total_num_nodes == graph2.total_num_nodes
     assert graph.total_num_edges == graph2.total_num_edges
@@ -338,9 +338,9 @@ def test_load_save_hetero_graph(
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
-        filename = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, filename)
-        graph2 = gb.load_fused_csc_sampling_graph(filename)
+        filename = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, filename)
+        graph2 = torch.load(filename)
 
     assert graph.total_num_nodes == graph2.total_num_nodes
     assert graph.total_num_edges == graph2.total_num_edges
@@ -376,9 +376,11 @@ def test_pickle_homo_graph(total_num_nodes, total_num_edges):
     assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
     assert torch.equal(graph.indices, graph2.indices)
 
-    assert graph.metadata is None and graph2.metadata is None
     assert graph.node_type_offset is None and graph2.node_type_offset is None
     assert graph.type_per_edge is None and graph2.type_per_edge is None
+    assert graph.node_type_to_id is None and graph2.node_type_to_id is None
+    assert graph.edge_type_to_id is None and graph2.edge_type_to_id is None
+    assert graph.edge_attributes is None and graph2.edge_attributes is None
 
 
 @unittest.skipIf(
@@ -425,8 +427,12 @@ def test_pickle_hetero_graph(
     assert torch.equal(graph.indices, graph2.indices)
     assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
     assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
-    assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
-    assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+    assert graph.node_type_to_id.keys() == graph2.node_type_to_id.keys()
+    for i in graph.node_type_to_id.keys():
+        assert graph.node_type_to_id[i] == graph2.node_type_to_id[i]
+    assert graph.edge_type_to_id.keys() == graph2.edge_type_to_id.keys()
+    for i in graph.edge_type_to_id.keys():
+        assert graph.edge_type_to_id[i] == graph2.edge_type_to_id[i]
     assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
     for i in graph.edge_attributes.keys():
         assert torch.equal(graph.edge_attributes[i], graph2.edge_attributes[i])
@@ -1097,7 +1103,7 @@ def test_homo_graph_on_shared_memory(
 
     shm_name = "test_homo_g"
     graph1 = graph.copy_to_shared_memory(shm_name)
-    graph2 = gb.load_from_shared_memory(shm_name, graph.metadata)
+    graph2 = gb.load_from_shared_memory(shm_name)
 
     assert graph1.total_num_nodes == total_num_nodes
     assert graph1.total_num_nodes == total_num_nodes
@@ -1138,9 +1144,11 @@ def test_homo_graph_on_shared_memory(
 )
 @pytest.mark.parametrize(
     "total_num_nodes, total_num_edges",
-    [(1, 1), (100, 1), (10, 50), (1000, 50000)],
+    [(1, 1), (100, 1), (10, 50), (1000, 50 * 1000), (10 * 1000, 100 * 1000)],
 )
-@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+@pytest.mark.parametrize(
+    "num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1), (1000, 1000)]
+)
 @pytest.mark.parametrize("test_edge_attrs", [True, False])
 def test_hetero_graph_on_shared_memory(
     total_num_nodes, total_num_edges, num_ntypes, num_etypes, test_edge_attrs
@@ -1173,7 +1181,7 @@ def test_hetero_graph_on_shared_memory(
 
     shm_name = "test_hetero_g"
     graph1 = graph.copy_to_shared_memory(shm_name)
-    graph2 = gb.load_from_shared_memory(shm_name, graph.metadata)
+    graph2 = gb.load_from_shared_memory(shm_name)
 
     assert graph1.total_num_nodes == total_num_nodes
     assert graph1.total_num_nodes == total_num_nodes

@@ -7,6 +7,8 @@ import time
 
 import numpy as np
 
+import torch
+
 from .. import backend as F
 from ..base import DGLError, EID, ETYPE, NID, NTYPE
 from ..convert import to_homogeneous
@@ -1236,6 +1238,7 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
     part_config : str
         The partition configuration JSON file.
     """
+
     # As only this function requires GraphBolt for now, let's import here.
     from .. import graphbolt
 
@@ -1279,6 +1282,6 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
             part_meta[f"part-{part_id}"]["part_graph"],
         )
         csc_graph_path = os.path.join(
-            os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.tar"
+            os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.pt"
         )
-        graphbolt.save_fused_csc_sampling_graph(csc_graph, csc_graph_path)
+        torch.save(csc_graph, csc_graph_path)
