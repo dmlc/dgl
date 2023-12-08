@@ -1255,7 +1255,6 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         graph, _, _, gpb, _, _, _ = load_partition(
             part_config, part_id, load_feats=False
         )
-        # Construct GraphMetadata.
         _, _, ntypes, etypes = load_partition_book(part_config, part_id)
         node_type_to_id = {ntype: ntid for ntid, ntype in enumerate(ntypes)}
         edge_type_to_id = {

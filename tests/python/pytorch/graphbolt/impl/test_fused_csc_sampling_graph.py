@@ -80,9 +80,11 @@ def test_hetero_empty_graph(total_num_nodes):
 @pytest.mark.parametrize(
     "ntypes", [{"n1": 1, "n2": 1}, {5: 1, "n2": 2}, {"n1": 1.5, "n2": 2.0}]
 )
-def test_metadata_with_ntype_exception(ntypes):
-    with pytest.raises(Exception):
-        gb.GraphMetadata(ntypes, {"n1:e1:n2": 1})
+def test_type_to_id_with_ntype_exception(ntypes):
+    with pytest.raises(AssertionError):
+        gb.from_fused_csc(
+            None, None, node_type_to_id=ntypes, edge_type_to_id={"e1": 1}
+        )
 
 
 @unittest.skipIf(
@@ -101,9 +103,14 @@ def test_metadata_with_ntype_exception(ntypes):
         {"n1:e1:n2": 1.5},
     ],
 )
-def test_metadata_with_etype_exception(etypes):
+def test_type_to_id_with_etype_exception(etypes):
     with pytest.raises(Exception):
-        gb.GraphMetadata({"n1": 0, "n2": 1, "n3": 2}, etypes)
+        gb.from_fused_csc(
+            None,
+            None,
+            node_type_to_id={"n1": 0, "n2": 1, "n3": 2},
+            edge_type_to_id=etypes,
+        )
 
 
 @unittest.skipIf(
