@@ -45,6 +45,13 @@ set(BOLT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 file(GLOB BOLT_HEADERS ${BOLT_INCLUDE})
 file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
 
+if(USE_CUDA)
+  file(GLOB BOLT_CUDA_SRC
+  "../third_party/graphbolt_src_cuda/cuda/*.cu"
+  )
+  list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
+endif()
+
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            ${BOLT_HEADERS}
@@ -61,11 +68,6 @@ if(USE_CUDA)
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
                              "../third_party/cccl/libcudacxx/include")
-  
-  file(GLOB BOLT_CUDA_SRC
-    ../third_party/graphbolt_cuda_src/cuda/*.cu
-  )
-  list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
 endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when
