@@ -135,4 +135,20 @@ class SubgraphSampler(MiniBatchTransformer):
         )
 
     def _sample_subgraphs(self, seeds):
+        """Sample subgraphs from the given seeds.
+
+        Any subclass of SubgraphSampler should implement this method.
+
+        Parameters
+        ----------
+        seeds : Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The seed nodes.
+
+        Returns
+        -------
+        Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The input nodes.
+        SampledSubgraph
+            The sampled subgraphs.
+        """
         raise NotImplementedError

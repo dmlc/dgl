@@ -93,6 +93,7 @@ class SAGE(LightningModule):
                 )
 
     def training_step(self, batch, batch_idx):
+        batch = batch.to_dgl()
         blocks = [block.to("cuda") for block in batch.blocks]
         x = batch.node_features["feat"]
         y = batch.labels.to("cuda")
@@ -110,6 +111,7 @@ class SAGE(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        batch = batch.to_dgl()
         blocks = [block.to("cuda") for block in batch.blocks]
         x = batch.node_features["feat"]
         y = batch.labels.to("cuda")
@@ -158,10 +160,7 @@ class DataModule(LightningDataModule):
         )
         datapipe = sampler(self.graph, self.fanouts)
         datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
-        datapipe = datapipe.to_dgl()
-        dataloader = gb.MultiProcessDataLoader(
-            datapipe, num_workers=self.num_workers
-        )
+        dataloader = gb.DataLoader(datapipe, num_workers=self.num_workers)
         return dataloader
 
     ########################################################################
@@ -216,7 +215,7 @@ if __name__ == "__main__":
         args.num_workers,
     )
     in_size = dataset.feature.size("node", None, "feat")[0]
-    model = SAGE(in_size, 256, datamodule.num_classes).to(torch.double)
+    model = SAGE(in_size, 256, datamodule.num_classes)
 
     # Train.
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", mode="max")

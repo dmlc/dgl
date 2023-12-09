@@ -32,5 +32,5 @@ def test_DataLoader():
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
-    dataloader = dgl.graphbolt.SingleProcessDataLoader(device_transferrer)
+    dataloader = dgl.graphbolt.DataLoader(device_transferrer)
     assert len(list(dataloader)) == N // B

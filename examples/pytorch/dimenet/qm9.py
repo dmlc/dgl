@@ -86,7 +86,7 @@ class QM9(QM9Dataset):
     Examples
     --------
     >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
-    >>> data.num_labels
+    >>> data.num_classes
     2
     >>>
     >>> # iterate over the dataset

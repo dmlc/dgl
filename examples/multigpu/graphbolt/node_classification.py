@@ -128,7 +128,6 @@ def create_dataloader(
     )
     datapipe = datapipe.sample_neighbor(graph, args.fanout)
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
 
     ############################################################################
     # [Note]:
@@ -139,9 +138,7 @@ def create_dataloader(
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(
-        datapipe, num_workers=args.num_workers
-    )
+    dataloader = gb.DataLoader(datapipe, num_workers=args.num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -156,6 +153,7 @@ def evaluate(rank, model, dataloader, num_classes, device):
     for step, data in (
         tqdm.tqdm(enumerate(dataloader)) if rank == 0 else enumerate(dataloader)
     ):
+        data = data.to_dgl()
         blocks = data.blocks
         x = data.node_features["feat"]
         y.append(data.labels)
@@ -208,6 +206,9 @@ def train(
                 if rank == 0
                 else enumerate(train_dataloader)
             ):
+                # Convert data to DGL format.
+                data = data.to_dgl()
+
                 # The input features are from the source nodes in the first
                 # layer's computation graph.
                 x = data.node_features["feat"]

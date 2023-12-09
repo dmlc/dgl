@@ -17,12 +17,7 @@ from ..dataset import Dataset, Task
 from ..internal import copy_or_convert_data, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from .fused_csc_sampling_graph import (
-    from_dglgraph,
-    FusedCSCSamplingGraph,
-    load_fused_csc_sampling_graph,
-    save_fused_csc_sampling_graph,
-)
+from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
 from .ondisk_metadata import (
     OnDiskGraphTopology,
     OnDiskMetaData,
@@ -147,10 +142,10 @@ def preprocess_ondisk_dataset(
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "FusedCSCSamplingGraph"
     output_config["graph_topology"]["path"] = os.path.join(
-        processed_dir_prefix, "fused_csc_sampling_graph.tar"
+        processed_dir_prefix, "fused_csc_sampling_graph.pt"
     )
 
-    save_fused_csc_sampling_graph(
+    torch.save(
         fused_csc_sampling_graph,
         os.path.join(
             dataset_dir,
@@ -352,6 +347,7 @@ class OnDiskDataset(Dataset):
         yaml_path = preprocess_ondisk_dataset(path, include_original_edge_id)
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+        self._loaded = False
 
     def _convert_yaml_path_to_absolute_path(self):
         """Convert the path in YAML file to absolute path."""
@@ -384,6 +380,7 @@ class OnDiskDataset(Dataset):
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
+        self._loaded = True
         return self
 
     @property
@@ -394,26 +391,31 @@ class OnDiskDataset(Dataset):
     @property
     def tasks(self) -> List[Task]:
         """Return the tasks."""
+        self._check_loaded()
         return self._tasks
 
     @property
     def graph(self) -> SamplingGraph:
         """Return the graph."""
+        self._check_loaded()
         return self._graph
 
     @property
     def feature(self) -> TorchBasedFeatureStore:
         """Return the feature."""
+        self._check_loaded()
         return self._feature
 
     @property
     def dataset_name(self) -> str:
         """Return the dataset name."""
+        self._check_loaded()
         return self._dataset_name
 
     @property
     def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the itemset containing all nodes."""
+        self._check_loaded()
         return self._all_nodes_set
 
     def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
@@ -432,6 +434,12 @@ class OnDiskDataset(Dataset):
             )
         return ret
 
+    def _check_loaded(self):
+        assert self._loaded, (
+            "Please ensure that you have called the OnDiskDataset.load() method"
+            + " to properly load the data."
+        )
+
     def _load_graph(
         self, graph_topology: OnDiskGraphTopology
     ) -> FusedCSCSamplingGraph:
@@ -439,7 +447,7 @@ class OnDiskDataset(Dataset):
         if graph_topology is None:
             return None
         if graph_topology.type == "FusedCSCSamplingGraph":
-            return load_fused_csc_sampling_graph(graph_topology.path)
+            return torch.load(graph_topology.path)
         raise NotImplementedError(
             f"Graph topology type {graph_topology.type} is not supported."
         )

@@ -182,7 +182,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLCompactGraphs")
       List<HeteroGraphRef> compacted_graph_refs;
       List<Value> induced_nodes;
 
-      for (const HeteroGraphPtr g : result_pair.first)
+      for (const HeteroGraphPtr &g : result_pair.first)
         compacted_graph_refs.push_back(HeteroGraphRef(g));
       for (const IdArray &ids : result_pair.second)
         induced_nodes.push_back(Value(MakeValue(ids)));

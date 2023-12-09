@@ -158,6 +158,16 @@ class QM9Dataset(DGLDataset):
         return self.label.shape[1]
 
     @property
+    def num_classes(self):
+        r"""
+        Returns
+        --------
+        int
+            Number of prediction tasks.
+        """
+        return self.label.shape[1]
+
+    @property
     def num_tasks(self):
         r"""
         Returns

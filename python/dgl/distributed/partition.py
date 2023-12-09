@@ -7,6 +7,8 @@ import time
 
 import numpy as np
 
+import torch
+
 from .. import backend as F
 from ..base import DGLError, EID, ETYPE, NID, NTYPE
 from ..convert import to_homogeneous
@@ -1236,6 +1238,7 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
     part_config : str
         The partition configuration JSON file.
     """
+
     # As only this function requires GraphBolt for now, let's import here.
     from .. import graphbolt
 
@@ -1254,7 +1257,12 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         )
         # Construct GraphMetadata.
         _, _, ntypes, etypes = load_partition_book(part_config, part_id)
-        metadata = graphbolt.GraphMetadata(ntypes, etypes)
+        node_type_to_id = {ntype: ntid for ntid, ntype in enumerate(ntypes)}
+        edge_type_to_id = {
+            _etype_tuple_to_str(etype): etid
+            for etid, etype in enumerate(etypes)
+        }
+        metadata = graphbolt.GraphMetadata(node_type_to_id, edge_type_to_id)
         # Obtain CSC indtpr and indices.
         indptr, indices, _ = graph.adj().csc()
         # Initalize type per edge.
@@ -1263,13 +1271,17 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         # Sanity check.
         assert len(type_per_edge) == graph.num_edges()
         csc_graph = graphbolt.from_fused_csc(
-            indptr, indices, None, type_per_edge, metadata=metadata
+            indptr,
+            indices,
+            node_type_offset=None,
+            type_per_edge=type_per_edge,
+            metadata=metadata,
         )
         orig_graph_path = os.path.join(
             os.path.dirname(part_config),
             part_meta[f"part-{part_id}"]["part_graph"],
         )
         csc_graph_path = os.path.join(
-            os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.tar"
+            os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.pt"
         )
-        graphbolt.save_fused_csc_sampling_graph(csc_graph, csc_graph_path)
+        torch.save(csc_graph, csc_graph_path)

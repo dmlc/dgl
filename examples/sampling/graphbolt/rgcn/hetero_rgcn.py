@@ -124,9 +124,6 @@ def create_dataloader(
         node_feature_keys["institution"] = ["feat"]
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
 
-    # Convert a mini-batch to dgl mini-batch for computing.
-    datapipe = datapipe.to_dgl()
-
     # Move the mini-batch to the appropriate device.
     # `device`:
     #   The device to move the mini-batch to.
@@ -137,7 +134,7 @@ def create_dataloader(
     # Create a DataLoader from the datapipe.
     # `num_workers`:
     #   The number of worker processes to use for data loading.
-    return gb.MultiProcessDataLoader(datapipe, num_workers=num_workers)
+    return gb.DataLoader(datapipe, num_workers=num_workers)
 
 
 def extract_embed(node_embed, input_nodes):
@@ -490,6 +487,9 @@ def evaluate(
     y_true = list()
 
     for data in tqdm(data_loader, desc="Inference"):
+        # Convert data to DGL format for computing.
+        data = data.to_dgl()
+
         blocks = [block.to(device) for block in data.blocks]
         node_features = extract_node_features(
             name, blocks[0], data, node_embed, device
@@ -558,6 +558,9 @@ def run(
         total_loss = 0
 
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch:02d}"):
+            # Convert data to DGL format for computing.
+            data = data.to_dgl()
+
             # Convert MiniBatch to DGL Blocks.
             blocks = [block.to(device) for block in data.blocks]
 

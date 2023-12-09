@@ -100,6 +100,7 @@ class SAGE(nn.Module):
             )
             feature = feature.to(device)
             for step, data in tqdm.tqdm(enumerate(dataloader)):
+                data = data.to_dgl()
                 x = feature[data.input_nodes]
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
@@ -208,18 +209,6 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
-    # [Step-4]:
-    # datapipe.to_dgl()
-    # [Input]:
-    # 'datapipe': The previous datapipe object.
-    # [Output]:
-    # A DGLMiniBatch used for computing.
-    # [Role]:
-    # Convert a mini-batch to dgl-minibatch.
-    ############################################################################
-    datapipe = datapipe.to_dgl()
-
-    ############################################################################
     # [Input]:
     # 'device': The device to copy the data to.
     # [Output]:
@@ -232,11 +221,11 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # 'datapipe': The datapipe object to be used for data loading.
     # 'args.num_workers': The number of processes to be used for data loading.
     # [Output]:
-    # A MultiProcessDataLoader object to handle data loading.
+    # A DataLoader object to handle data loading.
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(
+    dataloader = gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
     )
@@ -332,6 +321,9 @@ def train(args, model, graph, features, train_set):
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
+            # Convert data to DGL format.
+            data = data.to_dgl()
+
             # Unpack MiniBatch.
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
             node_feature = data.node_features["feat"]
