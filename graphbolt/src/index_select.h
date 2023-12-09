@@ -18,9 +18,9 @@ namespace ops {
  * NOTE:
  * 1. The shape of all tensors must be 1-D.
  * 2. If indices is on pinned memory and nodes is on pinned memory or GPU
- * memory, then UVAIndexSelectCSCImpl will be called. If indices is on GPU
- * memory, then IndexSelectCSCImpl will be called. Otherwise,
- * FusedCSCSamplingGraph::InSubgraph will be called.
+ * memory, then gnndlp::cuda::ops::UVAIndexSelectCSC will be called. If
+ * indices is on GPU memory, then gnndlp::cuda::ops::IndexSelectCSC will be
+ * called. Otherwise, FusedCSCSamplingGraph::InSubgraph will be called.
  *
  * @param indptr Indptr tensor containing offsets with shape (N,).
  * @param indices Indices tensor with edge information of shape (indptr[N],).
@@ -38,8 +38,8 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
  * 1. The shape of input tensor can be multi-dimensional, but the index tensor
  * must be 1-D.
  * 2. If input is on pinned memory and index is on pinned memory or GPU memory,
- * then UVAIndexSelectImpl will be called. Otherwise, torch::index_select will
- * be called.
+ * then gnndlp::cuda::ops::UVAIndexSelect will be called. Otherwise,
+ * torch::index_select will be called.
  *
  * @param input Input tensor with shape (N, ...).
  * @param index Index tensor with shape (M,).
