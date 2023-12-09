@@ -126,18 +126,6 @@ def create_dataloader(
 
     ############################################################################
     # [Step-4]:
-    # self.to_dgl()
-    # [Input]:
-    # 'datapipe': The previous datapipe object.
-    # [Output]:
-    # A DGLMiniBatch used for computing.
-    # [Role]:
-    # Convert a mini-batch to dgl-minibatch.
-    ############################################################################
-    datapipe = datapipe.to_dgl()
-
-    ############################################################################
-    # [Step-5]:
     # self.copy_to()
     # [Input]:
     # 'device': The device to copy the data to.
@@ -147,17 +135,17 @@ def create_dataloader(
     datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
-    # [Step-6]:
-    # gb.MultiProcessDataLoader()
+    # [Step-5]:
+    # gb.DataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
     # 'num_workers': The number of processes to be used for data loading.
     # [Output]:
-    # A MultiProcessDataLoader object to handle data loading.
+    # A DataLoader object to handle data loading.
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=num_workers)
+    dataloader = gb.DataLoader(datapipe, num_workers=num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -214,6 +202,7 @@ class SAGE(nn.Module):
             feature = feature.to(device)
 
             for step, data in tqdm(enumerate(dataloader)):
+                data = data.to_dgl()
                 x = feature[data.input_nodes]
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
@@ -272,6 +261,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
     )
 
     for step, data in tqdm(enumerate(dataloader)):
+        data = data.to_dgl()
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
@@ -302,6 +292,9 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         model.train()
         total_loss = 0
         for step, data in enumerate(dataloader):
+            # Convert data to DGL format.
+            data = data.to_dgl()
+
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]

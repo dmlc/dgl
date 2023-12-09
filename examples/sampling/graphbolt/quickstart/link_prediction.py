@@ -47,14 +47,11 @@ def create_dataloader(dateset, device, is_train=True):
         dataset.feature, node_feature_keys=["feat"]
     )
 
-    # Convert the mini-batch to DGL format to train a DGL model.
-    datapipe = datapipe.to_dgl()
-
     # Copy the mini-batch to the designated device for training.
     datapipe = datapipe.copy_to(device)
 
     # Initiate the dataloader for the datapipe.
-    return gb.SingleProcessDataLoader(datapipe)
+    return gb.DataLoader(datapipe)
 
 
 class GraphSAGE(nn.Module):
@@ -101,6 +98,9 @@ def evaluate(model, dataset, device):
     logits = []
     labels = []
     for step, data in enumerate(dataloader):
+        # Convert data to DGL format for computing.
+        data = data.to_dgl()
+
         # Unpack MiniBatch.
         compacted_pairs, label = to_binary_link_dgl_computing_pack(data)
 
@@ -140,6 +140,9 @@ def train(model, dataset, device):
         # mini-batches.
         ########################################################################
         for step, data in enumerate(dataloader):
+            # Convert data to DGL format for computing.
+            data = data.to_dgl()
+
             # Unpack MiniBatch.
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
 

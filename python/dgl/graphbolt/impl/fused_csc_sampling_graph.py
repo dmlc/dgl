@@ -1,8 +1,5 @@
 """CSC format sampling graph."""
 # pylint: disable= invalid-name
-import os
-import tarfile
-import tempfile
 from collections import defaultdict
 from typing import Dict, Optional, Union
 
@@ -27,8 +24,6 @@ __all__ = [
     "FusedCSCSamplingGraph",
     "from_fused_csc",
     "load_from_shared_memory",
-    "load_fused_csc_sampling_graph",
-    "save_fused_csc_sampling_graph",
     "from_dglgraph",
 ]
 
@@ -99,11 +94,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return _csc_sampling_graph_str(self)
 
     def __init__(
-        self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
+        self,
+        c_csc_graph: torch.ScriptObject,
     ):
         super().__init__()
         self._c_csc_graph = c_csc_graph
-        self._metadata = metadata
 
     @property
     def total_num_nodes(self) -> int:
@@ -256,6 +251,44 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._c_csc_graph.set_type_per_edge(type_per_edge)
 
     @property
+    def node_type_to_id(self) -> Optional[Dict[str, int]]:
+        """Returns the node type to id dictionary if present.
+
+        Returns
+        -------
+        Dict[str, int] or None
+            If present, returns a dictionary mapping node type to node type
+            id.
+        """
+        return self._c_csc_graph.node_type_to_id()
+
+    @node_type_to_id.setter
+    def node_type_to_id(
+        self, node_type_to_id: Optional[Dict[str, int]]
+    ) -> None:
+        """Sets the node type to id dictionary if present."""
+        self._c_csc_graph.set_node_type_to_id(node_type_to_id)
+
+    @property
+    def edge_type_to_id(self) -> Optional[Dict[str, int]]:
+        """Returns the edge type to id dictionary if present.
+
+        Returns
+        -------
+        Dict[str, int] or None
+            If present, returns a dictionary mapping edge type to edge type
+            id.
+        """
+        return self._c_csc_graph.edge_type_to_id()
+
+    @edge_type_to_id.setter
+    def edge_type_to_id(
+        self, edge_type_to_id: Optional[Dict[str, int]]
+    ) -> None:
+        """Sets the edge type to id dictionary if present."""
+        self._c_csc_graph.set_edge_type_to_id(edge_type_to_id)
+
+    @property
     def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
         """Returns the edge attributes dictionary.
 
@@ -280,12 +313,16 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def metadata(self) -> Optional[GraphMetadata]:
         """Returns the metadata of the graph.
 
+        [TODO][Rui] This API needs to be updated.
+
         Returns
         -------
         GraphMetadata or None
             If present, returns the metadata of the graph.
         """
-        return self._metadata
+        if self.node_type_to_id is None or self.edge_type_to_id is None:
+            return None
+        return GraphMetadata(self.node_type_to_id, self.edge_type_to_id)
 
     def in_subgraph(
         self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
@@ -456,7 +493,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
                 node_edge_type[dst_ntype_id].append((etype, etype_id))
             # construct subgraphs
-            for (i, seed) in enumerate(column):
+            for i, seed in enumerate(column):
                 l = indptr[i].item()
                 r = indptr[i + 1].item()
                 node_type = (
@@ -465,7 +502,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     ).item()
                     - 1
                 )
-                for (etype, etype_id) in node_edge_type[node_type]:
+                for etype, etype_id in node_edge_type[node_type]:
                     src_ntype, _, _ = etype_str_to_tuple(etype)
                     src_ntype_id = self.metadata.node_type_to_id[src_ntype]
                     num_edges = torch.searchsorted(
@@ -505,7 +542,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-        deduplicate=True,
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -576,7 +614,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-        if deduplicate is True:
+        if not output_cscformat:
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
@@ -686,7 +724,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-        deduplicate=True,
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
@@ -770,7 +809,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             probs_name,
         )
 
-        if deduplicate:
+        if not output_cscformat:
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
@@ -844,7 +883,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         return FusedCSCSamplingGraph(
             self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
-            self._metadata,
         )
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
@@ -923,21 +961,23 @@ def from_fused_csc(
         assert len(metadata.node_type_to_id) + 1 == node_type_offset.size(
             0
         ), "node_type_offset length should be |ntypes| + 1."
+    node_type_to_id = metadata.node_type_to_id if metadata else None
+    edge_type_to_id = metadata.edge_type_to_id if metadata else None
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.from_fused_csc(
             csc_indptr,
             indices,
             node_type_offset,
             type_per_edge,
+            node_type_to_id,
+            edge_type_to_id,
             edge_attributes,
         ),
-        metadata,
     )
 
 
 def load_from_shared_memory(
     shared_memory_name: str,
-    metadata: Optional[GraphMetadata] = None,
 ) -> FusedCSCSamplingGraph:
     """Load a FusedCSCSamplingGraph object from shared memory.
 
@@ -953,7 +993,6 @@ def load_from_shared_memory(
     """
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.load_from_shared_memory(shared_memory_name),
-        metadata,
     )
 
 
@@ -989,38 +1028,6 @@ def _csc_sampling_graph_str(graph: FusedCSCSamplingGraph) -> str:
     return final_str
 
 
-def load_fused_csc_sampling_graph(filename):
-    """Load FusedCSCSamplingGraph from tar file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with tarfile.open(filename, "r") as archive:
-            archive.extractall(temp_dir)
-        graph_filename = os.path.join(temp_dir, "fused_csc_sampling_graph.pt")
-        metadata_filename = os.path.join(temp_dir, "metadata.pt")
-        return FusedCSCSamplingGraph(
-            torch.ops.graphbolt.load_fused_csc_sampling_graph(graph_filename),
-            torch.load(metadata_filename),
-        )
-
-
-def save_fused_csc_sampling_graph(graph, filename):
-    """Save FusedCSCSamplingGraph to tar file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        graph_filename = os.path.join(temp_dir, "fused_csc_sampling_graph.pt")
-        torch.ops.graphbolt.save_fused_csc_sampling_graph(
-            graph._c_csc_graph, graph_filename
-        )
-        metadata_filename = os.path.join(temp_dir, "metadata.pt")
-        torch.save(graph.metadata, metadata_filename)
-        with tarfile.open(filename, "w") as archive:
-            archive.add(
-                graph_filename, arcname=os.path.basename(graph_filename)
-            )
-            archive.add(
-                metadata_filename, arcname=os.path.basename(metadata_filename)
-            )
-    print(f"FusedCSCSamplingGraph has been saved to {filename}.")
-
-
 def from_dglgraph(
     g: DGLGraph,
     is_homogeneous: bool = False,
@@ -1044,7 +1051,11 @@ def from_dglgraph(
     # Obtain CSC matrix.
     indptr, indices, edge_ids = homo_g.adj_tensors("csc")
     ntype_count.insert(0, 0)
-    node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
+    node_type_offset = (
+        None
+        if is_homogeneous
+        else torch.cumsum(torch.LongTensor(ntype_count), 0)
+    )
 
     # Assign edge type according to the order of CSC matrix.
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
@@ -1054,13 +1065,16 @@ def from_dglgraph(
         # Assign edge attributes according to the original eids mapping.
         edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
 
+    node_type_to_id = metadata.node_type_to_id if metadata else None
+    edge_type_to_id = metadata.edge_type_to_id if metadata else None
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.from_fused_csc(
             indptr,
             indices,
             node_type_offset,
             type_per_edge,
+            node_type_to_id,
+            edge_type_to_id,
             edge_attributes,
         ),
-        metadata,
     )

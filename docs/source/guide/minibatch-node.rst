@@ -26,7 +26,7 @@ or the equivalent function-like interface :func:`~dgl.graphbolt.sample_neighbor`
 which makes the node gather messages from its neighbors.
 
 To use a sampler provided by DGL, one also need to combine it with
-:class:`~dgl.graphbolt.MultiProcessDataLoader`, which iterates
+:class:`~dgl.graphbolt.DataLoader`, which iterates
 over a set of indices (nodes in this case) in minibatches.
 
 For example, the following code creates a DataLoader that
@@ -52,7 +52,7 @@ putting the list of generated MFGs onto GPU.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe, num_workers=0)
 
 
 Iterating over the DataLoader will yield :class:`~dgl.graphbolt.DGLMiniBatch`
@@ -196,7 +196,7 @@ removed for simplicity):
 The samplers provided by DGL also support heterogeneous graphs.
 For example, one can still use the provided
 :class:`~dgl.graphbolt.NeighborSampler` class and
-:class:`~dgl.graphbolt.MultiProcessDataLoader` class for
+:class:`~dgl.graphbolt.DataLoader` class for
 stochastic training. The only difference is that the itemset is now an
 instance of :class:`~dgl.graphbolt.ItemSetDict` which is a dictionary
 of node types to node IDs.
@@ -217,7 +217,7 @@ of node types to node IDs.
     )
     datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe, num_workers=0)
 
 The training loop is almost the same as that of homogeneous graphs,
 except for the implementation of ``compute_loss`` that will take in two

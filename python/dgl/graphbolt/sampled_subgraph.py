@@ -6,7 +6,7 @@ import torch
 
 from dgl.utils import recursive_apply
 
-from .base import apply_to, etype_str_to_tuple, isin
+from .base import apply_to, CSCFormatBase, etype_str_to_tuple, isin
 
 
 __all__ = ["SampledSubgraph"]
@@ -144,7 +144,9 @@ class SampledSubgraph:
         assert (
             assume_num_node_within_int32
         ), "Values > int32 are not supported yet."
-        assert isinstance(self.node_pairs, tuple) == isinstance(edges, tuple), (
+        assert (
+            isinstance(self.node_pairs, (CSCFormatBase, tuple))
+        ) == isinstance(edges, tuple), (
             "The sampled subgraph and the edges to exclude should be both "
             "homogeneous or both heterogeneous."
         )
@@ -156,6 +158,16 @@ class SampledSubgraph:
         # 2. Exclude the edges and get the index of the edges to keep.
         # 3. Slice the subgraph according to the index.
         if isinstance(self.node_pairs, tuple):
+            reverse_edges = _to_reverse_ids_node_pairs(
+                self.node_pairs,
+                self.original_row_node_ids,
+                self.original_column_node_ids,
+            )
+            index = _exclude_homo_edges(
+                reverse_edges, edges, assume_num_node_within_int32
+            )
+            return calling_class(*_slice_subgraph_node_pairs(self, index))
+        elif isinstance(self.node_pairs, CSCFormatBase):
             reverse_edges = _to_reverse_ids(
                 self.node_pairs,
                 self.original_row_node_ids,
@@ -167,6 +179,7 @@ class SampledSubgraph:
             return calling_class(*_slice_subgraph(self, index))
         else:
             index = {}
+            is_cscformat = 0
             for etype, pair in self.node_pairs.items():
                 src_type, _, dst_type = etype_str_to_tuple(etype)
                 original_row_node_ids = (
@@ -179,17 +192,28 @@ class SampledSubgraph:
                     if self.original_column_node_ids is None
                     else self.original_column_node_ids.get(dst_type)
                 )
-                reverse_edges = _to_reverse_ids(
-                    pair,
-                    original_row_node_ids,
-                    original_column_node_ids,
-                )
+                if isinstance(pair, CSCFormatBase):
+                    is_cscformat = 1
+                    reverse_edges = _to_reverse_ids(
+                        pair,
+                        original_row_node_ids,
+                        original_column_node_ids,
+                    )
+                else:
+                    reverse_edges = _to_reverse_ids_node_pairs(
+                        pair,
+                        original_row_node_ids,
+                        original_column_node_ids,
+                    )
                 index[etype] = _exclude_homo_edges(
                     reverse_edges,
                     edges.get(etype),
                     assume_num_node_within_int32,
                 )
-            return calling_class(*_slice_subgraph(self, index))
+            if is_cscformat:
+                return calling_class(*_slice_subgraph(self, index))
+            else:
+                return calling_class(*_slice_subgraph_node_pairs(self, index))
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `SampledSubgraph` to the specified device using reflection."""
@@ -208,13 +232,31 @@ class SampledSubgraph:
         return self
 
 
-def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
+def _to_reverse_ids_node_pairs(
+    node_pair, original_row_node_ids, original_column_node_ids
+):
     u, v = node_pair
     if original_row_node_ids is not None:
         u = original_row_node_ids[u]
     if original_column_node_ids is not None:
         v = original_column_node_ids[v]
     return (u, v)
+
+
+def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
+    indptr = node_pair.indptr
+    indices = node_pair.indices
+    if original_row_node_ids is not None:
+        indices = original_row_node_ids[indices]
+    if original_column_node_ids is not None:
+        indptr = original_column_node_ids.repeat_interleave(
+            indptr[1:] - indptr[:-1]
+        )
+    else:
+        indptr = torch.arange(len(indptr) - 1).repeat_interleave(
+            indptr[1:] - indptr[:-1]
+        )
+    return (indices, indptr)
 
 
 def _relabel_two_arrays(lhs_array, rhs_array):
@@ -238,7 +280,7 @@ def _exclude_homo_edges(edges, edges_to_exclude, assume_num_node_within_int32):
     return torch.nonzero(mask, as_tuple=True)[0]
 
 
-def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
+def _slice_subgraph_node_pairs(subgraph: SampledSubgraph, index: torch.Tensor):
     """Slice the subgraph according to the index."""
 
     def _index_select(obj, index):
@@ -248,6 +290,37 @@ def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
             return obj[index]
         if isinstance(obj, tuple):
             return tuple(_index_select(v, index) for v in obj)
+        # Handle the case when obj is a dictionary.
+        assert isinstance(obj, dict)
+        assert isinstance(index, dict)
+        ret = {}
+        for k, v in obj.items():
+            ret[k] = _index_select(v, index[k])
+        return ret
+
+    return (
+        _index_select(subgraph.node_pairs, index),
+        subgraph.original_column_node_ids,
+        subgraph.original_row_node_ids,
+        _index_select(subgraph.original_edge_ids, index),
+    )
+
+
+def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
+    """Slice the subgraph according to the index."""
+
+    def _index_select(obj, index):
+        if obj is None:
+            return None
+        if isinstance(obj, CSCFormatBase):
+            new_indices = obj.indices[index]
+            new_indptr = torch.searchsorted(index, obj.indptr)
+            return CSCFormatBase(
+                indptr=new_indptr,
+                indices=new_indices,
+            )
+        if isinstance(obj, torch.Tensor):
+            return obj[index]
         # Handle the case when obj is a dictionary.
         assert isinstance(obj, dict)
         assert isinstance(index, dict)
