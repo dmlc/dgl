@@ -1,6 +1,6 @@
-"""Utils for tacking graph homophily and heterophily"""
+"""Utils for tracking graph homophily and heterophily"""
 # pylint: disable=W0611
-from . import function as fn
+from . import function as fn, to_bidirected
 
 try:
     import torch
@@ -9,7 +9,12 @@ except ImportError:
 else:
     HAS_TORCH = True
 
-__all__ = ["node_homophily", "edge_homophily", "linkx_homophily"]
+__all__ = [
+    "node_homophily",
+    "edge_homophily",
+    "linkx_homophily",
+    "adjusted_homophily",
+]
 
 
 def check_pytorch():
@@ -187,3 +192,78 @@ def linkx_homophily(graph, y):
             value += max(0, same_class_deg_k / deg_k - num_nodes_k / num_nodes)
 
         return value.item() / (num_classes - 1)
+
+
+def adjusted_homophily(graph, y):
+    r"""Homophily measure recommended in `Characterizing Graph Datasets for
+    Node Classification: Homophily-Heterophily Dichotomy and Beyond
+    <https://arxiv.org/abs/2209.06177>`__
+
+    Adjusted homophily is edge homophily adjusted for the expected number of
+    edges connecting nodes with the same class label (taking into account the
+    number of classes, their sizes, and the distribution of node degrees among
+    them).
+
+    Mathematically it is defined as follows:
+
+    .. math::
+        \frac{h_{edge} - \sum_{k=1}^C \bar{p}(k)^2}
+        {1 - \sum_{k=1}^C \bar{p}(k)^2},
+
+    where :math:`h_{edge}` denotes edge homophily, :math:`C` denotes the
+    number of classes, and :math:`\bar{p}(\cdot)` is the empirical
+    degree-weighted distribution of classes:
+    :math:`\bar{p}(k) = \frac{\sum_{v\,:\,y_v = k} d(v)}{2|E|}`,
+    where :math:`d(v)` is the degree of node :math:`v`.
+
+    It has been shown that adjusted homophily satisifes more desirable
+    properties than other homophily measures, which makes it appropriate for
+    comparing the levels of homophily across datasets with different number
+    of classes, different class sizes, andd different degree distributions
+    among classes.
+
+    Adjusted homophily can be negative. If adjusted homophily is zero, then
+    the edge pattern in the graph is independent of node class labels. If it
+    is positive, then the nodes in the graph tend to connect to nodes of the
+    same class more often, and if it is negative, than the nodes in the graph
+    tend to connect to nodes of different classes more often (compared to the
+    null model where edges are independent of node class labels).
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph.
+    y : torch.Tensor
+        The node labels, which is a tensor of shape (|V|).
+
+    Returns
+    -------
+    float
+        The adjusted homophily value.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+
+    >>> graph = dgl.graph(([1, 2, 0, 4], [0, 1, 2, 3]))
+    >>> y = torch.tensor([0, 0, 0, 0, 1])
+    >>> dgl.adjusted_homophily(graph, y)
+    -0.1428571492433548
+    """
+    check_pytorch()
+
+    graph = to_bidirected(graph.cpu()).to(y.device)
+
+    h_edge = edge_homophily(graph, y)
+
+    degrees = graph.in_degrees().float()
+    num_classes = y.max().item() + 1
+    degree_sums = torch.zeros(num_classes).to(y.device)
+    degree_sums.index_add_(dim=0, index=y, source=degrees)
+
+    adjust = (degree_sums**2).sum() / graph.num_edges() ** 2
+
+    h_adj = (h_edge - adjust) / (1 - adjust)
+
+    return h_adj.item()
