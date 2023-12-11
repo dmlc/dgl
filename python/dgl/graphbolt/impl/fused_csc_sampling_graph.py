@@ -171,6 +171,55 @@ class FusedCSCSamplingGraph(SamplingGraph):
             return num_nodes_per_type
 
     @property
+    def num_edges(self) -> Union[int, Dict[str, int]]:
+        """The number of edges in the graph.
+        - If the graph is homogenous, returns an integer.
+        - If the graph is heterogenous, returns a dictionary.
+
+        Returns
+        -------
+        Union[int, Dict[str, int]]
+            The number of edges. Integer indicates the total edges number of a
+            homogenous graph; dict indicates edges number per edge types of a
+            heterogenous graph.
+
+        Examples
+        --------
+        >>> import dgl.graphbolt as gb, torch
+        >>> total_num_nodes = 5
+        >>> total_num_edges = 12
+        >>> ntypes = {"N0": 0, "N1": 1}
+        >>> etypes = {"N0:R0:N0": 0, "N0:R1:N1": 1,
+        ...     "N1:R2:N0": 2, "N1:R3:N1": 3}
+        >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor(
+        ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
+        ...     type_per_edge, None, metadata)
+        >>> print(graph.num_edges)
+        {'N0:R0:N0': 2, 'N0:R1:N1': 1, 'N1:R2:N0': 2, 'N1:R3:N1': 3}
+        """
+
+        type_per_edge = self.type_per_edge
+
+        # Homogenous.
+        if type_per_edge is None or self.edge_type_to_id is None:
+            return self._c_csc_graph.num_edges()
+
+        # Heterogenous
+        bincount = torch.bincount(type_per_edge)
+        num_edges_per_type = {}
+        for etype, etype_id in self.edge_type_to_id.items():
+            if etype_id < len(bincount):
+                num_edges_per_type[etype] = bincount[etype_id].item()
+            else:
+                num_edges_per_type[etype] = 0
+        return num_edges_per_type
+
+    @property
     def csc_indptr(self) -> torch.tensor:
         """Returns the indices pointer in the CSC graph.
 

@@ -56,7 +56,7 @@ class SamplingGraph:
 
     def copy_to_shared_memory(
         self, shared_memory_name: str
-    ) -> "SamplingGraph":  # pylint: disable=unused-variable
+    ) -> "SamplingGraph":  # pylint: disable=invalid-name
         """Copy the graph to shared memory.
 
         Parameters
@@ -73,6 +73,6 @@ class SamplingGraph:
 
     def to(
         self, device: torch.device
-    ) -> "SamplingGraph":  # pylint: disable=unused-variable
+    ) -> "SamplingGraph":  # pylint: disable=invalid-name
         """Copy graph to the specified device."""
         raise NotImplementedError
