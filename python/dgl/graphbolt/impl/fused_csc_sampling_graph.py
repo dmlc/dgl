@@ -1,8 +1,5 @@
 """CSC format sampling graph."""
 # pylint: disable= invalid-name
-import os
-import tarfile
-import tempfile
 from collections import defaultdict
 from typing import Dict, Optional, Union
 
@@ -27,8 +24,6 @@ __all__ = [
     "FusedCSCSamplingGraph",
     "from_fused_csc",
     "load_from_shared_memory",
-    "load_fused_csc_sampling_graph",
-    "save_fused_csc_sampling_graph",
     "from_dglgraph",
 ]
 
@@ -99,11 +94,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return _csc_sampling_graph_str(self)
 
     def __init__(
-        self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
+        self,
+        c_csc_graph: torch.ScriptObject,
     ):
         super().__init__()
         self._c_csc_graph = c_csc_graph
-        self._metadata = metadata
 
     @property
     def total_num_nodes(self) -> int:
@@ -174,6 +169,55 @@ class FusedCSCSamplingGraph(SamplingGraph):
             }
 
             return num_nodes_per_type
+
+    @property
+    def num_edges(self) -> Union[int, Dict[str, int]]:
+        """The number of edges in the graph.
+        - If the graph is homogenous, returns an integer.
+        - If the graph is heterogenous, returns a dictionary.
+
+        Returns
+        -------
+        Union[int, Dict[str, int]]
+            The number of edges. Integer indicates the total edges number of a
+            homogenous graph; dict indicates edges number per edge types of a
+            heterogenous graph.
+
+        Examples
+        --------
+        >>> import dgl.graphbolt as gb, torch
+        >>> total_num_nodes = 5
+        >>> total_num_edges = 12
+        >>> ntypes = {"N0": 0, "N1": 1}
+        >>> etypes = {"N0:R0:N0": 0, "N0:R1:N1": 1,
+        ...     "N1:R2:N0": 2, "N1:R3:N1": 3}
+        >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor(
+        ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
+        ...     type_per_edge, None, metadata)
+        >>> print(graph.num_edges)
+        {'N0:R0:N0': 2, 'N0:R1:N1': 1, 'N1:R2:N0': 2, 'N1:R3:N1': 3}
+        """
+
+        type_per_edge = self.type_per_edge
+
+        # Homogenous.
+        if type_per_edge is None or self.edge_type_to_id is None:
+            return self._c_csc_graph.num_edges()
+
+        # Heterogenous
+        bincount = torch.bincount(type_per_edge)
+        num_edges_per_type = {}
+        for etype, etype_id in self.edge_type_to_id.items():
+            if etype_id < len(bincount):
+                num_edges_per_type[etype] = bincount[etype_id].item()
+            else:
+                num_edges_per_type[etype] = 0
+        return num_edges_per_type
 
     @property
     def csc_indptr(self) -> torch.tensor:
@@ -299,7 +343,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        torch.Tensor or None
+        Dict[str, torch.Tensor] or None
             If present, returns a dictionary of edge attributes. Each key
             represents the attribute's name, while the corresponding value
             holds the attribute's specific value. The length of each value
@@ -318,12 +362,16 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def metadata(self) -> Optional[GraphMetadata]:
         """Returns the metadata of the graph.
 
+        [TODO][Rui] This API needs to be updated.
+
         Returns
         -------
         GraphMetadata or None
             If present, returns the metadata of the graph.
         """
-        return self._metadata
+        if self.node_type_to_id is None or self.edge_type_to_id is None:
+            return None
+        return GraphMetadata(self.node_type_to_id, self.edge_type_to_id)
 
     def in_subgraph(
         self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
@@ -584,6 +632,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+
         Returns
         -------
         FusedSampledSubgraphImpl
@@ -699,6 +748,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+
         Returns
         -------
         torch.classes.graphbolt.SampledSubgraph
@@ -768,6 +818,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+
         Returns
         -------
         FusedSampledSubgraphImpl
@@ -884,7 +935,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         return FusedCSCSamplingGraph(
             self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
-            self._metadata,
         )
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
@@ -936,6 +986,7 @@ def from_fused_csc(
         Edge attributes of the graph, by default None.
     metadata: Optional[GraphMetadata], optional
         Metadata of the graph, by default None.
+
     Returns
     -------
     FusedCSCSamplingGraph
@@ -975,13 +1026,11 @@ def from_fused_csc(
             edge_type_to_id,
             edge_attributes,
         ),
-        metadata,
     )
 
 
 def load_from_shared_memory(
     shared_memory_name: str,
-    metadata: Optional[GraphMetadata] = None,
 ) -> FusedCSCSamplingGraph:
     """Load a FusedCSCSamplingGraph object from shared memory.
 
@@ -997,7 +1046,6 @@ def load_from_shared_memory(
     """
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.load_from_shared_memory(shared_memory_name),
-        metadata,
     )
 
 
@@ -1031,38 +1079,6 @@ def _csc_sampling_graph_str(graph: FusedCSCSamplingGraph) -> str:
 
     final_str = prefix + _add_indent(final_str, len(prefix))
     return final_str
-
-
-def load_fused_csc_sampling_graph(filename):
-    """Load FusedCSCSamplingGraph from tar file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with tarfile.open(filename, "r") as archive:
-            archive.extractall(temp_dir)
-        graph_filename = os.path.join(temp_dir, "fused_csc_sampling_graph.pt")
-        metadata_filename = os.path.join(temp_dir, "metadata.pt")
-        return FusedCSCSamplingGraph(
-            torch.ops.graphbolt.load_fused_csc_sampling_graph(graph_filename),
-            torch.load(metadata_filename),
-        )
-
-
-def save_fused_csc_sampling_graph(graph, filename):
-    """Save FusedCSCSamplingGraph to tar file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        graph_filename = os.path.join(temp_dir, "fused_csc_sampling_graph.pt")
-        torch.ops.graphbolt.save_fused_csc_sampling_graph(
-            graph._c_csc_graph, graph_filename
-        )
-        metadata_filename = os.path.join(temp_dir, "metadata.pt")
-        torch.save(graph.metadata, metadata_filename)
-        with tarfile.open(filename, "w") as archive:
-            archive.add(
-                graph_filename, arcname=os.path.basename(graph_filename)
-            )
-            archive.add(
-                metadata_filename, arcname=os.path.basename(metadata_filename)
-            )
-    print(f"FusedCSCSamplingGraph has been saved to {filename}.")
 
 
 def from_dglgraph(
@@ -1114,5 +1130,4 @@ def from_dglgraph(
             edge_type_to_id,
             edge_attributes,
         ),
-        metadata,
     )
