@@ -83,7 +83,7 @@ def preprocess_ondisk_dataset(
     os.makedirs(os.path.join(dataset_dir, processed_dir_prefix), exist_ok=True)
     output_config = deepcopy(input_config)
 
-    # 2. Load the edge data and create a DGLGraph.
+    # 2. Load the edge data and create a FusedCSCSamplingGraph.
     if "graph" not in input_config:
         raise RuntimeError("Invalid config: does not contain graph field.")
     is_homogeneous = "type" not in input_config["graph"]["nodes"][0]
