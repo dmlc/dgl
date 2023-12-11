@@ -259,7 +259,7 @@ def adjusted_homophily(graph, y):
 
     degrees = graph.in_degrees().float()
     num_classes = y.max().item() + 1
-    degree_sums = torch.zeros(num_classes)
+    degree_sums = torch.zeros(num_classes).to(y.device)
     degree_sums.index_add_(dim=0, index=y, source=degrees)
 
     adjust = (degree_sums**2).sum() / graph.num_edges() ** 2
