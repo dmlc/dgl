@@ -82,7 +82,7 @@ def edge_label_informativeness(graph, y, eps=1e-8):
     """
     check_pytorch()
 
-    graph = to_bidirected(graph)
+    graph = to_bidirected(graph.cpu())
 
     degrees = graph.in_degrees().float()
     num_classes = y.max() + 1
@@ -91,8 +91,8 @@ def edge_label_informativeness(graph, y, eps=1e-8):
     class_degree_weighted_probs /= class_degree_weighted_probs.sum()
 
     edge_probs = torch.zeros(num_classes, num_classes)
-    labels_u = y[graph.edges()[0]]
-    labels_v = y[graph.edges()[1]]
+    labels_u = y[graph.edges()[0].long()]
+    labels_v = y[graph.edges()[1].long()]
     edge_probs.index_put_(
         indices=(labels_u, labels_v),
         values=torch.ones(graph.num_edges()),
@@ -173,7 +173,7 @@ def node_label_informativeness(graph, y, eps=1e-8):
     """
     check_pytorch()
 
-    graph = to_bidirected(graph)
+    graph = to_bidirected(graph.cpu())
 
     degrees = graph.in_degrees().float()
     num_classes = y.max() + 1
@@ -189,9 +189,9 @@ def node_label_informativeness(graph, y, eps=1e-8):
     num_nonzero_degree_nodes = (degrees > 0).sum()
 
     edge_probs = torch.zeros(num_classes, num_classes)
-    labels_u = y[graph.edges()[0]]
-    labels_v = y[graph.edges()[1]]
-    degrees_u = degrees[graph.edges()[0]]
+    labels_u = y[graph.edges()[0].long()]
+    labels_v = y[graph.edges()[1].long()]
+    degrees_u = degrees[graph.edges()[0].long()]
     edge_probs.index_put_(
         indices=(labels_u, labels_v),
         values=1 / (num_nonzero_degree_nodes * degrees_u),
