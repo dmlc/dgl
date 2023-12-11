@@ -22,7 +22,7 @@ def test_edge_label_informativeness(idtype):
     assert math.isclose(
         dgl.edge_label_informativeness(graph, y),
         0.25177597999572754,
-        abs_tol=1e-6
+        abs_tol=1e-6,
     )
 
 
@@ -41,5 +41,5 @@ def test_node_label_informativeness(idtype):
     assert math.isclose(
         dgl.node_label_informativeness(graph, y),
         0.3381872773170471,
-        abs_tol=1e-6
+        abs_tol=1e-6,
     )
