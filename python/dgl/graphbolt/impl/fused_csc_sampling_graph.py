@@ -294,7 +294,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        torch.Tensor or None
+        Dict[str, torch.Tensor] or None
             If present, returns a dictionary of edge attributes. Each key
             represents the attribute's name, while the corresponding value
             holds the attribute's specific value. The length of each value
@@ -583,6 +583,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+
         Returns
         -------
         FusedSampledSubgraphImpl
@@ -698,6 +699,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+
         Returns
         -------
         torch.classes.graphbolt.SampledSubgraph
@@ -767,6 +769,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+
         Returns
         -------
         FusedSampledSubgraphImpl
@@ -934,6 +937,7 @@ def from_fused_csc(
         Edge attributes of the graph, by default None.
     metadata: Optional[GraphMetadata], optional
         Metadata of the graph, by default None.
+
     Returns
     -------
     FusedCSCSamplingGraph
