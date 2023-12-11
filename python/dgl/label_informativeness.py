@@ -86,16 +86,16 @@ def edge_label_informativeness(graph, y, eps=1e-8):
 
     degrees = graph.in_degrees().float()
     num_classes = y.max() + 1
-    class_degree_weighted_probs = torch.zeros(num_classes)
+    class_degree_weighted_probs = torch.zeros(num_classes).to(y.device)
     class_degree_weighted_probs.index_add_(dim=0, index=y, source=degrees)
     class_degree_weighted_probs /= class_degree_weighted_probs.sum()
 
-    edge_probs = torch.zeros(num_classes, num_classes)
+    edge_probs = torch.zeros(num_classes, num_classes).to(y.device)
     labels_u = y[graph.edges()[0].long()]
     labels_v = y[graph.edges()[1].long()]
     edge_probs.index_put_(
         indices=(labels_u, labels_v),
-        values=torch.ones(graph.num_edges()),
+        values=torch.ones(graph.num_edges()).to(y.device),
         accumulate=True,
     )
     edge_probs /= edge_probs.sum()
@@ -178,17 +178,17 @@ def node_label_informativeness(graph, y, eps=1e-8):
     degrees = graph.in_degrees().float()
     num_classes = y.max() + 1
 
-    class_probs = torch.zeros(num_classes)
+    class_probs = torch.zeros(num_classes).to(y.device)
     class_probs.index_add_(dim=0, index=y, source=torch.ones(graph.num_nodes()))
     class_probs /= class_probs.sum()
 
-    class_degree_weighted_probs = torch.zeros(num_classes)
+    class_degree_weighted_probs = torch.zeros(num_classes).to(y.device)
     class_degree_weighted_probs.index_add_(dim=0, index=y, source=degrees)
     class_degree_weighted_probs /= class_degree_weighted_probs.sum()
 
     num_nonzero_degree_nodes = (degrees > 0).sum()
 
-    edge_probs = torch.zeros(num_classes, num_classes)
+    edge_probs = torch.zeros(num_classes, num_classes).to(y.device)
     labels_u = y[graph.edges()[0].long()]
     labels_v = y[graph.edges()[1].long()]
     degrees_u = degrees[graph.edges()[0].long()]
