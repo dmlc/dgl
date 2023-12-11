@@ -59,15 +59,17 @@ class InSubgraphSampler(SubgraphSampler):
         self,
         datapipe,
         graph,
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
     ):
         super().__init__(datapipe)
         self.graph = graph
+        self.output_cscformat = output_cscformat
         self.sampler = graph.in_subgraph
 
-    def _sample_subgraphs(self, seeds, output_cscformat=False):
-        # TODO: clean up once the migration is done.
-        subgraph = self.sampler(seeds, output_cscformat)
-        if not output_cscformat:
+    def _sample_subgraphs(self, seeds):
+        subgraph = self.sampler(seeds, self.output_cscformat)
+        if not self.output_cscformat:
             (
                 original_row_node_ids,
                 compacted_node_pairs,
