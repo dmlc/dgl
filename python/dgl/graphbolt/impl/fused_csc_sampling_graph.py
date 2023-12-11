@@ -301,7 +301,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._c_csc_graph.set_edge_attributes(edge_attributes)
 
     def in_subgraph(
-        self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
+        self,
+        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        output_cscformat=False,
     ) -> FusedSampledSubgraphImpl:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
@@ -361,7 +363,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
         ), "Nodes cannot have duplicate values."
 
         _in_subgraph = self._c_csc_graph.in_subgraph(nodes)
-        return self._convert_to_fused_sampled_subgraph(_in_subgraph)
+        if not output_cscformat:
+            return self._convert_to_fused_sampled_subgraph(_in_subgraph)
+        else:
+            return self._convert_to_sampled_subgraph(_in_subgraph)
 
     def _convert_to_fused_sampled_subgraph(
         self,
