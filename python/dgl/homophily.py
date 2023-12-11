@@ -253,7 +253,7 @@ def adjusted_homophily(graph, y):
     """
     check_pytorch()
 
-    graph = to_bidirected(graph.cpu())
+    graph = to_bidirected(graph.cpu()).to(y.device)
 
     h_edge = edge_homophily(graph, y)
 
