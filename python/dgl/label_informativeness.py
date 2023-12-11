@@ -179,7 +179,9 @@ def node_label_informativeness(graph, y, eps=1e-8):
     num_classes = y.max() + 1
 
     class_probs = torch.zeros(num_classes).to(y.device)
-    class_probs.index_add_(dim=0, index=y, source=torch.ones(graph.num_nodes()))
+    class_probs.index_add_(
+        dim=0, index=y, source=torch.ones(graph.num_nodes()).to(y.device)
+    )
     class_probs /= class_probs.sum()
 
     class_degree_weighted_probs = torch.zeros(num_classes).to(y.device)
