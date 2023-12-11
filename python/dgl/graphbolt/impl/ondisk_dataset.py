@@ -109,15 +109,19 @@ def preprocess_ondisk_dataset(
         # Heterogeneous graph.
         node_type_offset = [0]
         node_type_to_id = {}
-        for id, node_info in enumerate(input_config["graph"]["nodes"]):
-            node_type_to_id[node_info["type"]] = id
+        for node_type_id, node_info in enumerate(
+            input_config["graph"]["nodes"]
+        ):
+            node_type_to_id[node_info["type"]] = node_type_id
             node_type_offset.append(node_type_offset[-1] + node_info["num"])
         edge_type_to_id = {}
         coo_src = torch.LongTensor([])
         coo_dst = torch.LongTensor([])
         coo_etype = torch.LongTensor([])
-        for id, edge_info in enumerate(input_config["graph"]["edges"]):
-            edge_type_to_id[edge_info["type"]] = id
+        for edge_type_id, edge_info in enumerate(
+            input_config["graph"]["edges"]
+        ):
+            edge_type_to_id[edge_info["type"]] = edge_type_id
             edge_data = pd.read_csv(
                 os.path.join(dataset_dir, edge_info["path"]),
                 names=["src", "dst"],
