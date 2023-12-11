@@ -109,6 +109,15 @@ class DGLMiniBatch(MiniBatchBase):
       of format (str, str, str).
     """
 
+    compacted_node_pairs: Union[
+        Tuple[torch.Tensor, torch.Tensor],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
+    ] = None
+    """
+    Representation of compacted node pairs corresponding to 'node_pairs', where
+    all node ids inside are compacted.
+    """
+
     labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """Labels associated with seed nodes / node pairs in the graph.
     - If `labels` is a tensor: It indicates the graph is homogeneous. The value
@@ -481,7 +490,7 @@ class MiniBatch:
 
         # For link prediction tasks.
         if self.compacted_node_pairs is not None:
-            minibatch.positive_node_pairs = self.compacted_node_pairs
+            positive_node_pairs = self.compacted_node_pairs
             # Build negative graph.
             if (
                 self.compacted_negative_srcs is not None
@@ -489,13 +498,13 @@ class MiniBatch:
             ):
                 # For homogeneous graph.
                 if isinstance(self.compacted_negative_srcs, torch.Tensor):
-                    minibatch.negative_node_pairs = (
+                    negative_node_pairs = (
                         self.compacted_negative_srcs.view(-1),
                         self.compacted_negative_dsts.view(-1),
                     )
                 # For heterogeneous graph.
                 else:
-                    minibatch.negative_node_pairs = {
+                    negative_node_pairs = {
                         etype: (
                             neg_src.view(-1),
                             self.compacted_negative_dsts[etype].view(-1),
@@ -506,7 +515,7 @@ class MiniBatch:
                 # For homogeneous graph.
                 if isinstance(self.compacted_negative_srcs, torch.Tensor):
                     negative_ratio = self.compacted_negative_srcs.size(1)
-                    minibatch.negative_node_pairs = (
+                    negative_node_pairs = (
                         self.compacted_negative_srcs.view(-1),
                         self.compacted_node_pairs[1].repeat_interleave(
                             negative_ratio
@@ -517,7 +526,7 @@ class MiniBatch:
                     negative_ratio = list(
                         self.compacted_negative_srcs.values()
                     )[0].size(1)
-                    minibatch.negative_node_pairs = {
+                    negative_node_pairs = {
                         etype: (
                             neg_src.view(-1),
                             self.compacted_node_pairs[etype][
@@ -530,7 +539,7 @@ class MiniBatch:
                 # For homogeneous graph.
                 if isinstance(self.compacted_negative_dsts, torch.Tensor):
                     negative_ratio = self.compacted_negative_dsts.size(1)
-                    minibatch.negative_node_pairs = (
+                    negative_node_pairs = (
                         self.compacted_node_pairs[0].repeat_interleave(
                             negative_ratio
                         ),
@@ -541,7 +550,7 @@ class MiniBatch:
                     negative_ratio = list(
                         self.compacted_negative_dsts.values()
                     )[0].size(1)
-                    minibatch.negative_node_pairs = {
+                    negative_node_pairs = {
                         etype: (
                             self.compacted_node_pairs[etype][
                                 0
@@ -550,6 +559,19 @@ class MiniBatch:
                         )
                         for etype, neg_dst in self.compacted_negative_dsts.items()
                     }
+            # Convert the minibatch to a training pair and a label tensor."""
+            pos_src, pos_dst = positive_node_pairs
+            neg_src, neg_dst = negative_node_pairs
+            node_pairs = (
+                torch.cat((pos_src, neg_src), dim=0),
+                torch.cat((pos_dst, neg_dst), dim=0),
+            )
+            pos_label = torch.ones_like(pos_src)
+            neg_label = torch.zeros_like(neg_src)
+            labels = torch.cat([pos_label, neg_label], dim=0)
+            minibatch.compacted_node_pairs = node_pairs
+            minibatch.labels = labels.float()
+
         return minibatch
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
