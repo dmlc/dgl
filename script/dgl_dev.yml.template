@@ -43,5 +43,7 @@ dependencies:
     - seaborn
     - jupyter_http_over_ws
     - ufmt
+    - clang-format
+    - pylint
 variables:
   DGL_HOME: __DGL_HOME__

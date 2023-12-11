@@ -1008,8 +1008,8 @@ def test_OnDiskDataset_Graph_homogeneous():
     graph = gb.from_fused_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
@@ -1046,8 +1046,8 @@ def test_OnDiskDataset_Graph_heterogeneous():
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
@@ -1119,12 +1119,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
         assert "graph" not in processed_dataset
         assert "graph_topology" in processed_dataset
 
-        fused_csc_sampling_graph = (
-            gb.fused_csc_sampling_graph.load_fused_csc_sampling_graph(
-                os.path.join(
-                    test_dir, processed_dataset["graph_topology"]["path"]
-                )
-            )
+        fused_csc_sampling_graph = torch.load(
+            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
         )
         assert fused_csc_sampling_graph.total_num_nodes == num_nodes
         assert fused_csc_sampling_graph.total_num_edges == num_edges
@@ -1166,12 +1162,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
         )
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
-        fused_csc_sampling_graph = (
-            gb.fused_csc_sampling_graph.load_fused_csc_sampling_graph(
-                os.path.join(
-                    test_dir, processed_dataset["graph_topology"]["path"]
-                )
-            )
+        fused_csc_sampling_graph = torch.load(
+            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
         )
         assert (
             fused_csc_sampling_graph.edge_attributes is not None
@@ -1325,7 +1317,7 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
             dataset_name: {dataset_name}
             graph_topology:
               type: FusedCSCSamplingGraph
-              path: preprocessed/fused_csc_sampling_graph.tar
+              path: preprocessed/fused_csc_sampling_graph.pt
             feature_data:
               - domain: node
                 type: null
@@ -1479,7 +1471,7 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
             dataset_name: {dataset_name}
             graph_topology:
               type: FusedCSCSamplingGraph
-              path: preprocessed\\fused_csc_sampling_graph.tar
+              path: preprocessed\\fused_csc_sampling_graph.pt
             feature_data:
               - domain: node
                 type: null
@@ -1836,8 +1828,8 @@ def test_OnDiskDataset_all_nodes_set_homo():
     graph = gb.from_fused_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
@@ -1873,8 +1865,8 @@ def test_OnDiskDataset_all_nodes_set_hetero():
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
@@ -1999,7 +1991,7 @@ def test_BuiltinDataset():
     """Test BuiltinDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # Case 1: download from DGL S3 storage.
-        dataset_name = "test-dataset-231204"
+        dataset_name = "test-dataset-231207"
         # Add dataset to the builtin dataset list for testing only.
         gb.BuiltinDataset._all_datasets.append(dataset_name)
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
