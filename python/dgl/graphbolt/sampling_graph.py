@@ -54,9 +54,7 @@ class SamplingGraph:
         """
         raise NotImplementedError
 
-    def copy_to_shared_memory(
-        self, shared_memory_name: str
-    ) -> "SamplingGraph":  # pylint: disable=invalid-name
+    def copy_to_shared_memory(self, shared_memory_name: str) -> "SamplingGraph":
         """Copy the graph to shared memory.
 
         Parameters
