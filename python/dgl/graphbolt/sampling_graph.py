@@ -74,5 +74,16 @@ class SamplingGraph:
     def to(
         self, device: torch.device
     ) -> "SamplingGraph":  # pylint: disable=invalid-name
-        """Copy graph to the specified device."""
+        """Copy graph to the specified device.
+
+        Parameters
+        ----------
+        device : torch.device
+            The destination device.
+
+        Returns
+        -------
+        SamplingGraph
+            The graph on the specified device.
+        """
         raise NotImplementedError
