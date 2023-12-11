@@ -187,7 +187,7 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
     "total_num_nodes, total_num_edges",
     [(1, 1), (100, 1), (10, 50), (1000, 50000)],
 )
-def test_num_nodes_homo(total_num_nodes, total_num_edges):
+def test_num_nodes_edges_homo(total_num_nodes, total_num_edges):
     csc_indptr, indices = gbt.random_homo_graph(
         total_num_nodes, total_num_edges
     )
@@ -200,6 +200,7 @@ def test_num_nodes_homo(total_num_nodes, total_num_edges):
     )
 
     assert graph.num_nodes == total_num_nodes
+    assert graph.num_edges == total_num_edges
 
 
 @unittest.skipIf(
@@ -233,6 +234,7 @@ def test_num_nodes_hetero():
         "N0:R1:N1": 1,
         "N1:R2:N0": 2,
         "N1:R3:N1": 3,
+        "N1:R4:N0": 4,
     }
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -254,9 +256,16 @@ def test_num_nodes_hetero():
         "N0": 2,
         "N1": 3,
     }
-    assert graph.num_nodes["N0"] == 2
-    assert graph.num_nodes["N1"] == 3
-    assert "N2" not in graph.num_nodes
+    assert sum(graph.num_nodes.values()) == total_num_nodes
+    # Verify edges number per edge types.
+    assert graph.num_edges == {
+        "N0:R0:N0": 2,
+        "N0:R1:N1": 4,
+        "N1:R2:N0": 3,
+        "N1:R3:N1": 3,
+        "N1:R4:N0": 0,
+    }
+    assert sum(graph.num_edges.values()) == total_num_edges
 
 
 @unittest.skipIf(

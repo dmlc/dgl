@@ -3,7 +3,11 @@
 import torch
 from torch.utils.data import functional_datapipe
 
-from ..internal import compact_csc_format, unique_and_compact_node_pairs
+from ..internal import (
+    compact_csc_format,
+    unique_and_compact_csc_formats,
+    unique_and_compact_node_pairs,
+)
 
 from ..subgraph_sampler import SubgraphSampler
 from .sampled_subgraph_impl import FusedSampledSubgraphImpl, SampledSubgraphImpl
@@ -123,17 +127,31 @@ class NeighborSampler(SubgraphSampler):
             )
             if self.deduplicate:
                 if self.output_cscformat:
-                    raise RuntimeError("Not implemented yet.")
-                (
-                    original_row_node_ids,
-                    compacted_node_pairs,
-                ) = unique_and_compact_node_pairs(subgraph.node_pairs, seeds)
-                subgraph = FusedSampledSubgraphImpl(
-                    node_pairs=compacted_node_pairs,
-                    original_column_node_ids=seeds,
-                    original_row_node_ids=original_row_node_ids,
-                    original_edge_ids=subgraph.original_edge_ids,
-                )
+                    (
+                        original_row_node_ids,
+                        compacted_csc_format,
+                    ) = unique_and_compact_csc_formats(
+                        subgraph.node_pairs, seeds
+                    )
+                    subgraph = SampledSubgraphImpl(
+                        node_pairs=compacted_csc_format,
+                        original_column_node_ids=seeds,
+                        original_row_node_ids=original_row_node_ids,
+                        original_edge_ids=subgraph.original_edge_ids,
+                    )
+                else:
+                    (
+                        original_row_node_ids,
+                        compacted_node_pairs,
+                    ) = unique_and_compact_node_pairs(
+                        subgraph.node_pairs, seeds
+                    )
+                    subgraph = FusedSampledSubgraphImpl(
+                        node_pairs=compacted_node_pairs,
+                        original_column_node_ids=seeds,
+                        original_row_node_ids=original_row_node_ids,
+                        original_edge_ids=subgraph.original_edge_ids,
+                    )
             else:
                 (
                     original_row_node_ids,
