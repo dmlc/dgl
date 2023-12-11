@@ -82,7 +82,7 @@ def edge_label_informativeness(graph, y, eps=1e-8):
     """
     check_pytorch()
 
-    graph = to_bidirected(graph.cpu())
+    graph = to_bidirected(graph.cpu()).to(y.device)
 
     degrees = graph.in_degrees().float()
     num_classes = y.max() + 1
@@ -173,7 +173,7 @@ def node_label_informativeness(graph, y, eps=1e-8):
     """
     check_pytorch()
 
-    graph = to_bidirected(graph.cpu())
+    graph = to_bidirected(graph.cpu()).to(y.device)
 
     degrees = graph.in_degrees().float()
     num_classes = y.max() + 1
