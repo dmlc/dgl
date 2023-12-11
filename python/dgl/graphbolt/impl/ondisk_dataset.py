@@ -8,16 +8,20 @@ import pandas as pd
 import torch
 import yaml
 
-import dgl
+import dgl.sparse as dglsp
 
 from ...base import dgl_warning
 from ...data.utils import download, extract_archive
-from ..base import etype_str_to_tuple
+from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
 from ..dataset import Dataset, Task
 from ..internal import copy_or_convert_data, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
+from .fused_csc_sampling_graph import (
+    from_fused_csc,
+    FusedCSCSamplingGraph,
+    GraphMetadata,
+)
 from .ondisk_metadata import (
     OnDiskGraphTopology,
     OnDiskMetaData,
@@ -85,60 +89,72 @@ def preprocess_ondisk_dataset(
     is_homogeneous = "type" not in input_config["graph"]["nodes"][0]
     if is_homogeneous:
         # Homogeneous graph.
-        num_nodes = input_config["graph"]["nodes"][0]["num"]
         edge_data = pd.read_csv(
             os.path.join(
                 dataset_dir, input_config["graph"]["edges"][0]["path"]
             ),
             names=["src", "dst"],
         )
-        src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
-
-        g = dgl.graph((src, dst), num_nodes=num_nodes)
+        coo_tensor = torch.LongTensor(edge_data.values).T
+        sparse_matrix = dglsp.spmatrix(coo_tensor)
+        indptr, indices, value_indices = sparse_matrix.csc()
+        fused_csc_sampling_graph = from_fused_csc(
+            csc_indptr=indptr,
+            indices=indices,
+            edge_attributes={}
+            if not include_original_edge_id
+            else {ORIGINAL_EDGE_ID: value_indices},
+        )
     else:
         # Heterogeneous graph.
-        # Construct the num nodes dict.
-        num_nodes_dict = {}
-        for node_info in input_config["graph"]["nodes"]:
-            num_nodes_dict[node_info["type"]] = node_info["num"]
-        # Construct the data dict.
-        data_dict = {}
-        for edge_info in input_config["graph"]["edges"]:
+        node_type_offset = [0]
+        node_type_to_id = {}
+        for id, node_info in enumerate(input_config["graph"]["nodes"]):
+            node_type_to_id[node_info["type"]] = id
+            node_type_offset.append(node_type_offset[-1] + node_info["num"])
+        edge_type_to_id = {}
+        coo_src = torch.LongTensor([])
+        coo_dst = torch.LongTensor([])
+        coo_etype = torch.LongTensor([])
+        for id, edge_info in enumerate(input_config["graph"]["edges"]):
+            edge_type_to_id[edge_info["type"]] = id
             edge_data = pd.read_csv(
                 os.path.join(dataset_dir, edge_info["path"]),
                 names=["src", "dst"],
             )
             src = torch.tensor(edge_data["src"])
             dst = torch.tensor(edge_data["dst"])
-            data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
-        # Construct the heterograph.
-        g = dgl.heterograph(data_dict, num_nodes_dict)
-
-    # 3. Load the sampling related node/edge features and add them to
-    # the sampling-graph.
-    if input_config["graph"].get("feature_data", None):
-        for graph_feature in input_config["graph"]["feature_data"]:
-            if graph_feature["domain"] == "node":
-                node_data = read_data(
-                    os.path.join(dataset_dir, graph_feature["path"]),
-                    graph_feature["format"],
-                    in_memory=graph_feature["in_memory"],
+            src_type, _, dst_type = etype_str_to_tuple(edge_info["type"])
+            src += node_type_offset[node_type_to_id[src_type]]
+            dst += node_type_offset[node_type_to_id[dst_type]]
+            coo_src = torch.cat((coo_src, src))
+            coo_dst = torch.cat((coo_dst, dst))
+            coo_etype = torch.cat(
+                (
+                    coo_etype,
+                    torch.full((len(src),), edge_type_to_id[edge_info["type"]]),
                 )
-                g.ndata[graph_feature["name"]] = node_data
-            if graph_feature["domain"] == "edge":
-                edge_data = read_data(
-                    os.path.join(dataset_dir, graph_feature["path"]),
-                    graph_feature["format"],
-                    in_memory=graph_feature["in_memory"],
-                )
-                g.edata[graph_feature["name"]] = edge_data
+            )
 
-    # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
-    fused_csc_sampling_graph = from_dglgraph(
-        g, is_homogeneous, include_original_edge_id
-    )
+        sparse_matrix = dglsp.spmatrix(
+            indices=torch.stack((coo_src, coo_dst), dim=0), val=coo_etype
+        )
+        indptr, indices, value_indices = sparse_matrix.csc()
 
-    # 5. Save the FusedCSCSamplingGraph and modify the output_config.
+        metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
+
+        fused_csc_sampling_graph = from_fused_csc(
+            csc_indptr=indptr,
+            indices=indices,
+            node_type_offset=torch.LongTensor(node_type_offset),
+            type_per_edge=coo_etype[value_indices],
+            edge_attributes={}
+            if not include_original_edge_id
+            else {ORIGINAL_EDGE_ID: value_indices},
+            metadata=metadata,
+        )
+
+    # 3. Save the FusedCSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "FusedCSCSamplingGraph"
     output_config["graph_topology"]["path"] = os.path.join(
@@ -154,7 +170,7 @@ def preprocess_ondisk_dataset(
     )
     del output_config["graph"]
 
-    # 6. Load the node/edge features and do necessary conversion.
+    # 4. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
         for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
@@ -173,7 +189,7 @@ def preprocess_ondisk_dataset(
                 is_feature=True,
             )
 
-    # 7. Save tasks and train/val/test split according to the output_config.
+    # 5. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
@@ -200,13 +216,13 @@ def preprocess_ondisk_dataset(
                             output_data["format"],
                         )
 
-    # 8. Save the output_config.
+    # 6. Save the output_config.
     output_config_path = os.path.join(dataset_dir, preprocess_metadata_path)
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
 
-    # 9. Return the absolute path of the preprocessing yaml file.
+    # 7. Return the absolute path of the preprocessing yaml file.
     return output_config_path
 
 
