@@ -65,6 +65,7 @@ class InSubgraphSampler(SubgraphSampler):
         self.sampler = graph.in_subgraph
 
     def _sample_subgraphs(self, seeds, output_cscformat=False):
+        # TODO: clean up once the migration is done.
         subgraph = self.sampler(seeds, output_cscformat)
         if not output_cscformat:
             (

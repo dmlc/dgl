@@ -303,8 +303,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def in_subgraph(
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        # TODO: clean up once the migration is done.
         output_cscformat=False,
-    ) -> FusedSampledSubgraphImpl:
+    ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
         An in subgraph is equivalent to creating a new graph using the incoming
