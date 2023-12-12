@@ -1,8 +1,8 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file cuda/index_select_impl.cu
- * @brief Index select operator implementation on CUDA.
+ * @file graphbolt/cuda_ops.h
+ * @brief Available CUDA operations in Graphbolt.
  */
 
 #include <torch/script.h>

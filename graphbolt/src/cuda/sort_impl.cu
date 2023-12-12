@@ -1,8 +1,8 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file cuda/index_select_impl.cu
- * @brief Index select operator implementation on CUDA.
+ * @file cuda/sort_impl.cu
+ * @brief Sort implementation on CUDA.
  */
 #include <c10/core/ScalarType.h>
 #include <c10/cuda/CUDAStream.h>
