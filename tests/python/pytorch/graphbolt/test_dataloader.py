@@ -1,13 +1,9 @@
-import os
-import unittest
-
 import backend as F
 
 import dgl
 import dgl.graphbolt
 import gb_test_utils
 import torch
-from torchdata.datapipes.iter import Mapper
 
 
 def test_DataLoader():
