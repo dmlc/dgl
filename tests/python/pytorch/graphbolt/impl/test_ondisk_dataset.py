@@ -1026,11 +1026,12 @@ def test_OnDiskDataset_Graph_homogeneous():
         assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
         assert torch.equal(graph.indices, graph2.indices)
 
-        assert graph.metadata is None and graph2.metadata is None
         assert (
             graph.node_type_offset is None and graph2.node_type_offset is None
         )
         assert graph.type_per_edge is None and graph2.type_per_edge is None
+        assert graph.node_type_to_id is None and graph2.node_type_to_id is None
+        assert graph.edge_type_to_id is None and graph2.edge_type_to_id is None
 
 
 def test_OnDiskDataset_Graph_heterogeneous():
@@ -1040,10 +1041,16 @@ def test_OnDiskDataset_Graph_heterogeneous():
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
     graph = gb.from_fused_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        csc_indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -1065,8 +1072,8 @@ def test_OnDiskDataset_Graph_heterogeneous():
         assert torch.equal(graph.indices, graph2.indices)
         assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
         assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
-        assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
-        assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+        assert graph.node_type_to_id == graph2.node_type_to_id
+        assert graph.edge_type_to_id == graph2.edge_type_to_id
 
 
 def test_OnDiskDataset_Metadata():
@@ -1854,15 +1861,17 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
     graph = gb.from_fused_csc(
         csc_indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
         edge_attributes=None,
-        metadata=metadata,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
