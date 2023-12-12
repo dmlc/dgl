@@ -65,7 +65,7 @@ TORCH_LIBRARY(graphbolt, m) {
             g->SetState(state);
             return g;
           });
-  m.def("from_fused_csc", &FusedCSCSamplingGraph::FromCSC);
+  m.def("from_fused_csc", &FusedCSCSamplingGraph::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
