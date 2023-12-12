@@ -46,6 +46,9 @@ class SharedMemory {
   /** @brief Get the pointer to the shared memory. */
   void* GetMemory() const { return ptr_; }
 
+  /** @brief Get the size of the shared memory. */
+  size_t GetSize() const { return size_; }
+
   /**
    * @brief Creates the shared memory object and map the shared memory.
    *
@@ -57,10 +60,8 @@ class SharedMemory {
   /**
    * @brief Open the created shared memory object and map the shared memory.
    *
-   * @param size The size of the shared memory.
-   * @return The pointer to the shared memory.
    */
-  void* Open(size_t size);
+  void* Open();
 
   /**
    * @brief Check if the shared memory exists.

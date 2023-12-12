@@ -375,14 +375,6 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   torch::optional<EdgeAttrMap> edge_attributes_;
 
   /**
-   * @brief Maximum number of bytes used to serialize the metadata of the
-   * member tensors, including tensor shape and dtype. The constant is estimated
-   * by multiplying the number of tensors in this class and the maximum number
-   * of bytes used to serialize the metadata of a tensor (10 * 8192 for now).
-   */
-  static constexpr int64_t SERIALIZED_METAINFO_SIZE_MAX = 10 * 81920;
-
-  /**
    * @brief Shared memory used to hold the tensor metadata and data of this
    * class. By storing its shared memory objects, the graph controls the
    * resources of shared memory, which will be released automatically when the

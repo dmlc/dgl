@@ -215,6 +215,18 @@ Utilities for measuring homophily of a graph
     edge_homophily
     node_homophily
     linkx_homophily
+    adjusted_homophily
+
+Label Informativeness Measures
+-------------------------
+
+Utilities for measuring label informativeness of a graph
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    edge_label_informativeness
+    node_label_informativeness
 
 Utilities
 -----------------------------------------------

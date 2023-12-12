@@ -3,6 +3,7 @@ from .basic_feature_store import *
 from .fused_csc_sampling_graph import *
 from .gpu_cached_feature import *
 from .in_subgraph_sampler import *
+from .legacy_dataset import *
 from .neighbor_sampler import *
 from .ondisk_dataset import *
 from .ondisk_metadata import *
