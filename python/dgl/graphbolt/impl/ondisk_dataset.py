@@ -115,9 +115,9 @@ def preprocess_ondisk_dataset(
             node_type_to_id[node_info["type"]] = node_type_id
             node_type_offset.append(node_type_offset[-1] + node_info["num"])
         edge_type_to_id = {}
-        coo_src = torch.LongTensor([])
-        coo_dst = torch.LongTensor([])
-        coo_etype = torch.LongTensor([])
+        coo_src_list = []
+        coo_dst_list = []
+        coo_etype_list = []
         for edge_type_id, edge_info in enumerate(
             input_config["graph"]["edges"]
         ):
@@ -131,21 +131,18 @@ def preprocess_ondisk_dataset(
             src_type, _, dst_type = etype_str_to_tuple(edge_info["type"])
             src += node_type_offset[node_type_to_id[src_type]]
             dst += node_type_offset[node_type_to_id[dst_type]]
-            coo_src = torch.cat((coo_src, src))
-            coo_dst = torch.cat((coo_dst, dst))
-            coo_etype = torch.cat(
-                (
-                    coo_etype,
-                    torch.full((len(src),), edge_type_to_id[edge_info["type"]]),
-                )
-            )
+            coo_src_list.append(src)
+            coo_dst_list.append(dst)
+            coo_etype_list.append(torch.full((len(src),), edge_type_id))
+
+        coo_src = torch.cat(coo_src_list)
+        coo_dst = torch.cat(coo_dst_list)
+        coo_etype = torch.cat(coo_etype_list)
 
         sparse_matrix = dglsp.spmatrix(
             indices=torch.stack((coo_src, coo_dst), dim=0), val=coo_etype
         )
         indptr, indices, value_indices = sparse_matrix.csc()
-
-        metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
 
         fused_csc_sampling_graph = from_fused_csc(
             csc_indptr=indptr,
@@ -155,7 +152,7 @@ def preprocess_ondisk_dataset(
             edge_attributes={}
             if not include_original_edge_id
             else {ORIGINAL_EDGE_ID: value_indices},
-            metadata=metadata,
+            metadata=GraphMetadata(node_type_to_id, edge_type_to_id),
         )
 
     # 3. Save the FusedCSCSamplingGraph and modify the output_config.
