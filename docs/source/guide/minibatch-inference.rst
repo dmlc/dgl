@@ -47,7 +47,6 @@ only one layer at a time.
     datapipe = gb.ItemSampler(all_nodes_set, batch_size=1024, shuffle=True)
     datapipe = datapipe.sample_neighbor(g, [-1]) # 1 layers.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
@@ -100,6 +99,7 @@ and combined as well.
                 feature = feature.to(device)
 
                 for step, data in tqdm(enumerate(dataloader)):
+                    data = data.to_dgl()
                     x = feature[data.input_nodes]
                     hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                     if not is_last_layer:
