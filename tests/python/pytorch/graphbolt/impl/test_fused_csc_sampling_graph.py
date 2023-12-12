@@ -742,9 +742,13 @@ def test_in_subgraph_hetero():
     assert all(type_per_edge < len(etypes))
 
     # Construct FusedCSCSamplingGraph.
-    metadata = gb.GraphMetadata(ntypes, etypes)
     graph = gb.from_fused_csc(
-        indptr, indices, node_type_offset, type_per_edge, None, metadata
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Extract in subgraph.
