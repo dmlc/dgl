@@ -78,7 +78,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /**
-   * @brief Create a homogeneous CSC graph from tensors of CSC format.
+   * @brief Create a fused CSC graph from tensors of CSC format.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
    * @param node_type_offset A tensor representing the offset of node types, if
@@ -93,7 +93,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @return FusedCSCSamplingGraph
    */
-  static c10::intrusive_ptr<FusedCSCSamplingGraph> FromCSC(
+  static c10::intrusive_ptr<FusedCSCSamplingGraph> Create(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,

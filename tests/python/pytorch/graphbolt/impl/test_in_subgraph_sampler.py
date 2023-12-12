@@ -1,7 +1,65 @@
+import unittest
+
+import backend as F
 import dgl.graphbolt as gb
+import pytest
 import torch
 
 from .. import gb_test_utils
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
+@pytest.mark.parametrize(
+    "indptr_dtype",
+    [torch.int32, torch.int64],
+)
+@pytest.mark.parametrize(
+    "indices_dtype",
+    [torch.int8, torch.int16, torch.int32, torch.int64],
+)
+@pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("is_pinned", [False, True])
+def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
+    """Original graph in COO:
+    1   0   1   0   1   0
+    1   0   0   1   0   1
+    0   1   0   1   0   0
+    0   1   0   0   1   0
+    1   0   0   0   0   1
+    0   0   1   0   1   0
+    """
+    indptr = torch.tensor([0, 3, 5, 7, 9, 12, 14], dtype=indptr_dtype)
+    indices = torch.tensor(
+        [0, 1, 4, 2, 3, 0, 5, 1, 2, 0, 3, 5, 1, 4], dtype=indices_dtype
+    )
+    index = torch.tensor([0, 5, 3], dtype=idtype)
+
+    cpu_indptr, cpu_indices = torch.ops.graphbolt.index_select_csc(
+        indptr, indices, index
+    )
+    if is_pinned:
+        indptr = indptr.pin_memory()
+        indices = indices.pin_memory()
+    else:
+        indptr = indptr.cuda()
+        indices = indices.cuda()
+    index = index.cuda()
+
+    gpu_indptr, gpu_indices = torch.ops.graphbolt.index_select_csc(
+        indptr, indices, index
+    )
+
+    assert not cpu_indptr.is_cuda
+    assert not cpu_indices.is_cuda
+
+    assert gpu_indptr.is_cuda
+    assert gpu_indices.is_cuda
+
+    assert torch.equal(cpu_indptr, gpu_indptr.cpu())
+    assert torch.equal(cpu_indices, gpu_indices.cpu())
 
 
 def test_InSubgraphSampler_homo():
@@ -15,7 +73,7 @@ def test_InSubgraphSampler_homo():
     """
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12, 14])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 5, 1, 2, 0, 3, 5, 1, 4])
-    graph = gb.from_fused_csc(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     seed_nodes = torch.LongTensor([0, 5, 3])
     item_set = gb.ItemSet(seed_nodes, names="seed_nodes")
@@ -80,7 +138,7 @@ def test_InSubgraphSampler_hetero():
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 5, 1, 2, 0, 3, 5, 1, 4])
     node_type_offset = torch.LongTensor([0, 3, 6])
     type_per_edge = torch.LongTensor([0, 0, 2, 0, 2, 0, 2, 1, 1, 1, 3, 3, 1, 3])
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr=indptr,
         indices=indices,
         node_type_offset=node_type_offset,
