@@ -40,6 +40,9 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
         { return IndexSelectCSCImpl(indptr, indices, nodes); });
   }
   // @todo: The CPU supports only integer dtypes for indices tensor.
+  TORCH_CHECK(
+      c10::isIntegralType(indices.scalar_type(), false),
+      "IndexSelectCSC is not implemented to slice noninteger types yet.");
   torch::optional<torch::Tensor> temp;
   torch::optional<sampling::FusedCSCSamplingGraph::NodeTypeToIDMap> temp2;
   torch::optional<sampling::FusedCSCSamplingGraph::EdgeTypeToIDMap> temp3;

@@ -141,6 +141,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   indptr_t edge_count, edge_count_aligned;
   auto output_indptr_aligned =
       allocator.AllocateStorage<indptr_t>(num_nodes + 1);
+
   {
     // Returns the actual and modified_indegree as a pair, the
     // latter overestimates the actual indegree for alignment
@@ -160,6 +161,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
         tmp_storage.get(), tmp_storage_size, modified_in_degree,
         output_indptr_pair, PairSum{}, zero_value, num_nodes + 1, stream));
   }
+
   // Copy the modified number of edges.
   CUDA_CALL(cudaMemcpyAsync(
       &edge_count_aligned, output_indptr_aligned.get() + num_nodes,
@@ -170,11 +172,13 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
       sizeof(edge_count), cudaMemcpyDeviceToHost, stream));
   // synchronizes here, we can read edge_count and edge_count_aligned
   CUDA_CALL(cudaStreamSynchronize(stream));
+
   // Allocate output array with actual number of edges.
   torch::Tensor output_indices =
       torch::empty(edge_count, nodes_options.dtype(indices.scalar_type()));
   const dim3 block(BLOCK_SIZE);
   const dim3 grid((edge_count_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
+
   // Perform the actual copying, of the indices array into
   // output_indices in an aligned manner.
   CUDA_KERNEL_CALL(
@@ -242,6 +246,7 @@ void IndexSelectCSCCopyIndices(
   auto buffer_sizes = thrust::make_transform_iterator(
       iota, ConvertToBytes<indptr_t, indices_t>{in_degree});
   constexpr int64_t max_copy_at_once = std::numeric_limits<int32_t>::max();
+
   // Performs the copy from indices into output_indices.
   for (int64_t i = 0; i < num_nodes; i += max_copy_at_once) {
     size_t tmp_storage_size = 0;
@@ -270,6 +275,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
         // Output indptr for the slice indexed by nodes.
         torch::Tensor output_indptr = torch::empty(
             num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
+
         {  // Compute the output indptr, output_indptr.
           size_t tmp_storage_size = 0;
           CUDA_CALL(cub::DeviceScan::ExclusiveSum(
@@ -281,7 +287,8 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
               tmp_storage.get(), tmp_storage_size, in_degree,
               output_indptr.data_ptr<indptr_t>(), num_nodes + 1, stream));
         }
-        // Number of edges being copied
+
+        // Number of edges being copied.
         indptr_t edge_count;
         CUDA_CALL(cudaMemcpyAsync(
             &edge_count, output_indptr.data_ptr<indptr_t>() + num_nodes,
