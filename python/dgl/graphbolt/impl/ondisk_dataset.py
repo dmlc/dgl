@@ -95,7 +95,7 @@ def preprocess_ondisk_dataset(
             ),
             names=["src", "dst"],
         )
-        coo_tensor = torch.LongTensor(edge_data.values).T
+        coo_tensor = torch.tensor(edge_data.values).T
         sparse_matrix = dglsp.spmatrix(coo_tensor)
         indptr, indices, value_indices = sparse_matrix.csc()
         fused_csc_sampling_graph = from_fused_csc(
@@ -150,7 +150,7 @@ def preprocess_ondisk_dataset(
         fused_csc_sampling_graph = from_fused_csc(
             csc_indptr=indptr,
             indices=indices,
-            node_type_offset=torch.LongTensor(node_type_offset),
+            node_type_offset=torch.tensor(node_type_offset),
             type_per_edge=coo_etype[value_indices],
             edge_attributes={}
             if not include_original_edge_id
