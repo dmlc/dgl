@@ -21,7 +21,7 @@ from .sampled_subgraph_impl import (
 
 __all__ = [
     "FusedCSCSamplingGraph",
-    "from_fused_csc",
+    "fused_csc_sampling_graph",
     "load_from_shared_memory",
     "from_dglgraph",
 ]
@@ -88,7 +88,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor(
         ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
-        >>> graph = gb.from_fused_csc(indptr, indices,
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices,
         ...     node_type_offset=node_type_offset,
         ...     type_per_edge=type_per_edge,
         ...     node_type_to_id=ntypes,
@@ -139,7 +139,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> type_per_edge = torch.LongTensor(
         ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
         >>> metadata = gb.GraphMetadata(ntypes, etypes)
-        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices, node_type_offset,
         ...     type_per_edge, None, metadata)
         >>> print(graph.num_edges)
         {'N0:R0:N0': 2, 'N0:R1:N1': 1, 'N1:R2:N0': 2, 'N1:R3:N1': 3}
@@ -337,7 +337,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor(
         ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
-        >>> graph = gb.from_fused_csc(indptr, indices,
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices,
         ...     node_type_offset=node_type_offset,
         ...     type_per_edge=type_per_edge,
         ...     node_type_to_id=ntypes,
@@ -577,7 +577,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
-        >>> graph = gb.from_fused_csc(indptr, indices,
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices,
         ...     node_type_offset=node_type_offset,
         ...     type_per_edge=type_per_edge,
         ...     node_type_to_id=ntypes,
@@ -765,7 +765,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
-        >>> graph = gb.from_fused_csc(indptr, indices,
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices,
         ...     node_type_offset=node_type_offset,
         ...     type_per_edge=type_per_edge,
         ...     node_type_to_id=ntypes,
@@ -893,7 +893,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return self
 
 
-def from_fused_csc(
+def fused_csc_sampling_graph(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,
     node_type_offset: Optional[torch.tensor] = None,
@@ -936,7 +936,7 @@ def from_fused_csc(
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
-    >>> graph = graphbolt.from_fused_csc(csc_indptr, indices,
+    >>> graph = graphbolt.fused_csc_sampling_graph(csc_indptr, indices,
     ...             node_type_offset=node_type_offset,
     ...             type_per_edge=type_per_edge,
     ...             node_type_to_id=ntypes, edge_type_to_id=etypes,
@@ -984,7 +984,7 @@ def from_fused_csc(
                 0
             ), "node_type_offset length should be |ntypes| + 1."
     return FusedCSCSamplingGraph(
-        torch.ops.graphbolt.from_fused_csc(
+        torch.ops.graphbolt.fused_csc_sampling_graph(
             csc_indptr,
             indices,
             node_type_offset,
@@ -1086,7 +1086,7 @@ def from_dglgraph(
         edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
 
     return FusedCSCSamplingGraph(
-        torch.ops.graphbolt.from_fused_csc(
+        torch.ops.graphbolt.fused_csc_sampling_graph(
             indptr,
             indices,
             node_type_offset,
