@@ -40,21 +40,3 @@ class MiniBatchTransformer(Mapper):
             minibatch, (MiniBatch, DGLMiniBatch)
         ), "The transformer output should be an instance of MiniBatch"
         return minibatch
-
-
-@functional_datapipe("to_dgl")
-class DGLMiniBatchConverter(Mapper):
-    """Convert a graphbolt mini-batch to a dgl mini-batch."""
-
-    def __init__(
-        self,
-        datapipe,
-    ):
-        """
-        Initlization for a subgraph transformer.
-        Parameters
-        ----------
-        datapipe : DataPipe
-            The datapipe.
-        """
-        super().__init__(datapipe, MiniBatch.to_dgl)
