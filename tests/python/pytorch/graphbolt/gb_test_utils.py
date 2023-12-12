@@ -32,7 +32,7 @@ def random_homo_graph(num_nodes, num_edges):
     return csc_indptr, indices
 
 
-def get_metadata(num_ntypes, num_etypes):
+def get_type_to_id(num_ntypes, num_etypes):
     ntypes = {f"n{i}": i for i in range(num_ntypes)}
     etypes = {}
     count = 0
@@ -42,7 +42,7 @@ def get_metadata(num_ntypes, num_etypes):
                 break
             etypes.update({f"n{n1}:e{count}:n{n2}": count})
             count += 1
-    return gb.GraphMetadata(ntypes, etypes)
+    return ntypes, etypes
 
 
 def get_ntypes_and_etypes(num_nodes, num_ntypes, num_etypes):
@@ -82,7 +82,8 @@ def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         gb_g.indices,
         gb_g.node_type_offset,
         gb_g.type_per_edge,
-        gb_g.metadata,
+        gb_g.node_type_to_id,
+        gb_g.edge_type_to_id,
     )
 
 

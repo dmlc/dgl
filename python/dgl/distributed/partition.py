@@ -1255,14 +1255,12 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         graph, _, _, gpb, _, _, _ = load_partition(
             part_config, part_id, load_feats=False
         )
-        # Construct GraphMetadata.
         _, _, ntypes, etypes = load_partition_book(part_config, part_id)
         node_type_to_id = {ntype: ntid for ntid, ntype in enumerate(ntypes)}
         edge_type_to_id = {
             _etype_tuple_to_str(etype): etid
             for etid, etype in enumerate(etypes)
         }
-        metadata = graphbolt.GraphMetadata(node_type_to_id, edge_type_to_id)
         # Obtain CSC indtpr and indices.
         indptr, indices, _ = graph.adj().csc()
         # Initalize type per edge.
@@ -1275,7 +1273,8 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
             indices,
             node_type_offset=None,
             type_per_edge=type_per_edge,
-            metadata=metadata,
+            node_type_to_id=node_type_to_id,
+            edge_type_to_id=edge_type_to_id,
         )
         orig_graph_path = os.path.join(
             os.path.dirname(part_config),
