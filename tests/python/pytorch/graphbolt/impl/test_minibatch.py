@@ -379,7 +379,7 @@ def test_minibatch_representation_hetero():
     assert result == expect_result, print(result)
 
 
-def test_dgl_minibatch_representation_homo():
+def test_get_dgl_blocks_homo():
     node_pairs = [
         (
             torch.tensor([0, 1, 2, 2, 2, 1]),
@@ -438,31 +438,15 @@ def test_dgl_minibatch_representation_homo():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
     expect_result = str(
-        """DGLMiniBatch(positive_node_pairs=(tensor([0, 1, 2]),
-                                  tensor([3, 4, 5])),
-             output_nodes=None,
-             node_features={'x': tensor([7, 6, 2, 2])},
-             negative_node_pairs=(tensor([0, 1, 2]),
-                                  tensor([6, 0, 0])),
-             labels=tensor([0., 1., 2.]),
-             input_nodes=None,
-             edge_features=[{'x': tensor([[8],
-                                    [1],
-                                    [6]])},
-                            {'x': tensor([[2],
-                                    [8],
-                                    [8]])}],
-             blocks=[Block(num_src_nodes=4, num_dst_nodes=4, num_edges=6),
-                     Block(num_src_nodes=3, num_dst_nodes=2, num_edges=3)],
-          )"""
+        """[Block(num_src_nodes=4, num_dst_nodes=4, num_edges=6), Block(num_src_nodes=3, num_dst_nodes=2, num_edges=3)]"""
     )
-    result = str(dgl_minibatch)
+    result = str(dgl_blocks)
     assert result == expect_result, print(result)
 
 
-def test_dgl_minibatch_representation_hetero():
+def test_get_dgl_blocks_hetero():
     node_pairs = [
         {
             relation: (torch.tensor([0, 1, 1]), torch.tensor([0, 1, 2])),
@@ -534,27 +518,17 @@ def test_dgl_minibatch_representation_hetero():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
     expect_result = str(
-        """DGLMiniBatch(positive_node_pairs={'A:r:B': (tensor([0, 1, 2]), tensor([3, 4, 5])), 'B:rr:A': (tensor([0, 1, 2]), tensor([3, 4, 5]))},
-             output_nodes=None,
-             node_features={('A', 'x'): tensor([6, 4, 0, 1])},
-             negative_node_pairs={'A:r:B': (tensor([0, 1, 2]), tensor([6, 0, 0]))},
-             labels={'B': tensor([2, 5])},
-             input_nodes=None,
-             edge_features=[{('A:r:B', 'x'): tensor([4, 2, 4])},
-                            {('A:r:B', 'x'): tensor([0, 6])}],
-             blocks=[Block(num_src_nodes={'A': 4, 'B': 3},
-                           num_dst_nodes={'A': 4, 'B': 3},
-                           num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
-                           metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]),
-                     Block(num_src_nodes={'A': 2, 'B': 2},
-                           num_dst_nodes={'B': 2},
-                           num_edges={('A', 'r', 'B'): 2},
-                           metagraph=[('A', 'B', 'r')])],
-          )"""
+        """[Block(num_src_nodes={'A': 4, 'B': 3},
+      num_dst_nodes={'A': 4, 'B': 3},
+      num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
+      metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]), Block(num_src_nodes={'A': 2, 'B': 2},
+      num_dst_nodes={'B': 2},
+      num_edges={('A', 'r', 'B'): 2},
+      metagraph=[('A', 'B', 'r')])]"""
     )
-    result = str(dgl_minibatch)
+    result = str(dgl_blocks)
     assert result == expect_result, print(result)
 
 
@@ -607,61 +581,48 @@ def check_dgl_blocks_homo(minibatch, blocks):
     assert torch.equal(blocks[0].srcdata[dgl.NID], original_row_node_ids[0])
 
 
-def test_to_dgl_node_classification_without_feature():
+def test_get_dgl_blocks_node_classification_without_feature():
     # Arrange
     minibatch = create_homo_minibatch()
     minibatch.node_features = None
     minibatch.labels = None
     minibatch.seed_nodes = torch.tensor([10, 15])
     # Act
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert dgl_minibatch.node_features is None
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert dgl_minibatch.labels is None
-    assert minibatch.input_nodes is dgl_minibatch.input_nodes
-    assert minibatch.seed_nodes is dgl_minibatch.output_nodes
-    check_dgl_blocks_homo(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    assert minibatch.node_features is None
+    assert minibatch.labels is None
+    check_dgl_blocks_homo(minibatch, dgl_blocks)
 
 
-def test_to_dgl_node_classification_homo():
+def test_get_dgl_blocks_node_classification_homo():
     # Arrange
     minibatch = create_homo_minibatch()
     minibatch.seed_nodes = torch.tensor([10, 15])
     minibatch.labels = torch.tensor([2, 5])
     # Act
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert minibatch.node_features is dgl_minibatch.node_features
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert minibatch.labels is dgl_minibatch.labels
-    assert dgl_minibatch.input_nodes is None
-    assert dgl_minibatch.output_nodes is None
-    check_dgl_blocks_homo(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    check_dgl_blocks_homo(minibatch, dgl_blocks)
 
 
 def test_to_dgl_node_classification_hetero():
     minibatch = create_hetero_minibatch()
     minibatch.labels = {"B": torch.tensor([2, 5])}
     minibatch.seed_nodes = {"B": torch.tensor([10, 15])}
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert minibatch.node_features is dgl_minibatch.node_features
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert minibatch.labels is dgl_minibatch.labels
-    assert dgl_minibatch.input_nodes is None
-    assert dgl_minibatch.output_nodes is None
-    check_dgl_blocks_hetero(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    check_dgl_blocks_hetero(minibatch, dgl_blocks)
 
 
 @pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
-def test_to_dgl_link_predication_homo(mode):
+def test_dgl_link_predication_homo(mode):
     # Arrange
     minibatch = create_homo_minibatch()
     minibatch.compacted_node_pairs = (
@@ -673,28 +634,43 @@ def test_to_dgl_link_predication_homo(mode):
     if mode == "neg_graph" or mode == "neg_dst":
         minibatch.compacted_negative_dsts = torch.tensor([[1, 0], [0, 1]])
     # Act
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert minibatch.node_features is dgl_minibatch.node_features
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert minibatch.compacted_node_pairs is dgl_minibatch.positive_node_pairs
-    check_dgl_blocks_homo(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    check_dgl_blocks_homo(minibatch, dgl_blocks)
     if mode == "neg_graph" or mode == "neg_src":
         assert torch.equal(
-            dgl_minibatch.negative_node_pairs[0],
+            minibatch.get_negative_node_pairs()[0],
             minibatch.compacted_negative_srcs.view(-1),
         )
     if mode == "neg_graph" or mode == "neg_dst":
         assert torch.equal(
-            dgl_minibatch.negative_node_pairs[1],
+            minibatch.get_negative_node_pairs()[1],
             minibatch.compacted_negative_dsts.view(-1),
         )
+    (
+        training_node_pairs,
+        training_labels,
+    ) = minibatch.get_training_node_pair_and_labels()
+    if mode == "neg_src":
+        expect_training_node_pairs = (
+            torch.tensor([0, 1, 0, 0, 1, 1]),
+            torch.tensor([1, 0, 1, 1, 0, 0]),
+        )
+    else:
+        expect_training_node_pairs = (
+            torch.tensor([0, 1, 0, 0, 1, 1]),
+            torch.tensor([1, 0, 1, 0, 0, 1]),
+        )
+    expect_training_labels = torch.tensor([1, 1, 0, 0, 0, 0]).float()
+    assert torch.equal(training_node_pairs[0], expect_training_node_pairs[0])
+    assert torch.equal(training_node_pairs[1], expect_training_node_pairs[1])
+    assert torch.equal(training_labels, expect_training_labels)
 
 
 @pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
-def test_to_dgl_link_predication_hetero(mode):
+def test_dgl_link_predication_hetero(mode):
     # Arrange
     minibatch = create_hetero_minibatch()
     minibatch.compacted_node_pairs = {
@@ -718,24 +694,21 @@ def test_to_dgl_link_predication_hetero(mode):
             reverse_relation: torch.tensor([[2, 1], [3, 1]]),
         }
     # Act
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert minibatch.node_features is dgl_minibatch.node_features
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert minibatch.compacted_node_pairs is dgl_minibatch.positive_node_pairs
-    check_dgl_blocks_hetero(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    check_dgl_blocks_hetero(minibatch, dgl_blocks)
     if mode == "neg_graph" or mode == "neg_src":
         for etype, src in minibatch.compacted_negative_srcs.items():
             assert torch.equal(
-                dgl_minibatch.negative_node_pairs[etype][0],
+                minibatch.get_negative_node_pairs()[etype][0],
                 src.view(-1),
             )
     if mode == "neg_graph" or mode == "neg_dst":
         for etype, dst in minibatch.compacted_negative_dsts.items():
             assert torch.equal(
-                dgl_minibatch.negative_node_pairs[etype][1],
+                minibatch.get_negative_node_pairs()[etype][1],
                 minibatch.compacted_negative_dsts[etype].view(-1),
             )
 
@@ -925,61 +898,49 @@ def check_dgl_blocks_homo_csc_format(minibatch, blocks):
     ), print(blocks[0].srcdata[dgl.NID])
 
 
-def test_to_dgl_node_classification_without_feature_csc_format():
+def test_dgl_node_classification_without_feature_csc_format():
     # Arrange
     minibatch = create_homo_minibatch_csc_format()
     minibatch.node_features = None
     minibatch.labels = None
     minibatch.seed_nodes = torch.tensor([10, 15])
     # Act
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert dgl_minibatch.node_features is None
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert dgl_minibatch.labels is None
-    assert minibatch.input_nodes is dgl_minibatch.input_nodes
-    assert minibatch.seed_nodes is dgl_minibatch.output_nodes
-    check_dgl_blocks_homo_csc_format(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    assert minibatch.node_features is None
+    assert minibatch.labels is None
+    check_dgl_blocks_homo_csc_format(minibatch, dgl_blocks)
 
 
-def test_to_dgl_node_classification_homo_csc_format():
+def test_dgl_node_classification_homo_csc_format():
     # Arrange
     minibatch = create_homo_minibatch_csc_format()
     minibatch.seed_nodes = torch.tensor([10, 15])
     minibatch.labels = torch.tensor([2, 5])
     # Act
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert minibatch.node_features is dgl_minibatch.node_features
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert minibatch.labels is dgl_minibatch.labels
-    assert dgl_minibatch.input_nodes is None
-    assert dgl_minibatch.output_nodes is None
-    check_dgl_blocks_homo_csc_format(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    check_dgl_blocks_homo_csc_format(minibatch, dgl_blocks)
 
 
-def test_to_dgl_node_classification_hetero_csc_format():
+def test_dgl_node_classification_hetero_csc_format():
     minibatch = create_hetero_minibatch_csc_format()
     minibatch.labels = {"B": torch.tensor([2, 5])}
     minibatch.seed_nodes = {"B": torch.tensor([10, 15])}
-    dgl_minibatch = minibatch.to_dgl()
+    # Act
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert minibatch.node_features is dgl_minibatch.node_features
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert minibatch.labels is dgl_minibatch.labels
-    assert dgl_minibatch.input_nodes is None
-    assert dgl_minibatch.output_nodes is None
-    check_dgl_blocks_hetero_csc_format(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    check_dgl_blocks_hetero_csc_format(minibatch, dgl_blocks)
 
 
 @pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
-def test_to_dgl_link_predication_homo_csc_format(mode):
+def test_dgl_link_predication_homo_csc_format(mode):
     # Arrange
     minibatch = create_homo_minibatch_csc_format()
     minibatch.compacted_node_pairs = (
@@ -991,28 +952,43 @@ def test_to_dgl_link_predication_homo_csc_format(mode):
     if mode == "neg_graph" or mode == "neg_dst":
         minibatch.compacted_negative_dsts = torch.tensor([[1, 0], [0, 1]])
     # Act
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert minibatch.node_features is dgl_minibatch.node_features
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert minibatch.compacted_node_pairs is dgl_minibatch.positive_node_pairs
-    check_dgl_blocks_homo_csc_format(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    check_dgl_blocks_homo_csc_format(minibatch, dgl_blocks)
     if mode == "neg_graph" or mode == "neg_src":
         assert torch.equal(
-            dgl_minibatch.negative_node_pairs[0],
+            minibatch.get_negative_node_pairs()[0],
             minibatch.compacted_negative_srcs.view(-1),
         )
     if mode == "neg_graph" or mode == "neg_dst":
         assert torch.equal(
-            dgl_minibatch.negative_node_pairs[1],
+            minibatch.get_negative_node_pairs()[1],
             minibatch.compacted_negative_dsts.view(-1),
         )
+    (
+        training_node_pairs,
+        training_labels,
+    ) = minibatch.get_training_node_pair_and_labels()
+    if mode == "neg_src":
+        expect_training_node_pairs = (
+            torch.tensor([0, 1, 0, 0, 1, 1]),
+            torch.tensor([1, 0, 1, 1, 0, 0]),
+        )
+    else:
+        expect_training_node_pairs = (
+            torch.tensor([0, 1, 0, 0, 1, 1]),
+            torch.tensor([1, 0, 1, 0, 0, 1]),
+        )
+    expect_training_labels = torch.tensor([1, 1, 0, 0, 0, 0]).float()
+    assert torch.equal(training_node_pairs[0], expect_training_node_pairs[0])
+    assert torch.equal(training_node_pairs[1], expect_training_node_pairs[1])
+    assert torch.equal(training_labels, expect_training_labels)
 
 
 @pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
-def test_to_dgl_link_predication_hetero_csc_format(mode):
+def test_dgl_link_predication_hetero_csc_format(mode):
     # Arrange
     minibatch = create_hetero_minibatch_csc_format()
     minibatch.compacted_node_pairs = {
@@ -1036,23 +1012,20 @@ def test_to_dgl_link_predication_hetero_csc_format(mode):
             reverse_relation: torch.tensor([[2, 1], [3, 1]]),
         }
     # Act
-    dgl_minibatch = minibatch.to_dgl()
+    dgl_blocks = minibatch.get_dgl_blocks()
 
     # Assert
-    assert len(dgl_minibatch.blocks) == 2
-    assert minibatch.node_features is dgl_minibatch.node_features
-    assert minibatch.edge_features is dgl_minibatch.edge_features
-    assert minibatch.compacted_node_pairs is dgl_minibatch.positive_node_pairs
-    check_dgl_blocks_hetero_csc_format(minibatch, dgl_minibatch.blocks)
+    assert len(dgl_blocks) == 2
+    check_dgl_blocks_hetero_csc_format(minibatch, dgl_blocks)
     if mode == "neg_graph" or mode == "neg_src":
         for etype, src in minibatch.compacted_negative_srcs.items():
             assert torch.equal(
-                dgl_minibatch.negative_node_pairs[etype][0],
+                minibatch.get_negative_node_pairs()[etype][0],
                 src.view(-1),
             )
     if mode == "neg_graph" or mode == "neg_dst":
         for etype, dst in minibatch.compacted_negative_dsts.items():
             assert torch.equal(
-                dgl_minibatch.negative_node_pairs[etype][1],
+                minibatch.get_negative_node_pairs()[etype][1],
                 minibatch.compacted_negative_dsts[etype].view(-1),
             )
