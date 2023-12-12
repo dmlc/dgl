@@ -1,7 +1,7 @@
 import dgl.graphbolt as gb
-import gb_test_utils
-import pytest
 import torch
+
+from .. import gb_test_utils
 
 
 def test_InSubgraphSampler_homo():

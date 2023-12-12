@@ -6,7 +6,6 @@ import tempfile
 import unittest
 import warnings
 
-import gb_test_utils as gbt
 import numpy as np
 import pandas as pd
 import pydantic
@@ -15,6 +14,8 @@ import torch
 import yaml
 
 from dgl import graphbolt as gb
+
+from .. import gb_test_utils as gbt
 
 
 def write_yaml_file(yaml_content, dir):
