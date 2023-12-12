@@ -1006,7 +1006,7 @@ def test_OnDiskDataset_Graph_Exceptions():
 def test_OnDiskDataset_Graph_homogeneous():
     """Test homogeneous graph topology."""
     csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
-    graph = gb.from_fused_csc(csc_indptr, indices)
+    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
         graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
@@ -1044,7 +1044,7 @@ def test_OnDiskDataset_Graph_heterogeneous():
         node_type_to_id,
         edge_type_to_id,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
         node_type_offset=node_type_offset,
@@ -1833,7 +1833,7 @@ def test_OnDiskDataset_load_tasks():
 def test_OnDiskDataset_all_nodes_set_homo():
     """Test homograph's all nodes set of OnDiskDataset."""
     csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
-    graph = gb.from_fused_csc(csc_indptr, indices)
+    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
         graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
@@ -1864,7 +1864,7 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         node_type_to_id,
         edge_type_to_id,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
         node_type_offset=node_type_offset,

@@ -1268,7 +1268,7 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
         # Sanity check.
         assert len(type_per_edge) == graph.num_edges()
-        csc_graph = graphbolt.from_fused_csc(
+        csc_graph = graphbolt.fused_csc_sampling_graph(
             indptr,
             indices,
             node_type_offset=None,
