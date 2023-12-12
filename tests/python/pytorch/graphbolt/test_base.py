@@ -12,7 +12,6 @@ import torch
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
-
     def checkData(dp):
         # Filtering DGLWarning:
         #    Failed to map item list to `MiniBatch`

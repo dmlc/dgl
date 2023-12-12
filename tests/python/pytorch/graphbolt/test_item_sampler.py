@@ -1,7 +1,7 @@
 import os
 import re
-from sys import platform
 import warnings
+from sys import platform
 
 import dgl
 import pytest
