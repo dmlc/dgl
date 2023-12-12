@@ -43,11 +43,11 @@ struct AlignmentFunc {
 };
 
 template <typename indptr_t, typename indices_t>
-__global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
+__global__ void _CopyIndicesAlignedKernel(
     const indptr_t edge_count, const int64_t num_nodes,
     const indptr_t* const indptr, const indptr_t* const output_indptr,
     const indptr_t* const output_indptr_aligned, const indices_t* const indices,
-    indices_t* const hop, const int64_t* const perm) {
+    indices_t* const output_indices, const int64_t* const perm) {
   indptr_t tx = static_cast<indptr_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
 
@@ -66,7 +66,7 @@ __global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
       const auto in_idx = indptr[rpos] + rofs;
       assert((size_t)(indices + in_idx - tx) % GPU_CACHE_LINE_SIZE == 0);
       const auto u = indices[in_idx];
-      hop[out_row + rofs] = u;
+      output_indices[out_row + rofs] = u;
     }
     tx += stride_x;
   }
@@ -182,9 +182,9 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   // Perform the actual copying, of the indices array into
   // output_indices in an aligned manner.
   CUDA_KERNEL_CALL(
-      _CSRRowWiseOneHopExtractorAlignedKernel, grid, block, 0, stream,
-      edge_count_aligned, num_nodes, sliced_indptr,
-      output_indptr.data_ptr<indptr_t>(), output_indptr_aligned.get(),
+      _CopyIndicesAlignedKernel, grid, block, 0, stream, edge_count_aligned,
+      num_nodes, sliced_indptr, output_indptr.data_ptr<indptr_t>(),
+      output_indptr_aligned.get(),
       reinterpret_cast<indices_t*>(indices.data_ptr()),
       reinterpret_cast<indices_t*>(output_indices.data_ptr()), perm);
   return {output_indptr, output_indices};
