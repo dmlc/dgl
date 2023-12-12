@@ -18,9 +18,8 @@ from ..internal import copy_or_convert_data, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
-    from_fused_csc,
+    fused_csc_sampling_graph,
     FusedCSCSamplingGraph,
-    GraphMetadata,
 )
 from .ondisk_metadata import (
     OnDiskGraphTopology,
@@ -100,14 +99,13 @@ def preprocess_ondisk_dataset(
         coo_tensor = torch.tensor(edge_data.values).T
         sparse_matrix = dglsp.spmatrix(coo_tensor)
         indptr, indices, value_indices = sparse_matrix.csc()
-        if indptr < INT32_MAX:
-            pass
-        fused_csc_sampling_graph = from_fused_csc(
-            csc_indptr=indptr,
-            indices=indices,
-            edge_attributes={}
-            if not include_original_edge_id
-            else {ORIGINAL_EDGE_ID: value_indices},
+        # if indptr < INT32_MAX:
+        #     pass
+        edge_attributes = {}
+        if include_original_edge_id:
+            edge_attributes[ORIGINAL_EDGE_ID] = value_indices
+        graph = fused_csc_sampling_graph(
+            csc_indptr=indptr, indices=indices, edge_attributes=edge_attributes
         )
     else:
         # Heterogeneous graph.
@@ -147,16 +145,18 @@ def preprocess_ondisk_dataset(
             indices=torch.stack((coo_src, coo_dst), dim=0), val=coo_etype
         )
         indptr, indices, value_indices = sparse_matrix.csc()
+        edge_attributes = {}
+        if include_original_edge_id:
+            edge_attributes[ORIGINAL_EDGE_ID] = value_indices
 
-        fused_csc_sampling_graph = from_fused_csc(
+        graph = fused_csc_sampling_graph(
             csc_indptr=indptr,
             indices=indices,
             node_type_offset=torch.tensor(node_type_offset),
             type_per_edge=coo_etype[value_indices],
-            edge_attributes={}
-            if not include_original_edge_id
-            else {ORIGINAL_EDGE_ID: value_indices},
-            metadata=GraphMetadata(node_type_to_id, edge_type_to_id),
+            node_type_to_id=node_type_to_id,
+            edge_type_to_id=edge_type_to_id,
+            edge_attributes=edge_attributes,
         )
 
     # 3. Save the FusedCSCSamplingGraph and modify the output_config.
@@ -167,7 +167,7 @@ def preprocess_ondisk_dataset(
     )
 
     torch.save(
-        fused_csc_sampling_graph,
+        graph,
         os.path.join(
             dataset_dir,
             output_config["graph_topology"]["path"],
