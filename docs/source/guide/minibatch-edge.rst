@@ -38,16 +38,18 @@ edges(namely, node pairs) in the training set instead of the nodes.
     # Or equivalently:
     # datapipe = gb.NeighborSampler(datapipe, g, [10, 10])
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
-Iterating over the DataLoader will yield :class:`~dgl.graphbolt.DGLMiniBatch`
+Iterating over the DataLoader will yield :class:`~dgl.graphbolt.MiniBatch`
 which contains a list of specially created graphs representing the computation
-dependencies on each layer. They are called *message flow graphs* (MFGs) in DGL.
+dependencies on each layer. In order to train with DGL, you need to convert them
+to :class:`~dgl.graphbolt.DGLMiniBatch`. Then you can access the
+*message flow graphs* (MFGs).
 
 .. code:: python
     mini_batch = next(iter(dataloader))
+    mini_batch = mini_batch.to_dgl()
     print(mini_batch.blocks)
 
 .. note::
@@ -91,7 +93,6 @@ You can use :func:`~dgl.graphbolt.exclude_seed_edges` alongside with
     exclude_seed_edges = partial(gb.exclude_seed_edges, include_reverse_edges=True)
     datapipe = datapipe.transform(exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
     
@@ -181,6 +182,7 @@ their incident node representations.
     opt = torch.optim.Adam(model.parameters())
 
     for data in dataloader:
+        data = data.to_dgl()
         blocks = data.blocks
         x = data.edge_features("feat")
         y_hat = model(data.blocks, x, data.positive_node_pairs)
@@ -273,7 +275,6 @@ only difference is that the train_set is now an instance of
     datapipe = datapipe.fetch_feature(
         feature, node_feature_keys={"item": ["feat"], "user": ["feat"]}
     )
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
@@ -310,17 +311,17 @@ dictionaries of node types and predictions here.
 
 .. code:: python
 
+    import torch.nn.functional as F
     model = Model(in_features, hidden_features, out_features, num_classes, etypes)
-    model = model.cuda()
+    model = model.to(device)
     opt = torch.optim.Adam(model.parameters())
-    
-    for input_nodes, edge_subgraph, blocks in dataloader:
-        blocks = [b.to(torch.device('cuda')) for b in blocks]
-        edge_subgraph = edge_subgraph.to(torch.device('cuda'))
-        input_features = blocks[0].srcdata['features']
-        edge_labels = edge_subgraph.edata['labels']
-        edge_predictions = model(edge_subgraph, blocks, input_features)
-        loss = compute_loss(edge_labels, edge_predictions)
+
+    for data in dataloader:
+        data = data.to_dgl()
+        blocks = data.blocks
+        x = data.edge_features(("user:like:item", "feat"))
+        y_hat = model(data.blocks, x, data.positive_node_pairs)
+        loss = F.cross_entropy(data.labels, y_hat)
         opt.zero_grad()
         loss.backward()
         opt.step()

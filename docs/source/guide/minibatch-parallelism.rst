@@ -21,7 +21,6 @@ generate a minibatch, including:
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
     datapipe = datapipe.transform(gb.exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
