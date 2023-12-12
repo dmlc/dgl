@@ -38,7 +38,7 @@ def test_integration_link_prediction():
     )
 
     item_set = gb.ItemSet(node_pairs, names="node_pairs")
-    graph = gb.from_fused_csc(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     node_feature = gb.TorchBasedFeature(node_feature_data)
     edge_feature = gb.TorchBasedFeature(edge_feature_data)
@@ -154,7 +154,7 @@ def test_integration_node_classification():
     )
 
     item_set = gb.ItemSet(node_pairs, names="node_pairs")
-    graph = gb.from_fused_csc(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     node_feature = gb.TorchBasedFeature(node_feature_data)
     edge_feature = gb.TorchBasedFeature(edge_feature_data)

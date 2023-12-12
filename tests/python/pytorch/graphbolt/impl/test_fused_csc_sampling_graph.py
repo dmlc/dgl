@@ -8,11 +8,12 @@ import backend as F
 
 import dgl
 import dgl.graphbolt as gb
-import gb_test_utils as gbt
 import pytest
 import torch
 import torch.multiprocessing as mp
 from scipy import sparse as spsp
+
+from .. import gb_test_utils as gbt
 
 torch.manual_seed(3407)
 mp.set_sharing_strategy("file_system")
@@ -26,7 +27,7 @@ mp.set_sharing_strategy("file_system")
 def test_empty_graph(total_num_nodes):
     csc_indptr = torch.zeros((total_num_nodes + 1,), dtype=int)
     indices = torch.tensor([])
-    graph = gb.from_fused_csc(csc_indptr, indices)
+    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
     assert graph.total_num_edges == 0
     assert graph.total_num_nodes == total_num_nodes
     assert torch.equal(graph.csc_indptr, csc_indptr)
@@ -41,7 +42,9 @@ def test_empty_graph(total_num_nodes):
 def test_hetero_empty_graph(total_num_nodes):
     csc_indptr = torch.zeros((total_num_nodes + 1,), dtype=int)
     indices = torch.tensor([])
-    metadata = gbt.get_metadata(num_ntypes=3, num_etypes=5)
+    node_type_to_id, edge_type_to_id = gbt.get_type_to_id(
+        num_ntypes=3, num_etypes=5
+    )
     # Some node types have no nodes.
     if total_num_nodes == 0:
         node_type_offset = torch.zeros((4,), dtype=int)
@@ -52,20 +55,21 @@ def test_hetero_empty_graph(total_num_nodes):
         node_type_offset[0] = 0
         node_type_offset[-1] = total_num_nodes
     type_per_edge = torch.tensor([])
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
-        node_type_offset,
-        type_per_edge,
-        None,
-        metadata,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
+        edge_attributes=None,
     )
     assert graph.total_num_edges == 0
     assert graph.total_num_nodes == total_num_nodes
     assert torch.equal(graph.csc_indptr, csc_indptr)
     assert torch.equal(graph.indices, indices)
-    assert graph.metadata.node_type_to_id == metadata.node_type_to_id
-    assert graph.metadata.edge_type_to_id == metadata.edge_type_to_id
+    assert graph.node_type_to_id == node_type_to_id
+    assert graph.edge_type_to_id == edge_type_to_id
     assert torch.equal(graph.node_type_offset, node_type_offset)
     assert torch.equal(graph.type_per_edge, type_per_edge)
 
@@ -77,9 +81,11 @@ def test_hetero_empty_graph(total_num_nodes):
 @pytest.mark.parametrize(
     "ntypes", [{"n1": 1, "n2": 1}, {5: 1, "n2": 2}, {"n1": 1.5, "n2": 2.0}]
 )
-def test_metadata_with_ntype_exception(ntypes):
-    with pytest.raises(Exception):
-        gb.GraphMetadata(ntypes, {"n1:e1:n2": 1})
+def test_type_to_id_with_ntype_exception(ntypes):
+    with pytest.raises(AssertionError):
+        gb.fused_csc_sampling_graph(
+            None, None, node_type_to_id=ntypes, edge_type_to_id={"e1": 1}
+        )
 
 
 @unittest.skipIf(
@@ -98,9 +104,14 @@ def test_metadata_with_ntype_exception(ntypes):
         {"n1:e1:n2": 1.5},
     ],
 )
-def test_metadata_with_etype_exception(etypes):
+def test_type_to_id_with_etype_exception(etypes):
     with pytest.raises(Exception):
-        gb.GraphMetadata({"n1": 0, "n2": 1, "n3": 2}, etypes)
+        gb.fused_csc_sampling_graph(
+            None,
+            None,
+            node_type_to_id={"n1": 0, "n2": 1, "n3": 2},
+            edge_type_to_id=etypes,
+        )
 
 
 @unittest.skipIf(
@@ -119,7 +130,7 @@ def test_homo_graph(total_num_nodes, total_num_edges):
         "A1": torch.randn(total_num_edges),
         "A2": torch.randn(total_num_edges),
     }
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr, indices, edge_attributes=edge_attributes
     )
 
@@ -130,9 +141,10 @@ def test_homo_graph(total_num_nodes, total_num_edges):
     assert torch.equal(indices, graph.indices)
 
     assert graph.edge_attributes == edge_attributes
-    assert graph.metadata is None
     assert graph.node_type_offset is None
     assert graph.type_per_edge is None
+    assert graph.node_type_to_id is None
+    assert graph.edge_type_to_id is None
 
 
 @unittest.skipIf(
@@ -150,7 +162,8 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
@@ -158,13 +171,14 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
         "A1": torch.randn(total_num_edges),
         "A2": torch.randn(total_num_edges),
     }
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
-        node_type_offset,
-        type_per_edge,
-        edge_attributes,
-        metadata,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
+        edge_attributes=edge_attributes,
     )
 
     assert graph.total_num_nodes == total_num_nodes
@@ -175,8 +189,8 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
     assert torch.equal(node_type_offset, graph.node_type_offset)
     assert torch.equal(type_per_edge, graph.type_per_edge)
     assert graph.edge_attributes == edge_attributes
-    assert metadata.node_type_to_id == graph.metadata.node_type_to_id
-    assert metadata.edge_type_to_id == graph.metadata.edge_type_to_id
+    assert node_type_to_id == graph.node_type_to_id
+    assert edge_type_to_id == graph.edge_type_to_id
 
 
 @unittest.skipIf(
@@ -187,7 +201,7 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
     "total_num_nodes, total_num_edges",
     [(1, 1), (100, 1), (10, 50), (1000, 50000)],
 )
-def test_num_nodes_homo(total_num_nodes, total_num_edges):
+def test_num_nodes_edges_homo(total_num_nodes, total_num_edges):
     csc_indptr, indices = gbt.random_homo_graph(
         total_num_nodes, total_num_edges
     )
@@ -195,11 +209,12 @@ def test_num_nodes_homo(total_num_nodes, total_num_edges):
         "A1": torch.randn(total_num_edges),
         "A2": torch.randn(total_num_edges),
     }
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr, indices, edge_attributes=edge_attributes
     )
 
     assert graph.num_nodes == total_num_nodes
+    assert graph.num_edges == total_num_edges
 
 
 @unittest.skipIf(
@@ -233,6 +248,7 @@ def test_num_nodes_hetero():
         "N0:R1:N1": 1,
         "N1:R2:N0": 2,
         "N1:R3:N1": 3,
+        "N1:R4:N0": 4,
     }
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -244,9 +260,13 @@ def test_num_nodes_hetero():
     assert all(type_per_edge < len(etypes))
 
     # Construct FusedCSCSamplingGraph.
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    graph = gb.from_fused_csc(
-        indptr, indices, node_type_offset, type_per_edge, None, metadata
+    graph = gb.fused_csc_sampling_graph(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Verify nodes number per node types.
@@ -254,9 +274,16 @@ def test_num_nodes_hetero():
         "N0": 2,
         "N1": 3,
     }
-    assert graph.num_nodes["N0"] == 2
-    assert graph.num_nodes["N1"] == 3
-    assert "N2" not in graph.num_nodes
+    assert sum(graph.num_nodes.values()) == total_num_nodes
+    # Verify edges number per edge types.
+    assert graph.num_edges == {
+        "N0:R0:N0": 2,
+        "N0:R1:N1": 4,
+        "N1:R2:N0": 3,
+        "N1:R3:N1": 3,
+        "N1:R4:N0": 0,
+    }
+    assert sum(graph.num_edges.values()) == total_num_edges
 
 
 @unittest.skipIf(
@@ -273,12 +300,22 @@ def test_num_nodes_hetero():
 )
 def test_node_type_offset_wrong_legnth(node_type_offset):
     num_ntypes = 3
-    csc_indptr, indices, _, type_per_edge, metadata = gbt.random_hetero_graph(
-        10, 50, num_ntypes, 5
-    )
+    (
+        csc_indptr,
+        indices,
+        _,
+        type_per_edge,
+        node_type_to_id,
+        edge_type_to_id,
+    ) = gbt.random_hetero_graph(10, 50, num_ntypes, 5)
     with pytest.raises(Exception):
-        gb.from_fused_csc(
-            csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        gb.fused_csc_sampling_graph(
+            csc_indptr,
+            indices,
+            node_type_offset=node_type_offset,
+            type_per_edge=type_per_edge,
+            node_type_to_id=node_type_to_id,
+            edge_type_to_id=edge_type_to_id,
         )
 
 
@@ -294,7 +331,7 @@ def test_load_save_homo_graph(total_num_nodes, total_num_edges):
     csc_indptr, indices = gbt.random_homo_graph(
         total_num_nodes, total_num_edges
     )
-    graph = gb.from_fused_csc(csc_indptr, indices)
+    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
         filename = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
@@ -307,9 +344,11 @@ def test_load_save_homo_graph(total_num_nodes, total_num_edges):
     assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
     assert torch.equal(graph.indices, graph2.indices)
 
-    assert graph.metadata is None and graph2.metadata is None
     assert graph.node_type_offset is None and graph2.node_type_offset is None
     assert graph.type_per_edge is None and graph2.type_per_edge is None
+    assert graph.node_type_to_id is None and graph2.node_type_to_id is None
+    assert graph.edge_type_to_id is None and graph2.edge_type_to_id is None
+    assert graph.edge_attributes is None and graph2.edge_attributes is None
 
 
 @unittest.skipIf(
@@ -329,12 +368,18 @@ def test_load_save_hetero_graph(
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
-    graph = gb.from_fused_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+    graph = gb.fused_csc_sampling_graph(
+        csc_indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -349,8 +394,8 @@ def test_load_save_hetero_graph(
     assert torch.equal(graph.indices, graph2.indices)
     assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
     assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
-    assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
-    assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+    assert graph.node_type_to_id == graph2.node_type_to_id
+    assert graph.edge_type_to_id == graph2.edge_type_to_id
 
 
 @unittest.skipIf(
@@ -365,7 +410,7 @@ def test_pickle_homo_graph(total_num_nodes, total_num_edges):
     csc_indptr, indices = gbt.random_homo_graph(
         total_num_nodes, total_num_edges
     )
-    graph = gb.from_fused_csc(csc_indptr, indices)
+    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
 
     serialized = pickle.dumps(graph)
     graph2 = pickle.loads(serialized)
@@ -400,7 +445,8 @@ def test_pickle_hetero_graph(
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
@@ -408,13 +454,14 @@ def test_pickle_hetero_graph(
         "a": torch.randn((total_num_edges,)),
         "b": torch.randint(1, 10, (total_num_edges,)),
     }
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
-        node_type_offset,
-        type_per_edge,
-        edge_attributes,
-        metadata,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
+        edge_attributes=edge_attributes,
     )
 
     serialized = pickle.dumps(graph)
@@ -456,20 +503,22 @@ def test_multiprocessing():
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
     edge_attributes = {
         "a": torch.randn((total_num_edges,)),
     }
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
-        node_type_offset,
-        type_per_edge,
-        edge_attributes,
-        metadata,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
+        edge_attributes=edge_attributes,
     )
 
     p = mp.Process(
@@ -500,7 +549,7 @@ def test_in_subgraph_homogeneous():
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     # Extract in subgraph.
     nodes = torch.LongTensor([4, 1, 3])
@@ -562,9 +611,13 @@ def test_in_subgraph_heterogeneous():
     assert all(type_per_edge < len(etypes))
 
     # Construct FusedCSCSamplingGraph.
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    graph = gb.from_fused_csc(
-        indptr, indices, node_type_offset, type_per_edge, None, metadata
+    graph = gb.fused_csc_sampling_graph(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Extract in subgraph.
@@ -633,7 +686,7 @@ def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
     assert len(indptr) == total_num_nodes + 1
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
@@ -668,8 +721,6 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    total_num_nodes = 5
     total_num_edges = 9
     indptr = torch.tensor([0, 2, 4, 6, 7, 9], dtype=indptr_dtype)
     indices = torch.tensor([2, 4, 2, 3, 0, 1, 1, 0, 1], dtype=indices_dtype)
@@ -679,12 +730,13 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Sample on both node types.
@@ -777,8 +829,6 @@ def test_sample_neighbors_fanouts(
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    total_num_nodes = 5
     total_num_edges = 9
     indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
@@ -788,12 +838,13 @@ def test_sample_neighbors_fanouts(
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
@@ -835,8 +886,6 @@ def test_sample_neighbors_replace(
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    total_num_nodes = 5
     total_num_edges = 9
     indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
@@ -846,12 +895,13 @@ def test_sample_neighbors_replace(
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
@@ -878,7 +928,6 @@ def test_sample_neighbors_return_eids_homo(labor):
     1   0   0   0   1
     """
     # Initialize data.
-    total_num_nodes = 5
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -889,7 +938,9 @@ def test_sample_neighbors_return_eids_homo(labor):
     edge_attributes = {gb.ORIGINAL_EDGE_ID: torch.randperm(total_num_edges)}
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices, edge_attributes=edge_attributes)
+    graph = gb.fused_csc_sampling_graph(
+        indptr, indices, edge_attributes=edge_attributes
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -923,8 +974,6 @@ def test_sample_neighbors_return_eids_hetero(labor):
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    total_num_nodes = 5
     total_num_edges = 9
     indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
@@ -937,13 +986,14 @@ def test_sample_neighbors_return_eids_hetero(labor):
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
         edge_attributes=edge_attributes,
-        metadata=metadata,
     )
 
     # Sample on both node types.
@@ -981,7 +1031,6 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
     1   0   0   0   1
     """
     # Initialize data.
-    total_num_nodes = 5
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -996,7 +1045,9 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices, edge_attributes=edge_attributes)
+    graph = gb.fused_csc_sampling_graph(
+        indptr, indices, edge_attributes=edge_attributes
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -1032,7 +1083,6 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
 )
 def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
     # Initialize data.
-    total_num_nodes = 5
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -1042,7 +1092,9 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
     edge_attributes = {"probs_or_mask": probs_or_mask}
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices, edge_attributes=edge_attributes)
+    graph = gb.fused_csc_sampling_graph(
+        indptr, indices, edge_attributes=edge_attributes
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -1097,7 +1149,7 @@ def test_homo_graph_on_shared_memory(
         }
     else:
         edge_attributes = None
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr, indices, edge_attributes=edge_attributes
     )
 
@@ -1133,9 +1185,10 @@ def test_homo_graph_on_shared_memory(
                 graph1.edge_attributes[name], graph2.edge_attributes[name]
             )
 
-    assert graph1.metadata is None and graph2.metadata is None
     assert graph1.node_type_offset is None and graph2.node_type_offset is None
     assert graph1.type_per_edge is None and graph2.type_per_edge is None
+    assert graph1.node_type_to_id is None and graph2.node_type_to_id is None
+    assert graph1.edge_type_to_id is None and graph2.edge_type_to_id is None
 
 
 @unittest.skipIf(
@@ -1158,7 +1211,8 @@ def test_hetero_graph_on_shared_memory(
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
@@ -1170,13 +1224,14 @@ def test_hetero_graph_on_shared_memory(
         }
     else:
         edge_attributes = None
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
         edge_attributes=edge_attributes,
-        metadata=metadata,
     )
 
     shm_name = "test_hetero_g"
@@ -1221,10 +1276,10 @@ def test_hetero_graph_on_shared_memory(
                 graph1.edge_attributes[name], graph2.edge_attributes[name]
             )
 
-    assert metadata.node_type_to_id == graph1.metadata.node_type_to_id
-    assert metadata.edge_type_to_id == graph1.metadata.edge_type_to_id
-    assert metadata.node_type_to_id == graph2.metadata.node_type_to_id
-    assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+    assert node_type_to_id == graph1.node_type_to_id
+    assert edge_type_to_id == graph1.edge_type_to_id
+    assert node_type_to_id == graph2.node_type_to_id
+    assert edge_type_to_id == graph2.edge_type_to_id
 
 
 def process_csc_sampling_graph_on_shared_memory(graph, data_queue, flag_queue):
@@ -1283,7 +1338,8 @@ def test_multiprocessing_with_shared_memory():
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
@@ -1293,13 +1349,14 @@ def test_multiprocessing_with_shared_memory():
     node_type_offset.share_memory_()
     type_per_edge.share_memory_()
 
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
         edge_attributes=None,
-        metadata=metadata,
     )
 
     ctx = mp.get_context("spawn")  # Use spawn method.
@@ -1364,7 +1421,8 @@ def test_from_dglgraph_homogeneous():
     assert gb_g.total_num_edges == dgl_g.num_edges()
     assert gb_g.node_type_offset is None
     assert gb_g.type_per_edge is None
-    assert gb_g.metadata is None
+    assert gb_g.node_type_to_id is None
+    assert gb_g.edge_type_to_id is None
 
 
 @unittest.skipIf(
@@ -1422,7 +1480,7 @@ def test_from_dglgraph_heterogeneous():
         list(
             map(
                 lambda ss: ss.split(":")[1],
-                gb_g.metadata.edge_type_to_id.keys(),
+                gb_g.edge_type_to_id.keys(),
             )
         )
         == dgl_g.etypes
@@ -1446,13 +1504,13 @@ def test_from_dglgraph_heterogeneous():
             [3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2, 1, 1, 2, 2, 1, 2]
         ),
     )
-    assert gb_g.metadata.node_type_to_id == {
+    assert gb_g.node_type_to_id == {
         "author": 0,
         "field": 1,
         "institution": 2,
         "paper": 3,
     }
-    assert gb_g.metadata.edge_type_to_id == {
+    assert gb_g.edge_type_to_id == {
         "author:affiliated_with:institution": 0,
         "author:writes:paper": 1,
         "paper:cites:paper": 2,
@@ -1507,7 +1565,9 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices, edge_attributes=edge_attributes)
+    graph = gb.fused_csc_sampling_graph(
+        indptr, indices, edge_attributes=edge_attributes
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([0, 1])
@@ -1574,7 +1634,6 @@ def test_sample_neighbors_hetero_pick_number(
         "N0:R1:N2": 1,
         "N0:R2:N3": 2,
     }
-    metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9])
     indices = torch.LongTensor([1, 2, 3, 4, 5, 6, 7, 8, 9])
     node_type_offset = torch.LongTensor([0, 1, 4, 7, 10])
@@ -1591,13 +1650,14 @@ def test_sample_neighbors_hetero_pick_number(
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         edge_attributes=edge_attributes,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Generate subgraph via sample neighbors.
@@ -1663,7 +1723,6 @@ def test_csc_sampling_graph_to_device():
         "N0:R1:N2": 1,
         "N0:R2:N3": 2,
     }
-    metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9])
     indices = torch.LongTensor([1, 2, 3, 4, 5, 6, 7, 8, 9])
     node_type_offset = torch.LongTensor([0, 1, 4, 7, 10])
@@ -1680,13 +1739,14 @@ def test_csc_sampling_graph_to_device():
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         edge_attributes=edge_attributes,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Copy to device.
@@ -1715,7 +1775,6 @@ def test_sample_neighbors_homo_csc_format():
     1   0   0   0   1
     """
     # Initialize data.
-    total_num_nodes = 5
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -1723,7 +1782,7 @@ def test_sample_neighbors_homo_csc_format():
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -1759,8 +1818,6 @@ def test_sample_neighbors_hetero_csc_format(labor):
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    total_num_nodes = 5
     total_num_edges = 9
     indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
@@ -1770,12 +1827,13 @@ def test_sample_neighbors_hetero_csc_format(labor):
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Sample on both node types.
@@ -1865,8 +1923,6 @@ def test_sample_neighbors_fanouts_csc_format(
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    total_num_nodes = 5
     total_num_edges = 9
     indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
@@ -1876,12 +1932,13 @@ def test_sample_neighbors_fanouts_csc_format(
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
@@ -1927,8 +1984,6 @@ def test_sample_neighbors_replace_csc_format(
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    total_num_nodes = 5
     total_num_edges = 9
     indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
@@ -1938,12 +1993,13 @@ def test_sample_neighbors_replace_csc_format(
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
@@ -1976,7 +2032,6 @@ def test_sample_neighbors_return_eids_homo_csc_format(labor):
     1   0   0   0   1
     """
     # Initialize data.
-    total_num_nodes = 5
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -1987,7 +2042,9 @@ def test_sample_neighbors_return_eids_homo_csc_format(labor):
     edge_attributes = {gb.ORIGINAL_EDGE_ID: torch.randperm(total_num_edges)}
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices, edge_attributes=edge_attributes)
+    graph = gb.fused_csc_sampling_graph(
+        indptr, indices, edge_attributes=edge_attributes
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -2024,8 +2081,6 @@ def test_sample_neighbors_return_eids_hetero_csc_format(labor):
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    total_num_nodes = 5
     total_num_edges = 9
     indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
@@ -2038,13 +2093,14 @@ def test_sample_neighbors_return_eids_hetero_csc_format(labor):
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
         edge_attributes=edge_attributes,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Sample on both node types.
@@ -2082,7 +2138,6 @@ def test_sample_neighbors_probs_csc_format(replace, labor, probs_name):
     1   0   0   0   1
     """
     # Initialize data.
-    total_num_nodes = 5
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -2097,7 +2152,9 @@ def test_sample_neighbors_probs_csc_format(replace, labor, probs_name):
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices, edge_attributes=edge_attributes)
+    graph = gb.fused_csc_sampling_graph(
+        indptr, indices, edge_attributes=edge_attributes
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -2145,7 +2202,9 @@ def test_sample_neighbors_zero_probs_csc_format(replace, labor, probs_or_mask):
     edge_attributes = {"probs_or_mask": probs_or_mask}
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices, edge_attributes=edge_attributes)
+    graph = gb.fused_csc_sampling_graph(
+        indptr, indices, edge_attributes=edge_attributes
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -2199,7 +2258,6 @@ def test_sample_neighbors_homo_pick_number_csc_format(
     0   0   0   0   0   0
     """
     # Initialize data.
-    total_num_nodes = 6
     total_num_edges = 6
     indptr = torch.LongTensor([0, 6, 6, 6, 6, 6, 6])
     indices = torch.LongTensor([0, 1, 2, 3, 4, 5])
@@ -2213,7 +2271,9 @@ def test_sample_neighbors_homo_pick_number_csc_format(
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices, edge_attributes=edge_attributes)
+    graph = gb.fused_csc_sampling_graph(
+        indptr, indices, edge_attributes=edge_attributes
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([0, 1])
@@ -2281,7 +2341,6 @@ def test_sample_neighbors_hetero_pick_number_csc_format(
         "N2:R1:N0": 1,
         "N3:R2:N0": 2,
     }
-    metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9])
     indices = torch.LongTensor([1, 2, 3, 4, 5, 6, 7, 8, 9])
     node_type_offset = torch.LongTensor([0, 1, 4, 7, 10])
@@ -2298,13 +2357,14 @@ def test_sample_neighbors_hetero_pick_number_csc_format(
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         edge_attributes=edge_attributes,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
     # Generate subgraph via sample neighbors.

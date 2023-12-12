@@ -3,7 +3,11 @@
 import torch
 from torch.utils.data import functional_datapipe
 
-from ..internal import compact_csc_format, unique_and_compact_node_pairs
+from ..internal import (
+    compact_csc_format,
+    unique_and_compact_csc_formats,
+    unique_and_compact_node_pairs,
+)
 
 from ..subgraph_sampler import SubgraphSampler
 from .sampled_subgraph_impl import FusedSampledSubgraphImpl, SampledSubgraphImpl
@@ -60,7 +64,7 @@ class NeighborSampler(SubgraphSampler):
     >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
-    >>> graph = gb.from_fused_csc(indptr, indices)
+    >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
@@ -108,7 +112,7 @@ class NeighborSampler(SubgraphSampler):
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
-            ntypes = list(self.graph.metadata.node_type_to_id.keys())
+            ntypes = list(self.graph.node_type_to_id.keys())
             seeds = {
                 ntype: seeds.get(ntype, torch.LongTensor([]))
                 for ntype in ntypes
@@ -123,17 +127,31 @@ class NeighborSampler(SubgraphSampler):
             )
             if self.deduplicate:
                 if self.output_cscformat:
-                    raise RuntimeError("Not implemented yet.")
-                (
-                    original_row_node_ids,
-                    compacted_node_pairs,
-                ) = unique_and_compact_node_pairs(subgraph.node_pairs, seeds)
-                subgraph = FusedSampledSubgraphImpl(
-                    node_pairs=compacted_node_pairs,
-                    original_column_node_ids=seeds,
-                    original_row_node_ids=original_row_node_ids,
-                    original_edge_ids=subgraph.original_edge_ids,
-                )
+                    (
+                        original_row_node_ids,
+                        compacted_csc_format,
+                    ) = unique_and_compact_csc_formats(
+                        subgraph.node_pairs, seeds
+                    )
+                    subgraph = SampledSubgraphImpl(
+                        node_pairs=compacted_csc_format,
+                        original_column_node_ids=seeds,
+                        original_row_node_ids=original_row_node_ids,
+                        original_edge_ids=subgraph.original_edge_ids,
+                    )
+                else:
+                    (
+                        original_row_node_ids,
+                        compacted_node_pairs,
+                    ) = unique_and_compact_node_pairs(
+                        subgraph.node_pairs, seeds
+                    )
+                    subgraph = FusedSampledSubgraphImpl(
+                        node_pairs=compacted_node_pairs,
+                        original_column_node_ids=seeds,
+                        original_row_node_ids=original_row_node_ids,
+                        original_edge_ids=subgraph.original_edge_ids,
+                    )
             else:
                 (
                     original_row_node_ids,
@@ -211,7 +229,7 @@ class LayerNeighborSampler(NeighborSampler):
     >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
-    >>> graph = gb.from_fused_csc(indptr, indices)
+    >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
     >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
