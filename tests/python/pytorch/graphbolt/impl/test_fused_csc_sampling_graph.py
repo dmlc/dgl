@@ -680,7 +680,7 @@ def test_in_subgraph_homo():
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     # Extract in subgraph.
     nodes = torch.LongTensor([4, 1, 3])
@@ -742,7 +742,7 @@ def test_in_subgraph_hetero():
     assert all(type_per_edge < len(etypes))
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
