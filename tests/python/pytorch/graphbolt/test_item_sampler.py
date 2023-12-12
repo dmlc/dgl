@@ -1,6 +1,7 @@
 import os
 import re
 from sys import platform
+import warnings
 
 import dgl
 import pytest
@@ -8,7 +9,6 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from dgl import graphbolt as gb
-from torch.testing import assert_close
 
 
 def test_ItemSampler_minibatcher():
@@ -210,17 +210,24 @@ def test_ItemSet_graphs(batch_size, shuffle, drop_last):
     )
     minibatch_num_nodes = []
     minibatch_num_edges = []
-    for i, minibatch in enumerate(item_sampler):
-        is_last = (i + 1) * batch_size >= num_graphs
-        if not is_last or num_graphs % batch_size == 0:
-            assert minibatch.batch_size == batch_size
-        else:
-            if not drop_last:
-                assert minibatch.batch_size == num_graphs % batch_size
+
+    # Filtering DGLWarning:
+    #    Failed to map item list to `MiniBatch`
+    #    as the names of items are not provided.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        for i, minibatch in enumerate(item_sampler):
+            is_last = (i + 1) * batch_size >= num_graphs
+            if not is_last or num_graphs % batch_size == 0:
+                assert minibatch.batch_size == batch_size
             else:
-                assert False
-        minibatch_num_nodes.append(minibatch.batch_num_nodes())
-        minibatch_num_edges.append(minibatch.batch_num_edges())
+                if not drop_last:
+                    assert minibatch.batch_size == num_graphs % batch_size
+                else:
+                    assert False
+            minibatch_num_nodes.append(minibatch.batch_num_nodes())
+            minibatch_num_edges.append(minibatch.batch_num_edges())
+
     minibatch_num_nodes = torch.cat(minibatch_num_nodes)
     minibatch_num_edges = torch.cat(minibatch_num_edges)
     assert (
@@ -383,9 +390,15 @@ def test_append_with_other_datapipes():
     data_pipe = gb.ItemSampler(item_set, batch_size)
     # torchdata.datapipes.iter.Enumerator
     data_pipe = data_pipe.enumerate()
-    for i, (idx, data) in enumerate(data_pipe):
-        assert i == idx
-        assert len(data) == batch_size
+
+    # Filtering DGLWarning:
+    #    Failed to map item list to `MiniBatch`
+    #    as the names of items are not provided.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        for i, (idx, data) in enumerate(data_pipe):
+            assert i == idx
+            assert len(data) == batch_size
 
 
 @pytest.mark.parametrize("batch_size", [1, 4])

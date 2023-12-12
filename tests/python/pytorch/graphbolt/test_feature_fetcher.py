@@ -1,4 +1,5 @@
 import random
+import warnings
 from enum import Enum
 
 import dgl.graphbolt as gb
@@ -82,6 +83,20 @@ def test_FeatureFetcher_homo(minibatch_type):
     assert len(list(fetcher_dp)) == 5
 
 
+def _check_features(fetcher_dp, node_names, edge_names):
+    # Filtering DGLWarning:
+    #    Failed to map item list to `MiniBatch`
+    #    as the names of items are not provided.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        assert len(list(fetcher_dp)) == 5
+        for data in fetcher_dp:
+            assert data.node_features[node_names].size(0) == 2
+            assert len(data.edge_features) == 3
+            for edge_feature in data.edge_features:
+                assert edge_feature[edge_names].size(0) == 10
+
+
 @pytest.mark.parametrize(
     "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
 )
@@ -123,13 +138,7 @@ def test_FeatureFetcher_with_edges_homo(minibatch_type):
     if minibatch_type == MiniBatchType.DGLMiniBatch:
         converter_dp = converter_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, ["a"], ["b"])
-
-    assert len(list(fetcher_dp)) == 5
-    for data in fetcher_dp:
-        assert data.node_features["a"].size(0) == 2
-        assert len(data.edge_features) == 3
-        for edge_feature in data.edge_features:
-            assert edge_feature["b"].size(0) == 10
+    _check_features(fetcher_dp, "a", "b")
 
 
 def get_hetero_graph():
@@ -247,10 +256,4 @@ def test_FeatureFetcher_with_edges_hetero(minibatch_type):
     fetcher_dp = gb.FeatureFetcher(
         converter_dp, feature_store, {"n1": ["a"]}, {"n1:e1:n2": ["a"]}
     )
-
-    assert len(list(fetcher_dp)) == 5
-    for data in fetcher_dp:
-        assert data.node_features[("n1", "a")].size(0) == 2
-        assert len(data.edge_features) == 3
-        for edge_feature in data.edge_features:
-            assert edge_feature[("n1:e1:n2", "a")].size(0) == 10
+    _check_features(fetcher_dp, ("n1", "a"), ("n1:e1:n2", "a"))

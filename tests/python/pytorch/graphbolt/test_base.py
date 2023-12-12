@@ -1,5 +1,6 @@
 import re
 import unittest
+import warnings
 
 import backend as F
 
@@ -11,17 +12,21 @@ import torch
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
+
+    def checkData(dp):
+        # Filtering DGLWarning:
+        #    Failed to map item list to `MiniBatch`
+        #    as the names of items are not provided.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            for data in dp:
+                assert data.device.type == "cuda"
+
     item_sampler = gb.ItemSampler(gb.ItemSet(torch.randn(20)), 4)
-
     # Invoke CopyTo via class constructor.
-    dp = gb.CopyTo(item_sampler, "cuda")
-    for data in dp:
-        assert data.device.type == "cuda"
-
+    checkData(gb.CopyTo(item_sampler, "cuda"))
     # Invoke CopyTo via functional form.
-    dp = item_sampler.copy_to("cuda")
-    for data in dp:
-        assert data.device.type == "cuda"
+    checkData(item_sampler.copy_to("cuda"))
 
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
