@@ -48,27 +48,27 @@ __global__ void _CopyIndicesAlignedKernel(
     const indptr_t* const indptr, const indptr_t* const output_indptr,
     const indptr_t* const output_indptr_aligned, const indices_t* const indices,
     indices_t* const output_indices, const int64_t* const perm) {
-  indptr_t tx = static_cast<indptr_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  indptr_t idx = static_cast<indptr_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
 
-  while (tx < edge_count) {
-    const auto rpos_ =
-        cuda::UpperBound(output_indptr_aligned, num_nodes, tx) - 1;
-    const auto rpos = perm ? perm[rpos_] : rpos_;
-    const auto out_row = output_indptr[rpos];
-    const auto d = output_indptr[rpos + 1] - out_row;
+  while (idx < edge_count) {
+    const auto permuted_row_pos =
+        cuda::UpperBound(output_indptr_aligned, num_nodes, idx) - 1;
+    const auto row_pos = perm ? perm[permuted_row_pos] : permuted_row_pos;
+    const auto out_row = output_indptr[row_pos];
+    const auto d = output_indptr[row_pos + 1] - out_row;
     const int offset =
-        ((size_t)(indices + indptr[rpos] - output_indptr_aligned[rpos_]) %
+        ((size_t)(indices + indptr[row_pos] - output_indptr_aligned[permuted_row_pos]) %
          GPU_CACHE_LINE_SIZE) /
         sizeof(indices_t);
-    const auto rofs = tx - output_indptr_aligned[rpos_] - offset;
+    const auto rofs = idx - output_indptr_aligned[permuted_row_pos] - offset;
     if (rofs >= 0 && rofs < d) {
-      const auto in_idx = indptr[rpos] + rofs;
-      assert((size_t)(indices + in_idx - tx) % GPU_CACHE_LINE_SIZE == 0);
+      const auto in_idx = indptr[row_pos] + rofs;
+      assert((size_t)(indices + in_idx - idx) % GPU_CACHE_LINE_SIZE == 0);
       const auto u = indices[in_idx];
       output_indices[out_row + rofs] = u;
     }
-    tx += stride_x;
+    idx += stride_x;
   }
 }
 
