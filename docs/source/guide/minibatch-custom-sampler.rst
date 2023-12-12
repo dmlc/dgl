@@ -47,11 +47,11 @@ To use this sampler with :class:`~dgl.graphbolt.DataLoader`:
     datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
     datapipe = datapipe.customized_sample_neighbor(g, [10, 10]) # 2 layers.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     for data in dataloader:
+        data = data.to_dgl()
         input_features = data.node_features["feat"]
         output_labels = data.labels
         output_predictions = model(data.blocks, input_features)
@@ -93,11 +93,11 @@ can be used on heterogeneous graphs:
     datapipe = datapipe.fetch_feature(
         feature, node_feature_keys={"user": ["feat"], "item": ["feat"]}
     )
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     for data in dataloader:
+        data = data.to_dgl()
         input_features = {
             ntype: data.node_features[(ntype, "feat")]
             for ntype in data.blocks[0].srctypes
