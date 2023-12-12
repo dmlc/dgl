@@ -7,7 +7,6 @@
 
 #include <torch/script.h>
 
-
 namespace graphbolt {
 namespace ops {
 
