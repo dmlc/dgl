@@ -8,7 +8,6 @@ from .minibatch import DGLMiniBatch, MiniBatch
 
 __all__ = [
     "MiniBatchTransformer",
-    "DGLMiniBatchConverter",
 ]
 
 
