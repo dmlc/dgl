@@ -40,7 +40,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
         c10::DeviceType::CUDA, "nodesSelectCSC",
         { return IndexSelectCSCImpl(indptr, indices, nodes); });
   }
-  // For testing purposes, to compare with CPU implementation
+  // @todo: The CPU supports only integer dtypes for indices tensor.
   torch::optional<torch::Tensor> temp;
   torch::optional<sampling::FusedCSCSamplingGraph::NodeTypeToIDMap> temp2;
   torch::optional<sampling::FusedCSCSamplingGraph::EdgeTypeToIDMap> temp3;

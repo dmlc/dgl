@@ -65,7 +65,7 @@ struct CUDAWorkspaceAllocator {
   }
 };
 
-inline auto BuildAllocator() { return CUDAWorkspaceAllocator{}; }
+inline auto GetAllocator() { return CUDAWorkspaceAllocator{}; }
 
 template <typename T>
 inline bool is_zero(T size) {
@@ -93,39 +93,27 @@ inline bool is_zero<dim3>(dim3 size) {
     switch (element_size) {                                                   \
       case 1: {                                                               \
         using element_size_t = uint8_t;                                       \
-        [[maybe_unused]] constexpr auto element_size_v =                      \
-            sizeof(element_size_t);                                           \
         return __VA_ARGS__();                                                 \
       }                                                                       \
       case 2: {                                                               \
         using element_size_t = uint16_t;                                      \
-        [[maybe_unused]] constexpr auto element_size_v =                      \
-            sizeof(element_size_t);                                           \
         return __VA_ARGS__();                                                 \
       }                                                                       \
       case 4: {                                                               \
         using element_size_t = uint32_t;                                      \
-        [[maybe_unused]] constexpr auto element_size_v =                      \
-            sizeof(element_size_t);                                           \
         return __VA_ARGS__();                                                 \
       }                                                                       \
       case 8: {                                                               \
         using element_size_t = uint64_t;                                      \
-        [[maybe_unused]] constexpr auto element_size_v =                      \
-            sizeof(element_size_t);                                           \
         return __VA_ARGS__();                                                 \
       }                                                                       \
       case 16: {                                                              \
         using element_size_t = float4;                                        \
-        [[maybe_unused]] constexpr auto element_size_v =                      \
-            sizeof(element_size_t);                                           \
         return __VA_ARGS__();                                                 \
       }                                                                       \
       default:                                                                \
         TORCH_CHECK(false, name, " with the element_size is not supported!"); \
         using element_size_t = uint8_t;                                       \
-        [[maybe_unused]] constexpr auto element_size_v =                      \
-            sizeof(element_size_t);                                           \
         return __VA_ARGS__();                                                 \
     }                                                                         \
   }()
