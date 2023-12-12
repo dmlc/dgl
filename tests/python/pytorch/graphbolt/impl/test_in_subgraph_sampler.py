@@ -1,8 +1,8 @@
 import unittest
-import pytest
 
 import backend as F
 import dgl.graphbolt as gb
+import pytest
 import torch
 
 from .. import gb_test_utils
