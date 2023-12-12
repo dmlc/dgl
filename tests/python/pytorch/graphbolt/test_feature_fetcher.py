@@ -2,10 +2,11 @@ import random
 from enum import Enum
 
 import dgl.graphbolt as gb
-import gb_test_utils
 import pytest
 import torch
 from torchdata.datapipes.iter import Mapper
+
+from . import gb_test_utils
 
 
 class MiniBatchType(Enum):

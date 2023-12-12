@@ -8,11 +8,12 @@ import backend as F
 
 import dgl
 import dgl.graphbolt as gb
-import gb_test_utils as gbt
 import pytest
 import torch
 import torch.multiprocessing as mp
 from scipy import sparse as spsp
+
+from .. import gb_test_utils as gbt
 
 torch.manual_seed(3407)
 mp.set_sharing_strategy("file_system")
