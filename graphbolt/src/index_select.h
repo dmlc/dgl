@@ -6,19 +6,10 @@
 #ifndef GRAPHBOLT_INDEX_SELECT_H_
 #define GRAPHBOLT_INDEX_SELECT_H_
 
-#include <graphbolt/fused_sampled_subgraph.h>
 #include <torch/script.h>
 
 namespace graphbolt {
 namespace ops {
-
-/** @brief Implemented in the cuda directory. */
-std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
-
-/** @brief Implemented in the cuda directory. */
-std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
 /**
  * @brief Select columns for a sparse matrix in a CSC format according to nodes
@@ -39,9 +30,6 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  */
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
-
-/** @brief Implemented in the cuda directory. */
-torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor nodes);
 
 /**
  * @brief Select rows from input tensor according to index tensor.

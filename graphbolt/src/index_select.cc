@@ -3,8 +3,7 @@
  * @file index_select.cc
  * @brief Index select operators.
  */
-#include "./index_select.h"
-
+#include <graphbolt/cuda_ops.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 
 #include "./macro.h"
