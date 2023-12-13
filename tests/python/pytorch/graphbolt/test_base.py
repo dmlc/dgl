@@ -5,9 +5,10 @@ import warnings
 import backend as F
 
 import dgl.graphbolt as gb
-import gb_test_utils
 import pytest
 import torch
+
+from . import gb_test_utils
 
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
