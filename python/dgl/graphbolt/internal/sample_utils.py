@@ -249,7 +249,7 @@ def unique_and_compact_csc_formats(
             csc_format.indices
         ), "The last element of indptr should be the same as the length of indices."
         src_type, _, dst_type = etype_str_to_tuple(etype)
-        assert len(unique_dst_nodes[dst_type]) + 1 == len(
+        assert len(unique_dst_nodes.get(dst_type, [])) + 1 == len(
             csc_format.indptr
         ), "The seed nodes should correspond to indptr."
         indices[src_type].append(csc_format.indices)
@@ -367,7 +367,7 @@ def compact_csc_format(
                 csc_format.indices
             ), "The last element of indptr should be the same as the length of indices."
             src_type, _, dst_type = etype_str_to_tuple(etype)
-            assert len(dst_nodes[dst_type]) + 1 == len(
+            assert len(dst_nodes.get(dst_type, [])) + 1 == len(
                 csc_format.indptr
             ), "The seed nodes should correspond to indptr."
             offset = original_row_ids.get(src_type, torch.tensor([])).size(0)
