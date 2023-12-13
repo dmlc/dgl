@@ -1,8 +1,7 @@
+import backend as F
 import dgl.graphbolt as gb
 import pytest
 import torch
-
-import backend as F
 
 
 def test_find_reverse_edges_homo():
@@ -73,9 +72,13 @@ def test_find_reverse_edges_circual_reverse_types():
 
 
 def test_unique_and_compact_hetero():
-    device = torch.device("cpu" if F._default_context_str == "cpu" else "cuda:0")
-    
-    N1 = torch.tensor([0, 5, 2, 7, 12, 7, 9, 5, 6, 2, 3, 4, 1, 0, 9], device=device)
+    device = torch.device(
+        "cpu" if F._default_context_str == "cpu" else "cuda:0"
+    )
+
+    N1 = torch.tensor(
+        [0, 5, 2, 7, 12, 7, 9, 5, 6, 2, 3, 4, 1, 0, 9], device=device
+    )
     N2 = torch.tensor([0, 3, 3, 5, 2, 7, 2, 8, 4, 9, 2, 3], device=device)
     N3 = torch.tensor([1, 2, 6, 6, 1, 8, 3, 6, 3, 2], device=device)
     expected_unique = {
@@ -84,10 +87,15 @@ def test_unique_and_compact_hetero():
         "n3": torch.tensor([1, 2, 6, 8, 3], device=device),
     }
     if N1.is_cuda:
-        expected_reverse_id = {k: v.sort()[1] for k, v in expected_unique.items()}
+        expected_reverse_id = {
+            k: v.sort()[1] for k, v in expected_unique.items()
+        }
         expected_unique = {k: v.sort()[0] for k, v in expected_unique.items()}
     else:
-        expected_reverse_id = {k: torch.arange(0, v.shape[0], device=device) for k, v in expected_unique.items()}
+        expected_reverse_id = {
+            k: torch.arange(0, v.shape[0], device=device)
+            for k, v in expected_unique.items()
+        }
     nodes_dict = {
         "n1": N1.split(5),
         "n2": N2.split(4),
@@ -127,15 +135,23 @@ def test_unique_and_compact_hetero():
 
 
 def test_unique_and_compact_homo():
-    device = torch.device("cpu" if F._default_context_str == "cpu" else "cuda:0")
-    
-    N = torch.tensor([0, 5, 2, 7, 12, 7, 9, 5, 6, 2, 3, 4, 1, 0, 9], device=device)
-    expected_unique_N = torch.tensor([0, 5, 2, 7, 12, 9, 6, 3, 4, 1], device=device)
+    device = torch.device(
+        "cpu" if F._default_context_str == "cpu" else "cuda:0"
+    )
+
+    N = torch.tensor(
+        [0, 5, 2, 7, 12, 7, 9, 5, 6, 2, 3, 4, 1, 0, 9], device=device
+    )
+    expected_unique_N = torch.tensor(
+        [0, 5, 2, 7, 12, 9, 6, 3, 4, 1], device=device
+    )
     if N.is_cuda:
         expected_reverse_id_N = expected_unique_N.sort()[1]
         expected_unique_N = expected_unique_N.sort()[0]
     else:
-        expected_reverse_id_N = torch.arange(0, expected_unique_N.shape[0], device=device)
+        expected_reverse_id_N = torch.arange(
+            0, expected_unique_N.shape[0], device=device
+        )
     nodes_list = N.split(5)
     expected_nodes_list = [
         torch.tensor([0, 1, 2, 3, 4], device=device),
@@ -153,8 +169,10 @@ def test_unique_and_compact_homo():
 
 
 def test_unique_and_compact_node_pairs_hetero():
-    device = torch.device("cpu" if F._default_context_str == "cpu" else "cuda:0")
-    
+    device = torch.device(
+        "cpu" if F._default_context_str == "cpu" else "cuda:0"
+    )
+
     node_pairs = {
         "n1:e1:n2": (
             torch.tensor([1, 3, 4, 6, 2, 7, 9, 4, 2, 6], device=device),
@@ -176,10 +194,17 @@ def test_unique_and_compact_node_pairs_hetero():
         "n3": torch.tensor([1, 2, 3, 7], device=device),
     }
     if expected_unique_nodes["n1"].is_cuda and False:
-        expected_reverse_id = {k: v.sort()[1] for k, v in expected_unique_nodes.items()}
-        expected_unique_nodes = {k: v.sort()[0] for k, v in expected_unique_nodes.items()}
+        expected_reverse_id = {
+            k: v.sort()[1] for k, v in expected_unique_nodes.items()
+        }
+        expected_unique_nodes = {
+            k: v.sort()[0] for k, v in expected_unique_nodes.items()
+        }
     else:
-        expected_reverse_id = {k: torch.arange(0, v.shape[0], device=device) for k, v in expected_unique_nodes.items()}
+        expected_reverse_id = {
+            k: torch.arange(0, v.shape[0], device=device)
+            for k, v in expected_unique_nodes.items()
+        }
     expected_node_pairs = {
         "n1:e1:n2": (
             torch.tensor([0, 1, 2, 3, 4, 5, 6, 2, 4, 3], device=device),
@@ -211,15 +236,21 @@ def test_unique_and_compact_node_pairs_hetero():
 
 
 def test_unique_and_compact_node_pairs_homo():
-    device = torch.device("cpu" if F._default_context_str == "cpu" else "cuda:0")
-    
+    device = torch.device(
+        "cpu" if F._default_context_str == "cpu" else "cuda:0"
+    )
+
     dst_nodes = torch.tensor([1, 1, 3, 3, 5, 5, 2, 6, 6, 6, 6], device=device)
     src_nodes = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4, 6], device=device)
     node_pairs = (src_nodes, dst_nodes)
 
     expected_unique_nodes = torch.tensor([1, 2, 3, 5, 6, 4], device=device)
-    expected_dst_nodes = torch.tensor([0, 0, 2, 2, 3, 3, 1, 4, 4, 4, 4], device=device)
-    expected_src_ndoes = torch.tensor([1, 2, 0, 5, 3, 1, 3, 0, 5, 5, 4], device=device)
+    expected_dst_nodes = torch.tensor(
+        [0, 0, 2, 2, 3, 3, 1, 4, 4, 4, 4], device=device
+    )
+    expected_src_ndoes = torch.tensor(
+        [1, 2, 0, 5, 3, 1, 3, 0, 5, 5, 4], device=device
+    )
     unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(
         node_pairs
     )
@@ -228,13 +259,20 @@ def test_unique_and_compact_node_pairs_homo():
     u, v = compacted_node_pairs
     assert torch.equal(u, expected_src_ndoes)
     assert torch.equal(v, expected_dst_nodes)
-    assert torch.equal(unique_nodes[:5], torch.tensor([1, 2, 3, 5, 6], device=device))
+    assert torch.equal(
+        unique_nodes[:5], torch.tensor([1, 2, 3, 5, 6], device=device)
+    )
 
 
 def test_incomplete_unique_dst_nodes_():
-    device = torch.device("cpu" if F._default_context_str == "cpu" else "cuda:0")
-    
-    node_pairs = (torch.arange(0, 50, device=device), torch.arange(100, 150, device=device))
+    device = torch.device(
+        "cpu" if F._default_context_str == "cpu" else "cuda:0"
+    )
+
+    node_pairs = (
+        torch.arange(0, 50, device=device),
+        torch.arange(100, 150, device=device),
+    )
     unique_dst_nodes = torch.arange(150, 200, device=device)
     with pytest.raises(IndexError):
         gb.unique_and_compact_node_pairs(node_pairs, unique_dst_nodes)
