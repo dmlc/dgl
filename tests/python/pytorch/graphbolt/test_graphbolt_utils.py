@@ -267,7 +267,7 @@ def test_unique_and_compact_csc_formats_hetero():
 
 def test_unique_and_compact_csc_formats_homo():
     seeds = torch.tensor([1, 3, 5, 2, 6])
-    indptr = torch.tensor([0, 2, 4, 6, 7, 10, 11])
+    indptr = torch.tensor([0, 2, 4, 6, 7, 11])
     indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4, 6])
     csc_formats = gb.CSCFormatBase(indptr=indptr, indices=indices)
 
@@ -284,6 +284,25 @@ def test_unique_and_compact_csc_formats_homo():
     assert torch.equal(indptr, expected_indptr)
     assert torch.equal(indices, expected_indices)
     assert torch.equal(unique_nodes, expected_unique_nodes)
+
+
+def test_unique_and_compact_incorrect_indptr():
+    seeds = torch.tensor([1, 3, 5, 2, 6, 7])
+    indptr = torch.tensor([0, 2, 4, 6, 7, 11])
+    indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4, 6])
+    csc_formats = gb.CSCFormatBase(indptr=indptr, indices=indices)
+
+    # The number of seeds is not corresponding to indptr.
+    with pytest.raises(AssertionError):
+        gb.unique_and_compact_csc_formats(csc_formats, seeds)
+    
+    seeds = torch.tensor([1, 3, 5, 2, 6])
+    indptr = torch.tensor([0, 2, 4, 6, 7, 11])
+    indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4])
+    csc_formats = gb.CSCFormatBase(indptr=indptr, indices=indices)
+    # The value of last element in indptr is not corresponding to indices.
+    with pytest.raises(AssertionError):
+        gb.unique_and_compact_csc_formats(csc_formats, seeds)
 
 
 def test_compact_csc_format_hetero():
@@ -365,3 +384,22 @@ def test_compact_csc_format_homo():
     assert torch.equal(indptr, expected_indptr)
     assert torch.equal(indices, expected_indices)
     assert torch.equal(original_row_ids, expected_original_row_ids)
+
+
+def test_compact_incorrect_indptr():
+    seeds = torch.tensor([1, 3, 5, 2, 6, 7])
+    indptr = torch.tensor([0, 2, 4, 6, 7, 11])
+    indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4, 6])
+    csc_formats = gb.CSCFormatBase(indptr=indptr, indices=indices)
+
+    # The number of seeds is not corresponding to indptr.
+    with pytest.raises(AssertionError):
+        gb.compact_csc_format(csc_formats, seeds)
+    
+    seeds = torch.tensor([1, 3, 5, 2, 6])
+    indptr = torch.tensor([0, 2, 4, 6, 7, 11])
+    indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4])
+    csc_formats = gb.CSCFormatBase(indptr=indptr, indices=indices)
+    # The value of last element in indptr is not corresponding to indices.
+    with pytest.raises(AssertionError):
+        gb.compact_csc_format(csc_formats, seeds)
