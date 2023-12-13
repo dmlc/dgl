@@ -652,7 +652,7 @@ def test_dgl_link_predication_homo(mode):
     (
         training_node_pairs,
         training_labels,
-    ) = minibatch.get_training_node_pair_and_labels()
+    ) = minibatch.get_node_pairs_and_labels()
     if mode == "neg_src":
         expect_training_node_pairs = (
             torch.tensor([0, 1, 0, 0, 1, 1]),
@@ -970,7 +970,7 @@ def test_dgl_link_predication_homo_csc_format(mode):
     (
         training_node_pairs,
         training_labels,
-    ) = minibatch.get_training_node_pair_and_labels()
+    ) = minibatch.get_node_pairs_and_labels()
     if mode == "neg_src":
         expect_training_node_pairs = (
             torch.tensor([0, 1, 0, 0, 1, 1]),
