@@ -363,9 +363,10 @@ class MiniBatch:
         """Set edge features."""
         self.edge_features = edge_features
 
-    def get_dgl_blocks(self):
-        """Extracting a `MiniBatch` into DGL blocks necessitates constructing
-        a graphical structure and ID mappings.
+    @property
+    def dgl_blocks(self):
+        """Extracts DGL blocks from `MiniBatch` to construct a graphical
+        structure and ID mappings.
         """
         if not self.sampled_subgraphs:
             return None
@@ -559,7 +560,8 @@ class MiniBatch:
             negative_node_pairs = None
         return negative_node_pairs
 
-    def get_node_pairs_with_labels(self):
+    @property
+    def node_pairs_with_labels(self):
         """Get a node pair tensor and a label tensor from MiniBatch. They are
         used for evaluating or computing loss.
         """
@@ -586,13 +588,16 @@ class MiniBatch:
         for attr in dir(self):
             # Only copy member variables.
             if not callable(getattr(self, attr)) and not attr.startswith("__"):
-                setattr(
-                    self,
-                    attr,
-                    recursive_apply(
-                        getattr(self, attr), lambda x: _to(x, device)
-                    ),
-                )
+                try:
+                    setattr(
+                        self,
+                        attr,
+                        recursive_apply(
+                            getattr(self, attr), lambda x: _to(x, device)
+                        ),
+                    )
+                except AttributeError:
+                    continue
 
         return self
 
