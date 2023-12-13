@@ -22,8 +22,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
    :titlesonly:
    :glob:
 
-   notebooks/stochastic_training/index
-   graphbolt/index
+   stochastic_training/index
    guide/index
    guide_cn/index
    guide_ko/index
