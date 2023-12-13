@@ -8,8 +8,10 @@
 #include <c10/cuda/CUDAStream.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
+#include <thrust/functional.h>
 #include <thrust/gather.h>
 #include <thrust/iterator/discard_iterator.h>
+#include <thrust/logical.h>
 #include <thrust/reduce.h>
 #include <thrust/remove.h>
 
@@ -20,6 +22,16 @@
 
 namespace graphbolt {
 namespace ops {
+
+template <typename scalar_t>
+struct EqualityFunc {
+  const scalar_t* sorted_order;
+  const scalar_t* found_locations;
+  const scalar_t* searched_items;
+  __host__ __device__ auto operator()(int64_t i) {
+    return sorted_order[found_locations[i]] == searched_items[i];
+  }
+};
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
@@ -33,7 +45,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
   return AT_DISPATCH_INTEGRAL_TYPES(
       src_ids.scalar_type(), "unique_and_compact", ([&] {
-        using scalar_t = int32_t;
         auto src_ids_ptr = src_ids.data_ptr<scalar_t>();
         auto dst_ids_ptr = dst_ids.data_ptr<scalar_t>();
         auto unique_dst_ids_ptr = unique_dst_ids.data_ptr<scalar_t>();
@@ -120,7 +131,19 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         thrust::lower_bound(
             exec_policy, sorted_order_ptr,
             sorted_order_ptr + sorted_order.size(0), dst_ids_ptr,
-            dst_ids_ptr + src_ids.size(0), new_dst_ids_loc.get());
+            dst_ids_ptr + dst_ids.size(0), new_dst_ids_loc.get());
+        {  // Checks if unique_dst_ids includes all dst_ids
+          thrust::counting_iterator<int64_t> iota(0);
+          auto equal_it = thrust::make_transform_iterator(
+              iota, EqualityFunc<scalar_t>{
+                        sorted_order_ptr, new_dst_ids_loc.get(), dst_ids_ptr});
+          auto all_exist = thrust::all_of(
+              exec_policy, equal_it, equal_it + dst_ids.size(0),
+              thrust::identity<bool>());
+          if (!all_exist) {
+            throw std::out_of_range("Some ids not found.");
+          }
+        }
         auto new_src_ids = torch::empty_like(src_ids);
         auto new_dst_ids = torch::empty_like(dst_ids);
         thrust::gather(

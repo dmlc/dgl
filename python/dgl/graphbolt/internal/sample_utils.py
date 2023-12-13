@@ -128,7 +128,10 @@ def unique_and_compact_node_pairs(
     # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
     dst_nodes = defaultdict(list)
+    device = None
     for etype, (src_node, dst_node) in node_pairs.items():
+        if device is None:
+            device = src_node.device
         src_type, _, dst_type = etype_str_to_tuple(etype)
         src_nodes[src_type].append(src_node)
         dst_nodes[dst_type].append(dst_node)
@@ -145,7 +148,7 @@ def unique_and_compact_node_pairs(
     compacted_src = {}
     compacted_dst = {}
     dtype = list(src_nodes.values())[0].dtype
-    default_tensor = torch.tensor([], dtype=dtype)
+    default_tensor = torch.tensor([], dtype=dtype, device=device)
     for ntype in ntypes:
         src = src_nodes.get(ntype, default_tensor)
         unique_dst = unique_dst_nodes.get(ntype, default_tensor)
