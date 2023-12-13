@@ -1,4 +1,4 @@
-Stochastic Training of GNNs
+🆕 Stochastic Training of GNNs
 ===========================
 
 This tutorial introduces how to train GNNs with stochastic training.
