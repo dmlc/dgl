@@ -545,7 +545,9 @@ def test_get_dgl_blocks_hetero():
     assert result == expect_result, print(result)
 
 
-@pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst", "edge_classification"])
+@pytest.mark.parametrize(
+    "mode", ["neg_graph", "neg_src", "neg_dst", "edge_classification"]
+)
 def test_get_node_pairs_with_labels(mode):
     # Arrange
     minibatch = create_homo_minibatch()
@@ -558,7 +560,7 @@ def test_get_node_pairs_with_labels(mode):
     if mode == "neg_graph" or mode == "neg_dst":
         minibatch.compacted_negative_dsts = torch.tensor([[1, 0], [0, 1]])
     if mode == "edge_classification":
-        minibatch.labels = torch.tensor([0, 1])
+        minibatch.labels = torch.tensor([0, 1]).long()
     # Act
     node_pairs, labels = minibatch.get_node_pairs_with_labels()
 
@@ -580,7 +582,7 @@ def test_get_node_pairs_with_labels(mode):
             torch.tensor([0, 1]),
             torch.tensor([1, 0]),
         )
-        expect_labels = torch.tensor([1, 1, 0, 0, 0, 0]).float()
+        expect_labels = torch.tensor([0, 1]).long()
     assert torch.equal(node_pairs[0], expect_node_pairs[0])
     assert torch.equal(node_pairs[1], expect_node_pairs[1])
     assert torch.equal(labels, expect_labels)
