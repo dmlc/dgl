@@ -60,8 +60,8 @@ class NeighborSampler(SubgraphSampler):
 
     Examples
     -------
+    >>> import torch
     >>> import dgl.graphbolt as gb
-    >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
     >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
