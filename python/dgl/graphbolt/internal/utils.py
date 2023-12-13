@@ -88,6 +88,7 @@ def copy_or_convert_data(
     output_format="numpy",
     in_memory=True,
     is_feature=False,
+    within_int32=False,
 ):
     """Copy or convert the data from input_path to output_path."""
     assert (
@@ -97,17 +98,19 @@ def copy_or_convert_data(
     # If the original format is numpy, just copy the file.
     if input_format == "numpy":
         # If dim of the data is 1, reshape it to n * 1 and save it to output_path.
+        data = read_data(input_path, input_format, in_memory)
         if is_feature and get_npy_dim(input_path) == 1:
-            data = read_data(input_path, input_format, in_memory)
             data = data.reshape(-1, 1)
-            save_data(data, output_path, output_format)
-        else:
-            shutil.copyfile(input_path, output_path)
+        if within_int32:
+            data = data.to(torch.int32)
+        save_data(data, output_path, output_format)
     else:
         # If the original format is not numpy, convert it to numpy.
         data = read_data(input_path, input_format, in_memory)
         if is_feature and data.dim() == 1:
             data = data.reshape(-1, 1)
+        if within_int32:
+            data = data.to(torch.int32)
         save_data(data, output_path, output_format)
 
 

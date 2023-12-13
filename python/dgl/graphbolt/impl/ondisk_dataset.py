@@ -99,12 +99,13 @@ def preprocess_ondisk_dataset(
         coo_tensor = torch.tensor(edge_data.values).T
         sparse_matrix = dglsp.spmatrix(coo_tensor)
         indptr, indices, value_indices = sparse_matrix.csc()
-        num_nodes = input_config["graph"]["nodes"][0]["num"]
-        num_edges = indptr[-1]
-        if num_nodes <= INT32_MAX:
-            # indices = indices.to(torch.int32)
-            pass
-        if num_edges <= INT32_MAX:
+        num_nodes_within_int32 = (
+            input_config["graph"]["nodes"][0]["num"] <= INT32_MAX
+        )
+        num_edges_within_int32 = indptr[-1] <= INT32_MAX
+        if num_nodes_within_int32:
+            indices = indices.to(torch.int32)
+        if num_edges_within_int32:
             indptr = indptr.to(torch.int32)
             value_indices = value_indices.to(torch.int32)
         edge_attributes = {}
@@ -141,7 +142,9 @@ def preprocess_ondisk_dataset(
             dst += node_type_offset[node_type_to_id[dst_type]]
             coo_src_list.append(src)
             coo_dst_list.append(dst)
-            coo_etype_list.append(torch.full((len(src),), edge_type_id))
+            coo_etype_list.append(
+                torch.full((len(src),), edge_type_id, dtype=torch.int16)
+            )
 
         coo_src = torch.cat(coo_src_list)
         coo_dst = torch.cat(coo_dst_list)
@@ -151,6 +154,15 @@ def preprocess_ondisk_dataset(
             indices=torch.stack((coo_src, coo_dst), dim=0), val=coo_etype
         )
         indptr, indices, value_indices = sparse_matrix.csc()
+
+        num_nodes_within_int32 = node_type_offset[-1] <= INT32_MAX
+        num_edges_within_int32 = indptr[-1] <= INT32_MAX
+        # if num_nodes_within_int32:
+        #     indices = indices.to(torch.int32)
+        # if num_edges_within_int32:
+        #     indptr = indptr.to(torch.int32)
+        #     value_indices = value_indices.to(torch.int32)
+
         edge_attributes = {}
         if include_original_edge_id:
             edge_attributes[ORIGINAL_EDGE_ID] = value_indices
@@ -159,7 +171,9 @@ def preprocess_ondisk_dataset(
             csc_indptr=indptr,
             indices=indices,
             node_type_offset=torch.tensor(node_type_offset),
-            type_per_edge=coo_etype[value_indices],
+            type_per_edge=torch.index_select(
+                coo_etype, dim=0, index=value_indices
+            ),
             node_type_to_id=node_type_to_id,
             edge_type_to_id=edge_type_to_id,
             edge_attributes=edge_attributes,
@@ -225,6 +239,7 @@ def preprocess_ondisk_dataset(
                             os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
                             output_data["format"],
+                            within_int32=num_nodes_within_int32,
                         )
 
     # 6. Save the output_config.
