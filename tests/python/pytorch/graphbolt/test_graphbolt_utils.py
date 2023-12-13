@@ -295,7 +295,7 @@ def test_unique_and_compact_incorrect_indptr():
     # The number of seeds is not corresponding to indptr.
     with pytest.raises(AssertionError):
         gb.unique_and_compact_csc_formats(csc_formats, seeds)
-    
+
     seeds = torch.tensor([1, 3, 5, 2, 6])
     indptr = torch.tensor([0, 2, 4, 6, 7, 11])
     indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4])
@@ -395,7 +395,7 @@ def test_compact_incorrect_indptr():
     # The number of seeds is not corresponding to indptr.
     with pytest.raises(AssertionError):
         gb.compact_csc_format(csc_formats, seeds)
-    
+
     seeds = torch.tensor([1, 3, 5, 2, 6])
     indptr = torch.tensor([0, 2, 4, 6, 7, 11])
     indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4])
