@@ -14,5 +14,4 @@ GraphBolt.
   neighbor_sampling_overview.nblink
   node_classification.nblink
   link_prediction.nblink
-  walkthrough.nblink
   ondisk-dataset
