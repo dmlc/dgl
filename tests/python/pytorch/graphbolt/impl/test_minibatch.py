@@ -545,6 +545,47 @@ def test_get_dgl_blocks_hetero():
     assert result == expect_result, print(result)
 
 
+@pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst", "edge_classification"])
+def test_get_node_pairs_with_labels(mode):
+    # Arrange
+    minibatch = create_homo_minibatch()
+    minibatch.compacted_node_pairs = (
+        torch.tensor([0, 1]),
+        torch.tensor([1, 0]),
+    )
+    if mode == "neg_graph" or mode == "neg_src":
+        minibatch.compacted_negative_srcs = torch.tensor([[0, 0], [1, 1]])
+    if mode == "neg_graph" or mode == "neg_dst":
+        minibatch.compacted_negative_dsts = torch.tensor([[1, 0], [0, 1]])
+    if mode == "edge_classification":
+        minibatch.labels = torch.tensor([0, 1])
+    # Act
+    node_pairs, labels = minibatch.get_node_pairs_with_labels()
+
+    # Assert
+    if mode == "neg_src":
+        expect_node_pairs = (
+            torch.tensor([0, 1, 0, 0, 1, 1]),
+            torch.tensor([1, 0, 1, 1, 0, 0]),
+        )
+        expect_labels = torch.tensor([1, 1, 0, 0, 0, 0]).float()
+    elif mode != "edge_classification":
+        expect_node_pairs = (
+            torch.tensor([0, 1, 0, 0, 1, 1]),
+            torch.tensor([1, 0, 1, 0, 0, 1]),
+        )
+        expect_labels = torch.tensor([1, 1, 0, 0, 0, 0]).float()
+    else:
+        expect_node_pairs = (
+            torch.tensor([0, 1]),
+            torch.tensor([1, 0]),
+        )
+        expect_labels = torch.tensor([1, 1, 0, 0, 0, 0]).float()
+    assert torch.equal(node_pairs[0], expect_node_pairs[0])
+    assert torch.equal(node_pairs[1], expect_node_pairs[1])
+    assert torch.equal(labels, expect_labels)
+
+
 def check_dgl_blocks_hetero(minibatch, blocks):
     etype = gb.etype_str_to_tuple(relation)
     node_pairs = [
@@ -662,24 +703,21 @@ def test_dgl_link_predication_homo(mode):
             minibatch.negative_node_pairs[1],
             minibatch.compacted_negative_dsts.view(-1),
         )
-    (
-        training_node_pairs,
-        training_labels,
-    ) = minibatch.get_node_pairs_with_labels()
+    node_pairs, labels = minibatch.get_node_pairs_with_labels()
     if mode == "neg_src":
-        expect_training_node_pairs = (
+        expect_node_pairs = (
             torch.tensor([0, 1, 0, 0, 1, 1]),
             torch.tensor([1, 0, 1, 1, 0, 0]),
         )
     else:
-        expect_training_node_pairs = (
+        expect_node_pairs = (
             torch.tensor([0, 1, 0, 0, 1, 1]),
             torch.tensor([1, 0, 1, 0, 0, 1]),
         )
-    expect_training_labels = torch.tensor([1, 1, 0, 0, 0, 0]).float()
-    assert torch.equal(training_node_pairs[0], expect_training_node_pairs[0])
-    assert torch.equal(training_node_pairs[1], expect_training_node_pairs[1])
-    assert torch.equal(training_labels, expect_training_labels)
+    expect_labels = torch.tensor([1, 1, 0, 0, 0, 0]).float()
+    assert torch.equal(node_pairs[0], expect_node_pairs[0])
+    assert torch.equal(node_pairs[1], expect_node_pairs[1])
+    assert torch.equal(labels, expect_labels)
 
 
 @pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])

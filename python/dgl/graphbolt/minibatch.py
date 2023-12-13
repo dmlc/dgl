@@ -561,18 +561,21 @@ class MiniBatch:
 
     def get_node_pairs_with_labels(self):
         """Get a node pair tensor and a label tensor from MiniBatch. They are
-        used for evaluating or computing loss in link prediction tasks.
+        used for evaluating or computing loss.
         """
-        pos_src, pos_dst = self.positive_node_pairs
-        neg_src, neg_dst = self.negative_node_pairs
-        node_pairs = (
-            torch.cat((pos_src, neg_src), dim=0),
-            torch.cat((pos_dst, neg_dst), dim=0),
-        )
-        pos_label = torch.ones_like(pos_src)
-        neg_label = torch.zeros_like(neg_src)
-        labels = torch.cat([pos_label, neg_label], dim=0)
-        return (node_pairs, labels.float())
+        if self.labels is None:
+            pos_src, pos_dst = self.positive_node_pairs
+            neg_src, neg_dst = self.negative_node_pairs
+            node_pairs = (
+                torch.cat((pos_src, neg_src), dim=0),
+                torch.cat((pos_dst, neg_dst), dim=0),
+            )
+            pos_label = torch.ones_like(pos_src)
+            neg_label = torch.zeros_like(neg_src)
+            labels = torch.cat([pos_label, neg_label], dim=0)
+            return (node_pairs, labels.float())
+        else:
+            return (self.compacted_node_pairs, self.labels)
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
