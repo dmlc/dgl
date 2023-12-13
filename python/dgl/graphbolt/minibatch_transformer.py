@@ -13,23 +13,24 @@ __all__ = [
 
 @functional_datapipe("transform")
 class MiniBatchTransformer(Mapper):
-    """A mini-batch transformer used to manipulate mini-batch"""
+    """A mini-batch transformer used to manipulate mini-batch.
+
+    Functional name: :obj:`transform`.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The datapipe.
+    transformer:
+        The function applied to each minibatch which is responsible for
+        transforming the minibatch.
+    """
 
     def __init__(
         self,
         datapipe,
         transformer,
     ):
-        """
-        Initlization for a subgraph transformer.
-        Parameters
-        ----------
-        datapipe : DataPipe
-            The datapipe.
-        transformer:
-            The function applied to each minibatch which is responsible for
-            transforming the minibatch.
-        """
         super().__init__(datapipe, self._transformer)
         self.transformer = transformer
 
