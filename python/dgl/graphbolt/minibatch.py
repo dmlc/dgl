@@ -559,7 +559,7 @@ class MiniBatch:
             negative_node_pairs = None
         return negative_node_pairs
 
-    def get_node_pairs_and_labels(self):
+    def get_node_pairs_with_labels(self):
         """Get a node pair tensor and a label tensor from MiniBatch. They are
         used for evaluating or computing loss in link prediction tasks.
         """
