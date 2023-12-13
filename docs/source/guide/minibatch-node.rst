@@ -50,18 +50,20 @@ putting the list of generated MFGs onto GPU.
     # Or equivalently:
     # datapipe = gb.NeighborSampler(datapipe, g, [10, 10])
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
 
-Iterating over the DataLoader will yield :class:`~dgl.graphbolt.DGLMiniBatch`
+Iterating over the DataLoader will yield :class:`~dgl.graphbolt.MiniBatch`
 which contains a list of specially created graphs representing the computation
-dependencies on each layer. They are called *message flow graphs* (MFGs) in DGL.
+dependencies on each layer. In order to train with DGL, you need to convert them
+to :class:`~dgl.graphbolt.DGLMiniBatch`. Then you could access the
+*message flow graphs* (MFGs).
 
 .. code:: python
 
     mini_batch = next(iter(dataloader))
+    mini_batch = mini_batch.to_dgl()
     print(mini_batch.blocks)
 
 
@@ -128,17 +130,20 @@ Training Loop
 
 The training loop simply consists of iterating over the dataset with the
 customized batching iterator. During each iteration that yields
-:class:`~dgl.graphbolt.DGLMiniBatch`, we:
+:class:`~dgl.graphbolt.MiniBatch`, we:
 
-1. Access the node features corresponding to the input nodes via
+1. Convert the :class:`~dgl.graphbolt.MiniBatch` to
+   :class:`~dgl.graphbolt.DGLMiniBatch`.
+
+2. Access the node features corresponding to the input nodes via
    ``data.node_features["feat"]``. These features are already moved to the
    target device (CPU or GPU) by the data loader.
 
-2. Access the node labels corresponding to the output nodes via
+3. Access the node labels corresponding to the output nodes via
    ``data.labels``. These labels are already moved to the target device
    (CPU or GPU) by the data loader.
 
-3. Feed the list of MFGs and the input node features to the multilayer
+4. Feed the list of MFGs and the input node features to the multilayer
    GNN and get the outputs.
 
 4. Compute the loss and backpropagate.
@@ -150,6 +155,7 @@ customized batching iterator. During each iteration that yields
     opt = torch.optim.Adam(model.parameters())
 
     for data in dataloader:
+        data = data.to_dgl()
         input_features = data.node_features["feat"]
         output_labels = data.labels
         output_predictions = model(data.blocks, input_features)
@@ -215,7 +221,6 @@ of node types to node IDs.
     datapipe = datapipe.fetch_feature(
         feature, node_feature_keys={"author": ["feat"], "paper": ["feat"]}
     )
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
@@ -230,6 +235,7 @@ dictionaries of node types and predictions here.
     opt = torch.optim.Adam(model.parameters())
     
     for data in dataloader:
+        data = data.to_dgl()
         # For heterogeneous graphs, we need to specify the node types and
         # feature name when accessing the node features. So does the labels.
         input_features = {

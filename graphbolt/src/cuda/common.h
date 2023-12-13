@@ -1,5 +1,6 @@
 /**
  *  Copyright (c) 2017-2023 by Contributors
+ *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  * @file cuda/common.h
  * @brief Common utilities for CUDA
  */
@@ -21,18 +22,18 @@ namespace cuda {
  * @brief This class is designed to allocate workspace storage
  * and to get a nonblocking thrust execution policy
  * that uses torch's CUDA memory pool and the current cuda stream:
-
+ *
  * cuda::CUDAWorkspaceAllocator allocator;
  * const auto stream = torch::cuda::getDefaultCUDAStream();
  * const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
-
+ *
  * Now, one can pass exec_policy to thrust functions
-
+ *
  * To get an integer array of size 1000 whose lifetime is managed by unique_ptr,
  * use:
-
+ *
  * auto int_array = allocator.AllocateStorage<int>(1000);
-
+ *
  * int_array.get() gives the raw pointer.
  */
 struct CUDAWorkspaceAllocator {
@@ -64,6 +65,8 @@ struct CUDAWorkspaceAllocator {
   }
 };
 
+inline auto GetAllocator() { return CUDAWorkspaceAllocator{}; }
+
 template <typename T>
 inline bool is_zero(T size) {
   return size == 0;
@@ -84,6 +87,36 @@ inline bool is_zero<dim3>(dim3 size) {
       C10_CUDA_KERNEL_LAUNCH_CHECK();                                 \
     }                                                                 \
   }
+
+#define GRAPHBOLT_DISPATCH_ELEMENT_SIZES(element_size, name, ...)             \
+  [&] {                                                                       \
+    switch (element_size) {                                                   \
+      case 1: {                                                               \
+        using element_size_t = uint8_t;                                       \
+        return __VA_ARGS__();                                                 \
+      }                                                                       \
+      case 2: {                                                               \
+        using element_size_t = uint16_t;                                      \
+        return __VA_ARGS__();                                                 \
+      }                                                                       \
+      case 4: {                                                               \
+        using element_size_t = uint32_t;                                      \
+        return __VA_ARGS__();                                                 \
+      }                                                                       \
+      case 8: {                                                               \
+        using element_size_t = uint64_t;                                      \
+        return __VA_ARGS__();                                                 \
+      }                                                                       \
+      case 16: {                                                              \
+        using element_size_t = float4;                                        \
+        return __VA_ARGS__();                                                 \
+      }                                                                       \
+      default:                                                                \
+        TORCH_CHECK(false, name, " with the element_size is not supported!"); \
+        using element_size_t = uint8_t;                                       \
+        return __VA_ARGS__();                                                 \
+    }                                                                         \
+  }()
 
 }  // namespace cuda
 }  // namespace graphbolt
