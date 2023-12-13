@@ -10,7 +10,8 @@
 namespace graphbolt {
 namespace ops {
 
-std::pair<torch::Tensor, torch::Tensor> Sort(torch::Tensor input, int num_bits = 0);
+std::pair<torch::Tensor, torch::Tensor> Sort(
+    torch::Tensor input, int num_bits = 0);
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
