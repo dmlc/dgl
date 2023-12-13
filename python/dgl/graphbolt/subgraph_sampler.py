@@ -17,20 +17,20 @@ __all__ = [
 @functional_datapipe("sample_subgraph")
 class SubgraphSampler(MiniBatchTransformer):
     """A subgraph sampler used to sample a subgraph from a given set of nodes
-    from a larger graph."""
+    from a larger graph.
+
+    Functional name: :obj:`sample_subgraph`.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The datapipe.
+    """
 
     def __init__(
         self,
         datapipe,
     ):
-        """
-        Initlization for a subgraph sampler.
-
-        Parameters
-        ----------
-        datapipe : DataPipe
-            The datapipe.
-        """
         super().__init__(datapipe, self._sample)
 
     def _sample(self, minibatch):
