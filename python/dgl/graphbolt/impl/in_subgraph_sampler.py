@@ -15,6 +15,8 @@ __all__ = ["InSubgraphSampler"]
 class InSubgraphSampler(SubgraphSampler):
     """Sample the subgraph induced on the inbound edges of the given nodes.
 
+    Functional name: :obj:`sample_in_subgraph`.
+
     In-subgraph sampler is responsible for sampling a subgraph from given data,
     returning an induced subgraph along with compacted information.
 

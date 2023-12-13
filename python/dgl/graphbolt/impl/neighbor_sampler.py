@@ -20,6 +20,8 @@ __all__ = ["NeighborSampler", "LayerNeighborSampler"]
 class NeighborSampler(SubgraphSampler):
     """Sample neighbor edges from a graph and return a subgraph.
 
+    Functional name: :obj:`sample_neighbor`.
+
     Neighbor sampler is responsible for sampling a subgraph from given data. It
     returns an induced subgraph along with compacted information. In the
     context of a node classification task, the neighbor sampler directly
@@ -182,6 +184,8 @@ class NeighborSampler(SubgraphSampler):
 @functional_datapipe("sample_layer_neighbor")
 class LayerNeighborSampler(NeighborSampler):
     """Sample layer neighbor edges from a graph and return a subgraph.
+
+    Functional name: :obj:`sample_layer_neighbor`.
 
     Sampler that builds computational dependency of node representations via
     labor sampling for multilayer GNN from the NeurIPS 2023 paper
