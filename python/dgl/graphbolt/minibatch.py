@@ -364,7 +364,7 @@ class MiniBatch:
         self.edge_features = edge_features
 
     def get_dgl_blocks(self):
-        """Transforming a `MiniBatch` into DGL blocks necessitates constructing
+        """Extracting a `MiniBatch` into DGL blocks necessitates constructing
         a graphical structure and ID mappings.
         """
         if not self.sampled_subgraphs:
@@ -459,9 +459,9 @@ class MiniBatch:
                     block.edata[dgl.EID] = subgraph.original_edge_ids
         return blocks
 
-    def get_positive_node_pairs(self):
-        """Get positive node pairs from MiniBatch.
-        `negative_node_pairs` is a representation of positive graphs used for
+    @property
+    def positive_node_pairs(self):
+        """`positive_node_pairs` is a representation of positive graphs used for
         evaluating or computing loss in link prediction tasks.
         - If `positive_node_pairs` is a tuple: It indicates a homogeneous graph
         containing two tensors representing source-destination node pairs.
@@ -471,9 +471,9 @@ class MiniBatch:
         """
         return self.compacted_node_pairs
 
-    def get_negative_node_pairs(self):
-        """Get negative node pairs from MiniBatch.
-        `negative_node_pairs` is a representation of negative graphs used for
+    @property
+    def negative_node_pairs(self):
+        """`negative_node_pairs` is a representation of negative graphs used for
         evaluating or computing loss in link prediction tasks.
         - If `negative_node_pairs` is a tuple: It indicates a homogeneous graph
         containing two tensors representing source-destination node pairs.
@@ -559,12 +559,12 @@ class MiniBatch:
             negative_node_pairs = None
         return negative_node_pairs
 
-    def get_training_node_pair_and_labels(self):
-        """Get a training node pair and a label tensor from MiniBatch. They are used for
-        evaluating or computing loss in link prediction tasks.
+    def get_node_pairs_and_labels(self):
+        """Get a node pair tensor and a label tensor from MiniBatch. They are
+        used for evaluating or computing loss in link prediction tasks.
         """
-        pos_src, pos_dst = self.get_positive_node_pairs()
-        neg_src, neg_dst = self.get_negative_node_pairs()
+        pos_src, pos_dst = self.positive_node_pairs
+        neg_src, neg_dst = self.negative_node_pairs
         node_pairs = (
             torch.cat((pos_src, neg_src), dim=0),
             torch.cat((pos_dst, neg_dst), dim=0),
