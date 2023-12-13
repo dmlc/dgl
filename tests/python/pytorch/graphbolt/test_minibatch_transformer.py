@@ -1,6 +1,7 @@
 import dgl.graphbolt as gb
-import gb_test_utils
 import torch
+
+from . import gb_test_utils
 
 
 def test_dgl_minibatch_converter():

@@ -27,7 +27,6 @@ The whole data loader pipeline is as follows:
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
     datapipe = datapipe.transform(gb.exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
@@ -130,6 +129,8 @@ above.
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
+            # Convert MiniBatch to DGLMiniBatch.
+            data = data.to_dgl()
             # Unpack MiniBatch.
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
             node_feature = data.node_features["feat"]
@@ -213,7 +214,6 @@ only difference is that you need to give edge types for feature fetching.
         feature,
         node_feature_keys={"user": ["feat"], "item": ["feat"]}
     )
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
@@ -273,6 +273,8 @@ except for computing loss on specific edge type.
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
+            # Convert MiniBatch to DGLMiniBatch.
+            data = data.to_dgl()
             # Unpack MiniBatch.
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data, category)
             node_features = {

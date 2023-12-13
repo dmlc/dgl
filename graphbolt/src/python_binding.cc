@@ -65,12 +65,13 @@ TORCH_LIBRARY(graphbolt, m) {
             g->SetState(state);
             return g;
           });
-  m.def("from_fused_csc", &FusedCSCSamplingGraph::FromCSC);
+  m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
+  m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 }
 
