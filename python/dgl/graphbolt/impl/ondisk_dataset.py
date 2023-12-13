@@ -31,6 +31,8 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
+INT32_MAX = 2147483647
+
 
 def preprocess_ondisk_dataset(
     dataset_dir: str, include_original_edge_id: bool = False
@@ -97,6 +99,14 @@ def preprocess_ondisk_dataset(
         coo_tensor = torch.tensor(edge_data.values).T
         sparse_matrix = dglsp.spmatrix(coo_tensor)
         indptr, indices, value_indices = sparse_matrix.csc()
+        num_nodes = input_config["graph"]["nodes"][0]["num"]
+        num_edges = indptr[-1]
+        if num_nodes <= INT32_MAX:
+            # indices = indices.to(torch.int32)
+            pass
+        if num_edges <= INT32_MAX:
+            indptr = indptr.to(torch.int32)
+            value_indices = value_indices.to(torch.int32)
         edge_attributes = {}
         if include_original_edge_id:
             edge_attributes[ORIGINAL_EDGE_ID] = value_indices
