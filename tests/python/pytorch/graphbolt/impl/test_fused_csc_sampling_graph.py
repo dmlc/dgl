@@ -532,7 +532,7 @@ def test_multiprocessing():
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-def test_in_subgraph_homogeneous():
+def test_in_subgraph_node_pairs_homogeneous():
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -573,7 +573,7 @@ def test_in_subgraph_homogeneous():
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-def test_in_subgraph_heterogeneous():
+def test_in_subgraph_node_pairs_heterogeneous():
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -651,6 +651,137 @@ def test_in_subgraph_heterogeneous():
     )
     assert torch.equal(
         in_subgraph.node_pairs["N1:R3:N1"][1], torch.LongTensor([2, 2, 1])
+    )
+    assert in_subgraph.original_column_node_ids is None
+    assert in_subgraph.original_row_node_ids is None
+    assert torch.equal(
+        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 9, 10, 11, 7, 8])
+    )
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_in_subgraph_homo():
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+    """
+    # Initialize data.
+    total_num_nodes = 5
+    total_num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    assert indptr[-1] == total_num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct FusedCSCSamplingGraph.
+    graph = gb.fused_csc_sampling_graph(indptr, indices)
+
+    # Extract in subgraph.
+    nodes = torch.LongTensor([4, 1, 3])
+    in_subgraph = graph.in_subgraph(nodes, output_cscformat=True)
+
+    # Verify in subgraph.
+    assert torch.equal(
+        in_subgraph.node_pairs.indices, torch.LongTensor([0, 3, 4, 2, 3, 1, 2])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs.indptr, torch.LongTensor([0, 3, 5, 7])
+    )
+    assert in_subgraph.original_column_node_ids is None
+    assert in_subgraph.original_row_node_ids is None
+    assert torch.equal(
+        in_subgraph.original_edge_ids, torch.LongTensor([9, 10, 11, 3, 4, 7, 8])
+    )
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_in_subgraph_hetero():
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+
+    node_type_0: [0, 1]
+    node_type_1: [2, 3, 4]
+    edge_type_0: node_type_0 -> node_type_0
+    edge_type_1: node_type_0 -> node_type_1
+    edge_type_2: node_type_1 -> node_type_0
+    edge_type_3: node_type_1 -> node_type_1
+    """
+    # Initialize data.
+    total_num_nodes = 5
+    total_num_edges = 12
+    ntypes = {
+        "N0": 0,
+        "N1": 1,
+    }
+    etypes = {
+        "N0:R0:N0": 0,
+        "N0:R1:N1": 1,
+        "N1:R2:N0": 2,
+        "N1:R3:N1": 3,
+    }
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    type_per_edge = torch.LongTensor([0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+    assert indptr[-1] == total_num_edges
+    assert indptr[-1] == len(indices)
+    assert node_type_offset[-1] == total_num_nodes
+    assert all(type_per_edge < len(etypes))
+
+    # Construct FusedCSCSamplingGraph.
+    graph = gb.fused_csc_sampling_graph(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
+    )
+
+    # Extract in subgraph.
+    nodes = {
+        "N0": torch.LongTensor([1]),
+        "N1": torch.LongTensor([2, 1]),
+    }
+    in_subgraph = graph.in_subgraph(nodes, output_cscformat=True)
+
+    # Verify in subgraph.
+    assert torch.equal(
+        in_subgraph.node_pairs["N0:R0:N0"].indices, torch.LongTensor([])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N0:R0:N0"].indptr, torch.LongTensor([0, 0])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N0:R1:N1"].indices, torch.LongTensor([0, 1])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N0:R1:N1"].indptr, torch.LongTensor([0, 1, 2])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N1:R2:N0"].indices, torch.LongTensor([0, 1])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N1:R2:N0"].indptr, torch.LongTensor([0, 2])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N1:R3:N1"].indices, torch.LongTensor([1, 2, 0])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N1:R3:N1"].indptr, torch.LongTensor([0, 2, 3])
     )
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
