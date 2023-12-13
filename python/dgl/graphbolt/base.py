@@ -104,6 +104,8 @@ class CopyTo(IterDataPipe):
     """DataPipe that transfers each element yielded from the previous DataPipe
     to the given device.
 
+    Functional name: :obj:`copy_to`.
+
     This is equivalent to
 
     .. code:: python
