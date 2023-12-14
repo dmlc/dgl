@@ -277,7 +277,9 @@ def unique_and_compact_csc_formats(
             compacted_indices[ntype],
             _,
         ) = torch.ops.graphbolt.unique_and_compact(
-            indice, torch.tensor([], dtype=indice.dtype, device=device), unique_dst
+            indice,
+            torch.tensor([], dtype=indice.dtype, device=device),
+            unique_dst,
         )
 
     compacted_csc_formats = {}

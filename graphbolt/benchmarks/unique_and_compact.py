@@ -63,7 +63,9 @@ def gen_random_indices(n_rows, num_indices):
     indices = []
     weights = torch.ones(n_rows)
     for _ in range(50):
-        indices.append(torch.multinomial(weights, num_indices, replacement=False))
+        indices.append(
+            torch.multinomial(weights, num_indices, replacement=False)
+        )
     return indices
 
 
@@ -71,13 +73,18 @@ def test_unique_and_compact_throughput(graph, indices):
     indptr, tensor = graph
     problems = []
     for index in indices:
-        subindptr, subindices = torch.ops.graphbolt.index_select_csc(indptr, tensor, index)
+        subindptr, subindices = torch.ops.graphbolt.index_select_csc(
+            indptr, tensor, index
+        )
         problems.append((subindptr, subindices, index))
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
     start.record()
     for subindptr, subindices, index in problems:
-        gb.unique_and_compact_csc_formats((gb.CSCFormatBase(subindptr, subindices)), index.to(subindices.dtype))
+        gb.unique_and_compact_csc_formats(
+            (gb.CSCFormatBase(subindptr, subindices)),
+            index.to(subindices.dtype),
+        )
     end.record()
     end.synchronize()
     # @todo: Also add dgl.to_block() time measurement here for comparison.
@@ -101,7 +108,7 @@ def test_unique_and_compact_throughput(graph, indices):
 
 
 available_RAM = 10 * (2**30)  ## 10 GiB
-n_rows = [2 ** 24]
+n_rows = [2**24]
 avg_degrees = [8, 64, 256]
 num_indices = [1000, 100000, 1000000]
 indptr_dtypes = [torch.int64]
