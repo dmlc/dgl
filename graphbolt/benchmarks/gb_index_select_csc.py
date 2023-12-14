@@ -100,7 +100,7 @@ def test_index_select_csc_throughput(graph, indices):
 
 
 available_RAM = 10 * (2**30)  ## 10 GiB
-n_rows = [2000000 * factor for factor in [1, 10, 100, 1000]]
+n_rows = [2000000 * factor for factor in [1, 8, 64, 512]]
 avg_degrees = [8, 64, 256]
 num_indices = [1000, 100000, 1000000]
 indptr_dtypes = [torch.int64]
