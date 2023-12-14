@@ -193,12 +193,16 @@ def test_unique_and_compact_node_pairs_hetero():
         "n2": torch.tensor([1, 2, 3, 4, 5, 6, 0], device=device),
         "n3": torch.tensor([1, 2, 3, 7], device=device),
     }
-    if expected_unique_nodes["n1"].is_cuda and False:
+    if expected_unique_nodes["n1"].is_cuda:
         expected_reverse_id = {
-            k: v.sort()[1] for k, v in expected_unique_nodes.items()
+            "n1": expected_unique_nodes["n1"].sort()[1],
+            "n2": torch.tensor([0, 1, 2, 3, 6, 4, 5], device=device),
+            "n3": expected_unique_nodes["n3"].sort()[1],
         }
         expected_unique_nodes = {
-            k: v.sort()[0] for k, v in expected_unique_nodes.items()
+            "n1": expected_unique_nodes["n1"].sort()[0],
+            "n2": torch.tensor([1, 2, 3, 4, 0, 5, 6], device=device),
+            "n3": expected_unique_nodes["n3"].sort()[0],
         }
     else:
         expected_reverse_id = {
@@ -228,8 +232,9 @@ def test_unique_and_compact_node_pairs_hetero():
         assert torch.equal(nodes, expected_nodes)
     for etype, pair in compacted_node_pairs.items():
         u, v = pair
-        u = expected_reverse_id[ntype][u]
-        v = expected_reverse_id[ntype][v]
+        ntype1, _, ntype2 = etype.split(":")
+        u = expected_reverse_id[ntype1][u]
+        v = expected_reverse_id[ntype2][v]
         expected_u, expected_v = expected_node_pairs[etype]
         assert torch.equal(u, expected_u)
         assert torch.equal(v, expected_v)
