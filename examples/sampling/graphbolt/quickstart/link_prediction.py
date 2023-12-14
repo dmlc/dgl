@@ -99,7 +99,7 @@ def evaluate(model, dataset, device):
     labels = []
     for step, data in enumerate(dataloader):
         # Get node pairs with labels for loss calculation.
-        compacted_pairs, labels = data.node_pairs_with_labels
+        compacted_pairs, label = data.node_pairs_with_labels
 
         # The features of sampled nodes.
         x = data.node_features["feat"]
