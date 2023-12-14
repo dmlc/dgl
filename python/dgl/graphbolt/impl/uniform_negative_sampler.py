@@ -12,6 +12,8 @@ class UniformNegativeSampler(NegativeSampler):
     """Sample negative destination nodes for each source node based on a uniform
     distribution.
 
+    Functional name: :obj:`sample_uniform_negative`.
+
     It's important to note that the term 'negative' refers to false negatives,
     indicating that the sampled pairs are not ensured to be absent in the graph.
     For each edge ``(u, v)``, it is supposed to generate `negative_ratio` pairs
