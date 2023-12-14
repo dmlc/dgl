@@ -13,6 +13,7 @@
 
 #ifdef _WIN32
 #ifndef NOMINMAX
+#define SPARSE_TORCH_HEADERS_H_NOMINMAX
 #define NOMINMAX
 #endif  // NOMINMAX
 #endif  // _WIN32
@@ -22,8 +23,8 @@
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
-#ifdef _WIN32
+#ifdef SPARSE_TORCH_HEADERS_H_NOMINMAX
 #undef NOMINMAX
-#endif  // _WIN32
+#endif  // SPARSE_TORCH_HEADERS_H_NOMINMAX
 
 #endif  // SPARSE_TORCH_HEADERS_H_
