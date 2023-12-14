@@ -563,7 +563,14 @@ class MiniBatch:
     @property
     def node_pairs_with_labels(self):
         """Get a node pair tensor and a label tensor from MiniBatch. They are
-        used for evaluating or computing loss.
+        used for evaluating or computing loss. It will return
+        `(node_pairs, labels)` as result.
+        - If it's a link prediction task, `node_pairs` will contain both
+        negative and positive node pairs and `labels` will consist of 0 and 1,
+        indicating whether the corresponding node pair is negative or positive.
+        - If it's an edge classification task, this function will directly
+        return `compacted_node_pairs` and corresponding `labels`.
+        - Otherwise it will return None.
         """
         if self.labels is None:
             positive_node_pairs = self.positive_node_pairs
