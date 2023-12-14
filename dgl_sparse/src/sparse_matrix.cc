@@ -7,10 +7,8 @@
 #include <sparse/dgl_headers.h>
 // clang-format on
 
-#include <c10/util/Logging.h>
 #include <sparse/elementwise_op.h>
 #include <sparse/sparse_matrix.h>
-#include <torch/script.h>
 
 #include "./utils.h"
 

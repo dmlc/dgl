@@ -7,7 +7,6 @@
 #define DGL_SPARSE_MATMUL_H_
 
 #include <sparse/sparse_matrix.h>
-#include <torch/script.h>
 
 #include <string>
 

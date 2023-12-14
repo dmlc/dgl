@@ -8,10 +8,8 @@
 
 // clang-format off
 #include <sparse/dgl_headers.h>
+#include <sparse/torch_headers.h>
 // clang-format on
-
-#include <torch/custom_class.h>
-#include <torch/script.h>
 
 #include <memory>
 #include <utility>
