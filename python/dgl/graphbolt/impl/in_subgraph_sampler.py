@@ -67,7 +67,7 @@ class InSubgraphSampler(SubgraphSampler):
         self.output_cscformat = output_cscformat
         self.sampler = graph.in_subgraph
 
-    def _sample_subgraphs(self, seeds):
+    def sample_subgraphs(self, seeds):
         subgraph = self.sampler(seeds, self.output_cscformat)
         if not self.output_cscformat:
             (

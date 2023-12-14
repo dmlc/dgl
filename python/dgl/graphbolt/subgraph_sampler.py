@@ -21,6 +21,9 @@ class SubgraphSampler(MiniBatchTransformer):
 
     Functional name: :obj:`sample_subgraph`.
 
+    This class is the base class of all subgraph samplers. Any subclass of
+    SubgraphSampler should implement the :meth:`sample_subgraphs` method.
+
     Parameters
     ----------
     datapipe : DataPipe
@@ -51,7 +54,7 @@ class SubgraphSampler(MiniBatchTransformer):
         (
             minibatch.input_nodes,
             minibatch.sampled_subgraphs,
-        ) = self._sample_subgraphs(seeds)
+        ) = self.sample_subgraphs(seeds)
         return minibatch
 
     def _node_pairs_preprocess(self, minibatch):
@@ -134,7 +137,7 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted_negative_dsts if has_neg_dst else None,
         )
 
-    def _sample_subgraphs(self, seeds):
+    def sample_subgraphs(self, seeds):
         """Sample subgraphs from the given seeds.
 
         Any subclass of SubgraphSampler should implement this method.
@@ -148,7 +151,25 @@ class SubgraphSampler(MiniBatchTransformer):
         -------
         Union[torch.Tensor, Dict[str, torch.Tensor]]
             The input nodes.
-        SampledSubgraph
+        List[SampledSubgraph]
             The sampled subgraphs.
+
+        Examples
+        --------
+        >>> @functional_datapipe("my_sample_subgraph")
+        >>> class MySubgraphSampler(SubgraphSampler):
+        >>>     def __init__(self, datapipe, graph, fanouts):
+        >>>         super().__init__(datapipe)
+        >>>         self.graph = graph
+        >>>         self.fanouts = fanouts
+        >>>     def sample_subgraphs(self, seeds):
+        >>>         # Sample subgraphs from the given seeds.
+        >>>         subgs = []
+        >>>         for fanout in reversed(self.fanouts):
+        >>>             # Sample a fixed number of neighbors for each seed node.
+        >>>             input_nodes, subg = self.graph.sample_neighbors(seeds, fanout)
+        >>>             seeds = input_nodes
+        >>>             subgs.insert(0, subg)
+        >>>         return input_nodes, subgs
         """
         raise NotImplementedError
