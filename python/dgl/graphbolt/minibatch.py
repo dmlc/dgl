@@ -566,8 +566,12 @@ class MiniBatch:
         used for evaluating or computing loss.
         """
         if self.labels is None:
-            pos_src, pos_dst = self.positive_node_pairs
-            neg_src, neg_dst = self.negative_node_pairs
+            positive_node_pairs = self.positive_node_pairs
+            negative_node_pairs = self.negative_node_pairs
+            if positive_node_pairs is None or negative_node_pairs is None:
+                return None
+            pos_src, pos_dst = positive_node_pairs
+            neg_src, neg_dst = negative_node_pairs
             node_pairs = (
                 torch.cat((pos_src, neg_src), dim=0),
                 torch.cat((pos_dst, neg_dst), dim=0),
