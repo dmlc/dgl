@@ -98,17 +98,14 @@ def evaluate(model, dataset, device):
     logits = []
     labels = []
     for step, data in enumerate(dataloader):
-        # Convert data to DGL format for computing.
-        data = data.to_dgl()
-
-        # Unpack MiniBatch.
-        compacted_pairs, label = to_binary_link_dgl_computing_pack(data)
+        # Get node pairs with labels for loss calculation.
+        compacted_pairs, labels = data.node_pairs_with_labels
 
         # The features of sampled nodes.
         x = data.node_features["feat"]
 
         # Forward.
-        y = model(data.blocks, x)
+        y = model(data.dgl_blocks, x)
         logit = (
             model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
             .squeeze()
@@ -140,17 +137,14 @@ def train(model, dataset, device):
         # mini-batches.
         ########################################################################
         for step, data in enumerate(dataloader):
-            # Convert data to DGL format for computing.
-            data = data.to_dgl()
-
-            # Unpack MiniBatch.
-            compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
+            # Get node pairs with labels for loss calculation.
+            compacted_pairs, labels = data.node_pairs_with_labels
 
             # The features of sampled nodes.
             x = data.node_features["feat"]
 
             # Forward.
-            y = model(data.blocks, x)
+            y = model(data.dgl_blocks, x)
             logits = model.predictor(
                 y[compacted_pairs[0]] * y[compacted_pairs[1]]
             ).squeeze()
