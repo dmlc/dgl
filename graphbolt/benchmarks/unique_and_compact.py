@@ -79,7 +79,11 @@ def test_unique_and_compact_throughput(graph, indices):
             indptr, tensor, index
         )
         index = index.to(subindices.dtype)
-        dst_idx = -1 + torch.searchsorted(subindptr, torch.arange(0, subindices.shape[0], device=subindices.device), right=True)
+        dst_idx = -1 + torch.searchsorted(
+            subindptr,
+            torch.arange(0, subindices.shape[0], device=subindices.device),
+            right=True,
+        )
         dst = index[dst_idx]
         src = subindices
         problems.append((src, dst, index))
@@ -120,10 +124,12 @@ def test_unique_and_compact_throughput(graph, indices):
     average_time = start.elapsed_time(end) / 1000 / len(indices)
     average_time1 = start1.elapsed_time(end1) / 1000 / len(indices)
     average_time2 = start2.elapsed_time(end2) / 1000 / len(indices)
-    selected_size = (
-        2 * num_items_copied * tensor.element_size()
+    selected_size = 2 * num_items_copied * tensor.element_size()
+    return (
+        (average_time, selected_size / average_time),
+        (average_time1, selected_size / average_time1),
+        (average_time2, selected_size / average_time2),
     )
-    return (average_time, selected_size / average_time), (average_time1, selected_size / average_time1), (average_time2, selected_size / average_time2)
 
 
 available_RAM = 10 * (2**30)  ## 10 GiB
@@ -146,7 +152,11 @@ keys = [
     "indices_device",
     "regular",
 ]
-names = ["torch.ops.graphbolt.unique_and_compact", "gb.unique_and_compact_csc_formats", "dgl.to_block"]
+names = [
+    "torch.ops.graphbolt.unique_and_compact",
+    "gb.unique_and_compact_csc_formats",
+    "dgl.to_block",
+]
 
 sum_of_runtimes = {k: 0 for k in names}
 
@@ -224,9 +234,11 @@ def test_random():
                 "graph": graph,
                 "indices": indices,
             }
-            (runtime, throughput), (runtime1, throughput1), (runtime2, throughput2) = test_unique_and_compact_throughput(
-                **params_dict
-            )
+            (
+                (runtime, throughput),
+                (runtime1, throughput1),
+                (runtime2, throughput2),
+            ) = test_unique_and_compact_throughput(**params_dict)
             _print_result(runtime, throughput, names[0])
             _print_result(runtime1, throughput1, names[1])
             _print_result(runtime2, throughput2, names[2])
