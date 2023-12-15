@@ -1,6 +1,6 @@
 .. _guide-minibatch-parallelism:
 
-6.8 Data Loading Parallelism
+6.9 Data Loading Parallelism
 -----------------------
 
 In minibatch training of GNNs, we usually need to cover several stages to
