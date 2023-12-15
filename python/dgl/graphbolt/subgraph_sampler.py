@@ -165,12 +165,13 @@ class SubgraphSampler(MiniBatchTransformer):
         >>>     def sample_subgraphs(self, seeds):
         >>>         # Sample subgraphs from the given seeds.
         >>>         subgraphs = []
-        >>>         subgraphs_nodes = {}
+        >>>         subgraphs_nodes = []
         >>>         for fanout in reversed(self.fanouts):
         >>>             subgraph = self.graph.sample_neighbors(seeds, fanout)
         >>>             subgraphs.insert(0, subgraph)
-        >>>             subgraphs_nodes.upate(subgraph.nodes)
+        >>>             subgraphs_nodes.append(subgraph.nodes)
         >>>             seeds = subgraph.nodes
+        >>>         subgraphs_nodes = torch.unique(torch.cat(subgraphs_nodes))
         >>>         return subgraphs_nodes, subgraphs
         """
         raise NotImplementedError
