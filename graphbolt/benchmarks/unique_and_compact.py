@@ -72,24 +72,42 @@ def gen_random_indices(n_rows, num_indices):
 def test_unique_and_compact_throughput(graph, indices):
     indptr, tensor = graph
     problems = []
+    problems1 = []
+    problems2 = []
     for index in indices:
         subindptr, subindices = torch.ops.graphbolt.index_select_csc(
             indptr, tensor, index
         )
-        problems.append((subindptr, subindices, index))
+        index = index.to(subindices.dtype)
+        dst_idx = -1 + torch.searchsorted(subindptr, torch.arange(0, subindices.shape[0], device=subindices.device), right=True)
+        dst = index[dst_idx]
+        src = subindices
+        problems.append((src, dst, index))
+        problems1.append((gb.CSCFormatBase(subindptr, src), index))
+        problems2.append((dgl.graph((src, dst)), index))
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
     start.record()
-    for subindptr, subindices, index in problems:
-        gb.unique_and_compact_csc_formats(
-            (gb.CSCFormatBase(subindptr, subindices)),
-            index.to(subindices.dtype),
-        )
+    for src, dst, index in problems:
+        torch.ops.graphbolt.unique_and_compact(src, dst, index)
     end.record()
     end.synchronize()
-    # @todo: Also add dgl.to_block() time measurement here for comparison.
+    start1 = torch.cuda.Event(enable_timing=True)
+    end1 = torch.cuda.Event(enable_timing=True)
+    start1.record()
+    for g, index in problems1:
+        gb.unique_and_compact_csc_formats(g, index)
+    end1.record()
+    end1.synchronize()
+    start2 = torch.cuda.Event(enable_timing=True)
+    end2 = torch.cuda.Event(enable_timing=True)
+    start2.record()
+    for g, index in problems2:
+        dgl.to_block(g, index)
+    end2.record()
+    end2.synchronize()
     # Summarize all index sizes
-    num_indices = sum([index.numel() for index in indices]) / len(indices)
+    # num_indices = sum([index.numel() for index in indices]) / len(indices)
     num_items_copied = sum(
         [
             torch.sum(
@@ -100,16 +118,17 @@ def test_unique_and_compact_throughput(graph, indices):
         ]
     ) / len(indices)
     average_time = start.elapsed_time(end) / 1000 / len(indices)
+    average_time1 = start1.elapsed_time(end1) / 1000 / len(indices)
+    average_time2 = start2.elapsed_time(end2) / 1000 / len(indices)
     selected_size = (
-        num_indices * 2 * indptr.element_size()
-        + num_items_copied * tensor.element_size()
+        2 * num_items_copied * tensor.element_size()
     )
-    return average_time, selected_size / average_time
+    return (average_time, selected_size / average_time), (average_time1, selected_size / average_time1), (average_time2, selected_size / average_time2)
 
 
 available_RAM = 10 * (2**30)  ## 10 GiB
 n_rows = [2**24]
-avg_degrees = [8, 64, 256]
+avg_degrees = [8, 16, 32]
 num_indices = [1000, 100000, 1000000]
 indptr_dtypes = [torch.int64]
 tensor_dtypes = [torch.int32]
@@ -127,19 +146,20 @@ keys = [
     "indices_device",
     "regular",
 ]
+names = ["torch.ops.graphbolt.unique_and_compact", "gb.unique_and_compact_csc_formats", "dgl.to_block"]
 
-sum_of_runtimes = {k: 0 for k in graph_devices}
+sum_of_runtimes = {k: 0 for k in names}
 
 
-def _print_result(runtime, throughput, graph_device):
+def _print_result(runtime, throughput, name):
     runtime = int(runtime * 1000000)
     print(
-        f"Runtime in us: {runtime}, Throughput in MiB/s: {int(throughput / (2 ** 20))}"
+        f"{name} --- Runtime in us: {runtime}, Throughput in MiB/s: {int(throughput / (2 ** 20))}"
     )
     print("")
     print("")
     global sum_of_runtimes
-    sum_of_runtimes[graph_device] += runtime
+    sum_of_runtimes[name] += runtime
 
 
 def test_random():
@@ -204,10 +224,12 @@ def test_random():
                 "graph": graph,
                 "indices": indices,
             }
-            runtime, throughput = test_unique_and_compact_throughput(
+            (runtime, throughput), (runtime1, throughput1), (runtime2, throughput2) = test_unique_and_compact_throughput(
                 **params_dict
             )
-            _print_result(runtime, throughput, graph_device)
+            _print_result(runtime, throughput, names[0])
+            _print_result(runtime1, throughput1, names[1])
+            _print_result(runtime2, throughput2, names[2])
 
 
 test_random()
