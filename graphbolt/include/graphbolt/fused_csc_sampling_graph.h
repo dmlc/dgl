@@ -154,6 +154,25 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
     return edge_attributes_;
   }
 
+  /**
+   * @brief Get the edge attribute tensor by name.
+   *
+   * If the input name is empty, return nullopt. Otherwise, return the edge
+   * attribute tensor by name.
+   */
+  inline torch::optional<torch::Tensor> EdgeAttribute(
+      torch::optional<std::string> name) const {
+    if (!name.has_value()) {
+      return torch::nullopt;
+    }
+    TORCH_CHECK(
+        edge_attributes_.has_value() &&
+            edge_attributes_.value().contains(name.value()),
+        "Edge attribute ", name.value(), " does not exist.");
+    return torch::optional<torch::Tensor>(
+        edge_attributes_.value().at(name.value()));
+  }
+
   /** @brief Set the csc index pointer tensor. */
   inline void SetCSCIndptr(const torch::Tensor& indptr) { indptr_ = indptr; }
 
