@@ -4,7 +4,7 @@ from torch.utils.data import functional_datapipe
 
 from torchdata.datapipes.iter import Mapper
 
-from .minibatch import DGLMiniBatch, MiniBatch
+from .minibatch import MiniBatch
 
 __all__ = [
     "MiniBatchTransformer",
