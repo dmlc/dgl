@@ -16,7 +16,30 @@ __all__ = [
 
 @functional_datapipe("fetch_feature")
 class FeatureFetcher(MiniBatchTransformer):
-    """A feature fetcher used to fetch features for node/edge in graphbolt."""
+    """A feature fetcher used to fetch features for node/edge in graphbolt.
+
+    Functional name: :obj:`fetch_feature`.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The datapipe.
+    feature_store : FeatureStore
+        A storage for features, support read and update.
+    node_feature_keys : List[str] or Dict[str, List[str]]
+        Node features keys indicates the node features need to be read.
+        - If `node_features` is a list: It means the graph is homogeneous
+        graph, and the 'str' inside are feature names.
+        - If `node_features` is a dictionary: The keys should be node type
+        and the values are lists of feature names.
+    edge_feature_keys : List[str] or Dict[str, List[str]]
+        Edge features name indicates the edge features need to be read.
+        - If `edge_features` is a list: It means the graph is homogeneous
+        graph, and the 'str' inside are feature names.
+        - If `edge_features` is a dictionary: The keys are edge types,
+        following the format 'str:str:str', and the values are lists of
+        feature names.
+    """
 
     def __init__(
         self,
@@ -25,29 +48,6 @@ class FeatureFetcher(MiniBatchTransformer):
         node_feature_keys=None,
         edge_feature_keys=None,
     ):
-        """
-        Initlization for a feature fetcher.
-
-        Parameters
-        ----------
-        datapipe : DataPipe
-            The datapipe.
-        feature_store : FeatureStore
-            A storage for features, support read and update.
-        node_feature_keys : List[str] or Dict[str, List[str]]
-            Node features keys indicates the node features need to be read.
-            - If `node_features` is a list: It means the graph is homogeneous
-            graph, and the 'str' inside are feature names.
-            - If `node_features` is a dictionary: The keys should be node type
-            and the values are lists of feature names.
-        edge_feature_keys : List[str] or Dict[str, List[str]]
-            Edge features name indicates the edge features need to be read.
-            - If `edge_features` is a list: It means the graph is homogeneous
-            graph, and the 'str' inside are feature names.
-            - If `edge_features` is a dictionary: The keys are edge types,
-            following the format 'str:str:str', and the values are lists of
-            feature names.
-        """
         super().__init__(datapipe, self._read)
         self.feature_store = feature_store
         self.node_feature_keys = node_feature_keys

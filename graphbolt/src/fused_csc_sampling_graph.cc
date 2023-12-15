@@ -69,7 +69,7 @@ FusedCSCSamplingGraph::FusedCSCSamplingGraph(
   TORCH_CHECK(indptr.device() == indices.device());
 }
 
-c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::FromCSC(
+c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::Create(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,

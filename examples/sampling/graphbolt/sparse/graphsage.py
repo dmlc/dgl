@@ -113,7 +113,7 @@ class SparseNeighborSampler(SubgraphSampler):
                 fanout = torch.LongTensor([int(fanout)])
             self.fanouts.insert(0, fanout)
 
-    def _sample_subgraphs(self, seeds):
+    def sample_subgraphs(self, seeds):
         sampled_matrices = []
         src = seeds
 

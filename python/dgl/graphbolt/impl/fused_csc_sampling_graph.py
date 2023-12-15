@@ -20,71 +20,11 @@ from .sampled_subgraph_impl import (
 
 
 __all__ = [
-    "GraphMetadata",
     "FusedCSCSamplingGraph",
-    "from_fused_csc",
+    "fused_csc_sampling_graph",
     "load_from_shared_memory",
     "from_dglgraph",
 ]
-
-
-class GraphMetadata:
-    r"""Class for metadata of csc sampling graph."""
-
-    def __init__(
-        self,
-        node_type_to_id: Dict[str, int],
-        edge_type_to_id: Dict[str, int],
-    ):
-        """Initialize the GraphMetadata object.
-
-        Parameters
-        ----------
-        node_type_to_id : Dict[str, int]
-            Dictionary from node types to node type IDs.
-        edge_type_to_id : Dict[str, int]
-            Dictionary from edge types to edge type IDs.
-
-        Raises
-        ------
-        AssertionError
-            If any of the assertions fail.
-        """
-
-        node_types = list(node_type_to_id.keys())
-        edge_types = list(edge_type_to_id.keys())
-        node_type_ids = list(node_type_to_id.values())
-        edge_type_ids = list(edge_type_to_id.values())
-
-        # Validate node_type_to_id.
-        assert all(
-            isinstance(x, str) for x in node_types
-        ), "Node type name should be string."
-        assert all(
-            isinstance(x, int) for x in node_type_ids
-        ), "Node type id should be int."
-        assert len(node_type_ids) == len(
-            set(node_type_ids)
-        ), "Multiple node types shoud not be mapped to a same id."
-        # Validate edge_type_to_id.
-        for edge_type in edge_types:
-            src, edge, dst = etype_str_to_tuple(edge_type)
-            assert isinstance(edge, str), "Edge type name should be string."
-            assert (
-                src in node_types
-            ), f"Unrecognized node type {src} in edge type {edge_type}"
-            assert (
-                dst in node_types
-            ), f"Unrecognized node type {dst} in edge type {edge_type}"
-        assert all(
-            isinstance(x, int) for x in edge_type_ids
-        ), "Edge type id should be int."
-        assert len(edge_type_ids) == len(
-            set(edge_type_ids)
-        ), "Multiple edge types shoud not be mapped to a same id."
-
-        self.node_type_to_id = node_type_to_id
-        self.edge_type_to_id = edge_type_to_id
 
 
 class FusedCSCSamplingGraph(SamplingGraph):
@@ -148,9 +88,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor(
         ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
-        >>> metadata = gb.GraphMetadata(ntypes, etypes)
-        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
-        ...     type_per_edge, None, metadata)
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices,
+        ...     node_type_offset=node_type_offset,
+        ...     type_per_edge=type_per_edge,
+        ...     node_type_to_id=ntypes,
+        ...     edge_type_to_id=etypes)
         >>> print(graph.num_nodes)
         {'N0': 2, 'N1': 3}
         """
@@ -158,14 +100,14 @@ class FusedCSCSamplingGraph(SamplingGraph):
         offset = self.node_type_offset
 
         # Homogenous.
-        if offset is None or self.metadata is None:
+        if offset is None or self.node_type_to_id is None:
             return self._c_csc_graph.num_nodes()
 
         # Heterogenous
         else:
             num_nodes_per_type = {
                 _type: (offset[_idx + 1] - offset[_idx]).item()
-                for _type, _idx in self.metadata.node_type_to_id.items()
+                for _type, _idx in self.node_type_to_id.items()
             }
 
             return num_nodes_per_type
@@ -197,7 +139,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> type_per_edge = torch.LongTensor(
         ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
         >>> metadata = gb.GraphMetadata(ntypes, etypes)
-        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices, node_type_offset,
         ...     type_per_edge, None, metadata)
         >>> print(graph.num_edges)
         {'N0:R0:N0': 2, 'N0:R1:N1': 1, 'N1:R2:N0': 2, 'N1:R3:N1': 3}
@@ -358,24 +300,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Sets the edge attributes dictionary."""
         self._c_csc_graph.set_edge_attributes(edge_attributes)
 
-    @property
-    def metadata(self) -> Optional[GraphMetadata]:
-        """Returns the metadata of the graph.
-
-        [TODO][Rui] This API needs to be updated.
-
-        Returns
-        -------
-        GraphMetadata or None
-            If present, returns the metadata of the graph.
-        """
-        if self.node_type_to_id is None or self.edge_type_to_id is None:
-            return None
-        return GraphMetadata(self.node_type_to_id, self.edge_type_to_id)
-
     def in_subgraph(
-        self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
-    ) -> FusedSampledSubgraphImpl:
+        self,
+        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
+    ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
         An in subgraph is equivalent to creating a new graph using the incoming
@@ -405,14 +335,16 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> ntypes = {"N0": 0, "N1": 1}
         >>> etypes = {
         ...     "N0:R0:N0": 0, "N0:R1:N1": 1, "N1:R2:N0": 2, "N1:R3:N1": 3}
-        >>> metadata = gb.GraphMetadata(ntypes, etypes)
         >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
         >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor(
         ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
-        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
-        ...     type_per_edge, None, metadata)
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices,
+        ...     node_type_offset=node_type_offset,
+        ...     type_per_edge=type_per_edge,
+        ...     node_type_to_id=ntypes,
+        ...     edge_type_to_id=etypes)
         >>> nodes = {"N0":torch.LongTensor([1]), "N1":torch.LongTensor([1, 2])}
         >>> in_subgraph = graph.in_subgraph(nodes)
         >>> print(in_subgraph.node_pairs)
@@ -432,7 +364,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
         ), "Nodes cannot have duplicate values."
 
         _in_subgraph = self._c_csc_graph.in_subgraph(nodes)
-        return self._convert_to_fused_sampled_subgraph(_in_subgraph)
+        if not output_cscformat:
+            return self._convert_to_fused_sampled_subgraph(_in_subgraph)
+        else:
+            return self._convert_to_sampled_subgraph(_in_subgraph)
 
     def _convert_to_fused_sampled_subgraph(
         self,
@@ -465,10 +400,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
             # converted to heterogeneous graphs.
             node_pairs = defaultdict(list)
             original_hetero_edge_ids = {}
-            for etype, etype_id in self.metadata.edge_type_to_id.items():
+            for etype, etype_id in self.edge_type_to_id.items():
                 src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
-                src_ntype_id = self.metadata.node_type_to_id[src_ntype]
-                dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
+                src_ntype_id = self.node_type_to_id[src_ntype]
+                dst_ntype_id = self.node_type_to_id[dst_ntype]
                 mask = type_per_edge == etype_id
                 hetero_row = row[mask] - self.node_type_offset[src_ntype_id]
                 hetero_column = (
@@ -486,7 +421,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def _convert_to_homogeneous_nodes(self, nodes):
         homogeneous_nodes = []
         for ntype, ids in nodes.items():
-            ntype_id = self.metadata.node_type_to_id[ntype]
+            ntype_id = self.node_type_to_id[ntype]
             homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
         return torch.cat(homogeneous_nodes)
 
@@ -526,7 +461,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             subgraph_indptr = {}
             node_edge_type = defaultdict(list)
             original_hetero_edge_ids = {}
-            for etype, etype_id in self.metadata.edge_type_to_id.items():
+            for etype, etype_id in self.edge_type_to_id.items():
                 subgraph_indice[etype] = torch.empty(
                     (num.get(etype_id, 0),), dtype=indices.dtype
                 )
@@ -539,7 +474,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 # Preprocessing saves the type of seed_nodes as the edge type
                 # of dst_ntype.
                 _, _, dst_ntype = etype_str_to_tuple(etype)
-                dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
+                dst_ntype_id = self.node_type_to_id[dst_ntype]
                 node_edge_type[dst_ntype_id].append((etype, etype_id))
             # construct subgraphs
             for i, seed in enumerate(column):
@@ -553,7 +488,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 )
                 for etype, etype_id in node_edge_type[node_type]:
                     src_ntype, _, _ = etype_str_to_tuple(etype)
-                    src_ntype_id = self.metadata.node_type_to_id[src_ntype]
+                    src_ntype_id = self.node_type_to_id[src_ntype]
                     num_edges = torch.searchsorted(
                         type_per_edge[l:r], etype_id, right=True
                     ).item()
@@ -578,7 +513,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     indptr=torch.tensor(subgraph_indptr[etype]),
                     indices=subgraph_indice[etype],
                 )
-                for etype in self.metadata.edge_type_to_id.keys()
+                for etype in self.edge_type_to_id.keys()
             }
         return SampledSubgraphImpl(
             node_pairs=node_pairs,
@@ -644,13 +579,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> import torch
         >>> ntypes = {"n1": 0, "n2": 1}
         >>> etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-        >>> metadata = gb.GraphMetadata(ntypes, etypes)
         >>> indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
         >>> indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
-        >>> graph = gb.from_fused_csc(indptr, indices, type_per_edge=type_per_edge,
-        ...     node_type_offset=node_type_offset, metadata=metadata)
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices,
+        ...     node_type_offset=node_type_offset,
+        ...     type_per_edge=type_per_edge,
+        ...     node_type_to_id=ntypes,
+        ...     edge_type_to_id=etypes)
         >>> nodes = {'n1': torch.LongTensor([0]), 'n2': torch.LongTensor([0])}
         >>> fanouts = torch.tensor([1, 1])
         >>> subgraph = graph.sample_neighbors(nodes, fanouts)
@@ -673,8 +610,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
         expected_fanout_len = 1
-        if self.metadata and self.metadata.edge_type_to_id:
-            expected_fanout_len = len(self.metadata.edge_type_to_id)
+        if self.edge_type_to_id:
+            expected_fanout_len = len(self.edge_type_to_id)
         assert len(fanouts) in [
             expected_fanout_len,
             1,
@@ -830,13 +767,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> import torch
         >>> ntypes = {"n1": 0, "n2": 1}
         >>> etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-        >>> metadata = gb.GraphMetadata(ntypes, etypes)
         >>> indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
         >>> indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
-        >>> graph = gb.from_fused_csc(indptr, indices, type_per_edge=type_per_edge,
-        ...     node_type_offset=node_type_offset, metadata=metadata)
+        >>> graph = gb.fused_csc_sampling_graph(indptr, indices,
+        ...     node_type_offset=node_type_offset,
+        ...     type_per_edge=type_per_edge,
+        ...     node_type_to_id=ntypes,
+        ...     edge_type_to_id=etypes)
         >>> nodes = {'n1': torch.LongTensor([0]), 'n2': torch.LongTensor([0])}
         >>> fanouts = torch.tensor([1, 1])
         >>> subgraph = graph.sample_layer_neighbors(nodes, fanouts)
@@ -907,7 +846,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             ), "The 'node_type_offset' array is necessary for performing \
                 negative sampling by edge type."
             _, _, dst_node_type = etype_str_to_tuple(edge_type)
-            dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
+            dst_node_type_id = self.node_type_to_id[dst_node_type]
             max_node_id = (
                 self.node_type_offset[dst_node_type_id + 1]
                 - self.node_type_offset[dst_node_type_id]
@@ -960,13 +899,14 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return self
 
 
-def from_fused_csc(
+def fused_csc_sampling_graph(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,
     node_type_offset: Optional[torch.tensor] = None,
     type_per_edge: Optional[torch.tensor] = None,
+    node_type_to_id: Optional[Dict[str, int]] = None,
+    edge_type_to_id: Optional[Dict[str, int]] = None,
     edge_attributes: Optional[Dict[str, torch.tensor]] = None,
-    metadata: Optional[GraphMetadata] = None,
 ) -> FusedCSCSamplingGraph:
     """Create a FusedCSCSamplingGraph object from a CSC representation.
 
@@ -982,10 +922,12 @@ def from_fused_csc(
         Offset of node types in the graph, by default None.
     type_per_edge : Optional[torch.tensor], optional
         Type ids of each edge in the graph, by default None.
+    node_type_to_id : Optional[Dict[str, int]], optional
+        Map node types to ids, by default None.
+    edge_type_to_id : Optional[Dict[str, int]], optional
+        Map edge types to ids, by default None.
     edge_attributes: Optional[Dict[str, torch.tensor]], optional
         Edge attributes of the graph, by default None.
-    metadata: Optional[GraphMetadata], optional
-        Metadata of the graph, by default None.
 
     Returns
     -------
@@ -995,29 +937,60 @@ def from_fused_csc(
     Examples
     --------
     >>> ntypes = {'n1': 0, 'n2': 1, 'n3': 2}
-    >>> etypes = {('n1', 'e1', 'n2'): 0, ('n1', 'e2', 'n3'): 1}
-    >>> metadata = graphbolt.GraphMetadata(ntypes, etypes)
+    >>> etypes = {'n1:e1:n2': 0, 'n1:e2:n3': 1}
     >>> csc_indptr = torch.tensor([0, 2, 5, 7])
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
-    >>> graph = graphbolt.from_fused_csc(csc_indptr, indices,
+    >>> graph = graphbolt.fused_csc_sampling_graph(csc_indptr, indices,
     ...             node_type_offset=node_type_offset,
     ...             type_per_edge=type_per_edge,
-    ...             edge_attributes=None, metadata=metadata)
+    ...             node_type_to_id=ntypes, edge_type_to_id=etypes,
+    ...             edge_attributes=None,)
     >>> print(graph)
     FusedCSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
                      total_num_nodes=3, total_num_edges=7)
     """
-    if metadata and metadata.node_type_to_id and node_type_offset is not None:
-        assert len(metadata.node_type_to_id) + 1 == node_type_offset.size(
-            0
-        ), "node_type_offset length should be |ntypes| + 1."
-    node_type_to_id = metadata.node_type_to_id if metadata else None
-    edge_type_to_id = metadata.edge_type_to_id if metadata else None
+    if node_type_to_id is not None and edge_type_to_id is not None:
+        node_types = list(node_type_to_id.keys())
+        edge_types = list(edge_type_to_id.keys())
+        node_type_ids = list(node_type_to_id.values())
+        edge_type_ids = list(edge_type_to_id.values())
+
+        # Validate node_type_to_id.
+        assert all(
+            isinstance(x, str) for x in node_types
+        ), "Node type name should be string."
+        assert all(
+            isinstance(x, int) for x in node_type_ids
+        ), "Node type id should be int."
+        assert len(node_type_ids) == len(
+            set(node_type_ids)
+        ), "Multiple node types shoud not be mapped to a same id."
+        # Validate edge_type_to_id.
+        for edge_type in edge_types:
+            src, edge, dst = etype_str_to_tuple(edge_type)
+            assert isinstance(edge, str), "Edge type name should be string."
+            assert (
+                src in node_types
+            ), f"Unrecognized node type {src} in edge type {edge_type}"
+            assert (
+                dst in node_types
+            ), f"Unrecognized node type {dst} in edge type {edge_type}"
+        assert all(
+            isinstance(x, int) for x in edge_type_ids
+        ), "Edge type id should be int."
+        assert len(edge_type_ids) == len(
+            set(edge_type_ids)
+        ), "Multiple edge types shoud not be mapped to a same id."
+
+        if node_type_offset is not None:
+            assert len(node_type_to_id) + 1 == node_type_offset.size(
+                0
+            ), "node_type_offset length should be |ntypes| + 1."
     return FusedCSCSamplingGraph(
-        torch.ops.graphbolt.from_fused_csc(
+        torch.ops.graphbolt.fused_csc_sampling_graph(
             csc_indptr,
             indices,
             node_type_offset,
@@ -1055,10 +1028,18 @@ def _csc_sampling_graph_str(graph: FusedCSCSamplingGraph) -> str:
     """
     csc_indptr_str = str(graph.csc_indptr)
     indices_str = str(graph.indices)
-    meta_str = (
-        f"total_num_nodes={graph.total_num_nodes}, total_num_edges="
-        f"{graph.total_num_edges}"
-    )
+    meta_str = f"num_nodes={graph.total_num_nodes}, num_edges={graph.num_edges}"
+    if graph.node_type_offset is not None:
+        meta_str += f", node_type_offset={graph.node_type_offset}"
+    if graph.type_per_edge is not None:
+        meta_str += f", type_per_edge={graph.type_per_edge}"
+    if graph.node_type_to_id is not None:
+        meta_str += f", node_type_to_id={graph.node_type_to_id}"
+    if graph.edge_type_to_id is not None:
+        meta_str += f", edge_type_to_id={graph.edge_type_to_id}"
+    if graph.edge_attributes is not None:
+        meta_str += f", edge_attributes={graph.edge_attributes}"
+
     prefix = f"{type(graph).__name__}("
 
     def _add_indent(_str, indent):
@@ -1091,7 +1072,8 @@ def from_dglgraph(
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
 
     if is_homogeneous:
-        metadata = None
+        node_type_to_id = None
+        edge_type_to_id = None
     else:
         # Initialize metadata.
         node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
@@ -1099,7 +1081,6 @@ def from_dglgraph(
             etype_tuple_to_str(etype): g.get_etype_id(etype)
             for etype in g.canonical_etypes
         }
-        metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
 
     # Obtain CSC matrix.
     indptr, indices, edge_ids = homo_g.adj_tensors("csc")
@@ -1118,10 +1099,8 @@ def from_dglgraph(
         # Assign edge attributes according to the original eids mapping.
         edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
 
-    node_type_to_id = metadata.node_type_to_id if metadata else None
-    edge_type_to_id = metadata.edge_type_to_id if metadata else None
     return FusedCSCSamplingGraph(
-        torch.ops.graphbolt.from_fused_csc(
+        torch.ops.graphbolt.fused_csc_sampling_graph(
             indptr,
             indices,
             node_type_offset,

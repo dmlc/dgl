@@ -43,6 +43,7 @@ main
 """
 import argparse
 import time
+from functools import partial
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
@@ -191,7 +192,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # the negative samples.
     ############################################################################
     if is_train and args.exclude_edges:
-        datapipe = datapipe.transform(gb.exclude_seed_edges)
+        datapipe = datapipe.transform(
+            partial(gb.exclude_seed_edges, include_reverse_edges=True)
+        )
 
     ############################################################################
     # [Input]:

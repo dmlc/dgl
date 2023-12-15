@@ -20,6 +20,8 @@ __all__ = ["NeighborSampler", "LayerNeighborSampler"]
 class NeighborSampler(SubgraphSampler):
     """Sample neighbor edges from a graph and return a subgraph.
 
+    Functional name: :obj:`sample_neighbor`.
+
     Neighbor sampler is responsible for sampling a subgraph from given data. It
     returns an induced subgraph along with compacted information. In the
     context of a node classification task, the neighbor sampler directly
@@ -60,26 +62,33 @@ class NeighborSampler(SubgraphSampler):
 
     Examples
     -------
+    >>> import torch
     >>> import dgl.graphbolt as gb
-    >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
-    >>> graph = gb.from_fused_csc(indptr, indices)
+    >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
-    >>> item_sampler = gb.ItemSampler(
-    ...     item_set, batch_size=1,)
-    >>> neg_sampler = gb.UniformNegativeSampler(
-    ...     item_sampler, graph, 2)
-    >>> subgraph_sampler = gb.NeighborSampler(
-    ...     neg_sampler, graph, [5, 10, 15])
-    >>> for data in subgraph_sampler:
-    ...     print(data.compacted_node_pairs)
-    ...     print(len(data.sampled_subgraphs))
-    (tensor([0, 0, 0]), tensor([1, 0, 2]))
-    3
-    (tensor([0, 0, 0]), tensor([1, 1, 1]))
-    3
+    >>> datapipe = gb.ItemSampler(item_set, batch_size=1)
+    >>> datapipe = datapipe.sample_uniform_negative(graph, 2)
+    >>> datapipe = datapipe.sample_neighbor(graph, [5, 10, 15])
+    >>> next(iter(datapipe)).sampled_subgraphs
+    [FusedSampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 2, 4, 5]),
+                        original_edge_ids=None,
+                        original_column_node_ids=tensor([0, 1, 3, 2, 4, 5]),
+                        node_pairs=(tensor([1, 3, 0, 2, 4, 5, 2, 5]),
+                            tensor([0, 0, 1, 1, 2, 3, 4, 5])),),
+    FusedSampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 2, 4, 5]),
+                        original_edge_ids=None,
+                        original_column_node_ids=tensor([0, 1, 3, 2, 4]),
+                        node_pairs=(tensor([1, 3, 0, 2, 4, 5, 2]),
+                            tensor([0, 0, 1, 1, 2, 3, 4])),),
+    FusedSampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 2, 4]),
+                        original_edge_ids=None,
+                        original_column_node_ids=tensor([0, 1, 3]),
+                        node_pairs=(tensor([1, 3, 0, 2, 4]),
+                            tensor([0, 0, 1, 1, 2])),
+    )]
     """
 
     def __init__(
@@ -107,12 +116,12 @@ class NeighborSampler(SubgraphSampler):
         self.output_cscformat = output_cscformat
         self.sampler = graph.sample_neighbors
 
-    def _sample_subgraphs(self, seeds):
+    def sample_subgraphs(self, seeds):
         subgraphs = []
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
-            ntypes = list(self.graph.metadata.node_type_to_id.keys())
+            ntypes = list(self.graph.node_type_to_id.keys())
             seeds = {
                 ntype: seeds.get(ntype, torch.LongTensor([]))
                 for ntype in ntypes
@@ -176,6 +185,8 @@ class NeighborSampler(SubgraphSampler):
 class LayerNeighborSampler(NeighborSampler):
     """Sample layer neighbor edges from a graph and return a subgraph.
 
+    Functional name: :obj:`sample_layer_neighbor`.
+
     Sampler that builds computational dependency of node representations via
     labor sampling for multilayer GNN from the NeurIPS 2023 paper
     `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
@@ -229,7 +240,7 @@ class LayerNeighborSampler(NeighborSampler):
     >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
-    >>> graph = gb.from_fused_csc(indptr, indices)
+    >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
     >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")

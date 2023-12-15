@@ -187,6 +187,7 @@ def unique_and_compact_csc_formats(
 ):
     """
     Compact csc formats and return unique nodes (per type).
+
     Parameters
     ----------
     csc_formats : Union[CSCFormatBase, Dict(str, CSCFormatBase)]
@@ -203,6 +204,7 @@ def unique_and_compact_csc_formats(
         - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
         - If `csc_formats` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
+
     Returns
     -------
     Tuple[csc_formats, unique_nodes]
@@ -211,6 +213,7 @@ def unique_and_compact_csc_formats(
         "Compacted csc formats" indicates that the node IDs in the input node
         pairs are replaced with mapped node IDs, where each type of node is
         mapped to a contiguous space of IDs ranging from 0 to N.
+
     Examples
     --------
     >>> import dgl.graphbolt as gb
@@ -245,7 +248,13 @@ def unique_and_compact_csc_formats(
     # Collect all source and destination nodes for each node type.
     indices = defaultdict(list)
     for etype, csc_format in csc_formats.items():
-        src_type, _, _ = etype_str_to_tuple(etype)
+        assert csc_format.indptr[-1] == len(
+            csc_format.indices
+        ), "The last element of indptr should be the same as the length of indices."
+        src_type, _, dst_type = etype_str_to_tuple(etype)
+        assert len(unique_dst_nodes.get(dst_type, [])) + 1 == len(
+            csc_format.indptr
+        ), "The seed nodes should correspond to indptr."
         indices[src_type].append(csc_format.indices)
     indices = {ntype: torch.cat(nodes) for ntype, nodes in indices.items()}
 
@@ -361,7 +370,7 @@ def compact_csc_format(
                 csc_format.indices
             ), "The last element of indptr should be the same as the length of indices."
             src_type, _, dst_type = etype_str_to_tuple(etype)
-            assert len(dst_nodes[dst_type]) + 1 == len(
+            assert len(dst_nodes.get(dst_type, [])) + 1 == len(
                 csc_format.indptr
             ), "The seed nodes should correspond to indptr."
             offset = original_row_ids.get(src_type, torch.tensor([])).size(0)

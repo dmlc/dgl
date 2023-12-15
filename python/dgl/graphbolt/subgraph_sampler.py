@@ -17,20 +17,23 @@ __all__ = [
 @functional_datapipe("sample_subgraph")
 class SubgraphSampler(MiniBatchTransformer):
     """A subgraph sampler used to sample a subgraph from a given set of nodes
-    from a larger graph."""
+    from a larger graph.
+
+    Functional name: :obj:`sample_subgraph`.
+
+    This class is the base class of all subgraph samplers. Any subclass of
+    SubgraphSampler should implement the :meth:`sample_subgraphs` method.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The datapipe.
+    """
 
     def __init__(
         self,
         datapipe,
     ):
-        """
-        Initlization for a subgraph sampler.
-
-        Parameters
-        ----------
-        datapipe : DataPipe
-            The datapipe.
-        """
         super().__init__(datapipe, self._sample)
 
     def _sample(self, minibatch):
@@ -51,7 +54,7 @@ class SubgraphSampler(MiniBatchTransformer):
         (
             minibatch.input_nodes,
             minibatch.sampled_subgraphs,
-        ) = self._sample_subgraphs(seeds)
+        ) = self.sample_subgraphs(seeds)
         return minibatch
 
     def _node_pairs_preprocess(self, minibatch):
@@ -134,7 +137,7 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted_negative_dsts if has_neg_dst else None,
         )
 
-    def _sample_subgraphs(self, seeds):
+    def sample_subgraphs(self, seeds):
         """Sample subgraphs from the given seeds.
 
         Any subclass of SubgraphSampler should implement this method.
@@ -148,7 +151,27 @@ class SubgraphSampler(MiniBatchTransformer):
         -------
         Union[torch.Tensor, Dict[str, torch.Tensor]]
             The input nodes.
-        SampledSubgraph
+        List[SampledSubgraph]
             The sampled subgraphs.
+
+        Examples
+        --------
+        >>> @functional_datapipe("my_sample_subgraph")
+        >>> class MySubgraphSampler(SubgraphSampler):
+        >>>     def __init__(self, datapipe, graph, fanouts):
+        >>>         super().__init__(datapipe)
+        >>>         self.graph = graph
+        >>>         self.fanouts = fanouts
+        >>>     def sample_subgraphs(self, seeds):
+        >>>         # Sample subgraphs from the given seeds.
+        >>>         subgraphs = []
+        >>>         subgraphs_nodes = []
+        >>>         for fanout in reversed(self.fanouts):
+        >>>             subgraph = self.graph.sample_neighbors(seeds, fanout)
+        >>>             subgraphs.insert(0, subgraph)
+        >>>             subgraphs_nodes.append(subgraph.nodes)
+        >>>             seeds = subgraph.nodes
+        >>>         subgraphs_nodes = torch.unique(torch.cat(subgraphs_nodes))
+        >>>         return subgraphs_nodes, subgraphs
         """
         raise NotImplementedError
