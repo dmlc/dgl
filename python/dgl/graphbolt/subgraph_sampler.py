@@ -164,12 +164,13 @@ class SubgraphSampler(MiniBatchTransformer):
         >>>         self.fanouts = fanouts
         >>>     def sample_subgraphs(self, seeds):
         >>>         # Sample subgraphs from the given seeds.
-        >>>         subgs = []
+        >>>         subgraphs = []
+        >>>         subgraphs_nodes = {}
         >>>         for fanout in reversed(self.fanouts):
-        >>>             # Sample a fixed number of neighbors for each seed node.
-        >>>             input_nodes, subg = self.graph.sample_neighbors(seeds, fanout)
-        >>>             seeds = input_nodes
-        >>>             subgs.insert(0, subg)
-        >>>         return input_nodes, subgs
+        >>>             subgraph = self.graph.sample_neighbors(seeds, fanout)
+        >>>             subgraphs.insert(0, subgraph)
+        >>>             subgraphs_nodes.upate(subgraph.nodes)
+        >>>             seeds = subgraph.nodes
+        >>>         return subgraphs_nodes, subgraphs
         """
         raise NotImplementedError
