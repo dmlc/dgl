@@ -31,7 +31,7 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
-INT32_MAX = 2147483647
+INT32_MAX = torch.iinfo(torch.int32).max
 
 
 def preprocess_ondisk_dataset(
