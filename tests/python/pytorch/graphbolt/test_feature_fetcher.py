@@ -14,10 +14,7 @@ class MiniBatchType(Enum):
     DGLMiniBatch = 2
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_invoke(minibatch_type):
+def test_FeatureFetcher_invoke():
     # Prepare graph and required datapipes.
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
@@ -40,8 +37,6 @@ def test_FeatureFetcher_invoke(minibatch_type):
 
     # Invoke FeatureFetcher via class constructor.
     datapipe = gb.NeighborSampler(item_sampler, graph, fanouts)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        datapipe = datapipe.to_dgl()
 
     datapipe = gb.FeatureFetcher(datapipe, feature_store, ["a"], ["b"])
     assert len(list(datapipe)) == 5
@@ -53,10 +48,7 @@ def test_FeatureFetcher_invoke(minibatch_type):
     assert len(list(datapipe)) == 5
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_homo(minibatch_type):
+def test_FeatureFetcher_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
         [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
@@ -76,17 +68,12 @@ def test_FeatureFetcher_homo(minibatch_type):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        sampler_dp = sampler_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_with_edges_homo(minibatch_type):
+def test_FeatureFetcher_with_edges_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
         [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
@@ -121,8 +108,6 @@ def test_FeatureFetcher_with_edges_homo(minibatch_type):
     itemset = gb.ItemSet(torch.arange(10))
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        converter_dp = converter_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
@@ -155,10 +140,7 @@ def get_hetero_graph():
     )
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_hetero(minibatch_type):
+def test_FeatureFetcher_hetero():
     graph = get_hetero_graph()
     a = torch.tensor([[random.randint(0, 10)] for _ in range(2)])
     b = torch.tensor([[random.randint(0, 10)] for _ in range(3)])
@@ -179,8 +161,6 @@ def test_FeatureFetcher_hetero(minibatch_type):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        sampler_dp = sampler_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(
         sampler_dp, feature_store, {"n1": ["a"], "n2": ["a"]}
     )
@@ -188,10 +168,7 @@ def test_FeatureFetcher_hetero(minibatch_type):
     assert len(list(fetcher_dp)) == 3
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_with_edges_hetero(minibatch_type):
+def test_FeatureFetcher_with_edges_hetero():
     a = torch.tensor([[random.randint(0, 10)] for _ in range(20)])
     b = torch.tensor([[random.randint(0, 10)] for _ in range(50)])
 
@@ -243,8 +220,6 @@ def test_FeatureFetcher_with_edges_hetero(minibatch_type):
     )
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        converter_dp = converter_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(
         converter_dp, feature_store, {"n1": ["a"]}, {"n1:e1:n2": ["a"]}
     )
