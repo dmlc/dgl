@@ -132,30 +132,14 @@ void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
 
   if (read_from_archive(archive, "FusedCSCSamplingGraph/has_node_type_to_id")
           .toBool()) {
-    torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "FusedCSCSamplingGraph/node_type_to_id")
-            .toGenericDict();
-    NodeTypeToIDMap node_type_to_id;
-    for (const auto& pair : generic_dict) {
-      std::string key = pair.key().toStringRef();
-      int64_t value = pair.value().toInt();
-      node_type_to_id.insert(std::move(key), value);
-    }
-    node_type_to_id_ = std::move(node_type_to_id);
+    node_type_to_id_ = read_dict_from_archive<NodeTypeToIDMap>(
+        archive, "FusedCSCSamplingGraph/node_type_to_id");
   }
 
   if (read_from_archive(archive, "FusedCSCSamplingGraph/has_edge_type_to_id")
           .toBool()) {
-    torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "FusedCSCSamplingGraph/edge_type_to_id")
-            .toGenericDict();
-    EdgeTypeToIDMap edge_type_to_id;
-    for (const auto& pair : generic_dict) {
-      std::string key = pair.key().toStringRef();
-      int64_t value = pair.value().toInt();
-      edge_type_to_id.insert(std::move(key), value);
-    }
-    edge_type_to_id_ = std::move(edge_type_to_id);
+    edge_type_to_id_ = read_dict_from_archive<EdgeTypeToIDMap>(
+        archive, "FusedCSCSamplingGraph/edge_type_to_id");
   }
 
   // Optional node attributes.
@@ -163,18 +147,8 @@ void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   if (archive.try_read(
           "FusedCSCSamplingGraph/has_node_attributes", has_node_attributes) &&
       has_node_attributes.toBool()) {
-    torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "FusedCSCSamplingGraph/node_attributes")
-            .toGenericDict();
-    NodeAttrMap target_dict;
-    for (const auto& pair : generic_dict) {
-      std::string key = pair.key().toStringRef();
-      torch::Tensor value = pair.value().toTensor();
-      // Use move to avoid copy.
-      target_dict.insert(std::move(key), std::move(value));
-    }
-    // Same as above.
-    node_attributes_ = std::move(target_dict);
+    node_attributes_ = read_dict_from_archive<NodeAttrMap>(
+        archive, "FusedCSCSamplingGraph/node_attributes");
   }
 
   // Optional edge attributes.
@@ -182,18 +156,8 @@ void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   if (archive.try_read(
           "FusedCSCSamplingGraph/has_edge_attributes", has_edge_attributes) &&
       has_edge_attributes.toBool()) {
-    torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "FusedCSCSamplingGraph/edge_attributes")
-            .toGenericDict();
-    EdgeAttrMap target_dict;
-    for (const auto& pair : generic_dict) {
-      std::string key = pair.key().toStringRef();
-      torch::Tensor value = pair.value().toTensor();
-      // Use move to avoid copy.
-      target_dict.insert(std::move(key), std::move(value));
-    }
-    // Same as above.
-    edge_attributes_ = std::move(target_dict);
+    edge_attributes_ = read_dict_from_archive<EdgeAttrMap>(
+        archive, "FusedCSCSamplingGraph/edge_attributes");
   }
 }
 
