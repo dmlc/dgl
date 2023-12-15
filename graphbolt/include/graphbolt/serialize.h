@@ -57,47 +57,18 @@ inline serialize::OutputArchive& operator<<(
 namespace graphbolt {
 
 /**
- * @brief Read data from archive.
+ * @brief Read data from archive and format to specified type.
  * @param archive Input archive.
  * @param key Key name of data.
  *
  * @return data.
  */
-torch::IValue read_from_archive(
-    torch::serialize::InputArchive& archive, const std::string& key);
-
-/**
- * @brief Read dictionary from archive.
- * @param archive Input archive.
- * @param key Key name of dictionary.
- *
- * @return dictionary.
- */
-template <typename DictT>
-DictT read_dict_from_archive(
+template <typename T>
+T read_from_archive(
     torch::serialize::InputArchive& archive, const std::string& key) {
-  using KeyT = typename DictT::key_type;
-  using ValueT = typename DictT::mapped_type;
-  static_assert(std::is_same<KeyT, std::string>::value, "KeyT must be string");
-  static_assert(
-      std::is_same<ValueT, int64_t>::value ||
-          std::is_same<ValueT, torch::Tensor>::value,
-      "ValueT must be int64_t or torch::Tensor");
-  torch::Dict<torch::IValue, torch::IValue> generic_dict =
-      read_from_archive(archive, "FusedCSCSamplingGraph/node_type_to_id")
-          .toGenericDict();
-  DictT dict;
-  for (const auto& pair : generic_dict) {
-    std::string key = pair.key().toStringRef();
-    if constexpr (std::is_same<ValueT, int64_t>::value) {
-      int64_t value = pair.value().toInt();
-      dict.insert(std::move(key), value);
-    } else {
-      torch::Tensor value = pair.value().toTensor();
-      dict.insert(std::move(key), value);
-    }
-  }
-  return dict;
+  torch::IValue data;
+  archive.read(key, data);
+  return data.to<T>();
 }
 
 }  // namespace graphbolt
