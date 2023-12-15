@@ -50,6 +50,9 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("in_subgraph", &FusedCSCSamplingGraph::InSubgraph)
       .def("sample_neighbors", &FusedCSCSamplingGraph::SampleNeighbors)
       .def(
+          "temporal_sample_neighbors",
+          &FusedCSCSamplingGraph::TemporalSampleNeighbors)
+      .def(
           "sample_negative_edges_uniform",
           &FusedCSCSamplingGraph::SampleNegativeEdgesUniform)
       .def("copy_to_shared_memory", &FusedCSCSamplingGraph::CopyToSharedMemory)

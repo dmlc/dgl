@@ -322,6 +322,40 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       torch::optional<std::string> probs_name) const;
 
   /**
+   * @brief Sample neighboring edges of the given nodes with a temporal
+   * constraint. If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is
+   * given, the sampled neighbors or edges of an input node must have a
+   * timestamp that is no later than that of the input node.
+   *
+   * @param nodes The nodes from which to sample neighbors.
+   * @param input_nodes_timestamp The timestamp of the nodes.
+   * @param fanouts The number of edges to be sampled for each node with or
+   * without considering edge types, following the same rules as in
+   * SampleNeighbors.
+   * @param replace Boolean indicating whether the sample is preformed with or
+   * without replacement. If True, a value can be selected multiple times.
+   * Otherwise, each value can be selected only once.
+   * @param return_eids Boolean indicating whether edge IDs need to be returned,
+   * typically used when edge features are required.
+   * @param probs_name An optional string specifying the name of an edge
+   * attribute, following the same rules as in SampleNeighbors.
+   * @param node_timestamp_attr_name An optional string specifying the name of
+   * the node attribute that contains the timestamp of nodes in the graph.
+   * @param edge_timestamp_attr_name An optional string specifying the name of
+   * the edge attribute that contains the timestamp of edges in the graph.
+   *
+   * @return An intrusive pointer to a FusedSampledSubgraph object containing
+   * the sampled graph's information.
+   *
+   */
+  c10::intrusive_ptr<FusedSampledSubgraph> TemporalSampleNeighbors(
+      const torch::Tensor& nodes, const torch::Tensor& input_nodes_timestamp,
+      const std::vector<int64_t>& fanouts, bool replace, bool return_eids,
+      torch::optional<std::string> probs_name,
+      torch::optional<std::string> node_timestamp_attr_name,
+      torch::optional<std::string> edge_timestamp_attr_name) const;
+
+  /**
    * @brief Sample negative edges by randomly choosing negative
    * source-destination pairs according to a uniform distribution. For each edge
    * ``(u, v)``, it is supposed to generate `negative_ratio` pairs of negative
