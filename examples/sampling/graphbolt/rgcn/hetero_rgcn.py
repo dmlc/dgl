@@ -487,9 +487,6 @@ def evaluate(
     y_true = list()
 
     for data in tqdm(data_loader, desc="Inference"):
-        # Convert data to DGL format for computing.
-        data = data.to_dgl()
-
         blocks = [block.to(device) for block in data.blocks]
         node_features = extract_node_features(
             name, blocks[0], data, node_embed, device
@@ -558,9 +555,6 @@ def run(
         total_loss = 0
 
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch:02d}"):
-            # Convert data to DGL format for computing.
-            data = data.to_dgl()
-
             # Convert MiniBatch to DGL Blocks.
             blocks = [block.to(device) for block in data.blocks]
 
