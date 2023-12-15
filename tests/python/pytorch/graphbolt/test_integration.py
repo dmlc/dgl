@@ -97,8 +97,6 @@ def test_integration_link_prediction():
           input_nodes=tensor([5, 3, 1, 2, 0, 4]),
           edge_features=[{},
                         {}],
-          dgl_blocks=[Block(num_src_nodes=6, num_dst_nodes=6, num_edges=2),
-                     Block(num_src_nodes=6, num_dst_nodes=5, num_edges=1)],
           compacted_node_pairs=(tensor([0, 1, 1, 1]),
                                tensor([2, 3, 3, 1])),
           compacted_negative_srcs=tensor([[0],
@@ -109,6 +107,8 @@ def test_integration_link_prediction():
                                           [4],
                                           [1],
                                           [4]]),
+          blocks=[Block(num_src_nodes=6, num_dst_nodes=6, num_edges=2),
+                 Block(num_src_nodes=6, num_dst_nodes=5, num_edges=1)],
        )"""
         ),
         str(
@@ -148,8 +148,6 @@ def test_integration_link_prediction():
           input_nodes=tensor([3, 4, 0, 5, 1]),
           edge_features=[{},
                         {}],
-          dgl_blocks=[Block(num_src_nodes=5, num_dst_nodes=5, num_edges=2),
-                     Block(num_src_nodes=5, num_dst_nodes=5, num_edges=2)],
           compacted_node_pairs=(tensor([0, 1, 1, 2]),
                                tensor([0, 0, 1, 1])),
           compacted_negative_srcs=tensor([[0],
@@ -160,6 +158,8 @@ def test_integration_link_prediction():
                                           [1],
                                           [3],
                                           [4]]),
+          blocks=[Block(num_src_nodes=5, num_dst_nodes=5, num_edges=2),
+                 Block(num_src_nodes=5, num_dst_nodes=5, num_edges=2)],
        )"""
         ),
         str(
@@ -192,14 +192,14 @@ def test_integration_link_prediction():
           input_nodes=tensor([5, 4]),
           edge_features=[{},
                         {}],
-          dgl_blocks=[Block(num_src_nodes=2, num_dst_nodes=2, num_edges=1),
-                     Block(num_src_nodes=2, num_dst_nodes=2, num_edges=1)],
           compacted_node_pairs=(tensor([0, 1]),
                                tensor([0, 0])),
           compacted_negative_srcs=tensor([[0],
                                           [1]]),
           compacted_negative_dsts=tensor([[0],
                                           [0]]),
+          blocks=[Block(num_src_nodes=2, num_dst_nodes=2, num_edges=1),
+                 Block(num_src_nodes=2, num_dst_nodes=2, num_edges=1)],
        )"""
         ),
     ]
@@ -289,12 +289,12 @@ def test_integration_node_classification():
           input_nodes=tensor([5, 3, 1, 2, 4]),
           edge_features=[{},
                         {}],
-          dgl_blocks=[Block(num_src_nodes=5, num_dst_nodes=4, num_edges=4),
-                     Block(num_src_nodes=4, num_dst_nodes=4, num_edges=4)],
           compacted_node_pairs=(tensor([0, 1, 1, 1]),
                                tensor([2, 3, 3, 1])),
           compacted_negative_srcs=None,
           compacted_negative_dsts=None,
+          blocks=[Block(num_src_nodes=5, num_dst_nodes=4, num_edges=4),
+                 Block(num_src_nodes=4, num_dst_nodes=4, num_edges=4)],
        )"""
         ),
         str(
@@ -324,12 +324,12 @@ def test_integration_node_classification():
           input_nodes=tensor([3, 4, 0]),
           edge_features=[{},
                         {}],
-          dgl_blocks=[Block(num_src_nodes=3, num_dst_nodes=3, num_edges=2),
-                     Block(num_src_nodes=3, num_dst_nodes=3, num_edges=2)],
           compacted_node_pairs=(tensor([0, 1, 1, 2]),
                                tensor([0, 0, 1, 1])),
           compacted_negative_srcs=None,
           compacted_negative_dsts=None,
+          blocks=[Block(num_src_nodes=3, num_dst_nodes=3, num_edges=2),
+                 Block(num_src_nodes=3, num_dst_nodes=3, num_edges=2)],
        )"""
         ),
         str(
@@ -359,12 +359,12 @@ def test_integration_node_classification():
           input_nodes=tensor([5, 4, 0]),
           edge_features=[{},
                         {}],
-          dgl_blocks=[Block(num_src_nodes=3, num_dst_nodes=2, num_edges=2),
-                     Block(num_src_nodes=2, num_dst_nodes=2, num_edges=2)],
           compacted_node_pairs=(tensor([0, 1]),
                                tensor([0, 0])),
           compacted_negative_srcs=None,
           compacted_negative_dsts=None,
+          blocks=[Block(num_src_nodes=3, num_dst_nodes=2, num_edges=2),
+                 Block(num_src_nodes=2, num_dst_nodes=2, num_edges=2)],
        )"""
         ),
     ]

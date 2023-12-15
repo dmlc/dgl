@@ -173,10 +173,10 @@ def test_minibatch_representation_homo():
           labels=None,
           input_nodes=None,
           edge_features=None,
-          dgl_blocks=None,
           compacted_node_pairs=None,
           compacted_negative_srcs=None,
           compacted_negative_dsts=None,
+          blocks=None,
        )"""
     )
     result = str(minibatch)
@@ -237,8 +237,6 @@ def test_minibatch_representation_homo():
           input_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
           edge_features=[{'x': tensor([9, 0, 1, 1, 7, 4])},
                         {'x': tensor([0, 2, 2])}],
-          dgl_blocks=[Block(num_src_nodes=4, num_dst_nodes=4, num_edges=6),
-                     Block(num_src_nodes=3, num_dst_nodes=2, num_edges=3)],
           compacted_node_pairs=CSCFormatBase(indptr=tensor([0, 2, 3]),
                                              indices=tensor([3, 4, 5]),
                                ),
@@ -248,6 +246,8 @@ def test_minibatch_representation_homo():
           compacted_negative_dsts=tensor([[6],
                                           [0],
                                           [0]]),
+          blocks=[Block(num_src_nodes=4, num_dst_nodes=4, num_edges=6),
+                 Block(num_src_nodes=3, num_dst_nodes=2, num_edges=3)],
        )"""
     )
     result = str(minibatch)
@@ -389,14 +389,6 @@ def test_minibatch_representation_hetero():
           input_nodes={'A': tensor([ 5,  7,  9, 11]), 'B': tensor([10, 11, 12])},
           edge_features=[{('A:r:B', 'x'): tensor([4, 2, 4])},
                         {('A:r:B', 'x'): tensor([0, 6])}],
-          dgl_blocks=[Block(num_src_nodes={'A': 4, 'B': 3},
-                           num_dst_nodes={'A': 4, 'B': 3},
-                           num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
-                           metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]),
-                     Block(num_src_nodes={'A': 2, 'B': 2},
-                           num_dst_nodes={'B': 2},
-                           num_edges={('A', 'r', 'B'): 2},
-                           metagraph=[('A', 'B', 'r')])],
           compacted_node_pairs={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
                                              indices=tensor([3, 4, 5]),
                                ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2]),
@@ -408,6 +400,14 @@ def test_minibatch_representation_hetero():
           compacted_negative_dsts={'A:r:B': tensor([[6],
                                           [0],
                                           [0]])},
+          blocks=[Block(num_src_nodes={'A': 4, 'B': 3},
+                       num_dst_nodes={'A': 4, 'B': 3},
+                       num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
+                       metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]),
+                 Block(num_src_nodes={'A': 2, 'B': 2},
+                       num_dst_nodes={'B': 2},
+                       num_edges={('A', 'r', 'B'): 2},
+                       metagraph=[('A', 'B', 'r')])],
        )"""
     )
     result = str(minibatch)
@@ -473,7 +473,7 @@ def test_get_dgl_blocks_homo():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
     expect_result = str(
         """[Block(num_src_nodes=4, num_dst_nodes=4, num_edges=6), Block(num_src_nodes=3, num_dst_nodes=2, num_edges=3)]"""
     )
@@ -553,7 +553,7 @@ def test_get_dgl_blocks_hetero():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
     expect_result = str(
         """[Block(num_src_nodes={'A': 4, 'B': 3},
       num_dst_nodes={'A': 4, 'B': 3},
@@ -666,7 +666,7 @@ def test_get_dgl_blocks_node_classification_without_feature():
     minibatch.labels = None
     minibatch.seed_nodes = torch.tensor([10, 15])
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -681,7 +681,7 @@ def test_get_dgl_blocks_node_classification_homo():
     minibatch.seed_nodes = torch.tensor([10, 15])
     minibatch.labels = torch.tensor([2, 5])
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -692,7 +692,7 @@ def test_to_dgl_node_classification_hetero():
     minibatch = create_hetero_minibatch()
     minibatch.labels = {"B": torch.tensor([2, 5])}
     minibatch.seed_nodes = {"B": torch.tensor([10, 15])}
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -712,7 +712,7 @@ def test_dgl_link_predication_homo(mode):
     if mode == "neg_graph" or mode == "neg_dst":
         minibatch.compacted_negative_dsts = torch.tensor([[1, 0], [0, 1]])
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -769,7 +769,7 @@ def test_dgl_link_predication_hetero(mode):
             reverse_relation: torch.tensor([[2, 1], [3, 1]]),
         }
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -980,7 +980,7 @@ def test_dgl_node_classification_without_feature_csc_format():
     minibatch.labels = None
     minibatch.seed_nodes = torch.tensor([10, 15])
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -995,7 +995,7 @@ def test_dgl_node_classification_homo_csc_format():
     minibatch.seed_nodes = torch.tensor([10, 15])
     minibatch.labels = torch.tensor([2, 5])
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -1007,7 +1007,7 @@ def test_dgl_node_classification_hetero_csc_format():
     minibatch.labels = {"B": torch.tensor([2, 5])}
     minibatch.seed_nodes = {"B": torch.tensor([10, 15])}
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -1027,7 +1027,7 @@ def test_dgl_link_predication_homo_csc_format(mode):
     if mode == "neg_graph" or mode == "neg_dst":
         minibatch.compacted_negative_dsts = torch.tensor([[1, 0], [0, 1]])
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2
@@ -1087,7 +1087,7 @@ def test_dgl_link_predication_hetero_csc_format(mode):
             reverse_relation: torch.tensor([[2, 1], [3, 1]]),
         }
     # Act
-    dgl_blocks = minibatch.dgl_blocks
+    dgl_blocks = minibatch.blocks
 
     # Assert
     assert len(dgl_blocks) == 2

@@ -364,7 +364,7 @@ class MiniBatch:
         self.edge_features = edge_features
 
     @property
-    def dgl_blocks(self):
+    def blocks(self):
         """Extracts DGL blocks from `MiniBatch` to construct a graphical
         structure and ID mappings.
         """
