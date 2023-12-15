@@ -106,9 +106,9 @@ class SAGE(nn.Module):
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                 # By design, our output nodes are contiguous.
-                y[
-                    data.seed_nodes[0] : data.seed_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device, non_blocking=True)
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device, non_blocking=True
+                )
             feature = y
 
         return y
