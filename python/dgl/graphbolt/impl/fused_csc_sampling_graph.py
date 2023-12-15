@@ -301,8 +301,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._c_csc_graph.set_edge_attributes(edge_attributes)
 
     def in_subgraph(
-        self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
-    ) -> FusedSampledSubgraphImpl:
+        self,
+        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        # TODO: clean up once the migration is done.
+        output_cscformat=False,
+    ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
         An in subgraph is equivalent to creating a new graph using the incoming
@@ -361,7 +364,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
         ), "Nodes cannot have duplicate values."
 
         _in_subgraph = self._c_csc_graph.in_subgraph(nodes)
-        return self._convert_to_fused_sampled_subgraph(_in_subgraph)
+        if not output_cscformat:
+            return self._convert_to_fused_sampled_subgraph(_in_subgraph)
+        else:
+            return self._convert_to_sampled_subgraph(_in_subgraph)
 
     def _convert_to_fused_sampled_subgraph(
         self,
@@ -1024,10 +1030,18 @@ def _csc_sampling_graph_str(graph: FusedCSCSamplingGraph) -> str:
     """
     csc_indptr_str = str(graph.csc_indptr)
     indices_str = str(graph.indices)
-    meta_str = (
-        f"total_num_nodes={graph.total_num_nodes}, total_num_edges="
-        f"{graph.total_num_edges}"
-    )
+    meta_str = f"num_nodes={graph.total_num_nodes}, num_edges={graph.num_edges}"
+    if graph.node_type_offset is not None:
+        meta_str += f", node_type_offset={graph.node_type_offset}"
+    if graph.type_per_edge is not None:
+        meta_str += f", type_per_edge={graph.type_per_edge}"
+    if graph.node_type_to_id is not None:
+        meta_str += f", node_type_to_id={graph.node_type_to_id}"
+    if graph.edge_type_to_id is not None:
+        meta_str += f", edge_type_to_id={graph.edge_type_to_id}"
+    if graph.edge_attributes is not None:
+        meta_str += f", edge_attributes={graph.edge_attributes}"
+
     prefix = f"{type(graph).__name__}("
 
     def _add_indent(_str, indent):

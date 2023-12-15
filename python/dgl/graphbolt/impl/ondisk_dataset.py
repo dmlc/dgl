@@ -575,7 +575,7 @@ class BuiltinDataset(OnDiskDataset):
         The ogbn-arxiv dataset is a directed graph, representing the citation
         network between all Computer Science (CS) arXiv papers indexed by MAG.
         See more details in `ogbn-arxiv
-        https://ogb.stanford.edu/docs/nodeprop/#ogbn-arxiv>`_.
+        <https://ogb.stanford.edu/docs/nodeprop/#ogbn-arxiv>`_.
 
         .. note::
             Reverse edges are added to the original graph and duplicated
@@ -585,7 +585,7 @@ class BuiltinDataset(OnDiskDataset):
         The ogbn-products dataset is an undirected and unweighted graph,
         representing an Amazon product co-purchasing network. See more details
         in `ogbn-products
-        https://ogb.stanford.edu/docs/nodeprop/#ogbn-products>`_.
+        <https://ogb.stanford.edu/docs/nodeprop/#ogbn-products>`_.
 
         .. note::
             Reverse edges are added to the original graph.
