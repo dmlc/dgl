@@ -59,7 +59,7 @@ def evaluate(model, dataset, itemset, device):
     for step, data in enumerate(dataloader):
         x = data.node_features["feat"]
         y.append(data.labels)
-        y_hats.append(model(data.dgl_blocks, x))
+        y_hats.append(model(data.blocks, x))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -90,7 +90,7 @@ def train(model, dataset, device):
             y = data.labels
 
             # Forward.
-            y_hat = model(data.dgl_blocks, x)
+            y_hat = model(data.blocks, x)
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)

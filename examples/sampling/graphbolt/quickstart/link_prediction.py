@@ -105,7 +105,7 @@ def evaluate(model, dataset, device):
         x = data.node_features["feat"]
 
         # Forward.
-        y = model(data.dgl_blocks, x)
+        y = model(data.blocks, x)
         logit = (
             model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
             .squeeze()
@@ -144,7 +144,7 @@ def train(model, dataset, device):
             x = data.node_features["feat"]
 
             # Forward.
-            y = model(data.dgl_blocks, x)
+            y = model(data.blocks, x)
             logits = model.predictor(
                 y[compacted_pairs[0]] * y[compacted_pairs[1]]
             ).squeeze()
