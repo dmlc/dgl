@@ -157,11 +157,11 @@ def preprocess_ondisk_dataset(
 
         num_nodes_within_int32 = node_type_offset[-1] <= INT32_MAX
         num_edges_within_int32 = indptr[-1] <= INT32_MAX
-        # if num_nodes_within_int32:
-        #     indices = indices.to(torch.int32)
-        # if num_edges_within_int32:
-        #     indptr = indptr.to(torch.int32)
-        #     value_indices = value_indices.to(torch.int32)
+        if num_nodes_within_int32:
+            indices = indices.to(torch.int32)
+        if num_edges_within_int32:
+            indptr = indptr.to(torch.int32)
+            value_indices = value_indices.to(torch.int32)
 
         edge_attributes = {}
         if include_original_edge_id:

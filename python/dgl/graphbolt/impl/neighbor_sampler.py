@@ -113,8 +113,9 @@ class NeighborSampler(SubgraphSampler):
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
             ntypes = list(self.graph.node_type_to_id.keys())
+            _dtype = next(iter(seeds.values())).dtype
             seeds = {
-                ntype: seeds.get(ntype, torch.LongTensor([]))
+                ntype: seeds.get(ntype, torch.tensor([], dtype=_dtype))
                 for ntype in ntypes
             }
         for hop in range(num_layers):
