@@ -56,6 +56,7 @@ FusedCSCSamplingGraph::FusedCSCSamplingGraph(
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<NodeTypeToIDMap>& node_type_to_id,
     const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
+    const torch::optional<NodeAttrMap>& node_attributes,
     const torch::optional<EdgeAttrMap>& edge_attributes)
     : indptr_(indptr),
       indices_(indices),
@@ -63,6 +64,7 @@ FusedCSCSamplingGraph::FusedCSCSamplingGraph(
       type_per_edge_(type_per_edge),
       node_type_to_id_(node_type_to_id),
       edge_type_to_id_(edge_type_to_id),
+      node_attributes_(node_attributes),
       edge_attributes_(edge_attributes) {
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
@@ -75,6 +77,7 @@ c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::Create(
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<NodeTypeToIDMap>& node_type_to_id,
     const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
+    const torch::optional<NodeAttrMap>& node_attributes,
     const torch::optional<EdgeAttrMap>& edge_attributes) {
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
@@ -89,6 +92,11 @@ c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::Create(
     TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
     TORCH_CHECK(edge_type_to_id.has_value());
   }
+  if (node_attributes.has_value()) {
+    for (const auto& pair : node_attributes.value()) {
+      TORCH_CHECK(pair.value().size(0) == indptr.size(0) - 1);
+    }
+  }
   if (edge_attributes.has_value()) {
     for (const auto& pair : edge_attributes.value()) {
       TORCH_CHECK(pair.value().size(0) == indices.size(0));
@@ -96,7 +104,7 @@ c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::Create(
   }
   return c10::make_intrusive<FusedCSCSamplingGraph>(
       indptr, indices, node_type_offset, type_per_edge, node_type_to_id,
-      edge_type_to_id, edge_attributes);
+      edge_type_to_id, node_attributes, edge_attributes);
 }
 
 void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
@@ -148,6 +156,25 @@ void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
       edge_type_to_id.insert(std::move(key), value);
     }
     edge_type_to_id_ = std::move(edge_type_to_id);
+  }
+
+  // Optional node attributes.
+  torch::IValue has_node_attributes;
+  if (archive.try_read(
+          "FusedCSCSamplingGraph/has_node_attributes", has_node_attributes) &&
+      has_node_attributes.toBool()) {
+    torch::Dict<torch::IValue, torch::IValue> generic_dict =
+        read_from_archive(archive, "FusedCSCSamplingGraph/node_attributes")
+            .toGenericDict();
+    NodeAttrMap target_dict;
+    for (const auto& pair : generic_dict) {
+      std::string key = pair.key().toStringRef();
+      torch::Tensor value = pair.value().toTensor();
+      // Use move to avoid copy.
+      target_dict.insert(std::move(key), std::move(value));
+    }
+    // Same as above.
+    node_attributes_ = std::move(target_dict);
   }
 
   // Optional edge attributes.
@@ -204,6 +231,13 @@ void FusedCSCSamplingGraph::Save(
         "FusedCSCSamplingGraph/edge_type_to_id", edge_type_to_id_.value());
   }
   archive.write(
+      "FusedCSCSamplingGraph/has_node_attributes",
+      node_attributes_.has_value());
+  if (node_attributes_) {
+    archive.write(
+        "FusedCSCSamplingGraph/node_attributes", node_attributes_.value());
+  }
+  archive.write(
       "FusedCSCSamplingGraph/has_edge_attributes",
       edge_attributes_.has_value());
   if (edge_attributes_) {
@@ -238,6 +272,9 @@ void FusedCSCSamplingGraph::SetState(
   if (state.find("edge_type_to_id") != state.end()) {
     edge_type_to_id_ = DetensorizeDict(state.at("edge_type_to_id"));
   }
+  if (state.find("node_attributes") != state.end()) {
+    node_attributes_ = state.at("node_attributes");
+  }
   if (state.find("edge_attributes") != state.end()) {
     edge_attributes_ = state.at("edge_attributes");
   }
@@ -267,6 +304,9 @@ FusedCSCSamplingGraph::GetState() const {
   }
   if (edge_type_to_id_.has_value()) {
     state.insert("edge_type_to_id", TensorizeDict(edge_type_to_id_).value());
+  }
+  if (node_attributes_.has_value()) {
+    state.insert("node_attributes", node_attributes_.value());
   }
   if (edge_attributes_.has_value()) {
     state.insert("edge_attributes", edge_attributes_.value());
@@ -596,10 +636,11 @@ BuildGraphFromSharedMemoryHelper(SharedMemoryHelper&& helper) {
   auto type_per_edge = helper.ReadTorchTensor();
   auto node_type_to_id = DetensorizeDict(helper.ReadTorchTensorDict());
   auto edge_type_to_id = DetensorizeDict(helper.ReadTorchTensorDict());
+  auto node_attributes = helper.ReadTorchTensorDict();
   auto edge_attributes = helper.ReadTorchTensorDict();
   auto graph = c10::make_intrusive<FusedCSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
-      node_type_to_id, edge_type_to_id, edge_attributes);
+      node_type_to_id, edge_type_to_id, node_attributes, edge_attributes);
   auto shared_memory = helper.ReleaseSharedMemory();
   graph->HoldSharedMemoryObject(
       std::move(shared_memory.first), std::move(shared_memory.second));
@@ -616,6 +657,7 @@ FusedCSCSamplingGraph::CopyToSharedMemory(
   helper.WriteTorchTensor(type_per_edge_);
   helper.WriteTorchTensorDict(TensorizeDict(node_type_to_id_));
   helper.WriteTorchTensorDict(TensorizeDict(edge_type_to_id_));
+  helper.WriteTorchTensorDict(node_attributes_);
   helper.WriteTorchTensorDict(edge_attributes_);
   helper.Flush();
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
