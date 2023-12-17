@@ -202,7 +202,6 @@ class SAGE(nn.Module):
             feature = feature.to(device)
 
             for step, data in tqdm(enumerate(dataloader)):
-                data = data.to_dgl()
                 x = feature[data.input_nodes]
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
@@ -261,7 +260,6 @@ def evaluate(args, model, graph, features, itemset, num_classes):
     )
 
     for step, data in tqdm(enumerate(dataloader)):
-        data = data.to_dgl()
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
@@ -292,9 +290,6 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         model.train()
         total_loss = 0
         for step, data in enumerate(dataloader):
-            # Convert data to DGL format.
-            data = data.to_dgl()
-
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]

@@ -76,20 +76,6 @@ class GraphSAGE(nn.Module):
         return hidden_x
 
 
-def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
-    """Convert the minibatch to a training pair and a label tensor."""
-    pos_src, pos_dst = data.positive_node_pairs
-    neg_src, neg_dst = data.negative_node_pairs
-    node_pairs = (
-        torch.cat((pos_src, neg_src), dim=0),
-        torch.cat((pos_dst, neg_dst), dim=0),
-    )
-    pos_label = torch.ones_like(pos_src)
-    neg_label = torch.zeros_like(neg_src)
-    labels = torch.cat([pos_label, neg_label], dim=0)
-    return (node_pairs, labels)
-
-
 @torch.no_grad()
 def evaluate(model, dataset, device):
     model.eval()
