@@ -8,7 +8,6 @@ from .minibatch import DGLMiniBatch, MiniBatch
 
 __all__ = [
     "MiniBatchTransformer",
-    "DGLMiniBatchConverter",
 ]
 
 
@@ -41,22 +40,3 @@ class MiniBatchTransformer(Mapper):
             minibatch, (MiniBatch, DGLMiniBatch)
         ), "The transformer output should be an instance of MiniBatch"
         return minibatch
-
-
-@functional_datapipe("to_dgl")
-class DGLMiniBatchConverter(Mapper):
-    """Convert a graphbolt mini-batch to a dgl mini-batch.
-
-    Functional name: :obj:`to_dgl`.
-
-    Parameters
-    ----------
-    datapipe : DataPipe
-        The datapipe.
-    """
-
-    def __init__(
-        self,
-        datapipe,
-    ):
-        super().__init__(datapipe, MiniBatch.to_dgl)

@@ -280,6 +280,27 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._c_csc_graph.set_edge_type_to_id(edge_type_to_id)
 
     @property
+    def node_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Returns the node attributes dictionary.
+
+        Returns
+        -------
+        Dict[str, torch.Tensor] or None
+            If present, returns a dictionary of node attributes. Each key
+            represents the attribute's name, while the corresponding value
+            holds the attribute's specific value. The length of each value
+            should match the total number of nodes."
+        """
+        return self._c_csc_graph.node_attributes()
+
+    @node_attributes.setter
+    def node_attributes(
+        self, node_attributes: Optional[Dict[str, torch.Tensor]]
+    ) -> None:
+        """Sets the node attributes dictionary."""
+        self._c_csc_graph.set_node_attributes(node_attributes)
+
+    @property
     def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
         """Returns the edge attributes dictionary.
 
@@ -892,6 +913,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self.type_per_edge = recursive_apply(
             self.type_per_edge, lambda x: _to(x, device)
         )
+        self.node_attributes = recursive_apply(
+            self.node_attributes, lambda x: _to(x, device)
+        )
         self.edge_attributes = recursive_apply(
             self.edge_attributes, lambda x: _to(x, device)
         )
@@ -906,6 +930,7 @@ def fused_csc_sampling_graph(
     type_per_edge: Optional[torch.tensor] = None,
     node_type_to_id: Optional[Dict[str, int]] = None,
     edge_type_to_id: Optional[Dict[str, int]] = None,
+    node_attributes: Optional[Dict[str, torch.tensor]] = None,
     edge_attributes: Optional[Dict[str, torch.tensor]] = None,
 ) -> FusedCSCSamplingGraph:
     """Create a FusedCSCSamplingGraph object from a CSC representation.
@@ -926,6 +951,8 @@ def fused_csc_sampling_graph(
         Map node types to ids, by default None.
     edge_type_to_id : Optional[Dict[str, int]], optional
         Map edge types to ids, by default None.
+    node_attributes: Optional[Dict[str, torch.tensor]], optional
+        Node attributes of the graph, by default None.
     edge_attributes: Optional[Dict[str, torch.tensor]], optional
         Edge attributes of the graph, by default None.
 
@@ -946,7 +973,7 @@ def fused_csc_sampling_graph(
     ...             node_type_offset=node_type_offset,
     ...             type_per_edge=type_per_edge,
     ...             node_type_to_id=ntypes, edge_type_to_id=etypes,
-    ...             edge_attributes=None,)
+    ...             node_attributes=None, edge_attributes=None,)
     >>> print(graph)
     FusedCSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
@@ -997,6 +1024,7 @@ def fused_csc_sampling_graph(
             type_per_edge,
             node_type_to_id,
             edge_type_to_id,
+            node_attributes,
             edge_attributes,
         ),
     )
@@ -1037,6 +1065,8 @@ def _csc_sampling_graph_str(graph: FusedCSCSamplingGraph) -> str:
         meta_str += f", node_type_to_id={graph.node_type_to_id}"
     if graph.edge_type_to_id is not None:
         meta_str += f", edge_type_to_id={graph.edge_type_to_id}"
+    if graph.node_attributes is not None:
+        meta_str += f", node_attributes={graph.node_attributes}"
     if graph.edge_attributes is not None:
         meta_str += f", edge_attributes={graph.edge_attributes}"
 
@@ -1094,6 +1124,8 @@ def from_dglgraph(
     # Assign edge type according to the order of CSC matrix.
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
 
+    node_attributes = {}
+
     edge_attributes = {}
     if include_original_edge_id:
         # Assign edge attributes according to the original eids mapping.
@@ -1107,6 +1139,7 @@ def from_dglgraph(
             type_per_edge,
             node_type_to_id,
             edge_type_to_id,
+            node_attributes,
             edge_attributes,
         ),
     )

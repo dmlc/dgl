@@ -1,6 +1,6 @@
 .. _guide-minibatch-gpu-sampling:
 
-6.7 Using GPU for Neighborhood Sampling
+6.8 Using GPU for Neighborhood Sampling
 ---------------------------------------
 
 .. note::
