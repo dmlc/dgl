@@ -309,10 +309,11 @@ def train(args, model, graph, features, train_set):
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
-            # Get necessary values from MiniBatch.
+            # Get node pairs with labels for loss calculation.
+            compacted_pairs, labels = data.node_pairs_with_labels
+            
             node_feature = data.node_features["feat"]
             blocks = data.blocks
-            compacted_pairs, labels = data.node_pairs_with_labels
 
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)

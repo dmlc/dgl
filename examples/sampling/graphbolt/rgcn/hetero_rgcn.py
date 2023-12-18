@@ -176,7 +176,7 @@ def rel_graph_embed(graph, embed_size):
         for the "paper" node type.
     """
     node_num = {}
-    node_type_to_id = graph.metadata.node_type_to_id
+    node_type_to_id = graph.node_type_to_id
     node_type_offset = graph.node_type_offset
     for ntype, ntype_id in node_type_to_id.items():
         # Skip the "paper" node type.
@@ -328,12 +328,12 @@ class EntityClassify(nn.Module):
 
         # Generate and sort a list of unique edge types from the input graph.
         # eg. ['writes', 'cites']
-        etypes = list(graph.metadata.edge_type_to_id.keys())
+        etypes = list(graph.edge_type_to_id.keys())
         etypes = [gb.etype_str_to_tuple(etype)[1] for etype in etypes]
         self.relation_names = etypes
         self.relation_names.sort()
         self.dropout = 0.5
-        ntypes = list(graph.metadata.node_type_to_id.keys())
+        ntypes = list(graph.node_type_to_id.keys())
         self.layers = nn.ModuleList()
 
         # First layer: transform input features to hidden features. Use ReLU

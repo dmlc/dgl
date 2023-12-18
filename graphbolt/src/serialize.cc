@@ -24,14 +24,3 @@ serialize::OutputArchive& operator<<(
 }
 
 }  // namespace torch
-
-namespace graphbolt {
-
-torch::IValue read_from_archive(
-    torch::serialize::InputArchive& archive, const std::string& key) {
-  torch::IValue data;
-  archive.read(key, data);
-  return data;
-}
-
-}  // namespace graphbolt
