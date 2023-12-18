@@ -5,6 +5,7 @@
  * @brief Available CUDA operations in Graphbolt.
  */
 
+#include <graphbolt/fused_sampled_subgraph.h>
 #include <torch/script.h>
 
 namespace graphbolt {
@@ -19,6 +20,12 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
+
+c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
+    const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool return_eids, torch::optional<torch::Tensor> type_per_edge,
+    torch::optional<torch::Tensor> probs_or_mask);
 
 }  //  namespace ops
 }  //  namespace graphbolt
