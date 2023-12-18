@@ -93,7 +93,6 @@ class SAGE(LightningModule):
                 )
 
     def training_step(self, batch, batch_idx):
-        batch = batch.to_dgl()
         blocks = [block.to("cuda") for block in batch.blocks]
         x = batch.node_features["feat"]
         y = batch.labels.to("cuda")
@@ -111,7 +110,6 @@ class SAGE(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        batch = batch.to_dgl()
         blocks = [block.to("cuda") for block in batch.blocks]
         x = batch.node_features["feat"]
         y = batch.labels.to("cuda")
