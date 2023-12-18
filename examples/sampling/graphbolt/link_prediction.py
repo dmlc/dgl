@@ -311,7 +311,7 @@ def train(args, model, graph, features, train_set):
         for step, data in enumerate(dataloader):
             # Get node pairs with labels for loss calculation.
             compacted_pairs, labels = data.node_pairs_with_labels
-            
+
             node_feature = data.node_features["feat"]
             blocks = data.blocks
 
