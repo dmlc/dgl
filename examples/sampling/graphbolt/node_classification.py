@@ -208,9 +208,9 @@ class SAGE(nn.Module):
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
-                y[
-                    data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device)
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device
+                )
             feature = y
 
         return y
