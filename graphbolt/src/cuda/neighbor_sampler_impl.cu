@@ -23,6 +23,13 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
     bool return_eids, torch::optional<torch::Tensor> type_per_edge,
-    torch::optional<torch::Tensor> probs_or_mask) {}
+    torch::optional<torch::Tensor> probs_or_mask) {
+  TORCH_CHECK(
+      replace,
+      "CUDA implementation of sampling with replacement is not implemented "
+      "yet!");
+  const auto num_rows = nodes.size(0);
+  auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
+}
 }  //  namespace ops
 }  //  namespace graphbolt
