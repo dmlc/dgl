@@ -973,8 +973,15 @@ def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
 
     # Generate subgraph via sample neighbors.
     nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
+    nodes_in_incorrect_dtype = torch.tensor(
+        [1, 3, 4],
+        dtype=(torch.int64 if indices_dtype == torch.int32 else torch.int32),
+    )
+    fanouts = torch.LongTensor([2])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts=torch.LongTensor([2]))
+    with pytest.raises(AssertionError):
+        _subgraph = sampler(nodes_in_incorrect_dtype, fanouts)
+    subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
     sampled_num = subgraph.node_pairs[0].size(0)
@@ -1052,8 +1059,18 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
 
     # Sample on single node type.
     nodes = {"n1": torch.tensor([0], dtype=indices_dtype)}
+    nodes_in_incorrect_dtype = {
+        "n1": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        )
+    }
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    with pytest.raises(AssertionError):
+        _subgraph = sampler(nodes_in_incorrect_dtype, fanouts)
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
