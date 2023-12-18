@@ -397,8 +397,8 @@ class MiniBatch:
                                 v.indices,
                                 torch.arange(
                                     0,
-                                    len(v.indices),
-                                    device=v.indptr.device,
+                                    v.indptr[-1],
+                                    device=v.indices.device,
                                 ),
                             ),
                         )
@@ -427,8 +427,8 @@ class MiniBatch:
                             node_pairs.indices,
                             torch.arange(
                                 0,
-                                len(node_pairs.indices),
-                                device=node_pairs.indptr.device,
+                                node_pairs.indptr[-1],
+                                device=node_pairs.indices.device,
                             ),
                         ),
                     )
