@@ -24,7 +24,12 @@ torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
 std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
     torch::Tensor indptr, torch::Tensor nodes);
 
-c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
+torch::Tensor CSCToCOO(
+    torch::Tensor indptr, torch::ScalarType indices_scalar_type,
+    torch::optional<int64_t> num_edges);
+
+c10::intrusive_ptr<sampling::FusedSampledSubgraph>
+SampleNeighborsWithoutReplacement(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
     bool return_eids, torch::optional<torch::Tensor> type_per_edge,
