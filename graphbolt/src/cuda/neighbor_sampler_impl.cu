@@ -43,37 +43,28 @@ struct AdjacentDifference {
   }
 };
 
-torch::Tensor CSCToCOO(
-    torch::Tensor indptr, torch::ScalarType indices_scalar_type,
-    torch::optional<int64_t> num_edges) {
+torch::Tensor CSRToCOO(
+    torch::Tensor indptr, torch::ScalarType indices_scalar_type) {
   auto allocator = cuda::GetAllocator();
   auto stream = c10::cuda::getDefaultCUDAStream();
   const auto num_rows = indptr.size(0) - 1;
-
-  if (!num_edges.has_value()) {
-    AT_DISPATCH_INTEGRAL_TYPES(
-        indptr.scalar_type(), "CSCToCOOIndptr", ([&] {
-          scalar_t num_edges_temp;
-          CUDA_CALL(cudaMemcpyAsync(
-              &num_edges_temp, indptr.data_ptr<scalar_t>() + num_rows,
-              sizeof(num_edges_temp), cudaMemcpyDeviceToHost, stream));
-          CUDA_CALL(cudaStreamSynchronize(stream));
-          num_edges = static_cast<int64_t>(num_edges_temp);
-        }));
-  }  // Now, num_edges holds how many edges there are.
-
-  auto csc_rows = torch::empty(
-      num_edges.value(), indptr.options().dtype(indices_scalar_type));
   thrust::counting_iterator<int64_t> iota(0);
 
-  AT_DISPATCH_INTEGRAL_TYPES(
+  return AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "CSCToCOOIndptr2", ([&] {
         using indptr_t = scalar_t;
         auto indptr_ptr = indptr.data_ptr<indptr_t>();
+        indptr_t num_edges;
+        CUDA_CALL(cudaMemcpyAsync(
+            &num_edges, indptr.data_ptr<scalar_t>() + num_rows,
+            sizeof(num_edges), cudaMemcpyDeviceToHost, stream));
+        CUDA_CALL(cudaStreamSynchronize(stream));
+        auto csr_rows = torch::empty(
+            num_edges, indptr.options().dtype(indices_scalar_type));
         AT_DISPATCH_INTEGRAL_TYPES(
             indices_scalar_type, "CSCToCOOIndices", ([&] {
               using indices_t = scalar_t;
-              auto csc_rows_ptr = csc_rows.data_ptr<indices_t>();
+              auto csc_rows_ptr = csr_rows.data_ptr<indices_t>();
 
               auto input_buffer = thrust::make_transform_iterator(
                   iota, RepeatIndex<indices_t>{});
@@ -101,9 +92,8 @@ torch::Tensor CSCToCOO(
                     std::min(num_rows - i, max_copy_at_once), stream));
               }
             }));
+        return csr_rows;
       }));
-
-  return csc_rows;
 }
 
 c10::intrusive_ptr<sampling::FusedSampledSubgraph>
@@ -120,7 +110,9 @@ SampleNeighborsWithoutReplacement(
       "yet!");
   const auto num_rows = nodes.size(0);
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
-  auto allocator = cuda::GetAllocator();
+  auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
+  auto output_indptr = in_degree.cumsum(0);
+  auto coo_rows = CSRToCOO(output_indptr, indices.scalar_type());
 }
 }  //  namespace ops
 }  //  namespace graphbolt
