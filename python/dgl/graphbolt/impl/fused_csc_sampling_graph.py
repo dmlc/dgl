@@ -629,9 +629,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
-        assert (
-            nodes.dtype == self.indices.dtype
-        ), f"Data type of nodes must be consistent with indices.dtype({self.indices.dtype}), but got {nodes.dtype}."
+        assert nodes.dtype == self.indices.dtype, (
+            f"Data type of nodes must be consistent with "
+            f"indices.dtype({self.indices.dtype}), but got {nodes.dtype}."
+        )
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
         expected_fanout_len = 1
         if self.edge_type_to_id:
