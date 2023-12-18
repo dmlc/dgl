@@ -399,6 +399,7 @@ class MiniBatch:
                                     0,
                                     v.indptr[-1],
                                     device=v.indptr.device,
+                                    dtype=v.indptr.dtype,
                                 ),
                             ),
                         )
@@ -429,6 +430,7 @@ class MiniBatch:
                                 0,
                                 node_pairs.indptr[-1],
                                 device=node_pairs.indptr.device,
+                                dtype=node_pairs.indptr.dtype,
                             ),
                         ),
                     )
