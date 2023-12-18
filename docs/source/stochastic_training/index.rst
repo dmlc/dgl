@@ -8,10 +8,9 @@ This tutorial introduces how to enable stochastic training of GNNs with
 GraphBolt.
 
 .. toctree::
-  :maxdepth: 2
-  :titlesonly:
+  :maxdepth: 1
 
   neighbor_sampling_overview.nblink
   node_classification.nblink
   link_prediction.nblink
-  ondisk-dataset
+  ondisk-dataset.rst

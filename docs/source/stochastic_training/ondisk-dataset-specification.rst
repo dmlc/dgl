@@ -1,4 +1,4 @@
-.. _stochastic_training-bk-ondisk-dataset:
+.. _stochastic_training-ondisk-dataset-specification:
 
 Prepare dataset
 ===============
