@@ -2077,10 +2077,14 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
         assert dataset.feature.size("edge", None, "feat")[0] == num_classes
 
         for itemset in [
-            tasks[0].train_set,
-            tasks[0].validation_set,
-            tasks[0].test_set,
+            # tasks[0].train_set,
+            # tasks[0].validation_set,
+            # tasks[0].test_set,
+            gb.ItemSet(torch.tensor([[   0, 1000],
+                         [   1, 1001],
+                         [   2, 1002]]), names="node_pairs")
         ]:
+            # assert False, (itemset._items, itemset._names)
             datapipe = gb.ItemSampler(itemset, batch_size=10)
             datapipe = datapipe.sample_neighbor(graph, [-1])
             datapipe = datapipe.fetch_feature(

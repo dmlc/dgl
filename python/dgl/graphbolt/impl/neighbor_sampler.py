@@ -117,6 +117,7 @@ class NeighborSampler(SubgraphSampler):
         self.sampler = graph.sample_neighbors
 
     def sample_subgraphs(self, seeds):
+        print(f"seeds: {seeds}")
         subgraphs = []
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.
@@ -150,6 +151,7 @@ class NeighborSampler(SubgraphSampler):
                         original_edge_ids=subgraph.original_edge_ids,
                     )
                 else:
+                    print(f"subgraph.node_pairs: {subgraph.node_pairs},\tseeds: {seeds}")
                     (
                         original_row_node_ids,
                         compacted_node_pairs,
