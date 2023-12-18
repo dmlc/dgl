@@ -99,7 +99,6 @@ and combined as well.
                 feature = feature.to(device)
 
                 for step, data in tqdm(enumerate(dataloader)):
-                    data = data.to_dgl()
                     x = feature[data.input_nodes]
                     hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                     if not is_last_layer:
@@ -107,7 +106,7 @@ and combined as well.
                         hidden_x = self.dropout(hidden_x)
                     # By design, our output nodes are contiguous.
                     y[
-                        data.output_nodes[0] : data.output_nodes[-1] + 1
+                        data.seed_nodes[0] : data.seed_nodes[-1] + 1
                     ] = hidden_x.to(device)
                 feature = y
 

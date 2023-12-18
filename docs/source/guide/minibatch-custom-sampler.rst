@@ -51,7 +51,6 @@ To use this sampler with :class:`~dgl.graphbolt.DataLoader`:
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     for data in dataloader:
-        data = data.to_dgl()
         input_features = data.node_features["feat"]
         output_labels = data.labels
         output_predictions = model(data.blocks, input_features)
@@ -97,7 +96,6 @@ can be used on heterogeneous graphs:
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     for data in dataloader:
-        data = data.to_dgl()
         input_features = {
             ntype: data.node_features[(ntype, "feat")]
             for ntype in data.blocks[0].srctypes

@@ -101,15 +101,14 @@ class SAGE(nn.Module):
             )
             feature = feature.to(device)
             for step, data in tqdm.tqdm(enumerate(dataloader)):
-                data = data.to_dgl()
                 x = feature[data.input_nodes]
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
-                # By design, our output nodes are contiguous.
-                y[
-                    data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device, non_blocking=True)
+                # By design, our seed nodes are contiguous.
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device, non_blocking=True
+                )
             feature = y
 
         return y
@@ -237,20 +236,6 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     return dataloader
 
 
-def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch):
-    """Convert the minibatch to a training pair and a label tensor."""
-    pos_src, pos_dst = data.positive_node_pairs
-    neg_src, neg_dst = data.negative_node_pairs
-    node_pairs = (
-        torch.cat((pos_src, neg_src), dim=0),
-        torch.cat((pos_dst, neg_dst), dim=0),
-    )
-    pos_label = torch.ones_like(pos_src)
-    neg_label = torch.zeros_like(neg_src)
-    labels = torch.cat([pos_label, neg_label], dim=0)
-    return (node_pairs, labels.float())
-
-
 @torch.no_grad()
 def compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst):
     """Compute the Mean Reciprocal Rank (MRR) for given source and destination
@@ -324,13 +309,10 @@ def train(args, model, graph, features, train_set):
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
-            # Convert data to DGL format.
-            data = data.to_dgl()
+            # Get node pairs with labels for loss calculation.
+            compacted_pairs, labels = data.node_pairs_with_labels
 
-            # Unpack MiniBatch.
-            compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
             node_feature = data.node_features["feat"]
-            # Convert sampled subgraphs to DGL blocks.
             blocks = data.blocks
 
             # Get the embeddings of the input nodes.

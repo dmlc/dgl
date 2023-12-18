@@ -50,6 +50,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  public:
   using NodeTypeToIDMap = torch::Dict<std::string, int64_t>;
   using EdgeTypeToIDMap = torch::Dict<std::string, int64_t>;
+  using NodeAttrMap = torch::Dict<std::string, torch::Tensor>;
   using EdgeAttrMap = torch::Dict<std::string, torch::Tensor>;
   /** @brief Default constructor. */
   FusedCSCSamplingGraph() = default;
@@ -66,16 +67,18 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
    * present.
+   * @param node_attributes A dictionary of node attributes, if present.
    * @param edge_attributes A dictionary of edge attributes, if present.
    *
    */
   FusedCSCSamplingGraph(
       const torch::Tensor& indptr, const torch::Tensor& indices,
-      const torch::optional<torch::Tensor>& node_type_offset,
-      const torch::optional<torch::Tensor>& type_per_edge,
-      const torch::optional<NodeTypeToIDMap>& node_type_to_id,
-      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
-      const torch::optional<EdgeAttrMap>& edge_attributes);
+      const torch::optional<torch::Tensor>& node_type_offset = torch::nullopt,
+      const torch::optional<torch::Tensor>& type_per_edge = torch::nullopt,
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id = torch::nullopt,
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id = torch::nullopt,
+      const torch::optional<NodeAttrMap>& node_attributes = torch::nullopt,
+      const torch::optional<EdgeAttrMap>& edge_attributes = torch::nullopt);
 
   /**
    * @brief Create a fused CSC graph from tensors of CSC format.
@@ -89,6 +92,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
    * present.
+   * @param node_attributes A dictionary of node attributes, if present.
    * @param edge_attributes A dictionary of edge attributes, if present.
    *
    * @return FusedCSCSamplingGraph
@@ -99,6 +103,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       const torch::optional<torch::Tensor>& type_per_edge,
       const torch::optional<NodeTypeToIDMap>& node_type_to_id,
       const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
+      const torch::optional<NodeAttrMap>& node_attributes,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /** @brief Get the number of nodes. */
@@ -137,6 +142,11 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    */
   inline const torch::optional<EdgeTypeToIDMap> EdgeTypeToID() const {
     return edge_type_to_id_;
+  }
+
+  /** @brief Get the node attributes dictionary. */
+  inline const torch::optional<EdgeAttrMap> NodeAttributes() const {
+    return node_attributes_;
   }
 
   /** @brief Get the edge attributes dictionary. */
@@ -178,6 +188,12 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   inline void SetEdgeTypeToID(
       const torch::optional<EdgeTypeToIDMap>& edge_type_to_id) {
     edge_type_to_id_ = edge_type_to_id;
+  }
+
+  /** @brief Set the node attributes dictionary. */
+  inline void SetNodeAttributes(
+      const torch::optional<EdgeAttrMap>& node_attributes) {
+    node_attributes_ = node_attributes;
   }
 
   /** @brief Set the edge attributes dictionary. */
@@ -366,6 +382,13 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * the value is the corresponding type ID.
    */
   torch::optional<EdgeTypeToIDMap> edge_type_to_id_;
+
+  /**
+   * @brief A dictionary of node attributes. Each key represents the attribute's
+   * name, while the corresponding value holds the attribute's specific value.
+   * The length of each value should match the total number of nodes."
+   */
+  torch::optional<NodeAttrMap> node_attributes_;
 
   /**
    * @brief A dictionary of edge attributes. Each key represents the attribute's

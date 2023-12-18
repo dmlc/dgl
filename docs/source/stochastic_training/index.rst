@@ -9,9 +9,8 @@ GraphBolt.
 
 .. toctree::
   :maxdepth: 1
-  :titlesonly:
 
   neighbor_sampling_overview.nblink
   node_classification.nblink
   link_prediction.nblink
-  ondisk-dataset
+  ondisk-dataset.rst
