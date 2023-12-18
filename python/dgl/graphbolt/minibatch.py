@@ -1,12 +1,11 @@
 """Unified data structure for input and ouput of all the stages in loading process."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import torch
 
 import dgl
-from dgl.heterograph import DGLBlock
 from dgl.utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple
