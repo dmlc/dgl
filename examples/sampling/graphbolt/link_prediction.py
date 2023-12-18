@@ -105,7 +105,7 @@ class SAGE(nn.Module):
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
-                # By design, our output nodes are contiguous.
+                # By design, our seed nodes are contiguous.
                 y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
                     buffer_device, non_blocking=True
                 )
