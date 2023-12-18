@@ -50,7 +50,15 @@ from tqdm import tqdm
 
 
 def create_dataloader(
-    graph, features, itemset, batch_size, fanout, device, num_workers, job
+    graph,
+    features,
+    itemset,
+    batch_size,
+    fanout,
+    device,
+    num_workers,
+    job,
+    output_cscformat,
 ):
     """
     [HIGHLIGHT]
@@ -105,7 +113,9 @@ def create_dataloader(
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
     datapipe = datapipe.sample_neighbor(
-        graph, fanout if job != "infer" else [-1]
+        graph,
+        fanout if job != "infer" else [-1],
+        True if output_cscformat == "True" else False,
     )
 
     ############################################################################
@@ -283,6 +293,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         device=args.device,
         num_workers=args.num_workers,
         job="train",
+        output_cscformat=args.output_cscformat,
     )
 
     for epoch in range(args.epochs):
@@ -353,6 +364,12 @@ def parse_args():
         default="cpu",
         choices=["cpu", "cuda"],
         help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+    )
+    parser.add_argument(
+        "--output_cscformat",
+        default="False",
+        choices=["False", "True"],
+        help="Output type of SampledSubgraph. True for csc_formats, False for node_pairs.",
     )
     return parser.parse_args()
 
