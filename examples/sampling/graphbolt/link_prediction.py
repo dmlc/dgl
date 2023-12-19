@@ -176,7 +176,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
     datapipe = datapipe.sample_neighbor(
-        graph, args.fanout, True if args.output_cscformat == "True" else False
+        graph,
+        args.fanout,
+        output_cscformat=True if args.output_cscformat == "True" else False,
     )
 
     ############################################################################
