@@ -2089,7 +2089,6 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
             tasks[0].validation_set,
             tasks[0].test_set,
         ]:
-            # assert False, (itemset._items, itemset._names)
             datapipe = gb.ItemSampler(itemset, batch_size=10)
             datapipe = datapipe.sample_neighbor(graph, [-1])
             datapipe = datapipe.fetch_feature(
