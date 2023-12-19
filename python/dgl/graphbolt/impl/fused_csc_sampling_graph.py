@@ -830,6 +830,84 @@ class FusedCSCSamplingGraph(SamplingGraph):
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
+    def _temporal_sample_neighbors(
+        self,
+        nodes: torch.Tensor,
+        input_nodes_timestamp: torch.Tensor,
+        fanouts: torch.Tensor,
+        replace: bool = False,
+        probs_name: Optional[str] = None,
+        node_timestamp_attr_name: Optional[str] = None,
+        edge_timestamp_attr_name: Optional[str] = None,
+    ) -> torch.ScriptObject:
+        """Temporally Sample neighboring edges of the given nodes and return the induced
+        subgraph.
+
+        If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is given,
+        the sampled neighbors or edges of an input node must have a timestamp
+        that is no later than that of the input node.
+
+        Parameters
+        ----------
+        nodes: torch.Tensor
+            IDs of the given seed nodes.
+        input_nodes_timestamp: torch.Tensor
+            Timestamps of the given seed nodes.
+        fanouts: torch.Tensor
+            The number of edges to be sampled for each node with or without
+            considering edge types.
+              - When the length is 1, it indicates that the fanout applies to
+                all neighbors of the node as a collective, regardless of the
+                edge type.
+              - Otherwise, the length should equal to the number of edge
+                types, and each fanout value corresponds to a specific edge
+                type of the nodes.
+            The value of each fanout should be >= 0 or = -1.
+              - When the value is -1, all neighbors (with non-zero probability,
+                if weighted) will be sampled once regardless of replacement. It
+                is equivalent to selecting all neighbors with non-zero
+                probability when the fanout is >= the number of neighbors (and
+                replace is set to false).
+              - When the value is a non-negative integer, it serves as a
+                minimum threshold for selecting neighbors.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        probs_name: str, optional
+            An optional string specifying the name of an edge attribute. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
+        node_timestamp_attr_name: str, optional
+            An optional string specifying the name of an node attribute.
+        edge_timestamp_attr_name: str, optional
+            An optional string specifying the name of an edge attribute.
+
+        Returns
+        -------
+        torch.classes.graphbolt.SampledSubgraph
+            The sampled C subgraph.
+        """
+        # Ensure nodes is 1-D tensor.
+        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        has_original_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
+        return self._c_csc_graph.temporal_sample_neighbors(
+            nodes,
+            input_nodes_timestamp,
+            fanouts.tolist(),
+            replace,
+            False,
+            has_original_eids,
+            probs_name,
+            node_timestamp_attr_name,
+            edge_timestamp_attr_name,
+        )
+
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
     ):

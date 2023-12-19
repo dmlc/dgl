@@ -571,6 +571,24 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
   }
 }
 
+c10::intrusive_ptr<FusedSampledSubgraph>
+FusedCSCSamplingGraph::TemporalSampleNeighbors(
+    const torch::Tensor& input_nodes,
+    const torch::Tensor& input_nodes_timestamp,
+    const std::vector<int64_t>& fanouts, bool replace, bool return_eids,
+    torch::optional<std::string> probs_name,
+    torch::optional<std::string> node_timestamp_attr_name,
+    torch::optional<std::string> edge_timestamp_attr_name) const {
+  // TODO(zhenkun):
+  // 1. Get probs_or_mask.
+  // 2. Get the timestamp attribute for nodes of the graph
+  // 3. Get the timestamp attribute for edges of the graph
+  // 4. GetTemporalNumPickFn (New implementation)
+  // 5. GetTemporalPickFn (New implementation)
+  // 6. Call SampleNeighborsImpl (Old implementation)
+  return c10::intrusive_ptr<FusedSampledSubgraph>();
+}
+
 std::tuple<torch::Tensor, torch::Tensor>
 FusedCSCSamplingGraph::SampleNegativeEdgesUniform(
     const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
