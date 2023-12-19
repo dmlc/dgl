@@ -402,7 +402,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         column = C_sampled_subgraph.original_column_node_ids.repeat_interleave(
             column_num
         )
-        row = C_sampled_subgraph.indices#.to(torch.int64)
+        row = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
         original_edge_ids = C_sampled_subgraph.original_edge_ids
         has_original_eids = (
@@ -624,7 +624,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-        print(f"C_sampled_subgraph.indices: {C_sampled_subgraph.indices}")
         if not output_cscformat:
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
