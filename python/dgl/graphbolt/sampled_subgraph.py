@@ -237,9 +237,9 @@ def _to_reverse_ids_node_pairs(
 ):
     u, v = node_pair
     if original_row_node_ids is not None:
-        u = original_row_node_ids[u]
+        u = torch.index_select(original_row_node_ids, dim=0, index=u)
     if original_column_node_ids is not None:
-        v = original_column_node_ids[v]
+        v = torch.index_select(original_column_node_ids, dim=0, index=v)
     return (u, v)
 
 
@@ -247,7 +247,9 @@ def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
     indptr = node_pair.indptr
     indices = node_pair.indices
     if original_row_node_ids is not None:
-        indices = original_row_node_ids[indices]
+        indices = torch.index_select(
+            original_row_node_ids, dim=0, index=indices
+        )
     if original_column_node_ids is not None:
         indptr = original_column_node_ids.repeat_interleave(
             indptr[1:] - indptr[:-1]
