@@ -1141,7 +1141,15 @@ def test_OnDiskDataset_preprocess_homogeneous():
         num_samples = 100
         fanout = 1
         subgraph = fused_csc_sampling_graph.sample_neighbors(
-            torch.arange(num_samples),
+            torch.arange(
+                0,
+                num_samples,
+                dtype=(
+                    torch.int32
+                    if num_nodes <= torch.iinfo(torch.int32).max
+                    else torch.int64
+                ),
+            ),
             torch.tensor([fanout]),
         )
         assert len(subgraph.node_pairs[0]) <= num_samples
@@ -2077,12 +2085,9 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
         assert dataset.feature.size("edge", None, "feat")[0] == num_classes
 
         for itemset in [
-            # tasks[0].train_set,
-            # tasks[0].validation_set,
-            # tasks[0].test_set,
-            gb.ItemSet(torch.tensor([[   0, 1000],
-                         [   1, 1001],
-                         [   2, 1002]]), names="node_pairs")
+            tasks[0].train_set,
+            tasks[0].validation_set,
+            tasks[0].test_set,
         ]:
             # assert False, (itemset._items, itemset._names)
             datapipe = gb.ItemSampler(itemset, batch_size=10)
