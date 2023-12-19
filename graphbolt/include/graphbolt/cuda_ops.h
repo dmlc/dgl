@@ -27,6 +27,8 @@ std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
 torch::Tensor CSRToCOO(
     torch::Tensor indptr, torch::ScalarType indices_scalar_type);
 
+torch::Tensor ExclusiveCumSum(torch::Tensor indptr);
+
 c10::intrusive_ptr<sampling::FusedSampledSubgraph>
 SampleNeighborsWithoutReplacement(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
