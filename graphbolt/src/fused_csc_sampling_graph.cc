@@ -109,91 +109,46 @@ c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::Create(
 
 void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   const int64_t magic_num =
-      read_from_archive(archive, "FusedCSCSamplingGraph/magic_num").toInt();
+      read_from_archive<int64_t>(archive, "FusedCSCSamplingGraph/magic_num");
   TORCH_CHECK(
       magic_num == kCSCSamplingGraphSerializeMagic,
       "Magic numbers mismatch when loading FusedCSCSamplingGraph.");
   indptr_ =
-      read_from_archive(archive, "FusedCSCSamplingGraph/indptr").toTensor();
-  indices_ =
-      read_from_archive(archive, "FusedCSCSamplingGraph/indices").toTensor();
-  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_node_type_offset")
-          .toBool()) {
-    node_type_offset_ =
-        read_from_archive(archive, "FusedCSCSamplingGraph/node_type_offset")
-            .toTensor();
+      read_from_archive<torch::Tensor>(archive, "FusedCSCSamplingGraph/indptr");
+  indices_ = read_from_archive<torch::Tensor>(
+      archive, "FusedCSCSamplingGraph/indices");
+  if (read_from_archive<bool>(
+          archive, "FusedCSCSamplingGraph/has_node_type_offset")) {
+    node_type_offset_ = read_from_archive<torch::Tensor>(
+        archive, "FusedCSCSamplingGraph/node_type_offset");
   }
-  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_type_per_edge")
-          .toBool()) {
-    type_per_edge_ =
-        read_from_archive(archive, "FusedCSCSamplingGraph/type_per_edge")
-            .toTensor();
+  if (read_from_archive<bool>(
+          archive, "FusedCSCSamplingGraph/has_type_per_edge")) {
+    type_per_edge_ = read_from_archive<torch::Tensor>(
+        archive, "FusedCSCSamplingGraph/type_per_edge");
   }
 
-  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_node_type_to_id")
-          .toBool()) {
-    torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "FusedCSCSamplingGraph/node_type_to_id")
-            .toGenericDict();
-    NodeTypeToIDMap node_type_to_id;
-    for (const auto& pair : generic_dict) {
-      std::string key = pair.key().toStringRef();
-      int64_t value = pair.value().toInt();
-      node_type_to_id.insert(std::move(key), value);
-    }
-    node_type_to_id_ = std::move(node_type_to_id);
+  if (read_from_archive<bool>(
+          archive, "FusedCSCSamplingGraph/has_node_type_to_id")) {
+    node_type_to_id_ = read_from_archive<NodeTypeToIDMap>(
+        archive, "FusedCSCSamplingGraph/node_type_to_id");
   }
 
-  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_edge_type_to_id")
-          .toBool()) {
-    torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "FusedCSCSamplingGraph/edge_type_to_id")
-            .toGenericDict();
-    EdgeTypeToIDMap edge_type_to_id;
-    for (const auto& pair : generic_dict) {
-      std::string key = pair.key().toStringRef();
-      int64_t value = pair.value().toInt();
-      edge_type_to_id.insert(std::move(key), value);
-    }
-    edge_type_to_id_ = std::move(edge_type_to_id);
+  if (read_from_archive<bool>(
+          archive, "FusedCSCSamplingGraph/has_edge_type_to_id")) {
+    edge_type_to_id_ = read_from_archive<EdgeTypeToIDMap>(
+        archive, "FusedCSCSamplingGraph/edge_type_to_id");
   }
 
-  // Optional node attributes.
-  torch::IValue has_node_attributes;
-  if (archive.try_read(
-          "FusedCSCSamplingGraph/has_node_attributes", has_node_attributes) &&
-      has_node_attributes.toBool()) {
-    torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "FusedCSCSamplingGraph/node_attributes")
-            .toGenericDict();
-    NodeAttrMap target_dict;
-    for (const auto& pair : generic_dict) {
-      std::string key = pair.key().toStringRef();
-      torch::Tensor value = pair.value().toTensor();
-      // Use move to avoid copy.
-      target_dict.insert(std::move(key), std::move(value));
-    }
-    // Same as above.
-    node_attributes_ = std::move(target_dict);
+  if (read_from_archive<bool>(
+          archive, "FusedCSCSamplingGraph/has_node_attributes")) {
+    node_attributes_ = read_from_archive<NodeAttrMap>(
+        archive, "FusedCSCSamplingGraph/node_attributes");
   }
-
-  // Optional edge attributes.
-  torch::IValue has_edge_attributes;
-  if (archive.try_read(
-          "FusedCSCSamplingGraph/has_edge_attributes", has_edge_attributes) &&
-      has_edge_attributes.toBool()) {
-    torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "FusedCSCSamplingGraph/edge_attributes")
-            .toGenericDict();
-    EdgeAttrMap target_dict;
-    for (const auto& pair : generic_dict) {
-      std::string key = pair.key().toStringRef();
-      torch::Tensor value = pair.value().toTensor();
-      // Use move to avoid copy.
-      target_dict.insert(std::move(key), std::move(value));
-    }
-    // Same as above.
-    edge_attributes_ = std::move(target_dict);
+  if (read_from_archive<bool>(
+          archive, "FusedCSCSamplingGraph/has_edge_attributes")) {
+    edge_attributes_ = read_from_archive<EdgeAttrMap>(
+        archive, "FusedCSCSamplingGraph/edge_attributes");
   }
 }
 
@@ -582,9 +537,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
-  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
-  if (probs_name.has_value() && !probs_name.value().empty()) {
-    probs_or_mask = edge_attributes_.value().at(probs_name.value());
+  auto probs_or_mask = this->EdgeAttribute(probs_name);
+  if (probs_name.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
     // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
     // avoid crashes, convert 'probs_or_mask' to 'float32' data type.

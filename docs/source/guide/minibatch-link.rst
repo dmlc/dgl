@@ -129,8 +129,6 @@ above.
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
-            # Convert MiniBatch to DGLMiniBatch.
-            data = data.to_dgl()
             # Unpack MiniBatch.
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
             node_feature = data.node_features["feat"]
@@ -273,8 +271,6 @@ except for computing loss on specific edge type.
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
-            # Convert MiniBatch to DGLMiniBatch.
-            data = data.to_dgl()
             # Unpack MiniBatch.
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data, category)
             node_features = {
