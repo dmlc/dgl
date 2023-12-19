@@ -548,9 +548,9 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
       probs_or_mask = edge_attributes_.value().at(probs_name.value());
     }
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "SampleNeighborsWithoutReplacement", {
-          return ops::SampleNeighborsWithoutReplacement(
-              indptr_, indices_, nodes, fanouts, layer, return_eids,
+        c10::DeviceType::CUDA, "SampleNeighbors", {
+          return ops::SampleNeighbors(
+              indptr_, indices_, nodes, fanouts, replace, layer, return_eids,
               type_per_edge_, probs_or_mask);
         });
   }

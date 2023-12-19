@@ -99,15 +99,15 @@ struct ConvertToBytes {
   }
 };
 
-c10::intrusive_ptr<sampling::FusedSampledSubgraph>
-SampleNeighborsWithoutReplacement(
+c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
-    const std::vector<int64_t>& fanouts, bool layer, bool return_eids,
-    torch::optional<torch::Tensor> type_per_edge,
+    const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool return_eids, torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<int64_t> random_seed) {
   TORCH_CHECK(
       fanouts.size() == 1, "Heterogenous sampling is not supported yet!");
+  TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
   // We assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them.
   const auto num_rows = nodes.size(0);
