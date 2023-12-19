@@ -537,9 +537,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
-  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
-  if (probs_name.has_value() && !probs_name.value().empty()) {
-    probs_or_mask = edge_attributes_.value().at(probs_name.value());
+  auto probs_or_mask = this->EdgeAttribute(probs_name);
+  if (probs_name.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
     // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
     // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
