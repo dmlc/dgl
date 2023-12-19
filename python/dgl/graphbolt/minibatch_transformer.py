@@ -37,6 +37,6 @@ class MiniBatchTransformer(Mapper):
     def _transformer(self, minibatch):
         minibatch = self.transformer(minibatch)
         assert isinstance(
-            minibatch, (MiniBatch, DGLMiniBatch)
+            minibatch, (MiniBatch,)
         ), "The transformer output should be an instance of MiniBatch"
         return minibatch
