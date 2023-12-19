@@ -182,10 +182,12 @@ SampleNeighborsWithoutReplacement(
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<int64_t> random_seed) {
   TORCH_CHECK(
-      type_per_edge.has_value(), "Heterogenous sampling is not supported yet!");
+      fanouts.size() == 1, "Heterogenous sampling is not supported yet!");
   // We assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them.
   const auto num_rows = nodes.size(0);
+  const auto fanout =
+      fanouts[0] >= 0 ? fanouts[0] : std::numeric_limits<int64_t>::max();
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
@@ -207,7 +209,7 @@ SampleNeighborsWithoutReplacement(
         thrust::counting_iterator<int64_t> iota(0);
         auto sampled_degree = thrust::make_transform_iterator(
             iota, MinInDegreeFanout<indptr_t>{
-                      in_degree.data_ptr<indptr_t>(), fanouts[0]});
+                      in_degree.data_ptr<indptr_t>(), fanout});
         {
           size_t tmp_storage_size = 0;
           cub::DeviceScan::ExclusiveSum(
@@ -319,7 +321,7 @@ SampleNeighborsWithoutReplacement(
         }
       }));
 
-  auto output_indices = indices[picked_eids];
+  auto output_indices = indices.gather(0, picked_eids);
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 
