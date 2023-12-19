@@ -201,7 +201,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         row_and_prob_sorted.get(), input_edge_id_segments.get(),
                         sorted_edge_id_segments.get(), num_edges,
                         decomposer_t<indices_t, float>{}, 0,
-                        sizeof(input_edge_id_segments.get()[0]), stream));
+                        sizeof(row_and_prob.get()[0]), stream));
                     auto tmp_storage =
                         allocator.AllocateStorage<char>(tmp_storage_size);
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
@@ -209,7 +209,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         row_and_prob_sorted.get(), input_edge_id_segments.get(),
                         sorted_edge_id_segments.get(), num_edges,
                         decomposer_t<indices_t, float>{}, 0,
-                        sizeof(input_edge_id_segments.get()[0]), stream));
+                        sizeof(row_and_prob.get()[0]), stream));
                   }));
             }));
 
