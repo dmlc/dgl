@@ -240,6 +240,7 @@ def layerwise_infer(
         device=args.device,
         num_workers=args.num_workers,
         job="infer",
+        output_cscformat=args.output_cscformat,
     )
     pred = model.inference(graph, features, dataloader, args.device)
     pred = pred[test_set._items[0]]
@@ -267,6 +268,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         device=args.device,
         num_workers=args.num_workers,
         job="evaluate",
+        output_cscformat=args.output_cscformat,
     )
 
     for step, data in tqdm(enumerate(dataloader)):
