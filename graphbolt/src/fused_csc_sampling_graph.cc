@@ -805,13 +805,14 @@ static torch::Tensor NonUniformPickOp(
     torch::Tensor probs, int64_t fanout, bool replace) {
   auto positive_probs_indices = probs.nonzero().squeeze(1);
   auto num_positive_probs = positive_probs_indices.size(0);
-  if (num_positive_probs == 0) return torch::Tensor();
+  if (num_positive_probs == 0) return torch::empty({0}, torch::kLong);
   if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
     return positive_probs_indices;
   }
   if (!replace) fanout = std::min(fanout, num_positive_probs);
-  if (fanout == 0) return torch::Tensor();
-  std::vector<int64_t> picked_indices;
+  if (fanout == 0) return torch::empty({0}, torch::kLong);
+  auto ret_tensor = torch::empty({fanout}, torch::kLong);
+  auto ret_ptr = ret_tensor.data_ptr<int64_t>();
   AT_DISPATCH_FLOATING_TYPES(
       probs.scalar_type(), "MultinomialSampling", ([&] {
         auto probs_data_ptr = probs.data_ptr<scalar_t>();
@@ -841,7 +842,7 @@ static torch::Tensor NonUniformPickOp(
                 max_prob_index = positive_probs_indices_ptr[i];
               }
             }
-            picked_indices.push_back(max_prob_index);
+            ret_ptr[0] = max_prob_index;
           } else {
             // Return topk(p / q).
             std::vector<std::pair<scalar_t, int64_t>> q(num_positive_probs);
@@ -855,14 +856,14 @@ static torch::Tensor NonUniformPickOp(
               std::partial_sort(
                   q.begin(), q.begin() + fanout, q.end(), std::greater{});
               for (auto i = 0; i < fanout; ++i) {
-                picked_indices.push_back(q[i].second);
+                ret_ptr[i] = q[i].second;
               }
             } else {
               // Use nth_element.
               std::nth_element(
                   q.begin(), q.begin() + fanout - 1, q.end(), std::greater{});
               for (auto i = 0; i < fanout; ++i) {
-                picked_indices.push_back(q[i].second);
+                ret_ptr[i] = q[i].second;
               }
             }
           }
@@ -889,14 +890,11 @@ static torch::Tensor NonUniformPickOp(
                                     prefix_sum_probs.begin(),
                                     prefix_sum_probs.end(), uniform_sample) -
                                 prefix_sum_probs.begin();
-            picked_indices.push_back(positive_probs_indices_ptr[sampled_index]);
+            ret_ptr[i] = positive_probs_indices_ptr[sampled_index];
           }
         }
       }));
-  return torch::from_blob(
-             picked_indices.data(),
-             {static_cast<int64_t>(picked_indices.size())}, torch::kLong)
-      .clone();
+  return ret_tensor;
 }
 
 /**
