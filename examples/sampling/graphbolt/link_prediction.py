@@ -178,7 +178,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     datapipe = datapipe.sample_neighbor(
         graph,
         args.fanout,
-        output_cscformat=True if args.output_cscformat == "True" else False,
+        output_cscformat=(args.output_cscformat == "True"),
     )
 
     ############################################################################

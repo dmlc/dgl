@@ -115,7 +115,7 @@ def create_dataloader(
     datapipe = datapipe.sample_neighbor(
         graph,
         fanout if job != "infer" else [-1],
-        output_cscformat=True if output_cscformat == "True" else False,
+        output_cscformat=(output_cscformat == "True"),
     )
 
     ############################################################################
