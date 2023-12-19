@@ -4,7 +4,6 @@
  * @file cuda/index_select_impl.cu
  * @brief Index select operator implementation on CUDA.
  */
-#include <ATen/cuda/CUDAEvent.h>
 #include <c10/core/ScalarType.h>
 #include <c10/cuda/CUDAStream.h>
 #include <curand_kernel.h>
@@ -145,16 +144,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               tmp_storage.get(), tmp_storage_size, sampled_degree,
               output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
         }
-        auto num_sampled_edges = torch::empty(
-            1, c10::TensorOptions()
-                   .dtype(indptr.scalar_type())
-                   .pinned_memory(true));
-        CUDA_CALL(cudaMemcpyAsync(
-            num_sampled_edges.data_ptr<indptr_t>(),
-            output_indptr.data_ptr<indptr_t>() + num_rows, sizeof(indptr_t),
-            cudaMemcpyDeviceToHost, stream));
-        at::cuda::CUDAEvent copy_event;
-        copy_event.record(stream);
+        auto num_sampled_edges =
+            cuda::ReadScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
         auto sorted_edge_id_segments =
             allocator.AllocateStorage<indptr_t>(num_edges);
         AT_DISPATCH_INTEGRAL_TYPES(
@@ -195,28 +186,27 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         random_seed.value(), row_and_prob.get(),
                         input_edge_id_segments.get());
 
+                    const int num_bits =
+                        sizeof(float) + cuda::NumberOfBits(num_rows);
+
                     size_t tmp_storage_size = 0;
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
                         nullptr, tmp_storage_size, row_and_prob.get(),
                         row_and_prob_sorted.get(), input_edge_id_segments.get(),
                         sorted_edge_id_segments.get(), num_edges,
-                        decomposer_t<indices_t, float>{}, 0,
-                        sizeof(row_and_prob.get()[0]), stream));
+                        decomposer_t<indices_t, float>{}, 0, num_bits, stream));
                     auto tmp_storage =
                         allocator.AllocateStorage<char>(tmp_storage_size);
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
                         tmp_storage.get(), tmp_storage_size, row_and_prob.get(),
                         row_and_prob_sorted.get(), input_edge_id_segments.get(),
                         sorted_edge_id_segments.get(), num_edges,
-                        decomposer_t<indices_t, float>{}, 0,
-                        sizeof(row_and_prob.get()[0]), stream));
+                        decomposer_t<indices_t, float>{}, 0, num_bits, stream));
                   }));
             }));
 
-        // Now we are free to access num_sampled_edges
-        copy_event.synchronize();
         picked_eids = torch::empty(
-            *num_sampled_edges.data_ptr<indptr_t>(),
+            static_cast<indptr_t>(num_sampled_edges),
             nodes.options().dtype(indices.scalar_type()));
 
         auto input_buffer_it = thrust::make_transform_iterator(

@@ -7,6 +7,7 @@
 #ifndef GRAPHBOLT_CUDA_COMMON_H_
 #define GRAPHBOLT_CUDA_COMMON_H_
 
+#include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime.h>
@@ -89,6 +90,33 @@ inline bool is_zero<dim3>(dim3 size) {
       C10_CUDA_KERNEL_LAUNCH_CHECK();                                 \
     }                                                                 \
   }
+
+template <typename scalar_t>
+struct ReadScalar {
+  ReadScalar(const scalar_t* device_ptr) : is_ready(false) {
+    pinned_scalar = torch::empty(
+        sizeof(scalar_t),
+        c10::TensorOptions().dtype(torch::kBool).pinned_memory(true));
+    auto stream = GetCurrentStream();
+    CUDA_CALL(cudaMemcpyAsync(
+        reinterpret_cast<scalar_t*>(pinned_scalar.data_ptr()), device_ptr,
+        sizeof(scalar_t), cudaMemcpyDeviceToHost, stream));
+    copy_event.record(stream);
+  }
+
+  operator scalar_t() {
+    if (!is_ready) {
+      copy_event.synchronize();
+      is_ready = true;
+    }
+    return reinterpret_cast<scalar_t*>(pinned_scalar.data_ptr())[0];
+  }
+
+ private:
+  torch::Tensor pinned_scalar;
+  at::cuda::CUDAEvent copy_event;
+  bool is_ready;
+};
 
 #define GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(...)            \
   AT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__)                 \
