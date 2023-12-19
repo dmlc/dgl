@@ -4,6 +4,7 @@
  * @brief Source file of sampling graph.
  */
 
+#include <graphbolt/cuda_ops.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
@@ -16,8 +17,10 @@
 #include <tuple>
 #include <vector>
 
+#include "./macro.h"
 #include "./random.h"
 #include "./shared_memory_helper.h"
+#include "./utils.h"
 
 namespace {
 torch::optional<torch::Dict<std::string, torch::Tensor>> TensorizeDict(
@@ -538,6 +541,20 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
   torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
+  if (!replace && utils::is_accessible_from_gpu(indptr_) &&
+      utils::is_accessible_from_gpu(indices_) &&
+      utils::is_accessible_from_gpu(nodes)) {
+    if (probs_name.has_value() && !probs_name.value().empty()) {
+      probs_or_mask = edge_attributes_.value().at(probs_name.value());
+    }
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+        c10::DeviceType::CUDA, "SampleNeighborsWithoutReplacement", {
+          return ops::SampleNeighborsWithoutReplacement(
+              indptr_, indices_, nodes, fanouts, layer, return_eids,
+              type_per_edge_, probs_or_mask);
+        });
+  }
+
   if (probs_name.has_value() && !probs_name.value().empty()) {
     probs_or_mask = edge_attributes_.value().at(probs_name.value());
     // Note probs will be passed as input for 'torch.multinomial' in deeper

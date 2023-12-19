@@ -106,7 +106,7 @@ std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
     torch::Tensor indptr, torch::Tensor nodes) {
   auto allocator = cuda::GetAllocator();
   const auto exec_policy =
-      thrust::cuda::par_nosync(allocator).on(c10::cuda::getDefaultCUDAStream());
+      thrust::cuda::par_nosync(allocator).on(cuda::GetCurrentStream());
   const int64_t num_nodes = nodes.size(0);
   // Read indptr only once in case it is pinned and access is slow.
   auto sliced_indptr =
@@ -203,7 +203,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
   // Sorting nodes so that accesses over PCI-e are more regular.
   const auto sorted_idx =
       Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1)).second;
-  auto stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   return AT_DISPATCH_INTEGRAL_TYPES(
@@ -271,7 +271,7 @@ void IndexSelectCSCCopyIndices(
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
-  auto stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   return AT_DISPATCH_INTEGRAL_TYPES(

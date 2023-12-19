@@ -67,6 +67,8 @@ struct CUDAWorkspaceAllocator {
 
 inline auto GetAllocator() { return CUDAWorkspaceAllocator{}; }
 
+inline auto GetCurrentStream() { return c10::cuda::getCurrentCUDAStream(); }
+
 template <typename T>
 inline bool is_zero(T size) {
   return size == 0;
@@ -87,6 +89,15 @@ inline bool is_zero<dim3>(dim3 size) {
       C10_CUDA_KERNEL_LAUNCH_CHECK();                                 \
     }                                                                 \
   }
+
+#define GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(...)            \
+  AT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__)                 \
+  AT_DISPATCH_CASE(at::ScalarType::Half, __VA_ARGS__)     \
+  AT_DISPATCH_CASE(at::ScalarType::BFloat16, __VA_ARGS__) \
+  AT_DISPATCH_CASE(at::ScalarType::Bool, __VA_ARGS__)
+
+#define GRAPHBOLT_DISPATCH_ALL_TYPES(TYPE, NAME, ...) \
+  AT_DISPATCH_SWITCH(TYPE, NAME, GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__))
 
 #define GRAPHBOLT_DISPATCH_ELEMENT_SIZES(element_size, name, ...)             \
   [&] {                                                                       \
