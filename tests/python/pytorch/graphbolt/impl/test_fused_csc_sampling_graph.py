@@ -1,6 +1,7 @@
 import os
 
 import pickle
+import re
 import tempfile
 import unittest
 
@@ -972,15 +973,24 @@ def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
     graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
-    nodes_in_incorrect_dtype = torch.tensor(
+    fanouts = torch.LongTensor([2])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = torch.tensor(
         [1, 3, 4],
         dtype=(torch.int64 if indices_dtype == torch.int32 else torch.int32),
     )
-    fanouts = torch.LongTensor([2])
-    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    with pytest.raises(AssertionError):
-        _subgraph = sampler(nodes_in_incorrect_dtype, fanouts)
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
+    nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
@@ -1030,12 +1040,37 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
     )
 
     # Sample on both node types.
+    fanouts = torch.tensor([-1, -1])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = {
+        "n1": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        ),
+        "n2": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        ),
+    }
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
     nodes = {
         "n1": torch.tensor([0], dtype=indices_dtype),
         "n2": torch.tensor([0], dtype=indices_dtype),
     }
-    fanouts = torch.tensor([-1, -1])
-    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
@@ -1058,8 +1093,11 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
     assert subgraph.original_edge_ids is None
 
     # Sample on single node type.
-    nodes = {"n1": torch.tensor([0], dtype=indices_dtype)}
-    nodes_in_incorrect_dtype = {
+    fanouts = torch.tensor([-1, -1])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = {
         "n1": torch.tensor(
             [0],
             dtype=(
@@ -1067,10 +1105,16 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
             ),
         )
     }
-    fanouts = torch.tensor([-1, -1])
-    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    with pytest.raises(AssertionError):
-        _subgraph = sampler(nodes_in_incorrect_dtype, fanouts)
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
+    nodes = {"n1": torch.tensor([0], dtype=indices_dtype)}
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
