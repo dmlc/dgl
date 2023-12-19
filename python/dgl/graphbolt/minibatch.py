@@ -203,7 +203,12 @@ class MiniBatch:
                             (
                                 v.indptr,
                                 v.indices,
-                                torch.tensor([]),
+                                torch.arange(
+                                    0,
+                                    v.indptr[-1],
+                                    device=v.indptr.device,
+                                    dtype=v.indptr.dtype,
+                                ),
                             ),
                         )
                         for etype, v in subgraph.node_pairs.items()
@@ -229,7 +234,12 @@ class MiniBatch:
                         (
                             node_pairs.indptr,
                             node_pairs.indices,
-                            torch.tensor([]),
+                            torch.arange(
+                                0,
+                                node_pairs.indptr[-1],
+                                device=node_pairs.indptr.device,
+                                dtype=node_pairs.indptr.dtype,
+                            ),
                         ),
                     )
                 num_src_nodes = original_row_node_ids.size(0)
