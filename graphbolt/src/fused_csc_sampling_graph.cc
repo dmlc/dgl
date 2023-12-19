@@ -573,7 +573,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
 
 c10::intrusive_ptr<FusedSampledSubgraph>
 FusedCSCSamplingGraph::TemporalSampleNeighbors(
-    const torch::Tensor& nodes, const torch::Tensor& input_nodes_timestamp,
+    const torch::Tensor& input_nodes,
+    const torch::Tensor& input_nodes_timestamp,
     const std::vector<int64_t>& fanouts, bool replace, bool return_eids,
     torch::optional<std::string> probs_name,
     torch::optional<std::string> node_timestamp_attr_name,
