@@ -102,7 +102,9 @@ def apply_to(x, device):
 @functional_datapipe("copy_to")
 class CopyTo(IterDataPipe):
     """DataPipe that transfers each element yielded from the previous DataPipe
-    to the given device.
+    to the given device. For MiniBatch, only the related attributes
+    (automatically inferred) will be transferred by default. If you want to
+    transfer any other attributes, indicate them in the `extra_attrs`.
 
     Functional name: :obj:`copy_to`.
 
@@ -119,16 +121,25 @@ class CopyTo(IterDataPipe):
         The DataPipe.
     device : torch.device
         The PyTorch CUDA device.
+    extra_attrs: List[string]
+        The extra attributes in the MiniBatch you wish to be carried to the
+        specific device.
     """
 
-    def __init__(self, datapipe, device):
+    def __init__(self, datapipe, device, extra_attrs=None):
         super().__init__()
         self.datapipe = datapipe
         self.device = device
+        self.extra_attrs = extra_attrs
 
     def __iter__(self):
+        from .minibatch import MiniBatch
+
         for data in self.datapipe:
-            data = recursive_apply(data, apply_to, self.device)
+            if isinstance(data, MiniBatch):
+                data = data.to(self.device, self.extra_attrs)
+            else:
+                data = recursive_apply(data, apply_to, self.device)
             yield data
 
 

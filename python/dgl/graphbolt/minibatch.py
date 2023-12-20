@@ -408,25 +408,63 @@ class MiniBatch:
         else:
             return (self.compacted_node_pairs, self.labels)
 
-    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+    def to(self, device, extra_attrs=None):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
 
         def _to(x, device):
             return x.to(device) if hasattr(x, "to") else x
 
-        for attr in dir(self):
-            # Only copy member variables.
-            if not callable(getattr(self, attr)) and not attr.startswith("__"):
-                try:
-                    setattr(
-                        self,
-                        attr,
-                        recursive_apply(
-                            getattr(self, attr), lambda x: _to(x, device)
-                        ),
-                    )
-                except AttributeError:
-                    continue
+        def apply_to(x, device):
+            return recursive_apply(x, lambda x: _to(x, device))
+
+        if self.labels is not None and self.seed_nodes is not None:
+            # Node classification.
+            self.labels = apply_to(self.labels, device)
+            self.sampled_subgraphs = apply_to(self.sampled_subgraphs, device)
+            self.node_features = apply_to(self.node_features, device)
+            self.edge_features = apply_to(self.edge_features, device)
+        elif self.labels is None and self.compacted_node_pairs is not None:
+            # Link prediction.
+            self.compacted_node_pairs = apply_to(
+                self.compacted_node_pairs, device
+            )
+            self.compacted_negative_srcs = apply_to(
+                self.compacted_negative_srcs, device
+            )
+            self.compacted_negative_dsts = apply_to(
+                self.compacted_negative_dsts, device
+            )
+            self.sampled_subgraphs = apply_to(self.sampled_subgraphs, device)
+            self.node_features = apply_to(self.node_features, device)
+            self.edge_features = apply_to(self.edge_features, device)
+        elif self.labels is not None and self.compacted_node_pairs is not None:
+            # Edge classification.
+            self.labels = apply_to(self.labels, device)
+            self.compacted_node_pairs = apply_to(
+                self.compacted_node_pairs, device
+            )
+            self.sampled_subgraphs = apply_to(self.sampled_subgraphs, device)
+            self.node_features = apply_to(self.node_features, device)
+            self.edge_features = apply_to(self.edge_features, device)
+        else:
+            # Unrecognized task. Will copy all the attributes to the device.
+            for attr in dir(self):
+                # Only copy member variables.
+                if not callable(getattr(self, attr)) and not attr.startswith(
+                    "__"
+                ):
+                    try:
+                        setattr(
+                            self, attr, apply_to(getattr(self, attr), device)
+                        )
+                    except AttributeError:
+                        continue
+        if extra_attrs is not None:
+            for attr in extra_attrs:
+                if not callable(getattr(self, attr)) and not attr.startswith(
+                    "__"
+                ):
+                    setattr(self, attr, apply_to(getattr(self, attr), device))
 
         return self
 
