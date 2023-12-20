@@ -118,18 +118,23 @@ def preprocess_ondisk_dataset(
     # the sampling-graph.
     if input_config["graph"].get("feature_data", None):
         for graph_feature in input_config["graph"]["feature_data"]:
+            in_memory = (
+                True
+                if "in_memory" not in graph_feature
+                else graph_feature["in_memory"]
+            )
             if graph_feature["domain"] == "node":
                 node_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
-                    in_memory=graph_feature["in_memory"],
+                    in_memory=in_memory,
                 )
                 g.ndata[graph_feature["name"]] = node_data
             if graph_feature["domain"] == "edge":
                 edge_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
-                    in_memory=graph_feature["in_memory"],
+                    in_memory=in_memory,
                 )
                 g.edata[graph_feature["name"]] = edge_data
 
@@ -164,12 +169,15 @@ def preprocess_ondisk_dataset(
             out_feature["path"] = os.path.join(
                 processed_dir_prefix, feature["path"].replace("pt", "npy")
             )
+            in_memory = (
+                True if "in_memory" not in feature else feature["in_memory"]
+            )
             copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
                 os.path.join(dataset_dir, out_feature["path"]),
                 feature["format"],
-                out_feature["format"],
-                feature["in_memory"],
+                output_format=out_feature["format"],
+                in_memory=in_memory,
                 is_feature=True,
             )
 
