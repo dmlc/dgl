@@ -16,6 +16,7 @@ from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
 from ..dataset import Dataset, Task
 from ..internal import copy_or_convert_data, read_data
 from ..itemset import ItemSet, ItemSetDict
+from ..minibatch import MiniBatch
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
     fused_csc_sampling_graph,
@@ -32,6 +33,12 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 INT32_MAX = torch.iinfo(torch.int32).max
+NAMES_INDICATING_NODE_IDS = [
+    "seed_nodes",
+    "node_pairs",
+    "negative_srcs",
+    "negative_srcs",
+]
 
 
 def preprocess_ondisk_dataset(
@@ -216,6 +223,7 @@ def preprocess_ondisk_dataset(
 
     # 5. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
+        _minibatch = MiniBatch()
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
         ):
@@ -234,12 +242,20 @@ def preprocess_ondisk_dataset(
                             processed_dir_prefix,
                             input_data["path"].replace("pt", "npy"),
                         )
+                        name = input_data["name"]
+                        if not hasattr(_minibatch, name):
+                            dgl_warning(
+                                f"Data name '{name}' is not a canonical "
+                                "attribute of `Minibatch`. You probably need "
+                                "to provide a customized `MiniBatcher`."
+                            )
                         copy_or_convert_data(
                             os.path.join(dataset_dir, input_data["path"]),
                             os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
                             output_data["format"],
-                            within_int32=num_nodes_within_int32,
+                            within_int32=name in NAMES_INDICATING_NODE_IDS
+                            and num_nodes_within_int32,
                         )
 
     # 6. Save the output_config.
