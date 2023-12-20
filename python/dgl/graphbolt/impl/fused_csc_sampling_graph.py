@@ -410,9 +410,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
         if has_original_eids:
-            original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
-                original_edge_ids
-            ]
+            original_edge_ids = torch.index_select(
+                self.edge_attributes[ORIGINAL_EDGE_ID],
+                dim=0,
+                index=original_edge_ids,
+            )
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
@@ -463,9 +465,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
         if has_original_eids:
-            original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
-                original_edge_ids
-            ]
+            original_edge_ids = torch.index_select(
+                self.edge_attributes[ORIGINAL_EDGE_ID],
+                dim=0,
+                index=original_edge_ids,
+            )
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = CSCFormatBase(indptr=indptr, indices=indices)
