@@ -67,6 +67,12 @@ if(USE_CUDA)
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
                              "../third_party/cccl/libcudacxx/include")
+  
+  if(DEFINED ENV{CUDAARCHS})
+    set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_ARCHITECTURES $ENV{CUDAARCHS})
+  endif()
+  get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
+  message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")
 endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when
