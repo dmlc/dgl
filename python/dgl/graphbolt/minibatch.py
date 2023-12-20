@@ -381,32 +381,57 @@ class MiniBatch:
     @property
     def node_pairs_with_labels(self):
         """Get a node pair tensor and a label tensor from MiniBatch. They are
-        used for evaluating or computing loss. It will return
-        `(node_pairs, labels)` as result.
+        used for evaluating or computing loss. For homogeneous graph, it will
+        return `(node_pairs, labels)` as result; for heterogeneous graph, the
+        `node_pairs` and `labels` will both be a dict with etype as the key.
         - If it's a link prediction task, `node_pairs` will contain both
         negative and positive node pairs and `labels` will consist of 0 and 1,
         indicating whether the corresponding node pair is negative or positive.
         - If it's an edge classification task, this function will directly
-        return `compacted_node_pairs` and corresponding `labels`.
+        return `compacted_node_pairs` for each etype and the corresponding
+        `labels`.
         - Otherwise it will return None.
         """
         if self.labels is None:
+            # Link prediction.
             positive_node_pairs = self.positive_node_pairs
             negative_node_pairs = self.negative_node_pairs
             if positive_node_pairs is None or negative_node_pairs is None:
                 return None
-            pos_src, pos_dst = positive_node_pairs
-            neg_src, neg_dst = negative_node_pairs
-            node_pairs = (
-                torch.cat((pos_src, neg_src), dim=0),
-                torch.cat((pos_dst, neg_dst), dim=0),
-            )
-            pos_label = torch.ones_like(pos_src)
-            neg_label = torch.zeros_like(neg_src)
-            labels = torch.cat([pos_label, neg_label], dim=0)
-            return (node_pairs, labels.float())
-        else:
+            if isinstance(positive_node_pairs, Dict):
+                # Heterogeneous graph.
+                node_pairs_by_etype = {}
+                labels_by_etype = {}
+                for etype in positive_node_pairs:
+                    pos_src, pos_dst = positive_node_pairs[etype]
+                    neg_src, neg_dst = negative_node_pairs[etype]
+                    node_pairs_by_etype[etype] = (
+                        torch.cat((pos_src, neg_src), dim=0),
+                        torch.cat((pos_dst, neg_dst), dim=0),
+                    )
+                    pos_label = torch.ones_like(pos_src)
+                    neg_label = torch.zeros_like(neg_src)
+                    labels_by_etype[etype] = torch.cat(
+                        [pos_label, neg_label], dim=0
+                    )
+                return (node_pairs_by_etype, labels_by_etype)
+            else:
+                # Homogeneous graph.
+                pos_src, pos_dst = positive_node_pairs
+                neg_src, neg_dst = negative_node_pairs
+                node_pairs = (
+                    torch.cat((pos_src, neg_src), dim=0),
+                    torch.cat((pos_dst, neg_dst), dim=0),
+                )
+                pos_label = torch.ones_like(pos_src)
+                neg_label = torch.zeros_like(neg_src)
+                labels = torch.cat([pos_label, neg_label], dim=0)
+                return (node_pairs, labels.float())
+        elif self.compacted_node_pairs is not None:
+            # Edge classification.
             return (self.compacted_node_pairs, self.labels)
+        else:
+            return None
 
     def to(self, device, extra_attrs=None):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
