@@ -130,8 +130,7 @@ class NeighborSampler(SubgraphSampler):
                 break
             default_tensor = torch.tensor([], dtype=dtype, device=device)
             seeds = {
-                ntype: seeds.get(ntype, default_tensor)
-                for ntype in ntypes
+                ntype: seeds.get(ntype, default_tensor) for ntype in ntypes
             }
         for hop in range(num_layers):
             subgraph = self.sampler(

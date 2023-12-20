@@ -1,9 +1,10 @@
+import unittest
+
 import backend as F
 import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
-import unittest
 from torchdata.datapipes.iter import Mapper
 
 from . import gb_test_utils
@@ -26,7 +27,9 @@ def test_SubgraphSampler_invoke():
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_NeighborSampler_invoke(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(F.ctx())
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
@@ -47,7 +50,9 @@ def test_NeighborSampler_invoke(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_NeighborSampler_fanouts(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(F.ctx())
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
@@ -71,7 +76,9 @@ def test_NeighborSampler_fanouts(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Node(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(F.ctx())
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
@@ -88,7 +95,9 @@ def to_link_batch(data):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(F.ctx())
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
@@ -100,7 +109,9 @@ def test_SubgraphSampler_Link(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_With_Negative(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(F.ctx())
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
@@ -293,7 +304,9 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
     seed_nodes = torch.LongTensor([0, 3, 4])
 
     itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(F.ctx())
+    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(
+        F.ctx()
+    )
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
@@ -309,7 +322,10 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
         torch.tensor([0, 1, 2, 4, 4, 6, 8, 10]).to(F.ctx()),
         torch.tensor([0, 1, 2, 4]).to(F.ctx()),
     ]
-    seeds = [torch.tensor([0, 3, 4, 5, 2, 2, 4]).to(F.ctx()), torch.tensor([0, 3, 4]).to(F.ctx())]
+    seeds = [
+        torch.tensor([0, 3, 4, 5, 2, 2, 4]).to(F.ctx()),
+        torch.tensor([0, 3, 4]).to(F.ctx()),
+    ]
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert len(sampled_subgraph.original_row_node_ids) == length[step]
@@ -414,7 +430,9 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
     seed_nodes = torch.LongTensor([0, 3, 4])
 
     itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(F.ctx())
+    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(
+        F.ctx()
+    )
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
@@ -440,7 +458,10 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
         torch.tensor([0, 1, 2, 4, 4, 6]).to(F.ctx()),
         torch.tensor([0, 1, 2, 4]).to(F.ctx()),
     ]
-    seeds = [torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()), torch.tensor([0, 3, 4]).to(F.ctx())]
+    seeds = [
+        torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        torch.tensor([0, 3, 4]).to(F.ctx()),
+    ]
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert torch.equal(

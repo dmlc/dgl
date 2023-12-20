@@ -277,7 +277,9 @@ def unique_and_compact_csc_formats(
             compacted_indices[ntype],
             _,
         ) = torch.ops.graphbolt.unique_and_compact(
-            indice, torch.tensor([], dtype=indice.dtype, device=device), unique_dst
+            indice,
+            torch.tensor([], dtype=indice.dtype, device=device),
+            unique_dst,
         )
 
     compacted_csc_formats = {}
@@ -366,7 +368,14 @@ def compact_csc_format(
         original_row_ids = torch.cat((dst_nodes, csc_formats.indices))
         compacted_csc_formats = CSCFormatBase(
             indptr=csc_formats.indptr,
-            indices=(torch.arange(0, csc_formats.indices.size(0), device=csc_formats.indices.device) + offset),
+            indices=(
+                torch.arange(
+                    0,
+                    csc_formats.indices.size(0),
+                    device=csc_formats.indices.device,
+                )
+                + offset
+            ),
         )
     else:
         compacted_csc_formats = {}
@@ -380,12 +389,16 @@ def compact_csc_format(
                 csc_format.indptr
             ), "The seed nodes should correspond to indptr."
             device = csc_format.indices.device
-            offset = original_row_ids.get(src_type, torch.tensor([], device=device)).size(0)
+            offset = original_row_ids.get(
+                src_type, torch.tensor([], device=device)
+            ).size(0)
             original_row_ids[src_type] = torch.cat(
                 (
                     original_row_ids.get(
                         src_type,
-                        torch.tensor([], dtype=csc_format.indices.dtype, device=device),
+                        torch.tensor(
+                            [], dtype=csc_format.indices.dtype, device=device
+                        ),
                     ),
                     csc_format.indices,
                 )
