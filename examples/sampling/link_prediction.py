@@ -349,10 +349,10 @@ def train(
         use_uva=use_uva,
     )
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
-    start_epoch_time = time.time()
     for epoch in range(args.epochs):
         model.train()
         total_loss = 0
+        start_epoch_time = time.time()
         # A block is a graph consisting of two sets of nodes: the
         # source nodes and destination nodes. The source and destination
         # nodes can have multiple node types. All the edges connect from

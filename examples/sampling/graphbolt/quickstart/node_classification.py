@@ -57,7 +57,6 @@ def evaluate(model, dataset, itemset, device):
     dataloader = create_dataloader(dataset, itemset, device)
 
     for step, data in enumerate(dataloader):
-        data = data.to_dgl()
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
@@ -84,9 +83,6 @@ def train(model, dataset, device):
         # mini-batches.
         ########################################################################
         for step, data in enumerate(dataloader):
-            # Convert data to DGL format for computing.
-            data = data.to_dgl()
-
             # The features of sampled nodes.
             x = data.node_features["feat"]
 

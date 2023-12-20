@@ -4,11 +4,10 @@ from torch.utils.data import functional_datapipe
 
 from torchdata.datapipes.iter import Mapper
 
-from .minibatch import DGLMiniBatch, MiniBatch
+from .minibatch import MiniBatch
 
 __all__ = [
     "MiniBatchTransformer",
-    "DGLMiniBatchConverter",
 ]
 
 
@@ -38,25 +37,6 @@ class MiniBatchTransformer(Mapper):
     def _transformer(self, minibatch):
         minibatch = self.transformer(minibatch)
         assert isinstance(
-            minibatch, (MiniBatch, DGLMiniBatch)
+            minibatch, (MiniBatch,)
         ), "The transformer output should be an instance of MiniBatch"
         return minibatch
-
-
-@functional_datapipe("to_dgl")
-class DGLMiniBatchConverter(Mapper):
-    """Convert a graphbolt mini-batch to a dgl mini-batch.
-
-    Functional name: :obj:`to_dgl`.
-
-    Parameters
-    ----------
-    datapipe : DataPipe
-        The datapipe.
-    """
-
-    def __init__(
-        self,
-        datapipe,
-    ):
-        super().__init__(datapipe, MiniBatch.to_dgl)

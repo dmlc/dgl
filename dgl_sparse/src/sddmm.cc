@@ -5,7 +5,6 @@
  */
 #include <sparse/sparse_matrix.h>
 #include <sparse/spmm.h>
-#include <torch/script.h>
 
 #include <sstream>
 

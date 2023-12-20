@@ -153,7 +153,6 @@ def evaluate(rank, model, dataloader, num_classes, device):
     for step, data in (
         tqdm.tqdm(enumerate(dataloader)) if rank == 0 else enumerate(dataloader)
     ):
-        data = data.to_dgl()
         blocks = data.blocks
         x = data.node_features["feat"]
         y.append(data.labels)
@@ -206,9 +205,6 @@ def train(
                 if rank == 0
                 else enumerate(train_dataloader)
             ):
-                # Convert data to DGL format.
-                data = data.to_dgl()
-
                 # The input features are from the source nodes in the first
                 # layer's computation graph.
                 x = data.node_features["feat"]

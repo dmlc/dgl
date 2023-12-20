@@ -5,6 +5,7 @@
  */
 // clang-format off
 #include <sparse/dgl_headers.h>
+#include <sparse/torch_headers.h>
 // clang-format on
 
 #include <sparse/elementwise_op.h>
@@ -15,8 +16,6 @@
 #include <sparse/sparse_matrix.h>
 #include <sparse/spmm.h>
 #include <sparse/spspmm.h>
-#include <torch/custom_class.h>
-#include <torch/script.h>
 
 namespace dgl {
 namespace sparse {
