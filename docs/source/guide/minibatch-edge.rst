@@ -43,13 +43,11 @@ edges(namely, node pairs) in the training set instead of the nodes.
 
 Iterating over the DataLoader will yield :class:`~dgl.graphbolt.MiniBatch`
 which contains a list of specially created graphs representing the computation
-dependencies on each layer. In order to train with DGL, you need to convert them
-to :class:`~dgl.graphbolt.DGLMiniBatch`. Then you can access the
-*message flow graphs* (MFGs).
+dependencies on each layer. You can access the *message flow graphs* (MFGs) via
+`mini_batch.blocks`.
 
 .. code:: python
     mini_batch = next(iter(dataloader))
-    mini_batch = mini_batch.to_dgl()
     print(mini_batch.blocks)
 
 .. note::
@@ -182,7 +180,6 @@ their incident node representations.
     opt = torch.optim.Adam(model.parameters())
 
     for data in dataloader:
-        data = data.to_dgl()
         blocks = data.blocks
         x = data.edge_features("feat")
         y_hat = model(data.blocks, x, data.positive_node_pairs)
@@ -317,7 +314,6 @@ dictionaries of node types and predictions here.
     opt = torch.optim.Adam(model.parameters())
 
     for data in dataloader:
-        data = data.to_dgl()
         blocks = data.blocks
         x = data.edge_features(("user:like:item", "feat"))
         y_hat = model(data.blocks, x, data.positive_node_pairs)

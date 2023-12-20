@@ -175,7 +175,11 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph,
+        args.fanout,
+        output_cscformat=(args.output_cscformat == "True"),
+    )
 
     ############################################################################
     # [Input]:
@@ -370,6 +374,12 @@ def parse_args():
         default="cpu",
         choices=["cpu", "cuda"],
         help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+    )
+    parser.add_argument(
+        "--output_cscformat",
+        default="False",
+        choices=["False", "True"],
+        help="Output type of SampledSubgraph. True for csc_formats, False for node_pairs.",
     )
     return parser.parse_args()
 
