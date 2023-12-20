@@ -248,10 +248,12 @@ def _torch_based_feature_str(feature: TorchBasedFeature) -> str:
         lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
         return "\n".join(lines)
 
-    feature_str = f"feature={_add_indent(str(feature._tensor), indent_len + 8)}"
+    feature_str = "feature=" + _add_indent(
+        str(feature._tensor), indent_len + len("feature=")
+    )
     final_str += feature_str + ",\n" + " " * indent_len
-    metadata_str = (
-        f"metadata={_add_indent(str(feature.metadata()), indent_len + 9)}"
+    metadata_str = "metadata=" + _add_indent(
+        str(feature.metadata()), indent_len + len("metadata=")
     )
     final_str += metadata_str + ",\n)"
     return final_str
@@ -268,6 +270,6 @@ def _torch_based_feature_store_str(
         lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
         return "\n".join(lines)
 
-    features_str = f"{_add_indent(str(features), indent_len+9)}"
+    features_str = _add_indent(str(features), indent_len)
     final_str += features_str
     return final_str

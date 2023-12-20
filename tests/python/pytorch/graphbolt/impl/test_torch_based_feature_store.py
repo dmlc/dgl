@@ -339,17 +339,19 @@ def test_torch_based_feature_store_repr(in_memory):
 
         expected_feature_store_str = str(
             """TorchBasedFeatureStore{(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(feature=tensor([[1, 2, 4],
-                                                                 [2, 5, 3]]),
-                                                 metadata={},
-                               ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(feature=tensor([[[1, 2],
-                                                                  [3, 4]],
-                                                         
-                                                                 [[2, 5],
-                                                                  [3, 4]]]),
-                                                 metadata={},
-                               )}"""
+                                                        [2, 5, 3]]),
+                                        metadata={},
+                      ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(feature=tensor([[[1, 2],
+                                                         [3, 4]],
+                                                
+                                                        [[2, 5],
+                                                         [3, 4]]]),
+                                        metadata={},
+                      )}"""
         )
-        assert str(feature_store) == expected_feature_store_str
+        assert str(feature_store) == expected_feature_store_str, print(
+            feature_store
+        )
 
         a = b = None
         feature_store = None
