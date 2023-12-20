@@ -307,7 +307,9 @@ def test_torch_based_feature_repr(in_memory):
         )
         assert str(feature_a) == expected_str_feature_a
         assert str(feature_b) == expected_str_feature_b
+        a = b = metadata = None
         feature_a = feature_b = None
+        expected_str_feature_a = expected_str_feature_b = None
 
 
 @pytest.mark.parametrize("in_memory", [True, False])
@@ -353,5 +355,5 @@ def test_torch_based_feature_store_repr(in_memory):
             feature_store
         )
 
-        a = b = None
-        feature_store = None
+        a = b = feature_data = None
+        feature_store = expected_feature_store_str = None
