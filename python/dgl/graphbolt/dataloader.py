@@ -1,6 +1,5 @@
 """Graph Bolt DataLoaders"""
 
-import torch.multiprocessing as mp
 import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
@@ -54,8 +53,6 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
 
     def __init__(self, datapipe, num_workers=0, persistent_workers=True):
         self.datapipe = datapipe
-        # https://pytorch.org/docs/master/notes/multiprocessing.html#cuda-in-multiprocessing
-        mp.set_start_method("spawn", force=True)
         self.dataloader = torch.utils.data.DataLoader(
             datapipe,
             batch_size=None,
