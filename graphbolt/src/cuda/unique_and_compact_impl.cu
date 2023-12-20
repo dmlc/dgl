@@ -4,7 +4,6 @@
  * @file cuda/unique_and_compact_impl.cu
  * @brief Unique and compact operator implementation on CUDA.
  */
-#include <c10/core/ScalarType.h>
 #include <c10/cuda/CUDAStream.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
@@ -41,7 +40,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
           dst_ids.scalar_type() == unique_dst_ids.scalar_type(),
       "Dtypes of tensors passed to UniqueAndCompact need to be identical.");
   auto allocator = cuda::GetAllocator();
-  auto stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = c10::cuda::getCurrentCUDAStream();
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
   return AT_DISPATCH_INTEGRAL_TYPES(
       src_ids.scalar_type(), "unique_and_compact", ([&] {
@@ -114,7 +113,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         CUDA_CALL(cudaMemcpyAsync(
             &unique_only_src_size, unique_only_src_cnt.get(),
             sizeof(unique_only_src_size), cudaMemcpyDeviceToHost, stream));
-        CUDA_CALL(cudaStreamSynchronize(stream));
+        stream.synchronize();
         unique_only_src = unique_only_src.slice(0, 0, unique_only_src_size);
         auto real_order = torch::cat({unique_dst_ids, unique_only_src});
         auto [sorted_order, new_ids] = Sort(real_order, num_bits);
