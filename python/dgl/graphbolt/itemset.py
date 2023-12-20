@@ -328,7 +328,7 @@ class ItemSetDict:
     def names(self) -> Tuple[str]:
         """Return the names of the items."""
         return self._names
-    
+
     def __repr__(self) -> str:
         return _itemset_str(self, "ItemSetDict")
 
