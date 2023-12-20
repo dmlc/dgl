@@ -280,6 +280,27 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._c_csc_graph.set_edge_type_to_id(edge_type_to_id)
 
     @property
+    def node_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Returns the node attributes dictionary.
+
+        Returns
+        -------
+        Dict[str, torch.Tensor] or None
+            If present, returns a dictionary of node attributes. Each key
+            represents the attribute's name, while the corresponding value
+            holds the attribute's specific value. The length of each value
+            should match the total number of nodes."
+        """
+        return self._c_csc_graph.node_attributes()
+
+    @node_attributes.setter
+    def node_attributes(
+        self, node_attributes: Optional[Dict[str, torch.Tensor]]
+    ) -> None:
+        """Sets the node attributes dictionary."""
+        self._c_csc_graph.set_node_attributes(node_attributes)
+
+    @property
     def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
         """Returns the edge attributes dictionary.
 
@@ -608,6 +629,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
+        assert nodes.dtype == self.indices.dtype, (
+            f"Data type of nodes must be consistent with "
+            f"indices.dtype({self.indices.dtype}), but got {nodes.dtype}."
+        )
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
         expected_fanout_len = 1
         if self.edge_type_to_id:
@@ -805,6 +830,84 @@ class FusedCSCSamplingGraph(SamplingGraph):
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
+    def _temporal_sample_neighbors(
+        self,
+        nodes: torch.Tensor,
+        input_nodes_timestamp: torch.Tensor,
+        fanouts: torch.Tensor,
+        replace: bool = False,
+        probs_name: Optional[str] = None,
+        node_timestamp_attr_name: Optional[str] = None,
+        edge_timestamp_attr_name: Optional[str] = None,
+    ) -> torch.ScriptObject:
+        """Temporally Sample neighboring edges of the given nodes and return the induced
+        subgraph.
+
+        If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is given,
+        the sampled neighbors or edges of an input node must have a timestamp
+        that is no later than that of the input node.
+
+        Parameters
+        ----------
+        nodes: torch.Tensor
+            IDs of the given seed nodes.
+        input_nodes_timestamp: torch.Tensor
+            Timestamps of the given seed nodes.
+        fanouts: torch.Tensor
+            The number of edges to be sampled for each node with or without
+            considering edge types.
+              - When the length is 1, it indicates that the fanout applies to
+                all neighbors of the node as a collective, regardless of the
+                edge type.
+              - Otherwise, the length should equal to the number of edge
+                types, and each fanout value corresponds to a specific edge
+                type of the nodes.
+            The value of each fanout should be >= 0 or = -1.
+              - When the value is -1, all neighbors (with non-zero probability,
+                if weighted) will be sampled once regardless of replacement. It
+                is equivalent to selecting all neighbors with non-zero
+                probability when the fanout is >= the number of neighbors (and
+                replace is set to false).
+              - When the value is a non-negative integer, it serves as a
+                minimum threshold for selecting neighbors.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        probs_name: str, optional
+            An optional string specifying the name of an edge attribute. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
+        node_timestamp_attr_name: str, optional
+            An optional string specifying the name of an node attribute.
+        edge_timestamp_attr_name: str, optional
+            An optional string specifying the name of an edge attribute.
+
+        Returns
+        -------
+        torch.classes.graphbolt.SampledSubgraph
+            The sampled C subgraph.
+        """
+        # Ensure nodes is 1-D tensor.
+        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        has_original_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
+        return self._c_csc_graph.temporal_sample_neighbors(
+            nodes,
+            input_nodes_timestamp,
+            fanouts.tolist(),
+            replace,
+            False,
+            has_original_eids,
+            probs_name,
+            node_timestamp_attr_name,
+            edge_timestamp_attr_name,
+        )
+
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
     ):
@@ -892,6 +995,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self.type_per_edge = recursive_apply(
             self.type_per_edge, lambda x: _to(x, device)
         )
+        self.node_attributes = recursive_apply(
+            self.node_attributes, lambda x: _to(x, device)
+        )
         self.edge_attributes = recursive_apply(
             self.edge_attributes, lambda x: _to(x, device)
         )
@@ -906,6 +1012,7 @@ def fused_csc_sampling_graph(
     type_per_edge: Optional[torch.tensor] = None,
     node_type_to_id: Optional[Dict[str, int]] = None,
     edge_type_to_id: Optional[Dict[str, int]] = None,
+    node_attributes: Optional[Dict[str, torch.tensor]] = None,
     edge_attributes: Optional[Dict[str, torch.tensor]] = None,
 ) -> FusedCSCSamplingGraph:
     """Create a FusedCSCSamplingGraph object from a CSC representation.
@@ -926,6 +1033,8 @@ def fused_csc_sampling_graph(
         Map node types to ids, by default None.
     edge_type_to_id : Optional[Dict[str, int]], optional
         Map edge types to ids, by default None.
+    node_attributes: Optional[Dict[str, torch.tensor]], optional
+        Node attributes of the graph, by default None.
     edge_attributes: Optional[Dict[str, torch.tensor]], optional
         Edge attributes of the graph, by default None.
 
@@ -946,7 +1055,7 @@ def fused_csc_sampling_graph(
     ...             node_type_offset=node_type_offset,
     ...             type_per_edge=type_per_edge,
     ...             node_type_to_id=ntypes, edge_type_to_id=etypes,
-    ...             edge_attributes=None,)
+    ...             node_attributes=None, edge_attributes=None,)
     >>> print(graph)
     FusedCSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
@@ -997,6 +1106,7 @@ def fused_csc_sampling_graph(
             type_per_edge,
             node_type_to_id,
             edge_type_to_id,
+            node_attributes,
             edge_attributes,
         ),
     )
@@ -1037,6 +1147,8 @@ def _csc_sampling_graph_str(graph: FusedCSCSamplingGraph) -> str:
         meta_str += f", node_type_to_id={graph.node_type_to_id}"
     if graph.edge_type_to_id is not None:
         meta_str += f", edge_type_to_id={graph.edge_type_to_id}"
+    if graph.node_attributes is not None:
+        meta_str += f", node_attributes={graph.node_attributes}"
     if graph.edge_attributes is not None:
         meta_str += f", edge_attributes={graph.edge_attributes}"
 
@@ -1094,6 +1206,8 @@ def from_dglgraph(
     # Assign edge type according to the order of CSC matrix.
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
 
+    node_attributes = {}
+
     edge_attributes = {}
     if include_original_edge_id:
         # Assign edge attributes according to the original eids mapping.
@@ -1107,6 +1221,7 @@ def from_dglgraph(
             type_per_edge,
             node_type_to_id,
             edge_type_to_id,
+            node_attributes,
             edge_attributes,
         ),
     )

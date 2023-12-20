@@ -88,10 +88,10 @@ void SharedMemoryHelper::WriteTorchTensor(
 
 torch::optional<torch::Tensor> SharedMemoryHelper::ReadTorchTensor() {
   auto archive = this->ReadTorchArchive();
-  bool has_value = read_from_archive(archive, "has_value").toBool();
+  bool has_value = read_from_archive<bool>(archive, "has_value");
   if (has_value) {
-    auto shape = read_from_archive(archive, "shape").toIntVector();
-    auto dtype = read_from_archive(archive, "dtype").toScalarType();
+    auto shape = read_from_archive<std::vector<int64_t>>(archive, "shape");
+    auto dtype = read_from_archive<torch::ScalarType>(archive, "dtype");
     auto data_ptr = this->GetCurrentDataPtr();
     auto tensor = torch::from_blob(data_ptr, shape, dtype);
     auto rounded_size = GetRoundedSize(tensor.numel() * tensor.element_size());
@@ -127,15 +127,14 @@ void SharedMemoryHelper::WriteTorchTensorDict(
 torch::optional<torch::Dict<std::string, torch::Tensor>>
 SharedMemoryHelper::ReadTorchTensorDict() {
   auto archive = this->ReadTorchArchive();
-  if (!read_from_archive(archive, "has_value").toBool()) {
+  if (!read_from_archive<bool>(archive, "has_value")) {
     return torch::nullopt;
   }
-  int64_t num_tensors = read_from_archive(archive, "num_tensors").toInt();
+  int64_t num_tensors = read_from_archive<int64_t>(archive, "num_tensors");
   torch::Dict<std::string, torch::Tensor> tensor_dict;
   for (int64_t i = 0; i < num_tensors; ++i) {
-    auto key =
-        read_from_archive(archive, std::string("key_") + std::to_string(i))
-            .toStringRef();
+    auto key = read_from_archive<std::string>(
+        archive, std::string("key_") + std::to_string(i));
     auto tensor = this->ReadTorchTensor();
     tensor_dict.insert(key, tensor.value());
   }
