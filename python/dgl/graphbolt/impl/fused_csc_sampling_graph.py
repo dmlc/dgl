@@ -443,7 +443,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         homogeneous_nodes = []
         for ntype, ids in nodes.items():
             ntype_id = self.node_type_to_id[ntype]
-            homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
+            homogeneous_nodes.append(ids + self.node_type_offset[ntype_id].item())
         return torch.cat(homogeneous_nodes)
 
     def _convert_to_sampled_subgraph(
