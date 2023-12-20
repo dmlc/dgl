@@ -1285,7 +1285,6 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
                       type: null
                       name: feat
                       format: numpy
-                      in_memory: true
                       path: data/edge-feat.npy
             feature_data:
                 - domain: node
@@ -2086,7 +2085,6 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
             datapipe = datapipe.fetch_feature(
                 dataset.feature, node_feature_keys=["feat"]
             )
-            datapipe = datapipe.to_dgl()
             dataloader = gb.DataLoader(datapipe)
             for _ in dataloader:
                 pass
@@ -2158,7 +2156,6 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
             datapipe = datapipe.fetch_feature(
                 dataset.feature, node_feature_keys={"user": ["feat"]}
             )
-            datapipe = datapipe.to_dgl()
             dataloader = gb.DataLoader(datapipe)
             for _ in dataloader:
                 pass

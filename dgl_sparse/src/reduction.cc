@@ -5,12 +5,12 @@
  */
 // clang-format off
 #include <sparse/dgl_headers.h>
+#include <sparse/torch_headers.h>
 // clang-format on
 
 #include <sparse/elementwise_op.h>
 #include <sparse/reduction.h>
 #include <sparse/sparse_matrix.h>
-#include <torch/script.h>
 
 #include <string>
 #include <vector>

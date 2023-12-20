@@ -57,14 +57,19 @@ inline serialize::OutputArchive& operator<<(
 namespace graphbolt {
 
 /**
- * @brief Read data from archive.
+ * @brief Read data from archive and format to specified type.
  * @param archive Input archive.
  * @param key Key name of data.
  *
  * @return data.
  */
-torch::IValue read_from_archive(
-    torch::serialize::InputArchive& archive, const std::string& key);
+template <typename T>
+T read_from_archive(
+    torch::serialize::InputArchive& archive, const std::string& key) {
+  torch::IValue data;
+  archive.read(key, data);
+  return data.to<T>();
+}
 
 }  // namespace graphbolt
 

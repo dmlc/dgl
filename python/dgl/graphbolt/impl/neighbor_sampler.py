@@ -116,7 +116,7 @@ class NeighborSampler(SubgraphSampler):
         self.output_cscformat = output_cscformat
         self.sampler = graph.sample_neighbors
 
-    def _sample_subgraphs(self, seeds):
+    def sample_subgraphs(self, seeds):
         subgraphs = []
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.

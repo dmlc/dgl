@@ -43,12 +43,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
   TORCH_CHECK(
       c10::isIntegralType(indices.scalar_type(), false),
       "IndexSelectCSC is not implemented to slice noninteger types yet.");
-  torch::optional<torch::Tensor> temp;
-  torch::optional<sampling::FusedCSCSamplingGraph::NodeTypeToIDMap> temp2;
-  torch::optional<sampling::FusedCSCSamplingGraph::EdgeTypeToIDMap> temp3;
-  torch::optional<sampling::FusedCSCSamplingGraph::EdgeAttrMap> temp4;
-  sampling::FusedCSCSamplingGraph g(
-      indptr, indices, temp, temp, temp2, temp3, temp4);
+  sampling::FusedCSCSamplingGraph g(indptr, indices);
   const auto res = g.InSubgraph(nodes);
   return std::make_tuple(res->indptr, res->indices);
 }

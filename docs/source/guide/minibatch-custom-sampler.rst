@@ -5,12 +5,12 @@
 
 Implementing custom samplers involves subclassing the
 :class:`dgl.graphbolt.SubgraphSampler` base class and implementing its abstract
-:attr:`_sample_subgraphs` method. The :attr:`_sample_subgraphs` method should
+:attr:`sample_subgraphs` method. The :attr:`sample_subgraphs` method should
 take in seed nodes which are the nodes to sample neighbors from:
 
 .. code:: python
 
-    def _sample_subgraphs(self, seed_nodes):
+    def sample_subgraphs(self, seed_nodes):
         return input_nodes, sampled_subgraphs
 
 The method should return the input node IDs list and a list of subgraphs. Each
@@ -31,7 +31,7 @@ The code below implements a classical neighbor sampler:
            self.graph = graph
            self.fanouts = fanouts
 
-       def _sample_subgraphs(self, seed_nodes):
+       def sample_subgraphs(self, seed_nodes):
            subgs = []
            for fanout in reversed(self.fanouts):
                # Sample a fixed number of neighbors of the current seed nodes.
@@ -51,7 +51,6 @@ To use this sampler with :class:`~dgl.graphbolt.DataLoader`:
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     for data in dataloader:
-        data = data.to_dgl()
         input_features = data.node_features["feat"]
         output_labels = data.labels
         output_predictions = model(data.blocks, input_features)
@@ -97,7 +96,6 @@ can be used on heterogeneous graphs:
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     for data in dataloader:
-        data = data.to_dgl()
         input_features = {
             ntype: data.node_features[(ntype, "feat")]
             for ntype in data.blocks[0].srctypes

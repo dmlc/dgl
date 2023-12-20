@@ -71,9 +71,6 @@ def test_CopyToWithMiniBatches():
     # Invoke CopyTo via functional form.
     test_data_device(datapipe.copy_to("cuda"))
 
-    # Test for DGLMiniBatch.
-    datapipe = gb.DGLMiniBatchConverter(datapipe)
-
     # Invoke CopyTo via class constructor.
     test_data_device(gb.CopyTo(datapipe, "cuda"))
 

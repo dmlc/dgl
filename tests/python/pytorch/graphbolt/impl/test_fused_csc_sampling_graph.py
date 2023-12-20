@@ -1,6 +1,7 @@
 import os
 
 import pickle
+import re
 import tempfile
 import unittest
 
@@ -126,12 +127,19 @@ def test_homo_graph(total_num_nodes, total_num_edges):
     csc_indptr, indices = gbt.random_homo_graph(
         total_num_nodes, total_num_edges
     )
+    node_attributes = {
+        "A1": torch.arange(total_num_nodes),
+        "A2": torch.arange(total_num_nodes),
+    }
     edge_attributes = {
         "A1": torch.randn(total_num_edges),
         "A2": torch.randn(total_num_edges),
     }
     graph = gb.fused_csc_sampling_graph(
-        csc_indptr, indices, edge_attributes=edge_attributes
+        csc_indptr,
+        indices,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
     )
 
     assert graph.total_num_nodes == total_num_nodes
@@ -140,6 +148,7 @@ def test_homo_graph(total_num_nodes, total_num_edges):
     assert torch.equal(csc_indptr, graph.csc_indptr)
     assert torch.equal(indices, graph.indices)
 
+    assert graph.node_attributes == node_attributes
     assert graph.edge_attributes == edge_attributes
     assert graph.node_type_offset is None
     assert graph.type_per_edge is None
@@ -167,6 +176,10 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
+    node_attributes = {
+        "A1": torch.arange(total_num_nodes),
+        "A2": torch.arange(total_num_nodes),
+    }
     edge_attributes = {
         "A1": torch.randn(total_num_edges),
         "A2": torch.randn(total_num_edges),
@@ -178,6 +191,7 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
         type_per_edge=type_per_edge,
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
+        node_attributes=node_attributes,
         edge_attributes=edge_attributes,
     )
 
@@ -188,6 +202,7 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
     assert torch.equal(indices, graph.indices)
     assert torch.equal(node_type_offset, graph.node_type_offset)
     assert torch.equal(type_per_edge, graph.type_per_edge)
+    assert graph.node_attributes == node_attributes
     assert graph.edge_attributes == edge_attributes
     assert node_type_to_id == graph.node_type_to_id
     assert edge_type_to_id == graph.edge_type_to_id
@@ -327,11 +342,32 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
     "total_num_nodes, total_num_edges",
     [(1, 1), (100, 1), (10, 50), (1000, 50000)],
 )
-def test_load_save_homo_graph(total_num_nodes, total_num_edges):
+@pytest.mark.parametrize("has_node_attrs", [True, False])
+@pytest.mark.parametrize("has_edge_attrs", [True, False])
+def test_load_save_homo_graph(
+    total_num_nodes, total_num_edges, has_node_attrs, has_edge_attrs
+):
     csc_indptr, indices = gbt.random_homo_graph(
         total_num_nodes, total_num_edges
     )
-    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
+    node_attributes = None
+    if has_node_attrs:
+        node_attributes = {
+            "A": torch.arange(total_num_nodes),
+            "B": torch.arange(total_num_nodes),
+        }
+    edge_attributes = None
+    if has_edge_attrs:
+        edge_attributes = {
+            "A": torch.arange(total_num_edges),
+            "B": torch.arange(total_num_edges),
+        }
+    graph = gb.fused_csc_sampling_graph(
+        csc_indptr,
+        indices,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
+    )
 
     with tempfile.TemporaryDirectory() as test_dir:
         filename = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
@@ -348,7 +384,22 @@ def test_load_save_homo_graph(total_num_nodes, total_num_edges):
     assert graph.type_per_edge is None and graph2.type_per_edge is None
     assert graph.node_type_to_id is None and graph2.node_type_to_id is None
     assert graph.edge_type_to_id is None and graph2.edge_type_to_id is None
-    assert graph.edge_attributes is None and graph2.edge_attributes is None
+    if has_node_attrs:
+        assert graph.node_attributes.keys() == graph2.node_attributes.keys()
+        for key in graph.node_attributes.keys():
+            assert torch.equal(
+                graph.node_attributes[key], graph2.node_attributes[key]
+            )
+    else:
+        assert graph.node_attributes is None and graph2.node_attributes is None
+    if has_edge_attrs:
+        assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
+        for key in graph.edge_attributes.keys():
+            assert torch.equal(
+                graph.edge_attributes[key], graph2.edge_attributes[key]
+            )
+    else:
+        assert graph.edge_attributes is None and graph2.edge_attributes is None
 
 
 @unittest.skipIf(
@@ -360,8 +411,15 @@ def test_load_save_homo_graph(total_num_nodes, total_num_edges):
     [(1, 1), (100, 1), (10, 50), (1000, 50000)],
 )
 @pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+@pytest.mark.parametrize("has_node_attrs", [True, False])
+@pytest.mark.parametrize("has_edge_attrs", [True, False])
 def test_load_save_hetero_graph(
-    total_num_nodes, total_num_edges, num_ntypes, num_etypes
+    total_num_nodes,
+    total_num_edges,
+    num_ntypes,
+    num_etypes,
+    has_node_attrs,
+    has_edge_attrs,
 ):
     (
         csc_indptr,
@@ -373,6 +431,18 @@ def test_load_save_hetero_graph(
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
+    node_attributes = None
+    if has_node_attrs:
+        node_attributes = {
+            "A": torch.arange(total_num_nodes),
+            "B": torch.arange(total_num_nodes),
+        }
+    edge_attributes = None
+    if has_edge_attrs:
+        edge_attributes = {
+            "A": torch.arange(total_num_edges),
+            "B": torch.arange(total_num_edges),
+        }
     graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
@@ -380,6 +450,8 @@ def test_load_save_hetero_graph(
         type_per_edge=type_per_edge,
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -396,6 +468,22 @@ def test_load_save_hetero_graph(
     assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
     assert graph.node_type_to_id == graph2.node_type_to_id
     assert graph.edge_type_to_id == graph2.edge_type_to_id
+    if has_node_attrs:
+        assert graph.node_attributes.keys() == graph2.node_attributes.keys()
+        for key in graph.node_attributes.keys():
+            assert torch.equal(
+                graph.node_attributes[key], graph2.node_attributes[key]
+            )
+    else:
+        assert graph.node_attributes is None and graph2.node_attributes is None
+    if has_edge_attrs:
+        assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
+        for key in graph.edge_attributes.keys():
+            assert torch.equal(
+                graph.edge_attributes[key], graph2.edge_attributes[key]
+            )
+    else:
+        assert graph.edge_attributes is None and graph2.edge_attributes is None
 
 
 @unittest.skipIf(
@@ -406,11 +494,32 @@ def test_load_save_hetero_graph(
     "total_num_nodes, total_num_edges",
     [(1, 1), (100, 1), (10, 50), (1000, 50000)],
 )
-def test_pickle_homo_graph(total_num_nodes, total_num_edges):
+@pytest.mark.parametrize("has_node_attrs", [True, False])
+@pytest.mark.parametrize("has_edge_attrs", [True, False])
+def test_pickle_homo_graph(
+    total_num_nodes, total_num_edges, has_node_attrs, has_edge_attrs
+):
     csc_indptr, indices = gbt.random_homo_graph(
         total_num_nodes, total_num_edges
     )
-    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
+    node_attributes = None
+    if has_node_attrs:
+        node_attributes = {
+            "A": torch.arange(total_num_nodes),
+            "B": torch.arange(total_num_nodes),
+        }
+    edge_attributes = None
+    if has_edge_attrs:
+        edge_attributes = {
+            "A": torch.arange(total_num_edges),
+            "B": torch.arange(total_num_edges),
+        }
+    graph = gb.fused_csc_sampling_graph(
+        csc_indptr,
+        indices,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
+    )
 
     serialized = pickle.dumps(graph)
     graph2 = pickle.loads(serialized)
@@ -425,7 +534,22 @@ def test_pickle_homo_graph(total_num_nodes, total_num_edges):
     assert graph.type_per_edge is None and graph2.type_per_edge is None
     assert graph.node_type_to_id is None and graph2.node_type_to_id is None
     assert graph.edge_type_to_id is None and graph2.edge_type_to_id is None
-    assert graph.edge_attributes is None and graph2.edge_attributes is None
+    if has_node_attrs:
+        assert graph.node_attributes.keys() == graph2.node_attributes.keys()
+        for key in graph.node_attributes.keys():
+            assert torch.equal(
+                graph.node_attributes[key], graph2.node_attributes[key]
+            )
+    else:
+        assert graph.node_attributes is None and graph2.node_attributes is None
+    if has_edge_attrs:
+        assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
+        for key in graph.edge_attributes.keys():
+            assert torch.equal(
+                graph.edge_attributes[key], graph2.edge_attributes[key]
+            )
+    else:
+        assert graph.edge_attributes is None and graph2.edge_attributes is None
 
 
 @unittest.skipIf(
@@ -437,8 +561,15 @@ def test_pickle_homo_graph(total_num_nodes, total_num_edges):
     [(1, 1), (100, 1), (10, 50), (1000, 50000)],
 )
 @pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+@pytest.mark.parametrize("has_node_attrs", [True, False])
+@pytest.mark.parametrize("has_edge_attrs", [True, False])
 def test_pickle_hetero_graph(
-    total_num_nodes, total_num_edges, num_ntypes, num_etypes
+    total_num_nodes,
+    total_num_edges,
+    num_ntypes,
+    num_etypes,
+    has_node_attrs,
+    has_edge_attrs,
 ):
     (
         csc_indptr,
@@ -450,10 +581,18 @@ def test_pickle_hetero_graph(
     ) = gbt.random_hetero_graph(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
-    edge_attributes = {
-        "a": torch.randn((total_num_edges,)),
-        "b": torch.randint(1, 10, (total_num_edges,)),
-    }
+    node_attributes = None
+    if has_node_attrs:
+        node_attributes = {
+            "A": torch.arange(total_num_nodes),
+            "B": torch.arange(total_num_nodes),
+        }
+    edge_attributes = None
+    if has_edge_attrs:
+        edge_attributes = {
+            "A": torch.arange(total_num_edges),
+            "B": torch.arange(total_num_edges),
+        }
     graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
@@ -461,6 +600,7 @@ def test_pickle_hetero_graph(
         type_per_edge=type_per_edge,
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
+        node_attributes=node_attributes,
         edge_attributes=edge_attributes,
     )
 
@@ -480,9 +620,22 @@ def test_pickle_hetero_graph(
     assert graph.edge_type_to_id.keys() == graph2.edge_type_to_id.keys()
     for i in graph.edge_type_to_id.keys():
         assert graph.edge_type_to_id[i] == graph2.edge_type_to_id[i]
-    assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
-    for i in graph.edge_attributes.keys():
-        assert torch.equal(graph.edge_attributes[i], graph2.edge_attributes[i])
+    if has_node_attrs:
+        assert graph.node_attributes.keys() == graph2.node_attributes.keys()
+        for key in graph.node_attributes.keys():
+            assert torch.equal(
+                graph.node_attributes[key], graph2.node_attributes[key]
+            )
+    else:
+        assert graph.node_attributes is None and graph2.node_attributes is None
+    if has_edge_attrs:
+        assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
+        for key in graph.edge_attributes.keys():
+            assert torch.equal(
+                graph.edge_attributes[key], graph2.edge_attributes[key]
+            )
+    else:
+        assert graph.edge_attributes is None and graph2.edge_attributes is None
 
 
 def process_csc_sampling_graph_multiprocessing(graph):
@@ -820,9 +973,25 @@ def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
     graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
+    fanouts = torch.LongTensor([2])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts=torch.LongTensor([2]))
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = torch.tensor(
+        [1, 3, 4],
+        dtype=(torch.int64 if indices_dtype == torch.int32 else torch.int32),
+    )
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
+    nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
+    subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
     sampled_num = subgraph.node_pairs[0].size(0)
@@ -871,12 +1040,37 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
     )
 
     # Sample on both node types.
+    fanouts = torch.tensor([-1, -1])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = {
+        "n1": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        ),
+        "n2": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        ),
+    }
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
     nodes = {
         "n1": torch.tensor([0], dtype=indices_dtype),
         "n2": torch.tensor([0], dtype=indices_dtype),
     }
-    fanouts = torch.tensor([-1, -1])
-    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
@@ -899,20 +1093,39 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
     assert subgraph.original_edge_ids is None
 
     # Sample on single node type.
-    nodes = {"n1": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = {
+        "n1": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        )
+    }
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
+    nodes = {"n1": torch.tensor([0], dtype=indices_dtype)}
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
     expected_node_pairs = {
         "n2:e2:n1": (
-            torch.LongTensor([0, 2]),
-            torch.LongTensor([0, 0]),
+            torch.tensor([0, 2], dtype=indices_dtype),
+            torch.tensor([0, 0], dtype=indices_dtype),
         ),
         "n1:e1:n2": (
-            torch.LongTensor([]),
-            torch.LongTensor([]),
+            torch.tensor([], dtype=indices_dtype),
+            torch.tensor([], dtype=indices_dtype),
         ),
     }
     assert len(subgraph.node_pairs) == 2
@@ -1258,6 +1471,18 @@ def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     t1[:] = old_t1
 
 
+def check_node_edge_attributes(graph1, graph2, attributes, attr_name):
+    for name, attr in attributes.items():
+        edge_attributes_1 = getattr(graph1, attr_name)
+        edge_attributes_2 = getattr(graph2, attr_name)
+        assert name in edge_attributes_1
+        assert name in edge_attributes_2
+        assert torch.equal(edge_attributes_1[name], attr)
+        check_tensors_on_the_same_shared_memory(
+            edge_attributes_1[name], edge_attributes_2[name]
+        )
+
+
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="FusedCSCSamplingGraph is only supported on CPU.",
@@ -1266,22 +1491,31 @@ def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     "total_num_nodes, total_num_edges",
     [(1, 1), (100, 1), (10, 50), (1000, 50000)],
 )
+@pytest.mark.parametrize("test_node_attrs", [True, False])
 @pytest.mark.parametrize("test_edge_attrs", [True, False])
 def test_homo_graph_on_shared_memory(
-    total_num_nodes, total_num_edges, test_edge_attrs
+    total_num_nodes, total_num_edges, test_node_attrs, test_edge_attrs
 ):
     csc_indptr, indices = gbt.random_homo_graph(
         total_num_nodes, total_num_edges
     )
+    node_attributes = None
+    if test_node_attrs:
+        node_attributes = {
+            "A1": torch.arange(total_num_nodes),
+            "A2": torch.arange(total_num_nodes),
+        }
+    edge_attributes = None
     if test_edge_attrs:
         edge_attributes = {
             "A1": torch.randn(total_num_edges),
             "A2": torch.randn(total_num_edges),
         }
-    else:
-        edge_attributes = None
     graph = gb.fused_csc_sampling_graph(
-        csc_indptr, indices, edge_attributes=edge_attributes
+        csc_indptr,
+        indices,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
     )
 
     shm_name = "test_homo_g"
@@ -1307,14 +1541,14 @@ def test_homo_graph_on_shared_memory(
     )
     check_tensors_on_the_same_shared_memory(graph1.indices, graph2.indices)
 
+    if test_node_attrs:
+        check_node_edge_attributes(
+            graph1, graph2, node_attributes, "node_attributes"
+        )
     if test_edge_attrs:
-        for name, edge_attr in edge_attributes.items():
-            assert name in graph1.edge_attributes
-            assert name in graph2.edge_attributes
-            assert torch.equal(graph1.edge_attributes[name], edge_attr)
-            check_tensors_on_the_same_shared_memory(
-                graph1.edge_attributes[name], graph2.edge_attributes[name]
-            )
+        check_node_edge_attributes(
+            graph1, graph2, edge_attributes, "edge_attributes"
+        )
 
     assert graph1.node_type_offset is None and graph2.node_type_offset is None
     assert graph1.type_per_edge is None and graph2.type_per_edge is None
@@ -1333,9 +1567,15 @@ def test_homo_graph_on_shared_memory(
 @pytest.mark.parametrize(
     "num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1), (1000, 1000)]
 )
+@pytest.mark.parametrize("test_node_attrs", [True, False])
 @pytest.mark.parametrize("test_edge_attrs", [True, False])
 def test_hetero_graph_on_shared_memory(
-    total_num_nodes, total_num_edges, num_ntypes, num_etypes, test_edge_attrs
+    total_num_nodes,
+    total_num_edges,
+    num_ntypes,
+    num_etypes,
+    test_node_attrs,
+    test_edge_attrs,
 ):
     (
         csc_indptr,
@@ -1348,13 +1588,20 @@ def test_hetero_graph_on_shared_memory(
         total_num_nodes, total_num_edges, num_ntypes, num_etypes
     )
 
+    node_attributes = None
+    if test_node_attrs:
+        node_attributes = {
+            "A1": torch.arange(total_num_nodes),
+            "A2": torch.arange(total_num_nodes),
+        }
+
+    edge_attributes = None
     if test_edge_attrs:
         edge_attributes = {
             "A1": torch.randn(total_num_edges),
             "A2": torch.randn(total_num_edges),
         }
-    else:
-        edge_attributes = None
+
     graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
@@ -1362,6 +1609,7 @@ def test_hetero_graph_on_shared_memory(
         type_per_edge=type_per_edge,
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
+        node_attributes=node_attributes,
         edge_attributes=edge_attributes,
     )
 
@@ -1398,14 +1646,14 @@ def test_hetero_graph_on_shared_memory(
         graph1.type_per_edge, graph2.type_per_edge
     )
 
+    if test_node_attrs:
+        check_node_edge_attributes(
+            graph1, graph2, node_attributes, "node_attributes"
+        )
     if test_edge_attrs:
-        for name, edge_attr in edge_attributes.items():
-            assert name in graph1.edge_attributes
-            assert name in graph2.edge_attributes
-            assert torch.equal(graph1.edge_attributes[name], edge_attr)
-            check_tensors_on_the_same_shared_memory(
-                graph1.edge_attributes[name], graph2.edge_attributes[name]
-            )
+        check_node_edge_attributes(
+            graph1, graph2, edge_attributes, "edge_attributes"
+        )
 
     assert node_type_to_id == graph1.node_type_to_id
     assert edge_type_to_id == graph1.edge_type_to_id
