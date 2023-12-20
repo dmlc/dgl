@@ -8,7 +8,6 @@
 #include <c10/cuda/CUDAStream.h>
 #include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
-#include <thrust/execution_policy.h>
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
@@ -56,7 +55,9 @@ __global__ void _ComputeRowRandomPairs(
 
     const auto rnd = curand_uniform(&rng);
     const auto prob = weights ? weights[in_idx] : static_cast<weights_t>(1);
-    const float_t adjusted_prob = -__logf(rnd) / prob;
+    const auto exp_rnd = -__logf(rnd);
+    const float_t adjusted_prob =
+        prob > 0 ? exp_rnd / prob : std::numeric_limits<float_t>::infinity();
     output[i] = {row_position, adjusted_prob};
     edge_ids[i] = in_idx;
 
@@ -152,8 +153,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             indices.scalar_type(), "SampleNeighborsWithoutReplacementIndices",
             ([&] {
               using indices_t = scalar_t;
-              const indices_t* indices_ptr =
-                  layer ? indices.data_ptr<indices_t>() : nullptr;
               auto row_and_prob =
                   allocator
                       .AllocateStorage<::cuda::std::tuple<indices_t, float>>(
@@ -176,6 +175,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                     }
                     auto input_edge_id_segments =
                         allocator.AllocateStorage<indptr_t>(num_edges);
+                    const indices_t* indices_ptr =
+                        layer ? indices.data_ptr<indices_t>() : nullptr;
                     const dim3 block(BLOCK_SIZE);
                     const dim3 grid((num_edges + BLOCK_SIZE - 1) / BLOCK_SIZE);
                     CUDA_KERNEL_CALL(
@@ -187,7 +188,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         input_edge_id_segments.get());
 
                     const int num_bits =
-                        sizeof(float) + cuda::NumberOfBits(num_rows);
+                        sizeof(float) * 8 + cuda::NumberOfBits(num_rows);
 
                     size_t tmp_storage_size = 0;
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
@@ -244,5 +245,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       output_indptr, output_indices, nodes, torch::nullopt,
       subgraph_reverse_edge_ids, torch::nullopt);
 }
+
 }  //  namespace ops
 }  //  namespace graphbolt
