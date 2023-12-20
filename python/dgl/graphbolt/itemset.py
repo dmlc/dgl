@@ -174,6 +174,9 @@ class ItemSet:
         """Return the names of the items."""
         return self._names
 
+    def __repr__(self) -> str:
+        return _itemset_str(self, "ItemSet")
+
 
 class ItemSetDict:
     r"""Dictionary wrapper of **ItemSet**.
@@ -325,3 +328,30 @@ class ItemSetDict:
     def names(self) -> Tuple[str]:
         """Return the names of the items."""
         return self._names
+    
+    def __repr__(self) -> str:
+        return _itemset_str(self, "ItemSetDict")
+
+
+def _itemset_str(itemset: Union[ItemSet, ItemSetDict], name) -> str:
+    final_str = f"{name}("
+    indent_len = len(final_str)
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    item_str = (
+        "items="
+        + _add_indent(str(list(itemset)), indent_len + len("items="))
+        + ",\n"
+        + " " * indent_len
+    )
+    name_str = (
+        "names="
+        + _add_indent(str(itemset.names), indent_len + len("items="))
+        + ",\n)"
+    )
+    final_str += item_str + name_str
+    return final_str
