@@ -9,11 +9,6 @@ from torchdata.datapipes.iter import Mapper
 from . import gb_test_utils
 
 
-class MiniBatchType(Enum):
-    MiniBatch = 1
-    DGLMiniBatch = 2
-
-
 def test_FeatureFetcher_invoke():
     # Prepare graph and required datapipes.
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)

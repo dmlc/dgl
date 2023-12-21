@@ -11,8 +11,7 @@ generate a minibatch, including:
 * Sample neighbors for each seed from graph.
 * Exclude seed edges from the sampled subgraphs.
 * Fetch node and edge features for the sampled subgraphs.
-* Convert the sampled subgraphs to DGLMiniBatches.
-* Copy the DGLMiniBatches to the target device.
+* Copy the MiniBatches to the target device.
 
 .. code:: python
 
