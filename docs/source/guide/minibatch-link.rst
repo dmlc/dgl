@@ -251,7 +251,8 @@ loss on specific edge type.
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)
             logits = model.predictor(
-                y[category][compacted_pairs[category][0]] * y[category][compacted_pairs[category][1]]
+                y[category][compacted_pairs[category][0]]
+                * y[category][compacted_pairs[category][1]]
             ).squeeze()
 
             # Compute loss.
