@@ -20,5 +20,8 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
 
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
 
+torch::Tensor CSRToCOO(
+    torch::Tensor indptr, torch::ScalarType indices_scalar_type);
+
 }  //  namespace ops
 }  //  namespace graphbolt
