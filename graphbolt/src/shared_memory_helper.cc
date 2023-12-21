@@ -33,10 +33,10 @@ inline static int64_t GetRoundedSize(int64_t size) {
   return (size + ALIGNED_SIZE - 1) / ALIGNED_SIZE * ALIGNED_SIZE;
 }
 
-SharedMemoryHelper::SharedMemoryHelper(
-    const std::string& name, int64_t max_metadata_size)
+SharedMemoryHelper::SharedMemoryHelper(const std::string& name)
     : name_(name),
-      max_metadata_size_(max_metadata_size),
+      metadata_size_(0),
+      data_size_(0),
       metadata_shared_memory_(nullptr),
       data_shared_memory_(nullptr),
       metadata_offset_(0),
@@ -49,16 +49,12 @@ void SharedMemoryHelper::InitializeRead() {
     // Reader process opens the shared memory.
     metadata_shared_memory_ =
         std::make_unique<SharedMemory>(GetSharedMemoryMetadataName(name_));
-    metadata_shared_memory_->Open(max_metadata_size_);
-    auto archive = this->ReadTorchArchive();
-    int64_t data_size = read_from_archive(archive, "data_size").toInt();
+    metadata_shared_memory_->Open();
+    metadata_size_ = metadata_shared_memory_->GetSize();
     data_shared_memory_ =
         std::make_unique<SharedMemory>(GetSharedMemoryDataName(name_));
-    data_shared_memory_->Open(data_size);
-  } else {
-    // Writer process already has the shared memory.
-    // Skip the first archive recording data size before read.
-    this->ReadTorchArchive();
+    data_shared_memory_->Open();
+    data_size_ = data_shared_memory_->GetSize();
   }
 }
 
@@ -92,10 +88,10 @@ void SharedMemoryHelper::WriteTorchTensor(
 
 torch::optional<torch::Tensor> SharedMemoryHelper::ReadTorchTensor() {
   auto archive = this->ReadTorchArchive();
-  bool has_value = read_from_archive(archive, "has_value").toBool();
+  bool has_value = read_from_archive<bool>(archive, "has_value");
   if (has_value) {
-    auto shape = read_from_archive(archive, "shape").toIntVector();
-    auto dtype = read_from_archive(archive, "dtype").toScalarType();
+    auto shape = read_from_archive<std::vector<int64_t>>(archive, "shape");
+    auto dtype = read_from_archive<torch::ScalarType>(archive, "dtype");
     auto data_ptr = this->GetCurrentDataPtr();
     auto tensor = torch::from_blob(data_ptr, shape, dtype);
     auto rounded_size = GetRoundedSize(tensor.numel() * tensor.element_size());
@@ -131,33 +127,41 @@ void SharedMemoryHelper::WriteTorchTensorDict(
 torch::optional<torch::Dict<std::string, torch::Tensor>>
 SharedMemoryHelper::ReadTorchTensorDict() {
   auto archive = this->ReadTorchArchive();
-  if (!read_from_archive(archive, "has_value").toBool()) {
+  if (!read_from_archive<bool>(archive, "has_value")) {
     return torch::nullopt;
   }
-  int64_t num_tensors = read_from_archive(archive, "num_tensors").toInt();
+  int64_t num_tensors = read_from_archive<int64_t>(archive, "num_tensors");
   torch::Dict<std::string, torch::Tensor> tensor_dict;
   for (int64_t i = 0; i < num_tensors; ++i) {
-    auto key =
-        read_from_archive(archive, std::string("key_") + std::to_string(i))
-            .toStringRef();
+    auto key = read_from_archive<std::string>(
+        archive, std::string("key_") + std::to_string(i));
     auto tensor = this->ReadTorchTensor();
     tensor_dict.insert(key, tensor.value());
   }
   return tensor_dict;
 }
 
-void SharedMemoryHelper::WriteTorchArchiveInternal(
-    torch::serialize::OutputArchive& archive) {
-  std::stringstream serialized;
-  archive.save_to(serialized);
-  auto serialized_str = serialized.str();
-  auto metadata_ptr = this->GetCurrentMetadataPtr();
-  static_cast<int64_t*>(metadata_ptr)[0] = serialized_str.size();
-  memcpy(
-      static_cast<char*>(metadata_ptr) + sizeof(int64_t), serialized_str.data(),
-      serialized_str.size());
-  int64_t rounded_size = GetRoundedSize(serialized_str.size());
-  this->MoveMetadataPtr(sizeof(int64_t) + rounded_size);
+void SharedMemoryHelper::SerializeMetadata() {
+  for (auto& archive : metadata_to_write_) {
+    std::stringstream serialized;
+    archive.save_to(serialized);
+    metadata_strings_to_write_.push_back(std::move(serialized.str()));
+  }
+  metadata_to_write_.clear();
+}
+
+void SharedMemoryHelper::WriteMetadataToSharedMemory() {
+  metadata_offset_ = 0;
+  for (const auto& str : metadata_strings_to_write_) {
+    auto metadata_ptr = this->GetCurrentMetadataPtr();
+    static_cast<int64_t*>(metadata_ptr)[0] = str.size();
+    memcpy(
+        static_cast<char*>(metadata_ptr) + sizeof(int64_t), str.data(),
+        str.size());
+    int64_t rounded_size = GetRoundedSize(str.size());
+    this->MoveMetadataPtr(sizeof(int64_t) + rounded_size);
+  }
+  metadata_strings_to_write_.clear();
 }
 
 void SharedMemoryHelper::WriteTorchTensorInternal(
@@ -172,8 +176,6 @@ void SharedMemoryHelper::WriteTorchTensorInternal(
 }
 
 void SharedMemoryHelper::Flush() {
-  // The first archive records the size of the tensor data.
-  torch::serialize::OutputArchive archive;
   size_t data_size = 0;
   for (auto tensor : tensors_to_write_) {
     if (tensor.has_value()) {
@@ -181,23 +183,32 @@ void SharedMemoryHelper::Flush() {
       data_size += GetRoundedSize(tensor_size);
     }
   }
-  archive.write("data_size", static_cast<int64_t>(data_size));
+
+  // Serialize the metadata archives.
+  SerializeMetadata();
+
+  // Create the shared memory objects.
+  const size_t metadata_size = std::accumulate(
+      metadata_strings_to_write_.begin(), metadata_strings_to_write_.end(), 0,
+      [](size_t sum, const std::string& str) {
+        return sum + sizeof(int64_t) + GetRoundedSize(str.size());
+      });
   metadata_shared_memory_ =
       std::make_unique<SharedMemory>(GetSharedMemoryMetadataName(name_));
-  metadata_shared_memory_->Create(max_metadata_size_);
-  metadata_offset_ = 0;
-  this->WriteTorchArchiveInternal(archive);
-  for (auto& archive : metadata_to_write_) {
-    this->WriteTorchArchiveInternal(archive);
-  }
+  metadata_shared_memory_->Create(metadata_size);
+  metadata_size_ = metadata_size;
 
+  // Write the metadata and tensor data to the shared memory.
+  WriteMetadataToSharedMemory();
   data_shared_memory_ =
       std::make_unique<SharedMemory>(GetSharedMemoryDataName(name_));
   data_shared_memory_->Create(data_size);
+  data_size_ = data_size;
   data_offset_ = 0;
   for (auto tensor : tensors_to_write_) {
     this->WriteTorchTensorInternal(tensor);
   }
+
   metadata_to_write_.clear();
   tensors_to_write_.clear();
 }

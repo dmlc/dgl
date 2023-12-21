@@ -50,7 +50,15 @@ from tqdm import tqdm
 
 
 def create_dataloader(
-    graph, features, itemset, batch_size, fanout, device, num_workers, job
+    graph,
+    features,
+    itemset,
+    batch_size,
+    fanout,
+    device,
+    num_workers,
+    job,
+    output_cscformat,
 ):
     """
     [HIGHLIGHT]
@@ -105,7 +113,9 @@ def create_dataloader(
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
     datapipe = datapipe.sample_neighbor(
-        graph, fanout if job != "infer" else [-1]
+        graph,
+        fanout if job != "infer" else [-1],
+        output_cscformat=(output_cscformat == "True"),
     )
 
     ############################################################################
@@ -126,18 +136,6 @@ def create_dataloader(
 
     ############################################################################
     # [Step-4]:
-    # self.to_dgl()
-    # [Input]:
-    # 'datapipe': The previous datapipe object.
-    # [Output]:
-    # A DGLMiniBatch used for computing.
-    # [Role]:
-    # Convert a mini-batch to dgl-minibatch.
-    ############################################################################
-    datapipe = datapipe.to_dgl()
-
-    ############################################################################
-    # [Step-5]:
     # self.copy_to()
     # [Input]:
     # 'device': The device to copy the data to.
@@ -147,17 +145,17 @@ def create_dataloader(
     datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
-    # [Step-6]:
-    # gb.MultiProcessDataLoader()
+    # [Step-5]:
+    # gb.DataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
     # 'num_workers': The number of processes to be used for data loading.
     # [Output]:
-    # A MultiProcessDataLoader object to handle data loading.
+    # A DataLoader object to handle data loading.
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=num_workers)
+    dataloader = gb.DataLoader(datapipe, num_workers=num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -220,9 +218,9 @@ class SAGE(nn.Module):
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
-                y[
-                    data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device)
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device
+                )
             feature = y
 
         return y
@@ -242,6 +240,7 @@ def layerwise_infer(
         device=args.device,
         num_workers=args.num_workers,
         job="infer",
+        output_cscformat=args.output_cscformat,
     )
     pred = model.inference(graph, features, dataloader, args.device)
     pred = pred[test_set._items[0]]
@@ -269,6 +268,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         device=args.device,
         num_workers=args.num_workers,
         job="evaluate",
+        output_cscformat=args.output_cscformat,
     )
 
     for step, data in tqdm(enumerate(dataloader)):
@@ -295,6 +295,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         device=args.device,
         num_workers=args.num_workers,
         job="train",
+        output_cscformat=args.output_cscformat,
     )
 
     for epoch in range(args.epochs):
@@ -365,6 +366,12 @@ def parse_args():
         default="cpu",
         choices=["cpu", "cuda"],
         help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+    )
+    parser.add_argument(
+        "--output_cscformat",
+        default="False",
+        choices=["False", "True"],
+        help="Output type of SampledSubgraph. True for csc_formats, False for node_pairs.",
     )
     return parser.parse_args()
 

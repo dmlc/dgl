@@ -6,14 +6,13 @@ import torchdata.datapipes as dp
 
 from .base import CopyTo
 from .feature_fetcher import FeatureFetcher
-from .item_sampler import ItemSampler
 
-from .utils import datapipe_graph_to_adjlist
+from .internal import datapipe_graph_to_adjlist
+from .item_sampler import ItemSampler
 
 
 __all__ = [
-    "SingleProcessDataLoader",
-    "MultiProcessDataLoader",
+    "DataLoader",
 ]
 
 
@@ -34,38 +33,6 @@ def _find_and_wrap_parent(
                 parent_datapipe,
                 wrapper(parent_datapipe, **kwargs),
             )
-
-
-class SingleProcessDataLoader(torch.utils.data.DataLoader):
-    """Single process DataLoader.
-
-    Iterates over the data pipeline in the main process.
-
-    Parameters
-    ----------
-    datapipe : DataPipe
-        The data pipeline.
-    """
-
-    # In the single process dataloader case, we don't need to do any
-    # modifications to the datapipe, and we just PyTorch's native
-    # dataloader as-is.
-    #
-    # The exception is that batch_size should be None, since we already
-    # have minibatch sampling and collating in ItemSampler.
-    def __init__(self, datapipe):
-        datapipe_graph = dp_utils.traverse_dps(datapipe)
-        datapipe_adjlist = datapipe_graph_to_adjlist(datapipe_graph)
-        # Cut datapipe at CopyTo and wrap with prefetcher. This enables the
-        # data pipeline up to the CopyTo operation to run in a separate thread.
-        _find_and_wrap_parent(
-            datapipe_graph,
-            datapipe_adjlist,
-            CopyTo,
-            dp.iter.Prefetcher,
-            buffer_size=2,
-        )
-        super().__init__(datapipe, batch_size=None, num_workers=0)
 
 
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
@@ -97,7 +64,7 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
         yield from self.dataloader
 
 
-class MultiProcessDataLoader(torch.utils.data.DataLoader):
+class DataLoader(torch.utils.data.DataLoader):
     """Multiprocessing DataLoader.
 
     Iterates over the data pipeline with everything before feature fetching
@@ -112,8 +79,7 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
     datapipe : DataPipe
         The data pipeline.
     num_workers : int, optional
-        Number of worker processes. Default is 0, which is identical to
-        :class:`SingleProcessDataLoader`.
+        Number of worker processes. Default is 0.
     persistent_workers : bool, optional
         If True, the data loader will not shut down the worker processes after a
         dataset has been consumed once. This allows to maintain the workers

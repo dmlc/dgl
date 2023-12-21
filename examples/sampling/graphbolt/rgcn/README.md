@@ -47,10 +47,15 @@ python3 hetero_rgcn.py --dataset ogb-lsc-mag240m --num_gpus 1
 ### Resource usage and time cost
 Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 96 vCPUs(Cascade Lake P-8259L), 8 NVIDIA T4 GPUs(16GB RAM). CPU RAM usage is the peak value of `used` field of `free` command which is a bit rough. Please refer to `RSS`/`USS`/`PSS` which are more accurate. GPU RAM usage is the peak value recorded by `nvidia-smi` command.
 
+> **note:**
+`buffer/cache` are highly used during train, it's about 300GB. If more RAM is available, more `buffer/cache` will be consumed as graph size is about 55GB and feature data is about 350GB.
+One more thing, first epoch is quite slow as `buffer/cache` is not ready yet. For GPU train, first epoch takes **34:56min, 1.93s/it**.
+Even in following epochs, time consumption varies.
+
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
 | ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
 | ~404GB       | ~55GB       | 0           |  0GB       | ~3min25s(1087it, 5.29it/s)  | ~2min26s(272it, 1.86it/s) + ~0min20s(34it, 1.62it/s) + ~0min13s(22it, 1.68it/s)   |
-| ~404GB       | ~55GB       | 1           |  7GB       | ~2min41s(1087it, 6.73it/s)  | ~1min52s(272it, 2.41it/s) + ~0min17s(34it, 1.93it/s) + ~0min11s(22it, 1.99it/s)  |
+| ~404GB       | ~55GB       | 1           |  7GB       | ~1min59s(1087it, 9.11it/s)  | ~1min52s(272it, 2.41it/s) + ~0min17s(34it, 1.93it/s) + ~0min11s(22it, 1.99it/s)  |
 
 ### Accuracies
 ```

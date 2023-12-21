@@ -1,4 +1,4 @@
-.. _graphbolt-ondisk-dataset:
+.. _stochastic_training-ondisk-dataset-specification:
 
 Prepare dataset
 ===============

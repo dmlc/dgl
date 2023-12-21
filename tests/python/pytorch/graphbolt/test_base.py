@@ -4,9 +4,10 @@ import unittest
 import backend as F
 
 import dgl.graphbolt as gb
-import gb_test_utils
 import pytest
 import torch
+
+from . import gb_test_utils
 
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
@@ -65,9 +66,6 @@ def test_CopyToWithMiniBatches():
 
     # Invoke CopyTo via functional form.
     test_data_device(datapipe.copy_to("cuda"))
-
-    # Test for DGLMiniBatch.
-    datapipe = gb.DGLMiniBatchConverter(datapipe)
 
     # Invoke CopyTo via class constructor.
     test_data_device(gb.CopyTo(datapipe, "cuda"))
@@ -150,3 +148,16 @@ def test_isin_non_1D_dim():
     test_elements = torch.tensor([[2, 5]])
     with pytest.raises(Exception):
         gb.isin(elements, test_elements)
+
+
+def test_csc_format_base_representation():
+    csc_format_base = gb.CSCFormatBase(
+        indptr=torch.tensor([0, 2, 4]),
+        indices=torch.tensor([4, 5, 6, 7]),
+    )
+    expected_result = str(
+        """CSCFormatBase(indptr=tensor([0, 2, 4]),
+              indices=tensor([4, 5, 6, 7]),
+)"""
+    )
+    assert str(csc_format_base) == expected_result, print(csc_format_base)

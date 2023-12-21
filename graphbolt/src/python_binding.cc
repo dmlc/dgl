@@ -10,6 +10,7 @@
 #include <graphbolt/unique_and_compact.h>
 
 #include "./index_select.h"
+#include "./random.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -34,14 +35,23 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("indices", &FusedCSCSamplingGraph::Indices)
       .def("node_type_offset", &FusedCSCSamplingGraph::NodeTypeOffset)
       .def("type_per_edge", &FusedCSCSamplingGraph::TypePerEdge)
+      .def("node_type_to_id", &FusedCSCSamplingGraph::NodeTypeToID)
+      .def("edge_type_to_id", &FusedCSCSamplingGraph::EdgeTypeToID)
+      .def("node_attributes", &FusedCSCSamplingGraph::NodeAttributes)
       .def("edge_attributes", &FusedCSCSamplingGraph::EdgeAttributes)
       .def("set_csc_indptr", &FusedCSCSamplingGraph::SetCSCIndptr)
       .def("set_indices", &FusedCSCSamplingGraph::SetIndices)
       .def("set_node_type_offset", &FusedCSCSamplingGraph::SetNodeTypeOffset)
       .def("set_type_per_edge", &FusedCSCSamplingGraph::SetTypePerEdge)
+      .def("set_node_type_to_id", &FusedCSCSamplingGraph::SetNodeTypeToID)
+      .def("set_edge_type_to_id", &FusedCSCSamplingGraph::SetEdgeTypeToID)
+      .def("set_node_attributes", &FusedCSCSamplingGraph::SetNodeAttributes)
       .def("set_edge_attributes", &FusedCSCSamplingGraph::SetEdgeAttributes)
       .def("in_subgraph", &FusedCSCSamplingGraph::InSubgraph)
       .def("sample_neighbors", &FusedCSCSamplingGraph::SampleNeighbors)
+      .def(
+          "temporal_sample_neighbors",
+          &FusedCSCSamplingGraph::TemporalSampleNeighbors)
       .def(
           "sample_negative_edges_uniform",
           &FusedCSCSamplingGraph::SampleNegativeEdgesUniform)
@@ -60,14 +70,14 @@ TORCH_LIBRARY(graphbolt, m) {
             g->SetState(state);
             return g;
           });
-  m.def("from_fused_csc", &FusedCSCSamplingGraph::FromCSC);
-  m.def("load_fused_csc_sampling_graph", &LoadFusedCSCSamplingGraph);
-  m.def("save_fused_csc_sampling_graph", &SaveFusedCSCSamplingGraph);
+  m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
+  m.def("index_select_csc", &ops::IndexSelectCSC);
+  m.def("set_seed", &RandomEngine::SetManualSeed);
 }
 
 }  // namespace sampling

@@ -14,9 +14,9 @@ from ..base import dgl_warning
 
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
+from .internal import calculate_range
 from .itemset import ItemSet, ItemSetDict
 from .minibatch import MiniBatch
-from .utils import calculate_range
 
 __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 
@@ -584,7 +584,7 @@ class DistributedItemSampler(ItemSampler):
     >>>     item_set, batch_size=2, shuffle=False, drop_last=False,
     >>>     drop_uneven_inputs=False
     >>> )
-    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> data_loader = gb.DataLoader(item_sampler)
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     Replica#0: [tensor([0, 1]), tensor([2, 3])]
     Replica#1: [tensor([4, 5]), tensor([6, 7])]
@@ -597,7 +597,7 @@ class DistributedItemSampler(ItemSampler):
     >>>     item_set, batch_size=2, shuffle=False, drop_last=True,
     >>>     drop_uneven_inputs=False
     >>> )
-    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> data_loader = gb.DataLoader(item_sampler)
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     Replica#0: [tensor([0, 1]), tensor([2, 3])]
     Replica#1: [tensor([4, 5]), tensor([6, 7])]
@@ -610,7 +610,7 @@ class DistributedItemSampler(ItemSampler):
     >>>     item_set, batch_size=2, shuffle=False, drop_last=False,
     >>>     drop_uneven_inputs=True
     >>> )
-    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> data_loader = gb.DataLoader(item_sampler)
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     Replica#0: [tensor([0, 1]), tensor([2, 3])]
     Replica#1: [tensor([4, 5]), tensor([6, 7])]
@@ -623,7 +623,7 @@ class DistributedItemSampler(ItemSampler):
     >>>     item_set, batch_size=2, shuffle=False, drop_last=True,
     >>>     drop_uneven_inputs=True
     >>> )
-    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> data_loader = gb.DataLoader(item_sampler)
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     Replica#0: [tensor([0, 1])]
     Replica#1: [tensor([4, 5])]
@@ -636,7 +636,7 @@ class DistributedItemSampler(ItemSampler):
     >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
     >>>     drop_uneven_inputs=False
     >>> )
-    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> data_loader = gb.DataLoader(item_sampler)
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     (One possible output:)
     Replica#0: [tensor([3, 2]), tensor([0, 1])]
@@ -650,7 +650,7 @@ class DistributedItemSampler(ItemSampler):
     >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
     >>>     drop_uneven_inputs=True
     >>> )
-    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> data_loader = gb.DataLoader(item_sampler)
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     (One possible output:)
     Replica#0: [tensor([1, 3])]

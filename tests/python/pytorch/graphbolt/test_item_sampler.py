@@ -759,9 +759,7 @@ def distributed_item_sampler_subprocess(
         gb.BasicFeatureStore({}),
         [],
     )
-    data_loader = gb.MultiProcessDataLoader(
-        feature_fetcher, num_workers=num_workers
-    )
+    data_loader = gb.DataLoader(feature_fetcher, num_workers=num_workers)
 
     # Count the numbers of items and batches.
     num_items = 0
@@ -865,7 +863,7 @@ def test_RangeCalculation(params):
     sum = 0
     for rank in range(num_replicas):
         for worker_id in range(max(num_workers, 1)):
-            result = gb.utils.calculate_range(
+            result = gb.internal.calculate_range(
                 True,
                 total,
                 num_replicas,

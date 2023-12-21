@@ -16,10 +16,22 @@ __all__ = [
     "CopyTo",
     "isin",
     "CSCFormatBase",
+    "seed",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
 ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
+
+
+def seed(val):
+    """Set the random seed of Graphbolt.
+
+    Parameters
+    ----------
+    val : int
+        The seed.
+    """
+    torch.ops.graphbolt.set_seed(val)
 
 
 def isin(elements, test_elements):
@@ -92,6 +104,8 @@ class CopyTo(IterDataPipe):
     """DataPipe that transfers each element yielded from the previous DataPipe
     to the given device.
 
+    Functional name: :obj:`copy_to`.
+
     This is equivalent to
 
     .. code:: python
@@ -134,3 +148,39 @@ class CSCFormatBase:
     """
     indptr: torch.Tensor = None
     indices: torch.Tensor = None
+
+    def __repr__(self) -> str:
+        return _csc_format_base_str(self)
+
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `CSCFormatBase` to the specified device using reflection."""
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: apply_to(x, device)
+                    ),
+                )
+
+        return self
+
+
+def _csc_format_base_str(csc_format_base: CSCFormatBase) -> str:
+    final_str = "CSCFormatBase("
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    final_str += (
+        f"indptr={_add_indent(str(csc_format_base.indptr), 21)},\n" + " " * 14
+    )
+    final_str += (
+        f"indices={_add_indent(str(csc_format_base.indices), 22)},\n" + ")"
+    )
+    return final_str

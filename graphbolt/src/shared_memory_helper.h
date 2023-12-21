@@ -29,8 +29,8 @@ namespace sampling {
  * solve this problem, we use two shared memory objects: one for storing the
  * metadata and the other for storing the binary buffer. The metadata includes
  * the metadata of data structures such as size and shape. The size of the
- * metadata is decided by the user via `max_metadata_size`. The size of the
- * binary buffer is decided by the size of the data structures.
+ * metadata is decided by the size of metadata. The size of the binary buffer is
+ * decided by the size of the data structures.
  *
  * To avoid repeated shared memory allocation, this helper class uses lazy data
  * structure writing. The data structures are written to the shared memory only
@@ -69,9 +69,8 @@ class SharedMemoryHelper {
   /**
    * @brief Constructor of the shared memory helper.
    * @param name The name of the shared memory.
-   * @param max_metadata_size The maximum size of metadata.
    */
-  SharedMemoryHelper(const std::string& name, int64_t max_metadata_size);
+  SharedMemoryHelper(const std::string& name);
 
   /** @brief Initialize this helper class before reading. */
   void InitializeRead();
@@ -95,10 +94,14 @@ class SharedMemoryHelper {
 
  private:
   /**
+   * @brief Serialize metadata to string.
+   */
+  void SerializeMetadata();
+  /**
    * @brief Write the metadata to the shared memory. This function is
    * called by `Flush`.
    */
-  void WriteTorchArchiveInternal(torch::serialize::OutputArchive& archive);
+  void WriteMetadataToSharedMemory();
   /**
    * @brief Write the tensor data to the shared memory. This function is
    * called by `Flush`.
@@ -114,26 +117,33 @@ class SharedMemoryHelper {
   }
   inline void MoveMetadataPtr(int64_t offset) {
     TORCH_CHECK(
-        metadata_offset_ + offset <= max_metadata_size_,
+        metadata_offset_ + offset <= metadata_size_,
         "The size of metadata exceeds the maximum size of shared memory.");
     metadata_offset_ += offset;
   }
-  inline void MoveDataPtr(int64_t offset) { data_offset_ += offset; }
+  inline void MoveDataPtr(int64_t offset) {
+    TORCH_CHECK(
+        data_offset_ + offset <= data_size_,
+        "The size of data exceeds the maximum size of shared memory.");
+    data_offset_ += offset;
+  }
 
   std::string name_;
   bool is_creator_;
 
-  int64_t max_metadata_size_;
+  size_t metadata_size_;
+  size_t data_size_;
 
   // The shared memory objects for storing metadata and tensor data.
   SharedMemoryPtr metadata_shared_memory_, data_shared_memory_;
 
   // The read/write offsets of the metadata and tensor data.
-  int64_t metadata_offset_, data_offset_;
+  size_t metadata_offset_, data_offset_;
 
   // The data structures to write to the shared memory. They are written to the
   // shared memory only when `Flush` is called.
   std::vector<torch::serialize::OutputArchive> metadata_to_write_;
+  std::vector<std::string> metadata_strings_to_write_;
   std::vector<torch::optional<torch::Tensor>> tensors_to_write_;
 };
 

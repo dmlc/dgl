@@ -1,14 +1,20 @@
 /**
  *  Copyright (c) 2023 by Contributors
+ *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  * @file cuda/index_select_impl.cu
  * @brief Index select operator implementation on CUDA.
  */
-#include <c10/cuda/CUDAException.h>
-#include <torch/script.h>
+#include <c10/core/ScalarType.h>
+#include <c10/cuda/CUDAStream.h>
+#include <graphbolt/cuda_ops.h>
+#include <thrust/execution_policy.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
 
+#include <cub/cub.cuh>
 #include <numeric>
 
-#include "../index_select.h"
+#include "./common.h"
 #include "./utils.h"
 
 namespace graphbolt {
@@ -100,51 +106,55 @@ template <typename DType, typename IdType>
 torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   const int64_t input_len = input.size(0);
   const int64_t return_len = index.size(0);
-  const int64_t feature_size = std::accumulate(
-      input.sizes().begin() + 1, input.sizes().end(), 1, std::multiplies<>());
+  const int64_t original_feature_size = std::accumulate(
+      input.sizes().begin() + 1, input.sizes().end(), 1ll, std::multiplies<>());
+  const auto aligned_feature_size =
+      input.element_size() * original_feature_size / sizeof(DType);
   torch::Tensor ret = torch::empty(
-      {return_len, feature_size}, torch::TensorOptions()
-                                      .dtype(input.dtype())
-                                      .device(c10::DeviceType::CUDA));
-  DType* input_ptr = input.data_ptr<DType>();
-  DType* ret_ptr = ret.data_ptr<DType>();
+      {return_len, original_feature_size}, torch::TensorOptions()
+                                               .dtype(input.dtype())
+                                               .device(c10::DeviceType::CUDA));
+  DType* input_ptr = reinterpret_cast<DType*>(input.data_ptr());
+  DType* ret_ptr = reinterpret_cast<DType*>(ret.data_ptr());
 
   // Sort the index to improve the memory access pattern.
   torch::Tensor sorted_index, permutation;
-  std::tie(sorted_index, permutation) = torch::sort(index);
+  std::tie(sorted_index, permutation) =
+      Sort(index, cuda::NumberOfBits(input_len));
   const IdType* index_sorted_ptr = sorted_index.data_ptr<IdType>();
   const int64_t* permutation_ptr = permutation.data_ptr<int64_t>();
 
-  cudaStream_t stream = 0;
+  cudaStream_t stream = c10::cuda::getDefaultCUDAStream();
 
-  if (feature_size == 1) {
+  if (aligned_feature_size == 1) {
     // Use a single thread to process each output row to avoid wasting threads.
     const int num_threads = cuda::FindNumThreads(return_len);
     const int num_blocks = (return_len + num_threads - 1) / num_threads;
-    IndexSelectSingleKernel<<<num_blocks, num_threads, 0, stream>>>(
-        input_ptr, input_len, index_sorted_ptr, return_len, ret_ptr,
-        permutation_ptr);
+    CUDA_KERNEL_CALL(
+        IndexSelectSingleKernel, num_blocks, num_threads, 0, stream, input_ptr,
+        input_len, index_sorted_ptr, return_len, ret_ptr, permutation_ptr);
   } else {
     dim3 block(512, 1);
-    while (static_cast<int64_t>(block.x) >= 2 * feature_size) {
+    while (static_cast<int64_t>(block.x) >= 2 * aligned_feature_size) {
       block.x >>= 1;
       block.y <<= 1;
     }
     const dim3 grid((return_len + block.y - 1) / block.y);
-    if (feature_size * sizeof(DType) <= GPU_CACHE_LINE_SIZE) {
+    if (aligned_feature_size * sizeof(DType) <= GPU_CACHE_LINE_SIZE) {
       // When feature size is smaller than GPU cache line size, use unaligned
       // version for less SM usage, which is more resource efficient.
-      IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
-          input_ptr, input_len, feature_size, index_sorted_ptr, return_len,
-          ret_ptr, permutation_ptr);
+      CUDA_KERNEL_CALL(
+          IndexSelectMultiKernel, grid, block, 0, stream, input_ptr, input_len,
+          aligned_feature_size, index_sorted_ptr, return_len, ret_ptr,
+          permutation_ptr);
     } else {
       // Use aligned version to improve the memory access pattern.
-      IndexSelectMultiKernelAligned<<<grid, block, 0, stream>>>(
-          input_ptr, input_len, feature_size, index_sorted_ptr, return_len,
+      CUDA_KERNEL_CALL(
+          IndexSelectMultiKernelAligned, grid, block, 0, stream, input_ptr,
+          input_len, aligned_feature_size, index_sorted_ptr, return_len,
           ret_ptr, permutation_ptr);
     }
   }
-  C10_CUDA_KERNEL_LAUNCH_CHECK();
 
   auto return_shape = std::vector<int64_t>({return_len});
   return_shape.insert(
@@ -156,18 +166,29 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
 /**
  * @brief UVA index select operator implementation on CUDA.
  *
- * The supporting input types are: float, double, int, int64_t.
+ * All basic torch types are supported for input.
  * The supporting index types are: int, int64_t.
  */
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
-  return AT_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Int, at::ScalarType::Long, input.scalar_type(),
-      "UVAIndexSelectImpl", [&] {
-        return AT_DISPATCH_INDEX_TYPES(
-            index.scalar_type(), "UVAIndexSelectImpl", [&] {
-              return UVAIndexSelectImpl_<scalar_t, index_t>(input, index);
-            });
-      });
+  return AT_DISPATCH_INDEX_TYPES(
+      index.scalar_type(), "UVAIndexSelectImpl", ([&] {
+        const auto ptr = (size_t)input.data_ptr();
+        const int64_t feature_size = std::accumulate(
+            input.sizes().begin() + 1, input.sizes().end(), 1ll,
+            std::multiplies<>());
+        // We perform the copy with datatype of size powers of 2, and the
+        // maximum data type we use has 16 bytes. We check the alignment of the
+        // pointer and the feature dimensionality to determine the largest
+        // type to use for the copy to minimize the number of CUDA threads used.
+        // Alignment denotes the maximum suitable alignment and datatype size
+        // for the copies.
+        const int aligned_access_size =
+            std::gcd(16, std::gcd(ptr, input.element_size() * feature_size));
+        return GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
+            aligned_access_size, "UVAIndexSelectImplElementSize", ([&] {
+              return UVAIndexSelectImpl_<element_size_t, index_t>(input, index);
+            }));
+      }));
 }
 
 }  //  namespace ops

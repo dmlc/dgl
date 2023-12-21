@@ -25,14 +25,11 @@ def create_dataloader(dateset, itemset, device):
         dataset.feature, node_feature_keys=["feat"]
     )
 
-    # Convert the mini-batch to DGL format to train a DGL model.
-    datapipe = datapipe.to_dgl()
-
     # Copy the mini-batch to the designated device for training.
     datapipe = datapipe.copy_to(device)
 
     # Initiate the dataloader for the datapipe.
-    return gb.SingleProcessDataLoader(datapipe)
+    return gb.DataLoader(datapipe)
 
 
 class GCN(nn.Module):

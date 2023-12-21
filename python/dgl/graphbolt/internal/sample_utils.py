@@ -7,101 +7,6 @@ from typing import Dict, List, Tuple, Union
 import torch
 
 from ..base import CSCFormatBase, etype_str_to_tuple
-from ..minibatch import MiniBatch
-
-
-def add_reverse_edges(
-    edges: Union[
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-        Tuple[torch.Tensor, torch.Tensor],
-    ],
-    reverse_etypes_mapping: Dict[str, str] = None,
-):
-    r"""
-    This function finds the reverse edges of the given `edges` and returns the
-    composition of them. In a homogeneous graph, reverse edges have inverted
-    source and destination node IDs. While in a heterogeneous graph, reversing
-    also involves swapping node IDs and their types. This function could be
-    used before `exclude_edges` function to help find targeting edges.
-    Note: The found reverse edges may not really exists in the original graph.
-    And repeat edges could be added becasue reverse edges may already exists in
-    the `edges`.
-
-    Parameters
-    ----------
-    edges : Union[Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-                Tuple[torch.Tensor, torch.Tensor]]
-        - If sampled subgraph is homogeneous, then `edges` should be a pair of
-        of tensors.
-        - If sampled subgraph is heterogeneous, then `edges` should be a
-        dictionary of edge types and the corresponding edges to exclude.
-    reverse_etypes_mapping : Dict[str, str], optional
-        The mapping from the original edge types to their reverse edge types.
-
-    Returns
-    -------
-    Union[Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-        Tuple[torch.Tensor, torch.Tensor]]
-        The node pairs contain both the original edges and their reverse
-        counterparts.
-
-    Examples
-    --------
-    >>> edges = {"A:r:B": (torch.tensor([0, 1]), torch.tensor([1, 2]))}
-    >>> print(gb.add_reverse_edges(edges, {"A:r:B": "B:rr:A"}))
-    {'A:r:B': (tensor([0, 1]), tensor([1, 2])),
-    'B:rr:A': (tensor([1, 2]), tensor([0, 1]))}
-
-    >>> edges = (torch.tensor([0, 1]), torch.tensor([2, 1]))
-    >>> print(gb.add_reverse_edges(edges))
-    (tensor([0, 1, 2, 1]), tensor([2, 1, 0, 1]))
-    """
-    if isinstance(edges, tuple):
-        u, v = edges
-        return (torch.cat([u, v]), torch.cat([v, u]))
-    else:
-        combined_edges = edges.copy()
-        for etype, reverse_etype in reverse_etypes_mapping.items():
-            if etype in edges:
-                if reverse_etype in combined_edges:
-                    u, v = combined_edges[reverse_etype]
-                    u = torch.cat([u, edges[etype][1]])
-                    v = torch.cat([v, edges[etype][0]])
-                    combined_edges[reverse_etype] = (u, v)
-                else:
-                    combined_edges[reverse_etype] = (
-                        edges[etype][1],
-                        edges[etype][0],
-                    )
-        return combined_edges
-
-
-def exclude_seed_edges(
-    minibatch: MiniBatch,
-    include_reverse_edges: bool = False,
-    reverse_etypes_mapping: Dict[str, str] = None,
-):
-    """
-    Exclude seed edges with or without their reverse edges from the sampled
-    subgraphs in the minibatch.
-
-    Parameters
-    ----------
-    minibatch : MiniBatch
-        The minibatch.
-    reverse_etypes_mapping : Dict[str, str] = None
-        The mapping from the original edge types to their reverse edge types.
-    """
-    edges_to_exclude = minibatch.node_pairs
-    if include_reverse_edges:
-        edges_to_exclude = add_reverse_edges(
-            minibatch.node_pairs, reverse_etypes_mapping
-        )
-    minibatch.sampled_subgraphs = [
-        subgraph.exclude_edges(edges_to_exclude)
-        for subgraph in minibatch.sampled_subgraphs
-    ]
-    return minibatch
 
 
 def unique_and_compact(
@@ -270,6 +175,125 @@ def unique_and_compact_node_pairs(
     return unique_nodes, compacted_node_pairs
 
 
+def unique_and_compact_csc_formats(
+    csc_formats: Union[
+        Tuple[torch.Tensor, torch.Tensor],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
+    ],
+    unique_dst_nodes: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ],
+):
+    """
+    Compact csc formats and return unique nodes (per type).
+
+    Parameters
+    ----------
+    csc_formats : Union[CSCFormatBase, Dict(str, CSCFormatBase)]
+        CSC formats representing source-destination edges.
+        - If `csc_formats` is a CSCFormatBase: It means the graph is
+        homogeneous. Also, indptr and indice in it should be torch.tensor
+        representing source and destination pairs in csc format. And IDs inside
+        are homogeneous ids.
+        - If `csc_formats` is a Dict[str, CSCFormatBase]: The keys
+        should be edge type and the values should be csc format node pairs.
+        And IDs inside are heterogeneous ids.
+    unique_dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
+        Unique nodes of all destination nodes in the node pairs.
+        - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
+        - If `csc_formats` is a dictionary: The keys are node type and the
+        values are corresponding nodes. And IDs inside are heterogeneous ids.
+
+    Returns
+    -------
+    Tuple[csc_formats, unique_nodes]
+        The compacted csc formats, where node IDs are replaced with mapped node
+        IDs, and the unique nodes (per type).
+        "Compacted csc formats" indicates that the node IDs in the input node
+        pairs are replaced with mapped node IDs, where each type of node is
+        mapped to a contiguous space of IDs ranging from 0 to N.
+
+    Examples
+    --------
+    >>> import dgl.graphbolt as gb
+    >>> N1 = torch.LongTensor([1, 2, 2])
+    >>> N2 = torch.LongTensor([5, 5, 6])
+    >>> unique_dst = {
+    ...     "n1": torch.LongTensor([1, 2]),
+    ...     "n2": torch.LongTensor([5, 6])}
+    >>> csc_formats = {
+    ...     "n1:e1:n2": CSCFormatBase(indptr=torch.tensor([0, 2, 3]),indices=N1),
+    ...     "n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1, 3]),indices=N2)}
+    >>> unique_nodes, compacted_csc_formats = gb.unique_and_compact_csc_formats(
+    ...     csc_formats, unique_dst
+    ... )
+    >>> print(unique_nodes)
+    {'n1': tensor([1, 2]), 'n2': tensor([5, 6])}
+    >>> print(compacted_csc_formats)
+    {"n1:e1:n2": CSCFormatBase(indptr=torch.tensor([0, 2, 3]),
+                               indices=torch.tensor([0, 1, 1])),
+     "n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1, 3]),
+                               indices=torch.Longtensor([0, 0, 1]))}
+    """
+    is_homogeneous = not isinstance(csc_formats, dict)
+    if is_homogeneous:
+        csc_formats = {"_N:_E:_N": csc_formats}
+        if unique_dst_nodes is not None:
+            assert isinstance(
+                unique_dst_nodes, torch.Tensor
+            ), "Edge type not supported in homogeneous graph."
+            unique_dst_nodes = {"_N": unique_dst_nodes}
+
+    # Collect all source and destination nodes for each node type.
+    indices = defaultdict(list)
+    for etype, csc_format in csc_formats.items():
+        assert csc_format.indptr[-1] == len(
+            csc_format.indices
+        ), "The last element of indptr should be the same as the length of indices."
+        src_type, _, dst_type = etype_str_to_tuple(etype)
+        assert len(unique_dst_nodes.get(dst_type, [])) + 1 == len(
+            csc_format.indptr
+        ), "The seed nodes should correspond to indptr."
+        indices[src_type].append(csc_format.indices)
+    indices = {ntype: torch.cat(nodes) for ntype, nodes in indices.items()}
+
+    ntypes = set(indices.keys())
+    unique_nodes = {}
+    compacted_indices = {}
+    dtype = list(indices.values())[0].dtype
+    default_tensor = torch.tensor([], dtype=dtype)
+    for ntype in ntypes:
+        indice = indices.get(ntype, default_tensor)
+        unique_dst = unique_dst_nodes.get(ntype, default_tensor)
+        (
+            unique_nodes[ntype],
+            compacted_indices[ntype],
+            _,
+        ) = torch.ops.graphbolt.unique_and_compact(
+            indice, torch.tensor([], dtype=indice.dtype), unique_dst
+        )
+
+    compacted_csc_formats = {}
+    # Map back with the same order.
+    for etype, csc_format in csc_formats.items():
+        num_elem = csc_format.indices.size(0)
+        src_type, _, _ = etype_str_to_tuple(etype)
+        indice = compacted_indices[src_type][:num_elem]
+        indptr = csc_format.indptr
+        compacted_csc_formats[etype] = CSCFormatBase(
+            indptr=indptr, indices=indice
+        )
+        compacted_indices[src_type] = compacted_indices[src_type][num_elem:]
+
+    # Return singleton for a homogeneous graph.
+    if is_homogeneous:
+        compacted_csc_formats = list(compacted_csc_formats.values())[0]
+        unique_nodes = list(unique_nodes.values())[0]
+
+    return unique_nodes, compacted_csc_formats
+
+
 def compact_csc_format(
     csc_formats: Union[CSCFormatBase, Dict[str, CSCFormatBase]],
     dst_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
@@ -346,7 +370,7 @@ def compact_csc_format(
                 csc_format.indices
             ), "The last element of indptr should be the same as the length of indices."
             src_type, _, dst_type = etype_str_to_tuple(etype)
-            assert len(dst_nodes[dst_type]) + 1 == len(
+            assert len(dst_nodes.get(dst_type, [])) + 1 == len(
                 csc_format.indptr
             ), "The seed nodes should correspond to indptr."
             offset = original_row_ids.get(src_type, torch.tensor([])).size(0)

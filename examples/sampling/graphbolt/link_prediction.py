@@ -43,6 +43,7 @@ main
 """
 import argparse
 import time
+from functools import partial
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
@@ -104,10 +105,10 @@ class SAGE(nn.Module):
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
-                # By design, our output nodes are contiguous.
-                y[
-                    data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device, non_blocking=True)
+                # By design, our seed nodes are contiguous.
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device, non_blocking=True
+                )
             feature = y
 
         return y
@@ -174,7 +175,11 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph,
+        args.fanout,
+        output_cscformat=(args.output_cscformat == "True"),
+    )
 
     ############################################################################
     # [Input]:
@@ -189,8 +194,10 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # to ensure that positive samples are not inadvertently included within
     # the negative samples.
     ############################################################################
-    if is_train:
-        datapipe = datapipe.transform(gb.exclude_seed_edges)
+    if is_train and args.exclude_edges:
+        datapipe = datapipe.transform(
+            partial(gb.exclude_seed_edges, include_reverse_edges=True)
+        )
 
     ############################################################################
     # [Input]:
@@ -208,18 +215,6 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
-    # [Step-4]:
-    # datapipe.to_dgl()
-    # [Input]:
-    # 'datapipe': The previous datapipe object.
-    # [Output]:
-    # A DGLMiniBatch used for computing.
-    # [Role]:
-    # Convert a mini-batch to dgl-minibatch.
-    ############################################################################
-    datapipe = datapipe.to_dgl()
-
-    ############################################################################
     # [Input]:
     # 'device': The device to copy the data to.
     # [Output]:
@@ -232,31 +227,17 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # 'datapipe': The datapipe object to be used for data loading.
     # 'args.num_workers': The number of processes to be used for data loading.
     # [Output]:
-    # A MultiProcessDataLoader object to handle data loading.
+    # A DataLoader object to handle data loading.
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(
+    dataloader = gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
     )
 
     # Return the fully-initialized DataLoader object.
     return dataloader
-
-
-def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch):
-    """Convert the minibatch to a training pair and a label tensor."""
-    pos_src, pos_dst = data.positive_node_pairs
-    neg_src, neg_dst = data.negative_node_pairs
-    node_pairs = (
-        torch.cat((pos_src, neg_src), dim=0),
-        torch.cat((pos_dst, neg_dst), dim=0),
-    )
-    pos_label = torch.ones_like(pos_src)
-    neg_label = torch.zeros_like(neg_src)
-    labels = torch.cat([pos_label, neg_label], dim=0)
-    return (node_pairs, labels.float())
 
 
 @torch.no_grad()
@@ -332,10 +313,10 @@ def train(args, model, graph, features, train_set):
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
-            # Unpack MiniBatch.
-            compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
+            # Get node pairs with labels for loss calculation.
+            compacted_pairs, labels = data.node_pairs_with_labels
+
             node_feature = data.node_features["feat"]
-            # Convert sampled subgraphs to DGL blocks.
             blocks = data.blocks
 
             # Get the embeddings of the input nodes.
@@ -369,7 +350,7 @@ def parse_args():
     parser.add_argument("--neg-ratio", type=int, default=1)
     parser.add_argument("--train-batch-size", type=int, default=512)
     parser.add_argument("--eval-batch-size", type=int, default=1024)
-    parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument(
         "--early-stop",
         type=int,
@@ -383,10 +364,22 @@ def parse_args():
         help="Fan-out of neighbor sampling. Default: 15,10,5",
     )
     parser.add_argument(
+        "--exclude-edges",
+        type=int,
+        default=1,
+        help="Whether to exclude reverse edges during sampling. Default: 1",
+    )
+    parser.add_argument(
         "--device",
         default="cpu",
         choices=["cpu", "cuda"],
         help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+    )
+    parser.add_argument(
+        "--output_cscformat",
+        default="False",
+        choices=["False", "True"],
+        help="Output type of SampledSubgraph. True for csc_formats, False for node_pairs.",
     )
     return parser.parse_args()
 

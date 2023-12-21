@@ -48,6 +48,9 @@ struct SamplerArgs<SamplerType::LABOR> {
  */
 class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  public:
+  using NodeTypeToIDMap = torch::Dict<std::string, int64_t>;
+  using EdgeTypeToIDMap = torch::Dict<std::string, int64_t>;
+  using NodeAttrMap = torch::Dict<std::string, torch::Tensor>;
   using EdgeAttrMap = torch::Dict<std::string, torch::Tensor>;
   /** @brief Default constructor. */
   FusedCSCSamplingGraph() = default;
@@ -60,28 +63,47 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    * @param type_per_edge A tensor representing the type of each edge, if
    * present.
+   * @param node_type_to_id A dictionary mapping node type names to type IDs, if
+   * present.
+   * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
+   * present.
+   * @param node_attributes A dictionary of node attributes, if present.
+   * @param edge_attributes A dictionary of edge attributes, if present.
+   *
    */
   FusedCSCSamplingGraph(
       const torch::Tensor& indptr, const torch::Tensor& indices,
-      const torch::optional<torch::Tensor>& node_type_offset,
-      const torch::optional<torch::Tensor>& type_per_edge,
-      const torch::optional<EdgeAttrMap>& edge_attributes);
+      const torch::optional<torch::Tensor>& node_type_offset = torch::nullopt,
+      const torch::optional<torch::Tensor>& type_per_edge = torch::nullopt,
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id = torch::nullopt,
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id = torch::nullopt,
+      const torch::optional<NodeAttrMap>& node_attributes = torch::nullopt,
+      const torch::optional<EdgeAttrMap>& edge_attributes = torch::nullopt);
 
   /**
-   * @brief Create a homogeneous CSC graph from tensors of CSC format.
+   * @brief Create a fused CSC graph from tensors of CSC format.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
    * @param node_type_offset A tensor representing the offset of node types, if
    * present.
    * @param type_per_edge A tensor representing the type of each edge, if
    * present.
+   * @param node_type_to_id A dictionary mapping node type names to type IDs, if
+   * present.
+   * @param edge_type_to_id A dictionary mapping edge type names to type IDs, if
+   * present.
+   * @param node_attributes A dictionary of node attributes, if present.
+   * @param edge_attributes A dictionary of edge attributes, if present.
    *
    * @return FusedCSCSamplingGraph
    */
-  static c10::intrusive_ptr<FusedCSCSamplingGraph> FromCSC(
+  static c10::intrusive_ptr<FusedCSCSamplingGraph> Create(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id,
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
+      const torch::optional<NodeAttrMap>& node_attributes,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /** @brief Get the number of nodes. */
@@ -106,9 +128,68 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
     return type_per_edge_;
   }
 
+  /**
+   * @brief Get the node type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping node type names to type IDs.
+   */
+  inline const torch::optional<NodeTypeToIDMap> NodeTypeToID() const {
+    return node_type_to_id_;
+  }
+
+  /**
+   * @brief Get the edge type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping edge type names to type IDs.
+   */
+  inline const torch::optional<EdgeTypeToIDMap> EdgeTypeToID() const {
+    return edge_type_to_id_;
+  }
+
+  /** @brief Get the node attributes dictionary. */
+  inline const torch::optional<EdgeAttrMap> NodeAttributes() const {
+    return node_attributes_;
+  }
+
   /** @brief Get the edge attributes dictionary. */
   inline const torch::optional<EdgeAttrMap> EdgeAttributes() const {
     return edge_attributes_;
+  }
+
+  /**
+   * @brief Get the node attribute tensor by name.
+   *
+   * If the input name is empty, return nullopt. Otherwise, return the node
+   * attribute tensor by name.
+   */
+  inline torch::optional<torch::Tensor> NodeAttribute(
+      torch::optional<std::string> name) const {
+    if (!name.has_value()) {
+      return torch::nullopt;
+    }
+    TORCH_CHECK(
+        node_attributes_.has_value() &&
+            node_attributes_.value().contains(name.value()),
+        "Node attribute ", name.value(), " does not exist.");
+    return torch::optional<torch::Tensor>(
+        node_attributes_.value().at(name.value()));
+  }
+
+  /**
+   * @brief Get the edge attribute tensor by name.
+   *
+   * If the input name is empty, return nullopt. Otherwise, return the edge
+   * attribute tensor by name.
+   */
+  inline torch::optional<torch::Tensor> EdgeAttribute(
+      torch::optional<std::string> name) const {
+    if (!name.has_value()) {
+      return torch::nullopt;
+    }
+    TORCH_CHECK(
+        edge_attributes_.has_value() &&
+            edge_attributes_.value().contains(name.value()),
+        "Edge attribute ", name.value(), " does not exist.");
+    return torch::optional<torch::Tensor>(
+        edge_attributes_.value().at(name.value()));
   }
 
   /** @brief Set the csc index pointer tensor. */
@@ -127,6 +208,30 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   inline void SetTypePerEdge(
       const torch::optional<torch::Tensor>& type_per_edge) {
     type_per_edge_ = type_per_edge;
+  }
+
+  /**
+   * @brief Set the node type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping node type names to type IDs.
+   */
+  inline void SetNodeTypeToID(
+      const torch::optional<NodeTypeToIDMap>& node_type_to_id) {
+    node_type_to_id_ = node_type_to_id;
+  }
+
+  /**
+   * @brief Set the edge type to id map for a heterogeneous graph.
+   * @note The map is a dictionary mapping edge type names to type IDs.
+   */
+  inline void SetEdgeTypeToID(
+      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id) {
+    edge_type_to_id_ = edge_type_to_id;
+  }
+
+  /** @brief Set the node attributes dictionary. */
+  inline void SetNodeAttributes(
+      const torch::optional<EdgeAttrMap>& node_attributes) {
+    node_attributes_ = node_attributes;
   }
 
   /** @brief Set the edge attributes dictionary. */
@@ -217,6 +322,41 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       torch::optional<std::string> probs_name) const;
 
   /**
+   * @brief Sample neighboring edges of the given nodes with a temporal
+   * constraint. If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is
+   * given, the sampled neighbors or edges of an input node must have a
+   * timestamp that is no later than that of the input node.
+   *
+   * @param nodes The nodes from which to sample neighbors.
+   * @param input_nodes_timestamp The timestamp of the nodes.
+   * @param fanouts The number of edges to be sampled for each node with or
+   * without considering edge types, following the same rules as in
+   * SampleNeighbors.
+   * @param replace Boolean indicating whether the sample is preformed with or
+   * without replacement. If True, a value can be selected multiple times.
+   * Otherwise, each value can be selected only once.
+   * @param return_eids Boolean indicating whether edge IDs need to be returned,
+   * typically used when edge features are required.
+   * @param probs_name An optional string specifying the name of an edge
+   * attribute, following the same rules as in SampleNeighbors.
+   * @param node_timestamp_attr_name An optional string specifying the name of
+   * the node attribute that contains the timestamp of nodes in the graph.
+   * @param edge_timestamp_attr_name An optional string specifying the name of
+   * the edge attribute that contains the timestamp of edges in the graph.
+   *
+   * @return An intrusive pointer to a FusedSampledSubgraph object containing
+   * the sampled graph's information.
+   *
+   */
+  c10::intrusive_ptr<FusedSampledSubgraph> TemporalSampleNeighbors(
+      const torch::Tensor& input_nodes,
+      const torch::Tensor& input_nodes_timestamp,
+      const std::vector<int64_t>& fanouts, bool replace, bool return_eids,
+      torch::optional<std::string> probs_name,
+      torch::optional<std::string> node_timestamp_attr_name,
+      torch::optional<std::string> edge_timestamp_attr_name) const;
+
+  /**
    * @brief Sample negative edges by randomly choosing negative
    * source-destination pairs according to a uniform distribution. For each edge
    * ``(u, v)``, it is supposed to generate `negative_ratio` pairs of negative
@@ -303,19 +443,32 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   torch::optional<torch::Tensor> type_per_edge_;
 
   /**
+   * @brief A dictionary mapping node type names to type IDs. The length of it
+   * is equal to the number of node types. The key is the node type name, and
+   * the value is the corresponding type ID.
+   */
+  torch::optional<NodeTypeToIDMap> node_type_to_id_;
+
+  /**
+   * @brief A dictionary mapping edge type names to type IDs. The length of it
+   * is equal to the number of edge types. The key is the edge type name, and
+   * the value is the corresponding type ID.
+   */
+  torch::optional<EdgeTypeToIDMap> edge_type_to_id_;
+
+  /**
+   * @brief A dictionary of node attributes. Each key represents the attribute's
+   * name, while the corresponding value holds the attribute's specific value.
+   * The length of each value should match the total number of nodes."
+   */
+  torch::optional<NodeAttrMap> node_attributes_;
+
+  /**
    * @brief A dictionary of edge attributes. Each key represents the attribute's
    * name, while the corresponding value holds the attribute's specific value.
    * The length of each value should match the total number of edges."
    */
   torch::optional<EdgeAttrMap> edge_attributes_;
-
-  /**
-   * @brief Maximum number of bytes used to serialize the metadata of the
-   * member tensors, including tensor shape and dtype. The constant is estimated
-   * by multiplying the number of tensors in this class and the maximum number
-   * of bytes used to serialize the metadata of a tensor (4 * 8192 for now).
-   */
-  static constexpr int64_t SERIALIZED_METAINFO_SIZE_MAX = 32768;
 
   /**
    * @brief Shared memory used to hold the tensor metadata and data of this

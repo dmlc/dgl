@@ -141,6 +141,11 @@ class QM7bDataset(DGLDataset):
         """Number of prediction tasks."""
         return 14
 
+    @property
+    def num_classes(self):
+        """Number of prediction tasks."""
+        return 14
+
     def __getitem__(self, idx):
         r"""Get graph and label by index
 

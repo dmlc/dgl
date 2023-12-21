@@ -16,6 +16,15 @@ class NegativeSampler(MiniBatchTransformer):
     """
     A negative sampler used to generate negative samples and return
     a mix of positive and negative samples.
+
+    Functional name: :obj:`sample_negative`.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The datapipe.
+    negative_ratio : int
+        The proportion of negative samples to positive samples.
     """
 
     def __init__(
@@ -23,16 +32,6 @@ class NegativeSampler(MiniBatchTransformer):
         datapipe,
         negative_ratio,
     ):
-        """
-        Initlization for a negative sampler.
-
-        Parameters
-        ----------
-        datapipe : DataPipe
-            The datapipe.
-        negative_ratio : int
-            The proportion of negative samples to positive samples.
-        """
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
         self.negative_ratio = negative_ratio

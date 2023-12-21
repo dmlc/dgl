@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     # create GAT model
     in_size = features.shape[1]
-    out_size = train_dataset.num_labels
+    out_size = train_dataset.num_classes
     model = GAT(in_size, 256, out_size, heads=[4, 4, 6]).to(device)
 
     # model training

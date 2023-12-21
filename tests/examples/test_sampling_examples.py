@@ -17,7 +17,9 @@ EXAMPLE_ROOT = os.path.join(
 def test_node_classification():
     script = os.path.join(EXAMPLE_ROOT, "node_classification.py")
     out = subprocess.run(["python", str(script)], capture_output=True)
-    assert out.returncode == 0
+    assert (
+        out.returncode == 0
+    ), f"stdout: {out.stdout.decode('utf-8')}\nstderr: {out.stderr.decode('utf-8')}"
     stdout = out.stdout.decode("utf-8")
     assert float(stdout[-5:]) > 0.60
 
@@ -26,6 +28,8 @@ def test_node_classification():
 def test_link_prediction():
     script = os.path.join(EXAMPLE_ROOT, "link_prediction.py")
     out = subprocess.run(["python", str(script)], capture_output=True)
-    assert out.returncode == 0
+    assert (
+        out.returncode == 0
+    ), f"stdout: {out.stdout.decode('utf-8')}\nstderr: {out.stderr.decode('utf-8')}"
     stdout = out.stdout.decode("utf-8")
     assert float(stdout[-5:]) > 0.80

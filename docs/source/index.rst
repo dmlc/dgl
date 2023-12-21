@@ -22,12 +22,11 @@ Welcome to Deep Graph Library Tutorials and Documentation
    :titlesonly:
    :glob:
 
-   graphbolt/index
+   stochastic_training/index
    guide/index
    guide_cn/index
    guide_ko/index
    notebooks/sparse/index
-   tutorials/large/index
    tutorials/cpu/index
    tutorials/multi/index
    tutorials/dist/index
@@ -99,7 +98,7 @@ For acquainted users who wish to learn more advanced usage,
 * `Learn DGL by examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
 * Read the :doc:`User Guide<guide/index>` (:doc:`中文版链接<guide_cn/index>`), which explains the concepts
   and usage of DGL in much more details.
-* Go through the tutorials for :doc:`Stochastic Training of GNNs <tutorials/large/index>`,
+* Go through the tutorials for :doc:`Stochastic Training of GNNs <notebooks/stochastic_training/index>`,
   which covers the basic steps for training GNNs on large graphs in mini-batches.
 * :doc:`Study classical papers <tutorials/models/index>` on graph machine learning alongside DGL.
 * Search for the usage of a specific API in the :doc:`API reference manual <api/python/index>`,
