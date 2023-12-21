@@ -6,10 +6,6 @@ if(USE_CUDA)
   message(STATUS "Build graphbolt with CUDA support")
   enable_language(CUDA)
   add_definitions(-DGRAPHBOLT_USE_CUDA)
-  if(DEFINED ENV{CUDAARCHS})
-    set(CUDA_ARCHITECTURES_LIST $ENV{CUDAARCHS})
-    separate_arguments(CUDA_ARCHITECTURES_LIST)
-  endif()
 endif()
 
 # Find PyTorch cmake files and PyTorch versions with the python interpreter
@@ -53,6 +49,9 @@ if(USE_CUDA)
     ${BOLT_DIR}/cuda/*.cu
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
+  if(DEFINED ENV{CUDAARCHS})
+    set(CMAKE_CUDA_ARCHITECTURES $ENV{CUDAARCHS})
+  endif()
 endif()
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
@@ -72,7 +71,6 @@ if(USE_CUDA)
                              "../third_party/cccl/cub"
                              "../third_party/cccl/libcudacxx/include")
   
-  set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_ARCHITECTURES "${CUDA_ARCHITECTURES_LIST}")
   get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
   message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")
 endif()
