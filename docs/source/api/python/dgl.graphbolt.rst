@@ -74,7 +74,7 @@ A dataloader is for iterating over a dataset and generate mini-batches.
 ItemSet
 -------
 
-An item set is a iterable collection of items.
+An item set is an iterable collection of items.
 
 .. autosummary::
     :toctree: ../../generated/
