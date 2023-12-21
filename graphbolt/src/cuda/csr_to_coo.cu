@@ -49,13 +49,11 @@ torch::Tensor CSRToCOO(
       indptr.scalar_type(), "CSRToCOOIndptr", ([&] {
         using indptr_t = scalar_t;
         auto indptr_ptr = indptr.data_ptr<indptr_t>();
-        indptr_t num_edges;
-        CUDA_CALL(cudaMemcpyAsync(
-            &num_edges, indptr.data_ptr<scalar_t>() + num_rows,
-            sizeof(num_edges), cudaMemcpyDeviceToHost, stream));
-        CUDA_CALL(cudaStreamSynchronize(stream));
+        auto num_edges =
+            cuda::ReadScalar{indptr.data_ptr<indptr_t>() + num_rows};
         auto csr_rows = torch::empty(
-            num_edges, indptr.options().dtype(indices_scalar_type));
+            static_cast<indptr_t>(num_edges),
+            indptr.options().dtype(indices_scalar_type));
         AT_DISPATCH_INTEGRAL_TYPES(
             indices_scalar_type, "CSRToCOOIndices", ([&] {
               using indices_t = scalar_t;
