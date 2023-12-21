@@ -342,15 +342,18 @@ def _itemset_str(itemset: Union[ItemSet, ItemSetDict], name) -> str:
         lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
         return "\n".join(lines)
 
+    items = (
+        itemset._items if isinstance(itemset, ItemSet) else itemset._itemsets
+    )
     item_str = (
         "items="
-        + _add_indent(str(list(itemset)), indent_len + len("items="))
+        + _add_indent(str(items), indent_len + len("items="))
         + ",\n"
         + " " * indent_len
     )
     name_str = (
         "names="
-        + _add_indent(str(itemset.names), indent_len + len("items="))
+        + _add_indent(str(itemset._names), indent_len + len("items="))
         + ",\n)"
     )
     final_str += item_str + name_str
