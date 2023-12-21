@@ -52,7 +52,7 @@ import dgl.nn as dglnn
 
 import psutil
 
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn import HeteroEmbedding
@@ -128,7 +128,7 @@ def create_dataloader(
     # `device`:
     #   The device to move the mini-batch to.
     # [TODO] Moving `MiniBatch` to GPU is not supported yet.
-    device = th.device("cpu")
+    device = torch.device("cpu")
     datapipe = datapipe.copy_to(device)
 
     # Create a DataLoader from the datapipe.
@@ -398,7 +398,7 @@ def extract_node_features(name, block, data, node_embed, device):
     return node_features
 
 
-@th.no_grad()
+@torch.no_grad()
 def evaluate(
     name,
     g,
@@ -450,9 +450,9 @@ def evaluate(
         y_hats.append(y_hat.cpu())
         y_true.append(data.labels[category].long())
 
-    y_pred = th.cat(y_hats, dim=0)
-    y_true = th.cat(y_true, dim=0)
-    y_true = th.unsqueeze(y_true, 1)
+    y_pred = torch.cat(y_hats, dim=0)
+    y_true = torch.cat(y_true, dim=0)
+    y_true = torch.unsqueeze(y_true, 1)
 
     if name == "ogb-lsc-mag240m":
         y_pred = y_pred.view(-1)
@@ -564,7 +564,7 @@ def train(
 
 
 def main(args):
-    device = th.device("cuda") if args.num_gpus > 0 else th.device("cpu")
+    device = torch.device("cuda") if args.num_gpus > 0 else torch.device("cpu")
 
     # Load dataset.
     g, features, train_set, valid_set, test_set, num_classes = load_dataset(
@@ -601,7 +601,7 @@ def main(args):
     # which is passed to the optimizer. The optimizer then updates all
     # these parameters during the training process.
     all_params = itertools.chain(model.parameters())
-    optimizer = th.optim.Adam(all_params, lr=0.01)
+    optimizer = torch.optim.Adam(all_params, lr=0.01)
 
     # `expected_max`` is the number of physical cores on your machine.
     # The `logical` parameter, when set to False, ensures that the count
