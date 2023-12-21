@@ -226,7 +226,6 @@ setup(
         "requests>=2.19.0",
         "tqdm",
         "psutil>=5.8.0",
-        "torchdata",
     ],
     url="https://github.com/dmlc/dgl",
     distclass=BinaryDistribution,
