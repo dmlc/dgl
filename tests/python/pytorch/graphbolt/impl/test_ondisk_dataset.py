@@ -1285,7 +1285,6 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
                       type: null
                       name: feat
                       format: numpy
-                      in_memory: true
                       path: data/edge-feat.npy
             feature_data:
                 - domain: node

@@ -1,210 +1,18 @@
 """Unified data structure for input and ouput of all the stages in loading process."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import torch
 
 import dgl
-from dgl.heterograph import DGLBlock
 from dgl.utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
-__all__ = ["DGLMiniBatch", "MiniBatch"]
-
-
-@dataclass
-class MiniBatchBase(object):
-    """Base class for `MiniBatch` and `DGLMiniBatch`."""
-
-    def node_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        """A representation of input nodes in the outermost layer. Contains all
-        nodes in the MiniBatch.
-        - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
-        - If `input_nodes` is a dictionary: The keys should be node type and the
-          value should be corresponding heterogeneous node id.
-        """
-        raise NotImplementedError
-
-    def num_layers(self) -> int:
-        """Return the number of layers."""
-        raise NotImplementedError
-
-    def set_node_features(
-        self,
-        node_features: Union[
-            Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]
-        ],
-    ) -> None:
-        """Set node features."""
-        raise NotImplementedError
-
-    def set_edge_features(
-        self,
-        edge_features: List[
-            Union[Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]]
-        ],
-    ) -> None:
-        """Set edge features."""
-        raise NotImplementedError
-
-    def edge_ids(
-        self, layer_id: int
-    ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
-        """Get the edge ids of a layer."""
-        raise NotImplementedError
-
-    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
-        """Copy MiniBatch to the specified device."""
-        raise NotImplementedError
-
-
-@dataclass
-class DGLMiniBatch(MiniBatchBase):
-    r"""A data class designed for the DGL library, encompassing all the
-    necessary fields for computation using the DGL library."""
-
-    blocks: List[DGLBlock] = None
-    """A list of 'DGLBlock's, each one corresponding to one layer, representing
-    a bipartite graph used for message passing.
-    """
-
-    input_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """A representation of input nodes in the outermost layer. Conatins all
-       nodes in the 'blocks'.
-    - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
-    - If `input_nodes` is a dictionary: The keys should be node type and the
-      value should be corresponding heterogeneous node id.
-    """
-
-    output_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """Representation of output nodes, usually also the seed nodes, used for
-    sampling in the graph.
-    - If `output_nodes` is a tensor: It indicates the graph is homogeneous.
-    - If `output_nodes` is a dictionary: The keys should be node type and the
-      value should be corresponding heterogeneous node ids.
-    """
-
-    node_features: Union[
-        Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]
-    ] = None
-    """A representation of node features.
-      - If keys are single strings: It means the graph is homogeneous, and the
-      keys are feature names.
-      - If keys are tuples: It means the graph is heterogeneous, and the keys
-      are tuples of '(node_type, feature_name)'.
-    """
-
-    edge_features: List[
-        Union[Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]]
-    ] = None
-    """Edge features associated with the 'blocks'.
-      - If keys are single strings: It means the graph is homogeneous, and the
-      keys are feature names.
-      - If keys are tuples: It means the graph is heterogeneous, and the keys
-      are tuples of '(edge_type, feature_name)'. Note, edge type is a triplet
-      of format (str, str, str).
-    """
-
-    labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """Labels associated with seed nodes / node pairs in the graph.
-    - If `labels` is a tensor: It indicates the graph is homogeneous. The value
-      are corresponding labels to given 'output_nodes' or 'node_pairs'.
-    - If `labels` is a dictionary: The keys are node or edge type and the value
-      should be corresponding labels to given 'output_nodes' or 'node_pairs'.
-    """
-
-    positive_node_pairs: Union[
-        Tuple[torch.Tensor, torch.Tensor],
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-    ] = None
-    """Representation of positive graphs used for evaluating or computing loss
-    in link prediction tasks.
-    - If `positive_node_pairs` is a tuple: It indicates a homogeneous graph
-    containing two tensors representing source-destination node pairs.
-    - If `positive_node_pairs` is a dictionary: The keys should be edge type,
-    and the value should be a tuple of tensors representing node pairs of the
-    given type.
-    """
-
-    negative_node_pairs: Union[
-        Tuple[torch.Tensor, torch.Tensor],
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-    ] = None
-    """Representation of negative graphs used for evaluating or computing loss in
-    link prediction tasks.
-    - If `negative_node_pairs` is a tuple: It indicates a homogeneous graph
-    containing two tensors representing source-destination node pairs.
-    - If `negative_node_pairs` is a dictionary: The keys should be edge type,
-    and the value should be a tuple of tensors representing node pairs of the
-    given type.
-    """
-
-    def __repr__(self) -> str:
-        return _dgl_minibatch_str(self)
-
-    def node_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        """A representation of input nodes in the outermost layer. Contains all
-        nodes in the `blocks`.
-        - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
-        - If `input_nodes` is a dictionary: The keys should be node type and the
-          value should be corresponding heterogeneous node id.
-        """
-        return self.input_nodes
-
-    def num_layers(self) -> int:
-        """Return the number of layers."""
-        if self.blocks is None:
-            return 0
-        return len(self.blocks)
-
-    def edge_ids(
-        self, layer_id: int
-    ) -> Optional[Union[Dict[str, torch.Tensor], torch.Tensor]]:
-        """Get edge ids of a layer."""
-        if dgl.EID not in self.blocks[layer_id].edata:
-            return None
-        return self.blocks[layer_id].edata[dgl.EID]
-
-    def set_node_features(
-        self,
-        node_features: Union[
-            Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]
-        ],
-    ) -> None:
-        """Set node features."""
-        self.node_features = node_features
-
-    def set_edge_features(
-        self,
-        edge_features: List[
-            Union[Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]]
-        ],
-    ) -> None:
-        """Set edge features."""
-        self.edge_features = edge_features
-
-    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
-        """Copy `DGLMiniBatch` to the specified device using reflection."""
-
-        def _to(x, device):
-            return x.to(device) if hasattr(x, "to") else x
-
-        for attr in dir(self):
-            # Only copy member variables.
-            if not callable(getattr(self, attr)) and not attr.startswith("__"):
-                setattr(
-                    self,
-                    attr,
-                    recursive_apply(
-                        getattr(self, attr), lambda x: _to(x, device)
-                    ),
-                )
-
-        return self
+__all__ = ["MiniBatch"]
 
 
 @dataclass
@@ -573,32 +381,57 @@ class MiniBatch:
     @property
     def node_pairs_with_labels(self):
         """Get a node pair tensor and a label tensor from MiniBatch. They are
-        used for evaluating or computing loss. It will return
-        `(node_pairs, labels)` as result.
+        used for evaluating or computing loss. For homogeneous graph, it will
+        return `(node_pairs, labels)` as result; for heterogeneous graph, the
+        `node_pairs` and `labels` will both be a dict with etype as the key.
         - If it's a link prediction task, `node_pairs` will contain both
         negative and positive node pairs and `labels` will consist of 0 and 1,
         indicating whether the corresponding node pair is negative or positive.
         - If it's an edge classification task, this function will directly
-        return `compacted_node_pairs` and corresponding `labels`.
+        return `compacted_node_pairs` for each etype and the corresponding
+        `labels`.
         - Otherwise it will return None.
         """
         if self.labels is None:
+            # Link prediction.
             positive_node_pairs = self.positive_node_pairs
             negative_node_pairs = self.negative_node_pairs
             if positive_node_pairs is None or negative_node_pairs is None:
                 return None
-            pos_src, pos_dst = positive_node_pairs
-            neg_src, neg_dst = negative_node_pairs
-            node_pairs = (
-                torch.cat((pos_src, neg_src), dim=0),
-                torch.cat((pos_dst, neg_dst), dim=0),
-            )
-            pos_label = torch.ones_like(pos_src)
-            neg_label = torch.zeros_like(neg_src)
-            labels = torch.cat([pos_label, neg_label], dim=0)
-            return (node_pairs, labels.float())
-        else:
+            if isinstance(positive_node_pairs, Dict):
+                # Heterogeneous graph.
+                node_pairs_by_etype = {}
+                labels_by_etype = {}
+                for etype in positive_node_pairs:
+                    pos_src, pos_dst = positive_node_pairs[etype]
+                    neg_src, neg_dst = negative_node_pairs[etype]
+                    node_pairs_by_etype[etype] = (
+                        torch.cat((pos_src, neg_src), dim=0),
+                        torch.cat((pos_dst, neg_dst), dim=0),
+                    )
+                    pos_label = torch.ones_like(pos_src)
+                    neg_label = torch.zeros_like(neg_src)
+                    labels_by_etype[etype] = torch.cat(
+                        [pos_label, neg_label], dim=0
+                    )
+                return (node_pairs_by_etype, labels_by_etype)
+            else:
+                # Homogeneous graph.
+                pos_src, pos_dst = positive_node_pairs
+                neg_src, neg_dst = negative_node_pairs
+                node_pairs = (
+                    torch.cat((pos_src, neg_src), dim=0),
+                    torch.cat((pos_dst, neg_dst), dim=0),
+                )
+                pos_label = torch.ones_like(pos_src)
+                neg_label = torch.zeros_like(neg_src)
+                labels = torch.cat([pos_label, neg_label], dim=0)
+                return (node_pairs, labels.float())
+        elif self.compacted_node_pairs is not None:
+            # Edge classification.
             return (self.compacted_node_pairs, self.labels)
+        else:
+            return None
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
@@ -654,34 +487,3 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
             final_str + f"{name}={_add_indent(val, len(name)+1)},\n" + " " * 10
         )
     return "MiniBatch(" + final_str[:-3] + ")"
-
-
-def _dgl_minibatch_str(dglminibatch: DGLMiniBatch) -> str:
-    final_str = ""
-    # Get all attributes in the class except methods.
-    attributes = get_attributes(dglminibatch)
-    attributes.reverse()
-    # Insert key with its value into the string.
-    for name in attributes:
-        val = getattr(dglminibatch, name)
-
-        def _add_indent(_str, indent):
-            lines = _str.split("\n")
-            lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-            return "\n".join(lines)
-
-        # Let the variables in the list occupy one line each, and adjust the
-        # indentation on top of the original if the original data output has
-        # line feeds.
-        if isinstance(val, list):
-            val = [str(val_str) for val_str in val]
-            val = "[" + ",\n".join(val) + "]"
-        elif isinstance(val, tuple):
-            val = [str(val_str) for val_str in val]
-            val = "(" + ",\n".join(val) + ")"
-        else:
-            val = str(val)
-        final_str = (
-            final_str + f"{name}={_add_indent(val, len(name)+15)},\n" + " " * 13
-        )
-    return "DGLMiniBatch(" + final_str[:-3] + ")"

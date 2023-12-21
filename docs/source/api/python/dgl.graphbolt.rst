@@ -111,8 +111,6 @@ features. It is the basic unit for training a GNN model.
     :template: graphbolt_classtemplate.rst
 
     MiniBatch
-    DGLMiniBatch
-    DGLMiniBatchConverter
 
 
 NegativeSampler

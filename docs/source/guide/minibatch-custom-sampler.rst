@@ -48,7 +48,7 @@ To use this sampler with :class:`~dgl.graphbolt.DataLoader`:
     datapipe = datapipe.customized_sample_neighbor(g, [10, 10]) # 2 layers.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
     for data in dataloader:
         input_features = data.node_features["feat"]
@@ -93,7 +93,7 @@ can be used on heterogeneous graphs:
         feature, node_feature_keys={"user": ["feat"], "item": ["feat"]}
     )
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
     for data in dataloader:
         input_features = {
