@@ -275,3 +275,85 @@ def test_torch_based_feature_store(in_memory):
         assert feature_store.size("node", None, "a") == torch.Size([3])
 
         feature_store = None
+
+
+@pytest.mark.parametrize("in_memory", [True, False])
+def test_torch_based_feature_repr(in_memory):
+    with tempfile.TemporaryDirectory() as test_dir:
+        a = torch.tensor([[1, 2, 3], [4, 5, 6]])
+        b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
+        metadata = {"max_value": 3}
+        if not in_memory:
+            a = to_on_disk_tensor(test_dir, "a", a)
+            b = to_on_disk_tensor(test_dir, "b", b)
+
+        feature_a = gb.TorchBasedFeature(a, metadata=metadata)
+        feature_b = gb.TorchBasedFeature(b)
+
+        expected_str_feature_a = str(
+            """TorchBasedFeature(feature=tensor([[1, 2, 3],
+                                  [4, 5, 6]]),
+                  metadata={'max_value': 3},
+)"""
+        )
+        expected_str_feature_b = str(
+            """TorchBasedFeature(feature=tensor([[[1, 2],
+                                   [3, 4]],
+                          
+                                  [[4, 5],
+                                   [6, 7]]]),
+                  metadata={},
+)"""
+        )
+        assert str(feature_a) == expected_str_feature_a
+        assert str(feature_b) == expected_str_feature_b
+        a = b = metadata = None
+        feature_a = feature_b = None
+        expected_str_feature_a = expected_str_feature_b = None
+
+
+@pytest.mark.parametrize("in_memory", [True, False])
+def test_torch_based_feature_store_repr(in_memory):
+    with tempfile.TemporaryDirectory() as test_dir:
+        a = torch.tensor([[1, 2, 4], [2, 5, 3]])
+        b = torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]])
+        write_tensor_to_disk(test_dir, "a", a, fmt="torch")
+        write_tensor_to_disk(test_dir, "b", b, fmt="numpy")
+        feature_data = [
+            gb.OnDiskFeatureData(
+                domain="node",
+                type="paper",
+                name="a",
+                format="torch",
+                path=os.path.join(test_dir, "a.pt"),
+                in_memory=True,
+            ),
+            gb.OnDiskFeatureData(
+                domain="edge",
+                type="paper:cites:paper",
+                name="b",
+                format="numpy",
+                path=os.path.join(test_dir, "b.npy"),
+                in_memory=in_memory,
+            ),
+        ]
+        feature_store = gb.TorchBasedFeatureStore(feature_data)
+
+        expected_feature_store_str = str(
+            """TorchBasedFeatureStore{(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(feature=tensor([[1, 2, 4],
+                                                        [2, 5, 3]]),
+                                        metadata={},
+                      ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(feature=tensor([[[1, 2],
+                                                         [3, 4]],
+                                                
+                                                        [[2, 5],
+                                                         [3, 4]]]),
+                                        metadata={},
+                      )}"""
+        )
+        assert str(feature_store) == expected_feature_store_str, print(
+            feature_store
+        )
+
+        a = b = feature_data = None
+        feature_store = expected_feature_store_str = None

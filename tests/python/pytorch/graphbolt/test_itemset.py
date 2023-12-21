@@ -524,3 +524,70 @@ def test_ItemSetDict_iteration_node_pairs_neg_dsts():
     assert torch.equal(item_set[:]["user:like:item"][1], neg_dsts)
     assert torch.equal(item_set[:]["user:follow:user"][0], node_pairs)
     assert torch.equal(item_set[:]["user:follow:user"][1], neg_dsts)
+
+
+def test_ItemSet_repr():
+    # ItemSet with single name.
+    item_set = gb.ItemSet(torch.arange(0, 5), names="seed_nodes")
+    expected_str = str(
+        """ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
+        names=('seed_nodes',),
+)"""
+    )
+    assert str(item_set) == expected_str, print(item_set)
+
+    # ItemSet with multiple names.
+    item_set = gb.ItemSet(
+        (torch.arange(0, 5), torch.arange(5, 10)),
+        names=("seed_nodes", "labels"),
+    )
+    expected_str = str(
+        """ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
+        names=('seed_nodes', 'labels'),
+)"""
+    )
+    assert str(item_set) == expected_str, print(item_set)
+
+
+def test_ItemSetDict_repr():
+    # ItemSetDict with single name.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seed_nodes"),
+        }
+    )
+    expected_str = str(
+        """ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
+                          names=('seed_nodes',),
+                  ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
+                          names=('seed_nodes',),
+                  )},
+            names=('seed_nodes',),
+)"""
+    )
+    assert str(item_set) == expected_str, print(item_set)
+
+    # ItemSetDict with multiple names.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(
+                (torch.arange(0, 5), torch.arange(5, 10)),
+                names=("seed_nodes", "labels"),
+            ),
+            "item": gb.ItemSet(
+                (torch.arange(5, 10), torch.arange(10, 15)),
+                names=("seed_nodes", "labels"),
+            ),
+        }
+    )
+    expected_str = str(
+        """ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
+                          names=('seed_nodes', 'labels'),
+                  ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]), tensor([10, 11, 12, 13, 14])),
+                          names=('seed_nodes', 'labels'),
+                  )},
+            names=('seed_nodes', 'labels'),
+)"""
+    )
+    assert str(item_set) == expected_str, print(item_set)
