@@ -476,14 +476,13 @@ class MiniBatch:
             ]
         else:
             # Unrecognized task. Will copy all the attributes to the device.
-            transfer_attrs += dir(self)
+            transfer_attrs += get_attributes(self)
         for attr in transfer_attrs:
             # Only copy member variables.
-            if not callable(getattr(self, attr)) and not attr.startswith("__"):
-                try:
-                    setattr(self, attr, apply_to(getattr(self, attr), device))
-                except AttributeError:
-                    continue
+            try:
+                setattr(self, attr, apply_to(getattr(self, attr), device))
+            except AttributeError:
+                continue
 
         return self
 

@@ -122,7 +122,7 @@ class CopyTo(IterDataPipe):
     device : torch.device
         The PyTorch CUDA device.
     extra_attrs: List[string]
-        The extra attributes in the MiniBatch you wish to be carried to the
+        The extra attributes in the MiniBatch you want to be carried to the
         specific device.
     """
 
