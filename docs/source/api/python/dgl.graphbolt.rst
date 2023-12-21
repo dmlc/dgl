@@ -111,6 +111,7 @@ features. It is the basic unit for training a GNN model.
     :template: graphbolt_classtemplate.rst
 
     MiniBatch
+    MiniBatchTransformer
 
 
 NegativeSampler
@@ -123,7 +124,6 @@ A negative sampler is for sampling negative items from mini-batches.
     :nosignatures:
     :template: graphbolt_classtemplate.rst
 
-    MiniBatchTransformer
     NegativeSampler
     UniformNegativeSampler
 
