@@ -27,18 +27,18 @@ def test_CopyTo():
 
 
 @pytest.mark.parametrize(
-    "mode",
+    "task",
     ["node_classification", "link_prediction", "edge_classification", "other"],
 )
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
-def test_CopyToWithMiniBatches(mode):
+def test_CopyToWithMiniBatches(task):
     N = 16
     B = 2
-    if mode == "node_classification":
+    if task == "node_classification":
         itemset = gb.ItemSet(
             (torch.arange(N), torch.arange(N)), names=("seed_nodes", "labels")
         )
-    elif mode == "link_prediction":
+    elif task == "link_prediction":
         itemset = gb.ItemSet(
             (
                 torch.arange(2 * N).reshape(-1, 2),
@@ -46,7 +46,7 @@ def test_CopyToWithMiniBatches(mode):
             ),
             names=("node_pairs", "negative_dsts"),
         )
-    elif mode == "edge_classification":
+    elif task == "edge_classification":
         itemset = gb.ItemSet(
             (torch.arange(2 * N).reshape(-1, 2), torch.arange(N)),
             names=("node_pairs", "labels"),
@@ -73,7 +73,7 @@ def test_CopyToWithMiniBatches(mode):
         ["a"],
     )
 
-    if mode == "node_classification":
+    if task == "node_classification":
         copied_attrs = [
             "node_features",
             "edge_features",
@@ -81,7 +81,7 @@ def test_CopyToWithMiniBatches(mode):
             "labels",
             "blocks",
         ]
-    elif mode == "link_prediction":
+    elif task == "link_prediction":
         copied_attrs = [
             "compacted_node_pairs",
             "node_features",
@@ -94,7 +94,7 @@ def test_CopyToWithMiniBatches(mode):
             "negative_node_pairs",
             "node_pairs_with_labels",
         ]
-    elif mode == "edge_classification":
+    elif task == "edge_classification":
         copied_attrs = [
             "compacted_node_pairs",
             "node_features",
