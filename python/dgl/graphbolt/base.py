@@ -74,7 +74,7 @@ def etype_tuple_to_str(c_etype):
 
 
 def etype_str_to_tuple(c_etype):
-    """Convert canonical etype from tuple to string.
+    """Convert canonical etype from string to tuple.
 
     Examples
     --------
