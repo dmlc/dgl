@@ -12,6 +12,8 @@ namespace ops {
 
 std::pair<torch::Tensor, torch::Tensor> Sort(torch::Tensor input, int num_bits);
 
+torch::Tensor ExclusiveCumSum(torch::Tensor indptr);
+
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
