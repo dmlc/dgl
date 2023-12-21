@@ -372,57 +372,6 @@ class EntityClassify(nn.Module):
         return h
 
 
-class Logger(object):
-    r"""
-    This class was taken directly from the PyG implementation and can be found
-    here: https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppre
-    d/mag/logger.py
-
-    This was done to ensure that performance was measured in precisely the same
-    way
-    """
-
-    def __init__(self, runs):
-        self.results = [[] for _ in range(runs)]
-
-    def add_result(self, run, result):
-        assert len(result) == 3
-        assert run >= 0 and run < len(self.results)
-        self.results[run].append(result)
-
-    def print_statistics(self, run=None):
-        if run is not None:
-            result = 100 * th.tensor(self.results[run])
-            argmax = result[:, 1].argmax().item()
-            print(f"Run {run + 1:02d}:")
-            print(f"Highest Train: {result[:, 0].max():.2f}")
-            print(f"Highest Valid: {result[:, 1].max():.2f}")
-            print(f"  Final Train: {result[argmax, 0]:.2f}")
-            print(f"   Final Test: {result[argmax, 2]:.2f}")
-        else:
-            result = 100 * th.tensor(self.results)
-
-            best_results = []
-            for r in result:
-                train1 = r[:, 0].max().item()
-                valid = r[:, 1].max().item()
-                train2 = r[r[:, 1].argmax(), 0].item()
-                test = r[r[:, 1].argmax(), 2].item()
-                best_results.append((train1, valid, train2, test))
-
-            best_result = th.tensor(best_results)
-
-            print("All runs:")
-            r = best_result[:, 0]
-            print(f"Highest Train: {r.mean():.2f} ± {r.std():.2f}")
-            r = best_result[:, 1]
-            print(f"Highest Valid: {r.mean():.2f} ± {r.std():.2f}")
-            r = best_result[:, 2]
-            print(f"  Final Train: {r.mean():.2f} ± {r.std():.2f}")
-            r = best_result[:, 3]
-            print(f"   Final Test: {r.mean():.2f} ± {r.std():.2f}")
-
-
 def extract_node_features(name, block, data, node_embed, device):
     """Extract the node features from embedding layer or raw features."""
     if name == "ogbn-mag":
@@ -516,7 +465,7 @@ def evaluate(
     return evaluator.eval({"y_true": y_true, "y_pred": y_pred})["acc"]
 
 
-def run(
+def train(
     name,
     g,
     model,
@@ -525,13 +474,11 @@ def run(
     train_set,
     valid_set,
     test_set,
-    logger,
     device,
-    run_id,
     features,
     num_workers,
 ):
-    print("start to run...")
+    print("Start to train...")
     category = "paper"
 
     data_loader = create_dataloader(
@@ -554,7 +501,7 @@ def run(
 
         total_loss = 0
 
-        for data in tqdm(data_loader, desc=f"Training~Epoch {epoch:02d}"):
+        for data in tqdm(data_loader, desc=f"Training~Epoch {epoch + 1:02d}"):
             # Convert MiniBatch to DGL Blocks.
             blocks = [block.to(device) for block in data.blocks]
 
@@ -607,25 +554,17 @@ def run(
         )
         print("Finish evaluating on test set.")
 
-        logger.add_result(run_id, (train_acc, valid_acc, test_acc))
         print(
-            f"Run: {run_id + 1:02d}, "
             f"Epoch: {epoch +1 :02d}, "
             f"Loss: {loss:.4f}, "
-            f"Train: {100 * train_acc:.2f}%, "
-            f"Valid: {100 * valid_acc:.2f}%, "
-            f"Test: {100 * test_acc:.2f}%"
+            f"Train accuracy: {100 * train_acc:.2f}%, "
+            f"Valid accuracy: {100 * valid_acc:.2f}%, "
+            f"Test accuracy: {100 * test_acc:.2f}%"
         )
-        print("Finish evaluating on test set.")
-
-    return logger
 
 
 def main(args):
     device = th.device("cuda") if args.num_gpus > 0 else th.device("cpu")
-
-    # Initialize a logger.
-    logger = Logger(args.runs)
 
     # Load dataset.
     g, features, train_set, valid_set, test_set, num_classes = load_dataset(
@@ -654,60 +593,41 @@ def main(args):
         f"{sum(p.numel() for p in model.parameters())}"
     )
 
-    for run_id in range(args.runs):
-        # [Why we need to reset the parameters?]
-        # If parameters are not reset, the model will start with the
-        # parameters learned from the last run, potentially resulting
-        # in biased outcomes or sub-optimal performance if the model was
-        # previously stuck in a poor local minimum.
-        if embed_layer is not None:
-            embed_layer.reset_parameters()
-        model.reset_parameters()
+    # `itertools.chain()` is a function in Python's itertools module.
+    # It is used to flatten a list of iterables, making them act as
+    # one big iterable.
+    # In this context, the following code is used to create a single
+    # iterable over the parameters of both the model and the embed_layer,
+    # which is passed to the optimizer. The optimizer then updates all
+    # these parameters during the training process.
+    all_params = itertools.chain(model.parameters())
+    optimizer = th.optim.Adam(all_params, lr=0.01)
 
-        # `itertools.chain()` is a function in Python's itertools module.
-        # It is used to flatten a list of iterables, making them act as
-        # one big iterable.
-        # In this context, the following code is used to create a single
-        # iterable over the parameters of both the model and the embed_layer,
-        # which is passed to the optimizer. The optimizer then updates all
-        # these parameters during the training process.
-        all_params = itertools.chain(
-            model.parameters(),
-            [] if embed_layer is None else embed_layer.parameters(),
-        )
-        optimizer = th.optim.Adam(all_params, lr=0.01)
-
-        # `expected_max`` is the number of physical cores on your machine.
-        # The `logical` parameter, when set to False, ensures that the count
-        # returned is the number of physical cores instead of logical cores
-        # (which could be higher due to technologies like Hyper-Threading).
-        expected_max = int(psutil.cpu_count(logical=False))
-        if args.num_workers >= expected_max:
-            print(
-                "[ERROR] You specified num_workers are larger than physical"
-                f"cores, please set any number less than {expected_max}",
-                file=sys.stderr,
-            )
-        logger = run(
-            args.dataset,
-            g,
-            model,
-            embed_layer,
-            optimizer,
-            train_set,
-            valid_set,
-            test_set,
-            logger,
-            device,
-            run_id,
-            features,
-            args.num_workers,
+    # `expected_max`` is the number of physical cores on your machine.
+    # The `logical` parameter, when set to False, ensures that the count
+    # returned is the number of physical cores instead of logical cores
+    # (which could be higher due to technologies like Hyper-Threading).
+    expected_max = int(psutil.cpu_count(logical=False))
+    if args.num_workers >= expected_max:
+        print(
+            "[ERROR] You specified num_workers are larger than physical"
+            f"cores, please set any number less than {expected_max}",
+            file=sys.stderr,
         )
 
-        logger.print_statistics(run_id)
-
-    print("Final performance: ")
-    logger.print_statistics()
+    train(
+        args.dataset,
+        g,
+        model,
+        embed_layer,
+        optimizer,
+        train_set,
+        valid_set,
+        test_set,
+        device,
+        features,
+        args.num_workers,
+    )
 
 
 if __name__ == "__main__":
@@ -716,9 +636,9 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="ogbn-mag",
+        choices=["ogbn-mag", "ogb-lsc-mag240m"],
         help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m",
     )
-    parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--num_gpus", type=int, default=0)
 
