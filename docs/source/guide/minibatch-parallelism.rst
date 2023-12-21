@@ -22,7 +22,7 @@ generate a minibatch, including:
     datapipe = datapipe.transform(gb.exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 All these stages are implemented in separate
 `IterableDataPipe <https://pytorch.org/data/main/torchdata.datapipes.iter.html>`__
