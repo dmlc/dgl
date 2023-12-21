@@ -91,6 +91,16 @@ inline bool is_zero<dim3>(dim3 size) {
     }                                                                 \
   }
 
+/**
+ * @brief This class is designed to handle the copy operation of a single
+ * scalar_t item from a given CUDA device pointer. Later, if the object is cast
+ * into scalar_t, the value can be read.
+ *
+ * auto num_edges = cuda::ReadScalar(indptr + indptr.size(0) - 1);
+ * // Perform many operations here, they will run as normal.
+ * // We finally need to read num_edges.
+ * auto indices = torch::empty(static_cast<scalar_t>(num_edges));
+ */
 template <typename scalar_t>
 struct ReadScalar {
   ReadScalar(const scalar_t* device_ptr) : is_ready(false) {
@@ -118,6 +128,7 @@ struct ReadScalar {
   bool is_ready;
 };
 
+// This includes all integer, float and boolean types.
 #define GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(...)            \
   AT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__)                 \
   AT_DISPATCH_CASE(at::ScalarType::Half, __VA_ARGS__)     \
