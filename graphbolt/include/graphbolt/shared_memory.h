@@ -12,8 +12,8 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #include <windows.h>
-#endif  // NOMINMAX
 #undef NOMINMAX
+#endif  // NOMINMAX
 #endif  // _WIN32
 
 #include <memory>
