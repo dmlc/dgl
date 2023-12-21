@@ -28,7 +28,7 @@ The whole data loader pipeline is as follows:
     datapipe = datapipe.transform(gb.exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 
 For the details about the builtin uniform negative sampler please see
@@ -213,7 +213,7 @@ only difference is that you need to give edge types for feature fetching.
         node_feature_keys={"user": ["feat"], "item": ["feat"]}
     )
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 If you want to give your own negative sampling function, just inherit from the
 :class:`~dgl.graphbolt.NegativeSampler` class and override the

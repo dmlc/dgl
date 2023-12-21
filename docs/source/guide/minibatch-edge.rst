@@ -39,7 +39,7 @@ edges(namely, node pairs) in the training set instead of the nodes.
     # datapipe = gb.NeighborSampler(datapipe, g, [10, 10])
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 Iterating over the DataLoader will yield :class:`~dgl.graphbolt.MiniBatch`
 which contains a list of specially created graphs representing the computation
@@ -92,7 +92,7 @@ You can use :func:`~dgl.graphbolt.exclude_seed_edges` alongside with
     datapipe = datapipe.transform(exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
     
 
 Adapt your model for minibatch training
@@ -273,7 +273,7 @@ only difference is that the train_set is now an instance of
         feature, node_feature_keys={"item": ["feat"], "user": ["feat"]}
     )
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 Things become a little different if you wish to exclude the reverse
 edges on heterogeneous graphs. On heterogeneous graphs, reverse edges
