@@ -8,7 +8,11 @@
 #define GRAPHBOLT_SHARED_MEMORY_H_
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
 #include <windows.h>
+#endif  // NOMINMAX
+#undef NOMINMAX
 #endif  // _WIN32
 
 #include <memory>
