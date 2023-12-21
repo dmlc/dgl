@@ -1,4 +1,5 @@
 """Graphbolt sampled subgraph."""
+
 # pylint: disable= invalid-name
 from typing import Dict, Tuple, Union
 
@@ -207,7 +208,7 @@ class SampledSubgraph:
                     )
                 index[etype] = _exclude_homo_edges(
                     reverse_edges,
-                    edges.get(etype),
+                    edges.get(etype, None),
                     assume_num_node_within_int32,
                 )
             if is_cscformat:
@@ -266,8 +267,15 @@ def _relabel_two_arrays(lhs_array, rhs_array):
     return mapping[: lhs_array.numel()], mapping[lhs_array.numel() :]
 
 
-def _exclude_homo_edges(edges, edges_to_exclude, assume_num_node_within_int32):
+def _exclude_homo_edges(
+    edges: Tuple[torch.Tensor, torch.Tensor],
+    edges_to_exclude: Tuple[torch.Tensor, torch.Tensor],
+    assume_num_node_within_int32: bool,
+):
     """Return the indices of edges that are not in edges_to_exclude."""
+    if edges_to_exclude is None:
+        # No edges are excluded, so return all indices of edges.
+        return torch.arange(len(edges[0]))
     if assume_num_node_within_int32:
         val = edges[0] << 32 | edges[1]
         val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]

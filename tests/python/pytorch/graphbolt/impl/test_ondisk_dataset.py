@@ -1812,11 +1812,13 @@ def test_OnDiskDataset_load_tasks():
         # the absolute path segment.
         dataset = gb.OnDiskDataset(test_dir).load()
         original_train_set = dataset.tasks[0].train_set._items
-        dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
-            "path"
-        ] = os.path.join(
-            test_dir,
-            dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0]["path"],
+        dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0]["path"] = (
+            os.path.join(
+                test_dir,
+                dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
+                    "path"
+                ],
+            )
         )
         dataset.load()
         modify_train_set = dataset.tasks[0].train_set._items
