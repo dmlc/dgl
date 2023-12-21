@@ -26,15 +26,19 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
   AT_DISPATCH_INTEGRAL_TYPES(
       ids.scalar_type(), "unique_and_compact", ([&] {
         std::unordered_map<scalar_t, scalar_t> id_map;
+        unique_ids = torch::empty_like(ids);
+        auto unique_ids_data = unique_ids.data_ptr<scalar_t>();
         auto ids_data = ids.data_ptr<scalar_t>();
         auto num_ids = ids.size(0);
         scalar_t index = 0;
         for (auto i = 0; i < num_ids; i++) {
           auto id = ids_data[i];
           if (id_map.count(id) == 0) {
+            unique_ids_data[index] = id;
             id_map[id] = index++;
           }
         }
+        unique_ids = unique_ids.slice(0, 0, index);
         compacted_src_ids = torch::empty_like(src_ids);
         compacted_dst_ids = torch::empty_like(dst_ids);
         num_ids = compacted_src_ids.size(0);
@@ -45,6 +49,11 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         torch::parallel_for(0, num_ids, 256, [&](int64_t s, int64_t e) {
           for (int64_t i = s; i < e; i++) {
             compacted_src_ids_data[i] = id_map[src_ids_data[i]];
+          }
+        });
+        num_ids = compacted_dst_ids.size(0);
+        torch::parallel_for(0, num_ids, 256, [&](int64_t s, int64_t e) {
+          for (int64_t i = s; i < e; i++) {
             compacted_dst_ids_data[i] = id_map[dst_ids_data[i]];
           }
         });
