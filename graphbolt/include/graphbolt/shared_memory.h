@@ -11,13 +11,17 @@
 // Add the macro to avoid MIN/MAX conflict.
 #ifndef NOMINMAX
 #define NOMINMAX
-#include <windows.h>
+#define GRAPHBOLT_WINDOWS_NOMINMAX_
 #endif  // NOMINMAX
-#undef NOMINMAX
+#include <windows.h>
 #endif  // _WIN32
 
 #include <memory>
 #include <string>
+
+#ifdef GRAPHBOLT_WINDOWS_NOMINMAX_
+#undef NOMINMAX
+#endif  // GRAPHBOLT_WINDOWS_NOMINMAX_
 
 namespace graphbolt {
 namespace sampling {
