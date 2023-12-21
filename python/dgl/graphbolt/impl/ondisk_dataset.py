@@ -14,7 +14,7 @@ from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
-from ..internal import copy_or_convert_data, read_data
+from ..internal import copy_or_convert_data, get_attributes, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
@@ -269,6 +269,9 @@ class OnDiskTask:
     def test_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the test set."""
         return self._test_set
+
+    def __repr__(self) -> str:
+        return _ondisk_task_str(self)
 
 
 class OnDiskDataset(Dataset):
@@ -609,3 +612,25 @@ class BuiltinDataset(OnDiskDataset):
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
         super().__init__(dataset_dir)
+
+
+def _ondisk_task_str(task: OnDiskTask) -> str:
+    final_str = "OnDiskTask("
+    indent_len = len(final_str)
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    attributes = get_attributes(task)
+    attributes.reverse()
+    for name in attributes:
+        if name[0] == "_":
+            continue
+        val = getattr(task, name)
+        final_str += (
+            f"{name}={_add_indent(str(val), indent_len + len(name) + 1)},\n"
+            + " " * indent_len
+        )
+    return final_str[:-indent_len] + ")"
