@@ -195,7 +195,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
   // Sorting nodes so that accesses over PCI-e are more regular.
   const auto sorted_idx =
       Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1)).second;
-  auto stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
 
   return AT_DISPATCH_INTEGRAL_TYPES(
@@ -263,7 +263,7 @@ void IndexSelectCSCCopyIndices(
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
-  auto stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
   return AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
