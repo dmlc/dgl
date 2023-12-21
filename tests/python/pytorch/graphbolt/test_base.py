@@ -120,7 +120,7 @@ def test_CopyToWithMiniBatches(task):
                     and not attr.startswith("__")
                     and hasattr(var, "device")
                 ):
-                    if mode == "other":
+                    if task == "other":
                         assert var.device.type == "cuda"
                     else:
                         if attr in copied_attrs:
