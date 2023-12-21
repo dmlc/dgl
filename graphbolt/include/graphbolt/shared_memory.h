@@ -8,6 +8,7 @@
 #define GRAPHBOLT_SHARED_MEMORY_H_
 
 #ifdef _WIN32
+// Add the macro to avoid MIN/MAX conflict.
 #ifndef NOMINMAX
 #define NOMINMAX
 #include <windows.h>
