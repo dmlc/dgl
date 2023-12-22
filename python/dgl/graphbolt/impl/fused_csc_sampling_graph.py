@@ -867,15 +867,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
         )
-        # Broadcast the input nodes' timestamp to the sampled neighbors.
-        sampled_count = torch.diff(C_sampled_subgraph.indptr)
-        neighbors_timestamp = input_nodes_timestamp.repeat_interleave(
-            sampled_count
-        )
-        return (
-            self._convert_to_sampled_subgraph(C_sampled_subgraph),
-            neighbors_timestamp,
-        )
+        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
