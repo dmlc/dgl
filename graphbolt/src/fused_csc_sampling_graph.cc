@@ -18,6 +18,7 @@
 
 #include "./random.h"
 #include "./shared_memory_helper.h"
+#include "./utils.h"
 
 namespace {
 torch::optional<torch::Dict<std::string, torch::Tensor>> TensorizeDict(
@@ -773,9 +774,10 @@ int64_t TemporalNumPick(
     const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
     int64_t offset, int64_t num_neighbors) {
   auto mask = TemporalMask(
-      seed_timestamp[seed_offset].item<int64_t>(), csc_indics, probs_or_mask,
-      node_timestamp, edge_timestamp, {offset, offset + num_neighbors});
-  int64_t num_valid_neighbors = mask.sum().item<int64_t>();
+      utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset), csc_indics,
+      probs_or_mask, node_timestamp, edge_timestamp,
+      {offset, offset + num_neighbors});
+  int64_t num_valid_neighbors = utils::GetValueByIndex<int64_t>(mask.sum(), 0);
   if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
   return replace ? fanout : std::min(fanout, num_valid_neighbors);
 }
@@ -1138,8 +1140,9 @@ int64_t TemporalPick(
     const torch::optional<torch::Tensor>& edge_timestamp,
     PickedType* picked_data_ptr) {
   auto mask = TemporalMask(
-      seed_timestamp[seed_offset].item<int64_t>(), csc_indices, probs_or_mask,
-      node_timestamp, edge_timestamp, {offset, offset + num_neighbors});
+      utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset), csc_indices,
+      probs_or_mask, node_timestamp, edge_timestamp,
+      {offset, offset + num_neighbors});
   torch::Tensor masked_prob;
   if (probs_or_mask.has_value()) {
     masked_prob =
