@@ -281,22 +281,33 @@ class OnDiskDataset(Dataset):
     Due to limited resources, the data which are too large to fit into RAM will
     remain on disk while others reside in RAM once ``OnDiskDataset`` is
     initialized. This behavior could be controled by user via ``in_memory``
-    field in YAML file.
+    field in YAML file. All paths in YAML file are relative paths to the
+    dataset directory.
 
     A full example of YAML file is as follows:
 
     .. code-block:: yaml
 
         dataset_name: graphbolt_test
-        graph_topology:
-          type: FusedCSCSamplingGraph
-          path: graph_topology/fused_csc_sampling_graph.tar
+        graph:
+          nodes:
+            - type: paper # could be omitted for homogeneous graph.
+              num: 1000
+            - type: author
+              num: 1000
+          edges:
+            - type: author:writes:paper # could be omitted for homogeneous graph.
+              format: csv # Can be csv only.
+              path: edge_data/author-writes-paper.csv
+            - type: paper:cites:paper
+              format: csv
+              path: edge_data/paper-cites-paper.csv
         feature_data:
           - domain: node
-            type: paper
+            type: paper # could be omitted for homogeneous graph.
             name: feat
             format: numpy
-            in_memory: false
+            in_memory: false # If not specified, default to true.
             path: node_data/paper-feat.npy
           - domain: edge
             type: "author:writes:paper"
@@ -308,37 +319,35 @@ class OnDiskDataset(Dataset):
           - name: "edge_classification"
             num_classes: 10
             train_set:
-              - type: paper # could be null for homogeneous graph.
-                data: # multiple data sources could be specified.
-                  - name: node_pairs
-                    format: numpy
+              - data: # multiple data sources could be specified.
+                  - type: paper
+                    name: node_pairs
+                    format: numpy # Can be numpy or torch.
                     in_memory: true # If not specified, default to true.
                     path: set/paper-train-node_pairs.npy
-                  - name: labels
+                  - type: paper
+                    name: labels
                     format: numpy
-                    in_memory: false
                     path: set/paper-train-labels.npy
             validation_set:
-              - type: paper
-                data:
-                  - name: node_pairs
+              - data:
+                  - type: paper
+                    name: node_pairs
                     format: numpy
-                    in_memory: true
                     path: set/paper-validation-node_pairs.npy
-                  - name: labels
+                  - type: paper
+                    name: labels
                     format: numpy
-                    in_memory: true
                     path: set/paper-validation-labels.npy
             test_set:
-              - type: paper
-                data:
-                  - name: node_pairs
+              - data:
+                  - type: paper
+                    name: node_pairs
                     format: numpy
-                    in_memory: true
                     path: set/paper-test-node_pairs.npy
-                  - name: labels
+                  - type: paper
+                    name: labels
                     format: numpy
-                    in_memory: true
                     path: set/paper-test-labels.npy
 
     Parameters
