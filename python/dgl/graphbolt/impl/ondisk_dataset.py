@@ -319,34 +319,31 @@ class OnDiskDataset(Dataset):
           - name: "edge_classification"
             num_classes: 10
             train_set:
-              - data: # multiple data sources could be specified.
-                  - type: paper
-                    name: node_pairs
+              - type: paper # could be omitted for homogeneous graph.
+                data: # multiple data sources could be specified.
+                  - name: node_pairs
                     format: numpy # Can be numpy or torch.
                     in_memory: true # If not specified, default to true.
                     path: set/paper-train-node_pairs.npy
-                  - type: paper
-                    name: labels
+                  - name: labels
                     format: numpy
                     path: set/paper-train-labels.npy
             validation_set:
-              - data:
-                  - type: paper
-                    name: node_pairs
+              - type: paper
+                data:
+                  - name: node_pairs
                     format: numpy
                     path: set/paper-validation-node_pairs.npy
-                  - type: paper
-                    name: labels
+                  - name: labels
                     format: numpy
                     path: set/paper-validation-labels.npy
             test_set:
-              - data:
-                  - type: paper
-                    name: node_pairs
+              - type: paper
+                data:
+                  - name: node_pairs
                     format: numpy
                     path: set/paper-test-node_pairs.npy
-                  - type: paper
-                    name: labels
+                  - name: labels
                     format: numpy
                     path: set/paper-test-labels.npy
 
