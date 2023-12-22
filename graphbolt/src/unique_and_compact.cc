@@ -48,13 +48,21 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         auto compacted_dst_ids_data = compacted_dst_ids.data_ptr<scalar_t>();
         torch::parallel_for(0, num_ids, 256, [&](int64_t s, int64_t e) {
           for (int64_t i = s; i < e; i++) {
-            compacted_src_ids_data[i] = id_map[src_ids_data[i]];
+            auto it = id_map.find(src_ids_data[i]);
+            if (it == id_map.end())
+              throw std::out_of_range(
+                  "Id not found: " + std::to_string(src_ids_data[i]));
+            compacted_src_ids_data[i] = it->second;
           }
         });
         num_ids = compacted_dst_ids.size(0);
         torch::parallel_for(0, num_ids, 256, [&](int64_t s, int64_t e) {
           for (int64_t i = s; i < e; i++) {
-            compacted_dst_ids_data[i] = id_map[dst_ids_data[i]];
+            auto it = id_map.find(dst_ids_data[i]);
+            if (it == id_map.end())
+              throw std::out_of_range(
+                  "Id not found: " + std::to_string(dst_ids_data[i]));
+            compacted_dst_ids_data[i] = it->second;
           }
         });
       }));
