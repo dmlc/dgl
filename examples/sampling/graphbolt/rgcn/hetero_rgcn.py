@@ -527,12 +527,7 @@ def train(
 
         loss = total_loss / num_train
 
-        # Evaluate the model on the train/val/test set.
-        print("Evaluating the model on the training set.")
-        train_acc = evaluate(
-            name, g, model, node_embed, device, train_set, features, num_workers
-        )
-        print("Finish evaluating on training set.")
+        # Evaluate the model on the val/test set.
 
         print("Evaluating the model on the validation set.")
         valid_acc = evaluate(
@@ -557,7 +552,6 @@ def train(
         print(
             f"Epoch: {epoch +1 :02d}, "
             f"Loss: {loss:.4f}, "
-            f"Train accuracy: {100 * train_acc:.2f}%, "
             f"Valid accuracy: {100 * valid_acc:.2f}%, "
             f"Test accuracy: {100 * test_acc:.2f}%"
         )
