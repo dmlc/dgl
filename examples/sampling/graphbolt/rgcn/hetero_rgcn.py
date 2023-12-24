@@ -55,6 +55,7 @@ import psutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchmetrics.functional as MF
 from dgl.nn import HeteroEmbedding
 from ogb.lsc import MAG240MEvaluator
 from ogb.nodeproppred import Evaluator
@@ -76,9 +77,10 @@ def load_dataset(dataset_name):
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
+    all_nodes_set = dataset.all_nodes_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    return graph, features, train_set, valid_set, test_set, num_classes
+    return graph, features, train_set, valid_set, test_set, all_nodes_set, num_classes
 
 
 def create_dataloader(
@@ -143,6 +145,40 @@ def extract_embed(node_embed, input_nodes):
     )
     return emb
 
+
+def extract_node_features(name, block, data, node_embed, device):
+    """Extract the node features from embedding layer or raw features."""
+    if name == "ogbn-mag":
+        print(f"block: {block}\n")
+        print(f"data: {data}\n")
+        input_nodes = {
+            k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
+        }
+        print(f"input_nodes: {input_nodes}\n")
+        # Extract node embeddings for the input nodes.
+        node_features = extract_embed(node_embed, input_nodes)
+        print(f"node_features: {node_features}\n")
+        # Add the batch's raw "paper" features. Corresponds to the content
+        # in the function `rel_graph_embed` comment.
+        node_features.update(
+            {"paper": data.node_features[("paper", "feat")].to(device)}
+        )
+        print(f"node_features: {node_features}\n")
+    else:
+        node_features = {
+            ntype: data.node_features[(ntype, "feat")]
+            for ntype in block.srctypes
+        }
+        # Original feature data are stored in float16 while model weights are
+        # float32, so we need to convert the features to float32.
+        node_features = {
+            k: v.to(device).float() for k, v in node_features.items()
+        }
+    return node_features
+
+
+def extract_node_features_for_inference(name, block, data, node_embed, device):
+    pass
 
 def rel_graph_embed(graph, embed_size):
     """Initialize a heterogenous embedding layer for all node types in the
@@ -298,7 +334,7 @@ class RelGraphConvLayer(nn.Module):
         inputs_dst = {
             k: v[: g.number_of_dst_nodes(k)] for k, v in inputs.items()
         }
-
+        assert False, (inputs, inputs_dst)
         # Apply the convolution operation on the graph. mod_kwargs are
         # additional arguments for each relation function defined in the
         # HeteroGraphConv. In this case, it's the weights for each relation.
@@ -366,36 +402,73 @@ class EntityClassify(nn.Module):
         for layer in self.layers:
             layer.reset_parameters()
 
-    def forward(self, h, blocks):
+    def forward(self, blocks, h):
         for layer, block in zip(self.layers, blocks):
             h = layer(block, h)
         return h
+    
+    def inference(self, name, graph, node_embed, dataloader, device):
+        # feature = features.read("node", "paper", "feat")
+        category = "paper"
+
+        buffer_device = torch.device("cpu")
+        # Enable pin_memory for faster CPU to GPU data transfer if the
+        # model is running on a GPU.
+        pin_memory = buffer_device != device
+
+        for layer_idx, layer in enumerate(self.layers):
+            is_last_layer = layer_idx == len(self.layers) - 1
+            y = torch.empty(
+                graph.total_num_nodes,
+                self.out_size if is_last_layer else self.hidden_size,
+                device=buffer_device,
+                pin_memory=pin_memory,
+            )
+
+            for data in tqdm(dataloader, desc="Inference~"):
+                if "paper" not in data.seed_nodes:
+                    continue
+                block = data.blocks[0].to(device) # len(blocks) = 1
+                # x = feature[data.input_nodes]
+                x = extract_node_features(name, block, data, node_embed, device)
+                hidden_x = layer(block, x)
+                assert False, (x, x["author"].shape, hidden_x)
+
+                # By design, our output nodes are contiguous.
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device
+                )
+            feature = y
+
+        return y
 
 
-def extract_node_features(name, block, data, node_embed, device):
-    """Extract the node features from embedding layer or raw features."""
-    if name == "ogbn-mag":
-        input_nodes = {
-            k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
-        }
-        # Extract node embeddings for the input nodes.
-        node_features = extract_embed(node_embed, input_nodes)
-        # Add the batch's raw "paper" features. Corresponds to the content
-        # in the function `rel_graph_embed` comment.
-        node_features.update(
-            {"paper": data.node_features[("paper", "feat")].to(device)}
-        )
-    else:
-        node_features = {
-            ntype: data.node_features[(ntype, "feat")]
-            for ntype in block.srctypes
-        }
-        # Original feature data are stored in float16 while model weights are
-        # float32, so we need to convert the features to float32.
-        node_features = {
-            k: v.to(device).float() for k, v in node_features.items()
-        }
-    return node_features
+@torch.no_grad()
+def layerwise_infer(
+    args, graph, features, test_set, all_nodes_set, node_embed, model, num_classes, device,
+):
+    model.eval()
+    dataloader = create_dataloader(
+        name=args.dataset,
+        graph=graph,
+        features=features,
+        item_set=all_nodes_set,
+        device=device,
+        batch_size=256,
+        fanouts=[-1],
+        shuffle=False,
+        num_workers=args.num_workers,
+    )
+    pred = model.inference(args.dataset, graph, node_embed, dataloader, device)
+    pred = pred[test_set._items[0]]
+    label = test_set._items[1].to(pred.device)
+
+    return MF.accuracy(
+        pred,
+        label,
+        task="multiclass",
+        num_classes=num_classes,
+    )
 
 
 @torch.no_grad()
@@ -442,7 +515,9 @@ def evaluate(
         )
 
         # Generate predictions.
-        logits = model(node_features, blocks)[category]
+        logits = model(blocks, node_features)
+        print(logits)
+        logits = logits[category]
 
         # Apply softmax to the logits and get the prediction by selecting the
         # argmax.
@@ -516,9 +591,13 @@ def train(
             # Reset gradients.
             optimizer.zero_grad()
             # Generate predictions.
-            logits = model(node_features, blocks)[category]
+            # logits = model(blocks, node_features)[category]
+            logits = model(blocks, node_features)
+            # print(logits)
+            logits = logits[category]
 
             y_hat = logits.log_softmax(dim=-1).cpu()
+            # assert False, y_hat
             loss = F.nll_loss(y_hat, data.labels[category].long())
             loss.backward()
             optimizer.step()
@@ -561,7 +640,7 @@ def main(args):
     device = torch.device("cuda") if args.num_gpus > 0 else torch.device("cpu")
 
     # Load dataset.
-    g, features, train_set, valid_set, test_set, num_classes = load_dataset(
+    g, features, train_set, valid_set, test_set, all_nodes_set, num_classes = load_dataset(
         args.dataset
     )
 
@@ -609,19 +688,35 @@ def main(args):
             file=sys.stderr,
         )
 
-    train(
-        args.dataset,
-        g,
-        model,
-        embed_layer,
-        optimizer,
-        train_set,
-        valid_set,
-        test_set,
-        device,
-        features,
-        args.num_workers,
-    )
+    # assert False, features
+    # dl_test = create_dataloader(
+    #     name=args.dataset,
+    #     graph=g,
+    #     features=features,
+    #     item_set=all_nodes_set,
+    #     device=device,
+    #     batch_size=256,
+    #     fanouts=[-1],
+    #     shuffle=False,
+    #     num_workers=args.num_workers,
+    # )
+    # y = model.inference(graph=g, features=features, dataloader=dl_test, device=device)
+    # print(y)
+    layerwise_infer(args, g, features, test_set, all_nodes_set, embed_layer, model, num_classes, device)
+
+    # train(
+    #     args.dataset,
+    #     g,
+    #     model,
+    #     embed_layer,
+    #     optimizer,
+    #     train_set,
+    #     valid_set,
+    #     test_set,
+    #     device,
+    #     features,
+    #     args.num_workers,
+    # )
 
 
 if __name__ == "__main__":
