@@ -94,8 +94,7 @@ def evaluate(model, dataset, device):
         y = model(data.blocks, x)
         logit = (
             model.predictor(
-                torch.index_select(y, 0, compacted_pairs[0])
-                * torch.index_select(y, 0, compacted_pairs[1])
+                y[compacted_pairs[0].long()] * y[compacted_pairs[1].long()]
             )
             .squeeze()
             .detach()
@@ -135,8 +134,7 @@ def train(model, dataset, device):
             # Forward.
             y = model(data.blocks, x)
             logits = model.predictor(
-                torch.index_select(y, 0, compacted_pairs[0])
-                * torch.index_select(y, 0, compacted_pairs[1])
+                y[compacted_pairs[0].long()] * y[compacted_pairs[1].long()]
             ).squeeze()
 
             # Compute loss.
