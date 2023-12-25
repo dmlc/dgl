@@ -15,7 +15,7 @@ namespace ops {
  *
  * @param input         A tensor containing IDs.
  * @param num_bits      An integer such that all elements of input tensor are
- *                      are less than or equal to (1 << num_bits)
+ *                      are less than (1 << num_bits).
  *
  * @return
  * - A tuple of tensors, the first one includes sorted input, the second
