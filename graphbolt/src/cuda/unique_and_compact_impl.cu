@@ -40,7 +40,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
           dst_ids.scalar_type() == unique_dst_ids.scalar_type(),
       "Dtypes of tensors passed to UniqueAndCompact need to be identical.");
   auto allocator = cuda::GetAllocator();
-  auto stream = c10::cuda::getCurrentCUDAStream();
+  auto stream = cuda::GetCurrentStream();
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
   return AT_DISPATCH_INTEGRAL_TYPES(
       src_ids.scalar_type(), "unique_and_compact", ([&] {
