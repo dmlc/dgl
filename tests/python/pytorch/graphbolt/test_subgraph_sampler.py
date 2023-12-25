@@ -1,3 +1,5 @@
+from functools import partial
+
 import dgl
 import dgl.graphbolt as gb
 import pytest
@@ -88,25 +90,27 @@ def to_link_batch(data):
 def test_SubgraphSampler_Link(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    datapipe = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    neighbor_dp = Sampler(item_sampler, graph, fanouts)
-    assert len(list(neighbor_dp)) == 5
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_With_Negative(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    datapipe = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
+    datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    neighbor_dp = Sampler(negative_dp, graph, fanouts)
-    assert len(list(neighbor_dp)) == 5
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 def get_hetero_graph():
@@ -163,12 +167,13 @@ def test_SubgraphSampler_Link_Hetero(labor):
         }
     )
 
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    datapipe = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    neighbor_dp = Sampler(item_sampler, graph, fanouts)
-    assert len(list(neighbor_dp)) == 5
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 @pytest.mark.parametrize("labor", [False, True])
@@ -187,13 +192,14 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
         }
     )
 
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    datapipe = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
+    datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    neighbor_dp = Sampler(negative_dp, graph, fanouts)
-    assert len(list(neighbor_dp)) == 5
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 @pytest.mark.parametrize("labor", [False, True])
