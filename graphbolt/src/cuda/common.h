@@ -104,29 +104,29 @@ inline bool is_zero<dim3>(dim3 size) {
  */
 template <typename scalar_t>
 struct CopyScalar {
-  CopyScalar(const scalar_t* device_ptr) : is_ready(false) {
-    pinned_scalar = torch::empty(
+  CopyScalar(const scalar_t* device_ptr) : is_ready_(false) {
+    pinned_scalar_ = torch::empty(
         sizeof(scalar_t),
         c10::TensorOptions().dtype(torch::kBool).pinned_memory(true));
     auto stream = GetCurrentStream();
     CUDA_CALL(cudaMemcpyAsync(
-        reinterpret_cast<scalar_t*>(pinned_scalar.data_ptr()), device_ptr,
+        reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr()), device_ptr,
         sizeof(scalar_t), cudaMemcpyDeviceToHost, stream));
-    copy_event.record(stream);
+    copy_event_.record(stream);
   }
 
   operator scalar_t() {
-    if (!is_ready) {
-      copy_event.synchronize();
-      is_ready = true;
+    if (!is_ready_) {
+      copy_event_.synchronize();
+      is_ready_ = true;
     }
-    return reinterpret_cast<scalar_t*>(pinned_scalar.data_ptr())[0];
+    return reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr())[0];
   }
 
  private:
-  torch::Tensor pinned_scalar;
-  at::cuda::CUDAEvent copy_event;
-  bool is_ready;
+  torch::Tensor pinned_scalar_;
+  at::cuda::CUDAEvent copy_event_;
+  bool is_ready_;
 };
 
 // This includes all integer, float and boolean types.
