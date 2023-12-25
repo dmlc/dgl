@@ -92,7 +92,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
             only_src.get();
         auto sorted_only_src =
             allocator.AllocateStorage<scalar_t>(only_src_size);
-        {
+
+        {  // Here, we sort the only_src tensor so that we can unique it with
+           // Encode operation later.
           size_t workspace_size;
           CUDA_CALL(cub::DeviceRadixSort::SortKeys(
               nullptr, workspace_size, only_src.get(), sorted_only_src.get(),
@@ -102,6 +104,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
               temp.get(), workspace_size, only_src.get(), sorted_only_src.get(),
               only_src_size, 0, num_bits, stream));
         }
+
         auto unique_only_src = torch::empty(only_src_size, src_ids.options());
         auto unique_only_src_ptr = unique_only_src.data_ptr<scalar_t>();
         auto unique_only_src_cnt = allocator.AllocateStorage<scalar_t>(1);
@@ -158,6 +161,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
             throw std::out_of_range("Some ids not found.");
           }
         }
+
+        // Finally, we lookup the new compact ids of the src and dst tensors
+        // via gather operations.
         auto new_src_ids = torch::empty_like(src_ids);
         auto new_dst_ids = torch::empty_like(dst_ids);
         thrust::gather(
