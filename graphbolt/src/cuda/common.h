@@ -129,6 +129,16 @@ struct CopyScalar {
   bool is_ready;
 };
 
+// This includes all integer, float and boolean types.
+#define GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(...)            \
+  AT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__)                 \
+  AT_DISPATCH_CASE(at::ScalarType::Half, __VA_ARGS__)     \
+  AT_DISPATCH_CASE(at::ScalarType::BFloat16, __VA_ARGS__) \
+  AT_DISPATCH_CASE(at::ScalarType::Bool, __VA_ARGS__)
+
+#define GRAPHBOLT_DISPATCH_ALL_TYPES(TYPE, NAME, ...) \
+  AT_DISPATCH_SWITCH(TYPE, NAME, GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__))
+
 #define GRAPHBOLT_DISPATCH_ELEMENT_SIZES(element_size, name, ...)             \
   [&] {                                                                       \
     switch (element_size) {                                                   \
