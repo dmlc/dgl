@@ -1,6 +1,8 @@
 import unittest
 
 import backend as F
+from functools import partial
+
 import dgl
 import dgl.graphbolt as gb
 import pytest
@@ -99,12 +101,13 @@ def test_SubgraphSampler_Link(labor):
         F.ctx()
     )
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
-    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    neighbor_dp = Sampler(item_sampler, graph, fanouts)
-    assert len(list(neighbor_dp)) == 5
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 @pytest.mark.parametrize("labor", [False, True])
@@ -113,13 +116,14 @@ def test_SubgraphSampler_Link_With_Negative(labor):
         F.ctx()
     )
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
-    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
+    datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    neighbor_dp = Sampler(negative_dp, graph, fanouts)
-    assert len(list(neighbor_dp)) == 5
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 def get_hetero_graph():
@@ -184,12 +188,13 @@ def test_SubgraphSampler_Link_Hetero(labor):
         }
     )
 
-    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    neighbor_dp = Sampler(item_sampler, graph, fanouts)
-    assert len(list(neighbor_dp)) == 5
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 @unittest.skipIf(
@@ -212,13 +217,14 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
         }
     )
 
-    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
+    datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    neighbor_dp = Sampler(negative_dp, graph, fanouts)
-    assert len(list(neighbor_dp)) == 5
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 @unittest.skipIf(
@@ -257,7 +263,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
     itemset = gb.ItemSetDict(
         {
             "n2": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
-            "n1": gb.ItemSet(torch.tensor([1]), names="seed_nodes"),
+            "n1": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
         }
     )
 
@@ -272,12 +278,12 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
         for sampledsubgraph in data.sampled_subgraphs:
             for _, value in sampledsubgraph.node_pairs.items():
                 assert torch.equal(
-                    torch.ge(value[0], torch.zeros(len(value[0]))),
-                    torch.ones(len(value[0])),
+                    torch.ge(value.indices, torch.zeros(len(value.indices))),
+                    torch.ones(len(value.indices)),
                 )
                 assert torch.equal(
-                    torch.ge(value[1], torch.zeros(len(value[1]))),
-                    torch.ones(len(value[1])),
+                    torch.ge(value.indptr, torch.zeros(len(value.indptr))),
+                    torch.ones(len(value.indptr)),
                 )
             for _, value in sampledsubgraph.original_column_node_ids.items():
                 assert torch.equal(

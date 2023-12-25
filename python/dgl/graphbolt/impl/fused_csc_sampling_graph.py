@@ -439,12 +439,18 @@ class FusedCSCSamplingGraph(SamplingGraph):
             node_pairs=node_pairs, original_edge_ids=original_edge_ids
         )
 
-    def _convert_to_homogeneous_nodes(self, nodes):
+    def _convert_to_homogeneous_nodes(self, nodes, timestamps=None):
         homogeneous_nodes = []
+        homogeneous_timestamps = []
         for ntype, ids in nodes.items():
             ntype_id = self.node_type_to_id[ntype]
             homogeneous_nodes.append(
                 ids + self.node_type_offset[ntype_id].item()
+            if timestamps is not None:
+                homogeneous_timestamps.append(timestamps[ntype])
+        if timestamps is not None:
+            return torch.cat(homogeneous_nodes), torch.cat(
+                homogeneous_timestamps
             )
         return torch.cat(homogeneous_nodes)
 
@@ -832,7 +838,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
-    def _temporal_sample_neighbors(
+    def temporal_sample_neighbors(
         self,
         nodes: torch.Tensor,
         input_nodes_timestamp: torch.Tensor,
@@ -889,25 +895,38 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        torch.classes.graphbolt.SampledSubgraph
-            The sampled C subgraph.
+        FusedSampledSubgraphImpl
+            The sampled subgraph.
         """
+        if isinstance(nodes, dict):
+            nodes, input_nodes_timestamp = self._convert_to_homogeneous_nodes(
+                nodes, input_nodes_timestamp
+            )
+
         # Ensure nodes is 1-D tensor.
         self._check_sampler_arguments(nodes, fanouts, probs_name)
         has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
-        return self._c_csc_graph.temporal_sample_neighbors(
+        C_sampled_subgraph = self._c_csc_graph.temporal_sample_neighbors(
             nodes,
             input_nodes_timestamp,
             fanouts.tolist(),
             replace,
-            False,
             has_original_eids,
             probs_name,
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
+        )
+        # Broadcast the input nodes' timestamp to the sampled neighbors.
+        sampled_count = torch.diff(C_sampled_subgraph.indptr)
+        neighbors_timestamp = input_nodes_timestamp.repeat_interleave(
+            sampled_count
+        )
+        return (
+            self._convert_to_sampled_subgraph(C_sampled_subgraph),
+            neighbors_timestamp,
         )
 
     def sample_negative_edges_uniform(

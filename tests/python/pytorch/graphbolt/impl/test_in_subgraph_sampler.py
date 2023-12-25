@@ -80,7 +80,9 @@ def test_InSubgraphSampler_node_pairs_homo():
     batch_size = 1
     item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
 
-    in_subgraph_sampler = gb.InSubgraphSampler(item_sampler, graph)
+    in_subgraph_sampler = gb.InSubgraphSampler(
+        item_sampler, graph, output_cscformat=False
+    )
 
     it = iter(in_subgraph_sampler)
 
@@ -156,7 +158,9 @@ def test_InSubgraphSampler_node_pairs_hetero():
     batch_size = 2
     item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
 
-    in_subgraph_sampler = gb.InSubgraphSampler(item_sampler, graph)
+    in_subgraph_sampler = gb.InSubgraphSampler(
+        item_sampler, graph, output_cscformat=False
+    )
 
     it = iter(in_subgraph_sampler)
 

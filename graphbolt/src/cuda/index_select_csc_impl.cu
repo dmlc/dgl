@@ -205,6 +205,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
       Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1)).second;
   auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
+
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   return AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "UVAIndexSelectCSCIndptr", ([&] {
