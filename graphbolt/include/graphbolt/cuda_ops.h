@@ -11,7 +11,7 @@ namespace graphbolt {
 namespace ops {
 
 /**
- * @brief Sort
+ * @brief Sorts the given input and also returns the original indexes.
  *
  * @param input         A tensor containing IDs.
  * @param num_bits      An integer such that all elements of input tensor are
