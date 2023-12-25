@@ -10,7 +10,6 @@
 #include <unordered_map>
 
 #include "./concurrent_id_hash_map.h"
-#include "./utils.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -71,8 +70,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
   AT_DISPATCH_INTEGRAL_TYPES(ids.scalar_type(), "unique_and_compact", ([&] {
                                ConcurrentIdHashMap<scalar_t> id_map;
                                unique_ids = id_map.Init(ids, num_dst);
-                               compacted_src_ids = id_map.MapIds(src_ids_cpu);
-                               compacted_dst_ids = id_map.MapIds(dst_ids_cpu);
+                               compacted_src_ids = id_map.MapIds(src_ids);
+                               compacted_dst_ids = id_map.MapIds(dst_ids);
                              }));
 #endif
   return std::tuple(unique_ids, compacted_src_ids, compacted_dst_ids);
