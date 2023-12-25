@@ -45,9 +45,6 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
 
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
 
-torch::Tensor CSRToCOO(
-    torch::Tensor indptr, torch::ScalarType indices_scalar_type);
-
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
