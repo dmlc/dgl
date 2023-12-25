@@ -60,7 +60,7 @@ class InSubgraphSampler(SubgraphSampler):
         datapipe,
         graph,
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ):
         super().__init__(datapipe)
         self.graph = graph
