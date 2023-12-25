@@ -12,6 +12,13 @@ namespace ops {
 
 std::pair<torch::Tensor, torch::Tensor> Sort(torch::Tensor input, int num_bits);
 
+/**
+ * @brief Computes the exclusive prefix sum of the given input.
+ *
+ * @param input The input tensor.
+ *
+ * @return The prefix sum result such that r[i] = \sum_{j=0}^{i-1} input[j]
+ */
 torch::Tensor ExclusiveCumSum(torch::Tensor indptr);
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
