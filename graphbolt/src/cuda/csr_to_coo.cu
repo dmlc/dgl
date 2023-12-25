@@ -49,7 +49,7 @@ torch::Tensor CSRToCOO(torch::Tensor indptr, torch::ScalarType output_dtype) {
         using indptr_t = scalar_t;
         auto indptr_ptr = indptr.data_ptr<indptr_t>();
         auto num_edges =
-            cuda::ReadScalar{indptr.data_ptr<indptr_t>() + num_rows};
+            cuda::CopyScalar{indptr.data_ptr<indptr_t>() + num_rows};
         auto csr_rows = torch::empty(
             static_cast<indptr_t>(num_edges),
             indptr.options().dtype(output_dtype));
