@@ -44,13 +44,19 @@ class InSubgraphSampler(SubgraphSampler):
     ...     print(data.sampled_subgraphs[0].node_pairs)
     ...     print(data.sampled_subgraphs[0].original_row_node_ids)
     ...     print(data.sampled_subgraphs[0].original_column_node_ids)
-    (tensor([0, 1, 2, 3, 4]), tensor([0, 0, 0, 1, 1]))
+    CSCFormatBase(indptr=tensor([0, 3, 5]),
+                indices=tensor([0, 1, 2, 3, 4]),
+    )
     tensor([0, 1, 4, 2, 3])
     tensor([0, 1])
-    (tensor([2, 3, 4, 0]), tensor([0, 0, 1, 1]))
+    CSCFormatBase(indptr=tensor([0, 2, 4]),
+                indices=tensor([2, 3, 4, 0]),
+    )
     tensor([2, 3, 0, 5, 1])
     tensor([2, 3])
-    (tensor([2, 3, 1, 4, 0]), tensor([0, 0, 0, 1, 1]))
+    CSCFormatBase(indptr=tensor([0, 3, 5]),
+                indices=tensor([2, 3, 1, 4, 0]),
+    )
     tensor([4, 5, 0, 3, 1])
     tensor([4, 5])
     """
