@@ -122,13 +122,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
               unique_only_src_cnt.get(), only_src_size, stream));
         }
 
-        // @todo: replace with cuda::CopyScalar after #6796.
-        scalar_t unique_only_src_size;
-        CUDA_CALL(cudaMemcpyAsync(
-            &unique_only_src_size, unique_only_src_cnt.get(),
-            sizeof(unique_only_src_size), cudaMemcpyDeviceToHost, stream));
-        stream.synchronize();
-        unique_only_src = unique_only_src.slice(0, 0, unique_only_src_size);
+        auto unique_only_src_size = cuda::CopyScalar(unique_only_src_cnt.get());
+        unique_only_src = unique_only_src.slice(
+            0, 0, static_cast<scalar_t>(unique_only_src_size));
         auto real_order = torch::cat({unique_dst_ids, unique_only_src});
         // Sort here so that we can lookup new_ids via binary search.
         auto [sorted_order, new_ids] = Sort(real_order, num_bits);
