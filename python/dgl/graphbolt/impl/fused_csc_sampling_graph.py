@@ -1228,14 +1228,20 @@ def from_dglgraph(
     )
 
     # Assign edge type according to the order of CSC matrix.
-    type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
+    type_per_edge = (
+        None
+        if is_homogeneous
+        else torch.index_select(homo_g.edata[ETYPE], dim=0, index=edge_ids)
+    )
 
     node_attributes = {}
 
     edge_attributes = {}
     if include_original_edge_id:
         # Assign edge attributes according to the original eids mapping.
-        edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
+        edge_attributes[ORIGINAL_EDGE_ID] = torch.index_select(
+            homo_g.edata[EID], dim=0, index=edge_ids
+        )
 
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.fused_csc_sampling_graph(
