@@ -39,7 +39,7 @@ struct AdjacentDifference {
 };
 
 torch::Tensor CSRToCOO(
-    torch::Tensor indptr, torch::ScalarType indices_scalar_type) {
+    torch::Tensor indptr, torch::ScalarType output_dtype) {
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
   const auto num_rows = indptr.size(0) - 1;
@@ -53,9 +53,9 @@ torch::Tensor CSRToCOO(
             cuda::ReadScalar{indptr.data_ptr<indptr_t>() + num_rows};
         auto csr_rows = torch::empty(
             static_cast<indptr_t>(num_edges),
-            indptr.options().dtype(indices_scalar_type));
+            indptr.options().dtype(output_dtype));
         AT_DISPATCH_INTEGRAL_TYPES(
-            indices_scalar_type, "CSRToCOOIndices", ([&] {
+            output_dtype, "CSRToCOOIndices", ([&] {
               using indices_t = scalar_t;
               auto csc_rows_ptr = csr_rows.data_ptr<indices_t>();
 
