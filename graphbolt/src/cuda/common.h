@@ -92,8 +92,8 @@ inline bool is_zero<dim3>(dim3 size) {
   }
 
 template <typename scalar_t>
-struct ReadScalar {
-  ReadScalar(const scalar_t* device_ptr) : is_ready(false) {
+struct CopyScalar {
+  CopyScalar(const scalar_t* device_ptr) : is_ready(false) {
     pinned_scalar = torch::empty(
         sizeof(scalar_t),
         c10::TensorOptions().dtype(torch::kBool).pinned_memory(true));

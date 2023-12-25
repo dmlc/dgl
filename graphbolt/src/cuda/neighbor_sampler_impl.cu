@@ -146,7 +146,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
         }
         auto num_sampled_edges =
-            cuda::ReadScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
+            cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
         auto sorted_edge_id_segments =
             allocator.AllocateStorage<indptr_t>(num_edges);
         AT_DISPATCH_INTEGRAL_TYPES(
