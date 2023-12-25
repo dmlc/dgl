@@ -67,6 +67,8 @@ struct CUDAWorkspaceAllocator {
 
 inline auto GetAllocator() { return CUDAWorkspaceAllocator{}; }
 
+inline auto GetCurrentStream() { return c10::cuda::getCurrentCUDAStream(); }
+
 template <typename T>
 inline bool is_zero(T size) {
   return size == 0;
