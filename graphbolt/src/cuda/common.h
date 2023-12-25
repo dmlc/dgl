@@ -96,15 +96,15 @@ inline bool is_zero<dim3>(dim3 size) {
  * scalar_t item from a given CUDA device pointer. Later, if the object is cast
  * into scalar_t, the value can be read.
  *
- * auto num_edges = cuda::ReadScalar(indptr.data_ptr<scalar_t>() +
- * indptr.size(0) - 1);
+ * auto num_edges = cuda::CopyScalar(indptr.data_ptr<scalar_t>() +
+ *     indptr.size(0) - 1);
  * // Perform many operations here, they will run as normal.
  * // We finally need to read num_edges.
  * auto indices = torch::empty(static_cast<scalar_t>(num_edges));
  */
 template <typename scalar_t>
-struct ReadScalar {
-  ReadScalar(const scalar_t* device_ptr) : is_ready(false) {
+struct CopyScalar {
+  CopyScalar(const scalar_t* device_ptr) : is_ready(false) {
     pinned_scalar = torch::empty(
         sizeof(scalar_t),
         c10::TensorOptions().dtype(torch::kBool).pinned_memory(true));

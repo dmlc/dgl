@@ -162,10 +162,10 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
 
   // Copy the actual total number of edges.
   auto edge_count =
-      cuda::ReadScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
+      cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
   // Copy the modified number of edges.
   auto edge_count_aligned =
-      cuda::ReadScalar{output_indptr_aligned.get() + num_nodes};
+      cuda::CopyScalar{output_indptr_aligned.get() + num_nodes};
 
   // Allocate output array with actual number of edges.
   torch::Tensor output_indices = torch::empty(
@@ -287,7 +287,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
 
         // Number of edges being copied.
         auto edge_count =
-            cuda::ReadScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
+            cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
         // Allocate output array of size number of copied edges.
         torch::Tensor output_indices = torch::empty(
             static_cast<indptr_t>(edge_count),
