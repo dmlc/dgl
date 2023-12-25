@@ -433,7 +433,7 @@ class MiniBatch:
         else:
             return None
 
-    def to(self, device=torch.device):  # pylint: disable=invalid-name
+    def to(self, device: torch.device):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
 
         def _to(x, device):
