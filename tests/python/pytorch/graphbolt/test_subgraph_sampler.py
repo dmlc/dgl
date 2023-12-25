@@ -234,7 +234,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
     itemset = gb.ItemSetDict(
         {
             "n2": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
-            "n1": gb.ItemSet(torch.tensor([1]), names="seed_nodes"),
+            "n1": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
         }
     )
 
@@ -248,12 +248,12 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
         for sampledsubgraph in data.sampled_subgraphs:
             for _, value in sampledsubgraph.node_pairs.items():
                 assert torch.equal(
-                    torch.ge(value[0], torch.zeros(len(value[0]))),
-                    torch.ones(len(value[0])),
+                    torch.ge(value.indices, torch.zeros(len(value.indices))),
+                    torch.ones(len(value.indices)),
                 )
                 assert torch.equal(
-                    torch.ge(value[1], torch.zeros(len(value[1]))),
-                    torch.ones(len(value[1])),
+                    torch.ge(value.indptr, torch.zeros(len(value.indptr))),
+                    torch.ones(len(value.indptr)),
                 )
             for _, value in sampledsubgraph.original_column_node_ids.items():
                 assert torch.equal(
