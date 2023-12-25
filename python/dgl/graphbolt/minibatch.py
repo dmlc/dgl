@@ -433,7 +433,7 @@ class MiniBatch:
         else:
             return None
 
-    def to(self, device, extra_attrs=None):  # pylint: disable=invalid-name
+    def to(self, device=torch.device):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
 
         def _to(x, device):
@@ -442,14 +442,9 @@ class MiniBatch:
         def apply_to(x, device):
             return recursive_apply(x, lambda x: _to(x, device))
 
-        transfer_attrs = []
-
-        if extra_attrs is not None:
-            transfer_attrs = extra_attrs
-
         if self.labels is not None and self.seed_nodes is not None:
             # Node classification.
-            transfer_attrs += [
+            transfer_attrs = [
                 "labels",
                 "sampled_subgraphs",
                 "node_features",
@@ -457,7 +452,7 @@ class MiniBatch:
             ]
         elif self.labels is None and self.compacted_node_pairs is not None:
             # Link prediction.
-            transfer_attrs += [
+            transfer_attrs = [
                 "compacted_node_pairs",
                 "compacted_negative_srcs",
                 "compacted_negative_dsts",
@@ -467,7 +462,7 @@ class MiniBatch:
             ]
         elif self.labels is not None and self.compacted_node_pairs is not None:
             # Edge classification.
-            transfer_attrs += [
+            transfer_attrs = [
                 "labels",
                 "compacted_node_pairs",
                 "sampled_subgraphs",
@@ -476,7 +471,8 @@ class MiniBatch:
             ]
         else:
             # Unrecognized task. Will copy all the attributes to the device.
-            transfer_attrs += get_attributes(self)
+            transfer_attrs = get_attributes(self)
+
         for attr in transfer_attrs:
             # Only copy member variables.
             try:

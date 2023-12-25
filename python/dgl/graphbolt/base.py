@@ -133,13 +133,17 @@ class CopyTo(IterDataPipe):
         self.extra_attrs = extra_attrs
 
     def __iter__(self):
-        from .minibatch import MiniBatch
-
         for data in self.datapipe:
-            if isinstance(data, MiniBatch):
-                data = data.to(self.device, self.extra_attrs)
-            else:
-                data = recursive_apply(data, apply_to, self.device)
+            data = recursive_apply(data, apply_to, self.device)
+            if self.extra_attrs is not None:
+                for attr in self.extra_attrs:
+                    setattr(
+                        data,
+                        attr,
+                        recursive_apply(
+                            getattr(data, attr), apply_to, self.device
+                        ),
+                    )
             yield data
 
 
