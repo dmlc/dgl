@@ -38,8 +38,7 @@ struct AdjacentDifference {
   }
 };
 
-torch::Tensor CSRToCOO(
-    torch::Tensor indptr, torch::ScalarType output_dtype) {
+torch::Tensor CSRToCOO(torch::Tensor indptr, torch::ScalarType output_dtype) {
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
   const auto num_rows = indptr.size(0) - 1;
