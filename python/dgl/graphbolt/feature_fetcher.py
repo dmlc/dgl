@@ -107,7 +107,7 @@ class FeatureFetcher(MiniBatchTransformer):
                 if original_edge_ids is None:
                     continue
                 if is_heterogeneous:
-                    # Convert edge type to string for DGLMiniBatch.
+                    # Convert edge type to string.
                     original_edge_ids = {
                         etype_tuple_to_str(key)
                         if isinstance(key, tuple)

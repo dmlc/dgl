@@ -105,10 +105,10 @@ class SAGE(nn.Module):
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
-                # By design, our output nodes are contiguous.
-                y[
-                    data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device, non_blocking=True)
+                # By design, our seed nodes are contiguous.
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device, non_blocking=True
+                )
             feature = y
 
         return y
@@ -175,7 +175,11 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph,
+        args.fanout,
+        output_cscformat=(args.output_cscformat == "True"),
+    )
 
     ############################################################################
     # [Input]:
@@ -311,8 +315,8 @@ def train(args, model, graph, features, train_set):
         for step, data in enumerate(dataloader):
             # Get node pairs with labels for loss calculation.
             compacted_pairs, labels = data.node_pairs_with_labels
+
             node_feature = data.node_features["feat"]
-            # Convert sampled subgraphs to DGL blocks.
             blocks = data.blocks
 
             # Get the embeddings of the input nodes.
@@ -370,6 +374,12 @@ def parse_args():
         default="cpu",
         choices=["cpu", "cuda"],
         help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+    )
+    parser.add_argument(
+        "--output_cscformat",
+        default="False",
+        choices=["False", "True"],
+        help="Output type of SampledSubgraph. True for csc_formats, False for node_pairs.",
     )
     return parser.parse_args()
 

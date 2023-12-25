@@ -28,7 +28,7 @@ The whole data loader pipeline is as follows:
     datapipe = datapipe.transform(gb.exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 
 For the details about the builtin uniform negative sampler please see
@@ -95,22 +95,8 @@ Define a GraphSAGE model for minibatch training
 
 When a negative sampler is provided, the data loader will generate positive and
 negative node pairs for each minibatch besides the *Message Flow Graphs* (MFGs).
-Let's define a utility function to compact node pairs as follows:
-
-.. code:: python
-
-    def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch):
-        """Convert the minibatch to a training pair and a label tensor."""
-        pos_src, pos_dst = data.positive_node_pairs
-        neg_src, neg_dst = data.negative_node_pairs
-        node_pairs = (
-            torch.cat((pos_src, neg_src), dim=0),
-            torch.cat((pos_dst, neg_dst), dim=0),
-        )
-        pos_label = torch.ones_like(pos_src)
-        neg_label = torch.zeros_like(neg_src)
-        labels = torch.cat([pos_label, neg_label], dim=0)
-        return (node_pairs, labels.float())
+Use `node_pairs_with_labels` to get compact node pairs with corresponding
+labels.
 
 
 Training loop
@@ -129,10 +115,8 @@ above.
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
-            # Convert MiniBatch to DGLMiniBatch.
-            data = data.to_dgl()
             # Unpack MiniBatch.
-            compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
+            compacted_pairs, labels = data.node_pairs_with_labels
             node_feature = data.node_features["feat"]
             # Convert sampled subgraphs to DGL blocks.
             blocks = data.blocks
@@ -215,7 +199,7 @@ only difference is that you need to give edge types for feature fetching.
         node_feature_keys={"user": ["feat"], "item": ["feat"]}
     )
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 If you want to give your own negative sampling function, just inherit from the
 :class:`~dgl.graphbolt.NegativeSampler` class and override the
@@ -242,26 +226,9 @@ If you want to give your own negative sampling function, just inherit from the
     datapipe = datapipe.customized_sample_negative(5, node_degrees)
 
 
-For heterogeneous graphs, node pairs are grouped by edge types.
-
-.. code:: python
-
-    def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch, etype):
-        """Convert the minibatch to a training pair and a label tensor."""
-        pos_src, pos_dst = data.positive_node_pairs[etype]
-        neg_src, neg_dst = data.negative_node_pairs[etype]
-        node_pairs = (
-            torch.cat((pos_src, neg_src), dim=0),
-            torch.cat((pos_dst, neg_dst), dim=0),
-        )
-        pos_label = torch.ones_like(pos_src)
-        neg_label = torch.zeros_like(neg_src)
-        labels = torch.cat([pos_label, neg_label], dim=0)
-        return (node_pairs, labels.float())
-
-
-The training loop is again almost the same as that on homogeneous graph,
-except for computing loss on specific edge type.
+For heterogeneous graphs, node pairs are grouped by edge types. The training
+loop is again almost the same as that on homogeneous graph, except for computing
+loss on specific edge type.
 
 .. code:: python
 
@@ -273,10 +240,8 @@ except for computing loss on specific edge type.
         total_loss = 0
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
-            # Convert MiniBatch to DGLMiniBatch.
-            data = data.to_dgl()
             # Unpack MiniBatch.
-            compacted_pairs, labels = to_binary_link_dgl_computing_pack(data, category)
+            compacted_pairs, labels = data.node_pairs_with_labels
             node_features = {
                 ntype: data.node_features[(ntype, "feat")]
                 for ntype in data.blocks[0].srctypes
@@ -286,11 +251,12 @@ except for computing loss on specific edge type.
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)
             logits = model.predictor(
-                y[category][compacted_pairs[0]] * y[category][compacted_pairs[1]]
+                y[category][compacted_pairs[category][0]]
+                * y[category][compacted_pairs[category][1]]
             ).squeeze()
 
             # Compute loss.
-            loss = F.binary_cross_entropy_with_logits(logits, labels)
+            loss = F.binary_cross_entropy_with_logits(logits, labels[category])
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

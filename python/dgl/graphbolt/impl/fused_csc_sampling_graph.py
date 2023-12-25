@@ -439,11 +439,18 @@ class FusedCSCSamplingGraph(SamplingGraph):
             node_pairs=node_pairs, original_edge_ids=original_edge_ids
         )
 
-    def _convert_to_homogeneous_nodes(self, nodes):
+    def _convert_to_homogeneous_nodes(self, nodes, timestamps=None):
         homogeneous_nodes = []
+        homogeneous_timestamps = []
         for ntype, ids in nodes.items():
             ntype_id = self.node_type_to_id[ntype]
             homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
+            if timestamps is not None:
+                homogeneous_timestamps.append(timestamps[ntype])
+        if timestamps is not None:
+            return torch.cat(homogeneous_nodes), torch.cat(
+                homogeneous_timestamps
+            )
         return torch.cat(homogeneous_nodes)
 
     def _convert_to_sampled_subgraph(
@@ -629,6 +636,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
+        assert nodes.dtype == self.indices.dtype, (
+            f"Data type of nodes must be consistent with "
+            f"indices.dtype({self.indices.dtype}), but got {nodes.dtype}."
+        )
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
         expected_fanout_len = 1
         if self.edge_type_to_id:
@@ -825,6 +836,97 @@ class FusedCSCSamplingGraph(SamplingGraph):
             return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+
+    def temporal_sample_neighbors(
+        self,
+        nodes: torch.Tensor,
+        input_nodes_timestamp: torch.Tensor,
+        fanouts: torch.Tensor,
+        replace: bool = False,
+        probs_name: Optional[str] = None,
+        node_timestamp_attr_name: Optional[str] = None,
+        edge_timestamp_attr_name: Optional[str] = None,
+    ) -> torch.ScriptObject:
+        """Temporally Sample neighboring edges of the given nodes and return the induced
+        subgraph.
+
+        If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is given,
+        the sampled neighbors or edges of an input node must have a timestamp
+        that is no later than that of the input node.
+
+        Parameters
+        ----------
+        nodes: torch.Tensor
+            IDs of the given seed nodes.
+        input_nodes_timestamp: torch.Tensor
+            Timestamps of the given seed nodes.
+        fanouts: torch.Tensor
+            The number of edges to be sampled for each node with or without
+            considering edge types.
+              - When the length is 1, it indicates that the fanout applies to
+                all neighbors of the node as a collective, regardless of the
+                edge type.
+              - Otherwise, the length should equal to the number of edge
+                types, and each fanout value corresponds to a specific edge
+                type of the nodes.
+            The value of each fanout should be >= 0 or = -1.
+              - When the value is -1, all neighbors (with non-zero probability,
+                if weighted) will be sampled once regardless of replacement. It
+                is equivalent to selecting all neighbors with non-zero
+                probability when the fanout is >= the number of neighbors (and
+                replace is set to false).
+              - When the value is a non-negative integer, it serves as a
+                minimum threshold for selecting neighbors.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        probs_name: str, optional
+            An optional string specifying the name of an edge attribute. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
+        node_timestamp_attr_name: str, optional
+            An optional string specifying the name of an node attribute.
+        edge_timestamp_attr_name: str, optional
+            An optional string specifying the name of an edge attribute.
+
+        Returns
+        -------
+        FusedSampledSubgraphImpl
+            The sampled subgraph.
+        """
+        if isinstance(nodes, dict):
+            nodes, input_nodes_timestamp = self._convert_to_homogeneous_nodes(
+                nodes, input_nodes_timestamp
+            )
+
+        # Ensure nodes is 1-D tensor.
+        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        has_original_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
+        C_sampled_subgraph = self._c_csc_graph.temporal_sample_neighbors(
+            nodes,
+            input_nodes_timestamp,
+            fanouts.tolist(),
+            replace,
+            has_original_eids,
+            probs_name,
+            node_timestamp_attr_name,
+            edge_timestamp_attr_name,
+        )
+        # Broadcast the input nodes' timestamp to the sampled neighbors.
+        sampled_count = torch.diff(C_sampled_subgraph.indptr)
+        neighbors_timestamp = input_nodes_timestamp.repeat_interleave(
+            sampled_count
+        )
+        return (
+            self._convert_to_sampled_subgraph(C_sampled_subgraph),
+            neighbors_timestamp,
+        )
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio

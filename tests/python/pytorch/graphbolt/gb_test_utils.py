@@ -173,7 +173,6 @@ def random_homo_graphbolt_graph(
               type: null
               name: feat
               format: numpy
-              in_memory: true
               path: {edge_feat_path}
         tasks:
           - name: link_prediction

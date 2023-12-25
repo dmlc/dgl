@@ -1285,7 +1285,6 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
                       type: null
                       name: feat
                       format: numpy
-                      in_memory: true
                       path: data/edge-feat.npy
             feature_data:
                 - domain: node
@@ -2164,3 +2163,63 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
         graph = None
         tasks = None
         dataset = None
+
+
+def test_OnDiskTask_repr_homogeneous():
+    item_set = gb.ItemSet(
+        (torch.arange(0, 5), torch.arange(5, 10)),
+        names=("seed_nodes", "labels"),
+    )
+    metadata = {"name": "node_classification"}
+    task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
+    expected_str = str(
+        """OnDiskTask(validation_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
+                                  names=('seed_nodes', 'labels'),
+                          ),
+           train_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
+                             names=('seed_nodes', 'labels'),
+                     ),
+           test_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
+                            names=('seed_nodes', 'labels'),
+                    ),
+           metadata={'name': 'node_classification'},
+)"""
+    )
+    assert str(task) == expected_str, print(task)
+
+
+def test_OnDiskTask_repr_heterogeneous():
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seed_nodes"),
+        }
+    )
+    metadata = {"name": "node_classification"}
+    task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
+    expected_str = str(
+        """OnDiskTask(validation_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
+                                                    names=('seed_nodes',),
+                                            ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
+                                                    names=('seed_nodes',),
+                                            )},
+                                      names=('seed_nodes',),
+                          ),
+           train_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
+                                               names=('seed_nodes',),
+                                       ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
+                                               names=('seed_nodes',),
+                                       )},
+                                 names=('seed_nodes',),
+                     ),
+           test_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
+                                              names=('seed_nodes',),
+                                      ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
+                                              names=('seed_nodes',),
+                                      )},
+                                names=('seed_nodes',),
+                    ),
+           metadata={'name': 'node_classification'},
+)"""
+    )
+    assert str(task) == expected_str, print(task)

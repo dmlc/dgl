@@ -1,4 +1,5 @@
 """Graphbolt sampled subgraph."""
+
 # pylint: disable= invalid-name
 from typing import Dict, Tuple, Union
 
@@ -181,6 +182,10 @@ class SampledSubgraph:
             index = {}
             is_cscformat = 0
             for etype, pair in self.node_pairs.items():
+                if etype not in edges:
+                    # No edges need to be excluded.
+                    index[etype] = None
+                    continue
                 src_type, _, dst_type = etype_str_to_tuple(etype)
                 original_row_node_ids = (
                     None
@@ -207,7 +212,7 @@ class SampledSubgraph:
                     )
                 index[etype] = _exclude_homo_edges(
                     reverse_edges,
-                    edges.get(etype),
+                    edges[etype],
                     assume_num_node_within_int32,
                 )
             if is_cscformat:
@@ -266,8 +271,12 @@ def _relabel_two_arrays(lhs_array, rhs_array):
     return mapping[: lhs_array.numel()], mapping[lhs_array.numel() :]
 
 
-def _exclude_homo_edges(edges, edges_to_exclude, assume_num_node_within_int32):
-    """Return the indices of edges that are not in edges_to_exclude."""
+def _exclude_homo_edges(
+    edges: Tuple[torch.Tensor, torch.Tensor],
+    edges_to_exclude: Tuple[torch.Tensor, torch.Tensor],
+    assume_num_node_within_int32: bool,
+):
+    """Return the indices of edges to be included."""
     if assume_num_node_within_int32:
         val = edges[0] << 32 | edges[1]
         val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]
@@ -286,6 +295,8 @@ def _slice_subgraph_node_pairs(subgraph: SampledSubgraph, index: torch.Tensor):
     def _index_select(obj, index):
         if obj is None:
             return None
+        if index is None:
+            return obj
         if isinstance(obj, torch.Tensor):
             return obj[index]
         if isinstance(obj, tuple):
@@ -312,6 +323,8 @@ def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
     def _index_select(obj, index):
         if obj is None:
             return None
+        if index is None:
+            return obj
         if isinstance(obj, CSCFormatBase):
             new_indices = obj.indices[index]
             new_indptr = torch.searchsorted(index, obj.indptr)
