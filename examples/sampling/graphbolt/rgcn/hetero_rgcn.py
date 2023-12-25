@@ -55,7 +55,6 @@ import psutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchmetrics.functional as MF
 from dgl.nn import HeteroEmbedding
 from ogb.lsc import MAG240MEvaluator
 from ogb.nodeproppred import Evaluator
@@ -80,7 +79,15 @@ def load_dataset(dataset_name):
     all_nodes_set = dataset.all_nodes_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    return graph, features, train_set, valid_set, test_set, all_nodes_set, num_classes
+    return (
+        graph,
+        features,
+        train_set,
+        valid_set,
+        test_set,
+        all_nodes_set,
+        num_classes,
+    )
 
 
 def create_dataloader(
@@ -149,21 +156,21 @@ def extract_embed(node_embed, input_nodes):
 def extract_node_features(name, block, data, node_embed, device):
     """Extract the node features from embedding layer or raw features."""
     if name == "ogbn-mag":
-        print(f"block: {block}\n")
-        print(f"data: {data}\n")
+        # print(f"block: {block}\n")
+        # print(f"data: {data}\n")
         input_nodes = {
             k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
         }
-        print(f"input_nodes: {input_nodes}\n")
+        # print(f"input_nodes: {input_nodes}\n")
         # Extract node embeddings for the input nodes.
         node_features = extract_embed(node_embed, input_nodes)
-        print(f"node_features: {node_features}\n")
+        # print(f"node_features: {node_features}\n")
         # Add the batch's raw "paper" features. Corresponds to the content
         # in the function `rel_graph_embed` comment.
         node_features.update(
             {"paper": data.node_features[("paper", "feat")].to(device)}
         )
-        print(f"node_features: {node_features}\n")
+        # print(f"node_features: {node_features}\n")
     else:
         node_features = {
             ntype: data.node_features[(ntype, "feat")]
@@ -176,9 +183,6 @@ def extract_node_features(name, block, data, node_embed, device):
         }
     return node_features
 
-
-def extract_node_features_for_inference(name, block, data, node_embed, device):
-    pass
 
 def rel_graph_embed(graph, embed_size):
     """Initialize a heterogenous embedding layer for all node types in the
@@ -334,7 +338,7 @@ class RelGraphConvLayer(nn.Module):
         inputs_dst = {
             k: v[: g.number_of_dst_nodes(k)] for k, v in inputs.items()
         }
-        assert False, (inputs, inputs_dst)
+        # assert False, (inputs, inputs_dst)
         # Apply the convolution operation on the graph. mod_kwargs are
         # additional arguments for each relation function defined in the
         # HeteroGraphConv. In this case, it's the weights for each relation.
@@ -406,69 +410,101 @@ class EntityClassify(nn.Module):
         for layer, block in zip(self.layers, blocks):
             h = layer(block, h)
         return h
-    
-    def inference(self, name, graph, node_embed, dataloader, device):
-        # feature = features.read("node", "paper", "feat")
+
+    def inference(
+        self, name, graph, features, item_set, node_embed, device, num_workers
+    ):
         category = "paper"
 
-        buffer_device = torch.device("cpu")
-        # Enable pin_memory for faster CPU to GPU data transfer if the
-        # model is running on a GPU.
-        pin_memory = buffer_device != device
+        dataloeader = create_dataloader(
+            name,
+            graph,
+            features,
+            item_set,
+            device,
+            batch_size=4096,
+            fanouts=[25, 10],
+            shuffle=False,
+            num_workers=num_workers,
+        )
 
-        for layer_idx, layer in enumerate(self.layers):
-            is_last_layer = layer_idx == len(self.layers) - 1
-            y = torch.empty(
-                graph.total_num_nodes,
-                self.out_size if is_last_layer else self.hidden_size,
-                device=buffer_device,
-                pin_memory=pin_memory,
+        y = list()
+        for data in tqdm(dataloeader, desc="Model Inference"):
+            blocks = [block.to(device) for block in data.blocks]
+            node_features = extract_node_features(
+                name, blocks[0], data, node_embed, device
+            )
+            # Generate predictions.
+            logits = self(blocks, node_features)[category]
+
+            y.append(
+                logits.log_softmax(dim=-1).argmax(dim=1, keepdims=True).cpu()
             )
 
-            for data in tqdm(dataloader, desc="Inference~"):
-                if "paper" not in data.seed_nodes:
-                    continue
-                block = data.blocks[0].to(device) # len(blocks) = 1
-                # x = feature[data.input_nodes]
-                x = extract_node_features(name, block, data, node_embed, device)
-                hidden_x = layer(block, x)
-                assert False, (x, x["author"].shape, hidden_x)
+        return torch.cat(y)
 
-                # By design, our output nodes are contiguous.
-                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
-                    buffer_device
-                )
-            feature = y
+    # def inference(self, name, graph, node_embed, dataloader, device):
+    #     # feature = features.read("node", "paper", "feat")
+    #     category = "paper"
 
-        return y
+    #     buffer_device = torch.device("cpu")
+    #     # Enable pin_memory for faster CPU to GPU data transfer if the
+    #     # model is running on a GPU.
+    #     pin_memory = buffer_device != device
+
+    #     for layer_idx, layer in enumerate(self.layers):
+    #         is_last_layer = layer_idx == len(self.layers) - 1
+    #         y = torch.empty(
+    #             graph.total_num_nodes,
+    #             self.out_size if is_last_layer else self.hidden_size,
+    #             device=buffer_device,
+    #             pin_memory=pin_memory,
+    #         )
+
+    #         for data in tqdm(dataloader, desc="Inference~"):
+    #             if "paper" not in data.seed_nodes:
+    #                 continue
+    #             block = data.blocks[0].to(device) # len(blocks) = 1
+    #             # x = feature[data.input_nodes]
+    #             x = extract_node_features(name, block, data, node_embed, device)
+    #             hidden_x = layer(block, x)
+    #             assert False, (x, x["author"].shape, hidden_x)
+
+    #             # By design, our output nodes are contiguous.
+    #             y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+    #                 buffer_device
+    #             )
+    #         feature = y
+
+    #     return y
 
 
-@torch.no_grad()
-def layerwise_infer(
-    args, graph, features, test_set, all_nodes_set, node_embed, model, num_classes, device,
-):
-    model.eval()
-    dataloader = create_dataloader(
-        name=args.dataset,
-        graph=graph,
-        features=features,
-        item_set=all_nodes_set,
-        device=device,
-        batch_size=256,
-        fanouts=[-1],
-        shuffle=False,
-        num_workers=args.num_workers,
-    )
-    pred = model.inference(args.dataset, graph, node_embed, dataloader, device)
-    pred = pred[test_set._items[0]]
-    label = test_set._items[1].to(pred.device)
+# @torch.no_grad()
+# def layerwise_infer(
+#     args, graph, features, test_set, all_nodes_set, node_embed, model, num_classes, device,
+# ):
+#     model.eval()
+#     dataloader = create_dataloader(
+#         name=args.dataset,
+#         graph=graph,
+#         features=features,
+#         item_set=all_nodes_set,
+#         device=device,
+#         batch_size=256,
+#         fanouts=[-1],
+#         shuffle=False,
+#         num_workers=args.num_workers,
+#     )
+#     pred = model.inference(args.dataset, graph, node_embed, dataloader, device)
+#     pred = pred[test_set._items[0]]
+#     label = test_set._items[1].to(pred.device)
 
-    return MF.accuracy(
-        pred,
-        label,
-        task="multiclass",
-        num_classes=num_classes,
-    )
+#     return MF.accuracy(
+#         pred,
+#         label,
+#         task="multiclass",
+#         num_classes=num_classes,
+#     )
 
 
 @torch.no_grad()
@@ -481,7 +517,6 @@ def evaluate(
     item_set,
     features,
     num_workers,
-    save_test_submission=False,
 ):
     # Switches the model to evaluation mode.
     model.eval()
@@ -516,7 +551,7 @@ def evaluate(
 
         # Generate predictions.
         logits = model(blocks, node_features)
-        print(logits)
+
         logits = logits[category]
 
         # Apply softmax to the logits and get the prediction by selecting the
@@ -533,10 +568,10 @@ def evaluate(
         y_pred = y_pred.view(-1)
         y_true = y_true.view(-1)
 
-    if save_test_submission:
-        evaluator.save_test_submission(
-            input_dict={"y_pred": y_pred}, dir_path=".", mode="test-dev"
-        )
+    # if save_test_submission:
+    #     evaluator.save_test_submission(
+    #         input_dict={"y_pred": y_pred}, dir_path=".", mode="test-dev"
+    #     )
     return evaluator.eval({"y_true": y_true, "y_pred": y_pred})["acc"]
 
 
@@ -548,10 +583,10 @@ def train(
     optimizer,
     train_set,
     valid_set,
-    test_set,
     device,
     features,
     num_workers,
+    num_epochs,
 ):
     print("Start to train...")
     category = "paper"
@@ -570,7 +605,7 @@ def train(
 
     # Typically, the best Validation performance is obtained after
     # the 1st or 2nd epoch. This is why the max epoch is set to 3.
-    for epoch in range(3):
+    for epoch in range(num_epochs):
         num_train = len(train_set)
         model.train()
 
@@ -614,35 +649,58 @@ def train(
         )
         print("Finish evaluating on validation set.")
 
-        print("Evaluating the model on the test set.")
-        test_acc = evaluate(
-            name,
-            g,
-            model,
-            node_embed,
-            device,
-            test_set,
-            features,
-            num_workers,
-            save_test_submission=(name == "ogb-lsc-mag240m"),
-        )
-        print("Finish evaluating on test set.")
-
         print(
-            f"Epoch: {epoch +1 :02d}, "
+            f"Epoch: {epoch + 1:02d}, "
             f"Loss: {loss:.4f}, "
             f"Valid accuracy: {100 * valid_acc:.2f}%, "
-            f"Test accuracy: {100 * test_acc:.2f}%"
         )
+
+
+def infer(
+    name,
+    g,
+    model,
+    node_embed,
+    item_set,
+    device,
+    features,
+    num_workers,
+):
+    model.eval()
+    if name == "ogbn-mag":
+        evaluator = Evaluator(name=name)
+    else:
+        evaluator = MAG240MEvaluator()
+    pred = model.inference(
+        name=name,
+        graph=g,
+        features=features,
+        item_set=item_set,
+        node_embed=node_embed,
+        device=device,
+        num_workers=num_workers,
+    )
+    print(pred)
+    label = item_set._itemsets["paper"]._items[1].to(pred.device)
+    label = torch.unsqueeze(label, 1)
+    print(label)
+
+    return evaluator.eval({"y_true": label, "y_pred": pred})["acc"]
 
 
 def main(args):
     device = torch.device("cuda") if args.num_gpus > 0 else torch.device("cpu")
 
     # Load dataset.
-    g, features, train_set, valid_set, test_set, all_nodes_set, num_classes = load_dataset(
-        args.dataset
-    )
+    (
+        g,
+        features,
+        train_set,
+        valid_set,
+        test_set,
+        all_nodes_set,
+        num_classes,
+    ) = load_dataset(args.dataset)
 
     feat_size = features.size("node", "paper", "feat")[0]
 
@@ -688,35 +746,43 @@ def main(args):
             file=sys.stderr,
         )
 
-    # assert False, features
-    # dl_test = create_dataloader(
+    # y = model.inference(
     #     name=args.dataset,
     #     graph=g,
     #     features=features,
-    #     item_set=all_nodes_set,
+    #     item_set=test_set,
+    #     node_embed=embed_layer,
     #     device=device,
-    #     batch_size=256,
-    #     fanouts=[-1],
-    #     shuffle=False,
     #     num_workers=args.num_workers,
     # )
-    # y = model.inference(graph=g, features=features, dataloader=dl_test, device=device)
     # print(y)
-    layerwise_infer(args, g, features, test_set, all_nodes_set, embed_layer, model, num_classes, device)
 
-    # train(
-    #     args.dataset,
-    #     g,
-    #     model,
-    #     embed_layer,
-    #     optimizer,
-    #     train_set,
-    #     valid_set,
-    #     test_set,
-    #     device,
-    #     features,
-    #     args.num_workers,
-    # )
+    train(
+        args.dataset,
+        g,
+        model,
+        embed_layer,
+        optimizer,
+        train_set,
+        valid_set,
+        device,
+        features,
+        args.num_workers,
+        args.num_epochs,
+    )
+
+    print("Testing...")
+    test_acc = infer(
+        args.dataset,
+        g,
+        model,
+        embed_layer,
+        test_set,
+        device=device,
+        features=features,
+        num_workers=args.num_workers,
+    )
+    print(f"Test accuracy {test_acc:.4f}")
 
 
 if __name__ == "__main__":
@@ -728,8 +794,9 @@ if __name__ == "__main__":
         choices=["ogbn-mag", "ogb-lsc-mag240m"],
         help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m",
     )
+    parser.add_argument("--num_epochs", type=int, default=3)
     parser.add_argument("--num_workers", type=int, default=0)
-    parser.add_argument("--num_gpus", type=int, default=0)
+    parser.add_argument("--num_gpus", type=int, default=1)
 
     args = parser.parse_args()
 
