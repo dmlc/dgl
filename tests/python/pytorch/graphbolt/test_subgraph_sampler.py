@@ -1,7 +1,7 @@
 import unittest
+from functools import partial
 
 import backend as F
-from functools import partial
 
 import dgl
 import dgl.graphbolt as gb
