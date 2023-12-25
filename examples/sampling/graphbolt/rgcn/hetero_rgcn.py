@@ -559,13 +559,9 @@ def train(
             # Reset gradients.
             optimizer.zero_grad()
             # Generate predictions.
-            # logits = model(blocks, node_features)[category]
-            logits = model(blocks, node_features)
-            # print(logits)
-            logits = logits[category]
+            logits = model(blocks, node_features)[category]
 
             y_hat = logits.log_softmax(dim=-1).cpu()
-            # assert False, y_hat
             loss = F.nll_loss(y_hat, data.labels[category].long())
             loss.backward()
             optimizer.step()
@@ -660,6 +656,9 @@ def main(args):
         "Number of model parameters: "
         f"{sum(p.numel() for p in model.parameters())}"
     )
+
+    embed_layer.reset_parameters()
+    model.reset_parameters()
 
     # `itertools.chain()` is a function in Python's itertools module.
     # It is used to flatten a list of iterables, making them act as
