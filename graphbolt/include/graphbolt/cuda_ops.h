@@ -15,6 +15,18 @@ std::pair<torch::Tensor, torch::Tensor> Sort(torch::Tensor input, int num_bits);
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
+/**
+ * @brief Slices the indptr tensor with nodes and returns the indegrees of the
+ * given nodes and their indptr values.
+ *
+ * @param indptr The indptr tensor.
+ * @param nodes  The nodes to read from indptr
+ *
+ * @return Tuple of tensors with values:
+ * (indptr[nodes + 1] - indptr[nodes], indptr[nodes]), the returned indegrees
+ * tensor (first one) has size nodes.size(0) + 1 so that calling ExclusiveCumSum
+ * on it gives the output indptr.
+ */
 std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
     torch::Tensor indptr, torch::Tensor nodes);
 
