@@ -1,18 +1,15 @@
 .. _stochastic_training-ondisk-dataset:
 
-Creating OnDiskDataset
-======================
+Composing OnDiskDataset from raw data
+=====================================
 
-This tutorial shows how to create an `OnDiskDataset` from raw data and use it
-for stochastic training.
+This tutorial shows how to compose :class:`~dgl.graphbolt.OnDiskDataset` from
+raw data. A full specification of ``metadata.yaml`` is also provided.
 
 **GraphBolt** provides the ``OnDiskDataset`` class to help user organize plain
 data of graph strucutre, feature data and tasks. ``OnDiskDataset`` is also
 designed to efficiently handle large graphs and features that do not fit into
 memory by storing them on disk.
-
-For more details about `OnDiskDataset`, please refer to the
-:class:`~dgl.graphbolt.OnDiskDataset` API documentation.
 
 .. toctree::
     :maxdepth: 1
