@@ -19,7 +19,7 @@ std::pair<torch::Tensor, torch::Tensor> Sort(torch::Tensor input, int num_bits);
  *
  * @return The prefix sum result such that r[i] = \sum_{j=0}^{i-1} input[j]
  */
-torch::Tensor ExclusiveCumSum(torch::Tensor indptr);
+torch::Tensor ExclusiveCumSum(torch::Tensor input);
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
