@@ -40,7 +40,7 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
  */
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
-  
+
 /**
  * @brief Select columns for a sparse matrix in a CSC format according to nodes
  * tensor.
@@ -57,7 +57,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  */
 std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
-  
+
 /**
  * @brief Slices the indptr tensor with nodes and returns the indegrees of the
  * given nodes and their indptr values.
