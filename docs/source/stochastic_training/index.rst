@@ -14,7 +14,7 @@ Overview
   :width: 700
   :alt: Graphbolt Overview
 
-GraphBolt integrates seamlessly with the PyTorch `datapiple <https://pytorch.org/data/beta/torchdata.datapipes.iter.html>`_, relying on the unified "MiniBatch" data structure to connect processing stages. It streamlines data loading and preprocessing for GNN training, validation, and testing.
+GraphBolt integrates seamlessly with the PyTorch `datapipe <https://pytorch.org/data/beta/torchdata.datapipes.iter.html>`_, relying on the unified "MiniBatch" data structure to connect processing stages. It streamlines data loading and preprocessing for GNN training, validation, and testing.
 By default, GraphBolt provides a collection of built-in datasets and exceptionally efficient implementations of datapipes for common scenarios, which can be summarized as follows:
 
 1. **Item Sampler:** Randomly selects a subset (nodes, edges, graphs) from the entire training set as an initial mini-batch for downstream computation.
