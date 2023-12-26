@@ -108,9 +108,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
               temp.get(), workspace_size, sorted_only_src.data_ptr<scalar_t>(),
               unique_only_src_ptr, cub::DiscardOutputIterator{},
               unique_only_src_cnt.get(), only_src.size(0), stream));
-        }
 
-        {
           auto unique_only_src_size =
               cuda::CopyScalar(unique_only_src_cnt.get());
           unique_only_src = unique_only_src.slice(
