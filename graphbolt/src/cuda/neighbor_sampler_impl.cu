@@ -28,7 +28,7 @@ namespace ops {
 constexpr int BLOCK_SIZE = 128;
 
 /**
- * @brief Fills the output array with row, probability pairs and the edge_ids
+ * @brief Fills the output array with row&random number pairs and the edge_ids
  * array with original edge ids. When the output array is sorted along with
  * edge_ids, the first fanout elements of each row gives us the sampled edges.
  */
@@ -62,9 +62,9 @@ __global__ void _ComputeRowRandomPairs(
     const auto rnd = curand_uniform(&rng);
     const auto prob = weights ? weights[in_idx] : static_cast<weights_t>(1);
     const auto exp_rnd = -__logf(rnd);
-    const float_t adjusted_prob =
+    const float_t adjusted_rnd =
         prob > 0 ? exp_rnd / prob : std::numeric_limits<float_t>::infinity();
-    output[i] = {row_position, adjusted_prob};
+    output[i] = {row_position, adjusted_rnd};
     edge_ids[i] = in_idx;
 
     i += stride;
@@ -160,11 +160,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             indices.scalar_type(), "SampleNeighborsWithoutReplacementIndices",
             ([&] {
               using indices_t = scalar_t;
-              auto row_and_prob =
+              auto row_and_random =
                   allocator
                       .AllocateStorage<::cuda::std::tuple<indices_t, float>>(
                           num_edges);
-              auto row_and_prob_sorted =
+              auto row_and_random_sorted =
                   allocator
                       .AllocateStorage<::cuda::std::tuple<indices_t, float>>(
                           num_edges);
@@ -192,7 +192,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         num_edges, sliced_indptr.data_ptr<indptr_t>(),
                         sub_indptr.data_ptr<indptr_t>(),
                         coo_rows.data_ptr<indices_t>(), probs_ptr, indices_ptr,
-                        random_seed, row_and_prob.get(),
+                        random_seed, row_and_random.get(),
                         input_edge_id_segments.get());
 
                     // The row and random number pairs are sorted w.r.t. the
@@ -207,15 +207,15 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                     // give us the sampled edges.
                     size_t tmp_storage_size = 0;
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
-                        nullptr, tmp_storage_size, row_and_prob.get(),
-                        row_and_prob_sorted.get(), input_edge_id_segments.get(),
+                        nullptr, tmp_storage_size, row_and_random.get(),
+                        row_and_random_sorted.get(), input_edge_id_segments.get(),
                         sorted_edge_id_segments.get(), num_edges,
                         decomposer_t<indices_t, float>{}, 0, num_bits, stream));
                     auto tmp_storage =
                         allocator.AllocateStorage<char>(tmp_storage_size);
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
-                        tmp_storage.get(), tmp_storage_size, row_and_prob.get(),
-                        row_and_prob_sorted.get(), input_edge_id_segments.get(),
+                        tmp_storage.get(), tmp_storage_size, row_and_random.get(),
+                        row_and_random_sorted.get(), input_edge_id_segments.get(),
                         sorted_edge_id_segments.get(), num_edges,
                         decomposer_t<indices_t, float>{}, 0, num_bits, stream));
                   }));
