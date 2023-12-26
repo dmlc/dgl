@@ -1002,27 +1002,30 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `FusedCSCSamplingGraph` to the specified device."""
 
-        def _to(x, device):
+        def _to(x):
             return x.to(device) if hasattr(x, "to") else x
 
-        self.csc_indptr = recursive_apply(
-            self.csc_indptr, lambda x: _to(x, device)
-        )
-        self.indices = recursive_apply(self.indices, lambda x: _to(x, device))
-        self.node_type_offset = recursive_apply(
-            self.node_type_offset, lambda x: _to(x, device)
-        )
-        self.type_per_edge = recursive_apply(
-            self.type_per_edge, lambda x: _to(x, device)
-        )
-        self.node_attributes = recursive_apply(
-            self.node_attributes, lambda x: _to(x, device)
-        )
-        self.edge_attributes = recursive_apply(
-            self.edge_attributes, lambda x: _to(x, device)
-        )
+        self.csc_indptr = recursive_apply(self.csc_indptr, _to)
+        self.indices = recursive_apply(self.indices, _to)
+        self.node_type_offset = recursive_apply(self.node_type_offset, _to)
+        self.type_per_edge = recursive_apply(self.type_per_edge, _to)
+        self.node_attributes = recursive_apply(self.node_attributes, _to)
+        self.edge_attributes = recursive_apply(self.edge_attributes, _to)
 
         return self
+
+    def pin_memory_(self):
+        """Copy `FusedCSCSamplingGraph` to the pinned memory."""
+
+        def _pin(x):
+            return x.pinned_memory() if hasattr(x, "pinned_memory") else x
+
+        self.csc_indptr = recursive_apply(self.csc_indptr, _pin)
+        self.indices = recursive_apply(self.indices, _pin)
+        self.node_type_offset = recursive_apply(self.node_type_offset, _pin)
+        self.type_per_edge = recursive_apply(self.type_per_edge, _pin)
+        self.node_attributes = recursive_apply(self.node_attributes, _pin)
+        self.edge_attributes = recursive_apply(self.edge_attributes, _pin)
 
 
 def fused_csc_sampling_graph(
