@@ -144,6 +144,18 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<int64_t> random_seed = torch::nullopt);
 
 /**
+ * @brief CSRToCOO implements conversion from a given indptr offset tensor to a
+ * COO format tensor including ids in [0, indptr.size(0) - 1).
+ *
+ * @param input          A tensor containing IDs.
+ * @param output_dtype   Dtype of output.
+ *
+ * @return
+ * - The resulting tensor with output_dtype.
+ */
+torch::Tensor CSRToCOO(torch::Tensor indptr, torch::ScalarType output_dtype);
+
+/**
  * @brief Removes duplicate elements from the concatenated 'unique_dst_ids' and
  * 'src_ids' tensor and applies the uniqueness information to compact both
  * source and destination tensors.
