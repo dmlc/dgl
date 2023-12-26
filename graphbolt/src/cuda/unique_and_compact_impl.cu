@@ -78,13 +78,13 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         auto only_src =
             torch::empty(src_ids.size(0), sorted_unique_dst_ids.options());
         {
-            auto only_src_size =
-                thrust::remove_copy_if(
-                    exec_policy, src_ids_ptr, src_ids_ptr + src_ids.size(0),
-                    is_dst.get(), only_src.data_ptr<scalar_t>(),
-                    thrust::identity<bool>{}) -
-                only_src.data_ptr<scalar_t>();
-            only_src = only_src.slice(0, 0, only_src_size);
+          auto only_src_size =
+              thrust::remove_copy_if(
+                  exec_policy, src_ids_ptr, src_ids_ptr + src_ids.size(0),
+                  is_dst.get(), only_src.data_ptr<scalar_t>(),
+                  thrust::identity<bool>{}) -
+              only_src.data_ptr<scalar_t>();
+          only_src = only_src.slice(0, 0, only_src_size);
         }
 
         // Sort the only_src tensor so that we can unique it with Encode
@@ -92,7 +92,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         auto sorted_only_src = Sort<false>(
             only_src.data_ptr<scalar_t>(), only_src.size(0), num_bits);
 
-        auto unique_only_src = torch::empty(only_src.size(0), src_ids.options());
+        auto unique_only_src =
+            torch::empty(only_src.size(0), src_ids.options());
         auto unique_only_src_ptr = unique_only_src.data_ptr<scalar_t>();
         auto unique_only_src_cnt = allocator.AllocateStorage<scalar_t>(1);
 
@@ -110,9 +111,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         }
 
         {
-            auto unique_only_src_size = cuda::CopyScalar(unique_only_src_cnt.get());
-            unique_only_src = unique_only_src.slice(
-                0, 0, static_cast<scalar_t>(unique_only_src_size));
+          auto unique_only_src_size =
+              cuda::CopyScalar(unique_only_src_cnt.get());
+          unique_only_src = unique_only_src.slice(
+              0, 0, static_cast<scalar_t>(unique_only_src_size));
         }
 
         auto real_order = torch::cat({unique_dst_ids, unique_only_src});
