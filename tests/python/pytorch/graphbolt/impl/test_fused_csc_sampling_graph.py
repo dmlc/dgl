@@ -710,10 +710,10 @@ def test_in_subgraph_node_pairs_homogeneous():
 
     # Verify in subgraph.
     assert torch.equal(
-        in_subgraph.node_pairs[0], torch.LongTensor([0, 3, 4, 2, 3, 1, 2])
+        in_subgraph.sampled_csc[0], torch.LongTensor([0, 3, 4, 2, 3, 1, 2])
     )
     assert torch.equal(
-        in_subgraph.node_pairs[1], torch.LongTensor([4, 4, 4, 1, 1, 3, 3])
+        in_subgraph.sampled_csc[1], torch.LongTensor([4, 4, 4, 1, 1, 3, 3])
     )
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
@@ -782,28 +782,28 @@ def test_in_subgraph_node_pairs_heterogeneous():
 
     # Verify in subgraph.
     assert torch.equal(
-        in_subgraph.node_pairs["N0:R0:N0"][0], torch.LongTensor([])
+        in_subgraph.sampled_csc["N0:R0:N0"][0], torch.LongTensor([])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N0:R0:N0"][1], torch.LongTensor([])
+        in_subgraph.sampled_csc["N0:R0:N0"][1], torch.LongTensor([])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N0:R1:N1"][0], torch.LongTensor([0, 1])
+        in_subgraph.sampled_csc["N0:R1:N1"][0], torch.LongTensor([0, 1])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N0:R1:N1"][1], torch.LongTensor([2, 1])
+        in_subgraph.sampled_csc["N0:R1:N1"][1], torch.LongTensor([2, 1])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N1:R2:N0"][0], torch.LongTensor([0, 1])
+        in_subgraph.sampled_csc["N1:R2:N0"][0], torch.LongTensor([0, 1])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N1:R2:N0"][1], torch.LongTensor([1, 1])
+        in_subgraph.sampled_csc["N1:R2:N0"][1], torch.LongTensor([1, 1])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N1:R3:N1"][0], torch.LongTensor([1, 2, 0])
+        in_subgraph.sampled_csc["N1:R3:N1"][0], torch.LongTensor([1, 2, 0])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N1:R3:N1"][1], torch.LongTensor([2, 2, 1])
+        in_subgraph.sampled_csc["N1:R3:N1"][1], torch.LongTensor([2, 2, 1])
     )
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
@@ -841,10 +841,10 @@ def test_in_subgraph_homo():
 
     # Verify in subgraph.
     assert torch.equal(
-        in_subgraph.node_pairs.indices, torch.LongTensor([0, 3, 4, 2, 3, 1, 2])
+        in_subgraph.sampled_csc.indices, torch.LongTensor([0, 3, 4, 2, 3, 1, 2])
     )
     assert torch.equal(
-        in_subgraph.node_pairs.indptr, torch.LongTensor([0, 3, 5, 7])
+        in_subgraph.sampled_csc.indptr, torch.LongTensor([0, 3, 5, 7])
     )
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
@@ -913,28 +913,28 @@ def test_in_subgraph_hetero():
 
     # Verify in subgraph.
     assert torch.equal(
-        in_subgraph.node_pairs["N0:R0:N0"].indices, torch.LongTensor([])
+        in_subgraph.sampled_csc["N0:R0:N0"].indices, torch.LongTensor([])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N0:R0:N0"].indptr, torch.LongTensor([0, 0])
+        in_subgraph.sampled_csc["N0:R0:N0"].indptr, torch.LongTensor([0, 0])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N0:R1:N1"].indices, torch.LongTensor([0, 1])
+        in_subgraph.sampled_csc["N0:R1:N1"].indices, torch.LongTensor([0, 1])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N0:R1:N1"].indptr, torch.LongTensor([0, 1, 2])
+        in_subgraph.sampled_csc["N0:R1:N1"].indptr, torch.LongTensor([0, 1, 2])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N1:R2:N0"].indices, torch.LongTensor([0, 1])
+        in_subgraph.sampled_csc["N1:R2:N0"].indices, torch.LongTensor([0, 1])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N1:R2:N0"].indptr, torch.LongTensor([0, 2])
+        in_subgraph.sampled_csc["N1:R2:N0"].indptr, torch.LongTensor([0, 2])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N1:R3:N1"].indices, torch.LongTensor([1, 2, 0])
+        in_subgraph.sampled_csc["N1:R3:N1"].indices, torch.LongTensor([1, 2, 0])
     )
     assert torch.equal(
-        in_subgraph.node_pairs["N1:R3:N1"].indptr, torch.LongTensor([0, 2, 3])
+        in_subgraph.sampled_csc["N1:R3:N1"].indptr, torch.LongTensor([0, 2, 3])
     )
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
@@ -994,7 +994,7 @@ def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
     subgraph = sampler(nodes, fanouts, output_cscformat=False)
 
     # Verify in subgraph.
-    sampled_num = subgraph.node_pairs[0].size(0)
+    sampled_num = subgraph.sampled_csc[0].size(0)
     assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
@@ -1084,10 +1084,10 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
             torch.LongTensor([0, 0]),
         ),
     }
-    assert len(subgraph.node_pairs) == 2
+    assert len(subgraph.sampled_csc) == 2
     for etype, pairs in expected_node_pairs.items():
-        assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
-        assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
+        assert torch.equal(subgraph.sampled_csc[etype][0], pairs[0])
+        assert torch.equal(subgraph.sampled_csc[etype][1], pairs[1])
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -1128,10 +1128,10 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
             torch.tensor([], dtype=indices_dtype),
         ),
     }
-    assert len(subgraph.node_pairs) == 2
+    assert len(subgraph.sampled_csc) == 2
     for etype, pairs in expected_node_pairs.items():
-        assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
-        assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
+        assert torch.equal(subgraph.sampled_csc[etype][0], pairs[0])
+        assert torch.equal(subgraph.sampled_csc[etype][1], pairs[1])
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -1199,11 +1199,11 @@ def test_sample_neighbors_fanouts(
     # Verify in subgraph.
     assert (
         expected_sampled_num1 == 0
-        or subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
+        or subgraph.sampled_csc["n1:e1:n2"][0].numel() == expected_sampled_num1
     )
     assert (
         expected_sampled_num2 == 0
-        or subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+        or subgraph.sampled_csc["n2:e2:n1"][0].numel() == expected_sampled_num2
     )
 
 
@@ -1254,8 +1254,8 @@ def test_sample_neighbors_replace(
     )
 
     # Verify in subgraph.
-    assert subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
-    assert subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+    assert subgraph.sampled_csc["n1:e1:n2"][0].numel() == expected_sampled_num1
+    assert subgraph.sampled_csc["n2:e2:n1"][0].numel() == expected_sampled_num2
 
 
 @unittest.skipIf(
@@ -1408,7 +1408,7 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
     )
 
     # Verify in subgraph.
-    sampled_num = subgraph.node_pairs[0].size(0)
+    sampled_num = subgraph.sampled_csc[0].size(0)
     if replace:
         assert sampled_num == 6
     else:
@@ -1455,7 +1455,7 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
     )
 
     # Verify in subgraph.
-    sampled_num = subgraph.node_pairs[0].size(0)
+    sampled_num = subgraph.sampled_csc[0].size(0)
     assert sampled_num == 0
 
 
@@ -1965,7 +1965,7 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
         probs_name=probs_name if probs_name != "none" else None,
         output_cscformat=False,
     )
-    sampled_num = subgraph.node_pairs[0].size(0)
+    sampled_num = subgraph.sampled_csc[0].size(0)
 
     # Verify in subgraph.
     if probs_name == "mask":
@@ -2059,7 +2059,7 @@ def test_sample_neighbors_hetero_pick_number(
     )
 
     if probs_name == "none":
-        for etype, pairs in subgraph.node_pairs.items():
+        for etype, pairs in subgraph.sampled_csc.items():
             fanout = fanouts[etypes[etype]]
             if fanout == -1:
                 assert pairs[0].size(0) == 3
@@ -2070,7 +2070,7 @@ def test_sample_neighbors_hetero_pick_number(
                     assert pairs[0].size(0) == min(fanout, 3)
     else:
         fanout = fanouts[0]  # Here fanout is the same for all etypes.
-        for etype, pairs in subgraph.node_pairs.items():
+        for etype, pairs in subgraph.sampled_csc.items():
             if etypes[etype] == 0:
                 # Etype 0: 2 valid neighbors.
                 if fanout == -1:
@@ -2176,8 +2176,8 @@ def test_sample_neighbors_homo_csc_format():
     )
 
     # Verify in subgraph.
-    sampled_indptr_num = subgraph.node_pairs.indptr.size(0)
-    sampled_num = subgraph.node_pairs.indices.size(0)
+    sampled_indptr_num = subgraph.sampled_csc.indptr.size(0)
+    sampled_num = subgraph.sampled_csc.indices.size(0)
     assert sampled_indptr_num == 4
     assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
@@ -2228,7 +2228,7 @@ def test_sample_neighbors_hetero_csc_format(labor):
     subgraph = sampler(nodes, fanouts, output_cscformat=True)
 
     # Verify in subgraph.
-    expected_node_pairs = {
+    expected_sampled_csc = {
         "n1:e1:n2": gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 2]),
             indices=torch.LongTensor([0, 1]),
@@ -2238,10 +2238,10 @@ def test_sample_neighbors_hetero_csc_format(labor):
             indices=torch.LongTensor([0, 2]),
         ),
     }
-    assert len(subgraph.node_pairs) == 2
-    for etype, pairs in expected_node_pairs.items():
-        assert torch.equal(subgraph.node_pairs[etype].indptr, pairs.indptr)
-        assert torch.equal(subgraph.node_pairs[etype].indices, pairs.indices)
+    assert len(subgraph.sampled_csc) == 2
+    for etype, pairs in expected_sampled_csc.items():
+        assert torch.equal(subgraph.sampled_csc[etype].indptr, pairs.indptr)
+        assert torch.equal(subgraph.sampled_csc[etype].indices, pairs.indices)
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -2253,7 +2253,7 @@ def test_sample_neighbors_hetero_csc_format(labor):
     subgraph = sampler(nodes, fanouts, output_cscformat=True)
 
     # Verify in subgraph.
-    expected_node_pairs = {
+    expected_sampled_csc = {
         "n1:e1:n2": gb.CSCFormatBase(
             indptr=torch.LongTensor([0]),
             indices=torch.LongTensor([]),
@@ -2263,10 +2263,10 @@ def test_sample_neighbors_hetero_csc_format(labor):
             indices=torch.LongTensor([0, 2]),
         ),
     }
-    assert len(subgraph.node_pairs) == 2
-    for etype, pairs in expected_node_pairs.items():
-        assert torch.equal(subgraph.node_pairs[etype].indptr, pairs.indptr)
-        assert torch.equal(subgraph.node_pairs[etype].indices, pairs.indices)
+    assert len(subgraph.sampled_csc) == 2
+    for etype, pairs in expected_sampled_csc.items():
+        assert torch.equal(subgraph.sampled_csc[etype].indptr, pairs.indptr)
+        assert torch.equal(subgraph.sampled_csc[etype].indices, pairs.indices)
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -2334,16 +2334,16 @@ def test_sample_neighbors_fanouts_csc_format(
     # Verify in subgraph.
     assert (
         expected_sampled_num1 == 0
-        or subgraph.node_pairs["n1:e1:n2"].indices.numel()
+        or subgraph.sampled_csc["n1:e1:n2"].indices.numel()
         == expected_sampled_num1
     )
-    assert subgraph.node_pairs["n1:e1:n2"].indptr.size(0) == 2
+    assert subgraph.sampled_csc["n1:e1:n2"].indptr.size(0) == 2
     assert (
         expected_sampled_num2 == 0
-        or subgraph.node_pairs["n2:e2:n1"].indices.numel()
+        or subgraph.sampled_csc["n2:e2:n1"].indices.numel()
         == expected_sampled_num2
     )
-    assert subgraph.node_pairs["n2:e2:n1"].indptr.size(0) == 2
+    assert subgraph.sampled_csc["n2:e2:n1"].indptr.size(0) == 2
 
 
 @unittest.skipIf(
@@ -2394,13 +2394,13 @@ def test_sample_neighbors_replace_csc_format(
 
     # Verify in subgraph.
     assert (
-        subgraph.node_pairs["n1:e1:n2"].indices.numel() == expected_sampled_num1
+        subgraph.sampled_csc["n1:e1:n2"].indices.numel() == expected_sampled_num1
     )
-    assert subgraph.node_pairs["n1:e1:n2"].indptr.size(0) == 2
+    assert subgraph.sampled_csc["n1:e1:n2"].indptr.size(0) == 2
     assert (
-        subgraph.node_pairs["n2:e2:n1"].indices.numel() == expected_sampled_num2
+        subgraph.sampled_csc["n2:e2:n1"].indices.numel() == expected_sampled_num2
     )
-    assert subgraph.node_pairs["n2:e2:n1"].indptr.size(0) == 2
+    assert subgraph.sampled_csc["n2:e2:n1"].indptr.size(0) == 2
 
 
 @unittest.skipIf(
@@ -2554,8 +2554,8 @@ def test_sample_neighbors_probs_csc_format(replace, labor, probs_name):
     )
 
     # Verify in subgraph.
-    sampled_num = subgraph.node_pairs.indices.size(0)
-    assert subgraph.node_pairs.indptr.size(0) == 4
+    sampled_num = subgraph.sampled_csc.indices.size(0)
+    assert subgraph.sampled_csc.indptr.size(0) == 4
     if replace:
         assert sampled_num == 6
     else:
@@ -2603,8 +2603,8 @@ def test_sample_neighbors_zero_probs_csc_format(replace, labor, probs_or_mask):
     )
 
     # Verify in subgraph.
-    sampled_num = subgraph.node_pairs.indices.size(0)
-    assert subgraph.node_pairs.indptr.size(0) == 4
+    sampled_num = subgraph.sampled_csc.indices.size(0)
+    assert subgraph.sampled_csc.indptr.size(0) == 4
     assert sampled_num == 0
 
 
@@ -2673,8 +2673,8 @@ def test_sample_neighbors_homo_pick_number_csc_format(
         probs_name=probs_name if probs_name != "none" else None,
         output_cscformat=True,
     )
-    sampled_num = subgraph.node_pairs.indices.size(0)
-    assert subgraph.node_pairs.indptr.size(0) == 3
+    sampled_num = subgraph.sampled_csc.indices.size(0)
+    assert subgraph.sampled_csc.indptr.size(0) == 3
     # Verify in subgraph.
     if probs_name == "mask":
         if fanouts[0] == -1:
@@ -2767,7 +2767,7 @@ def test_sample_neighbors_hetero_pick_number_csc_format(
     )
     print(subgraph)
     if probs_name == "none":
-        for etype, pairs in subgraph.node_pairs.items():
+        for etype, pairs in subgraph.sampled_csc.items():
             assert pairs.indptr.size(0) == 2
             sampled_num = pairs.indices.size(0)
             fanout = fanouts[etypes[etype]]
@@ -2780,7 +2780,7 @@ def test_sample_neighbors_hetero_pick_number_csc_format(
                     assert sampled_num == min(fanout, 3)
     else:
         fanout = fanouts[0]  # Here fanout is the same for all etypes.
-        for etype, pairs in subgraph.node_pairs.items():
+        for etype, pairs in subgraph.sampled_csc.items():
             assert pairs.indptr.size(0) == 2
             sampled_num = pairs.indices.size(0)
             if etypes[etype] == 0:

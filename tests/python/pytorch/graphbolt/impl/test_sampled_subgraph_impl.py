@@ -71,7 +71,7 @@ def test_exclude_edges_homo_node_pairs(reverse_row, reverse_column):
         expected_column_node_ids = None
     expected_edge_ids = torch.Tensor([5, 10])
 
-    _assert_container_equal(result.node_pairs, expected_node_pairs)
+    _assert_container_equal(result.sampled_csc, expected_node_pairs)
     _assert_container_equal(
         result.original_column_node_ids, expected_column_node_ids
     )
@@ -106,7 +106,7 @@ def test_exclude_edges_hetero_node_pairs(reverse_row, reverse_column):
         dst_to_exclude = torch.tensor([0, 2])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     subgraph = FusedSampledSubgraphImpl(
-        node_pairs=node_pairs,
+        sampled_csc=node_pairs,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,
         original_edge_ids=original_edge_ids,
@@ -139,7 +139,7 @@ def test_exclude_edges_hetero_node_pairs(reverse_row, reverse_column):
         expected_column_node_ids = None
     expected_edge_ids = {"A:relation:B": torch.tensor([20])}
 
-    _assert_container_equal(result.node_pairs, expected_node_pairs)
+    _assert_container_equal(result.sampled_csc, expected_node_pairs)
     _assert_container_equal(
         result.original_column_node_ids, expected_column_node_ids
     )
@@ -188,7 +188,7 @@ def test_exclude_edges_homo_deduplicated(reverse_row, reverse_column):
         expected_column_node_ids = None
     expected_edge_ids = torch.Tensor([5, 9])
 
-    _assert_container_equal(result.node_pairs, expected_csc_formats)
+    _assert_container_equal(result.sampled_csc, expected_csc_formats)
     _assert_container_equal(
         result.original_column_node_ids, expected_column_node_ids
     )
@@ -237,7 +237,7 @@ def test_exclude_edges_homo_duplicated(reverse_row, reverse_column):
     else:
         expected_column_node_ids = None
     expected_edge_ids = torch.Tensor([5, 10, 10])
-    _assert_container_equal(result.node_pairs, expected_csc_formats)
+    _assert_container_equal(result.sampled_csc, expected_csc_formats)
     _assert_container_equal(
         result.original_column_node_ids, expected_column_node_ids
     )
@@ -272,7 +272,7 @@ def test_exclude_edges_hetero_deduplicated(reverse_row, reverse_column):
         dst_to_exclude = torch.tensor([0, 2])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     subgraph = SampledSubgraphImpl(
-        node_pairs=csc_formats,
+        sampled_csc=csc_formats,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,
         original_edge_ids=original_edge_ids,
@@ -305,7 +305,7 @@ def test_exclude_edges_hetero_deduplicated(reverse_row, reverse_column):
         expected_column_node_ids = None
     expected_edge_ids = {"A:relation:B": torch.tensor([20])}
 
-    _assert_container_equal(result.node_pairs, expected_csc_formats)
+    _assert_container_equal(result.sampled_csc, expected_csc_formats)
     _assert_container_equal(
         result.original_column_node_ids, expected_column_node_ids
     )
@@ -340,7 +340,7 @@ def test_exclude_edges_hetero_duplicated(reverse_row, reverse_column):
         dst_to_exclude = torch.tensor([0, 2])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 19, 20, 20, 21])}
     subgraph = SampledSubgraphImpl(
-        node_pairs=csc_formats,
+        sampled_csc=csc_formats,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,
         original_edge_ids=original_edge_ids,
@@ -373,7 +373,7 @@ def test_exclude_edges_hetero_duplicated(reverse_row, reverse_column):
         expected_column_node_ids = None
     expected_edge_ids = {"A:relation:B": torch.tensor([20, 20])}
 
-    _assert_container_equal(result.node_pairs, expected_csc_formats)
+    _assert_container_equal(result.sampled_csc, expected_csc_formats)
     _assert_container_equal(
         result.original_column_node_ids, expected_column_node_ids
     )
@@ -403,7 +403,7 @@ def test_sampled_subgraph_to_device():
     dst_to_exclude = torch.tensor([10, 12])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     subgraph = FusedSampledSubgraphImpl(
-        node_pairs=node_pairs,
+        sampled_csc=node_pairs,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,
         original_edge_ids=original_edge_ids,
@@ -420,9 +420,9 @@ def test_sampled_subgraph_to_device():
     graph = graph.to("cuda")
 
     # Check.
-    for key in graph.node_pairs:
-        assert graph.node_pairs[key][0].device.type == "cuda"
-        assert graph.node_pairs[key][1].device.type == "cuda"
+    for key in graph.sampled_csc:
+        assert graph.sampled_csc[key][0].device.type == "cuda"
+        assert graph.sampled_csc[key][1].device.type == "cuda"
     for key in graph.original_column_node_ids:
         assert graph.original_column_node_ids[key].device.type == "cuda"
     for key in graph.original_row_node_ids:
@@ -433,7 +433,7 @@ def test_sampled_subgraph_to_device():
 
 def test_sampled_subgraph_impl_representation_homo():
     sampled_subgraph_impl = SampledSubgraphImpl(
-        node_pairs=gb.CSCFormatBase(
+        sampled_csc=gb.CSCFormatBase(
             indptr=torch.arange(0, 101, 10),
             indices=torch.arange(10, 110),
         ),
@@ -442,7 +442,17 @@ def test_sampled_subgraph_impl_representation_homo():
         original_edge_ids=None,
     )
     expected_result = str(
-        """SampledSubgraphImpl(original_row_node_ids=tensor([  0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+        """SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([  0,  10,  20,  30,  40,  50,  60,  70,  80,  90, 100]),
+                                             indices=tensor([ 10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,
+                                                              24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,
+                                                              38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,
+                                                              52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,  65,
+                                                              66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,
+                                                              80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,
+                                                              94,  95,  96,  97,  98,  99, 100, 101, 102, 103, 104, 105, 106, 107,
+                                                             108, 109]),
+                               ),
+                   original_row_node_ids=tensor([  0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
                                                   14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,
                                                   28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,
                                                   42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,
@@ -452,16 +462,6 @@ def test_sampled_subgraph_impl_representation_homo():
                                                   98,  99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109]),
                    original_edge_ids=None,
                    original_column_node_ids=tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
-                   node_pairs=CSCFormatBase(indptr=tensor([  0,  10,  20,  30,  40,  50,  60,  70,  80,  90, 100]),
-                                            indices=tensor([ 10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,
-                                                             24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,
-                                                             38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,
-                                                             52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,  65,
-                                                             66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,
-                                                             80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,
-                                                             94,  95,  96,  97,  98,  99, 100, 101, 102, 103, 104, 105, 106, 107,
-                                                            108, 109]),
-                              ),
 )"""
     )
     assert str(sampled_subgraph_impl) == expected_result, print(
@@ -471,7 +471,7 @@ def test_sampled_subgraph_impl_representation_homo():
 
 def test_sampled_subgraph_impl_representation_hetero():
     sampled_subgraph_impl = SampledSubgraphImpl(
-        node_pairs={
+        sampled_csc={
             "n1:e1:n2": gb.CSCFormatBase(
                 indptr=torch.tensor([0, 2, 4]),
                 indices=torch.tensor([4, 5, 6, 7]),
@@ -492,14 +492,14 @@ def test_sampled_subgraph_impl_representation_hetero():
         original_edge_ids=None,
     )
     expected_result = str(
-        """SampledSubgraphImpl(original_row_node_ids={'n1': tensor([1, 0, 0, 1, 1, 0, 0, 1]), 'n2': tensor([1, 2, 0, 1, 0, 2, 0, 2, 0, 1])},
+        """SampledSubgraphImpl(sampled_csc={'n1:e1:n2': CSCFormatBase(indptr=tensor([0, 2, 4]),
+                                             indices=tensor([4, 5, 6, 7]),
+                               ), 'n2:e2:n1': CSCFormatBase(indptr=tensor([0, 2, 4, 6, 8]),
+                                             indices=tensor([2, 3, 4, 5, 6, 7, 8, 9]),
+                               )},
+                   original_row_node_ids={'n1': tensor([1, 0, 0, 1, 1, 0, 0, 1]), 'n2': tensor([1, 2, 0, 1, 0, 2, 0, 2, 0, 1])},
                    original_edge_ids=None,
                    original_column_node_ids={'n1': tensor([1, 0, 0, 1]), 'n2': tensor([1, 2])},
-                   node_pairs={'n1:e1:n2': CSCFormatBase(indptr=tensor([0, 2, 4]),
-                                            indices=tensor([4, 5, 6, 7]),
-                              ), 'n2:e2:n1': CSCFormatBase(indptr=tensor([0, 2, 4, 6, 8]),
-                                            indices=tensor([2, 3, 4, 5, 6, 7, 8, 9]),
-                              )},
 )"""
     )
-    assert str(sampled_subgraph_impl) == expected_result, print(expected_result)
+    assert str(sampled_subgraph_impl) == expected_result, print(sampled_subgraph_impl)

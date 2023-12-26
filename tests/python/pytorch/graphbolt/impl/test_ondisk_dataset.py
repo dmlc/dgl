@@ -1145,7 +1145,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             torch.tensor([fanout]),
             output_cscformat=False,
         )
-        assert len(subgraph.node_pairs[0]) <= num_samples
+        assert len(subgraph.sampled_csc[0]) <= num_samples
 
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
