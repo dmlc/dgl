@@ -999,20 +999,24 @@ class FusedCSCSamplingGraph(SamplingGraph):
             self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
         )
 
+    def _apply_to_members(self, fn):
+        """Applies passed fn to all members of `FusedCSCSamplingGraph`."""
+        self.csc_indptr = recursive_apply(self.csc_indptr, fn)
+        self.indices = recursive_apply(self.indices, fn)
+        self.node_type_offset = recursive_apply(self.node_type_offset, fn)
+        self.type_per_edge = recursive_apply(self.type_per_edge, fn)
+        self.node_attributes = recursive_apply(self.node_attributes, fn)
+        self.edge_attributes = recursive_apply(self.edge_attributes, fn)
+
+        return self
+
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `FusedCSCSamplingGraph` to the specified device."""
 
         def _to(x):
             return x.to(device) if hasattr(x, "to") else x
 
-        self.csc_indptr = recursive_apply(self.csc_indptr, _to)
-        self.indices = recursive_apply(self.indices, _to)
-        self.node_type_offset = recursive_apply(self.node_type_offset, _to)
-        self.type_per_edge = recursive_apply(self.type_per_edge, _to)
-        self.node_attributes = recursive_apply(self.node_attributes, _to)
-        self.edge_attributes = recursive_apply(self.edge_attributes, _to)
-
-        return self
+        return self._apply_to_members(_to)
 
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory."""
@@ -1020,12 +1024,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         def _pin(x):
             return x.pinned_memory() if hasattr(x, "pinned_memory") else x
 
-        self.csc_indptr = recursive_apply(self.csc_indptr, _pin)
-        self.indices = recursive_apply(self.indices, _pin)
-        self.node_type_offset = recursive_apply(self.node_type_offset, _pin)
-        self.type_per_edge = recursive_apply(self.type_per_edge, _pin)
-        self.node_attributes = recursive_apply(self.node_attributes, _pin)
-        self.edge_attributes = recursive_apply(self.edge_attributes, _pin)
+        self._apply_to_members(_pin)
 
 
 def fused_csc_sampling_graph(
