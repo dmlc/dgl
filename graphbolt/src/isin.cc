@@ -18,14 +18,8 @@ static constexpr int kSearchGrainSize = 4096;
 namespace graphbolt {
 namespace sampling {
 
-torch::Tensor IsIn(
+torch::Tensor IsInCPU(
     const torch::Tensor& elements, const torch::Tensor& test_elements) {
-  if (utils::is_accessible_from_gpu(elements) &&
-      utils::is_accessible_from_gpu(test_elements)) {
-    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "IsInOperation",
-        { return ops::IsIn(elements, test_elements); });
-  }
   torch::Tensor sorted_test_elements;
   std::tie(sorted_test_elements, std::ignore) = test_elements.sort(
       /*stable=*/false, /*dim=*/0, /*descending=*/false);
@@ -50,6 +44,19 @@ torch::Tensor IsIn(
             });
       }));
   return result;
+}
+
+torch::Tensor IsIn(
+    const torch::Tensor& elements, const torch::Tensor& test_elements) {
+  if (utils::is_accessible_from_gpu(elements) &&
+      utils::is_accessible_from_gpu(test_elements)) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+        c10::DeviceType::CUDA, "IsInOperation",
+        { return ops::IsIn(elements, test_elements); });
+  }
+  else {
+    return IsInCPU(elements, test_elements);
+  }
 }
 }  // namespace sampling
 }  // namespace graphbolt
