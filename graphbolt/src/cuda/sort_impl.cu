@@ -24,7 +24,7 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
   auto sorted_array = torch::empty_like(input);
   auto sorted_idx = torch::empty_like(original_idx);
   auto allocator = cuda::GetAllocator();
-  auto stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = cuda::GetCurrentStream();
   AT_DISPATCH_INDEX_TYPES(
       input.scalar_type(), "SortImpl", ([&] {
         const auto input_keys = input.data_ptr<index_t>();
