@@ -208,14 +208,16 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                     size_t tmp_storage_size = 0;
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
                         nullptr, tmp_storage_size, row_and_random.get(),
-                        row_and_random_sorted.get(), input_edge_id_segments.get(),
+                        row_and_random_sorted.get(),
+                        input_edge_id_segments.get(),
                         sorted_edge_id_segments.get(), num_edges,
                         decomposer_t<indices_t, float>{}, 0, num_bits, stream));
                     auto tmp_storage =
                         allocator.AllocateStorage<char>(tmp_storage_size);
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
-                        tmp_storage.get(), tmp_storage_size, row_and_random.get(),
-                        row_and_random_sorted.get(), input_edge_id_segments.get(),
+                        tmp_storage.get(), tmp_storage_size,
+                        row_and_random.get(), row_and_random_sorted.get(),
+                        input_edge_id_segments.get(),
                         sorted_edge_id_segments.get(), num_edges,
                         decomposer_t<indices_t, float>{}, 0, num_bits, stream));
                   }));
