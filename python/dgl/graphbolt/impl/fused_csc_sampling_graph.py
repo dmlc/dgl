@@ -325,7 +325,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
@@ -555,7 +555,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -745,7 +745,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
