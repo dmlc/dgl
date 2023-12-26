@@ -8,6 +8,7 @@
 #include <c10/cuda/CUDAStream.h>
 #include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
+#include <thrust/gather.h>
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
@@ -112,8 +113,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   TORCH_CHECK(
       fanouts.size() == 1, "Heterogenous sampling is not supported yet!");
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
-  // We assume that indptr, indices, nodes, type_per_edge and probs_or_mask
-  // are all resident on the GPU. If not, it is better to first extract them.
+  // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
+  // are all resident on the GPU. If not, it is better to first extract them
+  // before calling this function.
   const auto num_rows = nodes.size(0);
   const auto fanout =
       fanouts[0] >= 0 ? fanouts[0] : std::numeric_limits<int64_t>::max();
@@ -129,6 +131,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
   torch::Tensor picked_eids;
+  torch::Tensor output_indices;
 
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "SampleNeighborsWithoutReplacementIndptr", ([&] {
@@ -137,7 +140,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         auto sampled_degree = thrust::make_transform_iterator(
             iota, MinInDegreeFanout<indptr_t>{
                       in_degree.data_ptr<indptr_t>(), fanout});
-        {
+
+        {  // Compute output_indptr.
           size_t tmp_storage_size = 0;
           cub::DeviceScan::ExclusiveSum(
               nullptr, tmp_storage_size, sampled_degree,
@@ -147,6 +151,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               tmp_storage.get(), tmp_storage_size, sampled_degree,
               output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
         }
+
         auto num_sampled_edges =
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
         auto sorted_edge_id_segments =
@@ -181,6 +186,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         layer ? indices.data_ptr<indices_t>() : nullptr;
                     const dim3 block(BLOCK_SIZE);
                     const dim3 grid((num_edges + BLOCK_SIZE - 1) / BLOCK_SIZE);
+                    // Compute row and random number pairs.
                     CUDA_KERNEL_CALL(
                         _ComputeRowRandomPairs, grid, block, 0, stream,
                         num_edges, sliced_indptr.data_ptr<indptr_t>(),
@@ -189,9 +195,16 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         random_seed, row_and_prob.get(),
                         input_edge_id_segments.get());
 
+                    // The row and random number pairs are sorted w.r.t. the
+                    // random number and the rows. Since the maximum row is
+                    // num_rows - 1, we can reduce the number of bits used for
+                    // sorting.
                     const int num_bits =
                         sizeof(float) * 8 + cuda::NumberOfBits(num_rows);
 
+                    // Sort the row and random number pairs along with edge ids,
+                    // after sorting the first fanout elements of each row will
+                    // give us the sampled edges.
                     size_t tmp_storage_size = 0;
                     CUDA_CALL(cub::DeviceRadixSort::SortPairs(
                         nullptr, tmp_storage_size, row_and_prob.get(),
@@ -210,7 +223,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
         picked_eids = torch::empty(
             static_cast<indptr_t>(num_sampled_edges),
-            nodes.options().dtype(indices.scalar_type()));
+            nodes.options().dtype(indptr.scalar_type()));
 
         auto input_buffer_it = thrust::make_transform_iterator(
             iota, IteratorFunc<indptr_t, indptr_t>{
@@ -225,6 +238,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         constexpr int64_t max_copy_at_once =
             std::numeric_limits<int32_t>::max();
 
+        // Copy the sampled edge ids into picked_eids tensor.
         for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
           size_t tmp_storage_size = 0;
           CUDA_CALL(cub::DeviceMemcpy::Batched(
@@ -237,9 +251,26 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               output_buffer_it + i, buffer_sizes + i,
               std::min(num_rows - i, max_copy_at_once), stream));
         }
+
+        output_indices = torch::empty(
+            picked_eids.size(0),
+            picked_eids.options().dtype(indices.scalar_type()));
+
+        // Compute: output_indices = indices.gather(0, picked_eids);
+        AT_DISPATCH_INTEGRAL_TYPES(
+            indices.scalar_type(),
+            "SampleNeighborsWithoutReplacementOutputIndices", ([&] {
+              using indices_t = scalar_t;
+              const auto exec_policy =
+                  thrust::cuda::par_nosync(allocator).on(stream);
+              thrust::gather(
+                  exec_policy, picked_eids.data_ptr<indptr_t>(),
+                  picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
+                  indices.data_ptr<indices_t>(),
+                  output_indices.data_ptr<indices_t>());
+            }));
       }));
 
-  auto output_indices = indices.gather(0, picked_eids);
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 
