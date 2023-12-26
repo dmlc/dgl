@@ -58,8 +58,12 @@ class SAGE(LightningModule):
         self.dropout = nn.Dropout(0.5)
         self.n_hidden = n_hidden
         self.n_classes = n_classes
-        self.train_acc = Accuracy(task="multiclass", num_classes=n_classes)
-        self.val_acc = Accuracy(task="multiclass", num_classes=n_classes)
+        self.train_acc = Accuracy(
+            task="multiclass", num_classes=n_classes, top_k=1
+        )
+        self.val_acc = Accuracy(
+            task="multiclass", num_classes=n_classes, top_k=1
+        )
 
     def forward(self, blocks, x):
         h = x
