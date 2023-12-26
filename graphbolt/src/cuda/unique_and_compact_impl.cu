@@ -51,14 +51,26 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         // If the given num_bits argument is not in the reasonable range,
         // we recompute it to speedup the expensive sort operations.
         if (num_bits <= 0 || num_bits > sizeof(scalar_t) * 8) {
-          auto max_id = thrust::reduce(
-              exec_policy, src_ids_ptr, src_ids_ptr + src_ids.size(0),
-              static_cast<scalar_t>(0), thrust::maximum<scalar_t>{});
-          max_id = thrust::reduce(
+          auto max_id_src = torch::empty(
+              1, c10::TensorOptions()
+                     .dtype(src_ids.scalar_type())
+                     .pinned_memory(true));
+          auto max_id_src_ptr = max_id_src.data_ptr<scalar_t>();
+          size_t workspace_size;
+          cub::DeviceReduce::Max(
+              nullptr, workspace_size, src_ids_ptr, max_id_src_ptr,
+              src_ids.size(0));
+          auto temp = allocator.AllocateStorage<char>(workspace_size);
+          cub::DeviceReduce::Max(
+              temp.get(), workspace_size, src_ids_ptr, max_id_src_ptr,
+              src_ids.size(0));
+          auto max_id_dst = thrust::reduce(
               exec_policy, unique_dst_ids_ptr,
-              unique_dst_ids_ptr + unique_dst_ids.size(0), max_id,
-              thrust::maximum<scalar_t>{});
-          num_bits = cuda::NumberOfBits(max_id + 1);
+              unique_dst_ids_ptr + unique_dst_ids.size(0),
+              static_cast<scalar_t>(0), thrust::maximum<scalar_t>{});
+          // thrust::reduce syncs, so we can also safely access max_id_src_ptr
+          num_bits =
+              cuda::NumberOfBits(std::max(max_id_src_ptr[0], max_id_dst) + 1);
         }
 
         // Sort the unique_dst_ids tensor.
