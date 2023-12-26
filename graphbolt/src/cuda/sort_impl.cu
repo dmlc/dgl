@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file cuda/sort.cu
+ * @file cuda/sort_impl.cu
  * @brief Sort implementation on CUDA.
  */
 #include <c10/core/ScalarType.h>
