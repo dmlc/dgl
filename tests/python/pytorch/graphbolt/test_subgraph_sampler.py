@@ -299,7 +299,9 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
             assert torch.equal(
                 sampled_subgraph.sampled_csc.indices, compacted_indices[step]
             )
-            assert torch.equal(sampled_subgraph.sampled_csc.indptr, indptr[step])
+            assert torch.equal(
+                sampled_subgraph.sampled_csc.indptr, indptr[step]
+            )
             assert torch.equal(
                 sampled_subgraph.original_column_node_ids, seeds[step]
             )
@@ -425,7 +427,9 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
             assert torch.equal(
                 sampled_subgraph.sampled_csc.indices, compacted_indices[step]
             )
-            assert torch.equal(sampled_subgraph.sampled_csc.indptr, indptr[step])
+            assert torch.equal(
+                sampled_subgraph.sampled_csc.indptr, indptr[step]
+            )
             assert torch.equal(
                 sampled_subgraph.original_column_node_ids, seeds[step]
             )

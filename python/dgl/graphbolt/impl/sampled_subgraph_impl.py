@@ -18,13 +18,13 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
 
     Examples
     --------
-    >>> sampled_csc = {"A:relation:B"): (torch.tensor([0, 1, 2]),
+    >>> node_pairs = {"A:relation:B"): (torch.tensor([0, 1, 2]),
     ... torch.tensor([0, 1, 2]))}
     >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
     >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
     >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     >>> subgraph = gb.FusedSampledSubgraphImpl(
-    ... sampled_csc=sampled_csc,
+    ... sampled_csc=node_pairs,
     ... original_column_node_ids=original_column_node_ids,
     ... original_row_node_ids=original_row_node_ids,
     ... original_edge_ids=original_edge_ids
@@ -63,7 +63,8 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
                 ), "Nodes in pairs should be of type torch.Tensor."
         else:
             assert (
-                isinstance(self.sampled_csc, tuple) and len(self.sampled_csc) == 2
+                isinstance(self.sampled_csc, tuple)
+                and len(self.sampled_csc) == 2
             ), "Node pair should be a source-destination tuple (u, v)."
             assert all(
                 isinstance(item, torch.Tensor) for item in self.sampled_csc
@@ -100,10 +101,7 @@ class SampledSubgraphImpl(SampledSubgraph):
     >>> print(subgraph.original_edge_ids)
     {"A:relation:B": tensor([19, 20, 21])}
     """
-    sampled_csc: Union[
-        CSCFormatBase,
-        Dict[str, CSCFormatBase],
-    ] = None
+    sampled_csc: Union[CSCFormatBase, Dict[str, CSCFormatBase]] = None
     original_column_node_ids: Union[
         Dict[str, torch.Tensor], torch.Tensor
     ] = None

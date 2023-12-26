@@ -2394,11 +2394,13 @@ def test_sample_neighbors_replace_csc_format(
 
     # Verify in subgraph.
     assert (
-        subgraph.sampled_csc["n1:e1:n2"].indices.numel() == expected_sampled_num1
+        subgraph.sampled_csc["n1:e1:n2"].indices.numel()
+        == expected_sampled_num1
     )
     assert subgraph.sampled_csc["n1:e1:n2"].indptr.size(0) == 2
     assert (
-        subgraph.sampled_csc["n2:e2:n1"].indices.numel() == expected_sampled_num2
+        subgraph.sampled_csc["n2:e2:n1"].indices.numel()
+        == expected_sampled_num2
     )
     assert subgraph.sampled_csc["n2:e2:n1"].indptr.size(0) == 2
 

@@ -502,4 +502,6 @@ def test_sampled_subgraph_impl_representation_hetero():
                    original_column_node_ids={'n1': tensor([1, 0, 0, 1]), 'n2': tensor([1, 2])},
 )"""
     )
-    assert str(sampled_subgraph_impl) == expected_result, print(sampled_subgraph_impl)
+    assert str(sampled_subgraph_impl) == expected_result, print(
+        sampled_subgraph_impl
+    )

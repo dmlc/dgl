@@ -169,10 +169,6 @@ class NeighborSampler(SubgraphSampler):
                     original_row_node_ids,
                     compacted_csc_format,
                 ) = compact_csc_format(subgraph.sampled_csc, seeds)
-                # [TODO] For node_pairs is defined in SampledSubgraph, which is
-                # SampledSubgraph's parent class, and it's still inherited by
-                # other classes, the name cannot be changed currently. This
-                # part will be cleaned up later.
                 subgraph = SampledSubgraphImpl(
                     sampled_csc=compacted_csc_format,
                     original_column_node_ids=seeds,
