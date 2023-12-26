@@ -49,6 +49,9 @@ if(USE_CUDA)
     ${BOLT_DIR}/cuda/*.cu
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
+  if(DEFINED ENV{CUDAARCHS})
+    set(CMAKE_CUDA_ARCHITECTURES $ENV{CUDAARCHS})
+  endif()
 endif()
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
@@ -67,6 +70,9 @@ if(USE_CUDA)
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
                              "../third_party/cccl/libcudacxx/include")
+  
+  get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
+  message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")
 endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when
