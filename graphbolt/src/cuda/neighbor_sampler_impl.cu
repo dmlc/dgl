@@ -127,7 +127,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto allocator = cuda::GetAllocator();
   const auto stream = cuda::GetCurrentStream();
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
-        static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
+      static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
   torch::Tensor picked_eids;
 
   AT_DISPATCH_INTEGRAL_TYPES(
