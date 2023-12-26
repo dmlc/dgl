@@ -13,7 +13,7 @@ namespace graphbolt {
 namespace ops {
 
 /**
- * @brief Sorts the given input and also returns the original indexes.
+ * @brief Sorts the given input and optionally returns the original indexes.
  *
  * @param input         A pointer to storage containing IDs.
  * @param num_items     Size of the input storage.
@@ -33,7 +33,7 @@ std::conditional_t<
 Sort(const scalar_t* input, int64_t num_items, int num_bits);
 
 /**
- * @brief Sorts the given input and also returns the original indexes.
+ * @brief Sorts the given input and optionally returns the original indexes.
  *
  * @param input         A tensor containing IDs.
  * @param num_bits      An integer such that all elements of input tensor are
