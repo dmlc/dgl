@@ -47,9 +47,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         auto src_ids_ptr = src_ids.data_ptr<scalar_t>();
         auto dst_ids_ptr = dst_ids.data_ptr<scalar_t>();
         auto unique_dst_ids_ptr = unique_dst_ids.data_ptr<scalar_t>();
+
+        // If the given num_bits argument is not in the reasonable range,
+        // we recompute it to speedup the expensive sort operations.
         if (num_bits <= 0 || num_bits > sizeof(scalar_t) * 8) {
-          // If the given num_bits argument is not in the reasonable range,
-          // we recompute it to speedup the expensive sort operations.
           auto max_id = thrust::reduce(
               exec_policy, src_ids_ptr, src_ids_ptr + src_ids.size(0),
               static_cast<scalar_t>(0), thrust::maximum<scalar_t>{});
@@ -60,7 +61,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
           num_bits = cuda::NumberOfBits(max_id + 1);
         }
 
-        // This section sorts the unique_dst_ids tensor.
+        // Sort the unique_dst_ids tensor.
         auto sorted_unique_dst_ids =
             allocator.AllocateStorage<scalar_t>(unique_dst_ids.size(0));
         {
@@ -76,14 +77,14 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
               stream));
         }
 
-        // We mark dst nodes in the src_ids tensor.
+        // Mark dst nodes in the src_ids tensor.
         auto is_dst = allocator.AllocateStorage<bool>(src_ids.size(0));
         thrust::binary_search(
             exec_policy, sorted_unique_dst_ids.get(),
             sorted_unique_dst_ids.get() + unique_dst_ids.size(0), src_ids_ptr,
             src_ids_ptr + src_ids.size(0), is_dst.get());
 
-        // We filter the non-dst nodes in the src_ids tensor, hence only_src.
+        // Filter the non-dst nodes in the src_ids tensor, hence only_src.
         auto only_src = allocator.AllocateStorage<scalar_t>(src_ids.size(0));
         auto only_src_size =
             thrust::remove_copy_if(
@@ -93,8 +94,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         auto sorted_only_src =
             allocator.AllocateStorage<scalar_t>(only_src_size);
 
-        {  // Here, we sort the only_src tensor so that we can unique it with
-           // Encode operation later.
+        {  // Sort the only_src tensor so that we can unique it with Encode
+           // operation later.
           size_t workspace_size;
           CUDA_CALL(cub::DeviceRadixSort::SortKeys(
               nullptr, workspace_size, only_src.get(), sorted_only_src.get(),
@@ -109,7 +110,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         auto unique_only_src_ptr = unique_only_src.data_ptr<scalar_t>();
         auto unique_only_src_cnt = allocator.AllocateStorage<scalar_t>(1);
 
-        {  // Here, we compute the unique operation on the only_src tensor.
+        {  // Compute the unique operation on the only_src tensor.
           size_t workspace_size;
           CUDA_CALL(cub::DeviceRunLengthEncode::Encode(
               nullptr, workspace_size, sorted_only_src.get(),
@@ -126,7 +127,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         unique_only_src = unique_only_src.slice(
             0, 0, static_cast<scalar_t>(unique_only_src_size));
         auto real_order = torch::cat({unique_dst_ids, unique_only_src});
-        // Sort here so that we can lookup new_ids via binary search.
+        // Sort here so that binary search can be used to lookup new_ids.
         auto [sorted_order, new_ids] = Sort(real_order, num_bits);
         auto sorted_order_ptr = sorted_order.data_ptr<scalar_t>();
         auto new_ids_ptr = new_ids.data_ptr<int64_t>();
@@ -145,7 +146,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
             exec_policy, sorted_order_ptr,
             sorted_order_ptr + sorted_order.size(0), dst_ids_ptr,
             dst_ids_ptr + dst_ids.size(0), new_dst_ids_loc.get());
-        {  // Checks if unique_dst_ids includes all dst_ids
+        {  // Check if unique_dst_ids includes all dst_ids.
           thrust::counting_iterator<int64_t> iota(0);
           auto equal_it = thrust::make_transform_iterator(
               iota, EqualityFunc<scalar_t>{
@@ -158,8 +159,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
           }
         }
 
-        // Finally, we lookup the new compact ids of the src and dst tensors
-        // via gather operations.
+        // Finally, lookup the new compact ids of the src and dst tensors via
+        // gather operations.
         auto new_src_ids = torch::empty_like(src_ids);
         auto new_dst_ids = torch::empty_like(dst_ids);
         thrust::gather(
