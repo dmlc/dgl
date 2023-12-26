@@ -1000,7 +1000,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         )
 
     def _apply_to_members(self, fn):
-        """Applies passed fn to all members of `FusedCSCSamplingGraph`."""
+        """Apply passed fn to all members of `FusedCSCSamplingGraph`."""
         self.csc_indptr = recursive_apply(self.csc_indptr, fn)
         self.indices = recursive_apply(self.indices, fn)
         self.node_type_offset = recursive_apply(self.node_type_offset, fn)
