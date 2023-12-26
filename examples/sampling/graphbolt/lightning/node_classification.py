@@ -153,8 +153,8 @@ class DataModule(LightningDataModule):
         datapipe = gb.ItemSampler(
             node_set,
             batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=True,
+            shuffle=is_train,
+            drop_last=is_train,
         )
         if self.num_gpus > 0:
             datapipe = datapipe.copy_to("cuda")
