@@ -26,6 +26,11 @@ namespace ops {
 
 constexpr int BLOCK_SIZE = 128;
 
+/**
+ * @brief Fills the output array with row, probability pairs and the edge_ids
+ * array with original edge ids. When the output array is sorted along with
+ * edge_ids, the first fanout elements of each row gives us the sampled edges.
+ */
 template <
     typename float_t, typename indptr_t, typename indices_t, typename weights_t>
 __global__ void _ComputeRowRandomPairs(
@@ -103,8 +108,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
     bool return_eids, torch::optional<torch::Tensor> type_per_edge,
-    torch::optional<torch::Tensor> probs_or_mask,
-    torch::optional<int64_t> random_seed) {
+    torch::optional<torch::Tensor> probs_or_mask) {
   TORCH_CHECK(
       fanouts.size() == 1, "Heterogenous sampling is not supported yet!");
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
@@ -122,10 +126,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   const auto num_edges = coo_rows.size(0);
   auto allocator = cuda::GetAllocator();
   const auto stream = cuda::GetCurrentStream();
-  if (!random_seed.has_value()) {
-    random_seed = RandomEngine::ThreadLocal()->RandInt(
+  const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
-  }
   torch::Tensor picked_eids;
 
   AT_DISPATCH_INTEGRAL_TYPES(
@@ -184,7 +186,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         num_edges, sliced_indptr.data_ptr<indptr_t>(),
                         sub_indptr.data_ptr<indptr_t>(),
                         coo_rows.data_ptr<indices_t>(), probs_ptr, indices_ptr,
-                        random_seed.value(), row_and_prob.get(),
+                        random_seed, row_and_prob.get(),
                         input_edge_id_segments.get());
 
                     const int num_bits =
