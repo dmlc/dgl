@@ -70,5 +70,9 @@ Sort(torch::Tensor input, int num_bits) {
                                     }));
 }
 
+template torch::Tensor Sort<false>(torch::Tensor input, int num_bits);
+template std::pair<torch::Tensor, torch::Tensor> Sort<true>(
+    torch::Tensor input, int num_bits);
+
 }  //  namespace ops
 }  //  namespace graphbolt
