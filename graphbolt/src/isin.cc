@@ -53,8 +53,7 @@ torch::Tensor IsIn(
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "IsInOperation",
         { return ops::IsIn(elements, test_elements); });
-  }
-  else {
+  } else {
     return IsInCPU(elements, test_elements);
   }
 }
