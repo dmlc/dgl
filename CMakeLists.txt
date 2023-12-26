@@ -75,7 +75,7 @@ dgl_feature_option(
 dgl_feature_option(
     BUILD_GRAPHBOLT
     "Build Graphbolt library"
-    "dev" "dogfood"
+    "all"
 )
 
 dgl_feature_option(
