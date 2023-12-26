@@ -95,6 +95,7 @@ def to_link_batch(data):
     return block
 
 
+@unittest.skipIf(F._default_context_str != "cpu", "IsIn CUDA required.")
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
@@ -110,6 +111,7 @@ def test_SubgraphSampler_Link(labor):
     assert len(list(datapipe)) == 5
 
 
+@unittest.skipIf(F._default_context_str != "cpu", "IsIn CUDA required.")
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_With_Negative(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
