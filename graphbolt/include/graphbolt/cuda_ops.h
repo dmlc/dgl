@@ -15,6 +15,26 @@ namespace ops {
 /**
  * @brief Sorts the given input and also returns the original indexes.
  *
+ * @param input         A pointer to storage containing IDs.
+ * @param num_items     Size of the input storage.
+ * @param num_bits      An integer such that all elements of input tensor are
+ *                      are less than (1 << num_bits).
+ *
+ * @return
+ * - A tuple of tensors if return_original_positions is true, where the first
+ * one includes sorted input, the second contains original positions of the
+ * sorted result. If return_original_positions is false, then returns only the
+ * sorted input.
+ */
+template <bool return_original_positions, typename scalar_t>
+std::conditional_t<
+    return_original_positions, std::pair<torch::Tensor, torch::Tensor>,
+    torch::Tensor>
+Sort(const scalar_t* input, int64_t num_items, int num_bits);
+
+/**
+ * @brief Sorts the given input and also returns the original indexes.
+ *
  * @param input         A tensor containing IDs.
  * @param num_bits      An integer such that all elements of input tensor are
  *                      are less than (1 << num_bits).

@@ -62,7 +62,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         }
 
         // Sort the unique_dst_ids tensor.
-        auto sorted_unique_dst_ids = Sort<false>(unique_dst_ids, num_bits);
+        auto sorted_unique_dst_ids = Sort<false>(
+            unique_dst_ids.data_ptr<scalar_t>(), unique_dst_ids.size(0),
+            num_bits);
 
         // Mark dst nodes in the src_ids tensor.
         auto is_dst = allocator.AllocateStorage<bool>(src_ids.size(0));
@@ -82,7 +84,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
             only_src.data_ptr<scalar_t>();
         // Sort the only_src tensor so that we can unique it with Encode
         // operation later.
-        auto sorted_only_src = Sort<false>(only_src, num_bits);
+        auto sorted_only_src = Sort<false>(
+            only_src.data_ptr<scalar_t>(), only_src.size(0), num_bits);
 
         auto unique_only_src = torch::empty(only_src_size, src_ids.options());
         auto unique_only_src_ptr = unique_only_src.data_ptr<scalar_t>();
