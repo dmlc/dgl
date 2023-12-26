@@ -18,6 +18,7 @@
 
 #include "./random.h"
 #include "./shared_memory_helper.h"
+#include "./utils.h"
 
 namespace {
 torch::optional<torch::Dict<std::string, torch::Tensor>> TensorizeDict(
@@ -325,10 +326,11 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
  *
- * @return A lambda function (int64_t offset, int64_t num_neighbors) ->
- * torch::Tensor, which takes offset (the starting edge ID of the given node)
- * and num_neighbors (number of neighbors) as params and returns the pick number
- * of the given node.
+ * @return A lambda function (int64_t seed_offset, int64_t offset, int64_t
+ * num_neighbors) -> torch::Tensor, which takes seed offset (the offset of the
+ * seed to sample), offset (the starting edge ID of the given node) and
+ * num_neighbors (number of neighbors) as params and returns the pick number of
+ * the given node.
  */
 auto GetNumPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
@@ -337,13 +339,38 @@ auto GetNumPickFn(
   // If fanouts.size() > 1, returns the total number of all edge types of the
   // given node.
   return [&fanouts, replace, &probs_or_mask, &type_per_edge](
-             int64_t offset, int64_t num_neighbors) {
+             int64_t seed_offset, int64_t offset, int64_t num_neighbors) {
     if (fanouts.size() > 1) {
       return NumPickByEtype(
           fanouts, replace, type_per_edge.value(), probs_or_mask, offset,
           num_neighbors);
     } else {
       return NumPick(fanouts[0], replace, probs_or_mask, offset, num_neighbors);
+    }
+  };
+}
+
+auto GetTemporalNumPickFn(
+    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    const torch::optional<torch::Tensor>& node_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp) {
+  // If fanouts.size() > 1, returns the total number of all edge types of the
+  // given node.
+  return [&seed_timestamp, &csc_indices, &fanouts, replace, &probs_or_mask,
+          &type_per_edge, &node_timestamp, &edge_timestamp](
+             int64_t seed_offset, int64_t offset, int64_t num_neighbors) {
+    if (fanouts.size() > 1) {
+      return TemporalNumPickByEtype(
+          seed_timestamp, csc_indices, fanouts, replace, type_per_edge.value(),
+          probs_or_mask, node_timestamp, edge_timestamp, seed_offset, offset,
+          num_neighbors);
+    } else {
+      return TemporalNumPick(
+          seed_timestamp, csc_indices, fanouts[0], replace, probs_or_mask,
+          node_timestamp, edge_timestamp, seed_offset, offset, num_neighbors);
     }
   };
 }
@@ -365,11 +392,11 @@ auto GetNumPickFn(
  * equal to the number of edges in the graph.
  * @param args Contains sampling algorithm specific arguments.
  *
- * @return A lambda function: (int64_t offset, int64_t num_neighbors,
- * PickedType* picked_data_ptr) -> torch::Tensor, which takes offset (the
- * starting edge ID of the given node) and num_neighbors (number of neighbors)
- * as params and puts the picked neighbors at the address specified by
- * picked_data_ptr.
+ * @return A lambda function: (int64_t seed_offset, int64_t offset, int64_t
+ * num_neighbors, PickedType* picked_data_ptr) -> torch::Tensor, which takes
+ * seed_offset (the offset of the seed to sample), offset (the starting edge ID
+ * of the given node) and num_neighbors (number of neighbors) as params and puts
+ * the picked neighbors at the address specified by picked_data_ptr.
  */
 template <SamplerType S>
 auto GetPickFn(
@@ -378,7 +405,8 @@ auto GetPickFn(
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
   return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
-             int64_t offset, int64_t num_neighbors, auto picked_data_ptr) {
+             int64_t seed_offset, int64_t offset, int64_t num_neighbors,
+             auto picked_data_ptr) {
     // If fanouts.size() > 1, perform sampling for each edge type of each
     // node; otherwise just sample once for each node with no regard of edge
     // types.
@@ -390,6 +418,39 @@ auto GetPickFn(
       int64_t num_sampled = Pick(
           offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
           args, picked_data_ptr);
+      if (type_per_edge) {
+        std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
+      }
+      return num_sampled;
+    }
+  };
+}
+
+auto GetTemporalPickFn(
+    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    const torch::optional<torch::Tensor>& node_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp) {
+  return [&seed_timestamp, &csc_indices, &fanouts, replace, &options,
+          &type_per_edge, &probs_or_mask, &node_timestamp, &edge_timestamp](
+             int64_t seed_offset, int64_t offset, int64_t num_neighbors,
+             auto picked_data_ptr) {
+    // If fanouts.size() > 1, perform sampling for each edge type of each
+    // node; otherwise just sample once for each node with no regard of edge
+    // types.
+    if (fanouts.size() > 1) {
+      return TemporalPickByEtype(
+          seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
+          fanouts, replace, options, type_per_edge.value(), probs_or_mask,
+          node_timestamp, edge_timestamp, picked_data_ptr);
+    } else {
+      int64_t num_sampled = TemporalPick(
+          seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
+          fanouts[0], replace, options, probs_or_mask, node_timestamp,
+          edge_timestamp, picked_data_ptr);
       if (type_per_edge) {
         std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
       }
@@ -444,7 +505,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                       num_picked_neighbors_data_ptr[i + 1] =
                           num_neighbors == 0
                               ? 0
-                              : num_pick_fn(offset, num_neighbors);
+                              : num_pick_fn(i, offset, num_neighbors);
                     }
                   });
 
@@ -479,7 +540,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                       const auto picked_offset = subgraph_indptr_data_ptr[i];
                       if (picked_number > 0) {
                         auto actual_picked_count = pick_fn(
-                            offset, num_neighbors,
+                            i, offset, num_neighbors,
                             picked_eids_data_ptr + picked_offset);
                         TORCH_CHECK(
                             actual_picked_count == picked_number,
@@ -537,9 +598,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
-  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
-  if (probs_name.has_value() && !probs_name.value().empty()) {
-    probs_or_mask = edge_attributes_.value().at(probs_name.value());
+  auto probs_or_mask = this->EdgeAttribute(probs_name);
+  if (probs_name.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
     // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
     // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
@@ -568,6 +628,41 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
             args));
   }
+}
+
+c10::intrusive_ptr<FusedSampledSubgraph>
+FusedCSCSamplingGraph::TemporalSampleNeighbors(
+    const torch::Tensor& input_nodes,
+    const torch::Tensor& input_nodes_timestamp,
+    const std::vector<int64_t>& fanouts, bool replace, bool return_eids,
+    torch::optional<std::string> probs_name,
+    torch::optional<std::string> node_timestamp_attr_name,
+    torch::optional<std::string> edge_timestamp_attr_name) const {
+  // 1. Get probs_or_mask.
+  auto probs_or_mask = this->EdgeAttribute(probs_name);
+  if (probs_name.has_value()) {
+    // Note probs will be passed as input for 'torch.multinomial' in deeper
+    // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
+    // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
+    if (probs_or_mask.value().dtype() == torch::kBool ||
+        probs_or_mask.value().dtype() == torch::kFloat16) {
+      probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
+    }
+  }
+  // 2. Get the timestamp attribute for nodes of the graph
+  auto node_timestamp = this->NodeAttribute(node_timestamp_attr_name);
+  // 3. Get the timestamp attribute for edges of the graph
+  auto edge_timestamp = this->EdgeAttribute(edge_timestamp_attr_name);
+  // 4. Call SampleNeighborsImpl
+  return SampleNeighborsImpl(
+      input_nodes, return_eids,
+      GetTemporalNumPickFn(
+          input_nodes_timestamp, this->indices_, fanouts, replace,
+          type_per_edge_, probs_or_mask, node_timestamp, edge_timestamp),
+      GetTemporalPickFn(
+          input_nodes_timestamp, this->indices_, fanouts, replace,
+          indptr_.options(), type_per_edge_, probs_or_mask, node_timestamp,
+          edge_timestamp));
 }
 
 std::tuple<torch::Tensor, torch::Tensor>
@@ -650,6 +745,43 @@ int64_t NumPick(
   return replace ? fanout : std::min(fanout, num_valid_neighbors);
 }
 
+torch::Tensor TemporalMask(
+    int64_t seed_timestamp, torch::Tensor csc_indices,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    const torch::optional<torch::Tensor>& node_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp,
+    std::pair<int64_t, int64_t> edge_range) {
+  auto [l, r] = edge_range;
+  torch::Tensor mask = torch::ones({r - l}, torch::kBool);
+  if (node_timestamp.has_value()) {
+    auto neighbor_timestamp =
+        node_timestamp.value().index_select(0, csc_indices.slice(0, l, r));
+    mask &= neighbor_timestamp <= seed_timestamp;
+  }
+  if (edge_timestamp.has_value()) {
+    mask &= edge_timestamp.value().slice(0, l, r) <= seed_timestamp;
+  }
+  if (probs_or_mask.has_value()) {
+    mask &= probs_or_mask.value().slice(0, l, r) != 0;
+  }
+  return mask;
+}
+
+int64_t TemporalNumPick(
+    torch::Tensor seed_timestamp, torch::Tensor csc_indics, int64_t fanout,
+    bool replace, const torch::optional<torch::Tensor>& probs_or_mask,
+    const torch::optional<torch::Tensor>& node_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
+    int64_t offset, int64_t num_neighbors) {
+  auto mask = TemporalMask(
+      utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset), csc_indics,
+      probs_or_mask, node_timestamp, edge_timestamp,
+      {offset, offset + num_neighbors});
+  int64_t num_valid_neighbors = utils::GetValueByIndex<int64_t>(mask.sum(), 0);
+  if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
+  return replace ? fanout : std::min(fanout, num_valid_neighbors);
+}
+
 int64_t NumPickByEtype(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
@@ -674,6 +806,40 @@ int64_t NumPickByEtype(
           total_count += NumPick(
               fanouts[etype], replace, probs_or_mask, etype_begin,
               etype_end - etype_begin);
+          etype_begin = etype_end;
+        }
+      }));
+  return total_count;
+}
+
+int64_t TemporalNumPickByEtype(
+    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::Tensor& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    const torch::optional<torch::Tensor>& node_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
+    int64_t offset, int64_t num_neighbors) {
+  int64_t etype_begin = offset;
+  const int64_t end = offset + num_neighbors;
+  int64_t total_count = 0;
+  AT_DISPATCH_INTEGRAL_TYPES(
+      type_per_edge.scalar_type(), "TemporalNumPickFnByEtype", ([&] {
+        const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
+        while (etype_begin < end) {
+          scalar_t etype = type_per_edge_data[etype_begin];
+          TORCH_CHECK(
+              etype >= 0 && etype < (int64_t)fanouts.size(),
+              "Etype values exceed the number of fanouts.");
+          auto etype_end_it = std::upper_bound(
+              type_per_edge_data + etype_begin, type_per_edge_data + end,
+              etype);
+          int64_t etype_end = etype_end_it - type_per_edge_data;
+          // Do sampling for one etype.
+          total_count += TemporalNumPick(
+              seed_timestamp, csc_indices, fanouts[etype], replace,
+              probs_or_mask, node_timestamp, edge_timestamp, seed_offset,
+              etype_begin, etype_end - etype_begin);
           etype_begin = etype_end;
         }
       }));
@@ -799,6 +965,103 @@ inline int64_t UniformPick(
   }
 }
 
+/** @brief An operator to perform non-uniform sampling. */
+static torch::Tensor NonUniformPickOp(
+    torch::Tensor probs, int64_t fanout, bool replace) {
+  auto positive_probs_indices = probs.nonzero().squeeze(1);
+  auto num_positive_probs = positive_probs_indices.size(0);
+  if (num_positive_probs == 0) return torch::empty({0}, torch::kLong);
+  if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
+    return positive_probs_indices;
+  }
+  if (!replace) fanout = std::min(fanout, num_positive_probs);
+  if (fanout == 0) return torch::empty({0}, torch::kLong);
+  auto ret_tensor = torch::empty({fanout}, torch::kLong);
+  auto ret_ptr = ret_tensor.data_ptr<int64_t>();
+  AT_DISPATCH_FLOATING_TYPES(
+      probs.scalar_type(), "MultinomialSampling", ([&] {
+        auto probs_data_ptr = probs.data_ptr<scalar_t>();
+        auto positive_probs_indices_ptr =
+            positive_probs_indices.data_ptr<int64_t>();
+
+        if (!replace) {
+          // The algorithm is from gumbel softmax.
+          // s = argmax( logp - log(-log(eps)) ) where eps ~ U(0, 1).
+          // Here we can apply exp to the formula which will not affect result
+          // of argmax or topk. Then we have
+          // s = argmax( p / (-log(eps)) ) where eps ~ U(0, 1).
+          // We can also simplify the formula above by
+          // s = argmax( p / q ) where q ~ Exp(1).
+          if (fanout == 1) {
+            // Return argmax(p / q).
+            scalar_t max_prob = 0;
+            int64_t max_prob_index = -1;
+            // We only care about the neighbors with non-zero probability.
+            for (auto i = 0; i < num_positive_probs; ++i) {
+              // Calculate (p / q) for the current neighbor.
+              scalar_t current_prob =
+                  probs_data_ptr[positive_probs_indices_ptr[i]] /
+                  RandomEngine::ThreadLocal()->Exponential(1.);
+              if (current_prob > max_prob) {
+                max_prob = current_prob;
+                max_prob_index = positive_probs_indices_ptr[i];
+              }
+            }
+            ret_ptr[0] = max_prob_index;
+          } else {
+            // Return topk(p / q).
+            std::vector<std::pair<scalar_t, int64_t>> q(num_positive_probs);
+            for (auto i = 0; i < num_positive_probs; ++i) {
+              q[i].first = probs_data_ptr[positive_probs_indices_ptr[i]] /
+                           RandomEngine::ThreadLocal()->Exponential(1.);
+              q[i].second = positive_probs_indices_ptr[i];
+            }
+            if (fanout < num_positive_probs / 64) {
+              // Use partial_sort.
+              std::partial_sort(
+                  q.begin(), q.begin() + fanout, q.end(), std::greater{});
+              for (auto i = 0; i < fanout; ++i) {
+                ret_ptr[i] = q[i].second;
+              }
+            } else {
+              // Use nth_element.
+              std::nth_element(
+                  q.begin(), q.begin() + fanout - 1, q.end(), std::greater{});
+              for (auto i = 0; i < fanout; ++i) {
+                ret_ptr[i] = q[i].second;
+              }
+            }
+          }
+        } else {
+          // Calculate cumulative sum of probabilities.
+          std::vector<scalar_t> prefix_sum_probs(num_positive_probs);
+          scalar_t sum_probs = 0;
+          for (auto i = 0; i < num_positive_probs; ++i) {
+            sum_probs += probs_data_ptr[positive_probs_indices_ptr[i]];
+            prefix_sum_probs[i] = sum_probs;
+          }
+          // Normalize.
+          if ((sum_probs > 1.00001) || (sum_probs < 0.99999)) {
+            for (auto i = 0; i < num_positive_probs; ++i) {
+              prefix_sum_probs[i] /= sum_probs;
+            }
+          }
+          for (auto i = 0; i < fanout; ++i) {
+            // Sample a probability mass from a uniform distribution.
+            double uniform_sample =
+                RandomEngine::ThreadLocal()->Uniform(0., 1.);
+            // Use a binary search to find the index.
+            int sampled_index = std::lower_bound(
+                                    prefix_sum_probs.begin(),
+                                    prefix_sum_probs.end(), uniform_sample) -
+                                prefix_sum_probs.begin();
+            ret_ptr[i] = positive_probs_indices_ptr[sampled_index];
+          }
+        }
+      }));
+  return ret_tensor;
+}
+
 /**
  * @brief Perform non-uniform sampling of elements based on probabilities and
  * return the sampled indices.
@@ -842,104 +1105,13 @@ inline int64_t NonUniformPick(
     PickedType* picked_data_ptr) {
   auto local_probs =
       probs_or_mask.value().slice(0, offset, offset + num_neighbors);
-  auto positive_probs_indices = local_probs.nonzero().squeeze(1);
-  auto num_positive_probs = positive_probs_indices.size(0);
-  if (num_positive_probs == 0) return 0;
-  if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
-    std::memcpy(
-        picked_data_ptr,
-        (positive_probs_indices + offset).data_ptr<PickedType>(),
-        num_positive_probs * sizeof(PickedType));
-    return num_positive_probs;
-  } else {
-    if (!replace) fanout = std::min(fanout, num_positive_probs);
-    if (fanout == 0) return 0;
-    AT_DISPATCH_FLOATING_TYPES(
-        local_probs.scalar_type(), "MultinomialSampling", ([&] {
-          auto local_probs_data_ptr = local_probs.data_ptr<scalar_t>();
-          auto positive_probs_indices_ptr =
-              positive_probs_indices.data_ptr<PickedType>();
-
-          if (!replace) {
-            // The algorithm is from gumbel softmax.
-            // s = argmax( logp - log(-log(eps)) ) where eps ~ U(0, 1).
-            // Here we can apply exp to the formula which will not affect result
-            // of argmax or topk. Then we have
-            // s = argmax( p / (-log(eps)) ) where eps ~ U(0, 1).
-            // We can also simplify the formula above by
-            // s = argmax( p / q ) where q ~ Exp(1).
-            if (fanout == 1) {
-              // Return argmax(p / q).
-              scalar_t max_prob = 0;
-              PickedType max_prob_index = -1;
-              // We only care about the neighbors with non-zero probability.
-              for (auto i = 0; i < num_positive_probs; ++i) {
-                // Calculate (p / q) for the current neighbor.
-                scalar_t current_prob =
-                    local_probs_data_ptr[positive_probs_indices_ptr[i]] /
-                    RandomEngine::ThreadLocal()->Exponential(1.);
-                if (current_prob > max_prob) {
-                  max_prob = current_prob;
-                  max_prob_index = positive_probs_indices_ptr[i];
-                }
-              }
-              *picked_data_ptr = max_prob_index + offset;
-            } else {
-              // Return topk(p / q).
-              std::vector<std::pair<scalar_t, PickedType>> q(
-                  num_positive_probs);
-              for (auto i = 0; i < num_positive_probs; ++i) {
-                q[i].first =
-                    local_probs_data_ptr[positive_probs_indices_ptr[i]] /
-                    RandomEngine::ThreadLocal()->Exponential(1.);
-                q[i].second = positive_probs_indices_ptr[i];
-              }
-              if (fanout < num_positive_probs / 64) {
-                // Use partial_sort.
-                std::partial_sort(
-                    q.begin(), q.begin() + fanout, q.end(), std::greater{});
-                for (auto i = 0; i < fanout; ++i) {
-                  picked_data_ptr[i] = q[i].second + offset;
-                }
-              } else {
-                // Use nth_element.
-                std::nth_element(
-                    q.begin(), q.begin() + fanout - 1, q.end(), std::greater{});
-                for (auto i = 0; i < fanout; ++i) {
-                  picked_data_ptr[i] = q[i].second + offset;
-                }
-              }
-            }
-          } else {
-            // Calculate cumulative sum of probabilities.
-            std::vector<scalar_t> prefix_sum_probs(num_positive_probs);
-            scalar_t sum_probs = 0;
-            for (auto i = 0; i < num_positive_probs; ++i) {
-              sum_probs += local_probs_data_ptr[positive_probs_indices_ptr[i]];
-              prefix_sum_probs[i] = sum_probs;
-            }
-            // Normalize.
-            if ((sum_probs > 1.00001) || (sum_probs < 0.99999)) {
-              for (auto i = 0; i < num_positive_probs; ++i) {
-                prefix_sum_probs[i] /= sum_probs;
-              }
-            }
-            for (auto i = 0; i < fanout; ++i) {
-              // Sample a probability mass from a uniform distribution.
-              double uniform_sample =
-                  RandomEngine::ThreadLocal()->Uniform(0., 1.);
-              // Use a binary search to find the index.
-              int sampled_index = std::lower_bound(
-                                      prefix_sum_probs.begin(),
-                                      prefix_sum_probs.end(), uniform_sample) -
-                                  prefix_sum_probs.begin();
-              picked_data_ptr[i] =
-                  positive_probs_indices_ptr[sampled_index] + offset;
-            }
-          }
-        }));
-    return fanout;
+  auto picked_indices = NonUniformPickOp(local_probs, fanout, replace);
+  auto picked_indices_ptr = picked_indices.data_ptr<int64_t>();
+  for (int i = 0; i < picked_indices.numel(); ++i) {
+    picked_data_ptr[i] =
+        static_cast<PickedType>(picked_indices_ptr[i]) + offset;
   }
+  return picked_indices.numel();
 }
 
 template <typename PickedType>
@@ -956,6 +1128,35 @@ int64_t Pick(
     return UniformPick(
         offset, num_neighbors, fanout, replace, options, picked_data_ptr);
   }
+}
+
+template <typename PickedType>
+int64_t TemporalPick(
+    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+    int64_t seed_offset, int64_t offset, int64_t num_neighbors, int64_t fanout,
+    bool replace, const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    const torch::optional<torch::Tensor>& node_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp,
+    PickedType* picked_data_ptr) {
+  auto mask = TemporalMask(
+      utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset), csc_indices,
+      probs_or_mask, node_timestamp, edge_timestamp,
+      {offset, offset + num_neighbors});
+  torch::Tensor masked_prob;
+  if (probs_or_mask.has_value()) {
+    masked_prob =
+        probs_or_mask.value().slice(0, offset, offset + num_neighbors) * mask;
+  } else {
+    masked_prob = mask.to(torch::kFloat32);
+  }
+  auto picked_indices = NonUniformPickOp(masked_prob, fanout, replace);
+  auto picked_indices_ptr = picked_indices.data_ptr<int64_t>();
+  for (int i = 0; i < picked_indices.numel(); ++i) {
+    picked_data_ptr[i] =
+        static_cast<PickedType>(picked_indices_ptr[i]) + offset;
+  }
+  return picked_indices.numel();
 }
 
 template <SamplerType S, typename PickedType>
@@ -987,6 +1188,48 @@ int64_t PickByEtype(
             int64_t picked_count = Pick(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
                 probs_or_mask, args, picked_data_ptr + pick_offset);
+            pick_offset += picked_count;
+          }
+          etype_begin = etype_end;
+        }
+      }));
+  return pick_offset;
+}
+
+template <typename PickedType>
+int64_t TemporalPickByEtype(
+    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+    int64_t seed_offset, int64_t offset, int64_t num_neighbors,
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::TensorOptions& options, const torch::Tensor& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    const torch::optional<torch::Tensor>& node_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp,
+    PickedType* picked_data_ptr) {
+  int64_t etype_begin = offset;
+  int64_t etype_end = offset;
+  int64_t pick_offset = 0;
+  AT_DISPATCH_INTEGRAL_TYPES(
+      type_per_edge.scalar_type(), "TemporalPickByEtype", ([&] {
+        const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
+        const auto end = offset + num_neighbors;
+        while (etype_begin < end) {
+          scalar_t etype = type_per_edge_data[etype_begin];
+          TORCH_CHECK(
+              etype >= 0 && etype < (int64_t)fanouts.size(),
+              "Etype values exceed the number of fanouts.");
+          int64_t fanout = fanouts[etype];
+          auto etype_end_it = std::upper_bound(
+              type_per_edge_data + etype_begin, type_per_edge_data + end,
+              etype);
+          etype_end = etype_end_it - type_per_edge_data;
+          // Do sampling for one etype.
+          if (fanout != 0) {
+            int64_t picked_count = TemporalPick(
+                seed_timestamp, csc_indices, seed_offset, etype_begin,
+                etype_end - etype_begin, fanout, replace, options,
+                probs_or_mask, node_timestamp, edge_timestamp,
+                picked_data_ptr + pick_offset);
             pick_offset += picked_count;
           }
           etype_begin = etype_end;

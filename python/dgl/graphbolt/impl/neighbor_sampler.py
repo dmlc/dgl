@@ -73,21 +73,24 @@ class NeighborSampler(SubgraphSampler):
     >>> datapipe = datapipe.sample_uniform_negative(graph, 2)
     >>> datapipe = datapipe.sample_neighbor(graph, [5, 10, 15])
     >>> next(iter(datapipe)).sampled_subgraphs
-    [FusedSampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 2, 4, 5]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 3, 2, 4, 5]),
-                        node_pairs=(tensor([1, 3, 0, 2, 4, 5, 2, 5]),
-                            tensor([0, 0, 1, 1, 2, 3, 4, 5])),),
-    FusedSampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 2, 4, 5]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 3, 2, 4]),
-                        node_pairs=(tensor([1, 3, 0, 2, 4, 5, 2]),
-                            tensor([0, 0, 1, 1, 2, 3, 4])),),
-    FusedSampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 2, 4]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 3]),
-                        node_pairs=(tensor([1, 3, 0, 2, 4]),
-                            tensor([0, 0, 1, 1, 2])),
+    [SampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 4, 2, 5]),
+                   original_edge_ids=None,
+                   original_column_node_ids=tensor([0, 1, 3, 4, 2, 5]),
+                   node_pairs=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6, 7, 8]),
+                                            indices=tensor([1, 4, 0, 2, 3, 2, 5, 5]),
+                              ),
+    ), SampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 4, 2, 5]),
+                   original_edge_ids=None,
+                   original_column_node_ids=tensor([0, 1, 3, 4, 2]),
+                   node_pairs=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6, 7]),
+                                            indices=tensor([1, 4, 0, 2, 3, 2, 5]),
+                              ),
+    ), SampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 3, 4, 2]),
+                   original_edge_ids=None,
+                   original_column_node_ids=tensor([0, 1, 3, 4]),
+                   node_pairs=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6]),
+                                            indices=tensor([1, 4, 0, 2, 3, 2]),
+                              ),
     )]
     """
 
@@ -100,7 +103,7 @@ class NeighborSampler(SubgraphSampler):
         prob_name=None,
         deduplicate=True,
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ):
         super().__init__(datapipe)
         self.graph = graph
@@ -237,28 +240,39 @@ class LayerNeighborSampler(NeighborSampler):
     Examples
     -------
     >>> import dgl.graphbolt as gb
-    >>> from dgl import graphbolt as gb
+    >>> import torch
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
     >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
-    >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
-    >>> item_sampler = gb.ItemSampler(
-    ...     item_set, batch_size=1,)
-    >>> neg_sampler = gb.UniformNegativeSampler(
-    ...     item_sampler, 2, data_format, graph)
-    >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
-    ...     torch.LongTensor([15])]
-    >>> subgraph_sampler = gb.LayerNeighborSampler(
-    ...     neg_sampler, graph, fanouts)
-    >>> for data in subgraph_sampler:
-    ...      print(data.compacted_node_pairs)
-    ...      print(len(data.sampled_subgraphs))
-    (tensor([0, 0, 0]), tensor([1, 0, 2]))
-    3
-    (tensor([0, 0, 0]), tensor([1, 1, 1]))
-    3
+    >>> item_sampler = gb.ItemSampler(item_set, batch_size=1,)
+    >>> neg_sampler = gb.UniformNegativeSampler(item_sampler, graph, 2)
+    >>> fanouts = [torch.LongTensor([5]),
+    ...     torch.LongTensor([10]),torch.LongTensor([15])]
+    >>> subgraph_sampler = gb.LayerNeighborSampler(neg_sampler, graph, fanouts)
+    >>> next(iter(subgraph_sampler)).sampled_subgraphs
+    [SampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 2, 3, 5, 4]),
+                   original_edge_ids=None,
+                   original_column_node_ids=tensor([0, 1, 2, 3, 5, 4]),
+                   node_pairs=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6, 7, 8]),
+                                            indices=tensor([1, 2, 0, 3, 4, 5, 4, 3]),
+                              ),
+    ), SampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 2, 3, 5, 4]),
+                   original_edge_ids=None,
+                   original_column_node_ids=tensor([0, 1, 2, 3, 5]),
+                   node_pairs=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6, 7]),
+                                            indices=tensor([1, 2, 0, 3, 4, 5, 4]),
+                              ),
+    ), SampledSubgraphImpl(original_row_node_ids=tensor([0, 1, 2, 3, 5]),
+                   original_edge_ids=None,
+                   original_column_node_ids=tensor([0, 1, 2]),
+                   node_pairs=CSCFormatBase(indptr=tensor([0, 2, 4, 5]),
+                                            indices=tensor([1, 2, 0, 3, 4]),
+                              ),
+    )]
+    >>> next(iter(subgraph_sampler)).compacted_node_pairs
+    (tensor([0]), tensor([1]))
     """
 
     def __init__(
@@ -270,7 +284,7 @@ class LayerNeighborSampler(NeighborSampler):
         prob_name=None,
         deduplicate=True,
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ):
         super().__init__(
             datapipe,

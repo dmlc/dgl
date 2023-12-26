@@ -786,6 +786,48 @@ def test_dgl_link_predication_hetero(mode):
                 minibatch.negative_node_pairs[etype][1],
                 minibatch.compacted_negative_dsts[etype].view(-1),
             )
+    node_pairs, labels = minibatch.node_pairs_with_labels
+    if mode == "neg_src":
+        expect_node_pairs = {
+            "A:r:B": (
+                torch.tensor([1, 1, 2, 0, 1, 2]),
+                torch.tensor([1, 0, 1, 1, 0, 0]),
+            ),
+            "B:rr:A": (
+                torch.tensor([0, 1, 1, 2, 0, 2]),
+                torch.tensor([1, 0, 1, 1, 0, 0]),
+            ),
+        }
+    elif mode == "neg_dst":
+        expect_node_pairs = {
+            "A:r:B": (
+                torch.tensor([1, 1, 1, 1, 1, 1]),
+                torch.tensor([1, 0, 1, 3, 2, 1]),
+            ),
+            "B:rr:A": (
+                torch.tensor([0, 1, 0, 0, 1, 1]),
+                torch.tensor([1, 0, 2, 1, 3, 1]),
+            ),
+        }
+    else:
+        expect_node_pairs = {
+            "A:r:B": (
+                torch.tensor([1, 1, 2, 0, 1, 2]),
+                torch.tensor([1, 0, 1, 3, 2, 1]),
+            ),
+            "B:rr:A": (
+                torch.tensor([0, 1, 1, 2, 0, 2]),
+                torch.tensor([1, 0, 2, 1, 3, 1]),
+            ),
+        }
+    expect_labels = {
+        "A:r:B": torch.tensor([1, 1, 0, 0, 0, 0]),
+        "B:rr:A": torch.tensor([1, 1, 0, 0, 0, 0]),
+    }
+    for etype in node_pairs:
+        assert torch.equal(node_pairs[etype][0], expect_node_pairs[etype][0])
+        assert torch.equal(node_pairs[etype][1], expect_node_pairs[etype][1])
+        assert torch.equal(labels[etype], expect_labels[etype])
 
 
 def create_homo_minibatch_csc_format():

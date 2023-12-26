@@ -1,6 +1,7 @@
 import os
 
 import pickle
+import re
 import tempfile
 import unittest
 
@@ -705,7 +706,7 @@ def test_in_subgraph_node_pairs_homogeneous():
 
     # Extract in subgraph.
     nodes = torch.LongTensor([4, 1, 3])
-    in_subgraph = graph.in_subgraph(nodes)
+    in_subgraph = graph.in_subgraph(nodes, output_cscformat=False)
 
     # Verify in subgraph.
     assert torch.equal(
@@ -777,7 +778,7 @@ def test_in_subgraph_node_pairs_heterogeneous():
         "N0": torch.LongTensor([1]),
         "N1": torch.LongTensor([2, 1]),
     }
-    in_subgraph = graph.in_subgraph(nodes)
+    in_subgraph = graph.in_subgraph(nodes, output_cscformat=False)
 
     # Verify in subgraph.
     assert torch.equal(
@@ -972,9 +973,25 @@ def test_sample_neighbors_homo(labor, indptr_dtype, indices_dtype):
     graph = gb.fused_csc_sampling_graph(indptr, indices)
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
+    fanouts = torch.LongTensor([2])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts=torch.LongTensor([2]))
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = torch.tensor(
+        [1, 3, 4],
+        dtype=(torch.int64 if indices_dtype == torch.int32 else torch.int32),
+    )
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
+    nodes = torch.tensor([1, 3, 4], dtype=indices_dtype)
+    subgraph = sampler(nodes, fanouts, output_cscformat=False)
 
     # Verify in subgraph.
     sampled_num = subgraph.node_pairs[0].size(0)
@@ -1023,13 +1040,38 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
     )
 
     # Sample on both node types.
+    fanouts = torch.tensor([-1, -1])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = {
+        "n1": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        ),
+        "n2": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        ),
+    }
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts, output_cscformat=False)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
     nodes = {
         "n1": torch.tensor([0], dtype=indices_dtype),
         "n2": torch.tensor([0], dtype=indices_dtype),
     }
-    fanouts = torch.tensor([-1, -1])
-    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts)
+    subgraph = sampler(nodes, fanouts, output_cscformat=False)
 
     # Verify in subgraph.
     expected_node_pairs = {
@@ -1051,20 +1093,39 @@ def test_sample_neighbors_hetero(labor, indptr_dtype, indices_dtype):
     assert subgraph.original_edge_ids is None
 
     # Sample on single node type.
-    nodes = {"n1": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts)
+
+    # 1. Sample with nodes in mismatched dtype with graph's indices.
+    nodes = {
+        "n1": torch.tensor(
+            [0],
+            dtype=(
+                torch.int64 if indices_dtype == torch.int32 else torch.int32
+            ),
+        )
+    }
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Data type of nodes must be consistent with indices.dtype"
+        ),
+    ):
+        _ = sampler(nodes, fanouts, output_cscformat=False)
+
+    # 2. Sample with nodes in matched dtype with graph's indices.
+    nodes = {"n1": torch.tensor([0], dtype=indices_dtype)}
+    subgraph = sampler(nodes, fanouts, output_cscformat=False)
 
     # Verify in subgraph.
     expected_node_pairs = {
         "n2:e2:n1": (
-            torch.LongTensor([0, 2]),
-            torch.LongTensor([0, 0]),
+            torch.tensor([0, 2], dtype=indices_dtype),
+            torch.tensor([0, 0], dtype=indices_dtype),
         ),
         "n1:e1:n2": (
-            torch.LongTensor([]),
-            torch.LongTensor([]),
+            torch.tensor([], dtype=indices_dtype),
+            torch.tensor([], dtype=indices_dtype),
         ),
     }
     assert len(subgraph.node_pairs) == 2
@@ -1133,7 +1194,7 @@ def test_sample_neighbors_fanouts(
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.LongTensor(fanouts)
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts)
+    subgraph = sampler(nodes, fanouts, output_cscformat=False)
 
     # Verify in subgraph.
     assert (
@@ -1189,7 +1250,7 @@ def test_sample_neighbors_replace(
 
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     subgraph = graph.sample_neighbors(
-        nodes, torch.LongTensor([4]), replace=replace
+        nodes, torch.LongTensor([4]), replace=replace, output_cscformat=False
     )
 
     # Verify in subgraph.
@@ -1227,7 +1288,9 @@ def test_sample_neighbors_return_eids_homo(labor):
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    subgraph = graph.sample_neighbors(nodes, fanouts=torch.LongTensor([-1]))
+    subgraph = graph.sample_neighbors(
+        nodes, fanouts=torch.LongTensor([-1]), output_cscformat=False
+    )
 
     # Verify in subgraph.
     expected_reverse_edge_ids = edge_attributes[gb.ORIGINAL_EDGE_ID][
@@ -1283,7 +1346,7 @@ def test_sample_neighbors_return_eids_hetero(labor):
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(nodes, fanouts)
+    subgraph = sampler(nodes, fanouts, output_cscformat=False)
 
     # Verify in subgraph.
     expected_reverse_edge_ids = {
@@ -1341,6 +1404,7 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
         fanouts=torch.tensor([2]),
         replace=replace,
         probs_name=probs_name,
+        output_cscformat=False,
     )
 
     # Verify in subgraph.
@@ -1387,6 +1451,7 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
         fanouts=torch.tensor([5]),
         replace=replace,
         probs_name="probs_or_mask",
+        output_cscformat=False,
     )
 
     # Verify in subgraph.
@@ -1898,6 +1963,7 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
         fanouts=torch.LongTensor(fanouts),
         replace=replace,
         probs_name=probs_name if probs_name != "none" else None,
+        output_cscformat=False,
     )
     sampled_num = subgraph.node_pairs[0].size(0)
 
@@ -1989,6 +2055,7 @@ def test_sample_neighbors_hetero_pick_number(
         fanouts=torch.LongTensor(fanouts),
         replace=replace,
         probs_name=probs_name if probs_name != "none" else None,
+        output_cscformat=False,
     )
 
     if probs_name == "none":

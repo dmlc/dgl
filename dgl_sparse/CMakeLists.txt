@@ -27,6 +27,11 @@ if(USE_CUDA)
   enable_language(CUDA)
 endif()
 
+# For windows, define NOMINMAX to avoid conflict with std::min/max
+if(MSVC)
+  add_definitions(-DNOMINMAX)
+endif()
+
 set(Torch_DIR "${TORCH_PREFIX}/Torch")
 message(STATUS "Setting directory to ${Torch_DIR}")
 find_package(Torch REQUIRED)

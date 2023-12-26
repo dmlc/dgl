@@ -7,6 +7,7 @@
 #ifndef GRAPHBOLT_CUDA_COMMON_H_
 #define GRAPHBOLT_CUDA_COMMON_H_
 
+#include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime.h>
@@ -67,6 +68,8 @@ struct CUDAWorkspaceAllocator {
 
 inline auto GetAllocator() { return CUDAWorkspaceAllocator{}; }
 
+inline auto GetCurrentStream() { return c10::cuda::getCurrentCUDAStream(); }
+
 template <typename T>
 inline bool is_zero(T size) {
   return size == 0;
@@ -87,6 +90,54 @@ inline bool is_zero<dim3>(dim3 size) {
       C10_CUDA_KERNEL_LAUNCH_CHECK();                                 \
     }                                                                 \
   }
+
+/**
+ * @brief This class is designed to handle the copy operation of a single
+ * scalar_t item from a given CUDA device pointer. Later, if the object is cast
+ * into scalar_t, the value can be read.
+ *
+ * auto num_edges = cuda::CopyScalar(indptr.data_ptr<scalar_t>() +
+ *     indptr.size(0) - 1);
+ * // Perform many operations here, they will run as normal.
+ * // We finally need to read num_edges.
+ * auto indices = torch::empty(static_cast<scalar_t>(num_edges));
+ */
+template <typename scalar_t>
+struct CopyScalar {
+  CopyScalar(const scalar_t* device_ptr) : is_ready_(false) {
+    pinned_scalar_ = torch::empty(
+        sizeof(scalar_t),
+        c10::TensorOptions().dtype(torch::kBool).pinned_memory(true));
+    auto stream = GetCurrentStream();
+    CUDA_CALL(cudaMemcpyAsync(
+        reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr()), device_ptr,
+        sizeof(scalar_t), cudaMemcpyDeviceToHost, stream));
+    copy_event_.record(stream);
+  }
+
+  operator scalar_t() {
+    if (!is_ready_) {
+      copy_event_.synchronize();
+      is_ready_ = true;
+    }
+    return reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr())[0];
+  }
+
+ private:
+  torch::Tensor pinned_scalar_;
+  at::cuda::CUDAEvent copy_event_;
+  bool is_ready_;
+};
+
+// This includes all integer, float and boolean types.
+#define GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(...)            \
+  AT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__)                 \
+  AT_DISPATCH_CASE(at::ScalarType::Half, __VA_ARGS__)     \
+  AT_DISPATCH_CASE(at::ScalarType::BFloat16, __VA_ARGS__) \
+  AT_DISPATCH_CASE(at::ScalarType::Bool, __VA_ARGS__)
+
+#define GRAPHBOLT_DISPATCH_ALL_TYPES(TYPE, NAME, ...) \
+  AT_DISPATCH_SWITCH(TYPE, NAME, GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__))
 
 #define GRAPHBOLT_DISPATCH_ELEMENT_SIZES(element_size, name, ...)             \
   [&] {                                                                       \

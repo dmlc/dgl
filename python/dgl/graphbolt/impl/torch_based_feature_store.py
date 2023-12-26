@@ -168,6 +168,9 @@ class TorchBasedFeature(Feature):
         """In-place operation to copy the feature to pinned memory."""
         self._tensor = self._tensor.pin_memory()
 
+    def __repr__(self) -> str:
+        return _torch_based_feature_str(self)
+
 
 class TorchBasedFeatureStore(BasicFeatureStore):
     r"""A store to manage multiple pytorch based feature for access.
@@ -231,3 +234,42 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         """In-place operation to copy the feature store to pinned memory."""
         for feature in self._features.values():
             feature.pin_memory_()
+
+    def __repr__(self) -> str:
+        return _torch_based_feature_store_str(self._features)
+
+
+def _torch_based_feature_str(feature: TorchBasedFeature) -> str:
+    final_str = "TorchBasedFeature("
+    indent_len = len(final_str)
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    feature_str = "feature=" + _add_indent(
+        str(feature._tensor), indent_len + len("feature=")
+    )
+    final_str += feature_str + ",\n" + " " * indent_len
+    metadata_str = "metadata=" + _add_indent(
+        str(feature.metadata()), indent_len + len("metadata=")
+    )
+    final_str += metadata_str + ",\n)"
+    return final_str
+
+
+def _torch_based_feature_store_str(
+    features: Dict[str, TorchBasedFeature]
+) -> str:
+    final_str = "TorchBasedFeatureStore"
+    indent_len = len(final_str)
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    features_str = _add_indent(str(features), indent_len)
+    final_str += features_str
+    return final_str

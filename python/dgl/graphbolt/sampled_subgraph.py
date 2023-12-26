@@ -1,4 +1,5 @@
 """Graphbolt sampled subgraph."""
+
 # pylint: disable= invalid-name
 from typing import Dict, Tuple, Union
 
@@ -21,13 +22,11 @@ class SampledSubgraph:
     @property
     def node_pairs(
         self,
-    ) -> Union[
-        Tuple[torch.Tensor, torch.Tensor],
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-    ]:
-        """Returns the node pairs representing source-destination edges.
-        - If `node_pairs` is a tuple: It should be in the format ('u', 'v')
-            representing source and destination pairs.
+    ) -> Union[CSCFormatBase, Dict[str, CSCFormatBase],]:
+        """Returns the node pairs representing edges in csc format.
+        - If `node_pairs` is a CSCFormatBase: It should be in the csc format.
+            `indptr` stores the index in the data array where each column
+            starts. `indices` stores the row indices of the non-zero elements.
         - If `node_pairs` is a dictionary: The keys should be edge type and
             the values should be corresponding node pairs. The ids inside
             is heterogeneous ids."""
@@ -118,27 +117,33 @@ class SampledSubgraph:
 
         Examples
         --------
-        >>> node_pairs = {"A:relation:B": (torch.tensor([0, 1, 2]),
-        ...     torch.tensor([0, 1, 2]))}
-        >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
-        >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
+        >>> import dgl.graphbolt as gb
+        >>> import torch
+        >>> node_pairs = {"A:relation:B": gb.CSCFormatBase(
+        ...     indptr=torch.tensor([0, 1, 2, 3]),
+        ...     indices=torch.tensor([0, 1, 2]))}
+        >>> original_column_node_ids = {"B": torch.tensor([10, 11, 12])}
+        >>> original_row_node_ids = {"A": torch.tensor([13, 14, 15])}
         >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
-        >>> subgraph = gb.FusedSampledSubgraphImpl(
+        >>> subgraph = gb.SampledSubgraphImpl(
         ...     node_pairs=node_pairs,
         ...     original_column_node_ids=original_column_node_ids,
         ...     original_row_node_ids=original_row_node_ids,
         ...     original_edge_ids=original_edge_ids
         ... )
-        >>> edges_to_exclude = (torch.tensor([14, 15]), torch.tensor([11, 12]))
+        >>> edges_to_exclude = {"A:relation:B": (torch.tensor([14, 15]),
+        ...     torch.tensor([11, 12]))}
         >>> result = subgraph.exclude_edges(edges_to_exclude)
         >>> print(result.node_pairs)
-        {"A:relation:B": (tensor([0]), tensor([0]))}
+        {'A:relation:B': CSCFormatBase(indptr=tensor([0, 1, 1, 1]),
+                    indices=tensor([0]),
+        )}
         >>> print(result.original_column_node_ids)
         {'B': tensor([10, 11, 12])}
         >>> print(result.original_row_node_ids)
         {'A': tensor([13, 14, 15])}
         >>> print(result.original_edge_ids)
-        {"A:relation:B": tensor([19])}
+        {'A:relation:B': tensor([19])}
         """
         # TODO: Add support for value > in32, then remove this line.
         assert (
@@ -181,6 +186,10 @@ class SampledSubgraph:
             index = {}
             is_cscformat = 0
             for etype, pair in self.node_pairs.items():
+                if etype not in edges:
+                    # No edges need to be excluded.
+                    index[etype] = None
+                    continue
                 src_type, _, dst_type = etype_str_to_tuple(etype)
                 original_row_node_ids = (
                     None
@@ -207,7 +216,7 @@ class SampledSubgraph:
                     )
                 index[etype] = _exclude_homo_edges(
                     reverse_edges,
-                    edges.get(etype),
+                    edges[etype],
                     assume_num_node_within_int32,
                 )
             if is_cscformat:
@@ -266,8 +275,12 @@ def _relabel_two_arrays(lhs_array, rhs_array):
     return mapping[: lhs_array.numel()], mapping[lhs_array.numel() :]
 
 
-def _exclude_homo_edges(edges, edges_to_exclude, assume_num_node_within_int32):
-    """Return the indices of edges that are not in edges_to_exclude."""
+def _exclude_homo_edges(
+    edges: Tuple[torch.Tensor, torch.Tensor],
+    edges_to_exclude: Tuple[torch.Tensor, torch.Tensor],
+    assume_num_node_within_int32: bool,
+):
+    """Return the indices of edges to be included."""
     if assume_num_node_within_int32:
         val = edges[0] << 32 | edges[1]
         val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]
@@ -286,6 +299,8 @@ def _slice_subgraph_node_pairs(subgraph: SampledSubgraph, index: torch.Tensor):
     def _index_select(obj, index):
         if obj is None:
             return None
+        if index is None:
+            return obj
         if isinstance(obj, torch.Tensor):
             return obj[index]
         if isinstance(obj, tuple):
@@ -312,6 +327,8 @@ def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
     def _index_select(obj, index):
         if obj is None:
             return None
+        if index is None:
+            return obj
         if isinstance(obj, CSCFormatBase):
             new_indices = obj.indices[index]
             new_indptr = torch.searchsorted(index, obj.indptr)
