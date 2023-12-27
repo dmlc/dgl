@@ -29,18 +29,17 @@ namespace ops {
 constexpr int BLOCK_SIZE = 128;
 
 /**
- * @brief Fills the output array with row&random number pairs and the edge_ids
- * array with original edge ids. When the output array is sorted along with
- * edge_ids, the first fanout elements of each row gives us the sampled edges.
+ * @brief Fills the random_arr with random numbers and the edge_ids array with
+ * original edge ids. When random_arr is sorted along with edge_ids, the first
+ * fanout elements of each row gives us the sampled edges.
  */
 template <
     typename float_t, typename indptr_t, typename indices_t, typename weights_t>
-__global__ void _ComputeRowRandomPairs(
+__global__ void _ComputeRandoms(
     const int64_t num_edges, const indptr_t* const sliced_indptr,
     const indptr_t* const sub_indptr, const indices_t* const csr_rows,
     const weights_t* const weights, const indices_t* const indices,
-    const uint64_t random_seed, ::cuda::std::tuple<indices_t, float_t>* output,
-    indptr_t* edge_ids) {
+    const uint64_t random_seed, float_t* random_arr, indptr_t* edge_ids) {
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
   curandStatePhilox4_32_10_t rng;
@@ -65,21 +64,12 @@ __global__ void _ComputeRowRandomPairs(
     const auto exp_rnd = -__logf(rnd);
     const float_t adjusted_rnd =
         prob > 0 ? exp_rnd / prob : std::numeric_limits<float_t>::infinity();
-    output[i] = {row_position, adjusted_rnd};
+    random_arr[i] = adjusted_rnd;
     edge_ids[i] = in_idx;
 
     i += stride;
   }
 }
-
-template <typename indices_t, typename float_t>
-struct decomposer_t {
-  __host__ __device__ ::cuda::std::tuple<indices_t&, float_t&> operator()(
-      ::cuda::std::tuple<indices_t, float_t>& key) const {
-    auto& [t, prob] = key;
-    return {t, prob};
-  }
-};
 
 template <typename indptr_t>
 struct MinInDegreeFanout {
@@ -161,14 +151,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             indices.scalar_type(), "SampleNeighborsWithoutReplacementIndices",
             ([&] {
               using indices_t = scalar_t;
-              auto row_and_random =
-                  allocator
-                      .AllocateStorage<::cuda::std::tuple<indices_t, float>>(
-                          num_edges);
-              auto row_and_random_sorted =
-                  allocator
-                      .AllocateStorage<::cuda::std::tuple<indices_t, float>>(
-                          num_edges);
+              auto randoms = allocator.AllocateStorage<float>(num_edges);
+              auto randoms_sorted = allocator.AllocateStorage<float>(num_edges);
               auto probs_or_mask_scalar_type = torch::kFloat32;
               if (probs_or_mask.has_value()) {
                 probs_or_mask_scalar_type = probs_or_mask.value().scalar_type();
@@ -189,38 +173,31 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                     const dim3 grid((num_edges + BLOCK_SIZE - 1) / BLOCK_SIZE);
                     // Compute row and random number pairs.
                     CUDA_KERNEL_CALL(
-                        _ComputeRowRandomPairs, grid, block, 0, stream,
-                        num_edges, sliced_indptr.data_ptr<indptr_t>(),
+                        _ComputeRandoms, grid, block, 0, stream, num_edges,
+                        sliced_indptr.data_ptr<indptr_t>(),
                         sub_indptr.data_ptr<indptr_t>(),
                         coo_rows.data_ptr<indices_t>(), probs_ptr, indices_ptr,
-                        random_seed, row_and_random.get(),
+                        random_seed, randoms.get(),
                         input_edge_id_segments.get());
 
-                    // The row and random number pairs are sorted w.r.t. the
-                    // random number and the rows. Since the maximum row is
-                    // num_rows - 1, we can reduce the number of bits used for
-                    // sorting.
-                    const int num_bits =
-                        sizeof(float) * 8 + cuda::NumberOfBits(num_rows);
-
-                    // Sort the row and random number pairs along with edge ids,
-                    // after sorting the first fanout elements of each row will
-                    // give us the sampled edges.
+                    // Sort the random numbers along with edge ids, after
+                    // sorting the first fanout elements of each row will give
+                    // us the sampled edges.
                     size_t tmp_storage_size = 0;
-                    CUDA_CALL(cub::DeviceRadixSort::SortPairs(
-                        nullptr, tmp_storage_size, row_and_random.get(),
-                        row_and_random_sorted.get(),
-                        input_edge_id_segments.get(),
-                        sorted_edge_id_segments.get(), num_edges,
-                        decomposer_t<indices_t, float>{}, 0, num_bits, stream));
+                    CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
+                        nullptr, tmp_storage_size, randoms.get(),
+                        randoms_sorted.get(), input_edge_id_segments.get(),
+                        sorted_edge_id_segments.get(), num_edges, num_rows,
+                        sub_indptr.data_ptr<indptr_t>(),
+                        sub_indptr.data_ptr<indptr_t>() + 1, stream));
                     auto tmp_storage =
                         allocator.AllocateStorage<char>(tmp_storage_size);
-                    CUDA_CALL(cub::DeviceRadixSort::SortPairs(
-                        tmp_storage.get(), tmp_storage_size,
-                        row_and_random.get(), row_and_random_sorted.get(),
-                        input_edge_id_segments.get(),
-                        sorted_edge_id_segments.get(), num_edges,
-                        decomposer_t<indices_t, float>{}, 0, num_bits, stream));
+                    CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
+                        tmp_storage.get(), tmp_storage_size, randoms.get(),
+                        randoms_sorted.get(), input_edge_id_segments.get(),
+                        sorted_edge_id_segments.get(), num_edges, num_rows,
+                        sub_indptr.data_ptr<indptr_t>(),
+                        sub_indptr.data_ptr<indptr_t>() + 1, stream));
                   }));
             }));
 

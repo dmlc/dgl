@@ -445,6 +445,7 @@ class MiniBatch:
         if self.seed_nodes is not None and self.compacted_node_pairs is None:
             # Node related tasks.
             transfer_attrs = [
+                "seed_nodes",
                 "labels",
                 "sampled_subgraphs",
                 "node_features",
