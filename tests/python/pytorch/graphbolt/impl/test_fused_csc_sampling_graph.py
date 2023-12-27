@@ -1588,9 +1588,7 @@ def test_sample_neighbors_homo():
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    subgraph = graph.sample_neighbors(
-        nodes, fanouts=torch.LongTensor([2])
-    )
+    subgraph = graph.sample_neighbors(nodes, fanouts=torch.LongTensor([2]))
 
     # Verify in subgraph.
     sampled_indptr_num = subgraph.sampled_csc.indptr.size(0)
@@ -1853,9 +1851,7 @@ def test_sample_neighbors_return_eids_homo(labor):
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
-    subgraph = sampler(
-        nodes, fanouts=torch.LongTensor([-1])
-    )
+    subgraph = sampler(nodes, fanouts=torch.LongTensor([-1]))
 
     # Verify in subgraph.
     expected_reverse_edge_ids = edge_attributes[gb.ORIGINAL_EDGE_ID][
@@ -2048,9 +2044,7 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
         ([-1], "none"),
     ],
 )
-def test_sample_neighbors_homo_pick_number(
-    fanouts, replace, labor, probs_name
-):
+def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
     """Original graph in COO:
     1   1   1   1   1   1
     0   0   0   0   0   0
