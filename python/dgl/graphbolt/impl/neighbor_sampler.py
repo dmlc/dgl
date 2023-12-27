@@ -149,10 +149,10 @@ class NeighborSampler(SubgraphSampler):
                         original_row_node_ids,
                         compacted_csc_format,
                     ) = unique_and_compact_csc_formats(
-                        subgraph.node_pairs, seeds
+                        subgraph.sampled_csc, seeds
                     )
                     subgraph = SampledSubgraphImpl(
-                        node_pairs=compacted_csc_format,
+                        sampled_csc=compacted_csc_format,
                         original_column_node_ids=seeds,
                         original_row_node_ids=original_row_node_ids,
                         original_edge_ids=subgraph.original_edge_ids,
@@ -162,10 +162,10 @@ class NeighborSampler(SubgraphSampler):
                         original_row_node_ids,
                         compacted_node_pairs,
                     ) = unique_and_compact_node_pairs(
-                        subgraph.node_pairs, seeds
+                        subgraph.sampled_csc, seeds
                     )
                     subgraph = FusedSampledSubgraphImpl(
-                        node_pairs=compacted_node_pairs,
+                        sampled_csc=compacted_node_pairs,
                         original_column_node_ids=seeds,
                         original_row_node_ids=original_row_node_ids,
                         original_edge_ids=subgraph.original_edge_ids,
@@ -174,13 +174,9 @@ class NeighborSampler(SubgraphSampler):
                 (
                     original_row_node_ids,
                     compacted_csc_format,
-                ) = compact_csc_format(subgraph.node_pairs, seeds)
-                # [TODO] For node_pairs is defined in SampledSubgraph, which is
-                # SampledSubgraph's parent class, and it's still inherited by
-                # other classes, the name cannot be changed currently. This
-                # part will be cleaned up later.
+                ) = compact_csc_format(subgraph.sampled_csc, seeds)
                 subgraph = SampledSubgraphImpl(
-                    node_pairs=compacted_csc_format,
+                    sampled_csc=compacted_csc_format,
                     original_column_node_ids=seeds,
                     original_row_node_ids=original_row_node_ids,
                     original_edge_ids=subgraph.original_edge_ids,

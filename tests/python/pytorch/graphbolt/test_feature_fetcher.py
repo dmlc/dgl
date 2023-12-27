@@ -83,7 +83,7 @@ def test_FeatureFetcher_with_edges_homo():
             range_tensor = torch.arange(10)
             subgraphs.append(
                 gb.FusedSampledSubgraphImpl(
-                    node_pairs=(range_tensor, range_tensor),
+                    sampled_csc=(range_tensor, range_tensor),
                     original_column_node_ids=range_tensor,
                     original_row_node_ids=range_tensor,
                     original_edge_ids=torch.randint(
@@ -184,7 +184,7 @@ def test_FeatureFetcher_with_edges_hetero():
         for _ in range(3):
             subgraphs.append(
                 gb.FusedSampledSubgraphImpl(
-                    node_pairs={
+                    sampled_csc={
                         "n1:e1:n2": (
                             torch.arange(10),
                             torch.arange(10),

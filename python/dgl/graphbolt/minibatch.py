@@ -180,7 +180,7 @@ class MiniBatch:
             return None
 
         is_heterogeneous = isinstance(
-            self.sampled_subgraphs[0].node_pairs, Dict
+            self.sampled_subgraphs[0].sampled_csc, Dict
         )
 
         blocks = []
@@ -195,9 +195,9 @@ class MiniBatch:
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
                 if isinstance(
-                    list(subgraph.node_pairs.values())[0], CSCFormatBase
+                    list(subgraph.sampled_csc.values())[0], CSCFormatBase
                 ):
-                    node_pairs = {
+                    sampled_csc = {
                         etype_str_to_tuple(etype): (
                             "csc",
                             (
@@ -211,12 +211,12 @@ class MiniBatch:
                                 ),
                             ),
                         )
-                        for etype, v in subgraph.node_pairs.items()
+                        for etype, v in subgraph.sampled_csc.items()
                     }
                 else:
-                    node_pairs = {
+                    sampled_csc = {
                         etype_str_to_tuple(etype): v
-                        for etype, v in subgraph.node_pairs.items()
+                        for etype, v in subgraph.sampled_csc.items()
                     }
                 num_src_nodes = {
                     ntype: nodes.size(0)
@@ -227,18 +227,18 @@ class MiniBatch:
                     for ntype, nodes in original_column_node_ids.items()
                 }
             else:
-                node_pairs = subgraph.node_pairs
-                if isinstance(subgraph.node_pairs, CSCFormatBase):
-                    node_pairs = (
+                sampled_csc = subgraph.sampled_csc
+                if isinstance(subgraph.sampled_csc, CSCFormatBase):
+                    sampled_csc = (
                         "csc",
                         (
-                            node_pairs.indptr,
-                            node_pairs.indices,
+                            sampled_csc.indptr,
+                            sampled_csc.indices,
                             torch.arange(
                                 0,
-                                node_pairs.indptr[-1],
-                                device=node_pairs.indptr.device,
-                                dtype=node_pairs.indptr.dtype,
+                                sampled_csc.indptr[-1],
+                                device=sampled_csc.indptr.device,
+                                dtype=sampled_csc.indptr.dtype,
                             ),
                         ),
                     )
@@ -246,7 +246,7 @@ class MiniBatch:
                 num_dst_nodes = original_column_node_ids.size(0)
             blocks.append(
                 dgl.create_block(
-                    node_pairs,
+                    sampled_csc,
                     num_src_nodes=num_src_nodes,
                     num_dst_nodes=num_dst_nodes,
                 )
