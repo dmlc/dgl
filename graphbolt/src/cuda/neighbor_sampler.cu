@@ -62,8 +62,9 @@ __global__ void _ComputeRandoms(
     const auto rnd = curand_uniform(&rng);
     const auto prob = weights ? weights[in_idx] : static_cast<weights_t>(1);
     const auto exp_rnd = -__logf(rnd);
-    const float_t adjusted_rnd =
-        prob > 0 ? exp_rnd / prob : std::numeric_limits<float_t>::infinity();
+    const float_t adjusted_rnd = prob > 0
+                                     ? static_cast<float_t>(exp_rnd / prob)
+                                     : std::numeric_limits<float_t>::infinity();
     random_arr[i] = adjusted_rnd;
     edge_ids[i] = in_idx;
 
@@ -151,8 +152,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             indices.scalar_type(), "SampleNeighborsWithoutReplacementIndices",
             ([&] {
               using indices_t = scalar_t;
-              auto randoms = allocator.AllocateStorage<float>(num_edges);
-              auto randoms_sorted = allocator.AllocateStorage<float>(num_edges);
+              using rnd_t = nv_bfloat16;
+              auto randoms = allocator.AllocateStorage<rnd_t>(num_edges);
+              auto randoms_sorted = allocator.AllocateStorage<rnd_t>(num_edges);
               auto probs_or_mask_scalar_type = torch::kFloat32;
               if (probs_or_mask.has_value()) {
                 probs_or_mask_scalar_type = probs_or_mask.value().scalar_type();
