@@ -1,5 +1,6 @@
 import re
 import unittest
+from collections.abc import Iterable, Mapping
 
 import backend as F
 
@@ -25,11 +26,44 @@ def test_CopyTo():
         assert data.device.type == "cuda"
 
 
+@pytest.mark.parametrize(
+    "task",
+    [
+        "node_classification",
+        "node_inference",
+        "link_prediction",
+        "edge_classification",
+        "other",
+    ],
+)
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
-def test_CopyToWithMiniBatches():
+def test_CopyToWithMiniBatches(task):
     N = 16
     B = 2
-    itemset = gb.ItemSet(torch.arange(N), names="seed_nodes")
+    if task == "node_classification":
+        itemset = gb.ItemSet(
+            (torch.arange(N), torch.arange(N)), names=("seed_nodes", "labels")
+        )
+    elif task == "node_inference":
+        itemset = gb.ItemSet(torch.arange(N), names="seed_nodes")
+    elif task == "link_prediction":
+        itemset = gb.ItemSet(
+            (
+                torch.arange(2 * N).reshape(-1, 2),
+                torch.arange(3 * N).reshape(-1, 3),
+            ),
+            names=("node_pairs", "negative_dsts"),
+        )
+    elif task == "edge_classification":
+        itemset = gb.ItemSet(
+            (torch.arange(2 * N).reshape(-1, 2), torch.arange(N)),
+            names=("node_pairs", "labels"),
+        )
+    else:
+        itemset = gb.ItemSet(
+            (torch.arange(2 * N).reshape(-1, 2), torch.arange(N)),
+            names=("node_pairs", "seed_nodes"),
+        )
     graph = gb_test_utils.rand_csc_graph(100, 0.15, bidirection_edge=True)
 
     features = {}
@@ -44,28 +78,75 @@ def test_CopyToWithMiniBatches():
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )
-    datapipe = gb.FeatureFetcher(
-        datapipe,
-        feature_store,
-        ["a"],
-    )
+    if task != "node_inference":
+        datapipe = gb.FeatureFetcher(
+            datapipe,
+            feature_store,
+            ["a"],
+        )
+
+    if task == "node_classification":
+        copied_attrs = [
+            "node_features",
+            "edge_features",
+            "sampled_subgraphs",
+            "labels",
+            "blocks",
+        ]
+    elif task == "node_inference":
+        copied_attrs = [
+            "seed_nodes",
+            "sampled_subgraphs",
+            "blocks",
+            "labels",
+        ]
+    elif task == "link_prediction":
+        copied_attrs = [
+            "compacted_node_pairs",
+            "node_features",
+            "edge_features",
+            "sampled_subgraphs",
+            "compacted_negative_srcs",
+            "compacted_negative_dsts",
+            "blocks",
+            "positive_node_pairs",
+            "negative_node_pairs",
+            "node_pairs_with_labels",
+        ]
+    elif task == "edge_classification":
+        copied_attrs = [
+            "compacted_node_pairs",
+            "node_features",
+            "edge_features",
+            "sampled_subgraphs",
+            "labels",
+            "blocks",
+            "positive_node_pairs",
+            "negative_node_pairs",
+            "node_pairs_with_labels",
+        ]
 
     def test_data_device(datapipe):
         for data in datapipe:
             for attr in dir(data):
                 var = getattr(data, attr)
+                if isinstance(var, Mapping):
+                    var = var[next(iter(var))]
+                elif isinstance(var, Iterable):
+                    var = next(iter(var))
                 if (
                     not callable(var)
                     and not attr.startswith("__")
                     and hasattr(var, "device")
+                    and var is not None
                 ):
-                    assert var.device.type == "cuda"
-
-    # Invoke CopyTo via class constructor.
-    test_data_device(gb.CopyTo(datapipe, "cuda"))
-
-    # Invoke CopyTo via functional form.
-    test_data_device(datapipe.copy_to("cuda"))
+                    if task == "other":
+                        assert var.device.type == "cuda"
+                    else:
+                        if attr in copied_attrs:
+                            assert var.device.type == "cuda"
+                        else:
+                            assert var.device.type == "cpu"
 
     # Invoke CopyTo via class constructor.
     test_data_device(gb.CopyTo(datapipe, "cuda"))
