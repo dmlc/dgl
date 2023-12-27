@@ -102,26 +102,34 @@ struct PairSum {
 };
 
 // Returns (indptr[nodes + 1] - indptr[nodes], indptr[nodes])
-template <typename indptr_t>
-auto SliceCSCIndptr(
-    const indptr_t* const indptr, torch::Tensor nodes, cudaStream_t stream) {
+std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
+    torch::Tensor indptr, torch::Tensor nodes) {
   auto allocator = cuda::GetAllocator();
-  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
+  const auto exec_policy =
+      thrust::cuda::par_nosync(allocator).on(cuda::GetCurrentStream());
   const int64_t num_nodes = nodes.size(0);
   // Read indptr only once in case it is pinned and access is slow.
-  auto sliced_indptr = allocator.AllocateStorage<indptr_t>(num_nodes);
+  auto sliced_indptr =
+      torch::empty(num_nodes, nodes.options().dtype(indptr.scalar_type()));
   // compute in-degrees
-  auto in_degree = allocator.AllocateStorage<indptr_t>(num_nodes + 1);
+  auto in_degree =
+      torch::empty(num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
   thrust::counting_iterator<int64_t> iota(0);
-  AT_DISPATCH_INDEX_TYPES(nodes.scalar_type(), "IndexSelectCSCNodes", ([&] {
-                            using nodes_t = index_t;
-                            thrust::for_each(
-                                exec_policy, iota, iota + num_nodes,
-                                SliceFunc<indptr_t, nodes_t>{
-                                    nodes.data_ptr<nodes_t>(), indptr,
-                                    in_degree.get(), sliced_indptr.get()});
-                          }));
-  return std::make_pair(std::move(in_degree), std::move(sliced_indptr));
+  AT_DISPATCH_INTEGRAL_TYPES(
+      indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
+        using indptr_t = scalar_t;
+        AT_DISPATCH_INDEX_TYPES(
+            nodes.scalar_type(), "IndexSelectCSCNodes", ([&] {
+              using nodes_t = index_t;
+              thrust::for_each(
+                  exec_policy, iota, iota + num_nodes,
+                  SliceFunc<indptr_t, nodes_t>{
+                      nodes.data_ptr<nodes_t>(), indptr.data_ptr<indptr_t>(),
+                      in_degree.data_ptr<indptr_t>(),
+                      sliced_indptr.data_ptr<indptr_t>()});
+            }));
+      }));
+  return {in_degree, sliced_indptr};
 }
 
 template <typename indptr_t, typename indices_t>
@@ -137,8 +145,6 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   auto output_indptr =
       torch::empty(num_nodes + 1, nodes_options.dtype(indptr_scalar_type));
 
-  // Actual and modified number of edges.
-  indptr_t edge_count, edge_count_aligned;
   auto output_indptr_aligned =
       allocator.AllocateStorage<indptr_t>(num_nodes + 1);
 
@@ -162,29 +168,28 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
         output_indptr_pair, PairSum{}, zero_value, num_nodes + 1, stream));
   }
 
-  // Copy the modified number of edges.
-  CUDA_CALL(cudaMemcpyAsync(
-      &edge_count_aligned, output_indptr_aligned.get() + num_nodes,
-      sizeof(edge_count_aligned), cudaMemcpyDeviceToHost, stream));
   // Copy the actual total number of edges.
-  CUDA_CALL(cudaMemcpyAsync(
-      &edge_count, output_indptr.data_ptr<indptr_t>() + num_nodes,
-      sizeof(edge_count), cudaMemcpyDeviceToHost, stream));
-  // synchronizes here, we can read edge_count and edge_count_aligned
-  CUDA_CALL(cudaStreamSynchronize(stream));
+  auto edge_count =
+      cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
+  // Copy the modified number of edges.
+  auto edge_count_aligned =
+      cuda::CopyScalar{output_indptr_aligned.get() + num_nodes};
 
   // Allocate output array with actual number of edges.
-  torch::Tensor output_indices =
-      torch::empty(edge_count, nodes_options.dtype(indices.scalar_type()));
+  torch::Tensor output_indices = torch::empty(
+      static_cast<indptr_t>(edge_count),
+      nodes_options.dtype(indices.scalar_type()));
   const dim3 block(BLOCK_SIZE);
-  const dim3 grid((edge_count_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
+  const dim3 grid(
+      (static_cast<indptr_t>(edge_count_aligned) + BLOCK_SIZE - 1) /
+      BLOCK_SIZE);
 
   // Perform the actual copying, of the indices array into
   // output_indices in an aligned manner.
   CUDA_KERNEL_CALL(
-      _CopyIndicesAlignedKernel, grid, block, 0, stream, edge_count_aligned,
-      num_nodes, sliced_indptr, output_indptr.data_ptr<indptr_t>(),
-      output_indptr_aligned.get(),
+      _CopyIndicesAlignedKernel, grid, block, 0, stream,
+      static_cast<indptr_t>(edge_count_aligned), num_nodes, sliced_indptr,
+      output_indptr.data_ptr<indptr_t>(), output_indptr_aligned.get(),
       reinterpret_cast<indices_t*>(indices.data_ptr()),
       reinterpret_cast<indices_t*>(output_indices.data_ptr()), perm);
   return {output_indptr, output_indices};
@@ -195,16 +200,17 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
   // Sorting nodes so that accesses over PCI-e are more regular.
   const auto sorted_idx =
       Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1)).second;
-  auto stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
 
+  auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   return AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "UVAIndexSelectCSCIndptr", ([&] {
         using indptr_t = scalar_t;
-        auto [in_degree_ptr, sliced_indptr_ptr] =
-            SliceCSCIndptr(indptr.data_ptr<indptr_t>(), nodes, stream);
-        auto in_degree = in_degree_ptr.get();
-        auto sliced_indptr = sliced_indptr_ptr.get();
+        auto in_degree =
+            std::get<0>(in_degree_and_sliced_indptr).data_ptr<indptr_t>();
+        auto sliced_indptr =
+            std::get<1>(in_degree_and_sliced_indptr).data_ptr<indptr_t>();
         return GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
             indices.element_size(), "UVAIndexSelectCSCCopyIndices", ([&] {
               return UVAIndexSelectCSCCopyIndices<indptr_t, element_size_t>(
@@ -263,15 +269,16 @@ void IndexSelectCSCCopyIndices(
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
-  auto stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
+  auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   return AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
         using indptr_t = scalar_t;
-        auto [in_degree_ptr, sliced_indptr_ptr] =
-            SliceCSCIndptr(indptr.data_ptr<indptr_t>(), nodes, stream);
-        auto in_degree = in_degree_ptr.get();
-        auto sliced_indptr = sliced_indptr_ptr.get();
+        auto in_degree =
+            std::get<0>(in_degree_and_sliced_indptr).data_ptr<indptr_t>();
+        auto sliced_indptr =
+            std::get<1>(in_degree_and_sliced_indptr).data_ptr<indptr_t>();
         // Output indptr for the slice indexed by nodes.
         torch::Tensor output_indptr = torch::empty(
             num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
@@ -289,15 +296,12 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
         }
 
         // Number of edges being copied.
-        indptr_t edge_count;
-        CUDA_CALL(cudaMemcpyAsync(
-            &edge_count, output_indptr.data_ptr<indptr_t>() + num_nodes,
-            sizeof(edge_count), cudaMemcpyDeviceToHost, stream));
-        // blocking read of edge_count
-        CUDA_CALL(cudaStreamSynchronize(stream));
+        auto edge_count =
+            cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
         // Allocate output array of size number of copied edges.
         torch::Tensor output_indices = torch::empty(
-            edge_count, nodes.options().dtype(indices.scalar_type()));
+            static_cast<indptr_t>(edge_count),
+            nodes.options().dtype(indices.scalar_type()));
         GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
             indices.element_size(), "IndexSelectCSCCopyIndices", ([&] {
               using indices_t = element_size_t;

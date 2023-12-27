@@ -41,16 +41,22 @@ class InSubgraphSampler(SubgraphSampler):
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=2)
     >>> insubgraph_sampler = gb.InSubgraphSampler(item_sampler, graph)
     >>> for _, data in enumerate(insubgraph_sampler):
-    ...     print(data.sampled_subgraphs[0].node_pairs)
+    ...     print(data.sampled_subgraphs[0].sampled_csc)
     ...     print(data.sampled_subgraphs[0].original_row_node_ids)
     ...     print(data.sampled_subgraphs[0].original_column_node_ids)
-    (tensor([0, 1, 2, 3, 4]), tensor([0, 0, 0, 1, 1]))
+    CSCFormatBase(indptr=tensor([0, 3, 5]),
+                indices=tensor([0, 1, 2, 3, 4]),
+    )
     tensor([0, 1, 4, 2, 3])
     tensor([0, 1])
-    (tensor([2, 3, 4, 0]), tensor([0, 0, 1, 1]))
+    CSCFormatBase(indptr=tensor([0, 2, 4]),
+                indices=tensor([2, 3, 4, 0]),
+    )
     tensor([2, 3, 0, 5, 1])
     tensor([2, 3])
-    (tensor([2, 3, 1, 4, 0]), tensor([0, 0, 0, 1, 1]))
+    CSCFormatBase(indptr=tensor([0, 3, 5]),
+                indices=tensor([2, 3, 1, 4, 0]),
+    )
     tensor([4, 5, 0, 3, 1])
     tensor([4, 5])
     """
@@ -73,9 +79,9 @@ class InSubgraphSampler(SubgraphSampler):
             (
                 original_row_node_ids,
                 compacted_node_pairs,
-            ) = unique_and_compact_node_pairs(subgraph.node_pairs, seeds)
+            ) = unique_and_compact_node_pairs(subgraph.sampled_csc, seeds)
             subgraph = FusedSampledSubgraphImpl(
-                node_pairs=compacted_node_pairs,
+                sampled_csc=compacted_node_pairs,
                 original_column_node_ids=seeds,
                 original_row_node_ids=original_row_node_ids,
                 original_edge_ids=subgraph.original_edge_ids,
@@ -84,9 +90,9 @@ class InSubgraphSampler(SubgraphSampler):
             (
                 original_row_node_ids,
                 compacted_csc_formats,
-            ) = unique_and_compact_csc_formats(subgraph.node_pairs, seeds)
+            ) = unique_and_compact_csc_formats(subgraph.sampled_csc, seeds)
             subgraph = SampledSubgraphImpl(
-                node_pairs=compacted_csc_formats,
+                sampled_csc=compacted_csc_formats,
                 original_column_node_ids=seeds,
                 original_row_node_ids=original_row_node_ids,
                 original_edge_ids=subgraph.original_edge_ids,

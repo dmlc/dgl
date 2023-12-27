@@ -325,7 +325,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
@@ -368,7 +368,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         ...     edge_type_to_id=etypes)
         >>> nodes = {"N0":torch.LongTensor([1]), "N1":torch.LongTensor([1, 2])}
         >>> in_subgraph = graph.in_subgraph(nodes)
-        >>> print(in_subgraph.node_pairs)
+        >>> print(in_subgraph.sampled_csc)
         defaultdict(<class 'list'>, {
             'N0:R0:N0': (tensor([]), tensor([])),
             'N0:R1:N1': (tensor([1, 0]), tensor([1, 2])),
@@ -436,7 +436,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
         return FusedSampledSubgraphImpl(
-            node_pairs=node_pairs, original_edge_ids=original_edge_ids
+            sampled_csc=node_pairs, original_edge_ids=original_edge_ids
         )
 
     def _convert_to_homogeneous_nodes(self, nodes, timestamps=None):
@@ -475,7 +475,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             ]
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
-            node_pairs = CSCFormatBase(indptr=indptr, indices=indices)
+            sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
             # The sampled graph is a fused homogenized graph, which need to be
             # converted to heterogeneous graphs.
@@ -536,7 +536,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     l = end
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
-            node_pairs = {
+            sampled_csc = {
                 etype: CSCFormatBase(
                     indptr=torch.tensor(subgraph_indptr[etype]),
                     indices=subgraph_indice[etype],
@@ -544,7 +544,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 for etype in self.edge_type_to_id.keys()
             }
         return SampledSubgraphImpl(
-            node_pairs=node_pairs,
+            sampled_csc=sampled_csc,
             original_edge_ids=original_edge_ids,
         )
 
@@ -555,7 +555,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -619,7 +619,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> nodes = {'n1': torch.LongTensor([0]), 'n2': torch.LongTensor([0])}
         >>> fanouts = torch.tensor([1, 1])
         >>> subgraph = graph.sample_neighbors(nodes, fanouts)
-        >>> print(subgraph.node_pairs)
+        >>> print(subgraph.sampled_csc)
         defaultdict(<class 'list'>, {'n1:e1:n2': (tensor([0]),
           tensor([0])), 'n2:e2:n1': (tensor([2]), tensor([0]))})
         """
@@ -745,7 +745,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         # TODO: clean up once the migration is done.
-        output_cscformat=False,
+        output_cscformat=True,
     ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
@@ -811,7 +811,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> nodes = {'n1': torch.LongTensor([0]), 'n2': torch.LongTensor([0])}
         >>> fanouts = torch.tensor([1, 1])
         >>> subgraph = graph.sample_layer_neighbors(nodes, fanouts)
-        >>> print(subgraph.node_pairs)
+        >>> print(subgraph.sampled_csc)
         defaultdict(<class 'list'>, {'n1:e1:n2': (tensor([1]),
           tensor([0])), 'n2:e2:n1': (tensor([2]), tensor([0]))})
         """
