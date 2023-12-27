@@ -316,12 +316,15 @@ def compact_csc_format(
     ] = None,
 ):
     """
-    Relabel the row (source) IDs in the csc formats into a contiguous range from 0 and return the original row node IDs per type.
+    Relabel the row (source) IDs in the csc formats into a contiguous range from
+    0 and return the original row node IDs per type.
 
     Note that
     1. The column (destination) IDs are included in the relabeled row IDs.
-    2. If there are repeated row IDs, they would not be uniqued and will be treated as different nodes.
-    3. If `dst_timestamps` is given, the timestamp of each destination node will be broadcasted to its corresponding source nodes.
+    2. If there are repeated row IDs, they would not be uniqued and will be
+    treated as different nodes.
+    3. If `dst_timestamps` is given, the timestamp of each destination node will
+    be broadcasted to its corresponding source nodes.
 
     Parameters
     ----------
@@ -349,7 +352,8 @@ def compact_csc_format(
     -------
     Tuple[original_row_node_ids, compacted_csc_formats, ...]
         A tensor of original row node IDs (per type) of all nodes in the input.
-        The compacted CSC formats, where node IDs are replaced with mapped node IDs ranging from 0 to N.
+        The compacted CSC formats, where node IDs are replaced with mapped node
+        IDs ranging from 0 to N.
         The source timestamps (per type) of all nodes in the input if `dst_timestamps` is given.
 
     Examples
