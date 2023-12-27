@@ -7,6 +7,7 @@
 #include <sparse/elementwise_op.h>
 #include <sparse/matrix_ops.h>
 #include <sparse/sparse_matrix.h>
+#include <torch/script.h>
 
 #include <memory>
 
