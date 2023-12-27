@@ -448,7 +448,7 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
         item_sampler,
         graph,
         fanouts,
-        deduplicate=True,\
+        deduplicate=True,
     )
     csc_formats = [
         {
