@@ -1,8 +1,8 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file graphbolt/cuda_ops.h
- * @brief Available CUDA operations in Graphbolt.
+ * @file graphbolt/cuda_sampling_ops.h
+ * @brief Available CUDA sampling operations in Graphbolt.
  */
 
 #include <graphbolt/fused_sampled_subgraph.h>
