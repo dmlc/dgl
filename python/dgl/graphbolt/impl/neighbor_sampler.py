@@ -118,6 +118,9 @@ class NeighborSampler(SubgraphSampler):
         self.sampler = graph.sample_neighbors
 
     def sample_subgraphs(self, seeds, seeds_timestamp=None):
+        assert (
+            seeds_timestamp is None
+        ), "NeighborSampler does not support temporal sampling."
         subgraphs = []
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.

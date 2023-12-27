@@ -61,6 +61,57 @@ def unique_and_compact(
         return unique_and_compact_per_type(nodes)
 
 
+def compact_temporal_nodes(nodes, nodes_timestamp):
+    """Compact a list of temporal nodes without unique.
+
+    Note that since there is no unique, the nodes and nodes_timestamp are simply concatenated. And the compacted nodes are consecutive numbers starting from
+    0.
+
+    Parameters
+    ----------
+    nodes : List[torch.Tensor] or Dict[str, List[torch.Tensor]]
+        List of nodes for compacting.
+        the compact operator will be done per type
+        - If `nodes` is a list of tensor: All the tensors will compact together, usually it is used for homogeneous graph.
+        - If `nodes` is a list of dictionary: The keys should be node type and
+        the values should be corresponding nodes, the compact will be done per
+        type, usually it is used for heterogeneous graph.
+
+    nodes_timestamp : List[torch.Tensor] or Dict[str, List[torch.Tensor]]
+        List of timestamps for compacting.
+
+    Returns
+    -------
+    Tuple[nodes, nodes_timestamp, compacted_node_list]
+
+    The concatenated nodes and nodes_timestamp, and the compacted nodes list,
+    where IDs inside are replaced with compacted node IDs.
+    """
+
+    def _compact_per_type(per_type_nodes, per_type_nodes_timestamp):
+        per_type_nodes = torch.cat(per_type_nodes)
+        per_type_nodes_timestamp = torch.cat(per_type_nodes_timestamp)
+        compacted_nodes = torch.arange(
+            0,
+            per_type_nodes.numel(),
+            dtype=per_type_nodes.dtype,
+            device=per_type_nodes.device,
+        )
+        return per_type_nodes, per_type_nodes_timestamp, compacted_nodes
+
+    if isinstance(nodes, dict):
+        ret_nodes, ret_timestamp, compacted = {}, {}, {}
+        for ntype, nodes_of_type in nodes.items():
+            (
+                ret_nodes[ntype],
+                ret_timestamp[ntype],
+                compacted[ntype],
+            ) = _compact_per_type(nodes_of_type, nodes_timestamp[ntype])
+        return ret_nodes, ret_timestamp, compacted
+    else:
+        return _compact_per_type(nodes, nodes_timestamp)
+
+
 def unique_and_compact_csc_formats(
     csc_formats: Union[
         Tuple[torch.Tensor, torch.Tensor],
