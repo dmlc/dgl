@@ -75,69 +75,58 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
         // Sort the unique_dst_ids tensor.
         auto sorted_unique_dst_ids =
-            allocator.AllocateStorage<scalar_t>(unique_dst_ids.size(0));
-        {
-          size_t workspace_size;
-          CUDA_CALL(cub::DeviceRadixSort::SortKeys(
-              nullptr, workspace_size, unique_dst_ids_ptr,
-              sorted_unique_dst_ids.get(), unique_dst_ids.size(0), 0, num_bits,
-              stream));
-          auto temp = allocator.AllocateStorage<char>(workspace_size);
-          CUDA_CALL(cub::DeviceRadixSort::SortKeys(
-              temp.get(), workspace_size, unique_dst_ids_ptr,
-              sorted_unique_dst_ids.get(), unique_dst_ids.size(0), 0, num_bits,
-              stream));
-        }
+            Sort<false>(unique_dst_ids_ptr, unique_dst_ids.size(0), num_bits);
+        auto sorted_unique_dst_ids_ptr =
+            sorted_unique_dst_ids.data_ptr<scalar_t>();
 
         // Mark dst nodes in the src_ids tensor.
         auto is_dst = allocator.AllocateStorage<bool>(src_ids.size(0));
         thrust::binary_search(
-            exec_policy, sorted_unique_dst_ids.get(),
-            sorted_unique_dst_ids.get() + unique_dst_ids.size(0), src_ids_ptr,
+            exec_policy, sorted_unique_dst_ids_ptr,
+            sorted_unique_dst_ids_ptr + unique_dst_ids.size(0), src_ids_ptr,
             src_ids_ptr + src_ids.size(0), is_dst.get());
 
         // Filter the non-dst nodes in the src_ids tensor, hence only_src.
-        auto only_src = allocator.AllocateStorage<scalar_t>(src_ids.size(0));
-        auto only_src_size =
-            thrust::remove_copy_if(
-                exec_policy, src_ids_ptr, src_ids_ptr + src_ids.size(0),
-                is_dst.get(), only_src.get(), thrust::identity<bool>{}) -
-            only_src.get();
-        auto sorted_only_src =
-            allocator.AllocateStorage<scalar_t>(only_src_size);
-
-        {  // Sort the only_src tensor so that we can unique it with Encode
-           // operation later.
-          size_t workspace_size;
-          CUDA_CALL(cub::DeviceRadixSort::SortKeys(
-              nullptr, workspace_size, only_src.get(), sorted_only_src.get(),
-              only_src_size, 0, num_bits, stream));
-          auto temp = allocator.AllocateStorage<char>(workspace_size);
-          CUDA_CALL(cub::DeviceRadixSort::SortKeys(
-              temp.get(), workspace_size, only_src.get(), sorted_only_src.get(),
-              only_src_size, 0, num_bits, stream));
+        auto only_src =
+            torch::empty(src_ids.size(0), sorted_unique_dst_ids.options());
+        {
+          auto only_src_size =
+              thrust::remove_copy_if(
+                  exec_policy, src_ids_ptr, src_ids_ptr + src_ids.size(0),
+                  is_dst.get(), only_src.data_ptr<scalar_t>(),
+                  thrust::identity<bool>{}) -
+              only_src.data_ptr<scalar_t>();
+          only_src = only_src.slice(0, 0, only_src_size);
         }
 
-        auto unique_only_src = torch::empty(only_src_size, src_ids.options());
+        // Sort the only_src tensor so that we can unique it with Encode
+        // operation later.
+        auto sorted_only_src = Sort<false>(
+            only_src.data_ptr<scalar_t>(), only_src.size(0), num_bits);
+
+        auto unique_only_src =
+            torch::empty(only_src.size(0), src_ids.options());
         auto unique_only_src_ptr = unique_only_src.data_ptr<scalar_t>();
         auto unique_only_src_cnt = allocator.AllocateStorage<scalar_t>(1);
 
         {  // Compute the unique operation on the only_src tensor.
           size_t workspace_size;
           CUDA_CALL(cub::DeviceRunLengthEncode::Encode(
-              nullptr, workspace_size, sorted_only_src.get(),
+              nullptr, workspace_size, sorted_only_src.data_ptr<scalar_t>(),
               unique_only_src_ptr, cub::DiscardOutputIterator{},
-              unique_only_src_cnt.get(), only_src_size, stream));
+              unique_only_src_cnt.get(), only_src.size(0), stream));
           auto temp = allocator.AllocateStorage<char>(workspace_size);
           CUDA_CALL(cub::DeviceRunLengthEncode::Encode(
-              temp.get(), workspace_size, sorted_only_src.get(),
+              temp.get(), workspace_size, sorted_only_src.data_ptr<scalar_t>(),
               unique_only_src_ptr, cub::DiscardOutputIterator{},
-              unique_only_src_cnt.get(), only_src_size, stream));
+              unique_only_src_cnt.get(), only_src.size(0), stream));
+
+          auto unique_only_src_size =
+              cuda::CopyScalar(unique_only_src_cnt.get());
+          unique_only_src = unique_only_src.slice(
+              0, 0, static_cast<scalar_t>(unique_only_src_size));
         }
 
-        auto unique_only_src_size = cuda::CopyScalar(unique_only_src_cnt.get());
-        unique_only_src = unique_only_src.slice(
-            0, 0, static_cast<scalar_t>(unique_only_src_size));
         auto real_order = torch::cat({unique_dst_ids, unique_only_src});
         // Sort here so that binary search can be used to lookup new_ids.
         auto [sorted_order, new_ids] = Sort(real_order, num_bits);
