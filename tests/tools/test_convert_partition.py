@@ -152,3 +152,100 @@ def test_get_unique_invidx(num_nodes, num_edges, nid_begin, nid_end):
 
     assert len(uniques) > max_dst, f"Inverse idx, dst_ids, invalid max value."
     assert max_dst >= 0, f"Inverse idx, dst_ids has negative values."
+
+
+def test_get_unique_invidx_low_mem():
+    srcids = np.array([14, 0, 3, 3, 0, 3, 9, 5, 14, 12])
+    dstids = np.array([10, 16, 12, 13, 10, 17, 16, 13, 14, 16])
+    unique_nids = np.array([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+
+    uniques, idxes, srcids, dstids = _get_unique_invidx(
+        srcids,
+        dstids,
+        unique_nids,
+        low_mem=True,
+    )
+    expected_unqiues = np.array(
+        [0, 3, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    )
+    expected_idxes = np.array(
+        [1, 2, 7, 6, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+    )
+    expected_srcids = np.array([0, 1, 1, 1, 2, 6, 3, 8, 0, 8])
+    expected_dstids = np.array([4, 10, 6, 7, 4, 11, 10, 7, 8, 10])
+    assert np.all(
+        uniques == expected_unqiues
+    ), f"unique is not expected. {uniques} != {expected_unqiues}"
+    assert np.all(
+        idxes == expected_idxes
+    ), f"indices is not expected. {idxes} != {expected_idxes}"
+    assert np.all(
+        srcids == expected_srcids
+    ), f"srcids is not expected. {srcids} != {expected_srcids}"
+    assert np.all(
+        dstids == expected_dstids
+    ), f"dstdis is not expected. {dstids} != {expected_dstids}"
+
+
+def test_get_unique_invidx_high_mem():
+    srcids = np.array([14, 0, 3, 3, 0, 3, 9, 5, 14, 12])
+    dstids = np.array([10, 16, 12, 13, 10, 17, 16, 13, 14, 16])
+    unique_nids = np.array([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+
+    uniques, idxes, srcids, dstids = _get_unique_invidx(
+        srcids,
+        dstids,
+        unique_nids,
+        low_mem=False,
+    )
+    expected_unqiues = np.array(
+        [0, 3, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    )
+    expected_idxes = np.array(
+        [1, 2, 7, 6, 10, 21, 9, 13, 0, 25, 11, 15, 28, 29]
+    )
+    expected_srcids = np.array([8, 0, 1, 1, 0, 1, 3, 2, 8, 6])
+    expected_dstids = np.array([4, 10, 6, 7, 4, 11, 10, 7, 8, 10])
+    assert np.all(
+        uniques == expected_unqiues
+    ), f"unique is not expected. {uniques} != {expected_unqiues}"
+    assert np.all(
+        idxes == expected_idxes
+    ), f"indices is not expected. {idxes} != {expected_idxes}"
+    assert np.all(
+        srcids == expected_srcids
+    ), f"srcids is not expected. {srcids} != {expected_srcids}"
+    assert np.all(
+        dstids == expected_dstids
+    ), f"dstdis is not expected. {dstids} != {expected_dstids}"
+
+
+def test_get_unique_invidx_low_high_mem():
+    srcids = np.array([14, 0, 3, 3, 0, 3, 9, 5, 14, 12])
+    dstids = np.array([10, 16, 12, 13, 10, 17, 16, 13, 14, 16])
+    unique_nids = np.array([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+
+    uniques_low, idxes_low, srcids_low, dstids_low = _get_unique_invidx(
+        srcids,
+        dstids,
+        unique_nids,
+        low_mem=True,
+    )
+    uniques_high, idxes_high, srcids_high, dstids_high = _get_unique_invidx(
+        srcids,
+        dstids,
+        unique_nids,
+        low_mem=False,
+    )
+    assert np.all(
+        uniques_low == uniques_high
+    ), f"unique is not expected. {uniques_low} != {uniques_high}"
+    assert not np.all(
+        idxes_low == idxes_high
+    ), f"indices is not expected. {idxes_low} == {idxes_high}"
+    assert not np.all(
+        srcids_low == srcids_high
+    ), f"srcids is not expected. {srcids_low} == {srcids_high}"
+    assert np.all(
+        dstids_low == dstids_high
+    ), f"dstdis is not expected. {dstids_low} != {dstids_high}"

@@ -21,7 +21,7 @@ from pyarrow import csv
 from utils import get_idranges, memory_snapshot, read_json
 
 
-def _get_unique_invidx(srcids, dstids, nids):
+def _get_unique_invidx(srcids, dstids, nids, low_mem=True):
     """This function is used to compute a list of unique elements,
     and their indices in the input list, which is the concatenation
     of srcids, dstids and uniq_nids. In addition, this function will also
@@ -33,6 +33,14 @@ def _get_unique_invidx(srcids, dstids, nids):
     requirement. For an input list of 3 billion edges it consumes about
     550GB of systems memory, which is limiting the capability of the
     partitioning pipeline.
+
+    Note: This function is a workaround solution for the high memory requirement
+    of numpy's unique function call. This function is not a general purpose
+    function and is only used in the context of the partitioning pipeline.
+    What's more, this function does not behave exactly the same as numpy's
+    unique function call. Namely, this function does not return the exact same
+    inverse indices as numpy's unique function call. However, for the current
+    use case, this function is sufficient.
 
     Current numpy uniques function returns 3 return parameters, which are
         . list of unique elements
@@ -62,6 +70,11 @@ def _get_unique_invidx(srcids, dstids, nids):
         list of dstids. Current implementation of the pipeline guarantees
         this assumption and is used to simplify the current implementation
         of the workaround solution.
+    low_mem : bool, optional
+        Indicates whether to use the low memory version of the function. If
+        ``False``, the function will use numpy's native ``unique`` function.
+        Otherwise, the function will use the low memory version of the
+        function.
 
     Returns:
     --------
@@ -84,12 +97,11 @@ def _get_unique_invidx(srcids, dstids, nids):
     ), f"Please provide the correct input parameters"
     assert len(srcids) != 0, f"Please provide a non-empty edge-list."
 
-    if np.__version__ < "1.24.0":
+    if not low_mem:
         logging.warning(
-            f"Numpy version, {np.__version__}, is lower than expected."
-            f"Falling back to numpy's native function unique."
-            f"This functions memory overhead will limit size of the "
-            f"partitioned graph objects processed by each node in the cluster."
+            "Calling numpy's native function unique. This functions memory "
+            "overhead will limit size of the partitioned graph objects "
+            "processed by each node in the cluster."
         )
         uniques, idxes, inv_idxes = np.unique(
             np.concatenate([srcids, dstids, nids]),
@@ -135,23 +147,8 @@ def _get_unique_invidx(srcids, dstids, nids):
 
     # TODO: check if wrapping this while loop in a c++ wrapper
     # helps in speeding up the code
-    idx1 = 0
-    idx2 = 0
-    while (idx1 < len(srcids)) and (idx2 < len(uniques)):
-        if srcids[idx1] == uniques[idx2]:
-            srcids[idx1] = idx2
-            idx1 += 1
-        elif srcids[idx1] < uniques[idx2]:
-            idx1 += 1
-        else:
-            idx2 += 1
-
-    assert idx1 >= len(srcids), (
-        f"Failed to locate all srcids in the uniques array "
-        f" len(srcids) = {len(srcids)}, idx1 = {idx1} "
-        f" len(uniques) = {len(uniques)}, idx2 = {idx2}"
-    )
-    srcids[sort_ids] = srcids
+    srcids = np.searchsorted(uniques, srcids, side="left")
+    srcids = srcids[sort_ids]
 
     # process dstids now.
     # dstids is guaranteed to be a subset of the `nids` list
