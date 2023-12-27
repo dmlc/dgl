@@ -558,9 +558,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-        # TODO: clean up once the migration is done.
-        output_cscformat=True,
-    ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
+    ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
 
@@ -602,7 +600,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]
+        SampledSubgraphImpl
             The sampled subgraph.
 
         Examples
@@ -636,10 +634,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-        if not output_cscformat:
-            return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
-        else:
-            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -751,9 +746,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-        # TODO: clean up once the migration is done.
-        output_cscformat=True,
-    ) -> Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]:
+    ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
         `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
@@ -797,7 +790,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        FusedSampledSubgraphImpl
+        SampledSubgraphImpl
             The sampled subgraph.
 
         Examples
@@ -841,11 +834,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             has_original_eids,
             probs_name,
         )
-
-        if not output_cscformat:
-            return self._convert_to_fused_sampled_subgraph(C_sampled_subgraph)
-        else:
-            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def temporal_sample_neighbors(
         self,
@@ -904,7 +893,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        FusedSampledSubgraphImpl
+        SampledSubgraphImpl
             The sampled subgraph.
         """
         if isinstance(nodes, dict):
