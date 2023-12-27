@@ -8,6 +8,7 @@
 #include <c10/cuda/CUDAStream.h>
 #include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
+#include <graphbolt/cuda_sampling_ops.h>
 #include <thrust/gather.h>
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
