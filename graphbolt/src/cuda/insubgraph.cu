@@ -6,7 +6,7 @@
  */
 
 #include <graphbolt/cuda_ops.h>
-#include <graphbolt/fused_sampled_subgraph.h>
+#include <graphbolt/cuda_sampling_ops.h>
 
 #include <cub/cub.cuh>
 
