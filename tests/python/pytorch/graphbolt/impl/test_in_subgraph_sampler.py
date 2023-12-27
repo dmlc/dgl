@@ -90,11 +90,11 @@ def test_InSubgraphSampler_node_pairs_homo():
         sampled_subgraph = minibatch.sampled_subgraphs[0]
         _src = [
             sampled_subgraph.original_row_node_ids[id]
-            for id in sampled_subgraph.node_pairs[0]
+            for id in sampled_subgraph.sampled_csc[0]
         ]
         _dst = [
             sampled_subgraph.original_column_node_ids[id]
-            for id in sampled_subgraph.node_pairs[1]
+            for id in sampled_subgraph.sampled_csc[1]
         ]
         return _src, _dst
 
@@ -172,7 +172,7 @@ def test_InSubgraphSampler_node_pairs_hetero():
         "N1:R2:N0": (torch.LongTensor([0, 1]), torch.LongTensor([0, 1])),
         "N1:R3:N1": (torch.LongTensor([]), torch.LongTensor([])),
     }
-    for etype, pairs in mn.sampled_subgraphs[0].node_pairs.items():
+    for etype, pairs in mn.sampled_subgraphs[0].sampled_csc.items():
         assert torch.equal(pairs[0], expected_node_pairs[etype][0])
         assert torch.equal(pairs[1], expected_node_pairs[etype][1])
 
@@ -187,7 +187,7 @@ def test_InSubgraphSampler_node_pairs_hetero():
         "N1:R2:N0": (torch.LongTensor([1]), torch.LongTensor([0])),
         "N1:R3:N1": (torch.LongTensor([]), torch.LongTensor([])),
     }
-    for etype, pairs in mn.sampled_subgraphs[0].node_pairs.items():
+    for etype, pairs in mn.sampled_subgraphs[0].sampled_csc.items():
         assert torch.equal(pairs[0], expected_node_pairs[etype][0])
         assert torch.equal(pairs[1], expected_node_pairs[etype][1])
 
@@ -199,7 +199,7 @@ def test_InSubgraphSampler_node_pairs_hetero():
         "N1:R2:N0": (torch.LongTensor([]), torch.LongTensor([])),
         "N1:R3:N1": (torch.LongTensor([1, 2, 0]), torch.LongTensor([0, 1, 1])),
     }
-    for etype, pairs in mn.sampled_subgraphs[0].node_pairs.items():
+    for etype, pairs in mn.sampled_subgraphs[0].sampled_csc.items():
         assert torch.equal(pairs[0], expected_node_pairs[etype][0])
         assert torch.equal(pairs[1], expected_node_pairs[etype][1])
 
@@ -231,28 +231,28 @@ def test_InSubgraphSampler_homo():
     def original_indices(minibatch):
         sampled_subgraph = minibatch.sampled_subgraphs[0]
         _indices = sampled_subgraph.original_row_node_ids[
-            sampled_subgraph.node_pairs.indices
+            sampled_subgraph.sampled_csc.indices
         ]
         return _indices
 
     mn = next(it)
     assert torch.equal(mn.seed_nodes, torch.LongTensor([0]))
     assert torch.equal(
-        mn.sampled_subgraphs[0].node_pairs.indptr, torch.tensor([0, 3])
+        mn.sampled_subgraphs[0].sampled_csc.indptr, torch.tensor([0, 3])
     )
     assert torch.equal(original_indices(mn), torch.tensor([0, 1, 4]))
 
     mn = next(it)
     assert torch.equal(mn.seed_nodes, torch.LongTensor([5]))
     assert torch.equal(
-        mn.sampled_subgraphs[0].node_pairs.indptr, torch.tensor([0, 2])
+        mn.sampled_subgraphs[0].sampled_csc.indptr, torch.tensor([0, 2])
     )
     assert torch.equal(original_indices(mn), torch.tensor([1, 4]))
 
     mn = next(it)
     assert torch.equal(mn.seed_nodes, torch.LongTensor([3]))
     assert torch.equal(
-        mn.sampled_subgraphs[0].node_pairs.indptr, torch.tensor([0, 2])
+        mn.sampled_subgraphs[0].sampled_csc.indptr, torch.tensor([0, 2])
     )
     assert torch.equal(original_indices(mn), torch.tensor([1, 2]))
 
@@ -312,7 +312,7 @@ def test_InSubgraphSampler_hetero():
 
     mn = next(it)
     assert torch.equal(mn.seed_nodes["N0"], torch.LongTensor([1, 0]))
-    expected_node_pairs = {
+    expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 1, 3]),
             indices=torch.LongTensor([2, 1, 0]),
@@ -327,16 +327,16 @@ def test_InSubgraphSampler_hetero():
             indptr=torch.LongTensor([0]), indices=torch.LongTensor([])
         ),
     }
-    for etype, pairs in mn.sampled_subgraphs[0].node_pairs.items():
-        assert torch.equal(pairs.indices, expected_node_pairs[etype].indices)
-        assert torch.equal(pairs.indptr, expected_node_pairs[etype].indptr)
+    for etype, pairs in mn.sampled_subgraphs[0].sampled_csc.items():
+        assert torch.equal(pairs.indices, expected_sampled_csc[etype].indices)
+        assert torch.equal(pairs.indptr, expected_sampled_csc[etype].indptr)
 
     mn = next(it)
     assert mn.seed_nodes == {
         "N0": torch.LongTensor([2]),
         "N1": torch.LongTensor([0]),
     }
-    expected_node_pairs = {
+    expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 1]), indices=torch.LongTensor([1])
         ),
@@ -350,13 +350,13 @@ def test_InSubgraphSampler_hetero():
             indptr=torch.LongTensor([0, 0]), indices=torch.LongTensor([])
         ),
     }
-    for etype, pairs in mn.sampled_subgraphs[0].node_pairs.items():
-        assert torch.equal(pairs.indices, expected_node_pairs[etype].indices)
-        assert torch.equal(pairs.indptr, expected_node_pairs[etype].indptr)
+    for etype, pairs in mn.sampled_subgraphs[0].sampled_csc.items():
+        assert torch.equal(pairs.indices, expected_sampled_csc[etype].indices)
+        assert torch.equal(pairs.indptr, expected_sampled_csc[etype].indptr)
 
     mn = next(it)
     assert torch.equal(mn.seed_nodes["N1"], torch.LongTensor([2, 1]))
-    expected_node_pairs = {
+    expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0]), indices=torch.LongTensor([])
         ),
@@ -371,6 +371,6 @@ def test_InSubgraphSampler_hetero():
             indices=torch.LongTensor([1, 2, 0]),
         ),
     }
-    for etype, pairs in mn.sampled_subgraphs[0].node_pairs.items():
-        assert torch.equal(pairs.indices, expected_node_pairs[etype].indices)
-        assert torch.equal(pairs.indptr, expected_node_pairs[etype].indptr)
+    for etype, pairs in mn.sampled_subgraphs[0].sampled_csc.items():
+        assert torch.equal(pairs.indices, expected_sampled_csc[etype].indices)
+        assert torch.equal(pairs.indptr, expected_sampled_csc[etype].indptr)
