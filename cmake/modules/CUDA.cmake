@@ -176,6 +176,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
 
   set(__nvcc_flags "--expt-relaxed-constexpr")
   set(__nvcc_archs_readable "")
+  set(__archs "")
 
   # Tell NVCC to add binaries for the specified GPUs
   foreach(__arch ${__cuda_arch_bin})
@@ -183,10 +184,12 @@ function(dgl_select_nvcc_arch_flags out_variable)
       # User explicitly specified PTX for the concrete BIN
       list(APPEND __nvcc_flags -gencode arch=compute_${CMAKE_MATCH_2},code=sm_${CMAKE_MATCH_1})
       list(APPEND __nvcc_archs_readable sm_${CMAKE_MATCH_1})
+      list(APPEND __archs ${CMAKE_MATCH_1})
     else()
       # User didn't explicitly specify PTX for the concrete BIN, we assume PTX=BIN
       list(APPEND __nvcc_flags -gencode arch=compute_${__arch},code=sm_${__arch})
       list(APPEND __nvcc_archs_readable sm_${__arch})
+      list(APPEND __archs ${__arch})
     endif()
   endforeach()
 
@@ -199,6 +202,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
   string(REPLACE ";" " " __nvcc_archs_readable "${__nvcc_archs_readable}")
   set(${out_variable}          ${__nvcc_flags}          PARENT_SCOPE)
   set(${out_variable}_readable ${__nvcc_archs_readable} PARENT_SCOPE)
+  set(CUDA_ARCHITECTURES       ${__archs}               PARENT_SCOPE)
 endfunction()
 
 ################################################################################################

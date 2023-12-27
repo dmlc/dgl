@@ -246,7 +246,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
 
     for data in sampler_dp:
         for sampledsubgraph in data.sampled_subgraphs:
-            for _, value in sampledsubgraph.node_pairs.items():
+            for _, value in sampledsubgraph.sampled_csc.items():
                 assert torch.equal(
                     torch.ge(value.indices, torch.zeros(len(value.indices))),
                     torch.ones(len(value.indices)),
@@ -297,9 +297,11 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert len(sampled_subgraph.original_row_node_ids) == length[step]
             assert torch.equal(
-                sampled_subgraph.node_pairs.indices, compacted_indices[step]
+                sampled_subgraph.sampled_csc.indices, compacted_indices[step]
             )
-            assert torch.equal(sampled_subgraph.node_pairs.indptr, indptr[step])
+            assert torch.equal(
+                sampled_subgraph.sampled_csc.indptr, indptr[step]
+            )
             assert torch.equal(
                 sampled_subgraph.original_column_node_ids, seeds[step]
             )
@@ -372,11 +374,11 @@ def test_SubgraphSampler_without_dedpulication_Hetero(labor):
                 )
             for etype in ["n1:e1:n2", "n2:e2:n1"]:
                 assert torch.equal(
-                    sampled_subgraph.node_pairs[etype].indices,
+                    sampled_subgraph.sampled_csc[etype].indices,
                     csc_formats[step][etype].indices,
                 )
                 assert torch.equal(
-                    sampled_subgraph.node_pairs[etype].indptr,
+                    sampled_subgraph.sampled_csc[etype].indptr,
                     csc_formats[step][etype].indptr,
                 )
 
@@ -423,9 +425,11 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
                 original_row_node_ids[step],
             )
             assert torch.equal(
-                sampled_subgraph.node_pairs.indices, compacted_indices[step]
+                sampled_subgraph.sampled_csc.indices, compacted_indices[step]
             )
-            assert torch.equal(sampled_subgraph.node_pairs.indptr, indptr[step])
+            assert torch.equal(
+                sampled_subgraph.sampled_csc.indptr, indptr[step]
+            )
             assert torch.equal(
                 sampled_subgraph.original_column_node_ids, seeds[step]
             )
@@ -504,10 +508,10 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
                 )
             for etype in ["n1:e1:n2", "n2:e2:n1"]:
                 assert torch.equal(
-                    sampled_subgraph.node_pairs[etype].indices,
+                    sampled_subgraph.sampled_csc[etype].indices,
                     csc_formats[step][etype].indices,
                 )
                 assert torch.equal(
-                    sampled_subgraph.node_pairs[etype].indptr,
+                    sampled_subgraph.sampled_csc[etype].indptr,
                     csc_formats[step][etype].indptr,
                 )

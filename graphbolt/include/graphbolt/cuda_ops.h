@@ -26,6 +26,23 @@ std::pair<torch::Tensor, torch::Tensor> Sort(
     torch::Tensor input, int num_bits = 0);
 
 /**
+ * @brief Tests if each element of elements is in test_elements. Returns a
+ * boolean tensor of the same shape as elements that is True for elements
+ * in test_elements and False otherwise. Enhance torch.isin by implementing
+ * multi-threaded searching, as detailed in the documentation at
+ * https://pytorch.org/docs/stable/generated/torch.isin.html."
+ *
+ * @param elements        Input elements
+ * @param test_elements   Values against which to test for each input element.
+ *
+ * @return
+ * A boolean tensor of the same shape as elements that is True for elements
+ * in test_elements and False otherwise.
+ *
+ */
+torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements);
+
+/**
  * @brief Select columns for a sparse matrix in a CSC format according to nodes
  * tensor.
  *
