@@ -433,25 +433,50 @@ class MiniBatch:
         else:
             return None
 
-    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+    def to(self, device: torch.device):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
 
         def _to(x, device):
             return x.to(device) if hasattr(x, "to") else x
 
-        for attr in dir(self):
+        def apply_to(x, device):
+            return recursive_apply(x, lambda x: _to(x, device))
+
+        if self.seed_nodes is not None and self.compacted_node_pairs is None:
+            # Node related tasks.
+            transfer_attrs = [
+                "labels",
+                "sampled_subgraphs",
+                "node_features",
+                "edge_features",
+            ]
+            if self.labels is None:
+                # Layerwise inference
+                transfer_attrs.append("seed_nodes")
+        elif self.seed_nodes is None and self.compacted_node_pairs is not None:
+            # Link/edge related tasks.
+            transfer_attrs = [
+                "labels",
+                "compacted_node_pairs",
+                "compacted_negative_srcs",
+                "compacted_negative_dsts",
+                "sampled_subgraphs",
+                "node_features",
+                "edge_features",
+            ]
+        else:
+            # Otherwise copy all the attributes to the device.
+            transfer_attrs = get_attributes(self)
+
+        for attr in transfer_attrs:
             # Only copy member variables.
-            if not callable(getattr(self, attr)) and not attr.startswith("__"):
-                try:
-                    setattr(
-                        self,
-                        attr,
-                        recursive_apply(
-                            getattr(self, attr), lambda x: _to(x, device)
-                        ),
-                    )
-                except AttributeError:
-                    continue
+            try:
+                # For read-only attributes such as blocks and
+                # node_pairs_with_labels, setattr will throw an AttributeError.
+                # We catch these exceptions and skip those attributes.
+                setattr(self, attr, apply_to(getattr(self, attr), device))
+            except AttributeError:
+                continue
 
         return self
 
