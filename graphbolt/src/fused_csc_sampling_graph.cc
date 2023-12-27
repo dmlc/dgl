@@ -4,7 +4,6 @@
  * @brief Source file of sampling graph.
  */
 
-#include <graphbolt/cuda_ops.h>
 #include <graphbolt/cuda_sampling_ops.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
