@@ -13,11 +13,15 @@
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/transform_output_iterator.h>
 
+#include <algorithm>
+#include <array>
 #include <cub/cub.cuh>
 #include <cuda/std/tuple>
 #include <limits>
 #include <numeric>
+#include <type_traits>
 
 #include "../random.h"
 #include "./common.h"
@@ -34,12 +38,13 @@ constexpr int BLOCK_SIZE = 128;
  * fanout elements of each row gives us the sampled edges.
  */
 template <
-    typename float_t, typename indptr_t, typename indices_t, typename weights_t>
+    typename float_t, typename indptr_t, typename indices_t, typename weights_t,
+    typename edge_id_t>
 __global__ void _ComputeRandoms(
     const int64_t num_edges, const indptr_t* const sliced_indptr,
     const indptr_t* const sub_indptr, const indices_t* const csr_rows,
     const weights_t* const weights, const indices_t* const indices,
-    const uint64_t random_seed, float_t* random_arr, indptr_t* edge_ids) {
+    const uint64_t random_seed, float_t* random_arr, edge_id_t* edge_ids) {
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
   curandStatePhilox4_32_10_t rng;
@@ -66,7 +71,7 @@ __global__ void _ComputeRandoms(
                                      ? static_cast<float_t>(exp_rnd / prob)
                                      : std::numeric_limits<float_t>::infinity();
     random_arr[i] = adjusted_rnd;
-    edge_ids[i] = in_idx;
+    edge_ids[i] = row_offset;
 
     i += stride;
   }
@@ -89,11 +94,23 @@ struct IteratorFunc {
   __host__ __device__ auto operator()(int64_t i) { return indices + indptr[i]; }
 };
 
-template <typename indices_t>
-struct ConvertToBytes {
-  template <typename indptr_t>
-  __host__ __device__ auto operator()(indptr_t num_elements) {
-    return num_elements * sizeof(indices_t);
+template <typename indptr_t>
+struct AddOffset {
+  indptr_t offset;
+  template <typename edge_id_t>
+  __host__ __device__ indptr_t operator()(edge_id_t x) {
+    return x + offset;
+  }
+};
+
+template <typename indptr_t, typename indices_t>
+struct IteratorFuncAddOffset {
+  indptr_t* indptr;
+  indptr_t* sliced_indptr;
+  indices_t* indices;
+  __host__ __device__ auto operator()(int64_t i) {
+    return thrust::transform_output_iterator{
+        indices + indptr[i], AddOffset<indptr_t>{sliced_indptr[i]}};
   }
 };
 
@@ -113,6 +130,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       fanouts[0] >= 0 ? fanouts[0] : std::numeric_limits<int64_t>::max();
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
+  auto max_in_degree = in_degree.slice(0, 0, num_rows).max();
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto sub_indptr = ExclusiveCumSum(in_degree);
   auto output_indptr = torch::empty_like(sub_indptr);
@@ -146,95 +164,113 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
         auto num_sampled_edges =
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
-        auto sorted_edge_id_segments =
-            allocator.AllocateStorage<indptr_t>(num_edges);
+
+        // Find the smallest integer type to store the edge id offsets.
+        const int num_bits = cuda::NumberOfBits(max_in_degree.item<indptr_t>());
+        std::array<int, 4> type_bits = {8, 16, 32, 64};
+        const auto type_index =
+            std::lower_bound(type_bits.begin(), type_bits.end(), num_bits) -
+            type_bits.begin();
+        std::array<torch::ScalarType, 5> types = {
+            torch::kByte, torch::kInt16, torch::kInt32, torch::kLong,
+            torch::kLong};
+        auto edge_id_dtype = types[type_index];
         AT_DISPATCH_INTEGRAL_TYPES(
-            indices.scalar_type(), "SampleNeighborsWithoutReplacementIndices",
-            ([&] {
-              using indices_t = scalar_t;
-              // Using bfloat16 for random numbers works just as reliably as
-              // as using float32 and provides around %30 percent speedup.
+            edge_id_dtype, "SampleNeighborsEdgeIDs", ([&] {
+              using edge_id_t = std::make_unsigned_t<scalar_t>;
+              // Using bfloat16 for random numbers works just as reliably
+              // as as using float32 and provides around %30 percent
+              // speedup.
               using rnd_t = nv_bfloat16;
               auto randoms = allocator.AllocateStorage<rnd_t>(num_edges);
               auto randoms_sorted = allocator.AllocateStorage<rnd_t>(num_edges);
-              auto probs_or_mask_scalar_type = torch::kFloat32;
-              if (probs_or_mask.has_value()) {
-                probs_or_mask_scalar_type = probs_or_mask.value().scalar_type();
-              }
-              GRAPHBOLT_DISPATCH_ALL_TYPES(
-                  probs_or_mask_scalar_type,
-                  "SampleNeighborsWithoutReplacementProbs", ([&] {
-                    using probs_t = scalar_t;
-                    probs_t* probs_ptr = nullptr;
+              auto edge_id_segments =
+                  allocator.AllocateStorage<edge_id_t>(num_edges);
+              auto sorted_edge_id_segments =
+                  allocator.AllocateStorage<edge_id_t>(num_edges);
+              AT_DISPATCH_INTEGRAL_TYPES(
+                  indices.scalar_type(), "SampleNeighborsIndices", ([&] {
+                    using indices_t = scalar_t;
+                    auto probs_or_mask_scalar_type = torch::kFloat32;
                     if (probs_or_mask.has_value()) {
-                      probs_ptr = probs_or_mask.value().data_ptr<probs_t>();
+                      probs_or_mask_scalar_type =
+                          probs_or_mask.value().scalar_type();
                     }
-                    auto input_edge_id_segments =
-                        allocator.AllocateStorage<indptr_t>(num_edges);
-                    const indices_t* indices_ptr =
-                        layer ? indices.data_ptr<indices_t>() : nullptr;
-                    const dim3 block(BLOCK_SIZE);
-                    const dim3 grid((num_edges + BLOCK_SIZE - 1) / BLOCK_SIZE);
-                    // Compute row and random number pairs.
-                    CUDA_KERNEL_CALL(
-                        _ComputeRandoms, grid, block, 0, stream, num_edges,
-                        sliced_indptr.data_ptr<indptr_t>(),
-                        sub_indptr.data_ptr<indptr_t>(),
-                        coo_rows.data_ptr<indices_t>(), probs_ptr, indices_ptr,
-                        random_seed, randoms.get(),
-                        input_edge_id_segments.get());
-
-                    // Sort the random numbers along with edge ids, after
-                    // sorting the first fanout elements of each row will give
-                    // us the sampled edges.
-                    size_t tmp_storage_size = 0;
-                    CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
-                        nullptr, tmp_storage_size, randoms.get(),
-                        randoms_sorted.get(), input_edge_id_segments.get(),
-                        sorted_edge_id_segments.get(), num_edges, num_rows,
-                        sub_indptr.data_ptr<indptr_t>(),
-                        sub_indptr.data_ptr<indptr_t>() + 1, stream));
-                    auto tmp_storage =
-                        allocator.AllocateStorage<char>(tmp_storage_size);
-                    CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
-                        tmp_storage.get(), tmp_storage_size, randoms.get(),
-                        randoms_sorted.get(), input_edge_id_segments.get(),
-                        sorted_edge_id_segments.get(), num_edges, num_rows,
-                        sub_indptr.data_ptr<indptr_t>(),
-                        sub_indptr.data_ptr<indptr_t>() + 1, stream));
+                    GRAPHBOLT_DISPATCH_ALL_TYPES(
+                        probs_or_mask_scalar_type, "SampleNeighborsProbs",
+                        ([&] {
+                          using probs_t = scalar_t;
+                          probs_t* probs_ptr = nullptr;
+                          if (probs_or_mask.has_value()) {
+                            probs_ptr =
+                                probs_or_mask.value().data_ptr<probs_t>();
+                          }
+                          const indices_t* indices_ptr =
+                              layer ? indices.data_ptr<indices_t>() : nullptr;
+                          const dim3 block(BLOCK_SIZE);
+                          const dim3 grid(
+                              (num_edges + BLOCK_SIZE - 1) / BLOCK_SIZE);
+                          // Compute row and random number pairs.
+                          CUDA_KERNEL_CALL(
+                              _ComputeRandoms, grid, block, 0, stream,
+                              num_edges, sliced_indptr.data_ptr<indptr_t>(),
+                              sub_indptr.data_ptr<indptr_t>(),
+                              coo_rows.data_ptr<indices_t>(), probs_ptr,
+                              indices_ptr, random_seed, randoms.get(),
+                              edge_id_segments.get());
+                        }));
                   }));
+
+              // Sort the random numbers along with edge ids, after
+              // sorting the first fanout elements of each row will
+              // give us the sampled edges.
+              size_t tmp_storage_size = 0;
+              CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
+                  nullptr, tmp_storage_size, randoms.get(),
+                  randoms_sorted.get(), edge_id_segments.get(),
+                  sorted_edge_id_segments.get(), num_edges, num_rows,
+                  sub_indptr.data_ptr<indptr_t>(),
+                  sub_indptr.data_ptr<indptr_t>() + 1, stream));
+              auto tmp_storage =
+                  allocator.AllocateStorage<char>(tmp_storage_size);
+              CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
+                  tmp_storage.get(), tmp_storage_size, randoms.get(),
+                  randoms_sorted.get(), edge_id_segments.get(),
+                  sorted_edge_id_segments.get(), num_edges, num_rows,
+                  sub_indptr.data_ptr<indptr_t>(),
+                  sub_indptr.data_ptr<indptr_t>() + 1, stream));
+
+              picked_eids = torch::empty(
+                  static_cast<indptr_t>(num_sampled_edges),
+                  nodes.options().dtype(indptr.scalar_type()));
+
+              auto input_buffer_it = thrust::make_transform_iterator(
+                  iota, IteratorFunc<indptr_t, edge_id_t>{
+                            sub_indptr.data_ptr<indptr_t>(),
+                            sorted_edge_id_segments.get()});
+              auto output_buffer_it = thrust::make_transform_iterator(
+                  iota, IteratorFuncAddOffset<indptr_t, indptr_t>{
+                            output_indptr.data_ptr<indptr_t>(),
+                            sliced_indptr.data_ptr<indptr_t>(),
+                            picked_eids.data_ptr<indptr_t>()});
+              constexpr int64_t max_copy_at_once =
+                  std::numeric_limits<int32_t>::max();
+
+              // Copy the sampled edge ids into picked_eids tensor.
+              for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
+                size_t tmp_storage_size = 0;
+                CUDA_CALL(cub::DeviceCopy::Batched(
+                    nullptr, tmp_storage_size, input_buffer_it + i,
+                    output_buffer_it + i, sampled_degree + i,
+                    std::min(num_rows - i, max_copy_at_once), stream));
+                auto tmp_storage =
+                    allocator.AllocateStorage<char>(tmp_storage_size);
+                CUDA_CALL(cub::DeviceCopy::Batched(
+                    tmp_storage.get(), tmp_storage_size, input_buffer_it + i,
+                    output_buffer_it + i, sampled_degree + i,
+                    std::min(num_rows - i, max_copy_at_once), stream));
+              }
             }));
-
-        picked_eids = torch::empty(
-            static_cast<indptr_t>(num_sampled_edges),
-            nodes.options().dtype(indptr.scalar_type()));
-
-        auto input_buffer_it = thrust::make_transform_iterator(
-            iota, IteratorFunc<indptr_t, indptr_t>{
-                      sub_indptr.data_ptr<indptr_t>(),
-                      sorted_edge_id_segments.get()});
-        auto output_buffer_it = thrust::make_transform_iterator(
-            iota, IteratorFunc<indptr_t, indptr_t>{
-                      output_indptr.data_ptr<indptr_t>(),
-                      picked_eids.data_ptr<indptr_t>()});
-        auto buffer_sizes = thrust::make_transform_iterator(
-            sampled_degree, ConvertToBytes<indptr_t>{});
-        constexpr int64_t max_copy_at_once =
-            std::numeric_limits<int32_t>::max();
-
-        // Copy the sampled edge ids into picked_eids tensor.
-        for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
-          size_t tmp_storage_size = 0;
-          CUDA_CALL(cub::DeviceMemcpy::Batched(
-              nullptr, tmp_storage_size, input_buffer_it + i,
-              output_buffer_it + i, buffer_sizes + i,
-              std::min(num_rows - i, max_copy_at_once), stream));
-          auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-          CUDA_CALL(cub::DeviceMemcpy::Batched(
-              tmp_storage.get(), tmp_storage_size, input_buffer_it + i,
-              output_buffer_it + i, buffer_sizes + i,
-              std::min(num_rows - i, max_copy_at_once), stream));
-        }
 
         output_indices = torch::empty(
             picked_eids.size(0),
@@ -242,8 +278,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
         // Compute: output_indices = indices.gather(0, picked_eids);
         AT_DISPATCH_INTEGRAL_TYPES(
-            indices.scalar_type(),
-            "SampleNeighborsWithoutReplacementOutputIndices", ([&] {
+            indices.scalar_type(), "SampleNeighborsOutputIndices", ([&] {
               using indices_t = scalar_t;
               const auto exec_policy =
                   thrust::cuda::par_nosync(allocator).on(stream);
