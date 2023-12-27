@@ -471,6 +471,9 @@ class MiniBatch:
         for attr in transfer_attrs:
             # Only copy member variables.
             try:
+                # For read-only attributes such as blocks and
+                # node_pairs_with_labels, setattr will throw an AttributeError.
+                # We catch these exceptions and skip those attributes.
                 setattr(self, attr, apply_to(getattr(self, attr), device))
             except AttributeError:
                 continue
