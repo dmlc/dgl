@@ -274,10 +274,10 @@ def test_exclude_edges_hetero_duplicated(reverse_row, reverse_column):
 )
 def test_sampled_subgraph_to_device():
     # Initialize data.
-    node_pairs = {
-        "A:relation:B": (
-            torch.tensor([0, 1, 2]),
-            torch.tensor([2, 1, 0]),
+    csc_format = {
+        "A:relation:B": gb.CSCFormatBase(
+            indptr=torch.tensor([0, 1, 2, 3]),
+            indices=torch.tensor([0, 1, 2]),
         )
     }
     original_row_node_ids = {
@@ -289,8 +289,8 @@ def test_sampled_subgraph_to_device():
     }
     dst_to_exclude = torch.tensor([10, 12])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
-    subgraph = FusedSampledSubgraphImpl(
-        sampled_csc=node_pairs,
+    subgraph = SampledSubgraphImpl(
+        sampled_csc=csc_format,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,
         original_edge_ids=original_edge_ids,
@@ -308,8 +308,8 @@ def test_sampled_subgraph_to_device():
 
     # Check.
     for key in graph.sampled_csc:
-        assert graph.sampled_csc[key][0].device.type == "cuda"
-        assert graph.sampled_csc[key][1].device.type == "cuda"
+        assert graph.sampled_csc[key].indices.device.type == "cuda"
+        assert graph.sampled_csc[key].indptr.device.type == "cuda"
     for key in graph.original_column_node_ids:
         assert graph.original_column_node_ids[key].device.type == "cuda"
     for key in graph.original_row_node_ids:
