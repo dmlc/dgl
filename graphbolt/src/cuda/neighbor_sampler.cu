@@ -152,6 +152,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             indices.scalar_type(), "SampleNeighborsWithoutReplacementIndices",
             ([&] {
               using indices_t = scalar_t;
+              // Using bfloat16 for random numbers works just as reliably as
+              // as using float32 and provides around %30 percent speedup.
               using rnd_t = nv_bfloat16;
               auto randoms = allocator.AllocateStorage<rnd_t>(num_edges);
               auto randoms_sorted = allocator.AllocateStorage<rnd_t>(num_edges);
