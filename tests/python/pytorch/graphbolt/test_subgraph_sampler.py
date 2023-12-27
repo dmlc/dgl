@@ -402,7 +402,6 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
         fanouts,
         replace=False,
         deduplicate=True,
-        output_cscformat=True,
     )
 
     original_row_node_ids = [
@@ -449,8 +448,7 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
         item_sampler,
         graph,
         fanouts,
-        deduplicate=True,
-        output_cscformat=True,
+        deduplicate=True,\
     )
     csc_formats = [
         {

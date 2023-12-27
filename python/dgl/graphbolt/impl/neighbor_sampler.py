@@ -102,8 +102,6 @@ class NeighborSampler(SubgraphSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
-        # TODO: clean up once the migration is done.
-        output_cscformat=True,
     ):
         super().__init__(datapipe)
         self.graph = graph
@@ -116,7 +114,6 @@ class NeighborSampler(SubgraphSampler):
         self.replace = replace
         self.prob_name = prob_name
         self.deduplicate = deduplicate
-        self.output_cscformat = output_cscformat
         self.sampler = graph.sample_neighbors
 
     def sample_subgraphs(self, seeds):
@@ -135,35 +132,20 @@ class NeighborSampler(SubgraphSampler):
                 self.fanouts[hop],
                 self.replace,
                 self.prob_name,
-                not self.deduplicate or self.output_cscformat,
             )
             if self.deduplicate:
-                if self.output_cscformat:
-                    (
-                        original_row_node_ids,
-                        compacted_csc_format,
-                    ) = unique_and_compact_csc_formats(
-                        subgraph.sampled_csc, seeds
-                    )
-                    subgraph = SampledSubgraphImpl(
-                        sampled_csc=compacted_csc_format,
-                        original_column_node_ids=seeds,
-                        original_row_node_ids=original_row_node_ids,
-                        original_edge_ids=subgraph.original_edge_ids,
-                    )
-                else:
-                    (
-                        original_row_node_ids,
-                        compacted_node_pairs,
-                    ) = unique_and_compact_node_pairs(
-                        subgraph.sampled_csc, seeds
-                    )
-                    subgraph = FusedSampledSubgraphImpl(
-                        sampled_csc=compacted_node_pairs,
-                        original_column_node_ids=seeds,
-                        original_row_node_ids=original_row_node_ids,
-                        original_edge_ids=subgraph.original_edge_ids,
-                    )
+                (
+                    original_row_node_ids,
+                    compacted_csc_format,
+                ) = unique_and_compact_csc_formats(
+                    subgraph.sampled_csc, seeds
+                )
+                subgraph = SampledSubgraphImpl(
+                    sampled_csc=compacted_csc_format,
+                    original_column_node_ids=seeds,
+                    original_row_node_ids=original_row_node_ids,
+                    original_edge_ids=subgraph.original_edge_ids,
+                )
             else:
                 (
                     original_row_node_ids,
@@ -279,8 +261,6 @@ class LayerNeighborSampler(NeighborSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
-        # TODO: clean up once the migration is done.
-        output_cscformat=True,
     ):
         super().__init__(
             datapipe,
@@ -289,6 +269,5 @@ class LayerNeighborSampler(NeighborSampler):
             replace,
             prob_name,
             deduplicate,
-            output_cscformat,
         )
         self.sampler = graph.sample_layer_neighbors
