@@ -28,7 +28,13 @@ def test_CopyTo():
 
 @pytest.mark.parametrize(
     "task",
-    ["node_classification", "link_prediction", "edge_classification", "other"],
+    [
+        "node_classification",
+        "node_inference",
+        "link_prediction",
+        "edge_classification",
+        "other",
+    ],
 )
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyToWithMiniBatches(task):
@@ -38,6 +44,8 @@ def test_CopyToWithMiniBatches(task):
         itemset = gb.ItemSet(
             (torch.arange(N), torch.arange(N)), names=("seed_nodes", "labels")
         )
+    elif task == "node_inference":
+        itemset = gb.ItemSet(torch.arange(N), names="seed_nodes")
     elif task == "link_prediction":
         itemset = gb.ItemSet(
             (
@@ -52,7 +60,10 @@ def test_CopyToWithMiniBatches(task):
             names=("node_pairs", "labels"),
         )
     else:
-        itemset = gb.ItemSet(torch.arange(N), names="seed_nodes")
+        itemset = gb.ItemSet(
+            (torch.arange(2 * N).reshape(-1, 2), torch.arange(N)),
+            names=("node_pairs", "seed_nodes"),
+        )
     graph = gb_test_utils.rand_csc_graph(100, 0.15, bidirection_edge=True)
 
     features = {}
@@ -67,11 +78,12 @@ def test_CopyToWithMiniBatches(task):
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )
-    datapipe = gb.FeatureFetcher(
-        datapipe,
-        feature_store,
-        ["a"],
-    )
+    if task != "node_inference":
+        datapipe = gb.FeatureFetcher(
+            datapipe,
+            feature_store,
+            ["a"],
+        )
 
     if task == "node_classification":
         copied_attrs = [
@@ -80,6 +92,13 @@ def test_CopyToWithMiniBatches(task):
             "sampled_subgraphs",
             "labels",
             "blocks",
+        ]
+    elif task == "node_inference":
+        copied_attrs = [
+            "seed_nodes",
+            "sampled_subgraphs",
+            "blocks",
+            "labels",
         ]
     elif task == "link_prediction":
         copied_attrs = [
@@ -119,6 +138,7 @@ def test_CopyToWithMiniBatches(task):
                     not callable(var)
                     and not attr.startswith("__")
                     and hasattr(var, "device")
+                    and var is not None
                 ):
                     if task == "other":
                         assert var.device.type == "cuda"
