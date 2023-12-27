@@ -42,8 +42,6 @@ namespace ops {
  * @param probs_or_mask An optional tensor with (unnormalized) probabilities
  * corresponding to each neighboring edge of a node. It must be
  * a 1D tensor, with the number of elements equaling the total number of edges.
- * @param random_seed An optional random_seed parameter to fix the random_seed
- * of the sampling operation. (Useful when layer=True)
  *
  * @return An intrusive pointer to a FusedSampledSubgraph object containing
  * the sampled graph's information.
