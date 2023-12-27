@@ -147,10 +147,10 @@ def test_InSubgraphSampler_hetero():
     node_type_offset = torch.LongTensor([0, 3, 6])
     type_per_edge = torch.LongTensor([0, 0, 2, 0, 2, 0, 2, 1, 1, 1, 3, 3, 1, 3])
     graph = gb.fused_csc_sampling_graph(
-        csc_indptr=indptr.to(F.ctx()),
-        indices=indices.to(F.ctx()),
-        node_type_offset=node_type_offset.to(F.ctx()),
-        type_per_edge=type_per_edge.to(F.ctx()),
+        csc_indptr=indptr,
+        indices=indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
     ).to(F.ctx())
