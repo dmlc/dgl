@@ -442,17 +442,21 @@ class MiniBatch:
         def apply_to(x, device):
             return recursive_apply(x, lambda x: _to(x, device))
 
-        if self.labels is not None and self.seed_nodes is not None:
-            # Node classification.
+        if self.seed_nodes is not None and self.compacted_node_pairs is None:
+            # Node related tasks.
             transfer_attrs = [
                 "labels",
                 "sampled_subgraphs",
                 "node_features",
                 "edge_features",
             ]
-        elif self.labels is None and self.compacted_node_pairs is not None:
-            # Link prediction.
+            if self.labels is None:
+                # Layerwise inference
+                transfer_attrs.append("seed_nodes")
+        elif self.seed_nodes is None and self.compacted_node_pairs is not None:
+            # Link/edge related tasks.
             transfer_attrs = [
+                "labels",
                 "compacted_node_pairs",
                 "compacted_negative_srcs",
                 "compacted_negative_dsts",
@@ -460,17 +464,8 @@ class MiniBatch:
                 "node_features",
                 "edge_features",
             ]
-        elif self.labels is not None and self.compacted_node_pairs is not None:
-            # Edge classification.
-            transfer_attrs = [
-                "labels",
-                "compacted_node_pairs",
-                "sampled_subgraphs",
-                "node_features",
-                "edge_features",
-            ]
         else:
-            # Unrecognized task. Will copy all the attributes to the device.
+            # Otherwise copy all the attributes to the device.
             transfer_attrs = get_attributes(self)
 
         for attr in transfer_attrs:
