@@ -104,15 +104,24 @@ inline bool is_zero<dim3>(dim3 size) {
  */
 template <typename scalar_t>
 struct CopyScalar {
-  CopyScalar(const scalar_t* device_ptr) : is_ready_(false) {
-    pinned_scalar_ = torch::empty(
-        sizeof(scalar_t),
-        c10::TensorOptions().dtype(torch::kBool).pinned_memory(true));
+  CopyScalar() : is_ready_(true) { init_pinned_storage(); }
+
+  void record(at::cuda::CUDAStream stream = GetCurrentStream()) {
+    copy_event_.record(stream);
+    is_ready_ = false;
+  }
+
+  scalar_t* get() {
+    return reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr());
+  }
+
+  CopyScalar(const scalar_t* device_ptr) {
+    init_pinned_storage();
     auto stream = GetCurrentStream();
     CUDA_CALL(cudaMemcpyAsync(
         reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr()), device_ptr,
         sizeof(scalar_t), cudaMemcpyDeviceToHost, stream));
-    copy_event_.record(stream);
+    record(stream);
   }
 
   operator scalar_t() {
@@ -120,10 +129,16 @@ struct CopyScalar {
       copy_event_.synchronize();
       is_ready_ = true;
     }
-    return reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr())[0];
+    return *get();
   }
 
  private:
+  void init_pinned_storage() {
+    pinned_scalar_ = torch::empty(
+        sizeof(scalar_t),
+        c10::TensorOptions().dtype(torch::kBool).pinned_memory(true));
+  }
+
   torch::Tensor pinned_scalar_;
   at::cuda::CUDAEvent copy_event_;
   bool is_ready_;
