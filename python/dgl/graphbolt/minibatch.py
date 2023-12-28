@@ -8,7 +8,7 @@ import torch
 import dgl
 from dgl.utils import recursive_apply
 
-from .base import CSCFormatBase, etype_str_to_tuple
+from .base import etype_str_to_tuple
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
