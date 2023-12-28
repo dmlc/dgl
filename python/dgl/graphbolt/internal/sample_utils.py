@@ -338,7 +338,7 @@ def compact_csc_format(
     Examples
     --------
     >>> import dgl.graphbolt as gb
-    >>> N1 = torch.LongTecnsor([1, 2, 2])
+    >>> N1 = torch.LongTensor([1, 2, 2])
     >>> N2 = torch.LongTensor([5, 6, 5])
     >>> csc_formats = {"n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1]),
     ... indices=torch.tensor([5]))}
