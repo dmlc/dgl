@@ -92,6 +92,17 @@ def create_dataloader(
 
     ############################################################################
     # [Step-2]:
+    # self.copy_to()
+    # [Input]:
+    # 'device': The device to copy the data to.
+    # 'extra_attrs': The extra attributes to copy.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device.
+    ############################################################################
+    datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+
+    ############################################################################
+    # [Step-3]:
     # self.sample_neighbor()
     # [Input]:
     # 'graph': The network topology for sampling.
@@ -109,7 +120,7 @@ def create_dataloader(
     )
 
     ############################################################################
-    # [Step-3]:
+    # [Step-4]:
     # self.fetch_feature()
     # [Input]:
     # 'features': The node features.
@@ -123,16 +134,6 @@ def create_dataloader(
     ############################################################################
     if job != "infer":
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
-
-    ############################################################################
-    # [Step-4]:
-    # self.copy_to()
-    # [Input]:
-    # 'device': The device to copy the data to.
-    # [Output]:
-    # A CopyTo object to copy the data to the specified device.
-    ############################################################################
-    datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
     # [Step-5]:
@@ -350,7 +351,7 @@ def parse_args():
     )
     parser.add_argument(
         "--device",
-        default="cpu",
+        default="cuda",
         choices=["cpu", "cuda"],
         help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
     )
@@ -368,9 +369,12 @@ def main(args):
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
     graph = dataset.graph
-    # Currently the neighbor-sampling process can only be done on the CPU,
-    # therefore there is no need to copy the graph to the GPU.
     features = dataset.feature
+    # If a CUDA device is selected, we pin the graph and the features so that
+    # the GPU can access them.
+    if args.device == torch.device("cuda"):
+        graph.pin_memory_()
+        features.pin_memory_()
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
