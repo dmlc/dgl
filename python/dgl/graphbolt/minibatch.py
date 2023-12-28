@@ -227,7 +227,7 @@ class MiniBatch:
                         sampled_csc.indices,
                         torch.arange(
                             0,
-                            sampled_csc.indptr[-1],
+                            len(sampled_csc.indices),
                             device=sampled_csc.indptr.device,
                             dtype=sampled_csc.indptr.dtype,
                         ),

@@ -146,6 +146,14 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Input]:
+    # 'device': The device to copy the data to.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device.
+    ############################################################################
+    datapipe = datapipe.copy_to(device=args.device)
+
+    ############################################################################
+    # [Input]:
     # 'args.neg_ratio': Specify the ratio of negative to positive samples.
     # (E.g., if neg_ratio is 1, for each positive sample there will be 1
     # negative sample.)
@@ -209,14 +217,6 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     ############################################################################
     if is_train:
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
-
-    ############################################################################
-    # [Input]:
-    # 'device': The device to copy the data to.
-    # [Output]:
-    # A CopyTo object to copy the data to the specified device.
-    ############################################################################
-    datapipe = datapipe.copy_to(device=args.device)
 
     ############################################################################
     # [Input]:
@@ -367,7 +367,7 @@ def parse_args():
     )
     parser.add_argument(
         "--device",
-        default="cpu",
+        default="cuda",
         choices=["cpu", "cuda"],
         help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
     )
@@ -384,6 +384,11 @@ def main(args):
     dataset = gb.BuiltinDataset("ogbl-citation2").load()
     graph = dataset.graph
     features = dataset.feature
+    # If a CUDA device is selected, we pin the graph and the features so that
+    # the GPU can access them.
+    if args.device == "cuda":
+        graph.pin_memory_()
+        features.pin_memory_()
     train_set = dataset.tasks[0].train_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
