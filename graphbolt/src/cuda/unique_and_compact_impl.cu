@@ -33,20 +33,22 @@ struct EqualityFunc {
   }
 };
 
-template <typename scalar_iterator_t>
-auto Max(const scalar_iterator_t input, int64_t size) {
-  auto allocator = cuda::GetAllocator();
-  auto stream = cuda::GetCurrentStream();
-  using scalar_t = std::remove_reference_t<decltype(input[0])>;
-  cuda::CopyScalar<scalar_t> result;
-  size_t workspace_size = 0;
-  cub::DeviceReduce::Max(
-      nullptr, workspace_size, input, result.get(), size, stream);
-  auto temp = allocator.AllocateStorage<char>(workspace_size);
-  cub::DeviceReduce::Max(
-      temp.get(), workspace_size, input, result.get(), size, stream);
-  return result;
-}
+#define DefineReductionFunction(reduce_fn, name)                              \
+  template <typename scalar_iterator_t>                                       \
+  auto name(const scalar_iterator_t input, int64_t size) {                    \
+    auto allocator = cuda::GetAllocator();                                    \
+    auto stream = cuda::GetCurrentStream();                                   \
+    using scalar_t = std::remove_reference_t<decltype(input[0])>;             \
+    cuda::CopyScalar<scalar_t> result;                                        \
+    size_t workspace_size = 0;                                                \
+    reduce_fn(nullptr, workspace_size, input, result.get(), size, stream);    \
+    auto temp = allocator.AllocateStorage<char>(workspace_size);              \
+    reduce_fn(temp.get(), workspace_size, input, result.get(), size, stream); \
+    return result;                                                            \
+  }
+
+DefineReductionFunction(cub::DeviceReduce::Max, Max);
+DefineReductionFunction(cub::DeviceReduce::Min, Min);
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
@@ -157,12 +159,13 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
             dst_ids_ptr + dst_ids.size(0), new_dst_ids_loc.get());
 
         cuda::CopyScalar<bool> all_exist;
-        {  // Check if unique_dst_ids includes all dst_ids.
+        // Check if unique_dst_ids includes all dst_ids.
+        if (dst_ids.size(0) > 0) {
           thrust::counting_iterator<int64_t> iota(0);
           auto equal_it = thrust::make_transform_iterator(
               iota, EqualityFunc<scalar_t>{
                         sorted_order_ptr, new_dst_ids_loc.get(), dst_ids_ptr});
-          all_exist = Max(equal_it, dst_ids.size(0));
+          all_exist = Min(equal_it, dst_ids.size(0));
           all_exist.record();
         }
 
@@ -181,7 +184,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
             new_src_ids_loc.get() + src_ids.size(0),
             new_ids.data_ptr<int64_t>(), new_src_ids.data_ptr<scalar_t>());
         // Perform check before we gather for the dst indices.
-        if (dst_ids.size(0) != 0 && !static_cast<bool>(all_exist)) {
+        if (dst_ids.size(0) > 0 && !static_cast<bool>(all_exist)) {
           throw std::out_of_range("Some ids not found.");
         }
         auto new_dst_ids = torch::empty_like(dst_ids);
