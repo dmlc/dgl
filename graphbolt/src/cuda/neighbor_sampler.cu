@@ -115,7 +115,7 @@ struct IteratorFuncAddOffset {
 };
 
 template <typename indptr_t, typename in_degree_iterator_t>
-struct EndIteratorFunc {
+struct SegmentEndFunc {
   indptr_t* indptr;
   in_degree_iterator_t in_degree;
   __host__ __device__ auto operator()(int64_t i) {
@@ -275,7 +275,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                 // Ensuring sort result still ends up in sorted_edge_id_segments
                 std::swap(edge_id_segments, sorted_edge_id_segments);
                 auto sampled_segment_end_it = thrust::make_transform_iterator(
-                    iota, EndIteratorFunc<indptr_t, decltype(sampled_degree)>{
+                    iota, SegmentEndFunc<indptr_t, decltype(sampled_degree)>{
                               sub_indptr.data_ptr<indptr_t>(), sampled_degree});
                 size_t tmp_storage_size = 0;
                 CUDA_CALL(cub::DeviceSegmentedSort::SortKeys(
