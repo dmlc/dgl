@@ -4,6 +4,7 @@
  * @brief DGL C++ matrix operators.
  */
 #include <sparse/matrix_ops.h>
+#include <torch/script.h>
 
 namespace dgl {
 namespace sparse {

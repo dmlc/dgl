@@ -267,7 +267,7 @@ void IndexSelectCSCCopyIndices(
   }
 }
 
-std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
+std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
   auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
@@ -313,6 +313,15 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
             }));
         return std::make_tuple(output_indptr, output_indices);
       }));
+}
+
+std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
+  if (indices.is_pinned()) {
+    return UVAIndexSelectCSCImpl(indptr, indices, nodes);
+  } else {
+    return DeviceIndexSelectCSCImpl(indptr, indices, nodes);
+  }
 }
 
 }  //  namespace ops

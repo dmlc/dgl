@@ -45,5 +45,6 @@ dependencies:
     - ufmt
     - clang-format
     - pylint
+    - lintrunner
 variables:
   DGL_HOME: __DGL_HOME__
