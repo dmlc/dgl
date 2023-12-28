@@ -202,7 +202,7 @@ class MiniBatch:
                             v.indices,
                             torch.arange(
                                 0,
-                                v.indptr[-1],
+                                len(v.indices),
                                 device=v.indptr.device,
                                 dtype=v.indptr.dtype,
                             ),
