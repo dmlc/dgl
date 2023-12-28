@@ -971,7 +971,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""
 
         def _pin(x):
-            return x.pinned_memory() if hasattr(x, "pinned_memory") else x
+            return x.pin_memory() if hasattr(x, "pin_memory") else x
 
         self._apply_to_members(_pin)
 

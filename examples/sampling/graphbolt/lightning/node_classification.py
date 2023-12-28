@@ -143,11 +143,10 @@ class DataModule(LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.feature_store = dataset.feature
+        self.graph = dataset.graph
         if num_gpus > 0:
             self.feature_store.pin_memory_()
-        self.graph = dataset.graph.to(
-            None if num_gpus == 0 else torch.device("cuda")
-        )
+            self.graph.pin_memory_()
         self.train_set = dataset.tasks[0].train_set
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
