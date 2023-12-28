@@ -33,18 +33,19 @@ struct EqualityFunc {
   }
 };
 
-#define DefineReductionFunction(reduce_fn, name)                              \
-  template <typename scalar_iterator_t>                                       \
-  auto name(const scalar_iterator_t input, int64_t size) {                    \
-    auto allocator = cuda::GetAllocator();                                    \
-    auto stream = cuda::GetCurrentStream();                                   \
-    using scalar_t = std::remove_reference_t<decltype(input[0])>;             \
-    cuda::CopyScalar<scalar_t> result;                                        \
-    size_t workspace_size = 0;                                                \
-    reduce_fn(nullptr, workspace_size, input, result.get(), size, stream);    \
-    auto temp = allocator.AllocateStorage<char>(workspace_size);              \
-    reduce_fn(temp.get(), workspace_size, input, result.get(), size, stream); \
-    return result;                                                            \
+#define DefineReductionFunction(reduce_fn, name)                               \
+  template <typename scalar_iterator_t>                                        \
+  auto name(const scalar_iterator_t input, int64_t size) {                     \
+    auto allocator = cuda::GetAllocator();                                     \
+    auto stream = cuda::GetCurrentStream();                                    \
+    using scalar_t = std::remove_reference_t<decltype(input[0])>;              \
+    cuda::CopyScalar<scalar_t> result;                                         \
+    size_t workspace_size = 0;                                                 \
+    reduce_fn(nullptr, workspace_size, input, result.get(), size, stream);     \
+    auto tmp_storage = allocator.AllocateStorage<char>(workspace_size);        \
+    reduce_fn(                                                                 \
+        tmp_storage.get(), workspace_size, input, result.get(), size, stream); \
+    return result;                                                             \
   }
 
 DefineReductionFunction(cub::DeviceReduce::Max, Max);
@@ -66,8 +67,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         auto dst_ids_ptr = dst_ids.data_ptr<scalar_t>();
         auto unique_dst_ids_ptr = unique_dst_ids.data_ptr<scalar_t>();
 
-        // If num_bits is not given, compute it to speedup the expensive sort
-        // operations later.
+        // If num_bits is not given, compute maximum vertex ids to compute
+        // num_bits later to speedup the expensive sort operations.
         cuda::CopyScalar<scalar_t> max_id_src;
         cuda::CopyScalar<scalar_t> max_id_dst;
         if (num_bits == 0) {
@@ -100,9 +101,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
               nullptr, workspace_size, src_ids_ptr, is_src,
               only_src.data_ptr<scalar_t>(), only_src_size.get(),
               src_ids.size(0), stream);
-          auto temp = allocator.AllocateStorage<char>(workspace_size);
+          auto tmp_storage = allocator.AllocateStorage<char>(workspace_size);
           cub::DeviceSelect::Flagged(
-              temp.get(), workspace_size, src_ids_ptr, is_src,
+              tmp_storage.get(), workspace_size, src_ids_ptr, is_src,
               only_src.data_ptr<scalar_t>(), only_src_size.get(),
               src_ids.size(0), stream);
           stream.synchronize();
@@ -133,11 +134,11 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
               nullptr, workspace_size, sorted_only_src.data_ptr<scalar_t>(),
               unique_only_src_ptr, unique_only_src_size.get(), only_src.size(0),
               stream));
-          auto temp = allocator.AllocateStorage<char>(workspace_size);
+          auto tmp_storage = allocator.AllocateStorage<char>(workspace_size);
           CUDA_CALL(cub::DeviceSelect::Unique(
-              temp.get(), workspace_size, sorted_only_src.data_ptr<scalar_t>(),
-              unique_only_src_ptr, unique_only_src_size.get(), only_src.size(0),
-              stream));
+              tmp_storage.get(), workspace_size,
+              sorted_only_src.data_ptr<scalar_t>(), unique_only_src_ptr,
+              unique_only_src_size.get(), only_src.size(0), stream));
           stream.synchronize();
           unique_only_src = unique_only_src.slice(
               0, 0, static_cast<int64_t>(unique_only_src_size));
