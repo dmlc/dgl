@@ -72,9 +72,7 @@ torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements);
  * @brief Select columns for a sparse matrix in a CSC format according to nodes
  * tensor.
  *
- * NOTE:
- * 1. The shape of all tensors must be 1-D.
- * 2. Should be called if all input tensors are on device memory.
+ * NOTE: The shape of all tensors must be 1-D.
  *
  * @param indptr Indptr tensor containing offsets with shape (N,).
  * @param indices Indices tensor with edge information of shape (indptr[N],).
@@ -83,23 +81,6 @@ torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements);
  * shapes (M + 1,) and ((indptr[nodes + 1] - indptr[nodes]).sum(),).
  */
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
-
-/**
- * @brief Select columns for a sparse matrix in a CSC format according to nodes
- * tensor.
- *
- * NOTE:
- * 1. The shape of all tensors must be 1-D.
- * 2. Should be called if indices tensor is on pinned memory.
- *
- * @param indptr Indptr tensor containing offsets with shape (N,).
- * @param indices Indices tensor with edge information of shape (indptr[N],).
- * @param nodes Nodes tensor with shape (M,).
- * @return (torch::Tensor, torch::Tensor) Output indptr and indices tensors of
- * shapes (M + 1,) and ((indptr[nodes + 1] - indptr[nodes]).sum(),).
- */
-std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
 /**
