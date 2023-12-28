@@ -1569,6 +1569,10 @@ def test_csc_sampling_graph_to_device():
         assert graph.edge_attributes[key].device.type == "cuda"
 
 
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
 def test_csc_sampling_graph_to_pinned_memory():
     # Construct FusedCSCSamplingGraph.
     graph = create_fused_csc_sampling_graph()
