@@ -118,6 +118,7 @@ class NeighborSampler(SubgraphSampler):
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
             ntypes = list(self.graph.node_type_to_id.keys())
+            # Loop over different seeds to extract the device they are on.
             device = None
             dtype = None
             for _, seed in seeds.items():
