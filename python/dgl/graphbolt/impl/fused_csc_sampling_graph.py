@@ -444,7 +444,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         homogeneous_timestamps = []
         for ntype, ids in nodes.items():
             ntype_id = self.node_type_to_id[ntype]
-            homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
+            homogeneous_nodes.append(
+                ids + self.node_type_offset[ntype_id].item()
+            )
             if timestamps is not None:
                 homogeneous_timestamps.append(timestamps[ntype])
         if timestamps is not None:
