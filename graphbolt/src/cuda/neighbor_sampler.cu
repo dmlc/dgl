@@ -125,26 +125,39 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
+  auto allocator = cuda::GetAllocator();
+  const auto stream = cuda::GetCurrentStream();
   const auto num_rows = nodes.size(0);
   const auto fanout =
       fanouts[0] >= 0 ? fanouts[0] : std::numeric_limits<int64_t>::max();
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
-  auto max_in_degree = in_degree.slice(0, 0, num_rows).max();
+  auto max_in_degree = torch::empty(
+      1,
+      c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
+  AT_DISPATCH_INTEGRAL_TYPES(
+      indptr.scalar_type(), "SampleNeighborsInDegree", ([&] {
+        size_t tmp_storage_size = 0;
+        cub::DeviceReduce::Max(
+            nullptr, tmp_storage_size, in_degree.data_ptr<scalar_t>(),
+            max_in_degree.data_ptr<scalar_t>(), num_rows, stream);
+        auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
+        cub::DeviceReduce::Max(
+            tmp_storage.get(), tmp_storage_size, in_degree.data_ptr<scalar_t>(),
+            max_in_degree.data_ptr<scalar_t>(), num_rows, stream);
+      }));
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto sub_indptr = ExclusiveCumSum(in_degree);
   auto output_indptr = torch::empty_like(sub_indptr);
   auto coo_rows = CSRToCOO(sub_indptr, indices.scalar_type());
   const auto num_edges = coo_rows.size(0);
-  auto allocator = cuda::GetAllocator();
-  const auto stream = cuda::GetCurrentStream();
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
   torch::Tensor picked_eids;
   torch::Tensor output_indices;
 
   AT_DISPATCH_INTEGRAL_TYPES(
-      indptr.scalar_type(), "SampleNeighborsWithoutReplacementIndptr", ([&] {
+      indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
         using indptr_t = scalar_t;
         thrust::counting_iterator<int64_t> iota(0);
         auto sampled_degree = thrust::make_transform_iterator(
@@ -166,7 +179,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
 
         // Find the smallest integer type to store the edge id offsets.
-        const int num_bits = cuda::NumberOfBits(max_in_degree.item<indptr_t>());
+        // CSRToCOO had synch inside, so it is safe to read max_in_degree now.
+        const int num_bits =
+            cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         std::array<int, 4> type_bits = {8, 16, 32, 64};
         const auto type_index =
             std::lower_bound(type_bits.begin(), type_bits.end(), num_bits) -
@@ -178,9 +193,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         AT_DISPATCH_INTEGRAL_TYPES(
             edge_id_dtype, "SampleNeighborsEdgeIDs", ([&] {
               using edge_id_t = std::make_unsigned_t<scalar_t>;
-              // Using bfloat16 for random numbers works just as reliably
-              // as as using float32 and provides around %30 percent
-              // speedup.
+              TORCH_CHECK(
+                  num_bits <= sizeof(edge_id_t) * 8,
+                  "Selected edge_id_t must be capable of storing edge_ids.");
+              // Using bfloat16 for random numbers works just as reliably as
+              // float32 and provides around %30 percent speedup.
               using rnd_t = nv_bfloat16;
               auto randoms = allocator.AllocateStorage<rnd_t>(num_edges);
               auto randoms_sorted = allocator.AllocateStorage<rnd_t>(num_edges);
