@@ -226,8 +226,8 @@ def unique_and_compact_csc_formats(
     ...     "n1": torch.LongTensor([1, 2]),
     ...     "n2": torch.LongTensor([5, 6])}
     >>> csc_formats = {
-    ...     "n1:e1:n2": CSCFormatBase(indptr=torch.tensor([0, 2, 3]),indices=N1),
-    ...     "n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1, 3]),indices=N2)}
+    ...     "n1:e1:n2": gb.CSCFormatBase(indptr=torch.tensor([0, 2, 3]),indices=N1),
+    ...     "n2:e2:n1": gb.CSCFormatBase(indptr=torch.tensor([0, 1, 3]),indices=N2)}
     >>> unique_nodes, compacted_csc_formats = gb.unique_and_compact_csc_formats(
     ...     csc_formats, unique_dst
     ... )
@@ -338,9 +338,9 @@ def compact_csc_format(
     Examples
     --------
     >>> import dgl.graphbolt as gb
-    >>> N1 = torch.LongTecnsor([1, 2, 2])
+    >>> N1 = torch.LongTensor([1, 2, 2])
     >>> N2 = torch.LongTensor([5, 6, 5])
-    >>> csc_formats = {"n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1]),
+    >>> csc_formats = {"n2:e2:n1": gb.CSCFormatBase(indptr=torch.tensor([0, 1]),
     ... indices=torch.tensor([5]))}
     >>> dst_nodes = {"n1": N1[:1]}
     >>> original_row_node_ids, compacted_csc_formats = gb.compact_csc_format(
