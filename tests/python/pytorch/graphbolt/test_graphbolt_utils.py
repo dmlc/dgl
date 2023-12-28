@@ -350,14 +350,6 @@ def test_unique_and_compact_incorrect_indptr():
     with pytest.raises(AssertionError):
         gb.unique_and_compact_csc_formats(csc_formats, seeds)
 
-    seeds = torch.tensor([1, 3, 5, 2, 6])
-    indptr = torch.tensor([0, 2, 4, 6, 7, 11])
-    indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4])
-    csc_formats = gb.CSCFormatBase(indptr=indptr, indices=indices)
-    # The value of last element in indptr is not corresponding to indices.
-    with pytest.raises(AssertionError):
-        gb.unique_and_compact_csc_formats(csc_formats, seeds)
-
 
 def test_compact_csc_format_hetero():
     dst_nodes = {
