@@ -8,6 +8,11 @@ if(USE_CUDA)
   add_definitions(-DGRAPHBOLT_USE_CUDA)
 endif()
 
+# For windows, define NOMINMAX to avoid conflict with std::min/max
+if(MSVC)
+  add_definitions(-DNOMINMAX)
+endif()
+
 # Find PyTorch cmake files and PyTorch versions with the python interpreter
 # $PYTHON_INTERP ("python3" or "python" if empty)
 if(NOT PYTHON_INTERP)
