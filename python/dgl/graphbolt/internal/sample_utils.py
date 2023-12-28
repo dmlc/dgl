@@ -254,9 +254,6 @@ def unique_and_compact_csc_formats(
     for etype, csc_format in csc_formats.items():
         if device is None:
             device = csc_format.indices.device
-        assert csc_format.indptr[-1] == len(
-            csc_format.indices
-        ), "The last element of indptr should be the same as the length of indices."
         src_type, _, dst_type = etype_str_to_tuple(etype)
         assert len(unique_dst_nodes.get(dst_type, [])) + 1 == len(
             csc_format.indptr
