@@ -26,17 +26,11 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
   TORCH_CHECK(
       indices.sizes().size() == 1, "IndexSelectCSC only supports 1d tensors");
-  if (indices.is_pinned() && utils::is_accessible_from_gpu(indptr) &&
+  if (utils::is_accessible_from_gpu(indptr) &&
+      utils::is_accessible_from_gpu(indices) &&
       utils::is_accessible_from_gpu(nodes)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "UVAIndexSelectCSC",
-        { return UVAIndexSelectCSCImpl(indptr, indices, nodes); });
-  } else if (
-      indices.device().type() == c10::DeviceType::CUDA &&
-      utils::is_accessible_from_gpu(indptr) &&
-      utils::is_accessible_from_gpu(nodes)) {
-    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "nodesSelectCSC",
+        c10::DeviceType::CUDA, "IndexSelectCSCImpl",
         { return IndexSelectCSCImpl(indptr, indices, nodes); });
   }
   // @todo: The CPU supports only integer dtypes for indices tensor.
