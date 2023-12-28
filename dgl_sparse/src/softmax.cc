@@ -6,6 +6,7 @@
 
 #include <sparse/reduction.h>
 #include <sparse/sparse_matrix.h>
+#include <torch/script.h>
 
 #include "./matmul.h"
 #include "./utils.h"
