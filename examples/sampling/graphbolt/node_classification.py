@@ -126,18 +126,6 @@ def create_dataloader(
 
     ############################################################################
     # [Step-4]:
-    # self.to_dgl()
-    # [Input]:
-    # 'datapipe': The previous datapipe object.
-    # [Output]:
-    # A DGLMiniBatch used for computing.
-    # [Role]:
-    # Convert a mini-batch to dgl-minibatch.
-    ############################################################################
-    datapipe = datapipe.to_dgl()
-
-    ############################################################################
-    # [Step-5]:
     # self.copy_to()
     # [Input]:
     # 'device': The device to copy the data to.
@@ -147,7 +135,7 @@ def create_dataloader(
     datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
-    # [Step-6]:
+    # [Step-5]:
     # gb.DataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
@@ -220,9 +208,9 @@ class SAGE(nn.Module):
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
-                y[
-                    data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device)
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device
+                )
             feature = y
 
         return y

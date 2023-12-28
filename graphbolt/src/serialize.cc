@@ -24,27 +24,3 @@ serialize::OutputArchive& operator<<(
 }
 
 }  // namespace torch
-
-namespace graphbolt {
-
-c10::intrusive_ptr<sampling::FusedCSCSamplingGraph> LoadFusedCSCSamplingGraph(
-    const std::string& filename) {
-  auto&& graph = c10::make_intrusive<sampling::FusedCSCSamplingGraph>();
-  torch::load(*graph, filename);
-  return graph;
-}
-
-void SaveFusedCSCSamplingGraph(
-    c10::intrusive_ptr<sampling::FusedCSCSamplingGraph> graph,
-    const std::string& filename) {
-  torch::save(*graph, filename);
-}
-
-torch::IValue read_from_archive(
-    torch::serialize::InputArchive& archive, const std::string& key) {
-  torch::IValue data;
-  archive.read(key, data);
-  return data;
-}
-
-}  // namespace graphbolt

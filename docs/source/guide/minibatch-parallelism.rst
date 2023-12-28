@@ -1,6 +1,6 @@
 .. _guide-minibatch-parallelism:
 
-6.8 Data Loading Parallelism
+6.9 Data Loading Parallelism
 -----------------------
 
 In minibatch training of GNNs, we usually need to cover several stages to
@@ -11,8 +11,7 @@ generate a minibatch, including:
 * Sample neighbors for each seed from graph.
 * Exclude seed edges from the sampled subgraphs.
 * Fetch node and edge features for the sampled subgraphs.
-* Convert the sampled subgraphs to DGLMiniBatches.
-* Copy the DGLMiniBatches to the target device.
+* Copy the MiniBatches to the target device.
 
 .. code:: python
 
@@ -21,9 +20,8 @@ generate a minibatch, including:
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
     datapipe = datapipe.transform(gb.exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 All these stages are implemented in separate
 `IterableDataPipe <https://pytorch.org/data/main/torchdata.datapipes.iter.html>`__

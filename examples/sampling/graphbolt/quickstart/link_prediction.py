@@ -47,9 +47,6 @@ def create_dataloader(dateset, device, is_train=True):
         dataset.feature, node_feature_keys=["feat"]
     )
 
-    # Convert the mini-batch to DGL format to train a DGL model.
-    datapipe = datapipe.to_dgl()
-
     # Copy the mini-batch to the designated device for training.
     datapipe = datapipe.copy_to(device)
 
@@ -79,20 +76,6 @@ class GraphSAGE(nn.Module):
         return hidden_x
 
 
-def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
-    """Convert the minibatch to a training pair and a label tensor."""
-    pos_src, pos_dst = data.positive_node_pairs
-    neg_src, neg_dst = data.negative_node_pairs
-    node_pairs = (
-        torch.cat((pos_src, neg_src), dim=0),
-        torch.cat((pos_dst, neg_dst), dim=0),
-    )
-    pos_label = torch.ones_like(pos_src)
-    neg_label = torch.zeros_like(neg_src)
-    labels = torch.cat([pos_label, neg_label], dim=0)
-    return (node_pairs, labels)
-
-
 @torch.no_grad()
 def evaluate(model, dataset, device):
     model.eval()
@@ -101,8 +84,8 @@ def evaluate(model, dataset, device):
     logits = []
     labels = []
     for step, data in enumerate(dataloader):
-        # Unpack MiniBatch.
-        compacted_pairs, label = to_binary_link_dgl_computing_pack(data)
+        # Get node pairs with labels for loss calculation.
+        compacted_pairs, label = data.node_pairs_with_labels
 
         # The features of sampled nodes.
         x = data.node_features["feat"]
@@ -140,8 +123,8 @@ def train(model, dataset, device):
         # mini-batches.
         ########################################################################
         for step, data in enumerate(dataloader):
-            # Unpack MiniBatch.
-            compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
+            # Get node pairs with labels for loss calculation.
+            compacted_pairs, labels = data.node_pairs_with_labels
 
             # The features of sampled nodes.
             x = data.node_features["feat"]

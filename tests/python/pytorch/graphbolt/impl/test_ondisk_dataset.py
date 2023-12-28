@@ -6,7 +6,6 @@ import tempfile
 import unittest
 import warnings
 
-import gb_test_utils as gbt
 import numpy as np
 import pandas as pd
 import pydantic
@@ -15,6 +14,8 @@ import torch
 import yaml
 
 from dgl import graphbolt as gb
+
+from .. import gb_test_utils as gbt
 
 
 def write_yaml_file(yaml_content, dir):
@@ -1005,11 +1006,11 @@ def test_OnDiskDataset_Graph_Exceptions():
 def test_OnDiskDataset_Graph_homogeneous():
     """Test homogeneous graph topology."""
     csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
-    graph = gb.from_fused_csc(csc_indptr, indices)
+    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
@@ -1025,11 +1026,12 @@ def test_OnDiskDataset_Graph_homogeneous():
         assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
         assert torch.equal(graph.indices, graph2.indices)
 
-        assert graph.metadata is None and graph2.metadata is None
         assert (
             graph.node_type_offset is None and graph2.node_type_offset is None
         )
         assert graph.type_per_edge is None and graph2.type_per_edge is None
+        assert graph.node_type_to_id is None and graph2.node_type_to_id is None
+        assert graph.edge_type_to_id is None and graph2.edge_type_to_id is None
 
 
 def test_OnDiskDataset_Graph_heterogeneous():
@@ -1039,15 +1041,21 @@ def test_OnDiskDataset_Graph_heterogeneous():
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
-    graph = gb.from_fused_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+    graph = gb.fused_csc_sampling_graph(
+        csc_indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
@@ -1064,8 +1072,8 @@ def test_OnDiskDataset_Graph_heterogeneous():
         assert torch.equal(graph.indices, graph2.indices)
         assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
         assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
-        assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
-        assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+        assert graph.node_type_to_id == graph2.node_type_to_id
+        assert graph.edge_type_to_id == graph2.edge_type_to_id
 
 
 def test_OnDiskDataset_Metadata():
@@ -1119,12 +1127,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
         assert "graph" not in processed_dataset
         assert "graph_topology" in processed_dataset
 
-        fused_csc_sampling_graph = (
-            gb.fused_csc_sampling_graph.load_fused_csc_sampling_graph(
-                os.path.join(
-                    test_dir, processed_dataset["graph_topology"]["path"]
-                )
-            )
+        fused_csc_sampling_graph = torch.load(
+            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
         )
         assert fused_csc_sampling_graph.total_num_nodes == num_nodes
         assert fused_csc_sampling_graph.total_num_edges == num_edges
@@ -1140,7 +1144,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             torch.arange(num_samples),
             torch.tensor([fanout]),
         )
-        assert len(subgraph.node_pairs[0]) <= num_samples
+        assert len(subgraph.sampled_csc.indices) <= num_samples
 
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1166,12 +1170,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
         )
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
-        fused_csc_sampling_graph = (
-            gb.fused_csc_sampling_graph.load_fused_csc_sampling_graph(
-                os.path.join(
-                    test_dir, processed_dataset["graph_topology"]["path"]
-                )
-            )
+        fused_csc_sampling_graph = torch.load(
+            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
         )
         assert (
             fused_csc_sampling_graph.edge_attributes is not None
@@ -1285,7 +1285,6 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
                       type: null
                       name: feat
                       format: numpy
-                      in_memory: true
                       path: data/edge-feat.npy
             feature_data:
                 - domain: node
@@ -1325,7 +1324,7 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
             dataset_name: {dataset_name}
             graph_topology:
               type: FusedCSCSamplingGraph
-              path: preprocessed/fused_csc_sampling_graph.tar
+              path: preprocessed/fused_csc_sampling_graph.pt
             feature_data:
               - domain: node
                 type: null
@@ -1479,7 +1478,7 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
             dataset_name: {dataset_name}
             graph_topology:
               type: FusedCSCSamplingGraph
-              path: preprocessed\\fused_csc_sampling_graph.tar
+              path: preprocessed\\fused_csc_sampling_graph.pt
             feature_data:
               - domain: node
                 type: null
@@ -1833,11 +1832,11 @@ def test_OnDiskDataset_load_tasks():
 def test_OnDiskDataset_all_nodes_set_homo():
     """Test homograph's all nodes set of OnDiskDataset."""
     csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
-    graph = gb.from_fused_csc(csc_indptr, indices)
+    graph = gb.fused_csc_sampling_graph(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
@@ -1861,20 +1860,22 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         indices,
         node_type_offset,
         type_per_edge,
-        metadata,
+        node_type_to_id,
+        edge_type_to_id,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
-    graph = gb.from_fused_csc(
+    graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
         edge_attributes=None,
-        metadata=metadata,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
-        gb.save_fused_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.pt")
+        torch.save(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
@@ -1999,8 +2000,8 @@ def test_BuiltinDataset():
     """Test BuiltinDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # Case 1: download from DGL S3 storage.
-        dataset_name = "test-only"
-        # Add test-only dataset to the builtin dataset list for testing only.
+        dataset_name = "test-dataset-231207"
+        # Add dataset to the builtin dataset list for testing only.
         gb.BuiltinDataset._all_datasets.append(dataset_name)
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
         assert dataset.graph is not None
@@ -2084,7 +2085,6 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
             datapipe = datapipe.fetch_feature(
                 dataset.feature, node_feature_keys=["feat"]
             )
-            datapipe = datapipe.to_dgl()
             dataloader = gb.DataLoader(datapipe)
             for _ in dataloader:
                 pass
@@ -2156,7 +2156,6 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
             datapipe = datapipe.fetch_feature(
                 dataset.feature, node_feature_keys={"user": ["feat"]}
             )
-            datapipe = datapipe.to_dgl()
             dataloader = gb.DataLoader(datapipe)
             for _ in dataloader:
                 pass
@@ -2164,3 +2163,63 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
         graph = None
         tasks = None
         dataset = None
+
+
+def test_OnDiskTask_repr_homogeneous():
+    item_set = gb.ItemSet(
+        (torch.arange(0, 5), torch.arange(5, 10)),
+        names=("seed_nodes", "labels"),
+    )
+    metadata = {"name": "node_classification"}
+    task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
+    expected_str = str(
+        """OnDiskTask(validation_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
+                                  names=('seed_nodes', 'labels'),
+                          ),
+           train_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
+                             names=('seed_nodes', 'labels'),
+                     ),
+           test_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
+                            names=('seed_nodes', 'labels'),
+                    ),
+           metadata={'name': 'node_classification'},
+)"""
+    )
+    assert str(task) == expected_str, print(task)
+
+
+def test_OnDiskTask_repr_heterogeneous():
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seed_nodes"),
+        }
+    )
+    metadata = {"name": "node_classification"}
+    task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
+    expected_str = str(
+        """OnDiskTask(validation_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
+                                                    names=('seed_nodes',),
+                                            ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
+                                                    names=('seed_nodes',),
+                                            )},
+                                      names=('seed_nodes',),
+                          ),
+           train_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
+                                               names=('seed_nodes',),
+                                       ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
+                                               names=('seed_nodes',),
+                                       )},
+                                 names=('seed_nodes',),
+                     ),
+           test_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
+                                              names=('seed_nodes',),
+                                      ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
+                                              names=('seed_nodes',),
+                                      )},
+                                names=('seed_nodes',),
+                    ),
+           metadata={'name': 'node_classification'},
+)"""
+    )
+    assert str(task) == expected_str, print(task)

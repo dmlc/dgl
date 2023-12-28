@@ -50,14 +50,14 @@ putting the list of generated MFGs onto GPU.
     # Or equivalently:
     # datapipe = gb.NeighborSampler(datapipe, g, [10, 10])
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 
-Iterating over the DataLoader will yield :class:`~dgl.graphbolt.DGLMiniBatch`
+Iterating over the DataLoader will yield :class:`~dgl.graphbolt.MiniBatch`
 which contains a list of specially created graphs representing the computation
-dependencies on each layer. They are called *message flow graphs* (MFGs) in DGL.
+dependencies on each layer. In order to train with DGL, you can access the
+*message flow graphs* (MFGs) by calling `mini_batch.blocks`.
 
 .. code:: python
 
@@ -128,7 +128,7 @@ Training Loop
 
 The training loop simply consists of iterating over the dataset with the
 customized batching iterator. During each iteration that yields
-:class:`~dgl.graphbolt.DGLMiniBatch`, we:
+:class:`~dgl.graphbolt.MiniBatch`, we:
 
 1. Access the node features corresponding to the input nodes via
    ``data.node_features["feat"]``. These features are already moved to the
@@ -215,9 +215,8 @@ of node types to node IDs.
     datapipe = datapipe.fetch_feature(
         feature, node_feature_keys={"author": ["feat"], "paper": ["feat"]}
     )
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 The training loop is almost the same as that of homogeneous graphs,
 except for the implementation of ``compute_loss`` that will take in two

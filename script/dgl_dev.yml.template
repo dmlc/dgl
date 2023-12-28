@@ -27,7 +27,7 @@ dependencies:
     - scikit-learn
     - scipy
     - torch==__TORCH_VERSION__
-    - torchdata
+    - torchdata>=0.5.0
     - torcheval
     - torchmetrics
     - tqdm
@@ -43,5 +43,8 @@ dependencies:
     - seaborn
     - jupyter_http_over_ws
     - ufmt
+    - clang-format
+    - pylint
+    - lintrunner
 variables:
   DGL_HOME: __DGL_HOME__

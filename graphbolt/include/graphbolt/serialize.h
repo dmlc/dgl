@@ -21,11 +21,16 @@ namespace torch {
 
 /**
  * @brief Overload input stream operator for FusedCSCSamplingGraph
- * deserialization.
+ * deserialization. This enables `torch::load()` for FusedCSCSamplingGraph.
+ *
  * @param archive Input stream for deserializing.
  * @param graph FusedCSCSamplingGraph.
  *
  * @return archive
+ *
+ * @code
+ * auto&& graph = c10::make_intrusive<sampling::FusedCSCSamplingGraph>();
+ * torch::load(*graph, filename);
  */
 inline serialize::InputArchive& operator>>(
     serialize::InputArchive& archive,
@@ -33,11 +38,15 @@ inline serialize::InputArchive& operator>>(
 
 /**
  * @brief Overload output stream operator for FusedCSCSamplingGraph
- * serialization.
+ * serialization. This enables `torch::save()` for FusedCSCSamplingGraph.
  * @param archive Output stream for serializing.
  * @param graph FusedCSCSamplingGraph.
  *
  * @return archive
+ *
+ * @code
+ * auto&& graph = c10::make_intrusive<sampling::FusedCSCSamplingGraph>();
+ * torch::save(*graph, filename);
  */
 inline serialize::OutputArchive& operator<<(
     serialize::OutputArchive& archive,
@@ -48,33 +57,19 @@ inline serialize::OutputArchive& operator<<(
 namespace graphbolt {
 
 /**
- * @brief Load FusedCSCSamplingGraph from file.
- * @param filename File name to read.
- *
- * @return FusedCSCSamplingGraph.
- */
-c10::intrusive_ptr<sampling::FusedCSCSamplingGraph> LoadFusedCSCSamplingGraph(
-    const std::string& filename);
-
-/**
- * @brief Save FusedCSCSamplingGraph to file.
- * @param graph FusedCSCSamplingGraph to save.
- * @param filename File name to save.
- *
- */
-void SaveFusedCSCSamplingGraph(
-    c10::intrusive_ptr<sampling::FusedCSCSamplingGraph> graph,
-    const std::string& filename);
-
-/**
- * @brief Read data from archive.
+ * @brief Read data from archive and format to specified type.
  * @param archive Input archive.
  * @param key Key name of data.
  *
  * @return data.
  */
-torch::IValue read_from_archive(
-    torch::serialize::InputArchive& archive, const std::string& key);
+template <typename T>
+T read_from_archive(
+    torch::serialize::InputArchive& archive, const std::string& key) {
+  torch::IValue data;
+  archive.read(key, data);
+  return data.to<T>();
+}
 
 }  // namespace graphbolt
 

@@ -49,7 +49,7 @@ def main(args):
     else:
         device = "cpu"
 
-    num_classes = train_dataset.num_labels
+    num_classes = train_dataset.num_classes
 
     # Extract node features
     graph = train_dataset[0]

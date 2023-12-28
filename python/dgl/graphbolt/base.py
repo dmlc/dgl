@@ -74,7 +74,7 @@ def etype_tuple_to_str(c_etype):
 
 
 def etype_str_to_tuple(c_etype):
-    """Convert canonical etype from tuple to string.
+    """Convert canonical etype from string to tuple.
 
     Examples
     --------
@@ -102,7 +102,11 @@ def apply_to(x, device):
 @functional_datapipe("copy_to")
 class CopyTo(IterDataPipe):
     """DataPipe that transfers each element yielded from the previous DataPipe
-    to the given device.
+    to the given device. For MiniBatch, only the related attributes
+    (automatically inferred) will be transferred by default. If you want to
+    transfer any other attributes, indicate them in the `extra_attrs`.
+
+    Functional name: :obj:`copy_to`.
 
     This is equivalent to
 
@@ -117,16 +121,29 @@ class CopyTo(IterDataPipe):
         The DataPipe.
     device : torch.device
         The PyTorch CUDA device.
+    extra_attrs: List[string]
+        The extra attributes in the MiniBatch you want to be carried to the
+        specific device.
     """
 
-    def __init__(self, datapipe, device):
+    def __init__(self, datapipe, device, extra_attrs=None):
         super().__init__()
         self.datapipe = datapipe
         self.device = device
+        self.extra_attrs = extra_attrs
 
     def __iter__(self):
         for data in self.datapipe:
             data = recursive_apply(data, apply_to, self.device)
+            if self.extra_attrs is not None:
+                for attr in self.extra_attrs:
+                    setattr(
+                        data,
+                        attr,
+                        recursive_apply(
+                            getattr(data, attr), apply_to, self.device
+                        ),
+                    )
             yield data
 
 
@@ -149,6 +166,22 @@ class CSCFormatBase:
 
     def __repr__(self) -> str:
         return _csc_format_base_str(self)
+
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `CSCFormatBase` to the specified device using reflection."""
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: apply_to(x, device)
+                    ),
+                )
+
+        return self
 
 
 def _csc_format_base_str(csc_format_base: CSCFormatBase) -> str:

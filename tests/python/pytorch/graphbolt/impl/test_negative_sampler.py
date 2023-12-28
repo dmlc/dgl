@@ -1,7 +1,8 @@
 import dgl.graphbolt as gb
-import gb_test_utils
 import pytest
 import torch
+
+from .. import gb_test_utils
 
 
 def test_NegativeSampler_invoke():
@@ -105,17 +106,17 @@ def get_hetero_graph():
     # num_nodes = 5, num_n1 = 2, num_n2 = 3
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
     type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     node_type_offset = torch.LongTensor([0, 2, 5])
-    return gb.from_fused_csc(
+    return gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
 

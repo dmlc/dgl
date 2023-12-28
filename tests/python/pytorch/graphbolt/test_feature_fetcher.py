@@ -2,21 +2,14 @@ import random
 from enum import Enum
 
 import dgl.graphbolt as gb
-import gb_test_utils
 import pytest
 import torch
 from torchdata.datapipes.iter import Mapper
 
-
-class MiniBatchType(Enum):
-    MiniBatch = 1
-    DGLMiniBatch = 2
+from . import gb_test_utils
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_invoke(minibatch_type):
+def test_FeatureFetcher_invoke():
     # Prepare graph and required datapipes.
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
@@ -39,8 +32,6 @@ def test_FeatureFetcher_invoke(minibatch_type):
 
     # Invoke FeatureFetcher via class constructor.
     datapipe = gb.NeighborSampler(item_sampler, graph, fanouts)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        datapipe = datapipe.to_dgl()
 
     datapipe = gb.FeatureFetcher(datapipe, feature_store, ["a"], ["b"])
     assert len(list(datapipe)) == 5
@@ -52,10 +43,7 @@ def test_FeatureFetcher_invoke(minibatch_type):
     assert len(list(datapipe)) == 5
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_homo(minibatch_type):
+def test_FeatureFetcher_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
         [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
@@ -75,17 +63,12 @@ def test_FeatureFetcher_homo(minibatch_type):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        sampler_dp = sampler_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_with_edges_homo(minibatch_type):
+def test_FeatureFetcher_with_edges_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
         [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
@@ -100,7 +83,7 @@ def test_FeatureFetcher_with_edges_homo(minibatch_type):
             range_tensor = torch.arange(10)
             subgraphs.append(
                 gb.FusedSampledSubgraphImpl(
-                    node_pairs=(range_tensor, range_tensor),
+                    sampled_csc=(range_tensor, range_tensor),
                     original_column_node_ids=range_tensor,
                     original_row_node_ids=range_tensor,
                     original_edge_ids=torch.randint(
@@ -120,8 +103,6 @@ def test_FeatureFetcher_with_edges_homo(minibatch_type):
     itemset = gb.ItemSet(torch.arange(10))
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        converter_dp = converter_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
@@ -140,24 +121,21 @@ def get_hetero_graph():
     # num_nodes = 5, num_n1 = 2, num_n2 = 3
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
     type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     node_type_offset = torch.LongTensor([0, 2, 5])
-    return gb.from_fused_csc(
+    return gb.fused_csc_sampling_graph(
         indptr,
         indices,
         node_type_offset=node_type_offset,
         type_per_edge=type_per_edge,
-        metadata=metadata,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
     )
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_hetero(minibatch_type):
+def test_FeatureFetcher_hetero():
     graph = get_hetero_graph()
     a = torch.tensor([[random.randint(0, 10)] for _ in range(2)])
     b = torch.tensor([[random.randint(0, 10)] for _ in range(3)])
@@ -178,8 +156,6 @@ def test_FeatureFetcher_hetero(minibatch_type):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        sampler_dp = sampler_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(
         sampler_dp, feature_store, {"n1": ["a"], "n2": ["a"]}
     )
@@ -187,10 +163,7 @@ def test_FeatureFetcher_hetero(minibatch_type):
     assert len(list(fetcher_dp)) == 3
 
 
-@pytest.mark.parametrize(
-    "minibatch_type", [MiniBatchType.MiniBatch, MiniBatchType.DGLMiniBatch]
-)
-def test_FeatureFetcher_with_edges_hetero(minibatch_type):
+def test_FeatureFetcher_with_edges_hetero():
     a = torch.tensor([[random.randint(0, 10)] for _ in range(20)])
     b = torch.tensor([[random.randint(0, 10)] for _ in range(50)])
 
@@ -211,7 +184,7 @@ def test_FeatureFetcher_with_edges_hetero(minibatch_type):
         for _ in range(3):
             subgraphs.append(
                 gb.FusedSampledSubgraphImpl(
-                    node_pairs={
+                    sampled_csc={
                         "n1:e1:n2": (
                             torch.arange(10),
                             torch.arange(10),
@@ -242,8 +215,6 @@ def test_FeatureFetcher_with_edges_hetero(minibatch_type):
     )
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
-    if minibatch_type == MiniBatchType.DGLMiniBatch:
-        converter_dp = converter_dp.to_dgl()
     fetcher_dp = gb.FeatureFetcher(
         converter_dp, feature_store, {"n1": ["a"]}, {"n1:e1:n2": ["a"]}
     )

@@ -1,6 +1,6 @@
 .. _guide-minibatch-inference:
 
-6.6 Exact Offline Inference on Large Graphs
+6.7 Exact Offline Inference on Large Graphs
 ------------------------------------------------------
 
 :ref:`(中文版) <guide_cn-minibatch-inference>`
@@ -47,9 +47,8 @@ only one layer at a time.
     datapipe = gb.ItemSampler(all_nodes_set, batch_size=1024, shuffle=True)
     datapipe = datapipe.sample_neighbor(g, [-1]) # 1 layers.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    datapipe = datapipe.to_dgl()
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 
 Note that offline inference is implemented as a method of the GNN module
@@ -107,7 +106,7 @@ and combined as well.
                         hidden_x = self.dropout(hidden_x)
                     # By design, our output nodes are contiguous.
                     y[
-                        data.output_nodes[0] : data.output_nodes[-1] + 1
+                        data.seed_nodes[0] : data.seed_nodes[-1] + 1
                     ] = hidden_x.to(device)
                 feature = y
 

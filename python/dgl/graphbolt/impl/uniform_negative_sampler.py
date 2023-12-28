@@ -12,6 +12,8 @@ class UniformNegativeSampler(NegativeSampler):
     """Sample negative destination nodes for each source node based on a uniform
     distribution.
 
+    Functional name: :obj:`sample_uniform_negative`.
+
     It's important to note that the term 'negative' refers to false negatives,
     indicating that the sampled pairs are not ensured to be absent in the graph.
     For each edge ``(u, v)``, it is supposed to generate `negative_ratio` pairs
@@ -32,7 +34,7 @@ class UniformNegativeSampler(NegativeSampler):
     >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5])
     >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
-    >>> graph = gb.from_fused_csc(indptr, indices)
+    >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
     >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
