@@ -10,7 +10,7 @@ GraphBolt.
 Overview
 ^^^^^^^
 
-.. image:: ../../_static/graphbolt_overview.png
+.. image:: ../_static/graphbolt_overview.jpg
   :width: 700
   :alt: Graphbolt Overview
 
