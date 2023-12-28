@@ -161,7 +161,7 @@ class DataModule(LightningDataModule):
             drop_last=is_train,
         )
         if self.num_gpus > 0:
-            datapipe = datapipe.copy_to("cuda")
+            datapipe = datapipe.copy_to("cuda", ["seed_nodes"])
         sampler = (
             datapipe.sample_layer_neighbor
             if is_train
