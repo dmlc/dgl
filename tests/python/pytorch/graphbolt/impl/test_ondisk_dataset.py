@@ -1143,9 +1143,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
         subgraph = fused_csc_sampling_graph.sample_neighbors(
             torch.arange(num_samples),
             torch.tensor([fanout]),
-            output_cscformat=False,
         )
-        assert len(subgraph.sampled_csc[0]) <= num_samples
+        assert len(subgraph.sampled_csc.indices) <= num_samples
 
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
