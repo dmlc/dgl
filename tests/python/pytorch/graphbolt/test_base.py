@@ -87,6 +87,7 @@ def test_CopyToWithMiniBatches(task):
 
     if task == "node_classification":
         copied_attrs = [
+            "seed_nodes",
             "node_features",
             "edge_features",
             "sampled_subgraphs",
