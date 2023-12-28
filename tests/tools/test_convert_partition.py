@@ -171,7 +171,7 @@ def test_get_unique_invidx_low_mem():
     expected_idxes = np.array(
         [1, 2, 7, 6, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
     )
-    expected_srcids = np.array([0, 1, 1, 1, 2, 6, 3, 8, 0, 8])
+    expected_srcids = np.array([8, 0, 1, 1, 0, 1, 3, 2, 8, 6])
     expected_dstids = np.array([4, 10, 6, 7, 4, 11, 10, 7, 8, 10])
     assert np.all(
         uniques == expected_unqiues
@@ -243,9 +243,9 @@ def test_get_unique_invidx_low_high_mem():
     assert not np.all(
         idxes_low == idxes_high
     ), f"indices is not expected. {idxes_low} == {idxes_high}"
-    assert not np.all(
+    assert np.all(
         srcids_low == srcids_high
-    ), f"srcids is not expected. {srcids_low} == {srcids_high}"
+    ), f"srcids is not expected. {srcids_low} != {srcids_high}"
     assert np.all(
         dstids_low == dstids_high
     ), f"dstdis is not expected. {dstids_low} != {dstids_high}"

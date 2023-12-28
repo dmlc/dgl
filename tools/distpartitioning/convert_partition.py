@@ -140,15 +140,7 @@ def _get_unique_invidx(srcids, dstids, nids, low_mem=True):
     # uniques and idxes are built
     assert len(uniques) == len(idxes), f"Error building the idxes array."
 
-    # build inverse idxes for srcids, dstids and nids
-    # over-write the srcids and dstids arrays.
-    sort_ids = np.argsort(srcids)
-    srcids = srcids[sort_ids]
-
-    # TODO: check if wrapping this while loop in a c++ wrapper
-    # helps in speeding up the code
     srcids = np.searchsorted(uniques, srcids, side="left")
-    srcids = srcids[sort_ids]
 
     # process dstids now.
     # dstids is guaranteed to be a subset of the `nids` list
