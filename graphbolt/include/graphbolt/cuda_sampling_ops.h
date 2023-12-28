@@ -53,5 +53,15 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
     torch::optional<torch::Tensor> probs_or_mask = torch::nullopt);
 
+/**
+ * @brief Return the subgraph induced on the inbound edges of the given nodes.
+ * @param nodes Type agnostic node IDs to form the subgraph.
+ *
+ * @return FusedSampledSubgraph.
+ */
+c10::intrusive_ptr<sampling::FusedSampledSubgraph> InSubgraph(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
+    torch::optional<torch::Tensor> type_per_edge);
+
 }  //  namespace ops
 }  //  namespace graphbolt

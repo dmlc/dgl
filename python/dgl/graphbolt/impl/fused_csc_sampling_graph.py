@@ -439,11 +439,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
             original_hetero_edge_ids = {}
             for etype, etype_id in self.edge_type_to_id.items():
                 subgraph_indice[etype] = torch.empty(
-                    (num.get(etype_id, 0),), dtype=indices.dtype
+                    (num.get(etype_id, 0),),
+                    dtype=indices.dtype,
+                    device=indices.device,
                 )
                 if has_original_eids:
                     original_hetero_edge_ids[etype] = torch.empty(
-                        (num.get(etype_id, 0),), dtype=original_edge_ids.dtype
+                        (num.get(etype_id, 0),),
+                        dtype=original_edge_ids.dtype,
+                        device=original_edge_ids.device,
                     )
                 subgraph_indptr[etype] = [0]
                 subgraph_indice_position[etype] = 0
@@ -486,7 +490,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 original_edge_ids = original_hetero_edge_ids
             sampled_csc = {
                 etype: CSCFormatBase(
-                    indptr=torch.tensor(subgraph_indptr[etype]),
+                    indptr=torch.tensor(
+                        subgraph_indptr[etype], device=indptr.device
+                    ),
                     indices=subgraph_indice[etype],
                 )
                 for etype in self.edge_type_to_id.keys()

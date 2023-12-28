@@ -274,6 +274,15 @@ FusedCSCSamplingGraph::GetState() const {
 
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
+  if (utils::is_accessible_from_gpu(indptr_) &&
+      utils::is_accessible_from_gpu(indices_) &&
+      utils::is_accessible_from_gpu(nodes) &&
+      (!type_per_edge_.has_value() ||
+       utils::is_accessible_from_gpu(type_per_edge_.value()))) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(c10::DeviceType::CUDA, "InSubgraph", {
+      return ops::InSubgraph(indptr_, indices_, nodes, type_per_edge_);
+    });
+  }
   using namespace torch::indexing;
   const int32_t kDefaultGrainSize = 100;
   const auto num_seeds = nodes.size(0);
