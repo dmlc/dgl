@@ -1,4 +1,7 @@
+import unittest
 from functools import partial
+
+import backend as F
 
 import dgl
 import dgl.graphbolt as gb
@@ -11,7 +14,7 @@ from . import gb_test_utils
 
 def test_SubgraphSampler_invoke():
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
 
     # Invoke via class constructor.
     datapipe = gb.SubgraphSampler(item_sampler)
@@ -26,9 +29,11 @@ def test_SubgraphSampler_invoke():
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_NeighborSampler_invoke(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
@@ -47,9 +52,11 @@ def test_NeighborSampler_invoke(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_NeighborSampler_fanouts(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
 
     # `fanouts` is a list of tensors.
@@ -71,9 +78,11 @@ def test_NeighborSampler_fanouts(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Node(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
@@ -88,9 +97,11 @@ def to_link_batch(data):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
-    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
@@ -101,9 +112,11 @@ def test_SubgraphSampler_Link(labor):
 
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_With_Negative(labor):
-    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
+    graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
+        F.ctx()
+    )
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
-    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
@@ -135,13 +148,17 @@ def get_hetero_graph():
     )
 
 
+@unittest.skipIf(
+    F._default_context_str != "cpu",
+    reason="Heterogenous sampling not yet supported on GPU.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Node_Hetero(labor):
-    graph = get_hetero_graph()
+    graph = get_hetero_graph().to(F.ctx())
     itemset = gb.ItemSetDict(
         {"n2": gb.ItemSet(torch.arange(3), names="seed_nodes")}
     )
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
@@ -151,9 +168,13 @@ def test_SubgraphSampler_Node_Hetero(labor):
         assert len(minibatch.sampled_subgraphs) == num_layer
 
 
+@unittest.skipIf(
+    F._default_context_str != "cpu",
+    reason="Heterogenous sampling not yet supported on GPU.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_Hetero(labor):
-    graph = get_hetero_graph()
+    graph = get_hetero_graph().to(F.ctx())
     itemset = gb.ItemSetDict(
         {
             "n1:e1:n2": gb.ItemSet(
@@ -167,7 +188,7 @@ def test_SubgraphSampler_Link_Hetero(labor):
         }
     )
 
-    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
@@ -176,9 +197,13 @@ def test_SubgraphSampler_Link_Hetero(labor):
     assert len(list(datapipe)) == 5
 
 
+@unittest.skipIf(
+    F._default_context_str != "cpu",
+    reason="Heterogenous sampling not yet supported on GPU.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
-    graph = get_hetero_graph()
+    graph = get_hetero_graph().to(F.ctx())
     itemset = gb.ItemSetDict(
         {
             "n1:e1:n2": gb.ItemSet(
@@ -192,7 +217,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
         }
     )
 
-    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
@@ -202,6 +227,10 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     assert len(list(datapipe)) == 5
 
 
+@unittest.skipIf(
+    F._default_context_str != "cpu",
+    reason="Sampling with replacement not yet supported on GPU.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Random_Hetero_Graph(labor):
     num_nodes = 5
@@ -230,7 +259,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
         edge_attributes=edge_attributes,
-    )
+    ).to(F.ctx())
     itemset = gb.ItemSetDict(
         {
             "n2": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
@@ -238,10 +267,11 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
         }
     )
 
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+
     sampler_dp = Sampler(item_sampler, graph, fanouts, replace=True)
 
     for data in sampler_dp:
@@ -267,16 +297,22 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
                 )
 
 
+@unittest.skipIf(
+    F._default_context_str != "cpu",
+    reason="Fails due to randomness on the GPU.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_without_dedpulication_Homo(labor):
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
     )
-    graph = gb.from_dglgraph(graph, True)
+    graph = gb.from_dglgraph(graph, True).to(F.ctx())
     seed_nodes = torch.LongTensor([0, 3, 4])
 
     itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes))
+    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(
+        F.ctx()
+    )
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
@@ -285,14 +321,17 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
 
     length = [17, 7]
     compacted_indices = [
-        torch.arange(0, 10) + 7,
-        torch.arange(0, 4) + 3,
+        (torch.arange(0, 10) + 7).to(F.ctx()),
+        (torch.arange(0, 4) + 3).to(F.ctx()),
     ]
     indptr = [
-        torch.tensor([0, 1, 2, 4, 4, 6, 8, 10]),
-        torch.tensor([0, 1, 2, 4]),
+        torch.tensor([0, 1, 2, 4, 4, 6, 8, 10]).to(F.ctx()),
+        torch.tensor([0, 1, 2, 4]).to(F.ctx()),
     ]
-    seeds = [torch.tensor([0, 3, 4, 5, 2, 2, 4]), torch.tensor([0, 3, 4])]
+    seeds = [
+        torch.tensor([0, 3, 4, 5, 2, 2, 4]).to(F.ctx()),
+        torch.tensor([0, 3, 4]).to(F.ctx()),
+    ]
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert len(sampled_subgraph.original_row_node_ids) == length[step]
@@ -307,13 +346,17 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
             )
 
 
+@unittest.skipIf(
+    F._default_context_str != "cpu",
+    reason="Heterogenous sampling not yet supported on GPU.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_without_dedpulication_Hetero(labor):
-    graph = get_hetero_graph()
+    graph = get_hetero_graph().to(F.ctx())
     itemset = gb.ItemSetDict(
         {"n2": gb.ItemSet(torch.arange(2), names="seed_nodes")}
     )
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
@@ -383,15 +426,21 @@ def test_SubgraphSampler_without_dedpulication_Hetero(labor):
                 )
 
 
+@unittest.skipIf(
+    F._default_context_str != "cpu",
+    reason="Fails due to randomness on the GPU.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_unique_csc_format_Homo(labor):
     torch.manual_seed(1205)
     graph = dgl.graph(([5, 0, 6, 7, 2, 2, 4], [0, 1, 2, 2, 3, 4, 4]))
-    graph = gb.from_dglgraph(graph, True)
+    graph = gb.from_dglgraph(graph, True).to(F.ctx())
     seed_nodes = torch.LongTensor([0, 3, 4])
 
     itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes))
+    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(
+        F.ctx()
+    )
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
@@ -405,18 +454,21 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
     )
 
     original_row_node_ids = [
-        torch.tensor([0, 3, 4, 5, 2, 6, 7]),
-        torch.tensor([0, 3, 4, 5, 2]),
+        torch.tensor([0, 3, 4, 5, 2, 6, 7]).to(F.ctx()),
+        torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
     ]
     compacted_indices = [
-        torch.tensor([3, 4, 4, 2, 5, 6]),
-        torch.tensor([3, 4, 4, 2]),
+        torch.tensor([3, 4, 4, 2, 5, 6]).to(F.ctx()),
+        torch.tensor([3, 4, 4, 2]).to(F.ctx()),
     ]
     indptr = [
-        torch.tensor([0, 1, 2, 4, 4, 6]),
-        torch.tensor([0, 1, 2, 4]),
+        torch.tensor([0, 1, 2, 4, 4, 6]).to(F.ctx()),
+        torch.tensor([0, 1, 2, 4]).to(F.ctx()),
     ]
-    seeds = [torch.tensor([0, 3, 4, 5, 2]), torch.tensor([0, 3, 4])]
+    seeds = [
+        torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        torch.tensor([0, 3, 4]).to(F.ctx()),
+    ]
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert torch.equal(
@@ -434,13 +486,17 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
             )
 
 
+@unittest.skipIf(
+    F._default_context_str != "cpu",
+    reason="Heterogenous sampling not yet supported on GPU.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_unique_csc_format_Hetero(labor):
-    graph = get_hetero_graph()
+    graph = get_hetero_graph().to(F.ctx())
     itemset = gb.ItemSetDict(
         {"n2": gb.ItemSet(torch.arange(2), names="seed_nodes")}
     )
-    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler

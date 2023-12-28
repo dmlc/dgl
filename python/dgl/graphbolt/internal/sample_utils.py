@@ -368,7 +368,14 @@ def compact_csc_format(
         original_row_ids = torch.cat((dst_nodes, csc_formats.indices))
         compacted_csc_formats = CSCFormatBase(
             indptr=csc_formats.indptr,
-            indices=(torch.arange(0, csc_formats.indices.size(0)) + offset),
+            indices=(
+                torch.arange(
+                    0,
+                    csc_formats.indices.size(0),
+                    device=csc_formats.indices.device,
+                )
+                + offset
+            ),
         )
     else:
         compacted_csc_formats = {}
@@ -381,12 +388,17 @@ def compact_csc_format(
             assert len(dst_nodes.get(dst_type, [])) + 1 == len(
                 csc_format.indptr
             ), "The seed nodes should correspond to indptr."
-            offset = original_row_ids.get(src_type, torch.tensor([])).size(0)
+            device = csc_format.indices.device
+            offset = original_row_ids.get(
+                src_type, torch.tensor([], device=device)
+            ).size(0)
             original_row_ids[src_type] = torch.cat(
                 (
                     original_row_ids.get(
                         src_type,
-                        torch.tensor([], dtype=csc_format.indices.dtype),
+                        torch.tensor(
+                            [], dtype=csc_format.indices.dtype, device=device
+                        ),
                     ),
                     csc_format.indices,
                 )
@@ -398,6 +410,7 @@ def compact_csc_format(
                         0,
                         csc_format.indices.size(0),
                         dtype=csc_format.indices.dtype,
+                        device=device,
                     )
                     + offset
                 ),
