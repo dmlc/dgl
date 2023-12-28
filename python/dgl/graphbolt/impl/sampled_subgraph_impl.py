@@ -1,7 +1,7 @@
 """Sampled subgraph for FusedCSCSamplingGraph."""
 # pylint: disable= invalid-name
 from dataclasses import dataclass
-from typing import Dict, Tuple, Union
+from typing import Dict, Union
 
 import torch
 
