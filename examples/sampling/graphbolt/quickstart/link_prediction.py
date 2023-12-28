@@ -26,6 +26,9 @@ def create_dataloader(dateset, device, is_train=True):
     # Sample seed edges from the itemset.
     datapipe = gb.ItemSampler(itemset, batch_size=256)
 
+    # Copy the mini-batch to the designated device for sampling and training.
+    datapipe = datapipe.copy_to(device)
+
     if is_train:
         # Sample negative edges for the seed edges.
         datapipe = datapipe.sample_uniform_negative(
@@ -46,9 +49,6 @@ def create_dataloader(dateset, device, is_train=True):
     datapipe = datapipe.fetch_feature(
         dataset.feature, node_feature_keys=["feat"]
     )
-
-    # Copy the mini-batch to the designated device for training.
-    datapipe = datapipe.copy_to(device)
 
     # Initiate the dataloader for the datapipe.
     return gb.DataLoader(datapipe)
@@ -155,6 +155,12 @@ if __name__ == "__main__":
     # Load and preprocess dataset.
     print("Loading data...")
     dataset = gb.BuiltinDataset("cora").load()
+
+    # If a CUDA device is selected, we pin the graph and the features so that
+    # the GPU can access them.
+    if device == torch.device("cuda:0"):
+        dataset.graph.pin_memory_()
+        dataset.feature.pin_memory_()
 
     in_size = dataset.feature.size("node", None, "feat")[0]
     model = GraphSAGE(in_size).to(device)
