@@ -427,11 +427,11 @@ def test_get_dgl_blocks_homo():
     ]
     csc_formats = [
         gb.CSCFormatBase(
-            indptr=torch.tensor([0,1,3,5,6]),
+            indptr=torch.tensor([0, 1, 3, 5, 6]),
             indices=torch.tensor([0, 1, 2, 2, 1, 2]),
         ),
         gb.CSCFormatBase(
-            indptr=torch.tensor([0,1, 3]),
+            indptr=torch.tensor([0, 1, 3]),
             indices=torch.tensor([0, 1, 2]),
         ),
     ]
@@ -501,10 +501,20 @@ def test_get_dgl_blocks_hetero():
     ]
     csc_formats = [
         {
-            relation: gb.CSCFormatBase(indptr=torch.tensor([0, 1, 2,3]), indices=torch.tensor([0, 1, 1])),
-            reverse_relation: gb.CSCFormatBase(indptr=torch.tensor([0,0,0,1,2]), indices=torch.tensor([1, 0])),
+            relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0, 1, 2, 3]),
+                indices=torch.tensor([0, 1, 1]),
+            ),
+            reverse_relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0, 0, 0, 1, 2]),
+                indices=torch.tensor([1, 0]),
+            ),
         },
-        {relation: gb.CSCFormatBase(indptr=torch.tensor([0, 1, 2]), indices=torch.tensor([1, 0]))},
+        {
+            relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0, 1, 2]), indices=torch.tensor([1, 0])
+            )
+        },
     ]
     original_column_node_ids = [
         {"B": torch.tensor([10, 11, 12]), "A": torch.tensor([5, 7, 9, 11])},
