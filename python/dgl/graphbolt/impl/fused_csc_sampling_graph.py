@@ -369,11 +369,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> nodes = {"N0":torch.LongTensor([1]), "N1":torch.LongTensor([1, 2])}
         >>> in_subgraph = graph.in_subgraph(nodes)
         >>> print(in_subgraph.sampled_csc)
-        defaultdict(<class 'list'>, {
-            'N0:R0:N0': (tensor([]), tensor([])),
-            'N0:R1:N1': (tensor([1, 0]), tensor([1, 2])),
-            'N1:R2:N0': (tensor([0, 1]), tensor([1, 1])),
-            'N1:R3:N1': (tensor([0, 1, 2]), tensor([1, 2, 2]))}
+        {'N0:R0:N0': CSCFormatBase(indptr=tensor([0, 0]),
+              indices=tensor([], dtype=torch.int64),
+        ), 'N0:R1:N1': CSCFormatBase(indptr=tensor([0, 1, 2]),
+                    indices=tensor([1, 0]),
+        ), 'N1:R2:N0': CSCFormatBase(indptr=tensor([0, 2]),
+                    indices=tensor([0, 1]),
+        ), 'N1:R3:N1': CSCFormatBase(indptr=tensor([0, 1, 3]),
+                    indices=tensor([0, 1, 2]),
+        )}
         """
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)
@@ -600,7 +604,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Returns
         -------
-        FusedSampledSubgraphImpl
+        Union[FusedSampledSubgraphImpl, SampledSubgraphImpl]
             The sampled subgraph.
 
         Examples
@@ -622,8 +626,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> fanouts = torch.tensor([1, 1])
         >>> subgraph = graph.sample_neighbors(nodes, fanouts)
         >>> print(subgraph.sampled_csc)
-        defaultdict(<class 'list'>, {'n1:e1:n2': (tensor([0]),
-          tensor([0])), 'n2:e2:n1': (tensor([2]), tensor([0]))})
+        {'n1:e1:n2': CSCFormatBase(indptr=tensor([0, 1]),
+                    indices=tensor([0]),
+        ), 'n2:e2:n1': CSCFormatBase(indptr=tensor([0, 1]),
+                    indices=tensor([2]),
+        )}
         """
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)
@@ -814,8 +821,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> fanouts = torch.tensor([1, 1])
         >>> subgraph = graph.sample_layer_neighbors(nodes, fanouts)
         >>> print(subgraph.sampled_csc)
-        defaultdict(<class 'list'>, {'n1:e1:n2': (tensor([1]),
-          tensor([0])), 'n2:e2:n1': (tensor([2]), tensor([0]))})
+        {'n1:e1:n2': CSCFormatBase(indptr=tensor([0, 1]),
+                    indices=tensor([0]),
+        ), 'n2:e2:n1': CSCFormatBase(indptr=tensor([0, 1]),
+                    indices=tensor([2]),
+        )}
         """
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)

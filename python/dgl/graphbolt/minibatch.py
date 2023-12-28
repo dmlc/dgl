@@ -8,7 +8,7 @@ import torch
 import dgl
 from dgl.utils import recursive_apply
 
-from .base import CSCFormatBase, etype_str_to_tuple
+from .base import etype_str_to_tuple
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
@@ -194,30 +194,22 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
-                if isinstance(
-                    list(subgraph.sampled_csc.values())[0], CSCFormatBase
-                ):
-                    sampled_csc = {
-                        etype_str_to_tuple(etype): (
-                            "csc",
-                            (
-                                v.indptr,
-                                v.indices,
-                                torch.arange(
-                                    0,
-                                    v.indptr[-1],
-                                    device=v.indptr.device,
-                                    dtype=v.indptr.dtype,
-                                ),
+                sampled_csc = {
+                    etype_str_to_tuple(etype): (
+                        "csc",
+                        (
+                            v.indptr,
+                            v.indices,
+                            torch.arange(
+                                0,
+                                v.indptr[-1],
+                                device=v.indptr.device,
+                                dtype=v.indptr.dtype,
                             ),
-                        )
-                        for etype, v in subgraph.sampled_csc.items()
-                    }
-                else:
-                    sampled_csc = {
-                        etype_str_to_tuple(etype): v
-                        for etype, v in subgraph.sampled_csc.items()
-                    }
+                        ),
+                    )
+                    for etype, v in subgraph.sampled_csc.items()
+                }
                 num_src_nodes = {
                     ntype: nodes.size(0)
                     for ntype, nodes in original_row_node_ids.items()
@@ -228,20 +220,19 @@ class MiniBatch:
                 }
             else:
                 sampled_csc = subgraph.sampled_csc
-                if isinstance(subgraph.sampled_csc, CSCFormatBase):
-                    sampled_csc = (
-                        "csc",
-                        (
-                            sampled_csc.indptr,
-                            sampled_csc.indices,
-                            torch.arange(
-                                0,
-                                sampled_csc.indptr[-1],
-                                device=sampled_csc.indptr.device,
-                                dtype=sampled_csc.indptr.dtype,
-                            ),
+                sampled_csc = (
+                    "csc",
+                    (
+                        sampled_csc.indptr,
+                        sampled_csc.indices,
+                        torch.arange(
+                            0,
+                            sampled_csc.indptr[-1],
+                            device=sampled_csc.indptr.device,
+                            dtype=sampled_csc.indptr.dtype,
                         ),
-                    )
+                    ),
+                )
                 num_src_nodes = original_row_node_ids.size(0)
                 num_dst_nodes = original_column_node_ids.size(0)
             blocks.append(
