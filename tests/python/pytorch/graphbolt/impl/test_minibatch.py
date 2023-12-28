@@ -8,109 +8,6 @@ relation = "A:r:B"
 reverse_relation = "B:rr:A"
 
 
-def create_homo_minibatch():
-    node_pairs = [
-        (
-            torch.tensor([0, 1, 2, 2, 2, 1]),
-            torch.tensor([0, 1, 1, 2, 3, 2]),
-        ),
-        (
-            torch.tensor([0, 1, 2]),
-            torch.tensor([1, 0, 0]),
-        ),
-    ]
-    original_column_node_ids = [
-        torch.tensor([10, 11, 12, 13]),
-        torch.tensor([10, 11]),
-    ]
-    original_row_node_ids = [
-        torch.tensor([10, 11, 12, 13]),
-        torch.tensor([10, 11, 12]),
-    ]
-    original_edge_ids = [
-        torch.tensor([19, 20, 21, 22, 25, 30]),
-        torch.tensor([10, 15, 17]),
-    ]
-    node_features = {"x": torch.randint(0, 10, (4,))}
-    edge_features = [
-        {"x": torch.randint(0, 10, (6,))},
-        {"x": torch.randint(0, 10, (3,))},
-    ]
-    subgraphs = []
-    for i in range(2):
-        subgraphs.append(
-            gb.FusedSampledSubgraphImpl(
-                sampled_csc=node_pairs[i],
-                original_column_node_ids=original_column_node_ids[i],
-                original_row_node_ids=original_row_node_ids[i],
-                original_edge_ids=original_edge_ids[i],
-            )
-        )
-    return gb.MiniBatch(
-        sampled_subgraphs=subgraphs,
-        node_features=node_features,
-        edge_features=edge_features,
-        input_nodes=torch.tensor([10, 11, 12, 13]),
-    )
-
-
-def create_hetero_minibatch():
-    node_pairs = [
-        {
-            relation: (torch.tensor([0, 1, 1]), torch.tensor([0, 1, 2])),
-            reverse_relation: (torch.tensor([1, 0]), torch.tensor([2, 3])),
-        },
-        {relation: (torch.tensor([0, 1]), torch.tensor([1, 0]))},
-    ]
-    original_column_node_ids = [
-        {"B": torch.tensor([10, 11, 12]), "A": torch.tensor([5, 7, 9, 11])},
-        {"B": torch.tensor([10, 11])},
-    ]
-    original_row_node_ids = [
-        {
-            "A": torch.tensor([5, 7, 9, 11]),
-            "B": torch.tensor([10, 11, 12]),
-        },
-        {
-            "A": torch.tensor([5, 7]),
-            "B": torch.tensor([10, 11]),
-        },
-    ]
-    original_edge_ids = [
-        {
-            relation: torch.tensor([19, 20, 21]),
-            reverse_relation: torch.tensor([23, 26]),
-        },
-        {relation: torch.tensor([10, 12])},
-    ]
-    node_features = {
-        ("A", "x"): torch.randint(0, 10, (4,)),
-    }
-    edge_features = [
-        {(relation, "x"): torch.randint(0, 10, (3,))},
-        {(relation, "x"): torch.randint(0, 10, (2,))},
-    ]
-    subgraphs = []
-    for i in range(2):
-        subgraphs.append(
-            gb.FusedSampledSubgraphImpl(
-                sampled_csc=node_pairs[i],
-                original_column_node_ids=original_column_node_ids[i],
-                original_row_node_ids=original_row_node_ids[i],
-                original_edge_ids=original_edge_ids[i],
-            )
-        )
-    return gb.MiniBatch(
-        sampled_subgraphs=subgraphs,
-        node_features=node_features,
-        edge_features=edge_features,
-        input_nodes={
-            "A": torch.tensor([5, 7, 9, 11]),
-            "B": torch.tensor([10, 11, 12]),
-        },
-    )
-
-
 def test_minibatch_representation_homo():
     csc_formats = [
         gb.CSCFormatBase(
@@ -599,7 +496,7 @@ def test_get_dgl_blocks_hetero():
 )
 def test_minibatch_node_pairs_with_labels(mode):
     # Arrange
-    minibatch = create_homo_minibatch_csc_format()
+    minibatch = create_homo_minibatch()
     minibatch.compacted_node_pairs = (
         torch.tensor([0, 1]),
         torch.tensor([1, 0]),
@@ -637,7 +534,7 @@ def test_minibatch_node_pairs_with_labels(mode):
     assert torch.equal(labels, expect_labels)
 
 
-def create_homo_minibatch_csc_format():
+def create_homo_minibatch():
     csc_formats = [
         gb.CSCFormatBase(
             indptr=torch.tensor([0, 1, 3, 5, 6]),
@@ -683,7 +580,7 @@ def create_homo_minibatch_csc_format():
     )
 
 
-def create_hetero_minibatch_csc_format():
+def create_hetero_minibatch():
     sampled_csc = [
         {
             relation: gb.CSCFormatBase(
@@ -750,7 +647,7 @@ def create_hetero_minibatch_csc_format():
     )
 
 
-def check_dgl_blocks_hetero_csc_format(minibatch, blocks):
+def check_dgl_blocks_hetero(minibatch, blocks):
     etype = gb.etype_str_to_tuple(relation)
     sampled_csc = [
         subgraph.sampled_csc for subgraph in minibatch.sampled_subgraphs
@@ -793,7 +690,7 @@ def check_dgl_blocks_hetero_csc_format(minibatch, blocks):
     )
 
 
-def check_dgl_blocks_homo_csc_format(minibatch, blocks):
+def check_dgl_blocks_homo(minibatch, blocks):
     sampled_csc = [
         subgraph.sampled_csc for subgraph in minibatch.sampled_subgraphs
     ]
@@ -822,9 +719,9 @@ def check_dgl_blocks_homo_csc_format(minibatch, blocks):
     ), print(blocks[0].srcdata[dgl.NID])
 
 
-def test_dgl_node_classification_without_feature_csc_format():
+def test_dgl_node_classification_without_feature():
     # Arrange
-    minibatch = create_homo_minibatch_csc_format()
+    minibatch = create_homo_minibatch()
     minibatch.node_features = None
     minibatch.labels = None
     minibatch.seed_nodes = torch.tensor([10, 15])
@@ -835,12 +732,12 @@ def test_dgl_node_classification_without_feature_csc_format():
     assert len(dgl_blocks) == 2
     assert minibatch.node_features is None
     assert minibatch.labels is None
-    check_dgl_blocks_homo_csc_format(minibatch, dgl_blocks)
+    check_dgl_blocks_homo(minibatch, dgl_blocks)
 
 
-def test_dgl_node_classification_homo_csc_format():
+def test_dgl_node_classification_homo():
     # Arrange
-    minibatch = create_homo_minibatch_csc_format()
+    minibatch = create_homo_minibatch()
     minibatch.seed_nodes = torch.tensor([10, 15])
     minibatch.labels = torch.tensor([2, 5])
     # Act
@@ -848,11 +745,11 @@ def test_dgl_node_classification_homo_csc_format():
 
     # Assert
     assert len(dgl_blocks) == 2
-    check_dgl_blocks_homo_csc_format(minibatch, dgl_blocks)
+    check_dgl_blocks_homo(minibatch, dgl_blocks)
 
 
-def test_dgl_node_classification_hetero_csc_format():
-    minibatch = create_hetero_minibatch_csc_format()
+def test_dgl_node_classification_hetero():
+    minibatch = create_hetero_minibatch()
     minibatch.labels = {"B": torch.tensor([2, 5])}
     minibatch.seed_nodes = {"B": torch.tensor([10, 15])}
     # Act
@@ -860,13 +757,13 @@ def test_dgl_node_classification_hetero_csc_format():
 
     # Assert
     assert len(dgl_blocks) == 2
-    check_dgl_blocks_hetero_csc_format(minibatch, dgl_blocks)
+    check_dgl_blocks_hetero(minibatch, dgl_blocks)
 
 
 @pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
-def test_dgl_link_predication_homo_csc_format(mode):
+def test_dgl_link_predication_homo(mode):
     # Arrange
-    minibatch = create_homo_minibatch_csc_format()
+    minibatch = create_homo_minibatch()
     minibatch.compacted_node_pairs = (
         torch.tensor([0, 1]),
         torch.tensor([1, 0]),
@@ -880,7 +777,7 @@ def test_dgl_link_predication_homo_csc_format(mode):
 
     # Assert
     assert len(dgl_blocks) == 2
-    check_dgl_blocks_homo_csc_format(minibatch, dgl_blocks)
+    check_dgl_blocks_homo(minibatch, dgl_blocks)
     if mode == "neg_graph" or mode == "neg_src":
         assert torch.equal(
             minibatch.negative_node_pairs[0],
@@ -912,9 +809,9 @@ def test_dgl_link_predication_homo_csc_format(mode):
 
 
 @pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
-def test_dgl_link_predication_hetero_csc_format(mode):
+def test_dgl_link_predication_hetero(mode):
     # Arrange
-    minibatch = create_hetero_minibatch_csc_format()
+    minibatch = create_hetero_minibatch()
     minibatch.compacted_node_pairs = {
         relation: (
             torch.tensor([1, 1]),
@@ -940,7 +837,7 @@ def test_dgl_link_predication_hetero_csc_format(mode):
 
     # Assert
     assert len(dgl_blocks) == 2
-    check_dgl_blocks_hetero_csc_format(minibatch, dgl_blocks)
+    check_dgl_blocks_hetero(minibatch, dgl_blocks)
     if mode == "neg_graph" or mode == "neg_src":
         for etype, src in minibatch.compacted_negative_srcs.items():
             assert torch.equal(
