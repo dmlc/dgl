@@ -1511,7 +1511,7 @@ def test_from_dglgraph_heterogeneous():
     }
 
 
-def csc_sampling_graph_to_device_helper():
+def create_fused_csc_sampling_graph():
     # Initialize data.
     total_num_nodes = 10
     total_num_edges = 9
@@ -1553,7 +1553,8 @@ def csc_sampling_graph_to_device_helper():
     reason="`to` function needs GPU to test.",
 )
 def test_csc_sampling_graph_to_device():
-    graph = csc_sampling_graph_to_device_helper()
+    # Construct FusedCSCSamplingGraph.
+    graph = create_fused_csc_sampling_graph()
 
     # Copy to device.
     graph = graph.to("cuda")
@@ -1569,7 +1570,8 @@ def test_csc_sampling_graph_to_device():
 
 
 def test_csc_sampling_graph_to_pinned_memory():
-    graph = csc_sampling_graph_to_device_helper()
+    # Construct FusedCSCSamplingGraph.
+    graph = create_fused_csc_sampling_graph()
 
     # Copy to pinned_memory in-place.
     graph.pin_memory_()
