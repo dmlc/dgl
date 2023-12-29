@@ -29,34 +29,22 @@ class GraphSAGE(torch.nn.Module):
 def load_data():
     dataset = gb.BuiltinDataset("ogbn-arxiv").load()
     graph = dataset.graph
-    
     features = dataset.feature
-
     features_tensor = features.read('node', None, 'feat')
-    
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
-
     train_labels = train_set._items[1]  
     valid_labels = valid_set._items[1]
     test_labels = test_set._items[1]
-
-
     graph = dataset.graph
-
     num_classes = dataset.tasks[0].metadata["num_classes"]
-
     csc_indptr = graph.csc_indptr
     rows = torch.repeat_interleave(torch.arange(csc_indptr.size(0) - 1, device=csc_indptr.device), csc_indptr[1:] - csc_indptr[:-1])
     indices = graph.indices
     cols = indices
     edge_index =  torch.stack([rows, cols], dim=0)
-    
-
     pyg_data = Data(x=features_tensor, edge_index=edge_index, y=train_labels)  
-    
-
     num_nodes = csc_indptr.size(0) - 1
 
     return pyg_data, train_labels, valid_labels, test_labels, train_set, valid_set, test_set, num_nodes

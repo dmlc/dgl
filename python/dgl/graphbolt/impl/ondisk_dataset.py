@@ -59,7 +59,6 @@ def preprocess_ondisk_dataset(
 
     # 0. Check if the dataset is already preprocessed.
     preprocess_metadata_path = os.path.join("preprocessed", "metadata.yaml")
-    
     if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
         print("The dataset is already preprocessed.")
         return os.path.join(dataset_dir, preprocess_metadata_path)
