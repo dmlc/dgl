@@ -1,6 +1,5 @@
 """CSC format sampling graph."""
 # pylint: disable= invalid-name
-from collections import defaultdict
 from typing import Dict, Optional, Union
 
 import torch
