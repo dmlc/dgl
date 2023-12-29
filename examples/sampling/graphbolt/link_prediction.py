@@ -404,7 +404,7 @@ def main(args):
         features.pin_memory_()
     elif args.storage_device == "cuda":
         graph = graph.to(args.device)
-        features.pin_memory_()
+        features.to_(args.device)
     train_set = dataset.tasks[0].train_set
     args.fanout = list(map(int, args.fanout.split(",")))
 

@@ -391,7 +391,7 @@ def main(args):
         features.pin_memory_()
     elif args.storage_device == "cuda":
         graph = graph.to(args.device)
-        features.pin_memory_()
+        features.to_(args.device)
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
