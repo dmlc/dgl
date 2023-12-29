@@ -911,7 +911,7 @@ def test_temporal_sample_neighbors_homo(
         return available_neighbors
 
     nodes = torch.tensor(seed_list, dtype=indices_dtype)
-    subgraph, neighbors_timestamp = sampler(
+    subgraph = sampler(
         nodes,
         seed_timestamp,
         fanouts,
@@ -1004,7 +1004,7 @@ def test_temporal_sample_neighbors_hetero(
         )
         graph.edge_attributes = {"timestamp": edge_timestamp}
 
-    subgraph, neighbors_timestamp = sampler(
+    subgraph = sampler(
         seeds,
         seed_timestamp,
         fanouts,
