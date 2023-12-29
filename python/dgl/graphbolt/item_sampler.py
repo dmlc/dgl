@@ -264,11 +264,12 @@ class ItemSampler(IterDataPipe):
     buffer_size : int
         The size of the buffer to store items sliced from the :class:`ItemSet`
         or :class:`ItemSetDict`. By default, it is set to -1, which means the
-        buffer size will be set as the total number of items in the item set.
-        If the item set is too large, it is recommended to set a smaller buffer
-        size to avoid out of memory error. As items are shuffled within each
-        buffer, a smaller buffer size may incur less randomness and such less
-        randomness can further affect the training performance such as
+        buffer size will be set as the total number of items in the item set if
+        indexing is supported. If indexing is not supported, it is set to 10 *
+        batch size. If the item set is too large, it is recommended to set a
+        smaller buffer size to avoid out of memory error. As items are shuffled
+        within each buffer, a smaller buffer size may incur less randomness and
+        such less randomness can further affect the training performance such as
         convergence speed and accuracy. Therefore, it is recommended to set a
         larger buffer size if possible.
 
@@ -465,17 +466,26 @@ class ItemSampler(IterDataPipe):
         super().__init__()
         self._names = item_set.names
         # Check if the item set supports indexing.
+        indexable = True
         try:
             item_set[0]
         except TypeError:
-            use_indexing = False
-        self._use_indexing = use_indexing
+            indexable = False
+        self._use_indexing = use_indexing and indexable
         self._item_set = (
             item_set if self._use_indexing else IterableWrapper(item_set)
         )
-        self._buffer_size = (
-            len(self._item_set) if buffer_size == -1 else buffer_size
-        )
+        if buffer_size == -1:
+            if indexable:
+                # Set the buffer size to the total number of items in the item
+                # set if indexing is supported and the buffer size is not
+                # specified.
+                buffer_size = len(self._item_set)
+            else:
+                # Set the buffer size to 10 * batch size if indexing is not
+                # supported and the buffer size is not specified.
+                buffer_size = 10 * batch_size
+        self._buffer_size = buffer_size
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
