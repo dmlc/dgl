@@ -303,6 +303,8 @@ def unique_and_compact_csc_formats(
 
 
 def _broadcast_timestamps(csc, dst_timestamps):
+    """Broadcast the timestamp of each destination node to its corresponding
+    source nodes."""
     count = torch.diff(csc.indptr)
     src_timestamps = torch.repeat_interleave(dst_timestamps, count)
     return src_timestamps
@@ -484,6 +486,8 @@ def compact_csc_format(
                 ),
             )
             if use_timestamp:
+                # If destination timestamps are given, broadcast them to the
+                # corresponding source nodes.
                 src_timestamps[src_type] = torch.cat(
                     (
                         src_timestamps.get(
