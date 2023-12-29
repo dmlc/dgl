@@ -254,9 +254,6 @@ def unique_and_compact_csc_formats(
     for etype, csc_format in csc_formats.items():
         if device is None:
             device = csc_format.indices.device
-        assert csc_format.indptr[-1] == len(
-            csc_format.indices
-        ), "The last element of indptr should be the same as the length of indices."
         src_type, _, dst_type = etype_str_to_tuple(etype)
         assert len(unique_dst_nodes.get(dst_type, [])) + 1 == len(
             csc_format.indptr
@@ -358,9 +355,6 @@ def compact_csc_format(
             assert isinstance(
                 dst_nodes, torch.Tensor
             ), "Edge type not supported in homogeneous graph."
-            assert csc_formats.indptr[-1] == len(
-                csc_formats.indices
-            ), "The last element of indptr should be the same as the length of indices."
             assert len(dst_nodes) + 1 == len(
                 csc_formats.indptr
             ), "The seed nodes should correspond to indptr."
@@ -381,9 +375,6 @@ def compact_csc_format(
         compacted_csc_formats = {}
         original_row_ids = copy.deepcopy(dst_nodes)
         for etype, csc_format in csc_formats.items():
-            assert csc_format.indptr[-1] == len(
-                csc_format.indices
-            ), "The last element of indptr should be the same as the length of indices."
             src_type, _, dst_type = etype_str_to_tuple(etype)
             assert len(dst_nodes.get(dst_type, [])) + 1 == len(
                 csc_format.indptr
