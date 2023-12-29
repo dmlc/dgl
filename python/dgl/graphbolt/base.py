@@ -164,6 +164,14 @@ class CSCFormatBase:
     indptr: torch.Tensor = None
     indices: torch.Tensor = None
 
+    def __init__(self, indptr: torch.Tensor, indices: torch.Tensor):
+        self.indptr = indptr
+        self.indices = indices
+        if not indptr.is_cuda:
+            assert self.indptr[-1] == len(
+                self.indices
+            ), "The last element of indptr should be the same as the length of indices."
+
     def __repr__(self) -> str:
         return _csc_format_base_str(self)
 

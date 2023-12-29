@@ -244,3 +244,11 @@ def test_csc_format_base_representation():
 )"""
     )
     assert str(csc_format_base) == expected_result, print(csc_format_base)
+
+
+def test_csc_format_base_incorrect_indptr():
+    indptr = torch.tensor([0, 2, 4, 6, 7, 11])
+    indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4])
+    with pytest.raises(AssertionError):
+        # The value of last element in indptr is not corresponding to indices.
+        csc_formats = gb.CSCFormatBase(indptr=indptr, indices=indices)
