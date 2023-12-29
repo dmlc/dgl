@@ -141,7 +141,6 @@ def create_dataloader(
     # self.copy_to()
     # [Input]:
     # 'device': The device to copy the data to.
-    # 'extra_attrs': The extra attributes to copy.
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
