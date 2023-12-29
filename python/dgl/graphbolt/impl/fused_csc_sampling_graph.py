@@ -451,7 +451,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                         eids, indptr[nids + 1], right=False
                     )
                     sub_indptr[etype] = torch.cat(
-                        (torch.tensor([0]), cum_edges)
+                        (torch.tensor([0], device=indptr.device), cum_edges)
                     )
                     if has_original_eids:
                         original_hetero_edge_ids[etype] = original_edge_ids[
