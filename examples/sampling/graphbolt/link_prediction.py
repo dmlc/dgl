@@ -314,11 +314,11 @@ def train(args, model, graph, features, train_set):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(args, graph, features, train_set)
 
-    for epoch in tqdm.trange(args.epochs):
+    for epoch in range(args.epochs):
         model.train()
         total_loss = 0
         start_epoch_time = time.time()
-        for step, data in enumerate(dataloader):
+        for step, data in tqdm.tqdm(enumerate(dataloader)):
             # Get node pairs with labels for loss calculation.
             compacted_pairs, labels = data.node_pairs_with_labels
 
