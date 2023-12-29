@@ -105,6 +105,11 @@ def create_dataloader(
     #   Whether to shuffle the items in the dataset before sampling.
     datapipe = gb.ItemSampler(item_set, batch_size=batch_size, shuffle=shuffle)
 
+    # Move the mini-batch to the appropriate device.
+    # `device`:
+    #   The device to move the mini-batch to.
+    datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+
     # Sample neighbors for each seed node in the mini-batch.
     # `graph`:
     #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
@@ -123,13 +128,6 @@ def create_dataloader(
         node_feature_keys["author"] = ["feat"]
         node_feature_keys["institution"] = ["feat"]
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
-
-    # Move the mini-batch to the appropriate device.
-    # `device`:
-    #   The device to move the mini-batch to.
-    # [TODO] Moving `MiniBatch` to GPU is not supported yet.
-    device = th.device("cpu")
-    datapipe = datapipe.copy_to(device)
 
     # Create a DataLoader from the datapipe.
     # `num_workers`:
@@ -571,7 +569,7 @@ def run(
             # Generate predictions.
             logits = model(node_features, blocks)[category]
 
-            y_hat = logits.log_softmax(dim=-1).cpu()
+            y_hat = logits.log_softmax(dim=-1)
             loss = F.nll_loss(y_hat, data.labels[category].long())
             loss.backward()
             optimizer.step()
@@ -622,7 +620,11 @@ def run(
 
 
 def main(args):
-    device = th.device("cuda") if args.num_gpus > 0 else th.device("cpu")
+    device = (
+        th.device("cuda")
+        if args.num_gpus > 0 and th.cuda.is_available()
+        else th.device("cpu")
+    )
 
     # Initialize a logger.
     logger = Logger(args.runs)
@@ -631,6 +633,11 @@ def main(args):
     g, features, train_set, valid_set, test_set, num_classes = load_dataset(
         args.dataset
     )
+
+    # Move the dataset to the pinned memory to enable GPU access.
+    if device == th.device("cuda"):
+        g.pin_memory_()
+        features.pin_memory_()
 
     feat_size = features.size("node", "paper", "feat")[0]
 
@@ -720,7 +727,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--num_workers", type=int, default=0)
-    parser.add_argument("--num_gpus", type=int, default=0)
+    parser.add_argument("--num_gpus", type=int, default=1)
 
     args = parser.parse_args()
 
