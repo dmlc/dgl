@@ -137,7 +137,9 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, dataset, fanouts, batch_size, num_workers, num_gpus):
+    def __init__(
+        self, dataset, fanouts, batch_size, num_workers, num_gpus, use_uva
+    ):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
@@ -145,8 +147,12 @@ class DataModule(LightningDataModule):
         self.feature_store = dataset.feature
         self.graph = dataset.graph
         if num_gpus > 0:
-            self.feature_store.pin_memory_()
-            self.graph.pin_memory_()
+            if use_uva:
+                self.feature_store.pin_memory_()
+                self.graph.pin_memory_()
+            else:
+                self.feature_store.to_("cuda")
+                self.graph = self.graph.to("cuda")
         self.train_set = dataset.tasks[0].train_set
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
@@ -213,6 +219,11 @@ if __name__ == "__main__":
         default=0,
         help="number of workers (default: 0)",
     )
+    parser.add_argument(
+        "--use_uva",
+        action="store_true",
+        help="Moves the dataset into the pinned memory.",
+    )
     args = parser.parse_args()
 
     dataset = gb.BuiltinDataset("ogbn-products").load()
@@ -222,6 +233,7 @@ if __name__ == "__main__":
         args.batch_size,
         args.num_workers,
         args.num_gpus,
+        args.use_uva,
     )
     in_size = dataset.feature.size("node", None, "feat")[0]
     model = SAGE(in_size, 256, datamodule.num_classes)
