@@ -240,7 +240,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
             feature.pin_memory_()
 
     def to_(self, device):
-        """In-place operation to copy the feature store to pinned memory."""
+        """In-place operation to copy the feature store to the given device."""
         for feature in self._features.values():
             feature.to_(device)
 
