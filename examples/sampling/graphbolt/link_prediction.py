@@ -150,7 +150,8 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=args.device)
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
 
     ############################################################################
     # [Input]:
@@ -217,6 +218,15 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     ############################################################################
     if is_train:
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+
+    ############################################################################
+    # [Input]:
+    # 'device': The device to copy the data to.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device.
+    ############################################################################
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
 
     ############################################################################
     # [Input]:
@@ -366,28 +376,34 @@ def parse_args():
         help="Whether to exclude reverse edges during sampling. Default: 1",
     )
     parser.add_argument(
-        "--device",
-        default="cuda",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.storage_device, args.device = args.mode.split("-")
+    args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data")
     dataset = gb.BuiltinDataset("ogbl-citation2").load()
+
     graph = dataset.graph
     features = dataset.feature
-    # If a CUDA device is selected, we pin the graph and the features so that
-    # the GPU can access them.
-    if args.device == "cuda":
+    # Move the dataset to the selected storage.
+    if args.storage_device == "pinned":
         graph.pin_memory_()
+        features.pin_memory_()
+    elif args.storage_device == "cuda":
+        graph = graph.to(args.device)
         features.pin_memory_()
     train_set = dataset.tasks[0].train_set
     args.fanout = list(map(int, args.fanout.split(",")))
