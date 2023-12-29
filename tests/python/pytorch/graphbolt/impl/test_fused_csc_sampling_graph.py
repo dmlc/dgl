@@ -1511,11 +1511,7 @@ def test_from_dglgraph_heterogeneous():
     }
 
 
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="`to` function needs GPU to test.",
-)
-def test_csc_sampling_graph_to_device():
+def create_fused_csc_sampling_graph():
     # Initialize data.
     total_num_nodes = 10
     total_num_edges = 9
@@ -1541,7 +1537,7 @@ def test_csc_sampling_graph_to_device():
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.fused_csc_sampling_graph(
+    return gb.fused_csc_sampling_graph(
         indptr,
         indices,
         edge_attributes=edge_attributes,
@@ -1550,6 +1546,15 @@ def test_csc_sampling_graph_to_device():
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
     )
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="`to` function needs GPU to test.",
+)
+def test_csc_sampling_graph_to_device():
+    # Construct FusedCSCSamplingGraph.
+    graph = create_fused_csc_sampling_graph()
 
     # Copy to device.
     graph = graph.to("cuda")
@@ -1562,6 +1567,27 @@ def test_csc_sampling_graph_to_device():
     assert graph.csc_indptr.device.type == "cuda"
     for key in graph.edge_attributes:
         assert graph.edge_attributes[key].device.type == "cuda"
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
+def test_csc_sampling_graph_to_pinned_memory():
+    # Construct FusedCSCSamplingGraph.
+    graph = create_fused_csc_sampling_graph()
+
+    # Copy to pinned_memory in-place.
+    graph.pin_memory_()
+
+    # Check.
+    assert graph.csc_indptr.is_pinned()
+    assert graph.indices.is_pinned()
+    assert graph.node_type_offset.is_pinned()
+    assert graph.type_per_edge.is_pinned()
+    assert graph.csc_indptr.is_pinned()
+    for key in graph.edge_attributes:
+        assert graph.edge_attributes[key].is_pinned()
 
 
 @unittest.skipIf(
