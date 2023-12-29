@@ -99,7 +99,8 @@ def create_dataloader(
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
 
     ############################################################################
     # [Step-3]:
@@ -137,6 +138,18 @@ def create_dataloader(
 
     ############################################################################
     # [Step-5]:
+    # self.copy_to()
+    # [Input]:
+    # 'device': The device to copy the data to.
+    # 'extra_attrs': The extra attributes to copy.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device.
+    ############################################################################
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device=device)
+
+    ############################################################################
+    # [Step-6]:
     # gb.DataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
@@ -350,18 +363,20 @@ def parse_args():
         " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
-        "--device",
-        default="cuda",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.storage_device, args.device = args.mode.split("-")
     args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
@@ -370,10 +385,12 @@ def main(args):
 
     graph = dataset.graph
     features = dataset.feature
-    # If a CUDA device is selected, we pin the graph and the features so that
-    # the GPU can access them.
-    if args.device == torch.device("cuda"):
+    # Move the dataset to the selected storage.
+    if args.storage_device == "pinned":
         graph.pin_memory_()
+        features.pin_memory_()
+    elif args.storage_device == "cuda":
+        graph = graph.to(args.device)
         features.pin_memory_()
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
