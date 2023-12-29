@@ -105,12 +105,6 @@ def create_dataloader(
     #   Whether to shuffle the items in the dataset before sampling.
     datapipe = gb.ItemSampler(item_set, batch_size=batch_size, shuffle=shuffle)
 
-    # Move the mini-batch to the appropriate device.
-    # `device`:
-    #   The device to move the mini-batch to.
-    # [TODO] Moving `MiniBatch` to GPU is not supported yet.
-    datapipe = datapipe.copy_to(device)
-
     # Sample neighbors for each seed node in the mini-batch.
     # `graph`:
     #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
@@ -129,6 +123,13 @@ def create_dataloader(
         node_feature_keys["author"] = ["feat"]
         node_feature_keys["institution"] = ["feat"]
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
+
+    # Move the mini-batch to the appropriate device.
+    # `device`:
+    #   The device to move the mini-batch to.
+    # [TODO] Moving `MiniBatch` to GPU is not supported yet.
+    device = th.device("cpu")
+    datapipe = datapipe.copy_to(device)
 
     # Create a DataLoader from the datapipe.
     # `num_workers`:
@@ -630,12 +631,6 @@ def main(args):
     g, features, train_set, valid_set, test_set, num_classes = load_dataset(
         args.dataset
     )
-
-    # If a CUDA device is selected, we pin the graph and the features so that
-    # the GPU can access them.
-    if device == th.device("cuda"):
-        g.pin_memory_()
-        features.pin_memory_()
 
     feat_size = features.size("node", "paper", "feat")[0]
 
