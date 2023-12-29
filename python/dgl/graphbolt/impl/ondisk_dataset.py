@@ -59,6 +59,7 @@ def preprocess_ondisk_dataset(
 
     # 0. Check if the dataset is already preprocessed.
     preprocess_metadata_path = os.path.join("preprocessed", "metadata.yaml")
+    
     if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
         print("The dataset is already preprocessed.")
         return os.path.join(dataset_dir, preprocess_metadata_path)
@@ -599,7 +600,6 @@ class BuiltinDataset(OnDiskDataset):
     _all_datasets = _datasets + _large_datasets
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
-        dataset_dir = os.path.join(root, name)
         if not os.path.exists(dataset_dir):
             if name not in self._all_datasets:
                 raise RuntimeError(
