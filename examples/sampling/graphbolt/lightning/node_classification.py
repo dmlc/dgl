@@ -226,6 +226,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    if not torch.cuda.is_available():
+        args.num_gpus = 0
+
     dataset = gb.BuiltinDataset("ogbn-products").load()
     datamodule = DataModule(
         dataset,
@@ -248,7 +251,7 @@ if __name__ == "__main__":
     # https://lightning.ai/docs/pytorch/stable/common/trainer.html.
     ########################################################################
     trainer = Trainer(
-        accelerator="gpu",
+        accelerator="gpu" if args.num_gpus > 0 else "cpu",
         devices=args.num_gpus,
         max_epochs=args.epochs,
         callbacks=[checkpoint_callback, early_stopping_callback],
