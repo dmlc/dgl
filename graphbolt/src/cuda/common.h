@@ -91,6 +91,15 @@ inline bool is_zero<dim3>(dim3 size) {
     }                                                                 \
   }
 
+#define CUB_CALL(cub_func, ...)                                            \
+  {                                                                        \
+    auto allocator = graphbolt::cuda::GetAllocator();                      \
+    size_t tmp_storage_size = 0;                                           \
+    CUDA_CALL(cub_func(nullptr, tmp_storage_size, __VA_ARGS__));           \
+    auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);  \
+    CUDA_CALL(cub_func(tmp_storage.get(), tmp_storage_size, __VA_ARGS__)); \
+  }
+
 /**
  * @brief This class is designed to handle the copy operation of a single
  * scalar_t item from a given CUDA device pointer. Later, if the object is cast

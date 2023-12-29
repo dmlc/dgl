@@ -137,13 +137,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "SampleNeighborsInDegree", ([&] {
-        size_t tmp_storage_size = 0;
-        cub::DeviceReduce::Max(
-            nullptr, tmp_storage_size, in_degree.data_ptr<scalar_t>(),
-            max_in_degree.data_ptr<scalar_t>(), num_rows, stream);
-        auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-        cub::DeviceReduce::Max(
-            tmp_storage.get(), tmp_storage_size, in_degree.data_ptr<scalar_t>(),
+        CUB_CALL(
+            cub::DeviceReduce::Max, in_degree.data_ptr<scalar_t>(),
             max_in_degree.data_ptr<scalar_t>(), num_rows, stream);
       }));
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
@@ -164,16 +159,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             iota, MinInDegreeFanout<indptr_t>{
                       in_degree.data_ptr<indptr_t>(), fanout});
 
-        {  // Compute output_indptr.
-          size_t tmp_storage_size = 0;
-          cub::DeviceScan::ExclusiveSum(
-              nullptr, tmp_storage_size, sampled_degree,
-              output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
-          auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-          cub::DeviceScan::ExclusiveSum(
-              tmp_storage.get(), tmp_storage_size, sampled_degree,
-              output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
-        }
+        // Compute output_indptr.
+        CUB_CALL(
+            cub::DeviceScan::ExclusiveSum, sampled_degree,
+            output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
 
         auto num_sampled_edges =
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
@@ -241,21 +230,12 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               // Sort the random numbers along with edge ids, after
               // sorting the first fanout elements of each row will
               // give us the sampled edges.
-              size_t tmp_storage_size = 0;
-              CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
-                  nullptr, tmp_storage_size, randoms.get(),
+              CUB_CALL(
+                  cub::DeviceSegmentedSort::SortPairs, randoms.get(),
                   randoms_sorted.get(), edge_id_segments.get(),
                   sorted_edge_id_segments.get(), num_edges, num_rows,
                   sub_indptr.data_ptr<indptr_t>(),
-                  sub_indptr.data_ptr<indptr_t>() + 1, stream));
-              auto tmp_storage =
-                  allocator.AllocateStorage<char>(tmp_storage_size);
-              CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
-                  tmp_storage.get(), tmp_storage_size, randoms.get(),
-                  randoms_sorted.get(), edge_id_segments.get(),
-                  sorted_edge_id_segments.get(), num_edges, num_rows,
-                  sub_indptr.data_ptr<indptr_t>(),
-                  sub_indptr.data_ptr<indptr_t>() + 1, stream));
+                  sub_indptr.data_ptr<indptr_t>() + 1, stream);
 
               picked_eids = torch::empty(
                   static_cast<indptr_t>(num_sampled_edges),
@@ -275,17 +255,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
               // Copy the sampled edge ids into picked_eids tensor.
               for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
-                size_t tmp_storage_size = 0;
-                CUDA_CALL(cub::DeviceCopy::Batched(
-                    nullptr, tmp_storage_size, input_buffer_it + i,
+                CUB_CALL(
+                    cub::DeviceCopy::Batched, input_buffer_it + i,
                     output_buffer_it + i, sampled_degree + i,
-                    std::min(num_rows - i, max_copy_at_once), stream));
-                auto tmp_storage =
-                    allocator.AllocateStorage<char>(tmp_storage_size);
-                CUDA_CALL(cub::DeviceCopy::Batched(
-                    tmp_storage.get(), tmp_storage_size, input_buffer_it + i,
-                    output_buffer_it + i, sampled_degree + i,
-                    std::min(num_rows - i, max_copy_at_once), stream));
+                    std::min(num_rows - i, max_copy_at_once), stream);
               }
             }));
 

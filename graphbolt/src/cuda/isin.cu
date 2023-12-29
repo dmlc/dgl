@@ -7,8 +7,6 @@
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
 
-#include <cub/cub.cuh>
-
 #include "./common.h"
 
 namespace graphbolt {

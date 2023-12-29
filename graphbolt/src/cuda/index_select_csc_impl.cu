@@ -158,14 +158,9 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
         output_indptr.data_ptr<indptr_t>(), output_indptr_aligned.get());
     thrust::tuple<indptr_t, indptr_t> zero_value{};
     // Compute the prefix sum over actual and modified indegrees.
-    size_t tmp_storage_size = 0;
-    CUDA_CALL(cub::DeviceScan::ExclusiveScan(
-        nullptr, tmp_storage_size, modified_in_degree, output_indptr_pair,
-        PairSum{}, zero_value, num_nodes + 1, stream));
-    auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-    CUDA_CALL(cub::DeviceScan::ExclusiveScan(
-        tmp_storage.get(), tmp_storage_size, modified_in_degree,
-        output_indptr_pair, PairSum{}, zero_value, num_nodes + 1, stream));
+    CUB_CALL(
+        cub::DeviceScan::ExclusiveScan, modified_in_degree, output_indptr_pair,
+        PairSum{}, zero_value, num_nodes + 1, stream);
   }
 
   // Copy the actual total number of edges.
@@ -255,15 +250,9 @@ void IndexSelectCSCCopyIndices(
 
   // Performs the copy from indices into output_indices.
   for (int64_t i = 0; i < num_nodes; i += max_copy_at_once) {
-    size_t tmp_storage_size = 0;
-    CUDA_CALL(cub::DeviceMemcpy::Batched(
-        nullptr, tmp_storage_size, input_buffer_it + i, output_buffer_it + i,
-        buffer_sizes + i, std::min(num_nodes - i, max_copy_at_once), stream));
-    auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-    CUDA_CALL(cub::DeviceMemcpy::Batched(
-        tmp_storage.get(), tmp_storage_size, input_buffer_it + i,
-        output_buffer_it + i, buffer_sizes + i,
-        std::min(num_nodes - i, max_copy_at_once), stream));
+    CUB_CALL(
+        cub::DeviceMemcpy::Batched, input_buffer_it + i, output_buffer_it + i,
+        buffer_sizes + i, std::min(num_nodes - i, max_copy_at_once), stream);
   }
 }
 
@@ -283,17 +272,10 @@ std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
         torch::Tensor output_indptr = torch::empty(
             num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
 
-        {  // Compute the output indptr, output_indptr.
-          size_t tmp_storage_size = 0;
-          CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-              nullptr, tmp_storage_size, in_degree,
-              output_indptr.data_ptr<indptr_t>(), num_nodes + 1, stream));
-          auto allocator = cuda::GetAllocator();
-          auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-          CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-              tmp_storage.get(), tmp_storage_size, in_degree,
-              output_indptr.data_ptr<indptr_t>(), num_nodes + 1, stream));
-        }
+        // Compute the output indptr, output_indptr.
+        CUB_CALL(
+            cub::DeviceScan::ExclusiveSum, in_degree,
+            output_indptr.data_ptr<indptr_t>(), num_nodes + 1, stream);
 
         // Number of edges being copied.
         auto edge_count =
