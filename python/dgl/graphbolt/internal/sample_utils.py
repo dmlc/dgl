@@ -413,7 +413,7 @@ def compact_csc_format(
     {'n1': tensor([10, 20, 10, 20, 20]), 'n2': tensor([10, 20, 20])}
     """
     is_homogeneous = not isinstance(csc_formats, dict)
-    use_timestamp = dst_timestamps is not None
+    has_timestamp = dst_timestamps is not None
     if is_homogeneous:
         if dst_nodes is not None:
             assert isinstance(
@@ -440,7 +440,7 @@ def compact_csc_format(
         )
 
         src_timestamps = None
-        if use_timestamp is not None:
+        if has_timestamp:
             src_timestamps = _broadcast_timestamps(
                 compacted_csc_formats, dst_timestamps
             )
@@ -448,7 +448,7 @@ def compact_csc_format(
         compacted_csc_formats = {}
         src_timestamps = None
         original_row_ids = copy.deepcopy(dst_nodes)
-        if use_timestamp is not None:
+        if has_timestamp:
             src_timestamps = copy.deepcopy(dst_timestamps)
         for etype, csc_format in csc_formats.items():
             assert csc_format.indptr[-1] == len(
@@ -485,7 +485,7 @@ def compact_csc_format(
                     + offset
                 ),
             )
-            if use_timestamp:
+            if has_timestamp:
                 # If destination timestamps are given, broadcast them to the
                 # corresponding source nodes.
                 src_timestamps[src_type] = torch.cat(
@@ -501,6 +501,6 @@ def compact_csc_format(
                         ),
                     )
                 )
-    if use_timestamp:
+    if has_timestamp:
         return original_row_ids, compacted_csc_formats, src_timestamps
     return original_row_ids, compacted_csc_formats
