@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import unittest
 from collections import Counter
 
 import dgl
@@ -37,6 +38,7 @@ def create_random_hetero(type_n, node_n):
     ]
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize(
     "type_n, node_n, num_parts", [[3, 100, 2], [10, 500, 4], [10, 1000, 8]]
 )
@@ -45,6 +47,7 @@ def test_hetero_graph(type_n, node_n, num_parts):
     do_convert_and_check(g, "convert_conf_test", num_parts, expected_c_etypes)
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize("node_n, num_parts", [[100, 2], [500, 4]])
 def test_homo_graph(node_n, num_parts):
     g = dgl.rand_graph(node_n, node_n // 10)

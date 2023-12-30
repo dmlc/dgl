@@ -438,6 +438,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             for ntype, ntype_id in self.node_type_to_id.items():
                 # Get all nodes of a specific node type in column.
                 nids = torch.nonzero(node_types == ntype_id).view(-1)
+                nids_original_indptr = indptr[nids + 1]
                 for etype, etype_id in self.edge_type_to_id.items():
                     src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
                     if dst_ntype != ntype:
@@ -449,7 +450,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                         indices[eids] - self.node_type_offset[src_ntype_id]
                     )
                     cum_edges = torch.searchsorted(
-                        eids, indptr[nids + 1], right=False
+                        eids, nids_original_indptr, right=False
                     )
                     sub_indptr[etype] = torch.cat(
                         (torch.tensor([0], device=indptr.device), cum_edges)
@@ -837,15 +838,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
         )
-        # Broadcast the input nodes' timestamp to the sampled neighbors.
-        sampled_count = torch.diff(C_sampled_subgraph.indptr)
-        neighbors_timestamp = input_nodes_timestamp.repeat_interleave(
-            sampled_count
-        )
-        return (
-            self._convert_to_sampled_subgraph(C_sampled_subgraph),
-            neighbors_timestamp,
-        )
+        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
