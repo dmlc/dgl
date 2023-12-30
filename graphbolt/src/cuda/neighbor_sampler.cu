@@ -125,7 +125,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
   auto allocator = cuda::GetAllocator();
-  const auto stream = cuda::GetCurrentStream();
   const auto num_rows = nodes.size(0);
   const auto fanout =
       fanouts[0] >= 0 ? fanouts[0] : std::numeric_limits<int64_t>::max();
@@ -217,8 +216,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                               (num_edges + BLOCK_SIZE - 1) / BLOCK_SIZE);
                           // Compute row and random number pairs.
                           CUDA_KERNEL_CALL(
-                              _ComputeRandoms, grid, block, 0, stream,
-                              num_edges, sliced_indptr.data_ptr<indptr_t>(),
+                              _ComputeRandoms, grid, block, 0, num_edges,
+                              sliced_indptr.data_ptr<indptr_t>(),
                               sub_indptr.data_ptr<indptr_t>(),
                               coo_rows.data_ptr<indices_t>(), probs_ptr,
                               indices_ptr, random_seed, randoms.get(),
@@ -269,10 +268,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         AT_DISPATCH_INTEGRAL_TYPES(
             indices.scalar_type(), "SampleNeighborsOutputIndices", ([&] {
               using indices_t = scalar_t;
-              const auto exec_policy =
-                  thrust::cuda::par_nosync(allocator).on(stream);
-              thrust::gather(
-                  exec_policy, picked_eids.data_ptr<indptr_t>(),
+              THRUST_CALL(
+                  gather, picked_eids.data_ptr<indptr_t>(),
                   picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
                   indices.data_ptr<indices_t>(),
                   output_indices.data_ptr<indices_t>());

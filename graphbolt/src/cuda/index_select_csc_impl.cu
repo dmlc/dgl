@@ -103,9 +103,6 @@ struct PairSum {
 // Returns (indptr[nodes + 1] - indptr[nodes], indptr[nodes])
 std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
     torch::Tensor indptr, torch::Tensor nodes) {
-  auto allocator = cuda::GetAllocator();
-  const auto exec_policy =
-      thrust::cuda::par_nosync(allocator).on(cuda::GetCurrentStream());
   const int64_t num_nodes = nodes.size(0);
   // Read indptr only once in case it is pinned and access is slow.
   auto sliced_indptr =
@@ -120,8 +117,8 @@ std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
         AT_DISPATCH_INDEX_TYPES(
             nodes.scalar_type(), "IndexSelectCSCNodes", ([&] {
               using nodes_t = index_t;
-              thrust::for_each(
-                  exec_policy, iota, iota + num_nodes,
+              THRUST_CALL(
+                  for_each, iota, iota + num_nodes,
                   SliceFunc<indptr_t, nodes_t>{
                       nodes.data_ptr<nodes_t>(), indptr.data_ptr<indptr_t>(),
                       in_degree.data_ptr<indptr_t>(),
@@ -181,7 +178,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   // Perform the actual copying, of the indices array into
   // output_indices in an aligned manner.
   CUDA_KERNEL_CALL(
-      _CopyIndicesAlignedKernel, grid, block, 0, cuda::GetCurrentStream(),
+      _CopyIndicesAlignedKernel, grid, block, 0,
       static_cast<indptr_t>(edge_count_aligned), num_nodes, sliced_indptr,
       output_indptr.data_ptr<indptr_t>(), output_indptr_aligned.get(),
       reinterpret_cast<indices_t*>(indices.data_ptr()),
@@ -234,7 +231,6 @@ void IndexSelectCSCCopyIndices(
     const int64_t num_nodes, indices_t* const indices,
     indptr_t* const sliced_indptr, const indptr_t* const in_degree,
     indptr_t* const output_indptr, indices_t* const output_indices) {
-  auto allocator = cuda::GetAllocator();
   thrust::counting_iterator<int64_t> iota(0);
 
   auto input_buffer_it = thrust::make_transform_iterator(

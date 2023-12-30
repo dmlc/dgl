@@ -53,7 +53,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
       "Dtypes of tensors passed to UniqueAndCompact need to be identical.");
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
-  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
   return AT_DISPATCH_INTEGRAL_TYPES(
       src_ids.scalar_type(), "unique_and_compact", ([&] {
         auto src_ids_ptr = src_ids.data_ptr<scalar_t>();
@@ -77,8 +76,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
         // Mark dst nodes in the src_ids tensor.
         auto is_dst = allocator.AllocateStorage<bool>(src_ids.size(0));
-        thrust::binary_search(
-            exec_policy, sorted_unique_dst_ids_ptr,
+        THRUST_CALL(
+            binary_search, sorted_unique_dst_ids_ptr,
             sorted_unique_dst_ids_ptr + unique_dst_ids.size(0), src_ids_ptr,
             src_ids_ptr + src_ids.size(0), is_dst.get());
 
@@ -127,7 +126,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
         auto real_order = torch::cat({unique_dst_ids, unique_only_src});
         // Sort here so that binary search can be used to lookup new_ids.
-        auto [sorted_order, new_ids] = Sort(real_order, num_bits);
+        torch::Tensor sorted_order, new_ids;
+        std::tie(sorted_order, new_ids) = Sort(real_order, num_bits);
         auto sorted_order_ptr = sorted_order.data_ptr<scalar_t>();
         auto new_ids_ptr = new_ids.data_ptr<int64_t>();
         // Holds the found locations of the src and dst ids in the sorted_order.
@@ -135,8 +135,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         // tensors.
         auto new_dst_ids_loc =
             allocator.AllocateStorage<scalar_t>(dst_ids.size(0));
-        thrust::lower_bound(
-            exec_policy, sorted_order_ptr,
+        THRUST_CALL(
+            lower_bound, sorted_order_ptr,
             sorted_order_ptr + sorted_order.size(0), dst_ids_ptr,
             dst_ids_ptr + dst_ids.size(0), new_dst_ids_loc.get());
 
@@ -153,16 +153,16 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
         auto new_src_ids_loc =
             allocator.AllocateStorage<scalar_t>(src_ids.size(0));
-        thrust::lower_bound(
-            exec_policy, sorted_order_ptr,
+        THRUST_CALL(
+            lower_bound, sorted_order_ptr,
             sorted_order_ptr + sorted_order.size(0), src_ids_ptr,
             src_ids_ptr + src_ids.size(0), new_src_ids_loc.get());
 
         // Finally, lookup the new compact ids of the src and dst tensors via
         // gather operations.
         auto new_src_ids = torch::empty_like(src_ids);
-        thrust::gather(
-            exec_policy, new_src_ids_loc.get(),
+        THRUST_CALL(
+            gather, new_src_ids_loc.get(),
             new_src_ids_loc.get() + src_ids.size(0),
             new_ids.data_ptr<int64_t>(), new_src_ids.data_ptr<scalar_t>());
         // Perform check before we gather for the dst indices.
@@ -170,8 +170,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
           throw std::out_of_range("Some ids not found.");
         }
         auto new_dst_ids = torch::empty_like(dst_ids);
-        thrust::gather(
-            exec_policy, new_dst_ids_loc.get(),
+        THRUST_CALL(
+            gather, new_dst_ids_loc.get(),
             new_dst_ids_loc.get() + dst_ids.size(0),
             new_ids.data_ptr<int64_t>(), new_dst_ids.data_ptr<scalar_t>());
         return std::make_tuple(real_order, new_src_ids, new_dst_ids);

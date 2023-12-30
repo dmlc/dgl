@@ -14,15 +14,12 @@ namespace ops {
 
 torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements) {
   auto sorted_test_elements = Sort<false>(test_elements);
-  auto allocator = cuda::GetAllocator();
-  auto stream = cuda::GetCurrentStream();
-  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
   auto result = torch::empty_like(elements, torch::kBool);
 
   AT_DISPATCH_INTEGRAL_TYPES(
       elements.scalar_type(), "IsInOperation", ([&] {
-        thrust::binary_search(
-            exec_policy, sorted_test_elements.data_ptr<scalar_t>(),
+        THRUST_CALL(
+            binary_search, sorted_test_elements.data_ptr<scalar_t>(),
             sorted_test_elements.data_ptr<scalar_t>() +
                 sorted_test_elements.size(0),
             elements.data_ptr<scalar_t>(),
