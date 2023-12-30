@@ -8,6 +8,11 @@ if(USE_CUDA)
   add_definitions(-DGRAPHBOLT_USE_CUDA)
 endif()
 
+# For windows, define NOMINMAX to avoid conflict with std::min/max
+if(MSVC)
+  add_definitions(-DNOMINMAX)
+endif()
+
 # Find PyTorch cmake files and PyTorch versions with the python interpreter
 # $PYTHON_INTERP ("python3" or "python" if empty)
 if(NOT PYTHON_INTERP)
@@ -49,6 +54,9 @@ if(USE_CUDA)
     ${BOLT_DIR}/cuda/*.cu
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
+  if(DEFINED ENV{CUDAARCHS})
+    set(CMAKE_CUDA_ARCHITECTURES $ENV{CUDAARCHS})
+  endif()
 endif()
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
@@ -67,6 +75,9 @@ if(USE_CUDA)
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
                              "../third_party/cccl/libcudacxx/include")
+  
+  get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
+  message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")
 endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when

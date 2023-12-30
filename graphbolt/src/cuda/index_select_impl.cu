@@ -124,7 +124,7 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   const IdType* index_sorted_ptr = sorted_index.data_ptr<IdType>();
   const int64_t* permutation_ptr = permutation.data_ptr<int64_t>();
 
-  cudaStream_t stream = c10::cuda::getDefaultCUDAStream();
+  auto stream = cuda::GetCurrentStream();
 
   if (aligned_feature_size == 1) {
     // Use a single thread to process each output row to avoid wasting threads.

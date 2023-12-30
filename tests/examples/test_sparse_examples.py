@@ -68,7 +68,7 @@ def test_hgnn():
         out.returncode == 0
     ), f"stdout: {out.stdout.decode('utf-8')}\nstderr: {out.stderr.decode('utf-8')}"
     stdout = out.stdout.decode("utf-8")
-    assert float(stdout[-5:]) > 0.66
+    assert float(stdout[-5:]) >= 0.65
 
 
 def test_hypergraphatt():

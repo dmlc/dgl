@@ -14,7 +14,7 @@ from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
-from ..internal import copy_or_convert_data, read_data
+from ..internal import copy_or_convert_data, get_attributes, read_data
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
@@ -270,6 +270,9 @@ class OnDiskTask:
         """Return the test set."""
         return self._test_set
 
+    def __repr__(self) -> str:
+        return _ondisk_task_str(self)
+
 
 class OnDiskDataset(Dataset):
     """An on-disk dataset which reads graph topology, feature data and
@@ -278,22 +281,33 @@ class OnDiskDataset(Dataset):
     Due to limited resources, the data which are too large to fit into RAM will
     remain on disk while others reside in RAM once ``OnDiskDataset`` is
     initialized. This behavior could be controled by user via ``in_memory``
-    field in YAML file.
+    field in YAML file. All paths in YAML file are relative paths to the
+    dataset directory.
 
     A full example of YAML file is as follows:
 
     .. code-block:: yaml
 
         dataset_name: graphbolt_test
-        graph_topology:
-          type: FusedCSCSamplingGraph
-          path: graph_topology/fused_csc_sampling_graph.tar
+        graph:
+          nodes:
+            - type: paper # could be omitted for homogeneous graph.
+              num: 1000
+            - type: author
+              num: 1000
+          edges:
+            - type: author:writes:paper # could be omitted for homogeneous graph.
+              format: csv # Can be csv only.
+              path: edge_data/author-writes-paper.csv
+            - type: paper:cites:paper
+              format: csv
+              path: edge_data/paper-cites-paper.csv
         feature_data:
           - domain: node
-            type: paper
+            type: paper # could be omitted for homogeneous graph.
             name: feat
             format: numpy
-            in_memory: false
+            in_memory: false # If not specified, default to true.
             path: node_data/paper-feat.npy
           - domain: edge
             type: "author:writes:paper"
@@ -305,37 +319,32 @@ class OnDiskDataset(Dataset):
           - name: "edge_classification"
             num_classes: 10
             train_set:
-              - type: paper # could be null for homogeneous graph.
+              - type: paper # could be omitted for homogeneous graph.
                 data: # multiple data sources could be specified.
                   - name: node_pairs
-                    format: numpy
+                    format: numpy # Can be numpy or torch.
                     in_memory: true # If not specified, default to true.
                     path: set/paper-train-node_pairs.npy
                   - name: labels
                     format: numpy
-                    in_memory: false
                     path: set/paper-train-labels.npy
             validation_set:
               - type: paper
                 data:
                   - name: node_pairs
                     format: numpy
-                    in_memory: true
                     path: set/paper-validation-node_pairs.npy
                   - name: labels
                     format: numpy
-                    in_memory: true
                     path: set/paper-validation-labels.npy
             test_set:
               - type: paper
                 data:
                   - name: node_pairs
                     format: numpy
-                    in_memory: true
                     path: set/paper-test-node_pairs.npy
                   - name: labels
                     format: numpy
-                    in_memory: true
                     path: set/paper-test-labels.npy
 
     Parameters
@@ -609,3 +618,25 @@ class BuiltinDataset(OnDiskDataset):
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
         super().__init__(dataset_dir)
+
+
+def _ondisk_task_str(task: OnDiskTask) -> str:
+    final_str = "OnDiskTask("
+    indent_len = len(final_str)
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    attributes = get_attributes(task)
+    attributes.reverse()
+    for name in attributes:
+        if name[0] == "_":
+            continue
+        val = getattr(task, name)
+        final_str += (
+            f"{name}={_add_indent(str(val), indent_len + len(name) + 1)},\n"
+            + " " * indent_len
+        )
+    return final_str[:-indent_len] + ")"
