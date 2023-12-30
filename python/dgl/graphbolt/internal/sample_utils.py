@@ -302,8 +302,9 @@ def unique_and_compact_csc_formats(
 def _broadcast_timestamps(csc, dst_timestamps):
     """Broadcast the timestamp of each destination node to its corresponding
     source nodes."""
-    count = torch.diff(csc.indptr)
-    src_timestamps = torch.repeat_interleave(dst_timestamps, count)
+    src_timestamps = torch.ops.graphbolt.csr_to_coo(
+        csc.indptr, dst_timestamps.dtype, len(csc.indices), dst_timestamps
+    )
     return src_timestamps
 
 

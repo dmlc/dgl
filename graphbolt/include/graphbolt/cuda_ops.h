@@ -4,6 +4,8 @@
  * @file graphbolt/cuda_ops.h
  * @brief Available CUDA operations in Graphbolt.
  */
+#ifndef GRAPHBOLT_CUDA_OPS_H_
+#define GRAPHBOLT_CUDA_OPS_H_
 
 #include <torch/script.h>
 
@@ -124,15 +126,20 @@ torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
 
 /**
  * @brief CSRToCOO implements conversion from a given indptr offset tensor to a
- * COO format tensor including ids in [0, indptr.size(0) - 1).
+ * COO format tensor. If original_row_node_ids is not given, it is assumed to be
+ * equal to torch::arange(indptr.size(0) - 1, dtype=output_dtype).
  *
- * @param input          A tensor containing IDs.
- * @param output_dtype   Dtype of output.
+ * @param indptr                 The indptr offset tensor.
+ * @param output_dtype           Dtype of output.
+ * @param num_edges              Optional number of edges, equal to indptr[-1].
+ * @param original_row_node_ids  Optional original row ids for indptr.
  *
- * @return
- * - The resulting tensor with output_dtype.
+ * @return The resulting tensor with output_dtype.
  */
-torch::Tensor CSRToCOO(torch::Tensor indptr, torch::ScalarType output_dtype);
+torch::Tensor CSRToCOOImpl(
+    torch::Tensor indptr, torch::ScalarType output_dtype,
+    torch::optional<int64_t> num_edges = torch::nullopt,
+    torch::optional<torch::Tensor> original_row_node_ids = torch::nullopt);
 
 /**
  * @brief Removes duplicate elements from the concatenated 'unique_dst_ids' and
@@ -175,3 +182,5 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
 }  //  namespace ops
 }  //  namespace graphbolt
+
+#endif  // GRAPHBOLT_CUDA_OPS_H_

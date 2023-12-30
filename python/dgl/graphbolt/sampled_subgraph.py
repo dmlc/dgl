@@ -224,14 +224,9 @@ def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
     indices = node_pair.indices
     if original_row_node_ids is not None:
         indices = original_row_node_ids[indices]
-    if original_column_node_ids is not None:
-        indptr = original_column_node_ids.repeat_interleave(
-            indptr[1:] - indptr[:-1]
-        )
-    else:
-        indptr = torch.arange(len(indptr) - 1).repeat_interleave(
-            indptr[1:] - indptr[:-1]
-        )
+    indptr = torch.ops.graphbolt.csr_to_coo(
+        indptr, indices.dtype, len(indices), original_column_node_ids
+    )
     return (indices, indptr)
 
 

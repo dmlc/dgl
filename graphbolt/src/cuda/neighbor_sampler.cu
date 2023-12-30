@@ -149,7 +149,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto sub_indptr = ExclusiveCumSum(in_degree);
   auto output_indptr = torch::empty_like(sub_indptr);
-  auto coo_rows = CSRToCOO(sub_indptr, indices.scalar_type());
+  auto coo_rows = CSRToCOOImpl(sub_indptr, indices.scalar_type());
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
