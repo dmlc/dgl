@@ -74,7 +74,7 @@ A dataloader is for iterating over a dataset and generate mini-batches.
 ItemSet
 -------
 
-An item set is a iterable collection of items.
+An item set is an iterable collection of items.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -111,8 +111,7 @@ features. It is the basic unit for training a GNN model.
     :template: graphbolt_classtemplate.rst
 
     MiniBatch
-    DGLMiniBatch
-    DGLMiniBatchConverter
+    MiniBatchTransformer
 
 
 NegativeSampler
@@ -125,7 +124,6 @@ A negative sampler is for sampling negative items from mini-batches.
     :nosignatures:
     :template: graphbolt_classtemplate.rst
 
-    MiniBatchTransformer
     NegativeSampler
     UniformNegativeSampler
 

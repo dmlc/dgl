@@ -24,7 +24,7 @@ How to run
 ----------
 
 ```bash
-accelerate launch --multi_gpu --mixed_precision=fp16 train.py
+accelerate launch --multi_gpu --mixed_precision=fp16 main.py
 ```
 > **_NOTE:_**  The script will automatically download weights pre-trained on PCQM4Mv2. To reproduce the same result, set the total batch size to 64.
 

@@ -2,7 +2,7 @@
 
 import copy
 from collections import defaultdict
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 
@@ -128,7 +128,10 @@ def unique_and_compact_node_pairs(
     # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
     dst_nodes = defaultdict(list)
+    device = None
     for etype, (src_node, dst_node) in node_pairs.items():
+        if device is None:
+            device = src_node.device
         src_type, _, dst_type = etype_str_to_tuple(etype)
         src_nodes[src_type].append(src_node)
         dst_nodes[dst_type].append(dst_node)
@@ -145,7 +148,7 @@ def unique_and_compact_node_pairs(
     compacted_src = {}
     compacted_dst = {}
     dtype = list(src_nodes.values())[0].dtype
-    default_tensor = torch.tensor([], dtype=dtype)
+    default_tensor = torch.tensor([], dtype=dtype, device=device)
     for ntype in ntypes:
         src = src_nodes.get(ntype, default_tensor)
         unique_dst = unique_dst_nodes.get(ntype, default_tensor)
@@ -223,8 +226,8 @@ def unique_and_compact_csc_formats(
     ...     "n1": torch.LongTensor([1, 2]),
     ...     "n2": torch.LongTensor([5, 6])}
     >>> csc_formats = {
-    ...     "n1:e1:n2": CSCFormatBase(indptr=torch.tensor([0, 2, 3]),indices=N1),
-    ...     "n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1, 3]),indices=N2)}
+    ...     "n1:e1:n2": gb.CSCFormatBase(indptr=torch.tensor([0, 2, 3]),indices=N1),
+    ...     "n2:e2:n1": gb.CSCFormatBase(indptr=torch.tensor([0, 1, 3]),indices=N2)}
     >>> unique_nodes, compacted_csc_formats = gb.unique_and_compact_csc_formats(
     ...     csc_formats, unique_dst
     ... )
@@ -247,10 +250,10 @@ def unique_and_compact_csc_formats(
 
     # Collect all source and destination nodes for each node type.
     indices = defaultdict(list)
+    device = None
     for etype, csc_format in csc_formats.items():
-        assert csc_format.indptr[-1] == len(
-            csc_format.indices
-        ), "The last element of indptr should be the same as the length of indices."
+        if device is None:
+            device = csc_format.indices.device
         src_type, _, dst_type = etype_str_to_tuple(etype)
         assert len(unique_dst_nodes.get(dst_type, [])) + 1 == len(
             csc_format.indptr
@@ -262,7 +265,7 @@ def unique_and_compact_csc_formats(
     unique_nodes = {}
     compacted_indices = {}
     dtype = list(indices.values())[0].dtype
-    default_tensor = torch.tensor([], dtype=dtype)
+    default_tensor = torch.tensor([], dtype=dtype, device=device)
     for ntype in ntypes:
         indice = indices.get(ntype, default_tensor)
         unique_dst = unique_dst_nodes.get(ntype, default_tensor)
@@ -271,7 +274,9 @@ def unique_and_compact_csc_formats(
             compacted_indices[ntype],
             _,
         ) = torch.ops.graphbolt.unique_and_compact(
-            indice, torch.tensor([], dtype=indice.dtype), unique_dst
+            indice,
+            torch.tensor([], dtype=indice.dtype, device=device),
+            unique_dst,
         )
 
     compacted_csc_formats = {}
@@ -294,12 +299,31 @@ def unique_and_compact_csc_formats(
     return unique_nodes, compacted_csc_formats
 
 
+def _broadcast_timestamps(csc, dst_timestamps):
+    """Broadcast the timestamp of each destination node to its corresponding
+    source nodes."""
+    count = torch.diff(csc.indptr)
+    src_timestamps = torch.repeat_interleave(dst_timestamps, count)
+    return src_timestamps
+
+
 def compact_csc_format(
     csc_formats: Union[CSCFormatBase, Dict[str, CSCFormatBase]],
     dst_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+    dst_timestamps: Optional[
+        Union[torch.Tensor, Dict[str, torch.Tensor]]
+    ] = None,
 ):
     """
-    Compact csc formats and return original_row_ids (per type).
+    Relabel the row (source) IDs in the csc formats into a contiguous range from
+    0 and return the original row node IDs per type.
+
+    Note that
+    1. The column (destination) IDs are included in the relabeled row IDs.
+    2. If there are repeated row IDs, they would not be uniqued and will be
+    treated as different nodes.
+    3. If `dst_timestamps` is given, the timestamp of each destination node will
+    be broadcasted to its corresponding source nodes.
 
     Parameters
     ----------
@@ -318,41 +342,80 @@ def compact_csc_format(
         - If `dst_nodes` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
 
+    dst_timestamps: Optional[Union[torch.Tensor, Dict[str, torch.Tensor]]]
+        Timestamps of all destination nodes in the csc formats.
+        If given, the timestamp of each destination node will be broadcasted
+        to its corresponding source nodes.
+
     Returns
     -------
-    Tuple[original_row_node_ids, compacted_csc_formats]
+    Tuple[original_row_node_ids, compacted_csc_formats, ...]
+        A tensor of original row node IDs (per type) of all nodes in the input.
         The compacted CSC formats, where node IDs are replaced with mapped node
-        IDs, and all nodes (per type).
-        "Compacted CSC formats" indicates that the node IDs in the input node
-        pairs are replaced with mapped node IDs, where each type of node is
-        mapped to a contiguous space of IDs ranging from 0 to N.
+        IDs ranging from 0 to N.
+        The source timestamps (per type) of all nodes in the input if `dst_timestamps` is given.
 
     Examples
     --------
     >>> import dgl.graphbolt as gb
-    >>> N1 = torch.LongTecnsor([1, 2, 2])
-    >>> N2 = torch.LongTensor([5, 6, 5])
-    >>> csc_formats = {"n2:e2:n1": CSCFormatBase(indptr=torch.tensor([0, 1]),
-    ... indices=torch.tensor([5]))}
-    >>> dst_nodes = {"n1": N1[:1]}
+    >>> csc_formats = {
+    ...     "n2:e2:n1": gb.CSCFormatBase(
+    ...         indptr=torch.tensor([0, 1, 3]), indices=torch.tensor([5, 4, 6])
+    ...     ),
+    ...     "n1:e1:n1": gb.CSCFormatBase(
+    ...         indptr=torch.tensor([0, 1, 3]), indices=torch.tensor([1, 2, 3])
+    ...     ),
+    ... }
+    >>> dst_nodes = {"n1": torch.LongTensor([2, 4])}
     >>> original_row_node_ids, compacted_csc_formats = gb.compact_csc_format(
     ...     csc_formats, dst_nodes
     ... )
-    >>> print(original_row_node_ids)
-    {'n1': tensor([1]), 'n2': tensor([5])}
-    >>> print(compacted_csc_formats)
-    {"n2:e2:n1": CSCFormatBase(indptr=tensor([0, 1]),
-    ... indices=tensor([0]))}
+    >>> original_row_node_ids
+    {'n1': tensor([2, 4, 1, 2, 3]), 'n2': tensor([5, 4, 6])}
+    >>> compacted_csc_formats
+    {'n2:e2:n1': CSCFormatBase(indptr=tensor([0, 1, 3]),
+                indices=tensor([0, 1, 2]),
+    ), 'n1:e1:n1': CSCFormatBase(indptr=tensor([0, 1, 3]),
+                indices=tensor([2, 3, 4]),
+    )}
+
+    >>> csc_formats = {
+    ...     "n2:e2:n1": gb.CSCFormatBase(
+    ...         indptr=torch.tensor([0, 1, 3]), indices=torch.tensor([5, 4, 6])
+    ...     ),
+    ...     "n1:e1:n1": gb.CSCFormatBase(
+    ...         indptr=torch.tensor([0, 1, 3]), indices=torch.tensor([1, 2, 3])
+    ...     ),
+    ... }
+    >>> dst_nodes = {"n1": torch.LongTensor([2, 4])}
+    >>> original_row_node_ids, compacted_csc_formats = gb.compact_csc_format(
+    ...     csc_formats, dst_nodes
+    ... )
+    >>> original_row_node_ids
+    {'n1': tensor([2, 4, 1, 2, 3]), 'n2': tensor([5, 4, 6])}
+    >>> compacted_csc_formats
+    {'n2:e2:n1': CSCFormatBase(indptr=tensor([0, 1, 3]),
+                indices=tensor([0, 1, 2]),
+    ), 'n1:e1:n1': CSCFormatBase(indptr=tensor([0, 1, 3]),
+                indices=tensor([2, 3, 4]),
+    )}
+
+    >>> dst_timestamps = {"n1": torch.LongTensor([10, 20])}
+    >>> (
+    ...     original_row_node_ids,
+    ...     compacted_csc_formats,
+    ...     src_timestamps,
+    ... ) = gb.compact_csc_format(csc_formats, dst_nodes, dst_timestamps)
+    >>> src_timestamps
+    {'n1': tensor([10, 20, 10, 20, 20]), 'n2': tensor([10, 20, 20])}
     """
     is_homogeneous = not isinstance(csc_formats, dict)
+    has_timestamp = dst_timestamps is not None
     if is_homogeneous:
         if dst_nodes is not None:
             assert isinstance(
                 dst_nodes, torch.Tensor
             ), "Edge type not supported in homogeneous graph."
-            assert csc_formats.indptr[-1] == len(
-                csc_formats.indices
-            ), "The last element of indptr should be the same as the length of indices."
             assert len(dst_nodes) + 1 == len(
                 csc_formats.indptr
             ), "The seed nodes should correspond to indptr."
@@ -360,25 +423,43 @@ def compact_csc_format(
         original_row_ids = torch.cat((dst_nodes, csc_formats.indices))
         compacted_csc_formats = CSCFormatBase(
             indptr=csc_formats.indptr,
-            indices=(torch.arange(0, csc_formats.indices.size(0)) + offset),
+            indices=(
+                torch.arange(
+                    0,
+                    csc_formats.indices.size(0),
+                    device=csc_formats.indices.device,
+                )
+                + offset
+            ),
         )
+
+        src_timestamps = None
+        if has_timestamp:
+            src_timestamps = _broadcast_timestamps(
+                compacted_csc_formats, dst_timestamps
+            )
     else:
         compacted_csc_formats = {}
+        src_timestamps = None
         original_row_ids = copy.deepcopy(dst_nodes)
+        if has_timestamp:
+            src_timestamps = copy.deepcopy(dst_timestamps)
         for etype, csc_format in csc_formats.items():
-            assert csc_format.indptr[-1] == len(
-                csc_format.indices
-            ), "The last element of indptr should be the same as the length of indices."
             src_type, _, dst_type = etype_str_to_tuple(etype)
             assert len(dst_nodes.get(dst_type, [])) + 1 == len(
                 csc_format.indptr
             ), "The seed nodes should correspond to indptr."
-            offset = original_row_ids.get(src_type, torch.tensor([])).size(0)
+            device = csc_format.indices.device
+            offset = original_row_ids.get(
+                src_type, torch.tensor([], device=device)
+            ).size(0)
             original_row_ids[src_type] = torch.cat(
                 (
                     original_row_ids.get(
                         src_type,
-                        torch.tensor([], dtype=csc_format.indices.dtype),
+                        torch.tensor(
+                            [], dtype=csc_format.indices.dtype, device=device
+                        ),
                     ),
                     csc_format.indices,
                 )
@@ -390,8 +471,27 @@ def compact_csc_format(
                         0,
                         csc_format.indices.size(0),
                         dtype=csc_format.indices.dtype,
+                        device=device,
                     )
                     + offset
                 ),
             )
+            if has_timestamp:
+                # If destination timestamps are given, broadcast them to the
+                # corresponding source nodes.
+                src_timestamps[src_type] = torch.cat(
+                    (
+                        src_timestamps.get(
+                            src_type,
+                            torch.tensor(
+                                [], dtype=dst_timestamps[dst_type].dtype
+                            ),
+                        ),
+                        _broadcast_timestamps(
+                            csc_format, dst_timestamps[dst_type]
+                        ),
+                    )
+                )
+    if has_timestamp:
+        return original_row_ids, compacted_csc_formats, src_timestamps
     return original_row_ids, compacted_csc_formats

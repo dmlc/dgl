@@ -24,12 +24,12 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
     >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
     >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     >>> subgraph = gb.FusedSampledSubgraphImpl(
-    ... node_pairs=node_pairs,
+    ... sampled_csc=node_pairs,
     ... original_column_node_ids=original_column_node_ids,
     ... original_row_node_ids=original_row_node_ids,
     ... original_edge_ids=original_edge_ids
     ... )
-    >>> print(subgraph.node_pairs)
+    >>> print(subgraph.sampled_csc)
     {"A:relation:B": (tensor([0, 1, 2]), tensor([0, 1, 2]))}
     >>> print(subgraph.original_column_node_ids)
     {'B': tensor([10, 11, 12])}
@@ -38,7 +38,7 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
     >>> print(subgraph.original_edge_ids)
     {"A:relation:B": tensor([19, 20, 21])}
     """
-    node_pairs: Union[
+    sampled_csc: Union[
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
         Tuple[torch.Tensor, torch.Tensor],
     ] = None
@@ -49,8 +49,8 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
     original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
 
     def __post_init__(self):
-        if isinstance(self.node_pairs, dict):
-            for etype, pair in self.node_pairs.items():
+        if isinstance(self.sampled_csc, dict):
+            for etype, pair in self.sampled_csc.items():
                 assert (
                     isinstance(etype, str)
                     and len(etype_str_to_tuple(etype)) == 3
@@ -63,10 +63,11 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
                 ), "Nodes in pairs should be of type torch.Tensor."
         else:
             assert (
-                isinstance(self.node_pairs, tuple) and len(self.node_pairs) == 2
+                isinstance(self.sampled_csc, tuple)
+                and len(self.sampled_csc) == 2
             ), "Node pair should be a source-destination tuple (u, v)."
             assert all(
-                isinstance(item, torch.Tensor) for item in self.node_pairs
+                isinstance(item, torch.Tensor) for item in self.sampled_csc
             ), "Nodes in pairs should be of type torch.Tensor."
 
     def __repr__(self) -> str:
@@ -79,18 +80,18 @@ class SampledSubgraphImpl(SampledSubgraph):
 
     Examples
     --------
-    >>> node_pairs = {"A:relation:B": CSCFormatBase(indptr=torch.tensor([0, 1, 2, 3]),
+    >>> sampled_csc = {"A:relation:B": CSCFormatBase(indptr=torch.tensor([0, 1, 2, 3]),
     ... indices=torch.tensor([0, 1, 2]))}
     >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
     >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
     >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     >>> subgraph = gb.SampledSubgraphImpl(
-    ... node_pairs=node_pairs,
+    ... sampled_csc=sampled_csc,
     ... original_column_node_ids=original_column_node_ids,
     ... original_row_node_ids=original_row_node_ids,
     ... original_edge_ids=original_edge_ids
     ... )
-    >>> print(subgraph.node_pairs)
+    >>> print(subgraph.sampled_csc)
     {"A:relation:B": CSCForamtBase(indptr=torch.tensor([0, 1, 2, 3]),
     ... indices=torch.tensor([0, 1, 2]))}
     >>> print(subgraph.original_column_node_ids)
@@ -100,10 +101,7 @@ class SampledSubgraphImpl(SampledSubgraph):
     >>> print(subgraph.original_edge_ids)
     {"A:relation:B": tensor([19, 20, 21])}
     """
-    node_pairs: Union[
-        CSCFormatBase,
-        Dict[str, CSCFormatBase],
-    ] = None
+    sampled_csc: Union[CSCFormatBase, Dict[str, CSCFormatBase]] = None
     original_column_node_ids: Union[
         Dict[str, torch.Tensor], torch.Tensor
     ] = None
@@ -111,8 +109,8 @@ class SampledSubgraphImpl(SampledSubgraph):
     original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
 
     def __post_init__(self):
-        if isinstance(self.node_pairs, dict):
-            for etype, pair in self.node_pairs.items():
+        if isinstance(self.sampled_csc, dict):
+            for etype, pair in self.sampled_csc.items():
                 assert (
                     isinstance(etype, str)
                     and len(etype_str_to_tuple(etype)) == 3
@@ -125,13 +123,13 @@ class SampledSubgraphImpl(SampledSubgraph):
                 ), "Nodes in pairs should be of type torch.Tensor."
         else:
             assert (
-                self.node_pairs.indptr is not None
-                and self.node_pairs.indices is not None
+                self.sampled_csc.indptr is not None
+                and self.sampled_csc.indices is not None
             ), "Node pair should be have indptr and indice."
             assert isinstance(
-                self.node_pairs.indptr, torch.Tensor
+                self.sampled_csc.indptr, torch.Tensor
             ) and isinstance(
-                self.node_pairs.indices, torch.Tensor
+                self.sampled_csc.indices, torch.Tensor
             ), "Nodes in pairs should be of type torch.Tensor."
 
     def __repr__(self) -> str:

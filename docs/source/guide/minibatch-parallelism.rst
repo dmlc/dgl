@@ -11,8 +11,7 @@ generate a minibatch, including:
 * Sample neighbors for each seed from graph.
 * Exclude seed edges from the sampled subgraphs.
 * Fetch node and edge features for the sampled subgraphs.
-* Convert the sampled subgraphs to DGLMiniBatches.
-* Copy the DGLMiniBatches to the target device.
+* Copy the MiniBatches to the target device.
 
 .. code:: python
 
@@ -22,7 +21,7 @@ generate a minibatch, including:
     datapipe = datapipe.transform(gb.exclude_seed_edges)
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 All these stages are implemented in separate
 `IterableDataPipe <https://pytorch.org/data/main/torchdata.datapipes.iter.html>`__
