@@ -4,7 +4,6 @@
  * @file cuda/unique_and_compact_impl.cu
  * @brief Unique and compact operator implementation on CUDA.
  */
-#include <c10/cuda/CUDAStream.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
 #include <thrust/functional.h>
@@ -33,18 +32,17 @@ struct EqualityFunc {
   }
 };
 
-#define DefineReductionFunction(cub_reduce_fn, name)              \
+#define DefineCubReductionFunction(cub_reduce_fn, name)           \
   template <typename scalar_iterator_t>                           \
   auto name(const scalar_iterator_t input, int64_t size) {        \
-    auto stream = cuda::GetCurrentStream();                       \
     using scalar_t = std::remove_reference_t<decltype(input[0])>; \
     cuda::CopyScalar<scalar_t> result;                            \
-    CUB_CALL(cub_reduce_fn, input, result.get(), size, stream);   \
+    CUB_CALL(cub_reduce_fn, input, result.get(), size);           \
     return result;                                                \
   }
 
-DefineReductionFunction(cub::DeviceReduce::Max, Max);
-DefineReductionFunction(cub::DeviceReduce::Min, Min);
+DefineCubReductionFunction(DeviceReduce::Max, Max);
+DefineCubReductionFunction(DeviceReduce::Min, Min);
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
@@ -92,9 +90,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
               is_dst.get(), thrust::logical_not<bool>{});
           cuda::CopyScalar<int64_t> only_src_size;
           CUB_CALL(
-              cub::DeviceSelect::Flagged, src_ids_ptr, is_src,
+              DeviceSelect::Flagged, src_ids_ptr, is_src,
               only_src.data_ptr<scalar_t>(), only_src_size.get(),
-              src_ids.size(0), stream);
+              src_ids.size(0));
           stream.synchronize();
           only_src = only_src.slice(0, 0, static_cast<int64_t>(only_src_size));
         }
@@ -119,9 +117,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         {  // Compute the unique operation on the only_src tensor.
           cuda::CopyScalar<int64_t> unique_only_src_size;
           CUB_CALL(
-              cub::DeviceSelect::Unique, sorted_only_src.data_ptr<scalar_t>(),
-              unique_only_src_ptr, unique_only_src_size.get(), only_src.size(0),
-              stream);
+              DeviceSelect::Unique, sorted_only_src.data_ptr<scalar_t>(),
+              unique_only_src_ptr, unique_only_src_size.get(),
+              only_src.size(0));
           stream.synchronize();
           unique_only_src = unique_only_src.slice(
               0, 0, static_cast<int64_t>(unique_only_src_size));

@@ -5,7 +5,6 @@
  * @brief Index select operator implementation on CUDA.
  */
 #include <c10/core/ScalarType.h>
-#include <c10/cuda/CUDAStream.h>
 #include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/cuda_sampling_ops.h>
@@ -138,8 +137,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "SampleNeighborsInDegree", ([&] {
         CUB_CALL(
-            cub::DeviceReduce::Max, in_degree.data_ptr<scalar_t>(),
-            max_in_degree.data_ptr<scalar_t>(), num_rows, stream);
+            DeviceReduce::Max, in_degree.data_ptr<scalar_t>(),
+            max_in_degree.data_ptr<scalar_t>(), num_rows);
       }));
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto sub_indptr = ExclusiveCumSum(in_degree);
@@ -161,8 +160,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
         // Compute output_indptr.
         CUB_CALL(
-            cub::DeviceScan::ExclusiveSum, sampled_degree,
-            output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
+            DeviceScan::ExclusiveSum, sampled_degree,
+            output_indptr.data_ptr<indptr_t>(), num_rows + 1);
 
         auto num_sampled_edges =
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
@@ -231,11 +230,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               // sorting the first fanout elements of each row will
               // give us the sampled edges.
               CUB_CALL(
-                  cub::DeviceSegmentedSort::SortPairs, randoms.get(),
+                  DeviceSegmentedSort::SortPairs, randoms.get(),
                   randoms_sorted.get(), edge_id_segments.get(),
                   sorted_edge_id_segments.get(), num_edges, num_rows,
                   sub_indptr.data_ptr<indptr_t>(),
-                  sub_indptr.data_ptr<indptr_t>() + 1, stream);
+                  sub_indptr.data_ptr<indptr_t>() + 1);
 
               picked_eids = torch::empty(
                   static_cast<indptr_t>(num_sampled_edges),
@@ -256,9 +255,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               // Copy the sampled edge ids into picked_eids tensor.
               for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
                 CUB_CALL(
-                    cub::DeviceCopy::Batched, input_buffer_it + i,
+                    DeviceCopy::Batched, input_buffer_it + i,
                     output_buffer_it + i, sampled_degree + i,
-                    std::min(num_rows - i, max_copy_at_once), stream);
+                    std::min(num_rows - i, max_copy_at_once));
               }
             }));
 

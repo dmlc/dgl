@@ -39,8 +39,6 @@ struct AdjacentDifference {
 };
 
 torch::Tensor CSRToCOO(torch::Tensor indptr, torch::ScalarType output_dtype) {
-  auto allocator = cuda::GetAllocator();
-  auto stream = cuda::GetCurrentStream();
   const auto num_rows = indptr.size(0) - 1;
   thrust::counting_iterator<int64_t> iota(0);
 
@@ -70,9 +68,8 @@ torch::Tensor CSRToCOO(torch::Tensor indptr, torch::ScalarType output_dtype) {
                   std::numeric_limits<int32_t>::max();
               for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
                 CUB_CALL(
-                    cub::DeviceCopy::Batched, input_buffer + i,
-                    output_buffer + i, buffer_sizes + i,
-                    std::min(num_rows - i, max_copy_at_once), stream);
+                    DeviceCopy::Batched, input_buffer + i, output_buffer + i,
+                    buffer_sizes + i, std::min(num_rows - i, max_copy_at_once));
               }
             }));
         return csr_rows;

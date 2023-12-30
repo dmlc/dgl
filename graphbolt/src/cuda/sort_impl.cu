@@ -5,7 +5,6 @@
  * @brief Sort implementation on CUDA.
  */
 #include <c10/core/ScalarType.h>
-#include <c10/cuda/CUDAStream.h>
 
 #include <cub/cub.cuh>
 
@@ -21,8 +20,6 @@ std::conditional_t<
     torch::Tensor>
 Sort(const scalar_t* input_keys, int64_t num_items, int num_bits) {
   const auto options = torch::TensorOptions().device(c10::DeviceType::CUDA);
-  auto allocator = cuda::GetAllocator();
-  auto stream = cuda::GetCurrentStream();
   constexpr c10::ScalarType dtype = c10::CppTypeToScalarType<scalar_t>::value;
   auto sorted_array = torch::empty(num_items, options.dtype(dtype));
   auto sorted_keys = sorted_array.data_ptr<scalar_t>();
@@ -37,13 +34,13 @@ Sort(const scalar_t* input_keys, int64_t num_items, int num_bits) {
     const int64_t* input_values = original_idx.data_ptr<int64_t>();
     int64_t* sorted_values = sorted_idx.data_ptr<int64_t>();
     CUB_CALL(
-        cub::DeviceRadixSort::SortPairs, input_keys, sorted_keys, input_values,
-        sorted_values, num_items, 0, num_bits, stream);
+        DeviceRadixSort::SortPairs, input_keys, sorted_keys, input_values,
+        sorted_values, num_items, 0, num_bits);
     return std::make_pair(sorted_array, sorted_idx);
   } else {
     CUB_CALL(
-        cub::DeviceRadixSort::SortKeys, input_keys, sorted_keys, num_items, 0,
-        num_bits, stream);
+        DeviceRadixSort::SortKeys, input_keys, sorted_keys, num_items, 0,
+        num_bits);
     return sorted_array;
   }
 }

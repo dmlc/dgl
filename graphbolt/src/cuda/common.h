@@ -10,6 +10,7 @@
 #include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
+#include <c10/cuda/CUDAStream.h>
 #include <cuda_runtime.h>
 #include <torch/script.h>
 
@@ -91,13 +92,14 @@ inline bool is_zero<dim3>(dim3 size) {
     }                                                                 \
   }
 
-#define CUB_CALL(cub_func, ...)                                            \
-  {                                                                        \
-    auto allocator = graphbolt::cuda::GetAllocator();                      \
-    size_t tmp_storage_size = 0;                                           \
-    CUDA_CALL(cub_func(nullptr, tmp_storage_size, __VA_ARGS__));           \
-    auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);  \
-    CUDA_CALL(cub_func(tmp_storage.get(), tmp_storage_size, __VA_ARGS__)); \
+#define CUB_CALL(fn, ...)                                                     \
+  {                                                                           \
+    auto allocator = graphbolt::cuda::GetAllocator();                         \
+    auto stream = graphbolt::cuda::GetCurrentStream();                        \
+    size_t workspace_size = 0;                                                \
+    CUDA_CALL(cub::fn(nullptr, workspace_size, __VA_ARGS__, stream));         \
+    auto workspace = allocator.AllocateStorage<char>(workspace_size);         \
+    CUDA_CALL(cub::fn(workspace.get(), workspace_size, __VA_ARGS__, stream)); \
   }
 
 /**
