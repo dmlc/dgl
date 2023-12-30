@@ -424,10 +424,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
-            node_type_offset = self.node_type_offset.to(column.device)
+            self.node_type_offset = self.node_type_offset.to(column.device)
             # 1. Find node types for each nodes in column.
             node_types = (
-                torch.searchsorted(node_type_offset, column, right=True) - 1
+                torch.searchsorted(self.node_type_offset, column, right=True)
+                - 1
             )
 
             original_hetero_edge_ids = {}
@@ -445,7 +446,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     eids = torch.nonzero(type_per_edge == etype_id).view(-1)
                     src_ntype_id = self.node_type_to_id[src_ntype]
                     sub_indices[etype] = (
-                        indices[eids] - node_type_offset[src_ntype_id]
+                        indices[eids] - self.node_type_offset[src_ntype_id]
                     )
                     cum_edges = torch.searchsorted(
                         eids, indptr[nids + 1], right=False
