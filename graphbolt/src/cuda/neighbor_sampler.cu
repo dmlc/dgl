@@ -149,7 +149,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto sub_indptr = ExclusiveCumSum(in_degree);
   auto output_indptr = torch::empty_like(sub_indptr);
-  auto coo_rows = CSRToCOOImpl(sub_indptr, indices.scalar_type());
+  auto coo_rows = CSCToCOOImpl(sub_indptr, indices.scalar_type());
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
@@ -179,7 +179,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
 
         // Find the smallest integer type to store the edge id offsets.
-        // CSRToCOO had synch inside, so it is safe to read max_in_degree now.
+        // CSCToCOO had synch inside, so it is safe to read max_in_degree now.
         const int num_bits =
             cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         std::array<int, 4> type_bits = {8, 16, 32, 64};

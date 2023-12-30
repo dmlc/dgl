@@ -1,8 +1,8 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file cuda/csr_to_coo.cu
- * @brief CSRToCOO operator implementation on CUDA.
+ * @file cuda/csc_to_coo.cu
+ * @brief CSCToCOO operator implementation on CUDA.
  */
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
@@ -39,33 +39,33 @@ struct AdjacentDifference {
   }
 };
 
-torch::Tensor CSRToCOOImpl(
+torch::Tensor CSCToCOOImpl(
     torch::Tensor indptr, torch::ScalarType output_dtype,
     torch::optional<int64_t> num_edges, torch::optional<torch::Tensor> nodes) {
   if (!num_edges.has_value()) {
     num_edges = AT_DISPATCH_INTEGRAL_TYPES(
-        indptr.scalar_type(), "CSRToCOOIndptr[-1]", ([&]() -> int64_t {
+        indptr.scalar_type(), "CSCToCOOIndptr[-1]", ([&]() -> int64_t {
           auto indptr_ptr = indptr.data_ptr<scalar_t>();
           auto num_edges = cuda::CopyScalar{indptr_ptr + indptr.size(0) - 1};
           return static_cast<scalar_t>(num_edges);
         }));
   }
-  auto csr_rows =
+  auto csc_rows =
       torch::empty(num_edges.value(), indptr.options().dtype(output_dtype));
 
   AT_DISPATCH_INTEGRAL_TYPES(
-      indptr.scalar_type(), "CSRToCOOIndptr", ([&] {
+      indptr.scalar_type(), "CSCToCOOIndptr", ([&] {
         using indptr_t = scalar_t;
         auto indptr_ptr = indptr.data_ptr<indptr_t>();
         AT_DISPATCH_INTEGRAL_TYPES(
-            output_dtype, "CSRToCOOIndices", ([&] {
+            output_dtype, "CSCToCOOIndices", ([&] {
               using indices_t = scalar_t;
-              auto csc_rows_ptr = csr_rows.data_ptr<indices_t>();
+              auto csc_rows_ptr = csc_rows.data_ptr<indices_t>();
 
               auto nodes_dtype =
                   nodes ? nodes.value().scalar_type() : output_dtype;
               AT_DISPATCH_INTEGRAL_TYPES(
-                  nodes_dtype, "CSRToCOONodes", ([&] {
+                  nodes_dtype, "CSCToCOONodes", ([&] {
                     using nodes_t = scalar_t;
                     auto nodes_ptr =
                         nodes ? nodes.value().data_ptr<nodes_t>() : nullptr;
@@ -102,7 +102,7 @@ torch::Tensor CSRToCOOImpl(
                   }));
             }));
       }));
-  return csr_rows;
+  return csc_rows;
 }
 
 }  // namespace ops

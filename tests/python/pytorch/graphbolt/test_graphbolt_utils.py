@@ -442,13 +442,15 @@ def test_compact_incorrect_indptr():
     with pytest.raises(AssertionError):
         gb.compact_csc_format(csc_formats, seeds)
 
-def torch_csr_to_coo(indptr, dtype, nodes=None):
+
+def torch_csc_to_coo(indptr, dtype, nodes=None):
     if nodes is None:
         nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
     return nodes.repeat_interleave(indptr.diff())
 
+
 @pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
-def test_csr_to_coo(dtype):
+def test_csc_to_coo(dtype):
     num_nodes = 13
     nodes = None
     for _ in range(2):
@@ -456,10 +458,19 @@ def test_csr_to_coo(dtype):
         # tests when nodes is a valid tensor.
         for _ in range(10):
             degrees = torch.randint(0, 5, [num_nodes], device=F.ctx())
-            indptr = torch.cat((torch.zeros(1, dtype=torch.int64, device=F.ctx()), degrees.cumsum(0)))
-            torch_result = torch_csr_to_coo(indptr, dtype, nodes)
-            gb_result = torch.ops.graphbolt.csr_to_coo(indptr, dtype, None, nodes)
+            indptr = torch.cat(
+                (
+                    torch.zeros(1, dtype=torch.int64, device=F.ctx()),
+                    degrees.cumsum(0),
+                )
+            )
+            torch_result = torch_csc_to_coo(indptr, dtype, nodes)
+            gb_result = torch.ops.graphbolt.csc_to_coo(
+                indptr, dtype, None, nodes
+            )
             assert torch.equal(torch_result, gb_result)
-            gb_result = torch.ops.graphbolt.csr_to_coo(indptr, dtype, indptr[-1].item(), nodes)
+            gb_result = torch.ops.graphbolt.csc_to_coo(
+                indptr, dtype, indptr[-1].item(), nodes
+            )
             assert torch.equal(torch_result, gb_result)
         nodes = torch.randint(0, 199, [num_nodes], dtype=dtype, device=F.ctx())
