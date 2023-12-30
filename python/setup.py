@@ -211,6 +211,19 @@ if include_libs:
                 data_files.append(get_lib_file_path("graphbolt"))
     setup_kwargs = {"include_package_data": True, "data_files": data_files}
 
+# Configure dependencies.
+install_requires = [
+    "numpy>=1.14.0",
+    "scipy>=1.1.0",
+    "networkx>=2.1",
+    "requests>=2.19.0",
+    "tqdm",
+    "psutil>=5.8.0",
+    "torchdata>=0.5.0",
+]
+if "DGLBACKEND" in os.environ and os.environ["DGLBACKEND"] != "pytorch":
+    install_requires.pop(install_requires.index("torchdata>=0.5.0"))
+
 setup(
     name="dgl" + os.getenv("DGL_PACKAGE_SUFFIX", ""),
     version=VERSION,
@@ -219,14 +232,7 @@ setup(
     maintainer="DGL Team",
     maintainer_email="wmjlyjemaine@gmail.com",
     packages=find_packages(),
-    install_requires=[
-        "numpy>=1.14.0",
-        "scipy>=1.1.0",
-        "networkx>=2.1",
-        "requests>=2.19.0",
-        "tqdm",
-        "psutil>=5.8.0",
-    ],
+    install_requires=install_requires,
     url="https://github.com/dmlc/dgl",
     distclass=BinaryDistribution,
     ext_modules=config_cython(),
