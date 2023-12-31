@@ -29,8 +29,8 @@ torch::Tensor CSCToCOO(
         torch::arange(indptr.size(0) - 1, indptr.options().dtype(output_dtype));
   }
   return original_column_node_ids.value()
-      .repeat_interleave(indptr.diff())
-      .to(output_dtype);
+      .to(output_dtype)
+      .repeat_interleave(indptr.diff());
 }
 
 }  // namespace ops
