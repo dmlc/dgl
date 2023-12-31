@@ -233,6 +233,35 @@ def test_isin_non_1D_dim():
         gb.isin(elements, test_elements)
 
 
+def torch_csc_to_coo(indptr, dtype, nodes=None):
+    if nodes is None:
+        nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
+    return nodes.repeat_interleave(indptr.diff())
+
+
+@pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
+def test_csc_to_coo(dtype):
+    num_nodes = 13
+    nodes = None
+    for _ in range(2):
+        # First iteration tests the case when nodes is None, second iteration
+        # tests when nodes is a valid tensor.
+        for _ in range(10):
+            degrees = torch.randint(0, 5, [num_nodes], device=F.ctx())
+            indptr = torch.cat(
+                (
+                    torch.zeros(1, dtype=torch.int64, device=F.ctx()),
+                    degrees.cumsum(0),
+                )
+            )
+            torch_result = torch_csc_to_coo(indptr, dtype, nodes)
+            gb_result = gb.csc_to_coo(indptr, nodes, dtype)
+            assert torch.equal(torch_result, gb_result)
+            gb_result = gb.csc_to_coo(indptr, nodes, dtype, indptr[-1].item())
+            assert torch.equal(torch_result, gb_result)
+        nodes = torch.randint(0, 199, [num_nodes], dtype=dtype, device=F.ctx())
+
+
 def test_csc_format_base_representation():
     csc_format_base = gb.CSCFormatBase(
         indptr=torch.tensor([0, 2, 4]),
