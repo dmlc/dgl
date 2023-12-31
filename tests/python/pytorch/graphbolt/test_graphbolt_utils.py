@@ -465,12 +465,8 @@ def test_csc_to_coo(dtype):
                 )
             )
             torch_result = torch_csc_to_coo(indptr, dtype, nodes)
-            gb_result = torch.ops.graphbolt.csc_to_coo(
-                indptr, dtype, None, nodes
-            )
+            gb_result = gb.csc_to_coo(indptr, nodes, dtype)
             assert torch.equal(torch_result, gb_result)
-            gb_result = torch.ops.graphbolt.csc_to_coo(
-                indptr, dtype, indptr[-1].item(), nodes
-            )
+            gb_result = gb.csc_to_coo(indptr, nodes, dtype, indptr[-1].item())
             assert torch.equal(torch_result, gb_result)
         nodes = torch.randint(0, 199, [num_nodes], dtype=dtype, device=F.ctx())

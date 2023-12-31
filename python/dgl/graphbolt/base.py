@@ -15,6 +15,7 @@ __all__ = [
     "etype_tuple_to_str",
     "CopyTo",
     "isin",
+    "csc_to_coo",
     "CSCFormatBase",
     "seed",
 ]
@@ -54,6 +55,49 @@ def isin(elements, test_elements):
     assert elements.dim() == 1, "Elements should be 1D tensor."
     assert test_elements.dim() == 1, "Test_elements should be 1D tensor."
     return torch.ops.graphbolt.isin(elements, test_elements)
+
+
+def csc_to_coo(indptr, node_ids=None, dtype=None, output_size=None):
+    """Converts a given indptr offset tensor to a COO format tensor. If
+    node_ids is not given, it is assumed to be equal to
+    torch.arange(indptr.size(0) - 1, dtype=dtype, device=indptr.device).
+
+    This is equivalent to
+
+    .. code:: python
+
+       if node_ids is None:
+           node_ids = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
+       return node_ids.to(dtype).repeat_interleave(indptr.diff())
+
+    Parameters
+    ----------
+    indptr : torch.Tensor
+        A 1D tensor represents the csc_indptr tensor.
+    node_ids : Optional[torch.Tensor]
+        A 1D tensor represents the column node ids that the returned tensor will
+        be populated with.
+    dtype : Optional[torch.dtype]
+        The dtype of the returned output tensor.
+    output_size : Optional[int]
+        The size of the output tensor. Should be equal to indptr[-1]. Using this
+        argument avoids a stream synchronization to calculate the output shape.
+
+    Returns
+        -------
+        torch.Tensor
+            The converted COO tensor with values from node_ids.
+    """
+    assert indptr.dim() == 1, "Indptr should be 1D tensor."
+    assert not (
+        node_ids is None and dtype is None
+    ), "One of node_ids or dtype must be given."
+    assert (
+        node_ids is None or node_ids.dim() == 1
+    ), "Node_ids should be 1D tensor."
+    if dtype is None:
+        dtype = node_ids.dtype
+    return torch.ops.graphbolt.csc_to_coo(indptr, dtype, output_size, node_ids)
 
 
 def etype_tuple_to_str(c_etype):

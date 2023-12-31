@@ -7,7 +7,7 @@ import torch
 
 from dgl.utils import recursive_apply
 
-from .base import apply_to, CSCFormatBase, etype_str_to_tuple, isin
+from .base import apply_to, csc_to_coo, CSCFormatBase, etype_str_to_tuple, isin
 
 
 __all__ = ["SampledSubgraph"]
@@ -224,8 +224,8 @@ def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
     indices = node_pair.indices
     if original_row_node_ids is not None:
         indices = original_row_node_ids[indices]
-    indptr = torch.ops.graphbolt.csc_to_coo(
-        indptr, indices.dtype, len(indices), original_column_node_ids
+    indptr = csc_to_coo(
+        indptr, original_column_node_ids, indices.dtype, len(indices)
     )
     return (indices, indptr)
 
