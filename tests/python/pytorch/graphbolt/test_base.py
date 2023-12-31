@@ -236,7 +236,7 @@ def test_isin_non_1D_dim():
 def torch_csc_to_coo(indptr, dtype, nodes=None):
     if nodes is None:
         nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
-    return nodes.repeat_interleave(indptr.diff())
+    return nodes.to(dtype).repeat_interleave(indptr.diff())
 
 
 @pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
