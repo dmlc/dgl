@@ -1,4 +1,6 @@
 import unittest
+
+from enum import Enum
 from functools import partial
 
 import backend as F
@@ -10,6 +12,31 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 from . import gb_test_utils
+
+
+# Skip all tests on GPU.
+pytestmark = pytest.mark.skipif(
+    F._default_context_str != "cpu",
+    reason="GraphBolt sampling tests are only supported on CPU.",
+)
+
+
+class SamplerType(Enum):
+    Normal = 0
+    Layer = 1
+    Temporal = 2
+
+
+def _get_sampler(sampler_type):
+    if sampler_type == SamplerType.Normal:
+        return gb.NeighborSampler
+    if sampler_type == SamplerType.Layer:
+        return gb.LayerNeighborSampler
+    return partial(
+        gb.TemporalNeighborSampler,
+        node_timestamp_attr_name="timestamp",
+        edge_timestamp_attr_name="timestamp",
+    )
 
 
 def test_SubgraphSampler_invoke():
@@ -76,17 +103,29 @@ def test_NeighborSampler_fanouts(labor):
     assert len(list(datapipe)) == 5
 
 
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Node(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_Node(sampler_type):
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
-    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    items = torch.arange(10)
+    names = "seed_nodes"
+    if sampler_type == SamplerType.Temporal:
+        graph.node_attributes = {"timestamp": torch.arange(20).to(F.ctx())}
+        graph.edge_attributes = {
+            "timestamp": torch.arange(len(graph.indices)).to(F.ctx())
+        }
+        items = (items, torch.arange(10))
+        names = ("seed_nodes", "timestamp")
+    itemset = gb.ItemSet(items, names=names)
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    sampler_dp = Sampler(item_sampler, graph, fanouts)
+    sampler = _get_sampler(sampler_type)
+    sampler_dp = sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 5
 
 
@@ -95,33 +134,57 @@ def to_link_batch(data):
     return block
 
 
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Link(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_Link(sampler_type):
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
-    itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
+    items = torch.arange(20).reshape(-1, 2)
+    names = "node_pairs"
+    if sampler_type == SamplerType.Temporal:
+        graph.node_attributes = {"timestamp": torch.arange(20).to(F.ctx())}
+        graph.edge_attributes = {
+            "timestamp": torch.arange(len(graph.indices)).to(F.ctx())
+        }
+        items = (items, torch.arange(10))
+        names = ("node_pairs", "timestamp")
+    itemset = gb.ItemSet(items, names=names)
     datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    datapipe = Sampler(datapipe, graph, fanouts)
+    sampler = _get_sampler(sampler_type)
+    datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
 
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Link_With_Negative(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_Link_With_Negative(sampler_type):
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
-    itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
+    items = torch.arange(20).reshape(-1, 2)
+    names = "node_pairs"
+    if sampler_type == SamplerType.Temporal:
+        graph.node_attributes = {"timestamp": torch.arange(20).to(F.ctx())}
+        graph.edge_attributes = {
+            "timestamp": torch.arange(len(graph.indices)).to(F.ctx())
+        }
+        items = (items, torch.arange(10))
+        names = ("node_pairs", "timestamp")
+    itemset = gb.ItemSet(items, names=names)
     datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    datapipe = Sampler(datapipe, graph, fanouts)
+    sampler = _get_sampler(sampler_type)
+    datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
@@ -148,34 +211,64 @@ def get_hetero_graph():
     )
 
 
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Node_Hetero(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_Node_Hetero(sampler_type):
     graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict(
-        {"n2": gb.ItemSet(torch.arange(3), names="seed_nodes")}
-    )
+    items = torch.arange(3)
+    names = "seed_nodes"
+    if sampler_type == SamplerType.Temporal:
+        graph.node_attributes = {
+            "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
+        }
+        graph.edge_attributes = {
+            "timestamp": torch.arange(graph.indices.numel()).to(F.ctx())
+        }
+        items = (items, torch.randint(0, 10, (3,)))
+        names = (names, "timestamp")
+    itemset = gb.ItemSetDict({"n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    sampler_dp = Sampler(item_sampler, graph, fanouts)
+    sampler = _get_sampler(sampler_type)
+    sampler_dp = sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 2
     for minibatch in sampler_dp:
         assert len(minibatch.sampled_subgraphs) == num_layer
 
 
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Link_Hetero(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_Link_Hetero(sampler_type):
     graph = get_hetero_graph().to(F.ctx())
+    first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
+    first_names = "node_pairs"
+    second_items = torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T
+    second_names = "node_pairs"
+    if sampler_type == SamplerType.Temporal:
+        graph.node_attributes = {
+            "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
+        }
+        graph.edge_attributes = {
+            "timestamp": torch.arange(graph.indices.numel()).to(F.ctx())
+        }
+        first_items = (first_items, torch.randint(0, 10, (4,)))
+        first_names = (first_names, "timestamp")
+        second_items = (second_items, torch.randint(0, 10, (6,)))
+        second_names = (second_names, "timestamp")
     itemset = gb.ItemSetDict(
         {
             "n1:e1:n2": gb.ItemSet(
-                torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T,
-                names="node_pairs",
+                first_items,
+                names=first_names,
             ),
             "n2:e2:n1": gb.ItemSet(
-                torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T,
-                names="node_pairs",
+                second_items,
+                names=second_names,
             ),
         }
     )
@@ -183,24 +276,42 @@ def test_SubgraphSampler_Link_Hetero(labor):
     datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    datapipe = Sampler(datapipe, graph, fanouts)
+    sampler = _get_sampler(sampler_type)
+    datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
 
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
     graph = get_hetero_graph().to(F.ctx())
+    first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
+    first_names = "node_pairs"
+    second_items = torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T
+    second_names = "node_pairs"
+    if sampler_type == SamplerType.Temporal:
+        graph.node_attributes = {
+            "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
+        }
+        graph.edge_attributes = {
+            "timestamp": torch.arange(graph.indices.numel()).to(F.ctx())
+        }
+        first_items = (first_items, torch.randint(0, 10, (4,)))
+        first_names = (first_names, "timestamp")
+        second_items = (second_items, torch.randint(0, 10, (6,)))
+        second_names = (second_names, "timestamp")
     itemset = gb.ItemSetDict(
         {
             "n1:e1:n2": gb.ItemSet(
-                torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T,
-                names="node_pairs",
+                first_items,
+                names=first_names,
             ),
             "n2:e2:n1": gb.ItemSet(
-                torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T,
-                names="node_pairs",
+                second_items,
+                names=second_names,
             ),
         }
     )
@@ -209,8 +320,8 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    datapipe = Sampler(datapipe, graph, fanouts)
+    sampler = _get_sampler(sampler_type)
+    datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
@@ -219,8 +330,11 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     F._default_context_str != "cpu",
     reason="Sampling with replacement not yet supported on GPU.",
 )
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Random_Hetero_Graph(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_Random_Hetero_Graph(sampler_type):
     num_nodes = 5
     num_edges = 9
     num_ntypes = 3
@@ -235,10 +349,14 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
     ) = gb_test_utils.random_hetero_graph(
         num_nodes, num_edges, num_ntypes, num_etypes
     )
+    node_attributes = {}
     edge_attributes = {
         "A1": torch.randn(num_edges),
         "A2": torch.randn(num_edges),
     }
+    if sampler_type == SamplerType.Temporal:
+        node_attributes["timestamp"] = torch.randint(0, 10, (num_nodes,))
+        edge_attributes["timestamp"] = torch.randint(0, 10, (num_edges,))
     graph = gb.fused_csc_sampling_graph(
         csc_indptr,
         indices,
@@ -246,21 +364,31 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
         type_per_edge=type_per_edge,
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
+        node_attributes=node_attributes,
         edge_attributes=edge_attributes,
     ).to(F.ctx())
+    first_items = torch.tensor([0])
+    first_names = "seed_nodes"
+    second_items = torch.tensor([0])
+    second_names = "seed_nodes"
+    if sampler_type == SamplerType.Temporal:
+        first_items = (first_items, torch.randint(0, 10, (1,)))
+        first_names = (first_names, "timestamp")
+        second_items = (second_items, torch.randint(0, 10, (1,)))
+        second_names = (second_names, "timestamp")
     itemset = gb.ItemSetDict(
         {
-            "n2": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
-            "n1": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
+            "n2": gb.ItemSet(first_items, names=first_names),
+            "n1": gb.ItemSet(second_items, names=second_names),
         }
     )
 
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    sampler = _get_sampler(sampler_type)
 
-    sampler_dp = Sampler(item_sampler, graph, fanouts, replace=True)
+    sampler_dp = sampler(item_sampler, graph, fanouts, replace=True)
 
     for data in sampler_dp:
         for sampledsubgraph in data.sampled_subgraphs:
@@ -289,23 +417,40 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
     F._default_context_str != "cpu",
     reason="Fails due to randomness on the GPU.",
 )
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_without_dedpulication_Homo(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
     )
     graph = gb.from_dglgraph(graph, True).to(F.ctx())
     seed_nodes = torch.LongTensor([0, 3, 4])
+    items = seed_nodes
+    names = "seed_nodes"
+    if sampler_type == SamplerType.Temporal:
+        graph.node_attributes = {
+            "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
+        }
+        graph.edge_attributes = {
+            "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
+        }
+        items = (items, torch.randint(0, 10, (3,)))
+        names = (names, "timestamp")
 
-    itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
+    itemset = gb.ItemSet(items, names=names)
     item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(
         F.ctx()
     )
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    datapipe = Sampler(item_sampler, graph, fanouts, deduplicate=False)
+    sampler = _get_sampler(sampler_type)
+    if sampler_type == SamplerType.Temporal:
+        datapipe = sampler(item_sampler, graph, fanouts)
+    else:
+        datapipe = sampler(item_sampler, graph, fanouts, deduplicate=False)
 
     length = [17, 7]
     compacted_indices = [
@@ -334,17 +479,32 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
             )
 
 
-@pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_without_dedpulication_Hetero(labor):
+@pytest.mark.parametrize(
+    "sampler_type",
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+)
+def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
     graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict(
-        {"n2": gb.ItemSet(torch.arange(2), names="seed_nodes")}
-    )
+    items = torch.arange(2)
+    names = "seed_nodes"
+    if sampler_type == SamplerType.Temporal:
+        graph.node_attributes = {
+            "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
+        }
+        graph.edge_attributes = {
+            "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
+        }
+        items = (items, torch.randint(0, 10, (2,)))
+        names = (names, "timestamp")
+    itemset = gb.ItemSetDict({"n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    datapipe = Sampler(item_sampler, graph, fanouts, deduplicate=False)
+    sampler = _get_sampler(sampler_type)
+    if sampler_type == SamplerType.Temporal:
+        datapipe = sampler(item_sampler, graph, fanouts)
+    else:
+        datapipe = sampler(item_sampler, graph, fanouts, deduplicate=False)
     csc_formats = [
         {
             "n1:e1:n2": gb.CSCFormatBase(

@@ -47,6 +47,9 @@ class SubgraphSampler(MiniBatchTransformer):
             ) = self._node_pairs_preprocess(minibatch)
         elif minibatch.seed_nodes is not None:
             seeds = minibatch.seed_nodes
+            seeds_timestamp = (
+                minibatch.timestamp if hasattr(minibatch, "timestamp") else None
+            )
         else:
             raise ValueError(
                 f"Invalid minibatch {minibatch}: Either `node_pairs` or "
@@ -59,7 +62,7 @@ class SubgraphSampler(MiniBatchTransformer):
         return minibatch
 
     def _node_pairs_preprocess(self, minibatch):
-        has_timestamp = hasattr(minibatch, "timestamp")
+        use_timestamp = hasattr(minibatch, "timestamp")
         node_pairs = minibatch.node_pairs
         neg_src, neg_dst = minibatch.negative_srcs, minibatch.negative_dsts
         has_neg_src = neg_src is not None
@@ -75,20 +78,20 @@ class SubgraphSampler(MiniBatchTransformer):
             # Collect nodes from all types of input.
             nodes = defaultdict(list)
             nodes_timestamp = None
-            if has_timestamp:
+            if use_timestamp:
                 nodes_timestamp = defaultdict(list)
             for etype, (src, dst) in node_pairs.items():
                 src_type, _, dst_type = etype_str_to_tuple(etype)
                 nodes[src_type].append(src)
                 nodes[dst_type].append(dst)
-                if has_timestamp:
+                if use_timestamp:
                     nodes_timestamp[src_type].append(minibatch.timestamp[etype])
                     nodes_timestamp[dst_type].append(minibatch.timestamp[etype])
             if has_neg_src:
                 for etype, src in neg_src.items():
                     src_type, _, _ = etype_str_to_tuple(etype)
                     nodes[src_type].append(src.view(-1))
-                    if has_timestamp:
+                    if use_timestamp:
                         nodes_timestamp[src_type].append(
                             minibatch.timestamp[etype].repeat_interleave(
                                 src.shape[-1]
@@ -98,19 +101,20 @@ class SubgraphSampler(MiniBatchTransformer):
                 for etype, dst in neg_dst.items():
                     _, _, dst_type = etype_str_to_tuple(etype)
                     nodes[dst_type].append(dst.view(-1))
-                    if has_timestamp:
+                    if use_timestamp:
                         nodes_timestamp[dst_type].append(
                             minibatch.timestamp[etype].repeat_interleave(
                                 dst.shape[-1]
                             )
                         )
             # Unique and compact the collected nodes.
-            if has_timestamp:
-                seeds, seeds_timestamp, compacted = compact_temporal_nodes(
-                    seeds, nodes_timestamp, compacted
+            if use_timestamp:
+                seeds, nodes_timestamp, compacted = compact_temporal_nodes(
+                    nodes, nodes_timestamp
                 )
             else:
                 seeds, compacted = unique_and_compact(nodes)
+                nodes_timestamp = None
             (
                 compacted_node_pairs,
                 compacted_negative_srcs,
@@ -134,27 +138,29 @@ class SubgraphSampler(MiniBatchTransformer):
             # Collect nodes from all types of input.
             nodes = list(node_pairs)
             nodes_timestamp = None
-            if has_timestamp:
-                nodes_timestamp = list(minibatch.timestamp)
+            if use_timestamp:
+                # Timestamp for source and destination nodes are the same.
+                nodes_timestamp = [minibatch.timestamp, minibatch.timestamp]
             if has_neg_src:
                 nodes.append(neg_src.view(-1))
-                if has_timestamp:
+                if use_timestamp:
                     nodes_timestamp.append(
-                        minibatch.timestamp.repeat_interleave(src.shape[-1])
+                        minibatch.timestamp.repeat_interleave(neg_src.shape[-1])
                     )
             if has_neg_dst:
                 nodes.append(neg_dst.view(-1))
-                if has_timestamp:
+                if use_timestamp:
                     nodes_timestamp.append(
-                        minibatch.timestamp.repeat_interleave(dst.shape[-1])
+                        minibatch.timestamp.repeat_interleave(neg_dst.shape[-1])
                     )
             # Unique and compact the collected nodes.
-            if has_timestamp:
-                seeds, seeds_timestamp, compacted = compact_temporal_nodes(
-                    seeds, nodes_timestamp, compacted
+            if use_timestamp:
+                seeds, nodes_timestamp, compacted = compact_temporal_nodes(
+                    nodes, nodes_timestamp
                 )
             else:
                 seeds, compacted = unique_and_compact(nodes)
+                nodes_timestamp = None
             # Map back in same order as collect.
             compacted_node_pairs = tuple(compacted[:2])
             compacted = compacted[2:]
@@ -173,7 +179,7 @@ class SubgraphSampler(MiniBatchTransformer):
                 )
         return (
             seeds,
-            seeds_timestamp,
+            nodes_timestamp,
             compacted_node_pairs,
             compacted_negative_srcs if has_neg_src else None,
             compacted_negative_dsts if has_neg_dst else None,
@@ -190,7 +196,9 @@ class SubgraphSampler(MiniBatchTransformer):
             The seed nodes.
 
         seeds_timestamp : Optional[Union[torch.Tensor, Dict[str, torch.Tensor]]]
-            The timestamps of the seed nodes. If given, the sampled subgraphs should not contain any nodes or edges that are newer than the timestamps of the seed nodes. Default: None.
+            The timestamps of the seed nodes. If given, the sampled subgraphs
+            should not contain any nodes or edges that are newer than the
+            timestamps of the seed nodes. Default: None.
 
         Returns
         -------

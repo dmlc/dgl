@@ -117,10 +117,10 @@ class TemporalNeighborSampler(SubgraphSampler):
                 original_row_node_ids,
                 compacted_csc_formats,
                 row_timestamps,
-            ) = compact_csc_format(subgraph.node_pairs, seeds, seeds_timestamp)
+            ) = compact_csc_format(subgraph.sampled_csc, seeds, seeds_timestamp)
 
             subgraph = SampledSubgraphImpl(
-                node_pairs=compacted_csc_formats,
+                sampled_csc=compacted_csc_formats,
                 original_column_node_ids=seeds,
                 original_row_node_ids=original_row_node_ids,
                 original_edge_ids=subgraph.original_edge_ids,

@@ -761,8 +761,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def temporal_sample_neighbors(
         self,
-        nodes: torch.Tensor,
-        input_nodes_timestamp: torch.Tensor,
+        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        input_nodes_timestamp: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,

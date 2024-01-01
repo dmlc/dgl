@@ -64,7 +64,8 @@ def unique_and_compact(
 def compact_temporal_nodes(nodes, nodes_timestamp):
     """Compact a list of temporal nodes without unique.
 
-    Note that since there is no unique, the nodes and nodes_timestamp are simply concatenated. And the compacted nodes are consecutive numbers starting from
+    Note that since there is no unique, the nodes and nodes_timestamp are simply
+    concatenated. And the compacted nodes are consecutive numbers starting from
     0.
 
     Parameters
@@ -72,7 +73,8 @@ def compact_temporal_nodes(nodes, nodes_timestamp):
     nodes : List[torch.Tensor] or Dict[str, List[torch.Tensor]]
         List of nodes for compacting.
         the compact operator will be done per type
-        - If `nodes` is a list of tensor: All the tensors will compact together, usually it is used for homogeneous graph.
+        - If `nodes` is a list of tensor: All the tensors will compact together,
+        usually it is used for homogeneous graph.
         - If `nodes` is a list of dictionary: The keys should be node type and
         the values should be corresponding nodes, the compact will be done per
         type, usually it is used for heterogeneous graph.
@@ -89,6 +91,7 @@ def compact_temporal_nodes(nodes, nodes_timestamp):
     """
 
     def _compact_per_type(per_type_nodes, per_type_nodes_timestamp):
+        nums = [node.size(0) for node in per_type_nodes]
         per_type_nodes = torch.cat(per_type_nodes)
         per_type_nodes_timestamp = torch.cat(per_type_nodes_timestamp)
         compacted_nodes = torch.arange(
@@ -97,6 +100,7 @@ def compact_temporal_nodes(nodes, nodes_timestamp):
             dtype=per_type_nodes.dtype,
             device=per_type_nodes.device,
         )
+        compacted_nodes = list(compacted_nodes.split(nums))
         return per_type_nodes, per_type_nodes_timestamp, compacted_nodes
 
     if isinstance(nodes, dict):
@@ -287,7 +291,8 @@ def compact_csc_format(
         A tensor of original row node IDs (per type) of all nodes in the input.
         The compacted CSC formats, where node IDs are replaced with mapped node
         IDs ranging from 0 to N.
-        The source timestamps (per type) of all nodes in the input if `dst_timestamps` is given.
+        The source timestamps (per type) of all nodes in the input if
+        `dst_timestamps` is given.
 
     Examples
     --------
@@ -369,8 +374,13 @@ def compact_csc_format(
 
         src_timestamps = None
         if has_timestamp:
-            src_timestamps = _broadcast_timestamps(
-                compacted_csc_formats, dst_timestamps
+            src_timestamps = torch.cat(
+                [
+                    dst_timestamps,
+                    _broadcast_timestamps(
+                        compacted_csc_formats, dst_timestamps
+                    ),
+                ]
             )
     else:
         compacted_csc_formats = {}
