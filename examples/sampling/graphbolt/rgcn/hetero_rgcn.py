@@ -45,6 +45,7 @@ main
 import argparse
 import itertools
 import sys
+import time
 
 import dgl
 import dgl.graphbolt as gb
@@ -420,7 +421,7 @@ class Logger(object):
             r = best_result[:, 2]
             print(f"  Final Train: {r.mean():.2f} ± {r.std():.2f}")
             r = best_result[:, 3]
-            print(f"   Final Test: {r.mean():.2f} ± {r.std():.2f}")
+            print(f"Test accuracy {r.mean():.4f}")
 
 
 def extract_node_features(name, block, data, node_embed, device):
@@ -550,6 +551,7 @@ def run(
     # the 1st or 2nd epoch. This is why the max epoch is set to 3.
     for epoch in range(3):
         num_train = len(train_set)
+        t0 = time.time()
         model.train()
 
         total_loss = 0
@@ -578,6 +580,7 @@ def run(
 
             total_loss += loss.item() * num_seeds
 
+        t1 = time.time()
         loss = total_loss / num_train
 
         # Evaluate the model on the train/val/test set.
@@ -592,6 +595,11 @@ def run(
             name, g, model, node_embed, device, valid_set, features, num_workers
         )
         print("Finish evaluating on validation set.")
+        
+        print(
+            f"Epoch {epoch:05d} | Loss {total_loss / (epoch + 1):.4f} | "
+            f"Time {t1 - t0:.4f}"
+        )
 
         print("Evaluating the model on the test set.")
         test_acc = evaluate(
