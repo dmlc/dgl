@@ -529,9 +529,7 @@ def train(
             f"Valid: {100 * valid_acc:.2f}%, "
             f"Test: {100 * test_acc:.2f}%"
         )
-        print(
-            f"Time {t1 - t0:.4f}"
-        )
+        print(f"Time {t1 - t0:.4f}")
 
     return logger
 
