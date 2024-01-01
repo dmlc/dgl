@@ -129,14 +129,24 @@ def preprocess_ondisk_dataset(
                     graph_feature["format"],
                     in_memory=in_memory,
                 )
-                g.ndata[graph_feature["name"]] = node_data
+                if "type" in graph_feature:
+                    g.nodes[graph_feature["name"]] = {
+                        graph_feature["type"]: node_data
+                    }
+                else:
+                    g.ndata[graph_feature["name"]] = node_data
             if graph_feature["domain"] == "edge":
                 edge_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
                     in_memory=in_memory,
                 )
-                g.edata[graph_feature["name"]] = edge_data
+                if "type" in graph_feature:
+                    g.edges[graph_feature["name"]] = {
+                        graph_feature["type"]: edge_data
+                    }
+                else:
+                    g.edata[graph_feature["name"]] = edge_data
 
     # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
     fused_csc_sampling_graph = from_dglgraph(
