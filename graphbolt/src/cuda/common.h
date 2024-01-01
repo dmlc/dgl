@@ -105,8 +105,8 @@ inline bool is_zero<dim3>(dim3 size) {
 
 #define THRUST_CALL(fn, ...)                                                 \
   [&] {                                                                      \
-    auto allocator = cuda::GetAllocator();                                   \
-    auto stream = cuda::GetCurrentStream();                                  \
+    auto allocator = graphbolt::cuda::GetAllocator();                        \
+    auto stream = graphbolt::cuda::GetCurrentStream();                       \
     const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream); \
     return thrust::fn(exec_policy, __VA_ARGS__);                             \
   }()
