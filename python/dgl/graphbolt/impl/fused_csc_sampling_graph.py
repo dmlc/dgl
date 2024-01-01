@@ -1,6 +1,5 @@
 """CSC format sampling graph."""
 # pylint: disable= invalid-name
-from collections import defaultdict
 from typing import Dict, Optional, Union
 
 import torch
@@ -425,75 +424,47 @@ class FusedCSCSamplingGraph(SamplingGraph):
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
-            # The sampled graph is a fused homogenized graph, which need to be
-            # converted to heterogeneous graphs.
-            # Pre-calculate the number of each etype
-            num = {}
-            for etype in type_per_edge:
-                num[etype.item()] = num.get(etype.item(), 0) + 1
-            # Preallocate
-            subgraph_indice_position = {}
-            subgraph_indice = {}
-            subgraph_indptr = {}
-            node_edge_type = defaultdict(list)
+            self.node_type_offset = self.node_type_offset.to(column.device)
+            # 1. Find node types for each nodes in column.
+            node_types = (
+                torch.searchsorted(self.node_type_offset, column, right=True)
+                - 1
+            )
+
             original_hetero_edge_ids = {}
-            for etype, etype_id in self.edge_type_to_id.items():
-                subgraph_indice[etype] = torch.empty(
-                    (num.get(etype_id, 0),),
-                    dtype=indices.dtype,
-                    device=indices.device,
-                )
-                if has_original_eids:
-                    original_hetero_edge_ids[etype] = torch.empty(
-                        (num.get(etype_id, 0),),
-                        dtype=original_edge_ids.dtype,
-                        device=original_edge_ids.device,
-                    )
-                subgraph_indptr[etype] = [0]
-                subgraph_indice_position[etype] = 0
-                # Preprocessing saves the type of seed_nodes as the edge type
-                # of dst_ntype.
-                _, _, dst_ntype = etype_str_to_tuple(etype)
-                dst_ntype_id = self.node_type_to_id[dst_ntype]
-                node_edge_type[dst_ntype_id].append((etype, etype_id))
-            # construct subgraphs
-            for i, seed in enumerate(column):
-                l = indptr[i].item()
-                r = indptr[i + 1].item()
-                node_type = (
-                    torch.searchsorted(
-                        self.node_type_offset, seed, right=True
-                    ).item()
-                    - 1
-                )
-                for etype, etype_id in node_edge_type[node_type]:
-                    src_ntype, _, _ = etype_str_to_tuple(etype)
+            sub_indices = {}
+            sub_indptr = {}
+            # 2. For loop each node type.
+            for ntype, ntype_id in self.node_type_to_id.items():
+                # Get all nodes of a specific node type in column.
+                nids = torch.nonzero(node_types == ntype_id).view(-1)
+                nids_original_indptr = indptr[nids + 1]
+                for etype, etype_id in self.edge_type_to_id.items():
+                    src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
+                    if dst_ntype != ntype:
+                        continue
+                    # Get all edge ids of a specific edge type.
+                    eids = torch.nonzero(type_per_edge == etype_id).view(-1)
                     src_ntype_id = self.node_type_to_id[src_ntype]
-                    num_edges = torch.searchsorted(
-                        type_per_edge[l:r], etype_id, right=True
-                    ).item()
-                    end = num_edges + l
-                    subgraph_indptr[etype].append(
-                        subgraph_indptr[etype][-1] + num_edges
+                    sub_indices[etype] = (
+                        indices[eids] - self.node_type_offset[src_ntype_id]
                     )
-                    offset = subgraph_indice_position[etype]
-                    subgraph_indice_position[etype] += num_edges
-                    subgraph_indice[etype][offset : offset + num_edges] = (
-                        indices[l:end] - self.node_type_offset[src_ntype_id]
+                    cum_edges = torch.searchsorted(
+                        eids, nids_original_indptr, right=False
+                    )
+                    sub_indptr[etype] = torch.cat(
+                        (torch.tensor([0], device=indptr.device), cum_edges)
                     )
                     if has_original_eids:
-                        original_hetero_edge_ids[etype][
-                            offset : offset + num_edges
-                        ] = original_edge_ids[l:end]
-                    l = end
+                        original_hetero_edge_ids[etype] = original_edge_ids[
+                            eids
+                        ]
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
             sampled_csc = {
                 etype: CSCFormatBase(
-                    indptr=torch.tensor(
-                        subgraph_indptr[etype], device=indptr.device
-                    ),
-                    indices=subgraph_indice[etype],
+                    indptr=sub_indptr[etype],
+                    indices=sub_indices[etype],
                 )
                 for etype in self.edge_type_to_id.keys()
             }
@@ -867,15 +838,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
         )
-        # Broadcast the input nodes' timestamp to the sampled neighbors.
-        sampled_count = torch.diff(C_sampled_subgraph.indptr)
-        neighbors_timestamp = input_nodes_timestamp.repeat_interleave(
-            sampled_count
-        )
-        return (
-            self._convert_to_sampled_subgraph(C_sampled_subgraph),
-            neighbors_timestamp,
-        )
+        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
