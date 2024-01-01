@@ -49,6 +49,7 @@ main
 import argparse
 import itertools
 import sys
+import time
 
 import dgl
 import dgl.nn as dglnn
@@ -404,7 +405,7 @@ class Logger(object):
             r = best_result[:, 2]
             print(f"  Final Train: {r.mean():.2f} ± {r.std():.2f}")
             r = best_result[:, 3]
-            print(f"   Final Test: {r.mean():.2f} ± {r.std():.2f}")
+            print(f"Test accuracy {r.mean():.4f}")
 
 
 def extract_node_features(name, g, input_nodes, node_embed, feats, device):
@@ -451,6 +452,7 @@ def train(
     # the 1st or 2nd epoch. This is why the max epoch is set to 3.
     for epoch in range(3):
         num_train = split_idx["train"][category].shape[0]
+        t0 = time.time()
         model.train()
 
         total_loss = 0
@@ -482,6 +484,7 @@ def train(
 
             total_loss += loss.item() * batch_size
 
+        t1 = time.time()
         loss = total_loss / num_train
 
         # Evaluate the model on the train/val/test set.
@@ -525,6 +528,9 @@ def train(
             f"Train: {100 * train_acc:.2f}%, "
             f"Valid: {100 * valid_acc:.2f}%, "
             f"Test: {100 * test_acc:.2f}%"
+        )
+        print(
+            f"Time {t1 - t0:.4f}"
         )
 
     return logger

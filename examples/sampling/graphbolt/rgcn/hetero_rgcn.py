@@ -595,11 +595,6 @@ def run(
             name, g, model, node_embed, device, valid_set, features, num_workers
         )
         print("Finish evaluating on validation set.")
-        
-        print(
-            f"Epoch {epoch:05d} | Loss {total_loss / (epoch + 1):.4f} | "
-            f"Time {t1 - t0:.4f}"
-        )
 
         print("Evaluating the model on the test set.")
         test_acc = evaluate(
@@ -623,6 +618,9 @@ def run(
             f"Train: {100 * train_acc:.2f}%, "
             f"Valid: {100 * valid_acc:.2f}%, "
             f"Test: {100 * test_acc:.2f}%"
+        )
+        print(
+            f"Time {t1 - t0:.4f}"
         )
         print("Finish evaluating on test set.")
 
