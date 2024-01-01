@@ -1,5 +1,8 @@
 """Graph Bolt DataLoaders"""
 
+from queue import Queue
+
+import torch
 import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
@@ -34,6 +37,25 @@ def _find_and_wrap_parent(
                 wrapper(parent_datapipe, **kwargs),
             )
 
+
+class CUDAStreamPrefetcherIterDataPipe(dp.iter.IterDataPipe):
+    def __init__(self, datapipe, buffer_size = 2):
+        self.datapipe = datapipe
+        if buffer_size <= 0:
+            raise ValueError("'buffer_size' is required to be a positive integer.")
+        self.buffer = Queue(buffer_size)
+
+    def __iter__(self):
+        for data in self.datapipe:
+            data = (data, torch.cuda.current_stream().record_event())
+            if not self.buffer.full():
+                self.buffer.put(data)
+            else:
+                return_data = self.buffer.get()
+                self.buffer.put(data)
+                yield return_data
+        while not self.buffer.empty():
+            yield self.buffer.get()
 
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
@@ -113,14 +135,23 @@ class DataLoader(torch.utils.data.DataLoader):
             )
 
         # (2) Cut datapipe at FeatureFetcher and wrap.
-        _find_and_wrap_parent(
-            datapipe_graph,
-            datapipe_adjlist,
-            FeatureFetcher,
-            MultiprocessingWrapper,
-            num_workers=num_workers,
-            persistent_workers=persistent_workers,
-        )
+        if num_workers == 0 and torch.cuda.is_available():
+            _find_and_wrap_parent(
+                datapipe_graph,
+                datapipe_adjlist,
+                FeatureFetcher,
+                CUDAStreamPrefetcherIterDataPipe,
+                buffer_size=2,
+            )
+        else:
+            _find_and_wrap_parent(
+                datapipe_graph,
+                datapipe_adjlist,
+                FeatureFetcher,
+                MultiprocessingWrapper,
+                num_workers=num_workers,
+                persistent_workers=persistent_workers,
+            )
 
         # (3) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
         # data pipeline up to the CopyTo operation to run in a separate thread.

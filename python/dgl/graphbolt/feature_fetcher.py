@@ -2,6 +2,8 @@
 
 from typing import Dict
 
+import torch
+
 from torch.utils.data import functional_datapipe
 
 from .base import etype_tuple_to_str
@@ -52,8 +54,9 @@ class FeatureFetcher(MiniBatchTransformer):
         self.feature_store = feature_store
         self.node_feature_keys = node_feature_keys
         self.edge_feature_keys = edge_feature_keys
+        self.stream = None
 
-    def _read(self, data):
+    def _read_helper(self, data):
         """
         Fill in the node/edge features field in data.
 
@@ -140,3 +143,13 @@ class FeatureFetcher(MiniBatchTransformer):
         data.set_node_features(node_features)
         data.set_edge_features(edge_features)
         return data
+
+    def _read(self, data):
+        if isinstance(data, tuple) and isinstance(data[0], torch.cuda.Event):
+            data, event = data
+            if self.stream is None:
+                self.stream = torch.cuda.Stream()
+            event.wait(self.stream)
+        current_stream = torch.cuda.current_stream()
+        with torch.cuda.stream(self.stream):
+            return self._read_helper(data, current_stream)
