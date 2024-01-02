@@ -1,191 +1,109 @@
-import dgl.graphbolt as gb
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.data import Data
-from torch_geometric.loader import NeighborSampler
-from torch_geometric.nn import SAGEConv
+from dgl.graphbolt import BuiltinDataset, DataLoader, ItemSampler, FeatureFetcher, CopyTo
+from torch_geometric.nn import GCNConv
 
 
-class GraphSAGE(torch.nn.Module):
+dataset = BuiltinDataset("ogbn-arxiv").load()
+graph = dataset.graph
+feature = dataset.feature
+train_set = dataset.tasks[0].train_set
+valid_set = dataset.tasks[0].validation_set
+test_set = dataset.tasks[0].test_set
+num_classes = dataset.tasks[0].metadata["num_classes"]
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def create_sampler_and_loader(dataset_set):
+    sampler = ItemSampler(dataset_set, batch_size=1024, shuffle=True)
+    datapipe = sampler.sample_neighbor(graph, [4, 4])
+    datapipe = FeatureFetcher(datapipe, feature, node_feature_keys=["feat"])
+    datapipe = CopyTo(datapipe, device=device)
+    return DataLoader(datapipe, num_workers=0)
+
+train_dataloader = create_sampler_and_loader(train_set)
+valid_dataloader = create_sampler_and_loader(valid_set)
+test_dataloader = create_sampler_and_loader(test_set)
+
+
+class GCN(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
-        super(GraphSAGE, self).__init__()
-        self.conv1 = SAGEConv(in_channels, hidden_channels)
-        self.conv2 = SAGEConv(hidden_channels, out_channels)
+        super(GCN, self).__init__()
+        self.conv1 = GCNConv(in_channels, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, out_channels)
 
-    def forward(self, x, adjs):
-        for i, (edge_index, _, size) in enumerate(adjs):
-            x_target = x[: size[1]]
-            if i == 0:
-                x = self.conv1((x, x_target), edge_index)
-                x = F.relu(x)
-            else:
-                x = self.conv2((x, x_target), edge_index)
-                x = F.relu(x)
-            if i != len(adjs) - 1:
-                x = F.dropout(x, p=0.5, training=self.training)
-        return x
+    def forward(self, x, edge_index):
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, training=self.training)
+        x = self.conv2(x, edge_index)
+        return F.log_softmax(x, dim=1)
 
 
-def load_data():
-    dataset = gb.BuiltinDataset("ogbn-arxiv").load()
-    graph = dataset.graph
-    features = dataset.feature
-    features_tensor = features.read("node", None, "feat")
-    train_set = dataset.tasks[0].train_set
-    valid_set = dataset.tasks[0].validation_set
-    test_set = dataset.tasks[0].test_set
-    train_labels = train_set._items[1]
-    valid_labels = valid_set._items[1]
-    test_labels = test_set._items[1]
-    graph = dataset.graph
-    csc_indptr = graph.csc_indptr
-    rows = torch.repeat_interleave(
-        torch.arange(csc_indptr.size(0) - 1, device=csc_indptr.device),
-        csc_indptr[1:] - csc_indptr[:-1],
-    )
-    indices = graph.indices
-    cols = indices
-    edge_index = torch.stack([rows, cols], dim=0)
-    pyg_data = Data(x=features_tensor, edge_index=edge_index, y=train_labels)
-    num_nodes = graph.total_num_nodes
-
-    return (
-        pyg_data,
-        train_labels,
-        valid_labels,
-        test_labels,
-        train_set,
-        valid_set,
-        test_set,
-        num_nodes,
-    )
+in_channels = feature.size("node", None, "feat")[0]  
+model = GCN(in_channels, 16, num_classes) 
+model = model.to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 
 
-def create_data_loaders(
-    pyg_data,
-    train_labels,
-    valid_labels,
-    test_labels,
-    train_set,
-    valid_set,
-    test_set,
-):
-    train_mask = train_set._items[0]
-    valid_mask = valid_set._items[0]
-    test_mask = test_set._items[0]
-    train_loader = NeighborSampler(
-        pyg_data.edge_index,
-        node_idx=train_mask,
-        sizes=[10, 10],
-        batch_size=32,
-        shuffle=True,
-        num_workers=4,
-    )
-    valid_loader = NeighborSampler(
-        pyg_data.edge_index,
-        node_idx=valid_mask,
-        sizes=[10, 10],
-        batch_size=32,
-        shuffle=False,
-        num_workers=4,
-    )
-    test_loader = NeighborSampler(
-        pyg_data.edge_index,
-        node_idx=test_mask,
-        sizes=[10, 10],
-        batch_size=32,
-        shuffle=False,
-        num_workers=4,
-    )
-    return train_loader, valid_loader, test_loader
-
-
-def train(
-    model,
-    train_loader,
-    optimizer,
-    criterion,
-    device,
-    pyg_data,
-    full_train_labels,
-):
+def train_epoch(model, dataloader):
     model.train()
     total_loss = 0
-    for batch_size, n_id, adjs in train_loader:
-        adjs = [adj.to(device) for adj in adjs]
+    total_correct = 0
+    total_samples = 0
+    batch_count = 0  
+
+    for minibatch in dataloader:
+        batch_count += 1  
+        node_features = minibatch.node_features["feat"].to(device)
+        block = minibatch.blocks[-1]
+        edge_index = block.edges()
+        edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(device)
+        out = model(node_features, edge_index)
+        out = out[-block.number_of_dst_nodes():]
+        num_dst_nodes = block.number_of_dst_nodes()
+        labels = minibatch.labels[-num_dst_nodes:].to(device)
+        loss = F.nll_loss(out, labels)
+        total_loss += loss.item()
+        predictions = out.argmax(dim=1)
+        correct = (predictions == labels).sum().item()
+        total_correct += correct
+        total_samples += num_dst_nodes
         optimizer.zero_grad()
-        out = model(pyg_data.x[n_id].to(device), adjs)
-        loss = criterion(out, full_train_labels[n_id[:batch_size]].to(device))
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
-    return total_loss / len(train_loader)
+    return total_loss / batch_count, total_correct / total_samples
 
 
-def test(model, test_loader, device, pyg_data, test_labels):
+def evaluate(model, dataloader):
     model.eval()
-    correct = 0
-    total = 0
-    for batch_size, n_id, adjs in test_loader:
-        adjs = [adj.to(device) for adj in adjs]
-        out = model(pyg_data.x[n_id].to(device), adjs)
-        pred = out.argmax(dim=1)
-        correct += int(
-            (pred == test_labels[n_id[:batch_size]].to(device)).sum()
-        )
-        total += batch_size
-    return correct / total
+    total_correct = 0
+    total_samples = 0
+
+    with torch.no_grad():
+        for minibatch in dataloader:
+            node_features = minibatch.node_features["feat"].to(device)
+            block = minibatch.blocks[-1]
+            edge_index = block.edges()
+            edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(device)
+            out = model(node_features, edge_index)
+            out = out[-block.number_of_dst_nodes():]
+            num_dst_nodes = block.number_of_dst_nodes()
+            labels = minibatch.labels[-num_dst_nodes:].to(device)
+            predictions = out.argmax(dim=1)
+            total_correct += (predictions == labels).sum().item()
+            total_samples += num_dst_nodes
+    return total_correct / total_samples
 
 
-def main():
-    (
-        pyg_data,
-        train_labels,
-        valid_labels,
-        test_labels,
-        train_set,
-        valid_set,
-        test_set,
-        num_nodes,
-    ) = load_data()
-    train_loader, valid_loader, test_loader = create_data_loaders(
-        pyg_data,
-        train_labels,
-        valid_labels,
-        test_labels,
-        train_set,
-        valid_set,
-        test_set,
-    )
-
-    full_train_labels = torch.full((num_nodes,), -1, dtype=train_labels.dtype)
-
-    full_train_labels[train_set._items[0]] = train_labels
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = GraphSAGE(
-        in_channels=pyg_data.x.size(1),
-        hidden_channels=64,
-        out_channels=train_labels.max().item() + 1,
-    ).to(device)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    criterion = torch.nn.CrossEntropyLoss()
-    for epoch in range(10):
-        loss = train(
-            model,
-            train_loader,
-            optimizer,
-            criterion,
-            device,
-            pyg_data,
-            full_train_labels,
-        )
-        print(f"Epoch {epoch+1}, Loss: {loss}")
-
-    accuracy = test(model, test_loader, device, pyg_data)
-    print(f"Accuracy: {accuracy}")
+for epoch in range(100):
+    train_loss, train_accuracy = train_epoch(model, train_dataloader)
+    valid_accuracy = evaluate(model, valid_dataloader)
+    print(f"Epoch {epoch}: Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Valid Accuracy: {valid_accuracy:.4f}")
 
 
-if __name__ == "__main__":
-    main()
+test_accuracy = evaluate(model, test_dataloader)
+print(f"Test Accuracy: {test_accuracy:.4f}")
