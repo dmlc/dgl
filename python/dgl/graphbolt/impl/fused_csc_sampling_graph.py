@@ -920,6 +920,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Apply passed fn to all members of `FusedCSCSamplingGraph`."""
         self.csc_indptr = recursive_apply(self.csc_indptr, fn)
         self.indices = recursive_apply(self.indices, fn)
+        self.node_type_offset = recursive_apply(self.node_type_offset, fn)
         self.type_per_edge = recursive_apply(self.type_per_edge, fn)
         self.node_attributes = recursive_apply(self.node_attributes, fn)
         self.edge_attributes = recursive_apply(self.edge_attributes, fn)
