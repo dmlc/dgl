@@ -69,26 +69,29 @@ class NeighborSampler(SubgraphSampler):
     >>> datapipe = datapipe.sample_uniform_negative(graph, 2)
     >>> datapipe = datapipe.sample_neighbor(graph, [5, 10, 15])
     >>> next(iter(datapipe)).sampled_subgraphs
-    [SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6, 7, 8]),
-                                                indices=tensor([1, 4, 0, 5, 5, 3, 3, 2]),
-                                    ),
-                        original_row_node_ids=tensor([0, 1, 4, 5, 2, 3]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 4, 5, 2, 3]),
+    [SampledSubgraphImpl(sampled_csc=CSCFormatBase(
+            indptr=tensor([0, 2, 4, 5, 6, 7, 8]),
+            indices=tensor([1, 4, 0, 5, 5, 3, 3, 2]),
+        ),
+        original_row_node_ids=tensor([0, 1, 4, 5, 2, 3]),
+        original_edge_ids=None,
+        original_column_node_ids=tensor([0, 1, 4, 5, 2, 3]),
     ),
-    SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6, 7, 8]),
-                                                indices=tensor([1, 4, 0, 5, 5, 3, 3, 2]),
-                                    ),
-                        original_row_node_ids=tensor([0, 1, 4, 5, 2, 3]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 4, 5, 2, 3]),
+    SampledSubgraphImpl(sampled_csc=CSCFormatBase(
+            indptr=tensor([0, 2, 4, 5, 6, 7, 8]),
+            indices=tensor([1, 4, 0, 5, 5, 3, 3, 2]),
+        ),
+        original_row_node_ids=tensor([0, 1, 4, 5, 2, 3]),
+        original_edge_ids=None,
+        original_column_node_ids=tensor([0, 1, 4, 5, 2, 3]),
     ),
-    SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6]),
-                                                indices=tensor([1, 4, 0, 5, 5, 3]),
-                                    ),
-                        original_row_node_ids=tensor([0, 1, 4, 5, 2, 3]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 4, 5]),
+    SampledSubgraphImpl(sampled_csc=CSCFormatBase(
+            indptr=tensor([0, 2, 4, 5, 6]),
+            indices=tensor([1, 4, 0, 5, 5, 3]),
+        ),
+        original_row_node_ids=tensor([0, 1, 4, 5, 2, 3]),
+        original_edge_ids=None,
+        original_column_node_ids=tensor([0, 1, 4, 5]),
     )]
     """
 
@@ -226,26 +229,29 @@ class LayerNeighborSampler(NeighborSampler):
     ...     torch.LongTensor([10]),torch.LongTensor([15])]
     >>> subgraph_sampler = gb.LayerNeighborSampler(neg_sampler, graph, fanouts)
     >>> next(iter(subgraph_sampler)).sampled_subgraphs
-    [SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6, 7, 8]),
-                                                indices=tensor([1, 3, 0, 4, 2, 2, 5, 4]),
-                                    ),
-                        original_row_node_ids=tensor([0, 1, 5, 2, 3, 4]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 5, 2, 3, 4]),
+    [SampledSubgraphImpl(sampled_csc=CSCFormatBase(
+            indptr=tensor([0, 2, 4, 5, 6, 7, 8]),
+            indices=tensor([1, 3, 0, 4, 2, 2, 5, 4]),
+        ),
+        original_row_node_ids=tensor([0, 1, 5, 2, 3, 4]),
+        original_edge_ids=None,
+        original_column_node_ids=tensor([0, 1, 5, 2, 3, 4]),
     ),
-    SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6, 7]),
-                                                indices=tensor([1, 3, 0, 4, 2, 2, 5]),
-                                    ),
-                        original_row_node_ids=tensor([0, 1, 5, 2, 3, 4]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 5, 2, 3]),
+    SampledSubgraphImpl(sampled_csc=CSCFormatBase(
+            indptr=tensor([0, 2, 4, 5, 6, 7]),
+            indices=tensor([1, 3, 0, 4, 2, 2, 5]),
+        ),
+        original_row_node_ids=tensor([0, 1, 5, 2, 3, 4]),
+        original_edge_ids=None,
+        original_column_node_ids=tensor([0, 1, 5, 2, 3]),
     ),
-    SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 2, 4, 5, 6]),
-                                                indices=tensor([1, 3, 0, 4, 2, 2]),
-                                    ),
-                        original_row_node_ids=tensor([0, 1, 5, 2, 3]),
-                        original_edge_ids=None,
-                        original_column_node_ids=tensor([0, 1, 5, 2]),
+    SampledSubgraphImpl(sampled_csc=CSCFormatBase(
+            indptr=tensor([0, 2, 4, 5, 6]),
+            indices=tensor([1, 3, 0, 4, 2, 2]),
+        ),
+        original_row_node_ids=tensor([0, 1, 5, 2, 3]),
+        original_edge_ids=None,
+        original_column_node_ids=tensor([0, 1, 5, 2]),
     )]
     >>> next(iter(subgraph_sampler)).compacted_node_pairs
     (tensor([0]), tensor([1]))
