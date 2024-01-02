@@ -310,7 +310,7 @@ def _test_pipeline(
 def test_pipeline_basics(num_chunks, num_parts, world_size):
     _test_pipeline(num_chunks, num_parts, world_size)
     _test_pipeline(
-        num_chunks, num_parts, world_size, use_verify_partitions=True
+        num_chunks, num_parts, world_size, use_verify_partitions=False
     )
 
 

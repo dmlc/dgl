@@ -148,10 +148,6 @@ def get_hetero_graph():
     )
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Heterogenous sampling not yet supported on GPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Node_Hetero(labor):
     graph = get_hetero_graph().to(F.ctx())
@@ -168,10 +164,6 @@ def test_SubgraphSampler_Node_Hetero(labor):
         assert len(minibatch.sampled_subgraphs) == num_layer
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Heterogenous sampling not yet supported on GPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_Hetero(labor):
     graph = get_hetero_graph().to(F.ctx())
@@ -197,10 +189,6 @@ def test_SubgraphSampler_Link_Hetero(labor):
     assert len(list(datapipe)) == 5
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Heterogenous sampling not yet supported on GPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     graph = get_hetero_graph().to(F.ctx())
@@ -346,10 +334,6 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
             )
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Heterogenous sampling not yet supported on GPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_without_dedpulication_Hetero(labor):
     graph = get_hetero_graph().to(F.ctx())
@@ -409,20 +393,20 @@ def test_SubgraphSampler_without_dedpulication_Hetero(labor):
             for ntype in ["n1", "n2"]:
                 assert torch.equal(
                     sampled_subgraph.original_row_node_ids[ntype],
-                    original_row_node_ids[step][ntype],
+                    original_row_node_ids[step][ntype].to(F.ctx()),
                 )
                 assert torch.equal(
                     sampled_subgraph.original_column_node_ids[ntype],
-                    original_column_node_ids[step][ntype],
+                    original_column_node_ids[step][ntype].to(F.ctx()),
                 )
             for etype in ["n1:e1:n2", "n2:e2:n1"]:
                 assert torch.equal(
                     sampled_subgraph.sampled_csc[etype].indices,
-                    csc_formats[step][etype].indices,
+                    csc_formats[step][etype].indices.to(F.ctx()),
                 )
                 assert torch.equal(
                     sampled_subgraph.sampled_csc[etype].indptr,
-                    csc_formats[step][etype].indptr,
+                    csc_formats[step][etype].indptr.to(F.ctx()),
                 )
 
 
@@ -486,10 +470,6 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
             )
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Heterogenous sampling not yet supported on GPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_unique_csc_format_Hetero(labor):
     graph = get_hetero_graph().to(F.ctx())
@@ -554,18 +534,18 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
             for ntype in ["n1", "n2"]:
                 assert torch.equal(
                     sampled_subgraph.original_row_node_ids[ntype],
-                    original_row_node_ids[step][ntype],
+                    original_row_node_ids[step][ntype].to(F.ctx()),
                 )
                 assert torch.equal(
                     sampled_subgraph.original_column_node_ids[ntype],
-                    original_column_node_ids[step][ntype],
+                    original_column_node_ids[step][ntype].to(F.ctx()),
                 )
             for etype in ["n1:e1:n2", "n2:e2:n1"]:
                 assert torch.equal(
                     sampled_subgraph.sampled_csc[etype].indices,
-                    csc_formats[step][etype].indices,
+                    csc_formats[step][etype].indices.to(F.ctx()),
                 )
                 assert torch.equal(
                     sampled_subgraph.sampled_csc[etype].indptr,
-                    csc_formats[step][etype].indptr,
+                    csc_formats[step][etype].indptr.to(F.ctx()),
                 )
