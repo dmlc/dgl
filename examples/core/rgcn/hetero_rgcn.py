@@ -462,7 +462,7 @@ def train(
             f"Epoch: {epoch +1 :02d}, "
             f"Loss: {loss:.4f}, "
             f"Valid: {100 * valid_acc:.2f}%, "
-            f"Test: {100 * test_acc:.2f}%"
+            f"Test: {100 * test_acc:.2f}%, "
             f"Time {t1 - t0:.4f}"
         )
 
@@ -536,7 +536,6 @@ def main(args):
     device = (
         "cuda:0" if torch.cuda.is_available() and args.num_gpus > 0 else "cpu"
     )
-
 
     # Prepare the data.
     g, labels, num_classes, split_idx, train_loader, feats = prepare_data(
@@ -628,6 +627,7 @@ def main(args):
         save_test_submission=(args.dataset == "ogb-lsc-mag240m"),
     )
     print(f"Test accuracy {test_acc*100:.4f}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RGCN")
