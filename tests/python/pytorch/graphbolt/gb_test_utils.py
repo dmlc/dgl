@@ -173,7 +173,6 @@ def random_homo_graphbolt_graph(
               type: null
               name: feat
               format: numpy
-              in_memory: true
               path: {edge_feat_path}
         tasks:
           - name: link_prediction
@@ -236,7 +235,7 @@ def genereate_raw_data_for_hetero_dataset(
 
     # Generate train/test/valid set.
     os.makedirs(os.path.join(test_dir, "set"), exist_ok=True)
-    user_ids = np.arange(num_nodes["user"])
+    user_ids = torch.arange(num_nodes["user"])
     np.random.shuffle(user_ids)
     num_train = int(num_nodes["user"] * 0.6)
     num_validation = int(num_nodes["user"] * 0.2)

@@ -48,7 +48,7 @@ only one layer at a time.
     datapipe = datapipe.sample_neighbor(g, [-1]) # 1 layers.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 
 Note that offline inference is implemented as a method of the GNN module

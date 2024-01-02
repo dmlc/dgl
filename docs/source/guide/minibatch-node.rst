@@ -51,7 +51,7 @@ putting the list of generated MFGs onto GPU.
     # datapipe = gb.NeighborSampler(datapipe, g, [10, 10])
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 
 Iterating over the DataLoader will yield :class:`~dgl.graphbolt.MiniBatch`
@@ -216,7 +216,7 @@ of node types to node IDs.
         feature, node_feature_keys={"author": ["feat"], "paper": ["feat"]}
     )
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=0)
+    dataloader = gb.DataLoader(datapipe)
 
 The training loop is almost the same as that of homogeneous graphs,
 except for the implementation of ``compute_loss`` that will take in two
