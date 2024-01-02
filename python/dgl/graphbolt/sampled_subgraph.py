@@ -223,7 +223,9 @@ def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
     indptr = node_pair.indptr
     indices = node_pair.indices
     if original_row_node_ids is not None:
-        indices = original_row_node_ids[indices]
+        indices = torch.index_select(
+            original_row_node_ids, dim=0, index=indices
+        )
     indptr = csc_to_coo(
         indptr, original_column_node_ids, indices.dtype, len(indices)
     )
