@@ -582,40 +582,6 @@ def train(
         )
 
 
-def infer(
-    name,
-    g,
-    model,
-    node_embed,
-    item_set,
-    device,
-    features,
-    num_workers,
-):
-    model.eval()
-    if name == "ogbn-mag":
-        evaluator = Evaluator(name=name)
-    else:
-        evaluator = MAG240MEvaluator()
-    pred = model.inference(
-        name=name,
-        graph=g,
-        features=features,
-        item_set=item_set,
-        node_embed=node_embed,
-        device=device,
-        num_workers=num_workers,
-    )
-    label = item_set._itemsets["paper"]._items[1].to(pred.device)
-    label = torch.unsqueeze(label, 1)
-
-    if name == "ogb-lsc-mag240m":
-        pred = pred.view(-1)
-        label = label.view(-1)
-
-    return evaluator.eval({"y_true": label, "y_pred": pred})["acc"]
-
-
 def main(args):
     if args.dataset == "ogb-lsc-mag240m":
         raise NotImplementedError(
@@ -695,15 +661,15 @@ def main(args):
     )
 
     print("Testing...")
-    test_acc = infer(
+    test_acc = evaluate(
         args.dataset,
         g,
         model,
         embed_layer,
+        device,
         test_set,
-        device=device,
-        features=features,
-        num_workers=args.num_workers,
+        features,
+        args.num_workers,
     )
     print(f"Test accuracy {test_acc*100:.4f}")
 
