@@ -414,9 +414,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def _convert_to_homogeneous_nodes(self, nodes, timestamps=None):
         homogeneous_nodes = []
         homogeneous_timestamps = []
+        offset = self.node_type_offset_list
         for ntype, ids in nodes.items():
             ntype_id = self.node_type_to_id[ntype]
-            homogeneous_nodes.append(ids + self.node_type_offset_list[ntype_id])
+            homogeneous_nodes.append(ids + offset[ntype_id])
             if timestamps is not None:
                 homogeneous_timestamps.append(timestamps[ntype])
         if timestamps is not None:
@@ -462,6 +463,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             original_hetero_edge_ids = {}
             sub_indices = {}
             sub_indptr = {}
+            offset = self.node_type_offset_list
             # 2. For loop each node type.
             for ntype, ntype_id in self.node_type_to_id.items():
                 # Get all nodes of a specific node type in column.
@@ -474,9 +476,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     # Get all edge ids of a specific edge type.
                     eids = torch.nonzero(type_per_edge == etype_id).view(-1)
                     src_ntype_id = self.node_type_to_id[src_ntype]
-                    sub_indices[etype] = (
-                        indices[eids] - self.node_type_offset_list[src_ntype_id]
-                    )
+                    sub_indices[etype] = indices[eids] - offset[src_ntype_id]
                     cum_edges = torch.searchsorted(
                         eids, nids_original_indptr, right=False
                     )
@@ -910,9 +910,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 negative sampling by edge type."
             _, _, dst_node_type = etype_str_to_tuple(edge_type)
             dst_node_type_id = self.node_type_to_id[dst_node_type]
+            offset = self.node_type_offset_list
             max_node_id = (
-                self.node_type_offset_list[dst_node_type_id + 1]
-                - self.node_type_offset_list[dst_node_type_id]
+                offset[dst_node_type_id + 1] - offset[dst_node_type_id]
             )
         else:
             max_node_id = self.total_num_nodes
