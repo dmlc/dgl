@@ -129,24 +129,41 @@ def preprocess_ondisk_dataset(
                     graph_feature["format"],
                     in_memory=in_memory,
                 )
-                if "type" in graph_feature:
+                if is_homogeneous:
+                    g.ndata[graph_feature["name"]] = node_data
+                else:
                     g.nodes[graph_feature["name"]] = {
                         graph_feature["type"]: node_data
                     }
-                else:
-                    g.ndata[graph_feature["name"]] = node_data
             if graph_feature["domain"] == "edge":
                 edge_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
                     in_memory=in_memory,
                 )
-                if "type" in graph_feature:
-                    g.edges[graph_feature["name"]] = {
-                        graph_feature["type"]: edge_data
-                    }
-                else:
+                if is_homogeneous:
                     g.edata[graph_feature["name"]] = edge_data
+                else:
+                    g.edata[graph_feature["name"]] = {
+                        etype_str_to_tuple(graph_feature["type"]): edge_data
+                    }
+        if not is_homogeneous:
+            # For homogeneous graph, a node/edge feature must cover all
+            # node/edge types.
+            for feat_name, feat_data in g.ndata.items():
+                existing_types = set(feat_data.keys())
+                assert existing_types == set(g.ntypes), (
+                    f"Node feature {feat_name} does not cover all node types."
+                    + f"Existing types: {existing_types}."
+                    + f"Expected types: {g.ntypes}."
+                )
+            for feat_name, feat_data in g.edata.items():
+                existing_types = set(feat_data.keys())
+                assert existing_types == set(g.canonical_etypes), (
+                    f"Edge feature {feat_name} does not cover all edge types."
+                    + f"Existing types: {existing_types}."
+                    + f"Expected types: {g.etypes}."
+                )
 
     # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
     fused_csc_sampling_graph = from_dglgraph(
