@@ -215,10 +215,6 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     assert len(list(datapipe)) == 5
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Sampling with replacement not yet supported on GPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Random_Hetero_Graph(labor):
     num_nodes = 5
@@ -260,35 +256,36 @@ def test_SubgraphSampler_Random_Hetero_Graph(labor):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
 
-    sampler_dp = Sampler(item_sampler, graph, fanouts, replace=True)
+    sampler_dp = Sampler(item_sampler, graph, fanouts)
 
     for data in sampler_dp:
         for sampledsubgraph in data.sampled_subgraphs:
             for _, value in sampledsubgraph.sampled_csc.items():
                 assert torch.equal(
-                    torch.ge(value.indices, torch.zeros(len(value.indices))),
-                    torch.ones(len(value.indices)),
+                    torch.ge(
+                        value.indices,
+                        torch.zeros(len(value.indices)).to(F.ctx()),
+                    ),
+                    torch.ones(len(value.indices)).to(F.ctx()),
                 )
                 assert torch.equal(
-                    torch.ge(value.indptr, torch.zeros(len(value.indptr))),
-                    torch.ones(len(value.indptr)),
+                    torch.ge(
+                        value.indptr, torch.zeros(len(value.indptr)).to(F.ctx())
+                    ),
+                    torch.ones(len(value.indptr)).to(F.ctx()),
                 )
             for _, value in sampledsubgraph.original_column_node_ids.items():
                 assert torch.equal(
-                    torch.ge(value, torch.zeros(len(value))),
-                    torch.ones(len(value)),
+                    torch.ge(value, torch.zeros(len(value)).to(F.ctx())),
+                    torch.ones(len(value)).to(F.ctx()),
                 )
             for _, value in sampledsubgraph.original_row_node_ids.items():
                 assert torch.equal(
-                    torch.ge(value, torch.zeros(len(value))),
-                    torch.ones(len(value)),
+                    torch.ge(value, torch.zeros(len(value)).to(F.ctx())),
+                    torch.ones(len(value)).to(F.ctx()),
                 )
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Fails due to randomness on the GPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_without_dedpulication_Homo(labor):
     graph = dgl.graph(
@@ -317,7 +314,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
         torch.tensor([0, 1, 2, 4]).to(F.ctx()),
     ]
     seeds = [
-        torch.tensor([0, 3, 4, 5, 2, 2, 4]).to(F.ctx()),
+        torch.sort(torch.tensor([0, 3, 4, 5, 2, 2, 4]))[0].to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
     for data in datapipe:
@@ -330,7 +327,8 @@ def test_SubgraphSampler_without_dedpulication_Homo(labor):
                 sampled_subgraph.sampled_csc.indptr, indptr[step]
             )
             assert torch.equal(
-                sampled_subgraph.original_column_node_ids, seeds[step]
+                torch.sort(sampled_subgraph.original_column_node_ids)[0],
+                seeds[step],
             )
 
 
@@ -415,7 +413,7 @@ def test_SubgraphSampler_without_dedpulication_Hetero(labor):
     reason="Fails due to randomness on the GPU.",
 )
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_unique_csc_format_Homo(labor):
+def test_SubgraphSampler_unique_csc_format_Homo_cpu(labor):
     torch.manual_seed(1205)
     graph = dgl.graph(([5, 0, 6, 7, 2, 2, 4], [0, 1, 2, 2, 3, 4, 4]))
     graph = gb.from_dglgraph(graph, True).to(F.ctx())
@@ -433,7 +431,6 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
         item_sampler,
         graph,
         fanouts,
-        replace=False,
         deduplicate=True,
     )
 
@@ -451,6 +448,65 @@ def test_SubgraphSampler_unique_csc_format_Homo(labor):
     ]
     seeds = [
         torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        torch.tensor([0, 3, 4]).to(F.ctx()),
+    ]
+    for data in datapipe:
+        for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
+            assert torch.equal(
+                sampled_subgraph.original_row_node_ids,
+                original_row_node_ids[step],
+            )
+            assert torch.equal(
+                sampled_subgraph.sampled_csc.indices, compacted_indices[step]
+            )
+            assert torch.equal(
+                sampled_subgraph.sampled_csc.indptr, indptr[step]
+            )
+            assert torch.equal(
+                sampled_subgraph.original_column_node_ids, seeds[step]
+            )
+
+
+@unittest.skipIf(
+    F._default_context_str != "gpu",
+    reason="Fails due to different result on the CPU.",
+)
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_unique_csc_format_Homo_gpu(labor):
+    torch.manual_seed(1205)
+    graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
+    graph = gb.from_dglgraph(graph, True).to(F.ctx())
+    seed_nodes = torch.LongTensor([0, 3, 4])
+
+    itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(
+        F.ctx()
+    )
+    num_layer = 2
+    fanouts = [torch.LongTensor([-1]) for _ in range(num_layer)]
+
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    datapipe = Sampler(
+        item_sampler,
+        graph,
+        fanouts,
+        deduplicate=True,
+    )
+
+    original_row_node_ids = [
+        torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
+        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+    ]
+    compacted_indices = [
+        torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
+        torch.tensor([4, 3, 2]).to(F.ctx()),
+    ]
+    indptr = [
+        torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
+        torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+    ]
+    seeds = [
+        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
     for data in datapipe:
