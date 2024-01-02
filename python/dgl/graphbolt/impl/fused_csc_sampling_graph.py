@@ -426,11 +426,20 @@ class FusedCSCSamplingGraph(SamplingGraph):
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
+            if self.node_type_offset.device != column.device:
+                if (
+                    not hasattr(self, "_type_per_offset_gpu")
+                    or self._type_per_offset_gpu.device != column.device
+                ):
+                    self._type_per_offset_gpu = self.node_type_offset.to(
+                        column.device
+                    )
+                moved_node_type_offset = self._type_per_offset_gpu
+            else:
+                moved_node_type_offset = self.node_type_offset
             # 1. Find node types for each nodes in column.
             node_types = (
-                torch.searchsorted(
-                    self.node_type_offset.to(column.device), column, right=True
-                )
+                torch.searchsorted(moved_node_type_offset, column, right=True)
                 - 1
             )
 
