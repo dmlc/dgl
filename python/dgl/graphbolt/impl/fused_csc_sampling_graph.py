@@ -197,7 +197,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
-        """Returns the node type offset tensor if present.
+        """Returns the node type offset tensor if present. Do not modify the
+        returned tensor in place so that self.node_type_offset_list stays in
+        sync.
 
         Returns
         -------
