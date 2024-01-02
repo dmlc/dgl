@@ -57,7 +57,7 @@ import numpy as np
 
 import psutil
 
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import AddReverse, Compose, ToSimple
@@ -90,15 +90,15 @@ def prepare_data(args, device):
         dataset = MAG240MDataset(root=args.rootdir)
         (g,), _ = dgl.load_graphs(args.graph_path)
         g = g.formats(["csc"])
-        labels = th.as_tensor(dataset.paper_label).long()
+        labels = torch.as_tensor(dataset.paper_label).long()
         # As feature data is too large to fit in memory, we read it from disk.
-        feats["paper"] = th.as_tensor(
+        feats["paper"] = torch.as_tensor(
             np.load(args.paper_feature_path, mmap_mode="r+")
         )
-        feats["author"] = th.as_tensor(
+        feats["author"] = torch.as_tensor(
             np.load(args.author_feature_path, mmap_mode="r+")
         )
-        feats["institution"] = th.as_tensor(
+        feats["institution"] = torch.as_tensor(
             np.load(args.inst_feature_path, mmap_mode="r+")
         )
     print(f"Loaded graph: {g}")
@@ -377,7 +377,7 @@ class Logger(object):
 
     def print_statistics(self, run=None):
         if run is not None:
-            result = 100 * th.tensor(self.results[run])
+            result = 100 * torch.tensor(self.results[run])
             argmax = result[:, 1].argmax().item()
             print(f"Run {run + 1:02d}:")
             print(f"Highest Train: {result[:, 0].max():.2f}")
@@ -385,7 +385,7 @@ class Logger(object):
             print(f"  Final Train: {result[argmax, 0]:.2f}")
             print(f"   Final Test: {result[argmax, 2]:.2f}")
         else:
-            result = 100 * th.tensor(self.results)
+            result = 100 * torch.tensor(self.results)
 
             best_results = []
             for r in result:
@@ -395,7 +395,7 @@ class Logger(object):
                 test = r[r[:, 1].argmax(), 2].item()
                 best_results.append((train1, valid, train2, test))
 
-            best_result = th.tensor(best_results)
+            best_result = torch.tensor(best_results)
 
             print("All runs:")
             r = best_result[:, 0]
@@ -531,7 +531,7 @@ def train(
     return logger
 
 
-@th.no_grad()
+@torch.no_grad()
 def evaluate(
     dataset,
     g,
@@ -581,9 +581,9 @@ def evaluate(
         y_hats.append(y_hat.cpu())
         y_true.append(labels[seeds["paper"].cpu()])
 
-    y_pred = th.cat(y_hats, dim=0)
-    y_true = th.cat(y_true, dim=0)
-    y_true = th.unsqueeze(y_true, 1)
+    y_pred = torch.cat(y_hats, dim=0)
+    y_true = torch.cat(y_true, dim=0)
+    y_true = torch.unsqueeze(y_true, 1)
 
     if dataset == "ogb-lsc-mag240m":
         y_pred = y_pred.view(-1)
@@ -597,7 +597,9 @@ def evaluate(
 
 
 def main(args):
-    device = "cuda:0" if th.cuda.is_available() and args.num_gpus > 0 else "cpu"
+    device = (
+        "cuda:0" if torch.cuda.is_available() and args.num_gpus > 0 else "cpu"
+    )
 
     # Initialize a logger.
     logger = Logger(args.runs)
@@ -653,7 +655,7 @@ def main(args):
             model.parameters(),
             [] if embed_layer is None else embed_layer.parameters(),
         )
-        optimizer = th.optim.Adam(all_params, lr=0.01)
+        optimizer = torch.optim.Adam(all_params, lr=0.01)
 
         # `expected_max`` is the number of physical cores on your machine.
         # The `logical` parameter, when set to False, ensures that the count
