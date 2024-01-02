@@ -1,7 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.graphbolt import BuiltinDataset, DataLoader, ItemSampler, FeatureFetcher, CopyTo
+from dgl.graphbolt import (
+    BuiltinDataset,
+    CopyTo,
+    DataLoader,
+    FeatureFetcher,
+    ItemSampler,
+)
 from torch_geometric.nn import GCNConv
 
 
@@ -24,6 +30,7 @@ def create_sampler_and_loader(dataset_set):
     datapipe = CopyTo(datapipe, device=device)
     return DataLoader(datapipe, num_workers=0)
 
+
 train_dataloader = create_sampler_and_loader(train_set)
 valid_dataloader = create_sampler_and_loader(valid_set)
 test_dataloader = create_sampler_and_loader(test_set)
@@ -43,8 +50,8 @@ class GCN(torch.nn.Module):
         return F.log_softmax(x, dim=1)
 
 
-in_channels = feature.size("node", None, "feat")[0]  
-model = GCN(in_channels, 16, num_classes) 
+in_channels = feature.size("node", None, "feat")[0]
+model = GCN(in_channels, 16, num_classes)
 model = model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 
@@ -54,16 +61,18 @@ def train_epoch(model, dataloader):
     total_loss = 0
     total_correct = 0
     total_samples = 0
-    batch_count = 0  
+    batch_count = 0
 
     for minibatch in dataloader:
-        batch_count += 1  
+        batch_count += 1
         node_features = minibatch.node_features["feat"].to(device)
         block = minibatch.blocks[-1]
         edge_index = block.edges()
-        edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(device)
+        edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(
+            device
+        )
         out = model(node_features, edge_index)
-        out = out[-block.number_of_dst_nodes():]
+        out = out[-block.number_of_dst_nodes() :]
         num_dst_nodes = block.number_of_dst_nodes()
         labels = minibatch.labels[-num_dst_nodes:].to(device)
         loss = F.nll_loss(out, labels)
@@ -88,9 +97,11 @@ def evaluate(model, dataloader):
             node_features = minibatch.node_features["feat"].to(device)
             block = minibatch.blocks[-1]
             edge_index = block.edges()
-            edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(device)
+            edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(
+                device
+            )
             out = model(node_features, edge_index)
-            out = out[-block.number_of_dst_nodes():]
+            out = out[-block.number_of_dst_nodes() :]
             num_dst_nodes = block.number_of_dst_nodes()
             labels = minibatch.labels[-num_dst_nodes:].to(device)
             predictions = out.argmax(dim=1)
@@ -102,7 +113,9 @@ def evaluate(model, dataloader):
 for epoch in range(100):
     train_loss, train_accuracy = train_epoch(model, train_dataloader)
     valid_accuracy = evaluate(model, valid_dataloader)
-    print(f"Epoch {epoch}: Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Valid Accuracy: {valid_accuracy:.4f}")
+    print(
+        f"Epoch {epoch}: Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Valid Accuracy: {valid_accuracy:.4f}"
+    )
 
 
 test_accuracy = evaluate(model, test_dataloader)
