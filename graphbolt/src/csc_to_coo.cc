@@ -30,7 +30,7 @@ torch::Tensor CSCToCOO(
   }
   return original_column_node_ids.value()
       .to(output_dtype)
-      .repeat_interleave(indptr.diff());
+      .repeat_interleave(indptr.diff(), 0, num_edges);
 }
 
 }  // namespace ops
