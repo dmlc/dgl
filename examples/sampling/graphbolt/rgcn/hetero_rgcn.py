@@ -78,7 +78,6 @@ def load_dataset(dataset_name):
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
-    all_nodes_set = dataset.all_nodes_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
     return (
@@ -87,7 +86,6 @@ def load_dataset(dataset_name):
         train_set,
         valid_set,
         test_set,
-        all_nodes_set,
         num_classes,
     )
 
@@ -629,7 +627,6 @@ def main(args):
         train_set,
         valid_set,
         test_set,
-        all_nodes_set,
         num_classes,
     ) = load_dataset(args.dataset)
 
@@ -718,7 +715,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num_epochs", type=int, default=3)
     parser.add_argument("--num_workers", type=int, default=0)
-    parser.add_argument("--num_gpus", type=int, default=1)
+    parser.add_argument("--num_gpus", type=int, default=0)
 
     args = parser.parse_args()
 
