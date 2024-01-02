@@ -271,6 +271,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                   static_cast<indptr_t>(num_sampled_edges),
                   nodes.options().dtype(indptr.scalar_type()));
 
+              // Need to sort the sampled edges only when fanouts.size() == 1
+              // since multiple fanout sampling case is automatically going to
+              // be sorted.
               if (type_per_edge && fanouts.size() == 1) {
                 // Ensuring sort result still ends up in sorted_edge_id_segments
                 std::swap(edge_id_segments, sorted_edge_id_segments);
@@ -339,6 +342,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
         if (type_per_edge) {
           // output_type_per_edge = type_per_edge.gather(0, picked_eids);
+          // The commented out torch equivalent above does not work when
+          // type_per_edge is on pinned memory. That is why, we have to
+          // reimplement it, similar to the indices gather operation above.
           auto types = type_per_edge.value();
           output_type_per_edge = torch::empty(
               picked_eids.size(0),
