@@ -258,19 +258,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                 auto sampled_segment_end_it = thrust::make_transform_iterator(
                     iota, SegmentEndFunc<indptr_t, decltype(sampled_degree)>{
                               sub_indptr.data_ptr<indptr_t>(), sampled_degree});
-                size_t tmp_storage_size = 0;
-                CUDA_CALL(cub::DeviceSegmentedSort::SortKeys(
-                    nullptr, tmp_storage_size, edge_id_segments.get(),
+                CUB_CALL(
+                    DeviceSegmentedSort::SortKeys, edge_id_segments.get(),
                     sorted_edge_id_segments.get(), picked_eids.size(0),
                     num_rows, sub_indptr.data_ptr<indptr_t>(),
-                    sampled_segment_end_it, stream));
-                auto tmp_storage =
-                    allocator.AllocateStorage<char>(tmp_storage_size);
-                CUDA_CALL(cub::DeviceSegmentedSort::SortKeys(
-                    tmp_storage.get(), tmp_storage_size, edge_id_segments.get(),
-                    sorted_edge_id_segments.get(), picked_eids.size(0),
-                    num_rows, sub_indptr.data_ptr<indptr_t>(),
-                    sampled_segment_end_it, stream));
+                    sampled_segment_end_it);
               }
 
               auto input_buffer_it = thrust::make_transform_iterator(
@@ -320,10 +312,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               picked_eids.options().dtype(types.scalar_type()));
           AT_DISPATCH_INTEGRAL_TYPES(
               types.scalar_type(), "SampleNeighborsOutputTypePerEdge", ([&] {
-                const auto exec_policy =
-                    thrust::cuda::par_nosync(allocator).on(stream);
-                thrust::gather(
-                    exec_policy, picked_eids.data_ptr<indptr_t>(),
+                THRUST_CALL(
+                    gather, picked_eids.data_ptr<indptr_t>(),
                     picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
                     types.data_ptr<scalar_t>(),
                     output_type_per_edge.value().data_ptr<scalar_t>());
