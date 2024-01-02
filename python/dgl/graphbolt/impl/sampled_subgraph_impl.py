@@ -1,7 +1,7 @@
 """Sampled subgraph for FusedCSCSamplingGraph."""
 # pylint: disable= invalid-name
 from dataclasses import dataclass
-from typing import Dict, Tuple, Union
+from typing import Dict, Union
 
 import torch
 
@@ -9,69 +9,7 @@ from ..base import CSCFormatBase, etype_str_to_tuple
 from ..internal import get_attributes
 from ..sampled_subgraph import SampledSubgraph
 
-__all__ = ["FusedSampledSubgraphImpl", "SampledSubgraphImpl"]
-
-
-@dataclass
-class FusedSampledSubgraphImpl(SampledSubgraph):
-    r"""Sampled subgraph of FusedCSCSamplingGraph.
-
-    Examples
-    --------
-    >>> node_pairs = {"A:relation:B"): (torch.tensor([0, 1, 2]),
-    ... torch.tensor([0, 1, 2]))}
-    >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
-    >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
-    >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
-    >>> subgraph = gb.FusedSampledSubgraphImpl(
-    ... sampled_csc=node_pairs,
-    ... original_column_node_ids=original_column_node_ids,
-    ... original_row_node_ids=original_row_node_ids,
-    ... original_edge_ids=original_edge_ids
-    ... )
-    >>> print(subgraph.sampled_csc)
-    {"A:relation:B": (tensor([0, 1, 2]), tensor([0, 1, 2]))}
-    >>> print(subgraph.original_column_node_ids)
-    {'B': tensor([10, 11, 12])}
-    >>> print(subgraph.original_row_node_ids)
-    {'A': tensor([13, 14, 15])}
-    >>> print(subgraph.original_edge_ids)
-    {"A:relation:B": tensor([19, 20, 21])}
-    """
-    sampled_csc: Union[
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-        Tuple[torch.Tensor, torch.Tensor],
-    ] = None
-    original_column_node_ids: Union[
-        Dict[str, torch.Tensor], torch.Tensor
-    ] = None
-    original_row_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
-    original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
-
-    def __post_init__(self):
-        if isinstance(self.sampled_csc, dict):
-            for etype, pair in self.sampled_csc.items():
-                assert (
-                    isinstance(etype, str)
-                    and len(etype_str_to_tuple(etype)) == 3
-                ), "Edge type should be a string in format of str:str:str."
-                assert (
-                    isinstance(pair, tuple) and len(pair) == 2
-                ), "Node pair should be a source-destination tuple (u, v)."
-                assert all(
-                    isinstance(item, torch.Tensor) for item in pair
-                ), "Nodes in pairs should be of type torch.Tensor."
-        else:
-            assert (
-                isinstance(self.sampled_csc, tuple)
-                and len(self.sampled_csc) == 2
-            ), "Node pair should be a source-destination tuple (u, v)."
-            assert all(
-                isinstance(item, torch.Tensor) for item in self.sampled_csc
-            ), "Nodes in pairs should be of type torch.Tensor."
-
-    def __repr__(self) -> str:
-        return _sampled_subgraph_str(self, "FusedSampledSubgraphImpl")
+__all__ = ["SampledSubgraphImpl"]
 
 
 @dataclass
