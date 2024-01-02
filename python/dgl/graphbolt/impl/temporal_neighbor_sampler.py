@@ -90,6 +90,7 @@ class TemporalNeighborSampler(SubgraphSampler):
         self.sampler = graph.temporal_sample_neighbors
 
     def sample_subgraphs(self, seeds, seeds_timestamp=None):
+        assert seeds_timestamp is not None, "seeds_timestamp must be provided."
         subgraphs = []
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.
