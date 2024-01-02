@@ -34,6 +34,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ):
         super().__init__()
         self._c_csc_graph = c_csc_graph
+        self._node_type_offset = self.node_type_offset.tolist()
 
     @property
     def total_num_nodes(self) -> int:
@@ -92,7 +93,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         {'N0': 2, 'N1': 3}
         """
 
-        offset = self.node_type_offset
+        offset = self._node_type_offset
 
         # Homogenous.
         if offset is None or self.node_type_to_id is None:
@@ -101,7 +102,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         # Heterogenous
         else:
             num_nodes_per_type = {
-                _type: (offset[_idx + 1] - offset[_idx]).item()
+                _type: (offset[_idx + 1] - offset[_idx])
                 for _type, _idx in self.node_type_to_id.items()
             }
 
@@ -218,6 +219,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ) -> None:
         """Sets the node type offset tensor if present."""
         self._c_csc_graph.set_node_type_offset(node_type_offset)
+        self._node_type_offset = node_type_offset.tolist()
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
@@ -389,9 +391,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         homogeneous_timestamps = []
         for ntype, ids in nodes.items():
             ntype_id = self.node_type_to_id[ntype]
-            homogeneous_nodes.append(
-                ids + self.node_type_offset[ntype_id].item()
-            )
+            homogeneous_nodes.append(ids + self._node_type_offset[ntype_id])
             if timestamps is not None:
                 homogeneous_timestamps.append(timestamps[ntype])
         if timestamps is not None:
@@ -426,20 +426,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
-            if self.node_type_offset.device != column.device:
-                if (
-                    not hasattr(self, "_type_per_offset_gpu")
-                    or self._type_per_offset_gpu.device != column.device
-                ):
-                    self._type_per_offset_gpu = self.node_type_offset.to(
-                        column.device
-                    )
-                moved_node_type_offset = self._type_per_offset_gpu
-            else:
-                moved_node_type_offset = self.node_type_offset
             # 1. Find node types for each nodes in column.
             node_types = (
-                torch.searchsorted(moved_node_type_offset, column, right=True)
+                torch.searchsorted(self.node_type_offset, column, right=True)
                 - 1
             )
 
@@ -459,8 +448,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     eids = torch.nonzero(type_per_edge == etype_id).view(-1)
                     src_ntype_id = self.node_type_to_id[src_ntype]
                     sub_indices[etype] = (
-                        indices[eids]
-                        - self.node_type_offset[src_ntype_id].item()
+                        indices[eids] - self._node_type_offset[src_ntype_id]
                     )
                     cum_edges = torch.searchsorted(
                         eids, nids_original_indptr, right=False
@@ -896,9 +884,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             _, _, dst_node_type = etype_str_to_tuple(edge_type)
             dst_node_type_id = self.node_type_to_id[dst_node_type]
             max_node_id = (
-                self.node_type_offset[dst_node_type_id + 1]
-                - self.node_type_offset[dst_node_type_id]
-            ).item()
+                self._node_type_offset[dst_node_type_id + 1]
+                - self._node_type_offset[dst_node_type_id]
+            )
         else:
             max_node_id = self.total_num_nodes
         return self._c_csc_graph.sample_negative_edges_uniform(
@@ -1048,7 +1036,7 @@ def fused_csc_sampling_graph(
         torch.ops.graphbolt.fused_csc_sampling_graph(
             csc_indptr,
             indices,
-            node_type_offset.cpu(),
+            node_type_offset,
             type_per_edge,
             node_type_to_id,
             edge_type_to_id,
@@ -1169,7 +1157,7 @@ def from_dglgraph(
         torch.ops.graphbolt.fused_csc_sampling_graph(
             indptr,
             indices,
-            node_type_offset.cpu(),
+            node_type_offset,
             type_per_edge,
             node_type_to_id,
             edge_type_to_id,
