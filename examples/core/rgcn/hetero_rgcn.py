@@ -400,6 +400,7 @@ def train(
     # the 1st or 2nd epoch. This is why the max epoch is set to 3.
     for epoch in range(3):
         num_train = split_idx["train"][category].shape[0]
+        t0 = time.time()
         model.train()
 
         total_loss = 0
@@ -431,6 +432,7 @@ def train(
 
             total_loss += loss.item() * batch_size
 
+        t1 = time.time()
         loss = total_loss / num_train
 
         # Evaluate the model on the val/test set.
@@ -461,6 +463,7 @@ def train(
             f"Loss: {loss:.4f}, "
             f"Valid: {100 * valid_acc:.2f}%, "
             f"Test: {100 * test_acc:.2f}%"
+            f"Time {t1 - t0:.4f}"
         )
 
 
