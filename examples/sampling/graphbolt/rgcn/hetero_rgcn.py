@@ -333,7 +333,6 @@ class RelGraphConvLayer(nn.Module):
         inputs_dst = {
             k: v[: g.number_of_dst_nodes(k)] for k, v in inputs.items()
         }
-        # assert False, (inputs, inputs_dst)
         # Apply the convolution operation on the graph. mod_kwargs are
         # additional arguments for each relation function defined in the
         # HeteroGraphConv. In this case, it's the weights for each relation.
@@ -618,6 +617,11 @@ def infer(
 
 
 def main(args):
+    if args.dataset == "ogb-lsc-mag240m":
+        raise NotImplementedError(
+            "The revised example is not tested for ogb-lsc-mag240m."
+        )
+
     device = torch.device("cuda") if args.num_gpus > 0 else torch.device("cpu")
 
     # Load dataset.
