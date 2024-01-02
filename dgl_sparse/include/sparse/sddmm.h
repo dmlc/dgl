@@ -7,6 +7,7 @@
 #define SPARSE_SDDMM_H_
 
 #include <sparse/sparse_matrix.h>
+#include <torch/script.h>
 
 namespace dgl {
 namespace sparse {

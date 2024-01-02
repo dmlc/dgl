@@ -80,12 +80,15 @@ def test_FeatureFetcher_with_edges_homo():
     def add_node_and_edge_ids(seeds):
         subgraphs = []
         for _ in range(3):
-            range_tensor = torch.arange(10)
+            sampled_csc = gb.CSCFormatBase(
+                indptr=torch.arange(11),
+                indices=torch.arange(10),
+            )
             subgraphs.append(
-                gb.FusedSampledSubgraphImpl(
-                    node_pairs=(range_tensor, range_tensor),
-                    original_column_node_ids=range_tensor,
-                    original_row_node_ids=range_tensor,
+                gb.SampledSubgraphImpl(
+                    sampled_csc=sampled_csc,
+                    original_column_node_ids=torch.arange(10),
+                    original_row_node_ids=torch.arange(10),
                     original_edge_ids=torch.randint(
                         0, graph.total_num_edges, (10,)
                     ),
@@ -183,15 +186,15 @@ def test_FeatureFetcher_with_edges_hetero():
         }
         for _ in range(3):
             subgraphs.append(
-                gb.FusedSampledSubgraphImpl(
-                    node_pairs={
-                        "n1:e1:n2": (
-                            torch.arange(10),
-                            torch.arange(10),
+                gb.SampledSubgraphImpl(
+                    sampled_csc={
+                        "n1:e1:n2": gb.CSCFormatBase(
+                            indptr=torch.arange(11),
+                            indices=torch.arange(10),
                         ),
-                        "n2:e2:n1": (
-                            torch.arange(10),
-                            torch.arange(10),
+                        "n2:e2:n1": gb.CSCFormatBase(
+                            indptr=torch.arange(11),
+                            indices=torch.arange(10),
                         ),
                     },
                     original_column_node_ids=original_column_node_ids,
