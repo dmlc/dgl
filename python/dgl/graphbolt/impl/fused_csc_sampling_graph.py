@@ -426,10 +426,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
-            self.node_type_offset = self.node_type_offset.to(column.device)
             # 1. Find node types for each nodes in column.
             node_types = (
-                torch.searchsorted(self.node_type_offset, column, right=True)
+                torch.searchsorted(
+                    self.node_type_offset.to(column.device), column, right=True
+                )
                 - 1
             )
 
@@ -449,7 +450,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     eids = torch.nonzero(type_per_edge == etype_id).view(-1)
                     src_ntype_id = self.node_type_to_id[src_ntype]
                     sub_indices[etype] = (
-                        indices[eids] - self.node_type_offset[src_ntype_id]
+                        indices[eids]
+                        - self.node_type_offset[src_ntype_id].item()
                     )
                     cum_edges = torch.searchsorted(
                         eids, nids_original_indptr, right=False
@@ -887,7 +889,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             max_node_id = (
                 self.node_type_offset[dst_node_type_id + 1]
                 - self.node_type_offset[dst_node_type_id]
-            )
+            ).item()
         else:
             max_node_id = self.total_num_nodes
         return self._c_csc_graph.sample_negative_edges_uniform(
@@ -917,7 +919,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Apply passed fn to all members of `FusedCSCSamplingGraph`."""
         self.csc_indptr = recursive_apply(self.csc_indptr, fn)
         self.indices = recursive_apply(self.indices, fn)
-        self.node_type_offset = recursive_apply(self.node_type_offset, fn)
         self.type_per_edge = recursive_apply(self.type_per_edge, fn)
         self.node_attributes = recursive_apply(self.node_attributes, fn)
         self.edge_attributes = recursive_apply(self.edge_attributes, fn)
