@@ -49,6 +49,7 @@ main
 import argparse
 import itertools
 import sys
+import time
 
 import dgl
 import dgl.nn as dglnn
@@ -714,7 +715,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--rootdir",
         type=str,
-        default="./",
+        default="./dataset/",
         help="Directory to download the OGB dataset.",
     )
     parser.add_argument(
