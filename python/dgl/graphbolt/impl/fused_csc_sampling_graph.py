@@ -222,7 +222,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Sets the node type offset tensor if present."""
         self._c_csc_graph.set_node_type_offset(node_type_offset)
         self._node_type_offset = None
-        if node_type_offset:
+        if node_type_offset is not None:
             self._node_type_offset = node_type_offset.tolist()
 
     @property
