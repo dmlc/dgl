@@ -35,7 +35,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         super().__init__()
         self._c_csc_graph = c_csc_graph
         self._node_type_offset = self.node_type_offset
-        if self._node_type_offset:
+        if self._node_type_offset is not None:
             self._node_type_offset = self._node_type_offset.tolist()
 
     @property
