@@ -34,9 +34,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ):
         super().__init__()
         self._c_csc_graph = c_csc_graph
-        self._node_type_offset = self.node_type_offset
-        if self._node_type_offset is not None:
-            self._node_type_offset = self._node_type_offset.tolist()
 
     @property
     def total_num_nodes(self) -> int:
@@ -95,7 +92,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         {'N0': 2, 'N1': 3}
         """
 
-        offset = self._node_type_offset
+        offset = self.node_type_offset_list
 
         # Homogenous.
         if offset is None or self.node_type_to_id is None:
@@ -215,15 +212,37 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         return self._c_csc_graph.node_type_offset()
 
+    @property
+    def node_type_offset_list(self) -> Optional[list]:
+        """Returns the node type offset list if present.
+
+        Returns
+        -------
+        list or None
+            If present, returns a 1D integer list of shape
+            `(num_node_types + 1,)`. The list is in ascending order as nodes
+            of the same type have continuous IDs, and larger node IDs are
+            paired with larger node type IDs. The first value is 0 and last
+            value is the number of nodes. And nodes with IDs between
+            `node_type_offset_[i]~node_type_offset_[i+1]` are of type id 'i'.
+
+        """
+        if (
+            not hasattr(self, "_node_type_offset_list")
+            or self._node_type_offset_list is None
+        ):
+            self._node_type_offset_list = self.node_type_offset
+            if self._node_type_offset_list is not None:
+                self._node_type_offset_list = self.node_type_offset.tolist()
+        return self._node_type_offset_list
+
     @node_type_offset.setter
     def node_type_offset(
         self, node_type_offset: Optional[torch.Tensor]
     ) -> None:
         """Sets the node type offset tensor if present."""
-        self._c_csc_graph.set_node_type_offset(node_type_offset)
-        self._node_type_offset = None
-        if node_type_offset is not None:
-            self._node_type_offset = node_type_offset.tolist()
+        self._c_csc_graph.set_node_type_offset_list(node_type_offset)
+        self._node_type_offset_list = None
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
@@ -395,7 +414,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         homogeneous_timestamps = []
         for ntype, ids in nodes.items():
             ntype_id = self.node_type_to_id[ntype]
-            homogeneous_nodes.append(ids + self._node_type_offset[ntype_id])
+            homogeneous_nodes.append(ids + self.node_type_offset_list[ntype_id])
             if timestamps is not None:
                 homogeneous_timestamps.append(timestamps[ntype])
         if timestamps is not None:
@@ -452,7 +471,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     eids = torch.nonzero(type_per_edge == etype_id).view(-1)
                     src_ntype_id = self.node_type_to_id[src_ntype]
                     sub_indices[etype] = (
-                        indices[eids] - self._node_type_offset[src_ntype_id]
+                        indices[eids] - self.node_type_offset_list[src_ntype_id]
                     )
                     cum_edges = torch.searchsorted(
                         eids, nids_original_indptr, right=False
@@ -888,8 +907,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             _, _, dst_node_type = etype_str_to_tuple(edge_type)
             dst_node_type_id = self.node_type_to_id[dst_node_type]
             max_node_id = (
-                self._node_type_offset[dst_node_type_id + 1]
-                - self._node_type_offset[dst_node_type_id]
+                self.node_type_offset_list[dst_node_type_id + 1]
+                - self.node_type_offset_list[dst_node_type_id]
             )
         else:
             max_node_id = self.total_num_nodes
