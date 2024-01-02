@@ -130,9 +130,7 @@ class NeighborSampler(SubgraphSampler):
                 device = seed.device
                 dtype = seed.dtype
                 break
-            default_tensor = torch.tensor(
-                [], dtype=self.graph.indices.dtype, device=device
-            )
+            default_tensor = torch.tensor([], dtype=dtype, device=device)
             seeds = {
                 ntype: seeds.get(ntype, default_tensor) for ntype in ntypes
             }
