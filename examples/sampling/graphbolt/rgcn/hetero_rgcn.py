@@ -42,9 +42,11 @@ main
                   │
                   └───> EntityClassify.evaluate
 """
+
 import argparse
 import itertools
 import sys
+import time
 
 import dgl
 import dgl.graphbolt as gb
@@ -156,21 +158,16 @@ def extract_embed(node_embed, input_nodes):
 def extract_node_features(name, block, data, node_embed, device):
     """Extract the node features from embedding layer or raw features."""
     if name == "ogbn-mag":
-        # print(f"block: {block}\n")
-        # print(f"data: {data}\n")
         input_nodes = {
             k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
         }
-        # print(f"input_nodes: {input_nodes}\n")
         # Extract node embeddings for the input nodes.
         node_features = extract_embed(node_embed, input_nodes)
-        # print(f"node_features: {node_features}\n")
         # Add the batch's raw "paper" features. Corresponds to the content
         # in the function `rel_graph_embed` comment.
         node_features.update(
             {"paper": data.node_features[("paper", "feat")].to(device)}
         )
-        # print(f"node_features: {node_features}\n")
     else:
         node_features = {
             ntype: data.node_features[(ntype, "feat")]
@@ -540,6 +537,7 @@ def train(
     # the 1st or 2nd epoch. This is why the max epoch is set to 3.
     for epoch in range(num_epochs):
         num_train = len(train_set)
+        t0 = time.time()
         model.train()
 
         total_loss = 0
@@ -568,6 +566,7 @@ def train(
 
             total_loss += loss.item() * num_seeds
 
+        t1 = time.time()
         loss = total_loss / num_train
 
         # Evaluate the model on the val/test set.
@@ -582,6 +581,7 @@ def train(
             f"Epoch: {epoch + 1:02d}, "
             f"Loss: {loss:.4f}, "
             f"Valid accuracy: {100 * valid_acc:.2f}%, "
+            f"Time {t1 - t0:.4f}"
         )
 
 
@@ -609,10 +609,8 @@ def infer(
         device=device,
         num_workers=num_workers,
     )
-    print(pred)
     label = item_set._itemsets["paper"]._items[1].to(pred.device)
     label = torch.unsqueeze(label, 1)
-    print(label)
 
     if name == "ogb-lsc-mag240m":
         pred = pred.view(-1)
@@ -667,7 +665,10 @@ def main(args):
     # iterable over the parameters of both the model and the embed_layer,
     # which is passed to the optimizer. The optimizer then updates all
     # these parameters during the training process.
-    all_params = itertools.chain(model.parameters())
+    all_params = itertools.chain(
+        model.parameters(),
+        [] if embed_layer is None else embed_layer.parameters(),
+    )
     optimizer = torch.optim.Adam(all_params, lr=0.01)
 
     expected_max = int(psutil.cpu_count(logical=False))
@@ -703,7 +704,7 @@ def main(args):
         features=features,
         num_workers=args.num_workers,
     )
-    print(f"Test accuracy {test_acc:.4f}")
+    print(f"Test accuracy {test_acc*100:.4f}")
 
 
 if __name__ == "__main__":
