@@ -34,7 +34,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ):
         super().__init__()
         self._c_csc_graph = c_csc_graph
-        self._node_type_offset = self.node_type_offset.tolist()
+        self._node_type_offset = self.node_type_offset
+        if self._node_type_offset:
+            self._node_type_offset = self._node_type_offset.tolist()
 
     @property
     def total_num_nodes(self) -> int:
@@ -219,7 +221,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ) -> None:
         """Sets the node type offset tensor if present."""
         self._c_csc_graph.set_node_type_offset(node_type_offset)
-        self._node_type_offset = node_type_offset.tolist()
+        self._node_type_offset = None
+        if node_type_offset:
+            self._node_type_offset = node_type_offset.tolist()
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
