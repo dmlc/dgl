@@ -84,6 +84,7 @@ def prepare_data(args, device):
         # Apply transformation to the graph.
         # - "ToSimple()" removes multi-edge between two nodes.
         # - "AddReverse()" adds reverse edges to the graph.
+        print("Start to transform graph. This may take a while...")
         transform = Compose([ToSimple(), AddReverse()])
         g = transform(g)
     else:
@@ -357,57 +358,6 @@ class EntityClassify(nn.Module):
         return h
 
 
-class Logger(object):
-    r"""
-    This class was taken directly from the PyG implementation and can be found
-    here: https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppre
-    d/mag/logger.py
-
-    This was done to ensure that performance was measured in precisely the same
-    way
-    """
-
-    def __init__(self, runs):
-        self.results = [[] for _ in range(runs)]
-
-    def add_result(self, run, result):
-        assert len(result) == 3
-        assert run >= 0 and run < len(self.results)
-        self.results[run].append(result)
-
-    def print_statistics(self, run=None):
-        if run is not None:
-            result = 100 * torch.tensor(self.results[run])
-            argmax = result[:, 1].argmax().item()
-            print(f"Run {run + 1:02d}:")
-            print(f"Highest Train: {result[:, 0].max():.2f}")
-            print(f"Highest Valid: {result[:, 1].max():.2f}")
-            print(f"  Final Train: {result[argmax, 0]:.2f}")
-            print(f"   Final Test: {result[argmax, 2]:.2f}")
-        else:
-            result = 100 * torch.tensor(self.results)
-
-            best_results = []
-            for r in result:
-                train1 = r[:, 0].max().item()
-                valid = r[:, 1].max().item()
-                train2 = r[r[:, 1].argmax(), 0].item()
-                test = r[r[:, 1].argmax(), 2].item()
-                best_results.append((train1, valid, train2, test))
-
-            best_result = torch.tensor(best_results)
-
-            print("All runs:")
-            r = best_result[:, 0]
-            print(f"Highest Train: {r.mean():.2f} ± {r.std():.2f}")
-            r = best_result[:, 1]
-            print(f"Highest Valid: {r.mean():.2f} ± {r.std():.2f}")
-            r = best_result[:, 2]
-            print(f"  Final Train: {r.mean():.2f} ± {r.std():.2f}")
-            r = best_result[:, 3]
-            print(f"   Final Test: {r.mean():.2f} ± {r.std():.2f}")
-
-
 def extract_node_features(name, g, input_nodes, node_embed, feats, device):
     """Extract the node features from embedding layer or raw features."""
     if name == "ogbn-mag":
@@ -441,11 +391,9 @@ def train(
     train_loader,
     split_idx,
     labels,
-    logger,
     device,
-    run,
 ):
-    print("start training...")
+    print("Start training...")
     category = "paper"
 
     # Typically, the best Validation performance is obtained after
@@ -485,17 +433,7 @@ def train(
 
         loss = total_loss / num_train
 
-        # Evaluate the model on the train/val/test set.
-        train_acc = evaluate(
-            dataset,
-            g,
-            feats,
-            model,
-            node_embed,
-            labels,
-            device,
-            split_idx["train"],
-        )
+        # Evaluate the model on the val/test set.
         valid_acc = evaluate(
             dataset,
             g,
@@ -518,17 +456,12 @@ def train(
             split_idx[test_key],
             save_test_submission=(dataset == "ogb-lsc-mag240m"),
         )
-        logger.add_result(run, (train_acc, valid_acc, test_acc))
         print(
-            f"Run: {run + 1:02d}, "
             f"Epoch: {epoch +1 :02d}, "
             f"Loss: {loss:.4f}, "
-            f"Train: {100 * train_acc:.2f}%, "
             f"Valid: {100 * valid_acc:.2f}%, "
             f"Test: {100 * test_acc:.2f}%"
         )
-
-    return logger
 
 
 @torch.no_grad()
@@ -601,8 +534,6 @@ def main(args):
         "cuda:0" if torch.cuda.is_available() and args.num_gpus > 0 else "cpu"
     )
 
-    # Initialize a logger.
-    logger = Logger(args.runs)
 
     # Prepare the data.
     g, labels, num_classes, split_idx, train_loader, feats = prepare_data(
@@ -628,65 +559,72 @@ def main(args):
         f"{sum(p.numel() for p in model.parameters())}"
     )
 
-    for run in range(args.runs):
-        try:
-            if embed_layer is not None:
-                embed_layer.reset_parameters()
-            model.reset_parameters()
-        except:
-            # Old pytorch version doesn't support reset_parameters() API.
-            ##################################################################
-            # [Why we need to reset the parameters?]
-            # If parameters are not reset, the model will start with the
-            # parameters learned from the last run, potentially resulting
-            # in biased outcomes or sub-optimal performance if the model was
-            # previously stuck in a poor local minimum.
-            ##################################################################
-            pass
+    try:
+        if embed_layer is not None:
+            embed_layer.reset_parameters()
+        model.reset_parameters()
+    except:
+        # Old pytorch version doesn't support reset_parameters() API.
+        ##################################################################
+        # [Why we need to reset the parameters?]
+        # If parameters are not reset, the model will start with the
+        # parameters learned from the last run, potentially resulting
+        # in biased outcomes or sub-optimal performance if the model was
+        # previously stuck in a poor local minimum.
+        ##################################################################
+        pass
 
-        # `itertools.chain()` is a function in Python's itertools module.
-        # It is used to flatten a list of iterables, making them act as
-        # one big iterable.
-        # In this context, the following code is used to create a single
-        # iterable over the parameters of both the model and the embed_layer,
-        # which is passed to the optimizer. The optimizer then updates all
-        # these parameters during the training process.
-        all_params = itertools.chain(
-            model.parameters(),
-            [] if embed_layer is None else embed_layer.parameters(),
+    # `itertools.chain()` is a function in Python's itertools module.
+    # It is used to flatten a list of iterables, making them act as
+    # one big iterable.
+    # In this context, the following code is used to create a single
+    # iterable over the parameters of both the model and the embed_layer,
+    # which is passed to the optimizer. The optimizer then updates all
+    # these parameters during the training process.
+    all_params = itertools.chain(
+        model.parameters(),
+        [] if embed_layer is None else embed_layer.parameters(),
+    )
+    optimizer = torch.optim.Adam(all_params, lr=0.01)
+
+    # `expected_max`` is the number of physical cores on your machine.
+    # The `logical` parameter, when set to False, ensures that the count
+    # returned is the number of physical cores instead of logical cores
+    # (which could be higher due to technologies like Hyper-Threading).
+    expected_max = int(psutil.cpu_count(logical=False))
+    if args.num_workers >= expected_max:
+        print(
+            "[ERROR] You specified num_workers are larger than physical"
+            f"cores, please set any number less than {expected_max}",
+            file=sys.stderr,
         )
-        optimizer = torch.optim.Adam(all_params, lr=0.01)
+    train(
+        args.dataset,
+        g,
+        feats,
+        model,
+        embed_layer,
+        optimizer,
+        train_loader,
+        split_idx,
+        labels,
+        device,
+    )
 
-        # `expected_max`` is the number of physical cores on your machine.
-        # The `logical` parameter, when set to False, ensures that the count
-        # returned is the number of physical cores instead of logical cores
-        # (which could be higher due to technologies like Hyper-Threading).
-        expected_max = int(psutil.cpu_count(logical=False))
-        if args.num_workers >= expected_max:
-            print(
-                "[ERROR] You specified num_workers are larger than physical"
-                f"cores, please set any number less than {expected_max}",
-                file=sys.stderr,
-            )
-        logger = train(
-            args.dataset,
-            g,
-            feats,
-            model,
-            embed_layer,
-            optimizer,
-            train_loader,
-            split_idx,
-            labels,
-            logger,
-            device,
-            run,
-        )
-        logger.print_statistics(run)
-
-    print("Final performance: ")
-    logger.print_statistics()
-
+    print("Testing...")
+    test_key = "test" if args.dataset == "ogbn-mag" else "test-dev"
+    test_acc = evaluate(
+        args.dataset,
+        g,
+        feats,
+        model,
+        embed_layer,
+        labels,
+        device,
+        split_idx[test_key],
+        save_test_submission=(args.dataset == "ogb-lsc-mag240m"),
+    )
+    print(f"Test accuracy {test_acc*100:.4f}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RGCN")
@@ -701,12 +639,6 @@ if __name__ == "__main__":
         type=int,
         default=0,
         help="Number of GPUs. Use 0 for CPU training.",
-    )
-    parser.add_argument(
-        "--runs",
-        type=int,
-        default=5,
-        help="Number of runs. Each run will train the model from scratch.",
     )
     parser.add_argument(
         "--num_workers",
