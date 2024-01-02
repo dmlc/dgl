@@ -1039,7 +1039,7 @@ def fused_csc_sampling_graph(
         torch.ops.graphbolt.fused_csc_sampling_graph(
             csc_indptr,
             indices,
-            node_type_offset,
+            node_type_offset.cpu(),
             type_per_edge,
             node_type_to_id,
             edge_type_to_id,
@@ -1160,7 +1160,7 @@ def from_dglgraph(
         torch.ops.graphbolt.fused_csc_sampling_graph(
             indptr,
             indices,
-            node_type_offset,
+            node_type_offset.cpu(),
             type_per_edge,
             node_type_to_id,
             edge_type_to_id,
