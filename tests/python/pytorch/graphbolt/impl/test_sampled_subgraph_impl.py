@@ -5,10 +5,7 @@ import backend as F
 import dgl.graphbolt as gb
 import pytest
 import torch
-from dgl.graphbolt.impl.sampled_subgraph_impl import (
-    FusedSampledSubgraphImpl,
-    SampledSubgraphImpl,
-)
+from dgl.graphbolt.impl.sampled_subgraph_impl import SampledSubgraphImpl
 
 
 def _assert_container_equal(lhs, rhs):
