@@ -233,7 +233,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         ):
             self._node_type_offset_list = self.node_type_offset
             if self._node_type_offset_list is not None:
-                self._node_type_offset_list = self.node_type_offset.tolist()
+                self._node_type_offset_list = (
+                    self._node_type_offset_list.tolist()
+                )
         return self._node_type_offset_list
 
     @node_type_offset.setter
@@ -241,7 +243,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self, node_type_offset: Optional[torch.Tensor]
     ) -> None:
         """Sets the node type offset tensor if present."""
-        self._c_csc_graph.set_node_type_offset_list(node_type_offset)
+        self._c_csc_graph.set_node_type_offset(node_type_offset)
         self._node_type_offset_list = None
 
     @property
@@ -449,6 +451,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
+            # UVA sampling requires us to move node_type_offset to GPU.
+            self.node_type_offset = self.node_type_offset.to(column.device)
             # 1. Find node types for each nodes in column.
             node_types = (
                 torch.searchsorted(self.node_type_offset, column, right=True)
