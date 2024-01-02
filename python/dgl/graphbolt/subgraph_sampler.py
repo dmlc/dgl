@@ -137,7 +137,7 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted_negative_dsts if has_neg_dst else None,
         )
 
-    def sample_subgraphs(self, seeds):
+    def sample_subgraphs(self, seeds, seeds_timestamp=None):
         """Sample subgraphs from the given seeds.
 
         Any subclass of SubgraphSampler should implement this method.
