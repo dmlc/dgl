@@ -6,7 +6,7 @@ import torch
 
 from dgl.utils import recursive_apply
 
-from ...base import EID, ETYPE
+from ...base import EID, ETYPE, NID, NTYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
@@ -1117,7 +1117,9 @@ def from_dglgraph(
 ) -> FusedCSCSamplingGraph:
     """Convert a DGLGraph to FusedCSCSamplingGraph."""
 
-    homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
+    homo_g, ntype_count, _ = to_homogeneous(
+        g, ndata=g.ndata, edata=g.edata, return_count=True
+    )
 
     if is_homogeneous:
         node_type_to_id = None
@@ -1147,8 +1149,13 @@ def from_dglgraph(
     )
 
     node_attributes = {}
-
     edge_attributes = {}
+    for feat_name, feat_data in homo_g.ndata.items():
+        if feat_name not in (NID, NTYPE):
+            node_attributes[feat_name] = feat_data
+    for feat_name, feat_data in homo_g.edata.items():
+        if feat_name not in (EID, ETYPE):
+            edge_attributes[feat_name] = feat_data
     if include_original_edge_id:
         # Assign edge attributes according to the original eids mapping.
         edge_attributes[ORIGINAL_EDGE_ID] = torch.index_select(
