@@ -80,10 +80,11 @@ __global__ void _ComputeRandoms(
 template <typename indptr_t>
 struct MinInDegreeFanout {
   const indptr_t* in_degree;
-  int64_t fanout;
+  const int64_t* fanouts;
+  size_t num_fanouts;
   __host__ __device__ auto operator()(int64_t i) {
     return static_cast<indptr_t>(
-        min(static_cast<int64_t>(in_degree[i]), fanout));
+        min(static_cast<int64_t>(in_degree[i]), fanouts[i % num_fanouts]));
   }
 };
 
@@ -128,8 +129,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
     bool return_eids, torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask) {
-  TORCH_CHECK(
-      fanouts.size() == 1, "Heterogenous sampling is not supported yet!");
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
   // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
@@ -137,8 +136,19 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto allocator = cuda::GetAllocator();
   const auto stream = cuda::GetCurrentStream();
   const auto num_rows = nodes.size(0);
-  const auto fanout =
-      fanouts[0] >= 0 ? fanouts[0] : std::numeric_limits<int64_t>::max();
+  auto fanouts_pinned = torch::empty(
+      fanouts.size(),
+      c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
+  auto fanouts_pinned_ptr = fanouts_pinned.data_ptr<int64_t>();
+  for (size_t i = 0; i < fanouts.size(); i++) {
+    fanouts_pinned_ptr[i] =
+        fanouts[i] >= 0 ? fanouts[i] : std::numeric_limits<int64_t>::max();
+  }
+  // Finally, copy the pinned fanout values to the device memory.
+  auto fanouts_device = allocator.AllocateStorage<int64_t>(fanouts.size());
+  CUDA_CALL(cudaMemcpyAsync(
+      fanouts_device.get(), fanouts_pinned_ptr,
+      sizeof(int64_t) * fanouts.size(), cudaMemcpyHostToDevice, stream));
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto max_in_degree = torch::empty(
@@ -172,7 +182,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         thrust::counting_iterator<int64_t> iota(0);
         auto sampled_degree = thrust::make_transform_iterator(
             iota, MinInDegreeFanout<indptr_t>{
-                      in_degree.data_ptr<indptr_t>(), fanout});
+                      in_degree.data_ptr<indptr_t>(), fanouts_device.get(),
+                      fanouts.size()});
 
         {  // Compute output_indptr.
           size_t tmp_storage_size = 0;
