@@ -773,8 +773,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         subgraph.
 
         If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is given,
-        the sampled neighbors or edges of an input node must have a timestamp
-        that is no later than that of the input node.
+        the sampled neighbor or edge of an input node must have a timestamp
+        that is smaller than that of the input node.
 
         Parameters
         ----------
