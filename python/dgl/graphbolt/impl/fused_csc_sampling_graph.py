@@ -6,7 +6,7 @@ import torch
 
 from dgl.utils import recursive_apply
 
-from ...base import EID, ETYPE
+from ...base import EID, ETYPE, NID, NTYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
@@ -417,9 +417,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
         if has_original_eids:
-            original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
-                original_edge_ids
-            ]
+            original_edge_ids = torch.index_select(
+                self.edge_attributes[ORIGINAL_EDGE_ID],
+                dim=0,
+                index=original_edge_ids,
+            )
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
@@ -759,8 +761,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def temporal_sample_neighbors(
         self,
-        nodes: torch.Tensor,
-        input_nodes_timestamp: torch.Tensor,
+        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        input_nodes_timestamp: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
@@ -1115,7 +1117,9 @@ def from_dglgraph(
 ) -> FusedCSCSamplingGraph:
     """Convert a DGLGraph to FusedCSCSamplingGraph."""
 
-    homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
+    homo_g, ntype_count, _ = to_homogeneous(
+        g, ndata=g.ndata, edata=g.edata, return_count=True
+    )
 
     if is_homogeneous:
         node_type_to_id = None
@@ -1138,14 +1142,25 @@ def from_dglgraph(
     )
 
     # Assign edge type according to the order of CSC matrix.
-    type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
+    type_per_edge = (
+        None
+        if is_homogeneous
+        else torch.index_select(homo_g.edata[ETYPE], dim=0, index=edge_ids)
+    )
 
     node_attributes = {}
-
     edge_attributes = {}
+    for feat_name, feat_data in homo_g.ndata.items():
+        if feat_name not in (NID, NTYPE):
+            node_attributes[feat_name] = feat_data
+    for feat_name, feat_data in homo_g.edata.items():
+        if feat_name not in (EID, ETYPE):
+            edge_attributes[feat_name] = feat_data
     if include_original_edge_id:
         # Assign edge attributes according to the original eids mapping.
-        edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
+        edge_attributes[ORIGINAL_EDGE_ID] = torch.index_select(
+            homo_g.edata[EID], dim=0, index=edge_ids
+        )
 
     return FusedCSCSamplingGraph(
         torch.ops.graphbolt.fused_csc_sampling_graph(
