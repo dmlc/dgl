@@ -872,3 +872,40 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
                     sampled_subgraph.sampled_csc[etype].indptr,
                     csc_formats[step][etype].indptr.to(F.ctx()),
                 )
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Hetero_multifanout_per_layer(labor):
+    graph = get_hetero_graph().to(F.ctx())
+    itemset = gb.ItemSetDict(
+        {
+            "n1": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
+            "n2": gb.ItemSet(torch.tensor([1]), names="seed_nodes"),
+        }
+    )
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
+    num_layer = 2
+    # The number of edges to be sampled for each edge types of each node.
+    fanouts = [torch.LongTensor([2, 1]) for _ in range(num_layer)]
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    sampler_dp = Sampler(item_sampler, graph, fanouts)
+    indices_len = [
+        {
+            "n1:e1:n2": 4,
+            "n2:e2:n1": 2,
+        },
+        {
+            "n1:e1:n2": 2,
+            "n2:e2:n1": 1,
+        },
+    ]
+    for minibatch in sampler_dp:
+        for step, sampled_subgraph in enumerate(minibatch.sampled_subgraphs):
+            assert (
+                len(sampled_subgraph.sampled_csc["n1:e1:n2"].indices)
+                == indices_len[step]["n1:e1:n2"]
+            )
+            assert (
+                len(sampled_subgraph.sampled_csc["n2:e2:n1"].indices)
+                == indices_len[step]["n2:e2:n1"]
+            )
