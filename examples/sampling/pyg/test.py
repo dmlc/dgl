@@ -42,7 +42,6 @@ main
 
 """
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -130,6 +129,7 @@ def train_epoch(model, dataloader):
         loss.backward()
         optimizer.step()
     return total_loss / batch_count, total_correct / total_samples
+
 
 @torch.no_grad()
 def evaluate(model, dataloader):
