@@ -473,7 +473,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
 
-    sampler_dp = Sampler(item_sampler, graph, fanouts)
+    sampler_dp = sampler(item_sampler, graph, fanouts)
 
     for data in sampler_dp:
         for sampledsubgraph in data.sampled_subgraphs:
@@ -532,8 +532,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
-    sampler = 
-    (sampler_type)
+    sampler = _get_sampler(sampler_type)
     if sampler_type == SamplerType.Temporal:
         datapipe = sampler(item_sampler, graph, fanouts)
     else:
