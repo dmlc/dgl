@@ -874,6 +874,10 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
                 )
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Heterogenous sampling is not supported on GPU yet.",
+)
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Hetero_multifanout_per_layer(labor):
     graph = get_hetero_graph().to(F.ctx())
