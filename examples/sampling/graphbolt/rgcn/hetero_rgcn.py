@@ -585,7 +585,8 @@ def main(args):
         f"{sum(p.numel() for p in model.parameters())}"
     )
 
-    embed_layer.reset_parameters()
+    if embed_layer is not None:
+        embed_layer.reset_parameters()
     model.reset_parameters()
 
     # `itertools.chain()` is a function in Python's itertools module.
