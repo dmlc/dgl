@@ -436,7 +436,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
         graph.edge_attributes = {
             "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
         }
-        items = (items, torch.randint(0, 10, (3,)))
+        items = (items, torch.randint(1, 10, (3,)))
         names = (names, "timestamp")
 
     itemset = gb.ItemSet(items, names=names)
@@ -494,7 +494,7 @@ def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
         graph.edge_attributes = {
             "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
         }
-        items = (items, torch.randint(0, 10, (2,)))
+        items = (items, torch.randint(1, 10, (2,)))
         names = (names, "timestamp")
     itemset = gb.ItemSetDict({"n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
