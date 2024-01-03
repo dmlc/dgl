@@ -326,7 +326,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
     assert len(list(datapipe)) == 5
 
 
-@pytest.mark.parametrize("labor", [False])
+@pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_Hetero_Unknown_Etype(labor):
     graph = get_hetero_graph().to(F.ctx())
     # "e11" and "e22" are not valid edge types.
@@ -350,10 +350,34 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(labor):
     datapipe = Sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     dataloader = gb.DataLoader(datapipe)
-    for data in dataloader:
-        print(data)
     assert len(list(datapipe)) == 5
 
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
+    graph = get_hetero_graph().to(F.ctx())
+    # "e11" and "e22" are not valid edge types.
+    itemset = gb.ItemSetDict(
+        {
+            "n1:e11:n2": gb.ItemSet(
+                torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T,
+                names="node_pairs",
+            ),
+            "n2:e22:n1": gb.ItemSet(
+                torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T,
+                names="node_pairs",
+            ),
+        }
+    )
+
+    datapipe = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    assert len(list(datapipe)) == 5
 
 
 @unittest.skipIf(
