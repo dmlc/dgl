@@ -17,18 +17,17 @@ python3 hetero_rgcn.py --dataset ogbn-mag --num_gpus 1
 ### Resource usage and time cost
 Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 96 vCPUs(Cascade Lake P-8259L), 8 NVIDIA T4 GPUs(16GB RAM). CPU RAM usage is the peak value of `used` field of `free` command which is a bit rough. Please refer to `RSS`/`USS`/`PSS` which are more accurate. GPU RAM usage is the peak value recorded by `nvidia-smi` command.
 
-| Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
-| ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
-| ~1.1GB       | ~4.5GB        | 0           |  0GB       | ~3min55s(615it, 2.62it/s)   | ~0min18s(154it, 8.37it/s) + ~0min1s(16it, 8.37it/s) + ~0min1s(11it, 8.88it/s)   |
-| ~1.1GB       | ~2GB          | 1           |  4.4GB     | ~58s(615it, 10.43it/s)   | ~0min18s(154it, 8.29it/s) + ~0min1s(16it, 8.46it/s) + ~0min1s(11it, 8.82it/s)   |
+| Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) |
+| ------------ | ------------- | ----------- | ------------- | ------------------------ |
+| ~1.1GB       | ~4.5GB        | 0           |  0GB          | ~248s                    |
+| ~1.1GB       | ~2GB          | 1           |  4.4GB        | ~60s                     |
 
 ### Accuracies
 ```
-Epoch: 01, Loss: 2.6244, Valid accuracy: 33.57%, Time 61.9471
-Epoch: 02, Loss: 2.0163, Valid accuracy: 35.10%, Time 60.7852
-Epoch: 03, Loss: 1.7061, Valid accuracy: 36.70%, Time 60.7745
-Test accuracy 35.2679
-
+Epoch: 01, Loss: 2.6736, Valid accuracy: 42.21%, Time 61.4482
+Epoch: 02, Loss: 2.0809, Valid accuracy: 42.51%, Time 60.5549
+Epoch: 03, Loss: 1.8143, Valid accuracy: 42.76%, Time 60.1942
+Test accuracy 41.4817
 ```
 
 ## Run on `ogb-lsc-mag240m` dataset
