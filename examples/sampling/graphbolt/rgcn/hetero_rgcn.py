@@ -405,38 +405,6 @@ class EntityClassify(nn.Module):
             h = layer(block, h)
         return h
 
-    def inference(
-        self, name, graph, features, item_set, node_embed, device, num_workers
-    ):
-        category = "paper"
-
-        dataloeader = create_dataloader(
-            name,
-            graph,
-            features,
-            item_set,
-            device,
-            batch_size=4096,
-            fanouts=[25, 10],
-            shuffle=False,
-            num_workers=num_workers,
-        )
-
-        y = list()
-        for data in tqdm(dataloeader, desc="Model Inference"):
-            blocks = [block.to(device) for block in data.blocks]
-            node_features = extract_node_features(
-                name, blocks[0], data, node_embed, device
-            )
-            # Generate predictions.
-            logits = self(blocks, node_features)[category]
-
-            y.append(
-                logits.log_softmax(dim=-1).argmax(dim=1, keepdims=True).cpu()
-            )
-
-        return torch.cat(y)
-
 
 @torch.no_grad()
 def evaluate(
@@ -583,11 +551,6 @@ def train(
 
 
 def main(args):
-    if args.dataset == "ogb-lsc-mag240m":
-        raise NotImplementedError(
-            "The revised example is not tested for ogb-lsc-mag240m."
-        )
-
     device = torch.device("cuda") if args.num_gpus > 0 else torch.device("cpu")
 
     # Load dataset.
