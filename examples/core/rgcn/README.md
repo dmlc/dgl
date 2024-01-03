@@ -25,12 +25,10 @@ Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 9
 
 ### Accuracies
 ```
-Final performance: 
-All runs:
-Highest Train: 83.22 ± 0.00
-Highest Valid: 48.25 ± 0.20
-  Final Train: 68.45 ± 9.81
-   Final Test: 47.51 ± 0.19
+Epoch: 01, Loss: 2.3625, Valid: 48.25%, Test: 47.91%, Time 86.0210
+Epoch: 02, Loss: 1.5852, Valid: 48.56%, Test: 46.98%, Time 84.2728
+Epoch: 03, Loss: 1.1974, Valid: 45.99%, Test: 44.05%, Time 85.7916
+Test accuracy 44.1165
 ```
 
 ## Run on `ogb-lsc-mag240m` dataset
