@@ -132,9 +132,9 @@ def preprocess_ondisk_dataset(
                 if is_homogeneous:
                     g.ndata[graph_feature["name"]] = node_data
                 else:
-                    g.nodes[graph_feature["name"]] = {
-                        graph_feature["type"]: node_data
-                    }
+                    g.nodes[graph_feature["type"]].data[
+                        graph_feature["name"]
+                    ] = node_data
             if graph_feature["domain"] == "edge":
                 edge_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
@@ -144,9 +144,9 @@ def preprocess_ondisk_dataset(
                 if is_homogeneous:
                     g.edata[graph_feature["name"]] = edge_data
                 else:
-                    g.edata[graph_feature["name"]] = {
-                        etype_str_to_tuple(graph_feature["type"]): edge_data
-                    }
+                    g.edges[etype_str_to_tuple(graph_feature["type"])].data[
+                        graph_feature["name"]
+                    ] = edge_data
         if not is_homogeneous:
             # For homogeneous graph, a node/edge feature must cover all
             # node/edge types.
