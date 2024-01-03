@@ -185,7 +185,7 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted_negative_dsts if has_neg_dst else None,
         )
 
-    def sample_subgraphs(self, seeds, seeds_timestamp=None):
+    def sample_subgraphs(self, seeds, seeds_timestamp):
         """Sample subgraphs from the given seeds, possibly with temporal constraints.
 
         Any subclass of SubgraphSampler should implement this method.
@@ -195,7 +195,7 @@ class SubgraphSampler(MiniBatchTransformer):
         seeds : Union[torch.Tensor, Dict[str, torch.Tensor]]
             The seed nodes.
 
-        seeds_timestamp : Optional[Union[torch.Tensor, Dict[str, torch.Tensor]]]
+        seeds_timestamp : Union[torch.Tensor, Dict[str, torch.Tensor]]
             The timestamps of the seed nodes. If given, the sampled subgraphs
             should not contain any nodes or edges that are newer than the
             timestamps of the seed nodes. Default: None.
