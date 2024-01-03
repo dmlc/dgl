@@ -1,3 +1,48 @@
+"""
+This script demonstrates the training and testing of a GraphSAGE model for node classification on large graphs, leveraging the 
+GraphBolt framework for efficient data handling and mini-batch processing.
+
+Key Features:
+- Implements the GraphSAGE model, a scalable GNN, for node classification on large graphs.
+- Utilizes GraphBolt, an efficient framework for large-scale graph data processing.
+- Integrates with PyTorch Geometric for building and training the GraphSAGE model.
+- The script is well-documented, providing clear explanations at each step.
+
+This flowchart describes the main functional sequence of the provided example.
+main: 
+
+main
+│
+├───> Load and preprocess dataset (GraphBolt)
+│     │
+│     └───> Utilize GraphBolt's BuiltinDataset for dataset handling
+│
+├───> Instantiate the SAGE model (PyTorch Geometric)
+│     │
+│     └───> Define the GraphSAGE model architecture
+│
+├───> Train the model
+│     │
+│     ├───> Mini-Batch Processing with GraphBolt
+│     │     │
+│     │     └───> Efficient handling of mini-batches using GraphBolt's utilities
+│     │
+│     └───> Training Loop
+│           │
+│           ├───> Forward and backward passes
+│           │
+│           └───> Parameters optimization
+│
+└───> Evaluate the model
+      │
+      └───> Performance assessment on validation and test datasets
+            │
+            └───> Accuracy and other relevant metrics calculation
+
+
+"""
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -86,7 +131,7 @@ def train_epoch(model, dataloader):
         optimizer.step()
     return total_loss / batch_count, total_correct / total_samples
 
-
+@torch.no_grad()
 def evaluate(model, dataloader):
     model.eval()
     total_correct = 0
