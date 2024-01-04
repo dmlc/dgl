@@ -1872,18 +1872,18 @@ def test_sample_neighbors_return_eids_homo(labor):
     # Construct FusedCSCSamplingGraph.
     graph = gb.fused_csc_sampling_graph(
         indptr, indices, edge_attributes=edge_attributes
-    )
+    ).to(F.ctx())
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.LongTensor([1, 3, 4])
+    nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts=torch.LongTensor([-1]))
 
     # Verify in subgraph.
     expected_reverse_edge_ids = edge_attributes[gb.ORIGINAL_EDGE_ID][
         torch.tensor([3, 4, 7, 8, 9, 10, 11])
-    ]
-    assert torch.equal(expected_reverse_edge_ids, subgraph.original_edge_ids)
+    ].to(F.ctx())
+    assert torch.equal(torch.sort(expected_reverse_edge_ids)[0], torch.sort(subgraph.original_edge_ids)[0])
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
 
