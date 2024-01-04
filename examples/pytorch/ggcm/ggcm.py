@@ -2,49 +2,54 @@ import dgl.sparse as dglsp
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from utils import LinearNeuralNetwork, lazy_random_walk, inverse_graph_convolution
+from utils import (
+    inverse_graph_convolution,
+    lazy_random_walk,
+    symmetric_normalize_adjacency,
+)
 
 
 class GGCM(nn.Module):
-    def __init__(self, graph, args):
+    def __init__(self):
         super(GGCM, self).__init__()
-        self.linear_nn = LinearNeuralNetwork(nfeat=graph.ndata["feat"].shape[1],
-                               nclass=F.one_hot(graph.ndata["label"]).shape[1],
-                               bias=True).to(args.device)
-        
-        self.label = graph.ndata["label"]
-        self.test_mask = graph.ndata["test_mask"]
-        self.train_mask = graph.ndata["train_mask"]
-        self.val_mask = graph.ndata["val_mask"]
 
-    def forward(self, x):
-        return self.linear_nn(x)
-    
-    def update_embedds(features, A_hat, avg_edge_num, args):
+    def get_embedding(self, graph, args):
+        # get the learned node embeddings
         beta = 1.0
         beta_neg = 1.0
-        K = args.degree
-        X = features.clone()
+        layer_num, alpha = args.layer_num, args.alpha
+        device = args.device
+        features = graph.ndata["feat"]
+        orig_feats = features.clone()
         temp_sum = torch.zeros_like(features)
-        I_N = dglsp.identity((features.shape[0], features.shape[0]))
 
-        for _ in range(K):
-            # lazy graph convolution (LGC)
-            lazy_A = lazy_random_walk(A_hat, beta, I_N).to(args.device)
+        node_num = features.shape[0]
+        I_N = dglsp.identity((node_num, node_num))
+        A_hat = symmetric_normalize_adjacency(graph)
 
+        # the inverser random adj
+        edge_num = int(args.negative_rate * graph.num_edges() / node_num)
+        # need n*k odd, for networkx
+        edge_num = ((edge_num + 1) // 2) * 2
+
+        for _ in range(layer_num):
             # inverse graph convlution (IGC), lazy version
-            neg_A_hat = inverse_graph_convolution(
-                avg_edge_num, features.shape[0], args.device).to(args.device)
-            inv_lazy_A = lazy_random_walk(neg_A_hat, beta_neg, I_N).to(args.device)
+            neg_A_hat = inverse_graph_convolution(edge_num, node_num, I_N).to(
+                device
+            )
+            inv_lazy_A = lazy_random_walk(neg_A_hat, beta_neg, I_N).to(device)
             inv_features = dglsp.spmm(inv_lazy_A, features)
+
+            # lazy graph convolution (LGC)
+            lazy_A = lazy_random_walk(A_hat, beta, I_N).to(device)
             features = dglsp.spmm(lazy_A, features)
 
             # add for multi-scale version
             temp_sum += (features + inv_features) / 2.0
             beta *= args.decline
             beta_neg *= args.decline_neg
-
-        embedds = args.alpha * X + (1 - args.alpha) * (temp_sum / (K * 1.0))
-        return embedds
+        embeds = alpha * orig_feats + (1 - alpha) * (
+            temp_sum / (layer_num * 1.0)
+        )
+        return embeds
