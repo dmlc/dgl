@@ -89,7 +89,10 @@ class TemporalNeighborSampler(SubgraphSampler):
         self.edge_timestamp_attr_name = edge_timestamp_attr_name
         self.sampler = graph.temporal_sample_neighbors
 
-    def sample_subgraphs(self, seeds, seeds_timestamp=None):
+    def sample_subgraphs(self, seeds, seeds_timestamp):
+        assert (
+            seeds_timestamp is not None
+        ), "seeds_timestamp must be provided for temporal neighbor sampling."
         subgraphs = []
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.
@@ -117,10 +120,10 @@ class TemporalNeighborSampler(SubgraphSampler):
                 original_row_node_ids,
                 compacted_csc_formats,
                 row_timestamps,
-            ) = compact_csc_format(subgraph.node_pairs, seeds, seeds_timestamp)
+            ) = compact_csc_format(subgraph.sampled_csc, seeds, seeds_timestamp)
 
             subgraph = SampledSubgraphImpl(
-                node_pairs=compacted_csc_formats,
+                sampled_csc=compacted_csc_formats,
                 original_column_node_ids=seeds,
                 original_row_node_ids=original_row_node_ids,
                 original_edge_ids=subgraph.original_edge_ids,
