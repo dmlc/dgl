@@ -325,7 +325,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Sample neighboring edges of the given nodes with a temporal
    * constraint. If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is
    * given, the sampled neighbors or edges of an input node must have a
-   * timestamp that is no later than that of the input node.
+   * timestamp that is smaller than that of the input node.
    *
    * @param nodes The nodes from which to sample neighbors.
    * @param input_nodes_timestamp The timestamp of the nodes.

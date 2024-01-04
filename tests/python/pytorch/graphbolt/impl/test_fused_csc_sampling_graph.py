@@ -898,12 +898,12 @@ def test_temporal_sample_neighbors_homo(
                 neighbor = indices[j].item()
                 if (
                     use_node_timestamp
-                    and (node_timestamp[neighbor] > seed_timestamp[i]).item()
+                    and (node_timestamp[neighbor] >= seed_timestamp[i]).item()
                 ):
                     continue
                 if (
                     use_edge_timestamp
-                    and (edge_timestamp[j] > seed_timestamp[i]).item()
+                    and (edge_timestamp[j] >= seed_timestamp[i]).item()
                 ):
                     continue
                 neighbors.append(neighbor)
@@ -1035,13 +1035,13 @@ def test_temporal_sample_neighbors_hetero(
                 if (
                     use_node_timestamp
                     and (
-                        node_timestamp[neighbor] > homo_seed_timestamp[i]
+                        node_timestamp[neighbor] >= homo_seed_timestamp[i]
                     ).item()
                 ):
                     continue
                 if (
                     use_edge_timestamp
-                    and (edge_timestamp[j] > homo_seed_timestamp[i]).item()
+                    and (edge_timestamp[j] >= homo_seed_timestamp[i]).item()
                 ):
                     continue
                 neighbors.append(neighbor)
