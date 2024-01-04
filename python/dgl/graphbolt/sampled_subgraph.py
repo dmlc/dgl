@@ -227,13 +227,9 @@ def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
             original_row_node_ids, dim=0, index=indices
         )
     if original_column_node_ids is not None:
-        indptr = original_column_node_ids.repeat_interleave(
-            indptr[1:] - indptr[:-1]
-        )
+        indptr = original_column_node_ids.repeat_interleave(indptr.diff())
     else:
-        indptr = torch.arange(len(indptr) - 1).repeat_interleave(
-            indptr[1:] - indptr[:-1]
-        )
+        indptr = torch.arange(len(indptr) - 1).repeat_interleave(indptr.diff())
     return (indices, indptr)
 
 
