@@ -415,10 +415,6 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     assert len(list(datapipe)) == 5
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Sampling with replacement not yet supported on GPU.",
-)
 @pytest.mark.parametrize(
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
@@ -507,10 +503,6 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type):
                 )
 
 
-@unittest.skipIf(
-    F._default_context_str != "cpu",
-    reason="Fails due to randomness on the GPU.",
-)
 @pytest.mark.parametrize(
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
@@ -667,7 +659,7 @@ def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
 
 @unittest.skipIf(
     F._default_context_str != "cpu",
-    reason="Fails due to randomness on the GPU.",
+    reason="Fails due to different result on the GPU.",
 )
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_unique_csc_format_Homo_cpu(labor):
