@@ -784,10 +784,10 @@ torch::Tensor TemporalMask(
   if (node_timestamp.has_value()) {
     auto neighbor_timestamp =
         node_timestamp.value().index_select(0, csc_indices.slice(0, l, r));
-    mask &= neighbor_timestamp <= seed_timestamp;
+    mask &= neighbor_timestamp < seed_timestamp;
   }
   if (edge_timestamp.has_value()) {
-    mask &= edge_timestamp.value().slice(0, l, r) <= seed_timestamp;
+    mask &= edge_timestamp.value().slice(0, l, r) < seed_timestamp;
   }
   if (probs_or_mask.has_value()) {
     mask &= probs_or_mask.value().slice(0, l, r) != 0;
