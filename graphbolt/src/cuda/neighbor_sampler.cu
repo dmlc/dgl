@@ -221,7 +221,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto sub_indptr = ExclusiveCumSum(in_degree);
-  auto output_indptr = torch::empty_like(sub_indptr);
   if (fanouts.size() > 1) {
     torch::Tensor sliced_type_per_edge;
     std::tie(sub_indptr, sliced_type_per_edge) =
@@ -248,6 +247,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
+  auto output_indptr = torch::empty_like(sub_indptr);
   torch::Tensor picked_eids;
   torch::Tensor output_indices;
   torch::optional<torch::Tensor> output_type_per_edge;
