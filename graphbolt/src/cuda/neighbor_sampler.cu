@@ -130,6 +130,7 @@ struct EdgeTypeSearch {
   const indptr_t* sliced_indptr;
   const etype_t* etypes;
   int64_t num_fanouts;
+  int64_t num_rows;
   indptr_t* new_sub_indptr;
   indptr_t* new_sliced_indptr;
   __host__ __device__ auto operator()(int64_t i) {
@@ -137,10 +138,10 @@ struct EdgeTypeSearch {
     const auto indptr_i = sub_indptr[homo_i];
     const auto degree = sub_indptr[homo_i + 1] - indptr_i;
     const etype_t etype = i % num_fanouts;
-    auto offset = cuda::UpperBound(etypes + indptr_i, degree, etype);
+    auto offset = cuda::LowerBound(etypes + indptr_i, degree, etype);
+    new_sub_indptr[i] = indptr_i + offset;
     new_sliced_indptr[i] = sliced_indptr[homo_i] + offset;
-    new_sub_indptr[i + 1] = indptr_i + offset;
-    if (i == 0) new_sub_indptr[0] = 0;
+    if (i == num_rows - 1) new_sub_indptr[num_rows] = indptr_i + degree;
   }
 };
 
@@ -166,7 +167,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
                   EdgeTypeSearch<indptr_t, etype_t>{
                       sub_indptr.data_ptr<indptr_t>(),
                       sliced_indptr.data_ptr<indptr_t>(),
-                      etypes.data_ptr<etype_t>(), num_fanouts,
+                      etypes.data_ptr<etype_t>(), num_fanouts, num_rows,
                       new_sub_indptr.data_ptr<indptr_t>(),
                       new_sliced_indptr.data_ptr<indptr_t>()});
             }));
