@@ -664,10 +664,7 @@ def check_dgl_blocks_hetero(minibatch, blocks):
         edges = block.edges(etype=etype)
         dst_ndoes = torch.arange(
             0, len(sampled_csc[i][relation].indptr) - 1
-        ).repeat_interleave(
-            sampled_csc[i][relation].indptr[1:]
-            - sampled_csc[i][relation].indptr[:-1]
-        )
+        ).repeat_interleave(sampled_csc[i][relation].indptr.diff())
         assert torch.equal(edges[0], sampled_csc[i][relation].indices)
         assert torch.equal(edges[1], dst_ndoes)
         assert torch.equal(
@@ -676,10 +673,7 @@ def check_dgl_blocks_hetero(minibatch, blocks):
     edges = blocks[0].edges(etype=gb.etype_str_to_tuple(reverse_relation))
     dst_ndoes = torch.arange(
         0, len(sampled_csc[0][reverse_relation].indptr) - 1
-    ).repeat_interleave(
-        sampled_csc[0][reverse_relation].indptr[1:]
-        - sampled_csc[0][reverse_relation].indptr[:-1]
-    )
+    ).repeat_interleave(sampled_csc[0][reverse_relation].indptr.diff())
     assert torch.equal(edges[0], sampled_csc[0][reverse_relation].indices)
     assert torch.equal(edges[1], dst_ndoes)
     assert torch.equal(
@@ -704,9 +698,7 @@ def check_dgl_blocks_homo(minibatch, blocks):
     for i, block in enumerate(blocks):
         dst_ndoes = torch.arange(
             0, len(sampled_csc[i].indptr) - 1
-        ).repeat_interleave(
-            sampled_csc[i].indptr[1:] - sampled_csc[i].indptr[:-1]
-        )
+        ).repeat_interleave(sampled_csc[i].indptr.diff())
         assert torch.equal(block.edges()[0], sampled_csc[i].indices), print(
             block.edges()
         )
