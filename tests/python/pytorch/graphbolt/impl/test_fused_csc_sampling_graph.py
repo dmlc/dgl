@@ -1793,7 +1793,7 @@ def test_sample_neighbors_fanouts(
 
 @unittest.skipIf(
     F._default_context_str == "gpu",
-    reason="Heterogenous sampling on gpu is not supported yet.",
+    reason="Sampling with replacement not yet supported on GPU.",
 )
 @pytest.mark.parametrize(
     "replace, expected_sampled_num1, expected_sampled_num2",
@@ -1850,10 +1850,6 @@ def test_sample_neighbors_replace(
     assert subgraph.sampled_csc["n2:e2:n1"].indptr.size(0) == 2
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Heterogenous sampling on gpu is not supported yet.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_sample_neighbors_return_eids_homo(labor):
     """Original graph in COO:
