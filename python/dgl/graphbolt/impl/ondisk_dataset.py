@@ -382,6 +382,8 @@ class OnDiskDataset(Dataset):
         Whether to include the original edge id in the FusedCSCSamplingGraph.
     """
 
+    _tasks = ("validation", "train", "test")
+
     def __init__(
         self, path: str, include_original_edge_id: bool = False
     ) -> None:
@@ -415,14 +417,14 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self):
+    def load(self, selected_task="all"):
         """Load the dataset."""
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
-        self._tasks = self._init_tasks(self._meta.tasks)
+        self._tasks = self._init_tasks(self._meta.tasks, selected_task)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
         self._loaded = True
         return self
@@ -462,8 +464,18 @@ class OnDiskDataset(Dataset):
         self._check_loaded()
         return self._all_nodes_set
 
-    def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
+    def _init_tasks(
+        self, tasks: List[OnDiskTaskData], selected_task: str
+    ) -> List[OnDiskTask]:
         """Initialize the tasks."""
+        if selected_task == "all":
+            selected_task = self._tasks
+        else:
+            selected_task = set(selected_task.split("-"))
+            if not selected_task.issubset(self._tasks):
+                raise ValueError(
+                    f"Selected tasks should be in {self._tasks}, but got {selected_task}"
+                )
         ret = []
         if tasks is None:
             return ret
@@ -471,9 +483,15 @@ class OnDiskDataset(Dataset):
             ret.append(
                 OnDiskTask(
                     task.extra_fields,
-                    self._init_tvt_set(task.train_set),
-                    self._init_tvt_set(task.validation_set),
-                    self._init_tvt_set(task.test_set),
+                    train_set=self._init_tvt_set(task.train_set)
+                    if "train" in selected_task
+                    else None,
+                    validation_set=self._init_tvt_set(task.validation_set)
+                    if "validation" in selected_task
+                    else None,
+                    test_set=self._init_tvt_set(task.test_set)
+                    if "test" in selected_task
+                    else None,
                 )
             )
         return ret
