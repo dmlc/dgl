@@ -268,8 +268,7 @@ void IndexSelectCSCCopyIndices(
 }
 
 std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
-    torch::optional<int64_t> output_size) {
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
   auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
@@ -297,14 +296,12 @@ std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
         }
 
         // Number of edges being copied.
-        if (!output_size.has_value()) {
-          auto edge_count =
-              cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
-          output_size = static_cast<indptr_t>(edge_count);
-        }
+        auto edge_count =
+            cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
         // Allocate output array of size number of copied edges.
         torch::Tensor output_indices = torch::empty(
-            output_size.value(), nodes.options().dtype(indices.scalar_type()));
+            static_cast<indptr_t>(edge_count),
+            nodes.options().dtype(indices.scalar_type()));
         GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
             indices.element_size(), "IndexSelectCSCCopyIndices", ([&] {
               using indices_t = element_size_t;
@@ -319,12 +316,11 @@ std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
 }
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
-    torch::optional<int64_t> output_size) {
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
   if (indices.is_pinned()) {
     return UVAIndexSelectCSCImpl(indptr, indices, nodes);
   } else {
-    return DeviceIndexSelectCSCImpl(indptr, indices, nodes, output_size);
+    return DeviceIndexSelectCSCImpl(indptr, indices, nodes);
   }
 }
 

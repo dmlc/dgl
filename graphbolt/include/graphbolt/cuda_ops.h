@@ -81,8 +81,7 @@ torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements);
  * shapes (M + 1,) and ((indptr[nodes + 1] - indptr[nodes]).sum(),).
  */
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
-    torch::optional<int64_t> output_size = torch::nullopt);
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
 
 /**
  * @brief Slices the indptr tensor with nodes and returns the indegrees of the
