@@ -124,10 +124,67 @@ struct SegmentEndFunc {
   }
 };
 
-std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
-    torch::Tensor sub_indptr, torch::Tensor types, int64_t num_fanouts) {
+template <typename indptr_t, typename etype_t>
+struct EdgeTypeSearch {
+  const indptr_t* sub_indptr;
+  const indptr_t* sliced_indptr;
+  const etype_t* etypes;
+  int64_t num_fanouts;
+  indptr_t* new_sub_indptr;
+  indptr_t* new_sliced_indptr;
+  __host__ __device__ auto operator()(int64_t i) {
+    const auto homo_i = i / num_fanouts;
+    const auto indptr_i = sub_indptr[homo_i];
+    const auto degree = sub_indptr[homo_i + 1] - indptr_i;
+    const etype_t etype = i % num_fanouts;
+    auto offset = cuda::UpperBound(etypes + indptr_i, degree, etype);
+    new_sliced_indptr[i] = sliced_indptr[homo_i] + offset;
+    new_sub_indptr[i + 1] = indptr_i + offset;
+    if (i == 0) new_sub_indptr[0] = 0;
+  }
+};
+
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
+    torch::Tensor sub_indptr, torch::Tensor etypes, torch::Tensor sliced_indptr,
+    int64_t num_fanouts) {
   auto num_rows = (sub_indptr.size(0) - 1) * num_fanouts;
-  auto output_indptr = torch::empty(num_rows + 1, sub_indptr.options());
+  auto new_sub_indptr = torch::empty(num_rows + 1, sub_indptr.options());
+  auto new_indegree = torch::empty(num_rows + 2, sub_indptr.options());
+  auto new_sliced_indptr = torch::empty(num_rows, sliced_indptr.options());
+  auto allocator = cuda::GetAllocator();
+  auto stream = cuda::GetCurrentStream();
+  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
+  thrust::counting_iterator<int64_t> iota(0);
+  AT_DISPATCH_INTEGRAL_TYPES(
+      sub_indptr.scalar_type(), "SliceCSCIndptrHeteroIndptr", ([&] {
+        using indptr_t = scalar_t;
+        AT_DISPATCH_INTEGRAL_TYPES(
+            etypes.scalar_type(), "SliceCSCIndptrHeteroTypePerEdge", ([&] {
+              using etype_t = scalar_t;
+              thrust::for_each(
+                  exec_policy, iota, iota + num_rows,
+                  EdgeTypeSearch<indptr_t, etype_t>{
+                      sub_indptr.data_ptr<indptr_t>(),
+                      sliced_indptr.data_ptr<indptr_t>(),
+                      etypes.data_ptr<etype_t>(), num_fanouts,
+                      new_sub_indptr.data_ptr<indptr_t>(),
+                      new_sliced_indptr.data_ptr<indptr_t>()});
+            }));
+        size_t tmp_storage_size = 0;
+        cub::DeviceAdjacentDifference::SubtractLeftCopy(
+            nullptr, tmp_storage_size, new_sub_indptr.data_ptr<indptr_t>(),
+            new_indegree.data_ptr<indptr_t>(), num_rows + 1, cub::Difference{},
+            stream);
+        auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
+        cub::DeviceAdjacentDifference::SubtractLeftCopy(
+            tmp_storage.get(), tmp_storage_size,
+            new_sub_indptr.data_ptr<indptr_t>(),
+            new_indegree.data_ptr<indptr_t>(), num_rows + 1, cub::Difference{},
+            stream);
+      }));
+  // Discard the first element of the SubtractLeftCopy result.
+  new_indegree = new_indegree.slice(0, 1, num_rows + 2);
+  return {new_sub_indptr, new_indegree, new_sliced_indptr};
 }
 
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
@@ -165,13 +222,13 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto sub_indptr = ExclusiveCumSum(in_degree);
   auto output_indptr = torch::empty_like(sub_indptr);
-  torch::optional<torch::Tensor> sliced_type_per_edge;
   if (fanouts.size() > 1) {
+    torch::Tensor sliced_type_per_edge;
     std::tie(sub_indptr, sliced_type_per_edge) =
         IndexSelectCSCImpl(indptr, type_per_edge.value(), nodes);
-    // std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
-    // sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
-    num_rows = sub_indptr.size(0) - 1;
+    std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
+        sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
+    num_rows = sliced_indptr.size(0);
   }
   auto max_in_degree = torch::empty(
       1,
@@ -392,6 +449,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         }
       }));
 
+  output_indptr =
+      output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 
