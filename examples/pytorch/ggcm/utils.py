@@ -1,17 +1,21 @@
+import dgl
 import dgl.sparse as dglsp
+import networkx as nx
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import networkx as nx
 
 
-class LinearNeuralNetwork(nn.Module):
-    def __init__(self, nfeat, nclass, bias=True):
-        super(LinearNeuralNetwork, self).__init__()
-        self.W = nn.Linear(nfeat, nclass, bias=bias)
+class Classifier(nn.Module):
+    def __init__(self, in_feats, n_classes):
+        super(Classifier, self).__init__()
+        self.fc = nn.Linear(in_feats, n_classes)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.fc.reset_parameters()
 
     def forward(self, x):
-        return self.W(x)
+        return self.fc(x)
 
 
 def symmetric_normalize_adjacency(graph):
@@ -23,27 +27,13 @@ def symmetric_normalize_adjacency(graph):
     return deg_invsqrt @ adj @ deg_invsqrt
 
 
-def model_test(model, embedds):
-    model.eval()
-    with torch.no_grad():
-        output = model(embedds)
-        pred = output.argmax(dim=-1)
-        test_mask, val_mask = model.test_mask, model.val_mask
-        loss = F.cross_entropy(output[val_mask], model.label[val_mask])
-    accs = []
-    for mask in [val_mask, test_mask]:
-        accs.append(float((pred[mask] == model.label[mask]).sum()/mask.sum()))
-    return loss.item(), accs[0], accs[1]
+def inverse_graph_convolution(edge_num, node_num, I_N):
+    graph = dgl.from_networkx(nx.random_regular_graph(edge_num, node_num))
+    indices = torch.stack(graph.edges())
+    adj = dglsp.spmatrix(indices, shape=(node_num, node_num)).coalesce()
 
-
-def inverse_graph_convolution(k, n, device):
-    adj = nx.adjacency_matrix(nx.random_regular_graph(k, n)).tocoo()
-    indices = torch.tensor([adj.row.tolist(), adj.col.tolist()])
-    values = torch.tensor(adj.data.tolist())
-    adj_sym_nor = dglsp.spmatrix(indices, values, adj.shape).coalesce().to(device)
-    I_N = dglsp.identity((n, n)).to(dtype=torch.int64)
     # re-normalization trick
-    adj_sym_nor = dglsp.sub(2 * I_N, adj_sym_nor) / (k + 2)
+    adj_sym_nor = dglsp.sub(2 * I_N, adj) / (edge_num + 2)
     return adj_sym_nor
 
 
