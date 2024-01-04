@@ -289,7 +289,6 @@ if __name__ == "__main__":
         args.mode = "cpu"
     print(f"Training in {args.mode} mode.")
 
-
     print("Loading data")
     dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
 

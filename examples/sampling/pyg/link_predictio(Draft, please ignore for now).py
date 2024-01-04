@@ -1,15 +1,28 @@
+import random
+
 import torch
 import torch.nn.functional as F
+from dgl.graphbolt import (
+    BuiltinDataset,
+    CopyTo,
+    DataLoader,
+    FeatureFetcher,
+    ItemSampler,
+)
 from torch_geometric.nn import GCNConv
-from dgl.graphbolt import BuiltinDataset, DataLoader, ItemSampler, FeatureFetcher, CopyTo
-import random
 
 
 def load_data():
     dataset = BuiltinDataset("ogbl-citation2").load()
     graph = dataset.graph
     feature = dataset.feature
-    return graph, feature, dataset.tasks[0].train_set, dataset.tasks[0].validation_set, dataset.tasks[0].test_set
+    return (
+        graph,
+        feature,
+        dataset.tasks[0].train_set,
+        dataset.tasks[0].validation_set,
+        dataset.tasks[0].test_set,
+    )
 
 
 # def generate_negative_edges(num_nodes, positive_edges, num_neg_samples):
@@ -55,15 +68,19 @@ class LinkPredictionModel(torch.nn.Module):
         return edge_scores
 
 
-def train(model, feature, edge_index, train_item_set, optimizer, criterion, device):
+def train(
+    model, feature, edge_index, train_item_set, optimizer, criterion, device
+):
     model.train()
     optimizer.zero_grad()
 
     pos_edge_index = torch.stack(train_item_set[:], dim=0)
 
     z = model(feature, edge_index)
-    
-    neg_edge_index = generate_negative_edges(feature.size(0), pos_edge_index, pos_edge_index.size(1))
+
+    neg_edge_index = generate_negative_edges(
+        feature.size(0), pos_edge_index, pos_edge_index.size(1)
+    )
 
     pos_pred = model.predict_edges(z, pos_edge_index)
     neg_pred = model.predict_edges(z, neg_edge_index)
@@ -81,8 +98,10 @@ def evaluate(model, feature, edge_index, eval_item_set, device):
     model.eval()
     z = model(feature, edge_index)
     pos_edge_index = torch.stack(eval_item_set[:], dim=0)
-    neg_edge_index = generate_negative_edges(feature.size(0), pos_edge_index, pos_edge_index.size(1))
-    
+    neg_edge_index = generate_negative_edges(
+        feature.size(0), pos_edge_index, pos_edge_index.size(1)
+    )
+
     pos_pred = model.predict_edges(z, pos_edge_index)
     neg_pred = model.predict_edges(z, neg_edge_index)
     pos_label = torch.ones(pos_pred.size(0), device=device)
@@ -108,20 +127,34 @@ def get_edge_index_from_csc_graph(graph):
 
 def main():
     graph, feature_store, train_set, valid_set, test_set = load_data()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    feature_tensor = feature_store.read('node', None, 'feat')
+    feature_tensor = feature_store.read("node", None, "feat")
     feature_tensor = feature_tensor.to(device)
     edge_index = get_edge_index_from_csc_graph(graph).to(device)
 
-    model = LinkPredictionModel(in_channels=feature_tensor.size(1), hidden_channels=16).to(device)
+    model = LinkPredictionModel(
+        in_channels=feature_tensor.size(1), hidden_channels=16
+    ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
     criterion = torch.nn.BCELoss()
 
     for epoch in range(100):
-        train_loss = train(model, feature_tensor, edge_index, train_set, optimizer, criterion, device)
-        valid_loss = evaluate(model, feature_tensor, edge_index, valid_set, device)
-        print(f"Epoch {epoch}: Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
+        train_loss = train(
+            model,
+            feature_tensor,
+            edge_index,
+            train_set,
+            optimizer,
+            criterion,
+            device,
+        )
+        valid_loss = evaluate(
+            model, feature_tensor, edge_index, valid_set, device
+        )
+        print(
+            f"Epoch {epoch}: Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}"
+        )
 
     test_loss = evaluate(model, feature_tensor, edge_index, test_set, device)
     print(f"Test Loss: {test_loss:.4f}")

@@ -42,21 +42,22 @@ main
 
 """
 
-
-
-
 import torch
 import torch.nn.functional as F
+from dgl.graphbolt import (
+    BuiltinDataset,
+    CopyTo,
+    DataLoader,
+    FeatureFetcher,
+    ItemSampler,
+)
 from torch_geometric.nn import SAGEConv
-from dgl.graphbolt import BuiltinDataset, DataLoader, ItemSampler, FeatureFetcher, CopyTo
-
-
 
 
 class GraphSAGE(torch.nn.Module):
     #####################################################################
     # (HIGHLIGHT) Define the GraphSAGE model architecture.
-    # 
+    #
     # - This class inherits from `torch.nn.Module`.
     # - Two convolutional layers are created using the SAGEConv class from PyG.
     # - 'in_size', 'hidden_size', 'out_size' are the sizes of
@@ -72,11 +73,17 @@ class GraphSAGE(torch.nn.Module):
         h = x
         for i, block in enumerate(blocks):
             edge_index = block.edges()
-            edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(device)
-            h = self.conv1(h, edge_index) if i == 0 else self.conv2(h, edge_index)
+            edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(
+                device
+            )
+            h = (
+                self.conv1(h, edge_index)
+                if i == 0
+                else self.conv2(h, edge_index)
+            )
             if i != len(blocks) - 1:
                 h = F.relu(h)
-            h = h[:block.number_of_dst_nodes()]
+            h = h[: block.number_of_dst_nodes()]
         return h
 
 
@@ -100,6 +107,7 @@ def compute_accuracy(logits, labels):
     _, predicted = torch.max(logits, dim=1)
     correct = (predicted == labels).sum().item()
     return correct / labels.size(0)
+
 
 def train(model, dataloader, optimizer, criterion, device):
     #####################################################################
@@ -155,6 +163,7 @@ def evaluate(model, dataloader, device):
             total_samples += labels.size(0)
     return total_correct / total_samples
 
+
 def main():
     dataset = BuiltinDataset("ogbn-arxiv").load()
     graph = dataset.graph
@@ -164,8 +173,12 @@ def main():
     test_set = dataset.tasks[0].test_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_dataloader = create_dataloader(train_set, graph, feature, device, True)
-    valid_dataloader = create_dataloader(valid_set, graph, feature, device, False)
+    train_dataloader = create_dataloader(
+        train_set, graph, feature, device, True
+    )
+    valid_dataloader = create_dataloader(
+        valid_set, graph, feature, device, False
+    )
     test_dataloader = create_dataloader(test_set, graph, feature, device, False)
     in_channels = feature.size("node", None, "feat")[0]
     hidden_channels = 128
@@ -174,11 +187,16 @@ def main():
     criterion = torch.nn.CrossEntropyLoss()
 
     for epoch in range(100):
-        train_loss, train_accuracy = train(model, train_dataloader, optimizer, criterion, device)
+        train_loss, train_accuracy = train(
+            model, train_dataloader, optimizer, criterion, device
+        )
         valid_accuracy = evaluate(model, valid_dataloader, device)
         test_accuracy = evaluate(model, test_dataloader, device)
-        print(f"Epoch {epoch}, Train Loss: {train_loss}, Train Accuracy: {train_accuracy}, "
-              f"Valid Accuracy: {valid_accuracy}, Test Accuracy: {test_accuracy}")
+        print(
+            f"Epoch {epoch}, Train Loss: {train_loss}, Train Accuracy: {train_accuracy}, "
+            f"Valid Accuracy: {valid_accuracy}, Test Accuracy: {test_accuracy}"
+        )
+
 
 if __name__ == "__main__":
     main()
