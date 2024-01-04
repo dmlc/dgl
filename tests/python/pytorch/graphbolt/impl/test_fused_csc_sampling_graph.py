@@ -1402,7 +1402,7 @@ def test_from_dglgraph_homogeneous():
         dgl_g, is_homogeneous=True, include_original_edge_id=True
     )
     # Get the COO representation of the FusedCSCSamplingGraph.
-    num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
+    num_columns = gb_g.csc_indptr.diff()
     rows = gb_g.indices
     columns = torch.arange(gb_g.total_num_nodes).repeat_interleave(num_columns)
 
@@ -1456,11 +1456,11 @@ def test_from_dglgraph_heterogeneous():
 
     # `reverse_node_id` is used to map the node id in FusedCSCSamplingGraph to the
     # node id in Hetero-DGLGraph.
-    num_ntypes = gb_g.node_type_offset[1:] - gb_g.node_type_offset[:-1]
+    num_ntypes = gb_g.node_type_offset.diff()
     reverse_node_id = torch.cat([torch.arange(num) for num in num_ntypes])
 
     # Get the COO representation of the FusedCSCSamplingGraph.
-    num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
+    num_columns = gb_g.csc_indptr.diff()
     rows = reverse_node_id[gb_g.indices]
     columns = reverse_node_id[
         torch.arange(gb_g.total_num_nodes).repeat_interleave(num_columns)
