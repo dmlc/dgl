@@ -1,7 +1,7 @@
 import argparse
-import time
 import copy
 
+import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
@@ -9,80 +9,116 @@ from dgl import AddSelfLoop
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 from ggcm import GGCM
-from utils import model_test, symmetric_normalize_adjacency
+from utils import Classifier
 
 
-def train(model, embedds, args):
-    # Evaluate embedding by classification with the given split setting
+def evaluate(model, embeds, graph):
+    model.eval()
+    with torch.no_grad():
+        output = model(embeds)
+        pred = output.argmax(dim=-1)
+        label = graph.ndata["label"]
+        val_mask, test_mask = graph.ndata["val_mask"], graph.ndata["test_mask"]
+        loss = F.cross_entropy(output[val_mask], label[val_mask])
+    accs = []
+    for mask in [val_mask, test_mask]:
+        accs.append(float((pred[mask] == label[mask]).sum() / mask.sum()))
+    return loss.item(), accs[0], accs[1]
+
+
+def main(args):
+    # prepare data
+    transform = AddSelfLoop()
+    if args.dataset == "cora":
+        data = CoraGraphDataset(transform=transform)
+    elif args.dataset == "citeseer":
+        data = CiteseerGraphDataset(transform=transform)
+    elif args.dataset == "pubmed":
+        data = PubmedGraphDataset(transform=transform)
+    else:
+        raise ValueError("Unknown dataset: {}".format(args.dataset))
+
+    graph = data[0].to(args.device)
+    features = graph.ndata["feat"]
+    train_mask = graph.ndata["train_mask"]
+    in_feats = features.shape[1]
+    n_classes = data.num_classes
+
+    # get node embedding
+    ggcm = GGCM()
+    embeds = ggcm.get_embedding(graph, args)
+
+    # create classifier model
+    classifier = Classifier(in_feats, n_classes)
+    optimizer = optim.Adam(
+        classifier.parameters(), lr=args.lr, weight_decay=args.wd
+    )
+
+    # train classifier
     best_acc = -1
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
-
     for i in range(args.epochs):
-        model.train()
-        output = model(embedds)
-        loss = F.cross_entropy(output[model.train_mask], model.label[model.train_mask])
+        classifier.train()
+        output = classifier(embeds)
+        loss = F.cross_entropy(
+            output[train_mask], graph.ndata["label"][train_mask]
+        )
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        loss_val, acc_val, acc_test = model_test(model, embedds)
+        loss_val, acc_val, acc_test = evaluate(classifier, embeds, graph)
         if acc_val > best_acc:
-            best_acc, best_model = acc_val, copy.deepcopy(model)
+            best_acc, best_model = acc_val, copy.deepcopy(classifier)
 
-        print(f'{i+1} {loss_val:.4f} {acc_val:.3f} acc_test={acc_test:.3f}')
+        print(f"{i+1} {loss_val:.4f} {acc_val:.3f} acc_test={acc_test:.3f}")
 
-    loss_val, acc_val, acc_test = model_test(best_model, embedds)
-    return acc_test
+    _, _, acc_test = evaluate(best_model, embeds, graph)
+    print(f"Final test acc: {acc_test:.4f}")
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="GGCM")
     parser.add_argument(
-        '--dataset',
+        "--dataset",
         type=str,
         default="citeseer",
-        help='Dataset to use.',
+        choices=["citeseer", "cora", "pubmed"],
+        help="Dataset to use.",
     )
-    parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--lr', type=float, default=0.2)
-    parser.add_argument('--degree', type=int, default=16)
-    parser.add_argument('--decline', type=float, default=1)
-    parser.add_argument('--negative_rate', type=float, default=20.0)
-    parser.add_argument('--wd', type=float, nargs='*', default=1e-3)
-    parser.add_argument('--alpha', type=float, default=0.12)
-    parser.add_argument('--decline_neg', type=float, default=1.0)
+    parser.add_argument("--decline", type=float, default=1, help="Decline.")
+    parser.add_argument("--alpha", type=float, default=0.15, help="Alpha.")
     parser.add_argument(
-        '--device',
+        "--epochs", type=int, default=100, help="Number of epochs to train."
+    )
+    parser.add_argument(
+        "--lr", type=float, default=0.13, help="Initial learning rate."
+    )
+    parser.add_argument(
+        "--layer_num", type=int, default=16, help="Degree of the approximation."
+    )
+    parser.add_argument(
+        "--negative_rate",
+        type=float,
+        default=20.0,
+        help="Negative sampling rate for a negative graph.",
+    )
+    parser.add_argument(
+        "--wd",
+        type=float,
+        nargs="*",
+        default=2e-3,
+        help="Weight decay (L2 loss on parameters).",
+    )
+    parser.add_argument(
+        "--decline_neg", type=float, default=1.0, help="Decline negative."
+    )
+    parser.add_argument(
+        "--device",
         type=str,
-        default='cpu',
-        choices=['cpu', 'cuda'],
-        help='device to use',
+        default="cpu",
+        choices=["cpu", "cuda"],
+        help="device to use",
     )
     args, _ = parser.parse_known_args()
 
-    transform = (AddSelfLoop())
-    if args.dataset == "cora":
-        num_edges = CoraGraphDataset()[0].num_edges()
-        data = CoraGraphDataset(transform=transform)
-    elif args.dataset == "citeseer":
-        num_edges = CiteseerGraphDataset()[0].num_edges()
-        data = CiteseerGraphDataset(transform=transform)
-    elif args.dataset == "pubmed":
-        num_edges = PubmedGraphDataset()[0].num_edges()
-        data = PubmedGraphDataset(transform=transform)
-    else:
-        raise ValueError("Unknown dataset: {}".format(args.dataset))
-    
-    graph = data[0]
-    graph = graph.to(args.device)
-    features = graph.ndata["feat"]
-    adj = symmetric_normalize_adjacency(graph)
-
-    avg_edge_num = int(args.negative_rate * num_edges / features.shape[0])
-    avg_edge_num = ((avg_edge_num + 1) // 2) * 2
-
-    model = GGCM(graph, args).to(args.device)
-    start_time = time.time()
-    embedds = GGCM.update_embedds(features, adj, avg_edge_num, args)
-    test_acc = train(model, embedds, args)
-    print(f'Final test acc: {test_acc:.4f}')
-    print(f'Total Time: {time.time() - start_time:.4f}')
+    main(args)
