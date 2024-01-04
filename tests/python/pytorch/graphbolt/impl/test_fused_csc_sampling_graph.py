@@ -1883,7 +1883,10 @@ def test_sample_neighbors_return_eids_homo(labor):
     expected_reverse_edge_ids = edge_attributes[gb.ORIGINAL_EDGE_ID][
         torch.tensor([3, 4, 7, 8, 9, 10, 11])
     ].to(F.ctx())
-    assert torch.equal(torch.sort(expected_reverse_edge_ids)[0], torch.sort(subgraph.original_edge_ids)[0])
+    assert torch.equal(
+        torch.sort(expected_reverse_edge_ids)[0],
+        torch.sort(subgraph.original_edge_ids)[0],
+    )
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
 
