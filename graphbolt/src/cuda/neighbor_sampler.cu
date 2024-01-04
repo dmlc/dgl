@@ -449,6 +449,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         }
       }));
 
+  // Convert output_indptr back to homo by discarding intermediate offsets.
   output_indptr =
       output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
