@@ -933,7 +933,6 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
             },
         ]
     for minibatch in sampler_dp:
-        print(minibatch)
         for step, sampled_subgraph in enumerate(minibatch.sampled_subgraphs):
             assert (
                 len(sampled_subgraph.sampled_csc["n1:e1:n2"].indices)
