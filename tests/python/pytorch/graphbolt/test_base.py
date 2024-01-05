@@ -239,27 +239,25 @@ def torch_csc_to_coo(indptr, dtype, nodes=None):
     return nodes.to(dtype).repeat_interleave(indptr.diff())
 
 
+@pytest.mark.parametrize("nodes", [None, True])
 @pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
-def test_csc_to_coo(dtype):
+def test_csc_to_coo(nodes, dtype):
     num_nodes = 13
-    nodes = None
-    for _ in range(2):
-        # First iteration tests the case when nodes is None, second iteration
-        # tests when nodes is a valid tensor.
-        for _ in range(10):
-            degrees = torch.randint(0, 5, [num_nodes], device=F.ctx())
-            indptr = torch.cat(
-                (
-                    torch.zeros(1, dtype=torch.int64, device=F.ctx()),
-                    degrees.cumsum(0),
-                )
-            )
-            torch_result = torch_csc_to_coo(indptr, dtype, nodes)
-            gb_result = gb.csc_to_coo(indptr, nodes, dtype)
-            assert torch.equal(torch_result, gb_result)
-            gb_result = gb.csc_to_coo(indptr, nodes, dtype, indptr[-1].item())
-            assert torch.equal(torch_result, gb_result)
+    if nodes:
         nodes = torch.randint(0, 199, [num_nodes], dtype=dtype, device=F.ctx())
+    for _ in range(10):
+        degrees = torch.randint(0, 5, [num_nodes], device=F.ctx())
+        indptr = torch.cat(
+            (
+                torch.zeros(1, dtype=torch.int64, device=F.ctx()),
+                degrees.cumsum(0),
+            )
+        )
+        torch_result = torch_csc_to_coo(indptr, dtype, nodes)
+        gb_result = gb.csc_to_coo(indptr, nodes, dtype)
+        assert torch.equal(torch_result, gb_result)
+        gb_result = gb.csc_to_coo(indptr, nodes, dtype, indptr[-1].item())
+        assert torch.equal(torch_result, gb_result)
 
 
 def test_csc_format_base_representation():
