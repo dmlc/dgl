@@ -415,12 +415,14 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self, selected_task: list = ["all"]):
+    def load(self, selected_task: list = None):
         """Load the dataset."""
-        if not isinstance(selected_task, list):
+        if selected_task and not isinstance(selected_task, list):
             raise TypeError(
                 f"The type of selected_task should be list, but got {type(selected_task)}"
             )
+        if selected_task is None:
+            selected_task = ["all"]
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
@@ -467,7 +469,7 @@ class OnDiskDataset(Dataset):
         return self._all_nodes_set
 
     def _init_tasks(
-        self, tasks: List[OnDiskTaskData], selected_task: list = ["all"]
+        self, tasks: List[OnDiskTaskData], selected_task: list
     ) -> List[OnDiskTask]:
         """Initialize the tasks."""
         ret = []
