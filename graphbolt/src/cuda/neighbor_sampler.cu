@@ -153,19 +153,12 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto sub_indptr = ExclusiveCumSum(in_degree);
-  if (fanouts.size() > 1) {
-    torch::Tensor sliced_type_per_edge;
-    std::tie(sub_indptr, sliced_type_per_edge) =
-        IndexSelectCSCImpl(indptr, type_per_edge.value(), nodes);
-    std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
-        sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
-    num_rows = sliced_indptr.size(0);
-  }
+
   auto max_in_degree = torch::empty(
       1,
       c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
   AT_DISPATCH_INTEGRAL_TYPES(
-      indptr.scalar_type(), "SampleNeighborsInDegree", ([&] {
+      indptr.scalar_type(), "SampleNeighborsMaxInDegree", ([&] {
         size_t tmp_storage_size = 0;
         cub::DeviceReduce::Max(
             nullptr, tmp_storage_size, in_degree.data_ptr<scalar_t>(),
@@ -175,7 +168,19 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             tmp_storage.get(), tmp_storage_size, in_degree.data_ptr<scalar_t>(),
             max_in_degree.data_ptr<scalar_t>(), num_rows, stream);
       }));
-  auto coo_rows = CSCToCOOImpl(sub_indptr, indices.scalar_type());
+
+  torch::optional<int64_t> num_edges_optional;
+  if (fanouts.size() > 1) {
+    torch::Tensor sliced_type_per_edge;
+    std::tie(sub_indptr, sliced_type_per_edge) =
+        IndexSelectCSCImpl(indptr, type_per_edge.value(), nodes);
+    std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
+        sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
+    num_rows = sliced_indptr.size(0);
+    num_edges_optional = sliced_type_per_edge.size(0);
+  }
+  auto coo_rows =
+      CSCToCOOImpl(sub_indptr, indices.scalar_type(), num_edges_optional);
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
@@ -208,7 +213,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
 
         // Find the smallest integer type to store the edge id offsets.
-        // CSCToCOO had synch inside, so it is safe to read max_in_degree now.
+        // CSCToCOO or IndexSelectCSCImpl had synch inside, so it is safe to
+        // read max_in_degree now.
         const int num_bits =
             cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         std::array<int, 4> type_bits = {8, 16, 32, 64};
