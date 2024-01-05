@@ -80,10 +80,11 @@ __global__ void _ComputeRandoms(
 template <typename indptr_t>
 struct MinInDegreeFanout {
   const indptr_t* in_degree;
-  int64_t fanout;
+  const int64_t* fanouts;
+  size_t num_fanouts;
   __host__ __device__ auto operator()(int64_t i) {
     return static_cast<indptr_t>(
-        min(static_cast<int64_t>(in_degree[i]), fanout));
+        min(static_cast<int64_t>(in_degree[i]), fanouts[i % num_fanouts]));
   }
 };
 
@@ -128,19 +129,38 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
     bool return_eids, torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask) {
-  TORCH_CHECK(
-      fanouts.size() == 1, "Heterogenous sampling is not supported yet!");
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
   // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
   auto allocator = cuda::GetAllocator();
   const auto stream = cuda::GetCurrentStream();
-  const auto num_rows = nodes.size(0);
-  const auto fanout =
-      fanouts[0] >= 0 ? fanouts[0] : std::numeric_limits<int64_t>::max();
+  auto num_rows = nodes.size(0);
+  auto fanouts_pinned = torch::empty(
+      fanouts.size(),
+      c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
+  auto fanouts_pinned_ptr = fanouts_pinned.data_ptr<int64_t>();
+  for (size_t i = 0; i < fanouts.size(); i++) {
+    fanouts_pinned_ptr[i] =
+        fanouts[i] >= 0 ? fanouts[i] : std::numeric_limits<int64_t>::max();
+  }
+  // Finally, copy the adjusted fanout values to the device memory.
+  auto fanouts_device = allocator.AllocateStorage<int64_t>(fanouts.size());
+  CUDA_CALL(cudaMemcpyAsync(
+      fanouts_device.get(), fanouts_pinned_ptr,
+      sizeof(int64_t) * fanouts.size(), cudaMemcpyHostToDevice, stream));
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
+  auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
+  auto sub_indptr = ExclusiveCumSum(in_degree);
+  if (fanouts.size() > 1) {
+    torch::Tensor sliced_type_per_edge;
+    std::tie(sub_indptr, sliced_type_per_edge) =
+        IndexSelectCSCImpl(indptr, type_per_edge.value(), nodes);
+    std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
+        sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
+    num_rows = sliced_indptr.size(0);
+  }
   auto max_in_degree = torch::empty(
       1,
       c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
@@ -155,13 +175,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             tmp_storage.get(), tmp_storage_size, in_degree.data_ptr<scalar_t>(),
             max_in_degree.data_ptr<scalar_t>(), num_rows, stream);
       }));
-  auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
-  auto sub_indptr = ExclusiveCumSum(in_degree);
-  auto output_indptr = torch::empty_like(sub_indptr);
   auto coo_rows = CSCToCOOImpl(sub_indptr, indices.scalar_type());
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
+  auto output_indptr = torch::empty_like(sub_indptr);
   torch::Tensor picked_eids;
   torch::Tensor output_indices;
   torch::optional<torch::Tensor> output_type_per_edge;
@@ -172,7 +190,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         thrust::counting_iterator<int64_t> iota(0);
         auto sampled_degree = thrust::make_transform_iterator(
             iota, MinInDegreeFanout<indptr_t>{
-                      in_degree.data_ptr<indptr_t>(), fanout});
+                      in_degree.data_ptr<indptr_t>(), fanouts_device.get(),
+                      fanouts.size()});
 
         {  // Compute output_indptr.
           size_t tmp_storage_size = 0;
@@ -362,6 +381,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         }
       }));
 
+  // Convert output_indptr back to homo by discarding intermediate offsets.
+  output_indptr =
+      output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 

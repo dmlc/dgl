@@ -618,7 +618,9 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
       utils::is_accessible_from_gpu(indices_) &&
       utils::is_accessible_from_gpu(nodes) &&
       (!probs_or_mask.has_value() ||
-       utils::is_accessible_from_gpu(probs_or_mask.value()))) {
+       utils::is_accessible_from_gpu(probs_or_mask.value())) &&
+      (!type_per_edge_.has_value() ||
+       utils::is_accessible_from_gpu(type_per_edge_.value()))) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "SampleNeighbors", {
           return ops::SampleNeighbors(

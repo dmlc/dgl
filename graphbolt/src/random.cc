@@ -28,11 +28,13 @@ inline uint32_t GetThreadId() {
 
 };  // namespace
 
+std::mutex RandomEngine::manual_seed_mutex;
 std::optional<uint64_t> RandomEngine::manual_seed;
 
 /** @brief Constructor with default seed. */
 RandomEngine::RandomEngine() {
   std::random_device rd;
+  std::lock_guard lock(manual_seed_mutex);
   uint64_t seed = manual_seed.value_or(rd());
   SetSeed(seed);
 }
@@ -59,6 +61,11 @@ void RandomEngine::SetSeed(uint64_t seed, uint64_t stream) {
 }
 
 /** @brief Manually fix the seed. */
-void RandomEngine::SetManualSeed(int64_t seed) { manual_seed = seed; }
+void RandomEngine::SetManualSeed(int64_t seed) {
+  // Intentionally set the seed for current thread also.
+  RandomEngine::ThreadLocal()->SetSeed(seed);
+  std::lock_guard lock(manual_seed_mutex);
+  manual_seed = seed;
+}
 
 }  // namespace graphbolt
