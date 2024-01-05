@@ -415,7 +415,7 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self, selected_task: list = []):
+    def load(self, selected_task: list = ["all"]):
         """Load the dataset."""
         if not isinstance(selected_task, list):
             raise TypeError(
@@ -467,14 +467,17 @@ class OnDiskDataset(Dataset):
         return self._all_nodes_set
 
     def _init_tasks(
-        self, tasks: List[OnDiskTaskData], selected_task: list = []
+        self, tasks: List[OnDiskTaskData], selected_task: list = ["all"]
     ) -> List[OnDiskTask]:
         """Initialize the tasks."""
         ret = []
         if tasks is None:
             return ret
         for task in tasks:
-            if not selected_task or task.extra_fields["name"] in selected_task:
+            if (
+                selected_task == ["all"]
+                or task.extra_fields["name"] in selected_task
+            ):
                 ret.append(
                     OnDiskTask(
                         task.extra_fields,
