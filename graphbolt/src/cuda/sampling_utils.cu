@@ -123,7 +123,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
             new_indegree.data_ptr<indptr_t>(), num_rows + 1, cub::Difference{},
             stream);
       }));
-  // Discard the first element of the SubtractLeftCopy result.
+  // Discard the first element of the SubtractLeftCopy result and ensure that
+  // new_indegree tensor has size num_rows + 1 so that its ExclusiveCumSum is
+  // directly equivalent to new_sub_indptr.
+  // Equivalent to new_indegree = new_indegree[1:] in Python.
   new_indegree = new_indegree.slice(0, 1, num_rows + 2);
   return {new_sub_indptr, new_indegree, new_sliced_indptr};
 }
