@@ -272,7 +272,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         job="evaluate",
     )
 
-    for step, data in tqdm(enumerate(dataloader)):
+    for step, data in tqdm(enumerate(dataloader), "Evaluating"):
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
@@ -302,7 +302,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         t0 = time.time()
         model.train()
         total_loss = 0
-        for step, data in enumerate(dataloader):
+        for step, data in tqdm(enumerate(dataloader), "Training"):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -322,9 +322,9 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
 
             total_loss += loss.item()
 
-        t1 = time.time()
         # Evaluate the model.
         acc = evaluate(args, model, graph, features, valid_set, num_classes)
+        t1 = time.time()
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (step + 1):.4f} | "
             f"Accuracy {acc.item():.4f} | Time {t1 - t0:.4f}"
