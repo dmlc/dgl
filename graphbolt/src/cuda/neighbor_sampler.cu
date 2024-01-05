@@ -133,7 +133,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
   auto allocator = cuda::GetAllocator();
-  const auto stream = cuda::GetCurrentStream();
   auto num_rows = nodes.size(0);
   auto fanouts_pinned = torch::empty(
       fanouts.size(),
@@ -147,7 +146,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto fanouts_device = allocator.AllocateStorage<int64_t>(fanouts.size());
   CUDA_CALL(cudaMemcpyAsync(
       fanouts_device.get(), fanouts_pinned_ptr,
-      sizeof(int64_t) * fanouts.size(), cudaMemcpyHostToDevice, stream));
+      sizeof(int64_t) * fanouts.size(), cudaMemcpyHostToDevice,
+      cuda::GetCurrentStream()));
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
