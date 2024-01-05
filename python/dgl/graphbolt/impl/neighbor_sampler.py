@@ -117,7 +117,7 @@ class NeighborSampler(SubgraphSampler):
         self.deduplicate = deduplicate
         self.sampler = graph.sample_neighbors
 
-    def sample_subgraphs(self, seeds, seeds_timestamp=None):
+    def sample_subgraphs(self, seeds, seeds_timestamp):
         subgraphs = []
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.
