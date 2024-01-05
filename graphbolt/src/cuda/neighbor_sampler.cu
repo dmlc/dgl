@@ -193,11 +193,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
     bool return_eids, torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask) {
-  TORCH_CHECK(fanouts.size() >= 1, "At least one fanout value is needed.");
-  TORCH_CHECK(
-      fanouts.size() == 1 || type_per_edge.has_value(),
-      "type_per_edge needs to be a valid tensor if multiple fanout values are "
-      "passed.");
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
   // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
