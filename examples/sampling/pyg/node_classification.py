@@ -1,6 +1,13 @@
 """
-This script demonstrates the training and testing of a GraphSAGE model for node classification on large graphs, leveraging the 
-GraphBolt framework for efficient data handling and mini-batch processing.
+This script exemplifies the training and evaluation of a GraphSAGE model for node classification on large-scale graphs, uniquely combining 
+the strengths of GraphBolt (GB) and PyTorch Geometric (PyG). Leveraging GraphBolt's capabilities, the script efficiently handles the data 
+loading process, particularly adept at managing large graph datasets that might be challenging to fit entirely in memory. This efficiency 
+is pivotal for processing mini-batches, a crucial aspect when working with extensive graph data. Following data loading, the script transitions 
+to utilizing PyG for the model training phase. PyG is renowned for its user-friendly interface and flexible framework, allowing seamless 
+integration of diverse graph neural network layers and models. This script stands out from typical Deep Graph Library (DGL)  by showcasing how 
+GraphBolt can be effectively combined with PyG, thus providing an alternative yet efficient pathway for processing large-scale graph data. 
+This approach not only underscores the adaptability and scalability of modern graph neural network frameworks but also opens new avenues for 
+handling and analyzing large graph datasets in various real-world applications.
 
 Key Features:
 - Implements the GraphSAGE model, a scalable GNN, for node classification on large graphs.
@@ -42,15 +49,9 @@ main
 
 """
 
+import dgl.graphbolt as gb
 import torch
 import torch.nn.functional as F
-from dgl.graphbolt import (
-    BuiltinDataset,
-    CopyTo,
-    DataLoader,
-    FeatureFetcher,
-    ItemSampler,
-)
 from torch_geometric.nn import SAGEConv
 
 
@@ -66,21 +67,17 @@ class GraphSAGE(torch.nn.Module):
     #####################################################################
     def __init__(self, in_size, hidden_size, out_size):
         super(GraphSAGE, self).__init__()
-        self.conv1 = SAGEConv(in_size, hidden_size)
-        self.conv2 = SAGEConv(hidden_size, out_size)
+        self.layers = torch.nn.ModuleList()
+        self.layers.append(SAGEConv(in_size, hidden_size))
+        self.layers.append(SAGEConv(hidden_size, hidden_size))
+        self.layers.append(SAGEConv(hidden_size, out_size))
 
     def forward(self, blocks, x, device):
         h = x
-        for i, block in enumerate(blocks):
+        for i, (layer, block) in enumerate(zip(self.layers, blocks)):
             edge_index = block.edges()
-            edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0).to(
-                device
-            )
-            h = (
-                self.conv1(h, edge_index)
-                if i == 0
-                else self.conv2(h, edge_index)
-            )
+            edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0)
+            h = layer(h, edge_index)
             if i != len(blocks) - 1:
                 h = F.relu(h)
             h = h[: block.number_of_dst_nodes()]
@@ -95,12 +92,23 @@ def create_dataloader(dataset_set, graph, feature, device, shuffle):
     # - 'sample_neighbor' performs neighbor sampling on the graph.
     # - 'FeatureFetcher' fetches node features based on the sampled subgraph.
     # - 'CopyTo' copies the fetched data to the specified device.
+
     #####################################################################
-    datapipe = ItemSampler(dataset_set, batch_size=1024, shuffle=shuffle)
-    datapipe = datapipe.sample_neighbor(graph, [4, 4])
-    datapipe = FeatureFetcher(datapipe, feature, node_feature_keys=["feat"])
-    datapipe = CopyTo(datapipe, device=device)
-    return DataLoader(datapipe, num_workers=0)
+    # Create a datapipe for mini-batch sampling with a specific neighbor fanout.
+    # Here, [10, 10, 10] specifies the number of neighbors sampled for each node at each layer.
+    # We're using `sample_neighbor` for consistency with DGL's sampling API.
+    # Note: GraphBolt offers additional sampling methods, such as `sample_layer_neighbor`,
+    # which could provide further optimization and efficiency for GNN training.
+    # Users are encouraged to explore these advanced features for potentially improved performance.
+
+    item_sampler = gb.ItemSampler(dataset_set, batch_size=1024, shuffle=shuffle)
+    neighbor_sampler = item_sampler.sample_neighbor(graph, [10, 10, 10])
+    feature_fetcher = gb.FeatureFetcher(
+        neighbor_sampler, feature, node_feature_keys=["feat"]
+    )
+    datapipe = gb.CopyTo(feature_fetcher, device=device)
+    data_loader = gb.DataLoader(datapipe, num_workers=0)
+    return data_loader
 
 
 def compute_accuracy(logits, labels):
@@ -165,7 +173,7 @@ def evaluate(model, dataloader, device):
 
 
 def main():
-    dataset = BuiltinDataset("ogbn-arxiv").load()
+    dataset = gb.BuiltinDataset("ogbn-arxiv").load()
     graph = dataset.graph
     feature = dataset.feature
     train_set = dataset.tasks[0].train_set
