@@ -694,8 +694,8 @@ def test_in_subgraph_homo():
     # Initialize data.
     total_num_nodes = 5
     total_num_edges = 12
-    indptr = torch.tensor([0, 3, 5, 7, 9, 12], device=F.ctx())
-    indices = torch.tensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4], device=F.ctx())
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
     assert indptr[-1] == total_num_edges
     assert indptr[-1] == len(indices)
 
