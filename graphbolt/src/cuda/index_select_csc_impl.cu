@@ -72,24 +72,6 @@ __global__ void _CopyIndicesAlignedKernel(
   }
 }
 
-// Given rows and indptr, computes:
-// inrow_indptr[i] = indptr[rows[i]];
-// in_degree[i] = indptr[rows[i] + 1] - indptr[rows[i]];
-template <typename indptr_t, typename nodes_t>
-struct SliceFunc {
-  const nodes_t* rows;
-  const indptr_t* indptr;
-  indptr_t* in_degree;
-  indptr_t* inrow_indptr;
-  __host__ __device__ auto operator()(int64_t tIdx) {
-    const auto out_row = rows[tIdx];
-    const auto indptr_val = indptr[out_row];
-    const auto degree = indptr[out_row + 1] - indptr_val;
-    in_degree[tIdx] = degree;
-    inrow_indptr[tIdx] = indptr_val;
-  }
-};
-
 struct PairSum {
   template <typename indptr_t>
   __host__ __device__ auto operator()(
@@ -100,37 +82,6 @@ struct PairSum {
         thrust::get<1>(a) + thrust::get<1>(b));
   };
 };
-
-// Returns (indptr[nodes + 1] - indptr[nodes], indptr[nodes])
-std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
-    torch::Tensor indptr, torch::Tensor nodes) {
-  auto allocator = cuda::GetAllocator();
-  const auto exec_policy =
-      thrust::cuda::par_nosync(allocator).on(cuda::GetCurrentStream());
-  const int64_t num_nodes = nodes.size(0);
-  // Read indptr only once in case it is pinned and access is slow.
-  auto sliced_indptr =
-      torch::empty(num_nodes, nodes.options().dtype(indptr.scalar_type()));
-  // compute in-degrees
-  auto in_degree =
-      torch::empty(num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
-  thrust::counting_iterator<int64_t> iota(0);
-  AT_DISPATCH_INTEGRAL_TYPES(
-      indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
-        using indptr_t = scalar_t;
-        AT_DISPATCH_INDEX_TYPES(
-            nodes.scalar_type(), "IndexSelectCSCNodes", ([&] {
-              using nodes_t = index_t;
-              thrust::for_each(
-                  exec_policy, iota, iota + num_nodes,
-                  SliceFunc<indptr_t, nodes_t>{
-                      nodes.data_ptr<nodes_t>(), indptr.data_ptr<indptr_t>(),
-                      in_degree.data_ptr<indptr_t>(),
-                      sliced_indptr.data_ptr<indptr_t>()});
-            }));
-      }));
-  return {in_degree, sliced_indptr};
-}
 
 template <typename indptr_t, typename indices_t>
 std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(

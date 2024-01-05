@@ -874,15 +874,12 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
                 )
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Heterogenous sampling is not supported on GPU yet.",
-)
 @pytest.mark.parametrize(
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
+    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items_n1 = torch.tensor([0])
     items_n2 = torch.tensor([1])

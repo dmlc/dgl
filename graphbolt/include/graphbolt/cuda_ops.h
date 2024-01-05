@@ -99,6 +99,22 @@ std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
     torch::Tensor indptr, torch::Tensor nodes);
 
 /**
+ * @brief Given the compacted sub_indptr tensor, edge type tensor and
+ * sliced_indptr tensor of the original graph, returns the heterogenous
+ * versions of sub_indptr, indegrees and sliced_indptr.
+ *
+ * @param sub_indptr     The compacted indptr tensor.
+ * @param etypes         The compacted type_per_edge tensor.
+ * @param sliced_indptr  The sliced_indptr tensor of original graph.
+ * @param num_fanouts    The number of fanout values.
+ *
+ * @return Tuple of tensors (new_sub_indptr, new_indegrees, new_sliced_indptr):
+ */
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
+    torch::Tensor sub_indptr, torch::Tensor etypes, torch::Tensor sliced_indptr,
+    int64_t num_fanouts);
+
+/**
  * @brief Computes the exclusive prefix sum of the given input.
  *
  * @param input The input tensor.
