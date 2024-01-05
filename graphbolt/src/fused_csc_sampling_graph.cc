@@ -618,7 +618,9 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
       utils::is_accessible_from_gpu(indices_) &&
       utils::is_accessible_from_gpu(nodes) &&
       (!probs_or_mask.has_value() ||
-       utils::is_accessible_from_gpu(probs_or_mask.value()))) {
+       utils::is_accessible_from_gpu(probs_or_mask.value())) &&
+      (!type_per_edge_.has_value() ||
+       utils::is_accessible_from_gpu(type_per_edge_.value()))) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "SampleNeighbors", {
           return ops::SampleNeighbors(
@@ -784,10 +786,10 @@ torch::Tensor TemporalMask(
   if (node_timestamp.has_value()) {
     auto neighbor_timestamp =
         node_timestamp.value().index_select(0, csc_indices.slice(0, l, r));
-    mask &= neighbor_timestamp <= seed_timestamp;
+    mask &= neighbor_timestamp < seed_timestamp;
   }
   if (edge_timestamp.has_value()) {
-    mask &= edge_timestamp.value().slice(0, l, r) <= seed_timestamp;
+    mask &= edge_timestamp.value().slice(0, l, r) < seed_timestamp;
   }
   if (probs_or_mask.has_value()) {
     mask &= probs_or_mask.value().slice(0, l, r) != 0;
