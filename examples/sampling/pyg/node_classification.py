@@ -1,13 +1,13 @@
 """
-This script exemplifies the training and evaluation of a GraphSAGE model for node classification on large-scale graphs, uniquely combining 
-the strengths of GraphBolt (GB) and PyTorch Geometric (PyG). Leveraging GraphBolt's capabilities, the script efficiently handles the data 
-loading process, particularly adept at managing large graph datasets that might be challenging to fit entirely in memory. This efficiency 
-is pivotal for processing mini-batches, a crucial aspect when working with extensive graph data. Following data loading, the script transitions 
-to utilizing PyG for the model training phase. PyG is renowned for its user-friendly interface and flexible framework, allowing seamless 
-integration of diverse graph neural network layers and models. This script stands out from typical Deep Graph Library (DGL)  by showcasing how 
-GraphBolt can be effectively combined with PyG, thus providing an alternative yet efficient pathway for processing large-scale graph data. 
-This approach not only underscores the adaptability and scalability of modern graph neural network frameworks but also opens new avenues for 
-handling and analyzing large graph datasets in various real-world applications.
+This script demonstrates node classification with GraphSAGE on large graphs, 
+merging GraphBolt (GB) and PyTorch Geometric (PyG). GraphBolt efficiently manages 
+data loading for large datasets, crucial for mini-batch processing. Post data 
+loading, PyG's user-friendly framework takes over for training, showcasing seamless 
+integration with GraphBolt. This combination offers an efficient alternative to 
+traditional Deep Graph Library (DGL) methods, highlighting adaptability and 
+scalability in handling large-scale graph data for diverse real-world applications.
+
+
 
 Key Features:
 - Implements the GraphSAGE model, a scalable GNN, for node classification on large graphs.
@@ -52,6 +52,7 @@ main
 import dgl.graphbolt as gb
 import torch
 import torch.nn.functional as F
+import torchmetrics.functional as MF
 from torch_geometric.nn import SAGEConv
 
 
@@ -101,14 +102,27 @@ def create_dataloader(dataset_set, graph, feature, device, shuffle):
     # which could provide further optimization and efficiency for GNN training.
     # Users are encouraged to explore these advanced features for potentially improved performance.
 
-    item_sampler = gb.ItemSampler(dataset_set, batch_size=1024, shuffle=shuffle)
-    neighbor_sampler = item_sampler.sample_neighbor(graph, [10, 10, 10])
-    feature_fetcher = gb.FeatureFetcher(
-        neighbor_sampler, feature, node_feature_keys=["feat"]
-    )
-    datapipe = gb.CopyTo(feature_fetcher, device=device)
-    data_loader = gb.DataLoader(datapipe, num_workers=0)
-    return data_loader
+    # Initialize an ItemSampler to sample mini-batches from the dataset.
+    datapipe = gb.ItemSampler(dataset_set, batch_size=1024, shuffle=shuffle)
+    # Sample neighbors for each node in the mini-batch.
+    datapipe = datapipe.sample_neighbor(graph, [10, 10, 10])
+    # Fetch node features for the sampled subgraph.
+    datapipe = gb.FeatureFetcher(datapipe, feature, node_feature_keys=["feat"])
+    # Copy the data to the specified device.
+    datapipe = gb.CopyTo(datapipe, device=device)
+    # Create and return a DataLoader to handle data loading.
+    dataloader = gb.DataLoader(datapipe, num_workers=0)
+
+    return dataloader
+
+    # item_sampler = gb.ItemSampler(dataset_set, batch_size=1024, shuffle=shuffle)
+    # neighbor_sampler = item_sampler.sample_neighbor(graph, [10, 10, 10])
+    # feature_fetcher = gb.FeatureFetcher(
+    #     neighbor_sampler, feature, node_feature_keys=["feat"]
+    # )
+    # datapipe = gb.CopyTo(feature_fetcher, device=device)
+    # data_loader = gb.DataLoader(datapipe, num_workers=0)
+    # return data_loader
 
 
 def compute_accuracy(logits, labels):
@@ -158,18 +172,52 @@ def train(model, dataloader, optimizer, criterion, device):
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, device):
+def evaluate(model, dataloader, device, num_classes):
     model.eval()
-    total_correct = 0
-    total_samples = 0
-    with torch.no_grad():
-        for minibatch in dataloader:
-            node_features = minibatch.node_features["feat"]
-            labels = minibatch.labels
-            out = model(minibatch.blocks, node_features, device)
-            total_correct += compute_accuracy(out, labels) * labels.size(0)
-            total_samples += labels.size(0)
-    return total_correct / total_samples
+    y_hats = []
+    ys = []
+    for minibatch in dataloader:
+        node_features = minibatch.node_features["feat"]
+        labels = minibatch.labels
+        out = model(minibatch.blocks, node_features, device)
+        y_hats.append(out)
+        ys.append(labels)
+
+    return MF.accuracy(
+        torch.cat(y_hats),
+        torch.cat(ys),
+        task="multiclass",
+        num_classes=num_classes,
+    )
+
+
+@torch.no_grad()
+def layerwise_infer(graph, feature, test_set, model, num_classes, device):
+    model.eval()
+    dataloader = create_dataloader(
+        dataset_set=test_set,
+        graph=graph,
+        feature=feature,
+        device=device,
+        shuffle=False,
+    )
+    all_predictions = []
+    all_labels = []
+
+    for minibatch in dataloader:
+        node_features = minibatch.node_features["feat"]
+        labels = minibatch.labels
+        blocks = minibatch.blocks
+        predictions = model(blocks, node_features, device)
+        all_predictions.append(predictions)
+        all_labels.append(labels)
+
+    all_predictions = torch.cat(all_predictions, dim=0)
+    all_labels = torch.cat(all_labels, dim=0)
+
+    return MF.accuracy(
+        all_predictions, all_labels, task="multiclass", num_classes=num_classes
+    )
 
 
 def main():
@@ -193,13 +241,14 @@ def main():
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
     criterion = torch.nn.CrossEntropyLoss()
-
-    for epoch in range(100):
+    for epoch in range(10):
         train_loss, train_accuracy = train(
             model, train_dataloader, optimizer, criterion, device
         )
-        valid_accuracy = evaluate(model, valid_dataloader, device)
-        test_accuracy = evaluate(model, test_dataloader, device)
+        valid_accuracy = evaluate(model, valid_dataloader, device, num_classes)
+        test_accuracy = layerwise_infer(
+            graph, feature, test_set, model, num_classes, device
+        )
         print(
             f"Epoch {epoch}, Train Loss: {train_loss}, Train Accuracy: {train_accuracy}, "
             f"Valid Accuracy: {valid_accuracy}, Test Accuracy: {test_accuracy}"
