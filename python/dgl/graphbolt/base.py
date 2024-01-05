@@ -108,12 +108,28 @@ class CopyTo(IterDataPipe):
 
     Functional name: :obj:`copy_to`.
 
-    This is equivalent to
+    When `data` has `to` method implemented, `CopyTo` will be equivalent to
 
     .. code:: python
 
        for data in datapipe:
            yield data.to(device)
+
+    For `gb.MiniBatch`, only a part of attributes will be transferred to
+    accelerate the process:
+
+    - When `seed_nodes` is not None and `node_pairs` is None, node related
+    task is inferred. Only `labels`, `sampled_subgraphs`, `node_features`
+    and `edge_features` will be transferred.
+
+    - When `node_pairs` is not None and `seed_nodes` is None, edge/link
+    related task is inferred. Only `labels`, `compacted_node_pairs`,
+    `compacted_negative_srcs`, `compacted_negative_dsts`, `sampled_subgraphs`,
+    `node_features` and `edge_features` will be transferred.
+
+    - Otherwise, all attributes will be transferred. If you want some other
+    attributes to be transferred as well, please indicate the name in the
+    `extra_attrs`.
 
     Parameters
     ----------
@@ -122,8 +138,8 @@ class CopyTo(IterDataPipe):
     device : torch.device
         The PyTorch CUDA device.
     extra_attrs: List[string]
-        The extra attributes in the MiniBatch you want to be carried to the
-        specific device.
+        The extra attributes of the data in the DataPipe you want to be carried
+        to the specific device.
     """
 
     def __init__(self, datapipe, device, extra_attrs=None):
