@@ -62,6 +62,7 @@ void RandomEngine::SetSeed(uint64_t seed, uint64_t stream) {
 
 /** @brief Manually fix the seed. */
 void RandomEngine::SetManualSeed(int64_t seed) {
+  // Intentionally set the seed for current thread also.
   RandomEngine::ThreadLocal()->SetSeed(seed);
   std::lock_guard lock(manual_seed_mutex);
   manual_seed = seed;
