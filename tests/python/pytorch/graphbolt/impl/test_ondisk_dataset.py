@@ -2242,66 +2242,35 @@ def test_OnDiskDataset_load_tasks_selectively():
             num_edges,
             num_classes,
         )
+        train_path = os.path.join("set", "train.npy")
+
+        yaml_content += f"""      - name: node_classification
+            num_classes: {num_classes}
+            train_set:
+              - type: null
+                data:
+                  - format: numpy
+                    path: {train_path}
+        """
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        # Case1. Test load tasks selectively.
+        # Case1. Test load all tasks.
         dataset = gb.OnDiskDataset(test_dir).load()
-        original_train_set = dataset.tasks[0].train_set._items
-        original_test_set = dataset.tasks[0].test_set._items
-        original_validation_set = dataset.tasks[0].validation_set._items
-        assert original_train_set is not None
-        assert original_test_set is not None
-        assert original_validation_set is not None
-        dataset = gb.OnDiskDataset(test_dir).load(("train",))
-        selective_train_set = dataset.tasks[0].train_set._items
-        assert torch.equal(
-            original_train_set[0],
-            selective_train_set[0],
-        )
-        assert dataset.tasks[0].test_set is None
-        assert dataset.tasks[0].validation_set is None
-        dataset = gb.OnDiskDataset(test_dir).load(("test", "train"))
-        selective_train_set = dataset.tasks[0].train_set._items
-        selective_test_set = dataset.tasks[0].test_set._items
-        assert torch.equal(
-            original_train_set[0],
-            selective_train_set[0],
-        )
-        assert torch.equal(
-            original_test_set[0],
-            selective_test_set[0],
-        )
-        assert dataset.tasks[0].validation_set is None
-        dataset = gb.OnDiskDataset(test_dir).load(
-            ("test", "train", "validation")
-        )
-        selective_train_set = dataset.tasks[0].train_set._items
-        selective_test_set = dataset.tasks[0].test_set._items
-        selective_validation_set = dataset.tasks[0].validation_set._items
-        assert torch.equal(
-            original_train_set[0],
-            selective_train_set[0],
-        )
-        assert torch.equal(
-            original_test_set[0],
-            selective_test_set[0],
-        )
-        assert torch.equal(
-            original_validation_set[0],
-            selective_validation_set[0],
-        )
+        assert len(dataset.tasks) == 2
 
-        # Case2. Test load tasks selectively with incorrect task type.
-        tasks_type = ("test", "fake-name")
-        with pytest.raises(ValueError):
-            dataset = gb.OnDiskDataset(test_dir).load(tasks_type)
+        # Case2. Test load tasks selectively.
+        dataset = gb.OnDiskDataset(test_dir).load(["link_prediction"])
+        assert len(dataset.tasks) == 1
+        assert dataset.tasks[0].metadata["name"] == "link_prediction"
+
+        # Case3. Test load tasks with non-existent task name.
+        dataset = gb.OnDiskDataset(test_dir).load(["fake-name"])
+        assert len(dataset.tasks) == 0
+
+        # Case4. Test load tasks selectively with incorrect task type.
         with pytest.raises(TypeError):
-            dataset = gb.OnDiskDataset(test_dir).load("fake-name")
+            dataset = gb.OnDiskDataset(test_dir).load("link_prediction")
 
-        original_train_set = original_test_set = original_validation_set = None
-        selective_train_set = (
-            selective_test_set
-        ) = selective_validation_set = None
         dataset = None

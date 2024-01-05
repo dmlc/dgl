@@ -382,8 +382,6 @@ class OnDiskDataset(Dataset):
         Whether to include the original edge id in the FusedCSCSamplingGraph.
     """
 
-    _tasks_type = ("validation", "train", "test")
-
     def __init__(
         self, path: str, include_original_edge_id: bool = False
     ) -> None:
@@ -417,11 +415,11 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self, selected_task: tuple = ("all",)):
+    def load(self, selected_task: list = []):
         """Load the dataset."""
-        if not isinstance(selected_task, tuple):
+        if not isinstance(selected_task, list):
             raise TypeError(
-                f"The type of selected_task should be tuple, but got {type(selected_task)}"
+                f"The type of selected_task should be list, but got {type(selected_task)}"
             )
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
@@ -469,36 +467,22 @@ class OnDiskDataset(Dataset):
         return self._all_nodes_set
 
     def _init_tasks(
-        self, tasks: List[OnDiskTaskData], selected_task: tuple
+        self, tasks: List[OnDiskTaskData], selected_task: list = []
     ) -> List[OnDiskTask]:
         """Initialize the tasks."""
-        if selected_task == ("all",):
-            selected_task = self._tasks_type
-        else:
-            if not all(
-                task_type in self._tasks_type for task_type in selected_task
-            ):
-                raise ValueError(
-                    f"Selected tasks should be in {self._tasks_type}, but got {selected_task}."
-                )
         ret = []
         if tasks is None:
             return ret
         for task in tasks:
-            ret.append(
-                OnDiskTask(
-                    task.extra_fields,
-                    train_set=self._init_tvt_set(task.train_set)
-                    if "train" in selected_task
-                    else None,
-                    validation_set=self._init_tvt_set(task.validation_set)
-                    if "validation" in selected_task
-                    else None,
-                    test_set=self._init_tvt_set(task.test_set)
-                    if "test" in selected_task
-                    else None,
+            if not selected_task or task.extra_fields["name"] in selected_task:
+                ret.append(
+                    OnDiskTask(
+                        task.extra_fields,
+                        self._init_tvt_set(task.train_set),
+                        self._init_tvt_set(task.validation_set),
+                        self._init_tvt_set(task.test_set),
+                    )
                 )
-            )
         return ret
 
     def _check_loaded(self):
