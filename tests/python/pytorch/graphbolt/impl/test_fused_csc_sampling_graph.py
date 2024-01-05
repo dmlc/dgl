@@ -19,7 +19,6 @@ from scipy import sparse as spsp
 from .. import gb_test_utils as gbt
 
 torch.manual_seed(3407)
-gb.seed(123125)
 mp.set_sharing_strategy("file_system")
 
 
