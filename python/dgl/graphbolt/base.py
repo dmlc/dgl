@@ -115,21 +115,27 @@ class CopyTo(IterDataPipe):
        for data in datapipe:
            yield data.to(device)
 
-    For `gb.MiniBatch`, only a part of attributes will be transferred to
-    accelerate the process:
+    For :class:~dgl.graphbolt.MiniBatch, only a part of attributes will be
+    transferred to accelerate the process by default:
 
-    - When `seed_nodes` is not None and `node_pairs` is None, node related
-    task is inferred. Only `labels`, `sampled_subgraphs`, `node_features`
-    and `edge_features` will be transferred.
+    - When "seed_nodes" is not None and "node_pairs" is None, node related
+    task is inferred. Only "labels", "sampled_subgraphs", "node_features"
+    and "edge_features" will be transferred.
 
-    - When `node_pairs` is not None and `seed_nodes` is None, edge/link
-    related task is inferred. Only `labels`, `compacted_node_pairs`,
-    `compacted_negative_srcs`, `compacted_negative_dsts`, `sampled_subgraphs`,
-    `node_features` and `edge_features` will be transferred.
+    - When "node_pairs" is not None and "seed_nodes" is None, edge/link
+    related task is inferred. Only "labels", "compacted_node_pairs",
+    "compacted_negative_srcs", "compacted_negative_dsts", "sampled_subgraphs",
+    "node_features" and "edge_features" will be transferred.
 
-    - Otherwise, all attributes will be transferred. If you want some other
-    attributes to be transferred as well, please indicate the name in the
-    `extra_attrs`.
+    - Otherwise, all attributes will be transferred.
+
+    - If you want some other attributes to be transferred as well, please
+    indicate the name in the `extra_attrs`. For instance, the following code
+    will copy "seed_nodes" to the GPU as well:
+
+    .. code:: python
+
+       datapipe = datapipe.copy_to(device="cuda", extra_attrs=["seed_nodes"])
 
     Parameters
     ----------
@@ -139,7 +145,9 @@ class CopyTo(IterDataPipe):
         The PyTorch CUDA device.
     extra_attrs: List[string]
         The extra attributes of the data in the DataPipe you want to be carried
-        to the specific device.
+        to the specific device. The attributes indicated in the `extra_attrs`
+        will be transferred regardless of the task inferred. It could also be
+        applied to classes other than :class:~dgl.graphbolt.MiniBatch.
     """
 
     def __init__(self, datapipe, device, extra_attrs=None):
