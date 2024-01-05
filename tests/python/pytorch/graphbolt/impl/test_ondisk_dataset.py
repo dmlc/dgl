@@ -25,7 +25,7 @@ def write_yaml_file(yaml_content, dir):
         f.write(yaml_content)
 
 
-def load_dataset(dataset, selected_tasks="all"):
+def load_dataset(dataset):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         return dataset.load()
@@ -1805,8 +1805,8 @@ def test_OnDiskDataset_load_tasks():
         ):
             dataset.load()
 
-        # Case5. Test modifying the `path` field to an absolute path should
-        # work. In os.path.join, if a segment is an absolute path (which
+        # Modifying the `path` field to an absolute path should work.
+        # In os.path.join, if a segment is an absolute path (which
         # on Windows requires both a drive and a root), then all
         # previous segments are ignored and joining continues from
         # the absolute path segment.
