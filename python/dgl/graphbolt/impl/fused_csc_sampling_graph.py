@@ -92,7 +92,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         {'N0': 2, 'N1': 3}
         """
 
-        offset = self.node_type_offset_list
+        offset = self._node_type_offset_list
 
         # Homogenous.
         if offset is None or self.node_type_to_id is None:
@@ -198,8 +198,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
         """Returns the node type offset tensor if present. Do not modify the
-        returned tensor in place so that self.node_type_offset_list stays in
-        sync.
+        returned tensor in place.
 
         Returns
         -------
@@ -215,7 +214,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return self._c_csc_graph.node_type_offset()
 
     @property
-    def node_type_offset_list(self) -> Optional[list]:
+    def _node_type_offset_list(self) -> Optional[list]:
         """Returns the node type offset list if present.
 
         Returns
@@ -230,15 +229,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         """
         if (
-            not hasattr(self, "_node_type_offset_list")
-            or self._node_type_offset_list is None
+            not hasattr(self, "_node_type_offset_cached_list")
+            or self._node_type_offset_cached_list is None
         ):
-            self._node_type_offset_list = self.node_type_offset
-            if self._node_type_offset_list is not None:
-                self._node_type_offset_list = (
-                    self._node_type_offset_list.tolist()
+            self._node_type_offset_cached_list = self.node_type_offset
+            if self._node_type_offset_cached_list is not None:
+                self._node_type_offset_cached_list = (
+                    self._node_type_offset_cached_list.tolist()
                 )
-        return self._node_type_offset_list
+        return self._node_type_offset_cached_list
 
     @node_type_offset.setter
     def node_type_offset(
@@ -246,7 +245,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ) -> None:
         """Sets the node type offset tensor if present."""
         self._c_csc_graph.set_node_type_offset(node_type_offset)
-        self._node_type_offset_list = None
+        self._node_type_offset_cached_list = None
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
@@ -416,7 +415,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def _convert_to_homogeneous_nodes(self, nodes, timestamps=None):
         homogeneous_nodes = []
         homogeneous_timestamps = []
-        offset = self.node_type_offset_list
+        offset = self._node_type_offset_list
         for ntype, ids in nodes.items():
             ntype_id = self.node_type_to_id[ntype]
             homogeneous_nodes.append(ids + offset[ntype_id])
@@ -465,7 +464,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             original_hetero_edge_ids = {}
             sub_indices = {}
             sub_indptr = {}
-            offset = self.node_type_offset_list
+            offset = self._node_type_offset_list
             # 2. For loop each node type.
             for ntype, ntype_id in self.node_type_to_id.items():
                 # Get all nodes of a specific node type in column.
@@ -912,7 +911,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 negative sampling by edge type."
             _, _, dst_node_type = etype_str_to_tuple(edge_type)
             dst_node_type_id = self.node_type_to_id[dst_node_type]
-            offset = self.node_type_offset_list
+            offset = self._node_type_offset_list
             max_node_id = (
                 offset[dst_node_type_id + 1] - offset[dst_node_type_id]
             )
