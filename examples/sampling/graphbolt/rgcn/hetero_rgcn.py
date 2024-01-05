@@ -441,6 +441,7 @@ def evaluate(
     y_true = list()
 
     for data in tqdm(data_loader, desc="Inference"):
+        # Convert MiniBatch to DGL Blocks and move them to the target device.
         blocks = [block.to(device) for block in data.blocks]
         node_features = extract_node_features(
             name, blocks[0], data, node_embed, device
@@ -506,7 +507,8 @@ def train(
         total_loss = 0
 
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch + 1:02d}"):
-            # Convert MiniBatch to DGL Blocks.
+            # Convert MiniBatch to DGL Blocks and move them to the target
+            # device.
             blocks = [block.to(device) for block in data.blocks]
 
             # Fetch the number of seed nodes in the batch.
