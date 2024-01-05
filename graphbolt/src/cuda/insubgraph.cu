@@ -25,7 +25,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> InSubgraph(
     output_type_per_edge =
         std::get<1>(IndexSelectCSCImpl(indptr, type_per_edge.value(), nodes));
   }
-  auto rows = CSCToCOOImpl(output_indptr, indices.scalar_type());
+  auto rows = CSCToCOOImpl(
+      output_indptr, indices.scalar_type(), output_indices.size(0));
   auto [in_degree, sliced_indptr] = SliceCSCIndptr(indptr, nodes);
   auto i = torch::arange(output_indices.size(0), output_indptr.options());
   auto edge_ids =
