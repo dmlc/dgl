@@ -4,6 +4,7 @@
  * @brief Source file of sampling graph.
  */
 
+#include <graphbolt/cuda_sampling_ops.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
@@ -16,6 +17,7 @@
 #include <tuple>
 #include <vector>
 
+#include "./macro.h"
 #include "./random.h"
 #include "./shared_memory_helper.h"
 #include "./utils.h"
@@ -272,6 +274,15 @@ FusedCSCSamplingGraph::GetState() const {
 
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
+  if (utils::is_accessible_from_gpu(indptr_) &&
+      utils::is_accessible_from_gpu(indices_) &&
+      utils::is_accessible_from_gpu(nodes) &&
+      (!type_per_edge_.has_value() ||
+       utils::is_accessible_from_gpu(type_per_edge_.value()))) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(c10::DeviceType::CUDA, "InSubgraph", {
+      return ops::InSubgraph(indptr_, indices_, nodes, type_per_edge_);
+    });
+  }
   using namespace torch::indexing;
   const int32_t kDefaultGrainSize = 100;
   const auto num_seeds = nodes.size(0);
@@ -600,8 +611,27 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
-  auto probs_or_mask = this->EdgeAttribute(probs_name);
-  if (probs_name.has_value()) {
+  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
+  if (probs_name.has_value() && !probs_name.value().empty()) {
+    probs_or_mask = this->EdgeAttribute(probs_name);
+  }
+
+  if (!replace && utils::is_accessible_from_gpu(indptr_) &&
+      utils::is_accessible_from_gpu(indices_) &&
+      utils::is_accessible_from_gpu(nodes) &&
+      (!probs_or_mask.has_value() ||
+       utils::is_accessible_from_gpu(probs_or_mask.value())) &&
+      (!type_per_edge_.has_value() ||
+       utils::is_accessible_from_gpu(type_per_edge_.value()))) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+        c10::DeviceType::CUDA, "SampleNeighbors", {
+          return ops::SampleNeighbors(
+              indptr_, indices_, nodes, fanouts, replace, layer, return_eids,
+              type_per_edge_, probs_or_mask);
+        });
+  }
+
+  if (probs_or_mask.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
     // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
     // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
@@ -774,10 +804,10 @@ torch::Tensor TemporalMask(
   if (node_timestamp.has_value()) {
     auto neighbor_timestamp =
         node_timestamp.value().index_select(0, csc_indices.slice(0, l, r));
-    mask &= neighbor_timestamp <= seed_timestamp;
+    mask &= neighbor_timestamp < seed_timestamp;
   }
   if (edge_timestamp.has_value()) {
-    mask &= edge_timestamp.value().slice(0, l, r) <= seed_timestamp;
+    mask &= edge_timestamp.value().slice(0, l, r) < seed_timestamp;
   }
   if (probs_or_mask.has_value()) {
     mask &= probs_or_mask.value().slice(0, l, r) != 0;
