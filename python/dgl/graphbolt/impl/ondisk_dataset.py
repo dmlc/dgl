@@ -382,7 +382,7 @@ class OnDiskDataset(Dataset):
         Whether to include the original edge id in the FusedCSCSamplingGraph.
     """
 
-    _tasks = ("validation", "train", "test")
+    _tasks_type = ("validation", "train", "test")
 
     def __init__(
         self, path: str, include_original_edge_id: bool = False
@@ -417,7 +417,7 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self, selected_task="all"):
+    def load(self, selected_task: tuple = ("all",)):
         """Load the dataset."""
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
@@ -465,16 +465,15 @@ class OnDiskDataset(Dataset):
         return self._all_nodes_set
 
     def _init_tasks(
-        self, tasks: List[OnDiskTaskData], selected_task: str
+        self, tasks: List[OnDiskTaskData], selected_task: tuple
     ) -> List[OnDiskTask]:
         """Initialize the tasks."""
-        if selected_task == "all":
-            selected_task = self._tasks
+        if selected_task == ("all",):
+            selected_task = self._tasks_type
         else:
-            selected_task = set(selected_task.split("-"))
-            if not selected_task.issubset(self._tasks):
+            if not all(type in self._tasks_type for type in selected_task):
                 raise ValueError(
-                    f"Selected tasks should be in {self._tasks}, but got {selected_task}"
+                    f"Selected tasks should be in {self._tasks_type}, but got {selected_task}."
                 )
         ret = []
         if tasks is None:

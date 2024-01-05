@@ -25,7 +25,7 @@ def write_yaml_file(yaml_content, dir):
         f.write(yaml_content)
 
 
-def load_dataset(dataset):
+def load_dataset(dataset, selected_tasks="all"):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         return dataset.load()
@@ -1805,8 +1805,8 @@ def test_OnDiskDataset_load_tasks():
         ):
             dataset.load()
 
-        # Modifying the `path` field to an absolute path should work.
-        # In os.path.join, if a segment is an absolute path (which
+        # Case5. Test modifying the `path` field to an absolute path should
+        # work. In os.path.join, if a segment is an absolute path (which
         # on Windows requires both a drive and a root), then all
         # previous segments are ignored and joining continues from
         # the absolute path segment.
@@ -2223,3 +2223,83 @@ def test_OnDiskTask_repr_heterogeneous():
 )"""
     )
     assert str(task) == expected_str, print(task)
+
+
+def test_OnDiskDataset_load_tasks_selectively():
+    """Test preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # Case1. Test load tasks selectively.
+        dataset = gb.OnDiskDataset(test_dir).load()
+        original_train_set = dataset.tasks[0].train_set._items
+        original_test_set = dataset.tasks[0].test_set._items
+        original_validation_set = dataset.tasks[0].validation_set._items
+        assert original_train_set is not None
+        assert original_test_set is not None
+        assert original_validation_set is not None
+        dataset = gb.OnDiskDataset(test_dir).load(("train",))
+        selective_train_set = dataset.tasks[0].train_set._items
+        assert torch.equal(
+            original_train_set[0],
+            selective_train_set[0],
+        )
+        assert dataset.tasks[0].test_set is None
+        assert dataset.tasks[0].validation_set is None
+        dataset = gb.OnDiskDataset(test_dir).load(("test", "train"))
+        selective_train_set = dataset.tasks[0].train_set._items
+        selective_test_set = dataset.tasks[0].test_set._items
+        assert torch.equal(
+            original_train_set[0],
+            selective_train_set[0],
+        )
+        assert torch.equal(
+            original_test_set[0],
+            selective_test_set[0],
+        )
+        assert dataset.tasks[0].validation_set is None
+        dataset = gb.OnDiskDataset(test_dir).load(
+            ("test", "train", "validation")
+        )
+        selective_train_set = dataset.tasks[0].train_set._items
+        selective_test_set = dataset.tasks[0].test_set._items
+        selective_validation_set = dataset.tasks[0].validation_set._items
+        assert torch.equal(
+            original_train_set[0],
+            selective_train_set[0],
+        )
+        assert torch.equal(
+            original_test_set[0],
+            selective_test_set[0],
+        )
+        assert torch.equal(
+            original_validation_set[0],
+            selective_validation_set[0],
+        )
+
+        # Case2. Test load tasks selectively with incorrect task type.
+        tasks_type = ("test", "fake-name")
+        with pytest.raises(ValueError):
+            dataset = gb.OnDiskDataset(test_dir).load(tasks_type)
+
+        original_train_set = original_test_set = original_validation_set = None
+        selective_train_set = (
+            selective_test_set
+        ) = selective_validation_set = None
+        dataset = None
