@@ -2297,6 +2297,8 @@ def test_OnDiskDataset_load_tasks_selectively():
         tasks_type = ("test", "fake-name")
         with pytest.raises(ValueError):
             dataset = gb.OnDiskDataset(test_dir).load(tasks_type)
+        with pytest.raises(TypeError):
+            dataset = gb.OnDiskDataset(test_dir).load("fake-name")
 
         original_train_set = original_test_set = original_validation_set = None
         selective_train_set = (

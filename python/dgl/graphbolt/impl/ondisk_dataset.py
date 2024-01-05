@@ -419,6 +419,10 @@ class OnDiskDataset(Dataset):
 
     def load(self, selected_task: tuple = ("all",)):
         """Load the dataset."""
+        if not isinstance(selected_task, tuple):
+            raise TypeError(
+                f"The type of selected_task should be tuple, but got {type(selected_task)}"
+            )
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
@@ -471,7 +475,9 @@ class OnDiskDataset(Dataset):
         if selected_task == ("all",):
             selected_task = self._tasks_type
         else:
-            if not all(type in self._tasks_type for type in selected_task):
+            if not all(
+                task_type in self._tasks_type for task_type in selected_task
+            ):
                 raise ValueError(
                     f"Selected tasks should be in {self._tasks_type}, but got {selected_task}."
                 )
