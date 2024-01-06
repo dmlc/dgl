@@ -9,7 +9,6 @@
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/cuda_sampling_ops.h>
 #include <thrust/gather.h>
-#include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/iterator/transform_output_iterator.h>
@@ -17,7 +16,6 @@
 #include <algorithm>
 #include <array>
 #include <cub/cub.cuh>
-#include <cuda/std/tuple>
 #include <limits>
 #include <numeric>
 #include <type_traits>

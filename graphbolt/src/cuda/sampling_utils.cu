@@ -4,7 +4,7 @@
  * @file cuda/sampling_utils.cu
  * @brief Sampling utility function implementations on CUDA.
  */
-#include <thrust/execution_policy.h>
+#include <thrust/for_each.h>
 #include <thrust/iterator/counting_iterator.h>
 
 #include <cub/cub.cuh>

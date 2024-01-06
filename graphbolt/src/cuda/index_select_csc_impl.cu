@@ -6,9 +6,9 @@
  */
 #include <c10/core/ScalarType.h>
 #include <graphbolt/cuda_ops.h>
-#include <thrust/execution_policy.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/zip_iterator.h>
 
 #include <cub/cub.cuh>
 #include <numeric>

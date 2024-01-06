@@ -8,10 +8,7 @@
 #include <thrust/binary_search.h>
 #include <thrust/functional.h>
 #include <thrust/gather.h>
-#include <thrust/iterator/discard_iterator.h>
 #include <thrust/logical.h>
-#include <thrust/reduce.h>
-#include <thrust/remove.h>
 
 #include <cub/cub.cuh>
 #include <type_traits>
