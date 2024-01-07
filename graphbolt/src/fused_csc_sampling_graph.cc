@@ -293,14 +293,14 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
   std::vector<torch::Tensor> edge_ids_arr(num_seeds);
   std::vector<torch::Tensor> type_per_edge_arr(num_seeds);
 
-  AT_DISPATCH_INTEGRAL_TYPES(
+  AT_DISPATCH_INDEX_TYPES(
       indptr_.scalar_type(), "InSubgraph", ([&] {
         torch::parallel_for(
             0, num_seeds, kDefaultGrainSize, [&](size_t start, size_t end) {
               for (size_t i = start; i < end; ++i) {
-                const auto node_id = nodes[i].item<scalar_t>();
-                const auto start_idx = indptr_[node_id].item<scalar_t>();
-                const auto end_idx = indptr_[node_id + 1].item<scalar_t>();
+                const auto node_id = nodes[i].item<index_t>();
+                const auto start_idx = indptr_[node_id].item<index_t>();
+                const auto end_idx = indptr_[node_id + 1].item<index_t>();
                 indptr[i + 1] = end_idx - start_idx;
                 original_column_node_ids[i] = node_id;
                 indices_arr[i] = indices_.slice(0, start_idx, end_idx);
@@ -488,12 +488,12 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   torch::Tensor subgraph_indices;
   torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
 
-  AT_DISPATCH_INTEGRAL_TYPES(
+  AT_DISPATCH_INDEX_TYPES(
       indptr_.scalar_type(), "SampleNeighborsImplWrappedWithIndptr", ([&] {
-        using indptr_t = scalar_t;
-        AT_DISPATCH_INTEGRAL_TYPES(
+        using indptr_t = index_t;
+        AT_DISPATCH_INDEX_TYPES(
             nodes.scalar_type(), "SampleNeighborsImplWrappedWithNodes", ([&] {
-              using nodes_t = scalar_t;
+              using nodes_t = index_t;
               const auto indptr_data = indptr_.data_ptr<indptr_t>();
               auto num_picked_neighbors_data_ptr =
                   num_picked_neighbors_per_node.data_ptr<indptr_t>();
@@ -561,13 +561,13 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 
                         // Step 5. Calculate other attributes and return the
                         // subgraph.
-                        AT_DISPATCH_INTEGRAL_TYPES(
+                        AT_DISPATCH_INDEX_TYPES(
                             subgraph_indices.scalar_type(),
                             "IndexSelectSubgraphIndices", ([&] {
                               auto subgraph_indices_data_ptr =
-                                  subgraph_indices.data_ptr<scalar_t>();
+                                  subgraph_indices.data_ptr<index_t>();
                               auto indices_data_ptr =
-                                  indices_.data_ptr<scalar_t>();
+                                  indices_.data_ptr<index_t>();
                               for (auto i = picked_offset;
                                    i < picked_offset + picked_number; ++i) {
                                 subgraph_indices_data_ptr[i] =
@@ -1365,10 +1365,10 @@ inline int64_t LaborPick(
   const ProbsType* local_probs_data =
       NonUniform ? probs_or_mask.value().data_ptr<ProbsType>() + offset
                  : nullptr;
-  AT_DISPATCH_INTEGRAL_TYPES(
+  AT_DISPATCH_INDEX_TYPES(
       args.indices.scalar_type(), "LaborPickMain", ([&] {
-        const scalar_t* local_indices_data =
-            args.indices.data_ptr<scalar_t>() + offset;
+        const index_t* local_indices_data =
+            args.indices.data_ptr<index_t>() + offset;
         if constexpr (Replace) {
           // [Algorithm] @mfbalin
           // Use a max-heap to get rid of the big random numbers and filter the
@@ -1402,7 +1402,7 @@ inline int64_t LaborPick(
           auto heap_end = heap_data;
           const auto init_count = (num_neighbors + fanout - 1) / num_neighbors;
           auto sample_neighbor_i_with_index_t_jth_time =
-              [&](scalar_t t, int64_t j, uint32_t i) {
+              [&](index_t t, int64_t j, uint32_t i) {
                 auto rnd = labor::jth_sorted_uniform_random(
                     args.random_seed, t, args.num_nodes, j, remaining_data[i],
                     fanout - j);  // r_t
