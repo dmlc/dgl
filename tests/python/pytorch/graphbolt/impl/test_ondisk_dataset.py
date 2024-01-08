@@ -2261,16 +2261,20 @@ def test_OnDiskDataset_load_tasks_selectively():
         assert len(dataset.tasks) == 2
 
         # Case2. Test load tasks selectively.
-        dataset = gb.OnDiskDataset(test_dir).load(["link_prediction"])
+        dataset = gb.OnDiskDataset(test_dir).load(tasks="link_prediction")
+        assert len(dataset.tasks) == 1
+        assert dataset.tasks[0].metadata["name"] == "link_prediction"
+        dataset = gb.OnDiskDataset(test_dir).load(tasks=["link_prediction"])
         assert len(dataset.tasks) == 1
         assert dataset.tasks[0].metadata["name"] == "link_prediction"
 
         # Case3. Test load tasks with non-existent task name.
-        dataset = gb.OnDiskDataset(test_dir).load(["fake-name"])
-        assert len(dataset.tasks) == 0
+        with pytest.warns(UserWarning):
+            dataset = gb.OnDiskDataset(test_dir).load(tasks=["fake-name"])
+            assert len(dataset.tasks) == 0
 
         # Case4. Test load tasks selectively with incorrect task type.
         with pytest.raises(TypeError):
-            dataset = gb.OnDiskDataset(test_dir).load("link_prediction")
+            dataset = gb.OnDiskDataset(test_dir).load(tasks=2)
 
         dataset = None

@@ -1,6 +1,7 @@
 """GraphBolt OnDiskDataset."""
 
 import os
+import warnings
 from copy import deepcopy
 from typing import Dict, List, Union
 
@@ -415,20 +416,54 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self, selected_task: list = None):
-        """Load the dataset."""
-        if selected_task and not isinstance(selected_task, list):
-            raise TypeError(
-                f"The type of selected_task should be list, but got {type(selected_task)}"
-            )
-        if selected_task is None:
-            selected_task = ["all"]
+    def load(self, tasks: List[str] = None):
+        """Load the dataset.
+
+        Parameters
+        ----------
+        tasks: List[str] = None
+            The name of the tasks to be loaded. For single task, the type of
+            tasks can be both string and List[str]. For multiple tasks, only
+            List[str] is acceptable.
+
+        Examples
+        --------
+        1. Loading via single task name "node_classification".
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks="node_classification")
+        >>> len(dataset.tasks)
+        1
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+
+        2. Loading via single task name ["node_classification"].
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks=["node_classification"])
+        >>> len(dataset.tasks)
+        1
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+
+        3. Loading via multiple task names ["node_classification",
+        "link_prediction"].
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks=["node_classification","link_prediction"])
+        >>> len(dataset.tasks)
+        2
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+        >>> dataset.tasks[1].metadata["name"]
+        "link_prediction"
+        """
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
-        self._tasks = self._init_tasks(self._meta.tasks, selected_task)
+        self._tasks = self._init_tasks(self._meta.tasks, tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
         self._loaded = True
         return self
@@ -469,17 +504,22 @@ class OnDiskDataset(Dataset):
         return self._all_nodes_set
 
     def _init_tasks(
-        self, tasks: List[OnDiskTaskData], selected_task: list
+        self, tasks: List[OnDiskTaskData], selected_tasks: List[str]
     ) -> List[OnDiskTask]:
         """Initialize the tasks."""
+        if isinstance(selected_tasks, str):
+            selected_tasks = [selected_tasks]
+        if selected_tasks and not isinstance(selected_tasks, list):
+            raise TypeError(
+                f"The type of selected_task should be list, but got {type(selected_tasks)}"
+            )
         ret = []
         if tasks is None:
             return ret
+        task_names = set()
         for task in tasks:
-            if (
-                selected_task == ["all"]
-                or task.extra_fields["name"] in selected_task
-            ):
+            task_name = task.extra_fields.get("name", None)
+            if selected_tasks is None or task_name in selected_tasks:
                 ret.append(
                     OnDiskTask(
                         task.extra_fields,
@@ -487,6 +527,14 @@ class OnDiskDataset(Dataset):
                         self._init_tvt_set(task.validation_set),
                         self._init_tvt_set(task.test_set),
                     )
+                )
+                if selected_tasks:
+                    task_names.add(task_name)
+        if selected_tasks:
+            fake_task_name = set(selected_tasks) - task_names
+            if len(fake_task_name):
+                warnings.warn(
+                    f"The task name {fake_task_name} may not be feasible."
                 )
         return ret
 
