@@ -464,7 +464,7 @@ auto GetTemporalPickFn(
               seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
               fanouts[0], replace, options, probs_or_mask, node_timestamp,
               edge_timestamp, args, picked_data_ptr);
-          if (type_per_edge) {
+          if (type_per_edge.has_value()) {
             std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
           }
           return num_sampled;
