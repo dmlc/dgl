@@ -86,13 +86,22 @@ def preprocess_ondisk_dataset(
     if is_homogeneous:
         # Homogeneous graph.
         num_nodes = input_config["graph"]["nodes"][0]["num"]
-        edge_data = pd.read_csv(
-            os.path.join(
-                dataset_dir, input_config["graph"]["edges"][0]["path"]
-            ),
-            names=["src", "dst"],
-        )
-        src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
+        if input_config["graph"]["edges"][0]["format"] == "numpy":
+            edge_data = read_data(
+                os.path.join(
+                    dataset_dir, input_config["graph"]["edges"][0]["path"]
+                ),
+                input_config["graph"]["edges"][0]["format"],
+            )
+            src, dst = edge_data
+        else:
+            edge_data = pd.read_csv(
+                os.path.join(
+                    dataset_dir, input_config["graph"]["edges"][0]["path"]
+                ),
+                names=["src", "dst"],
+            )
+            src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
 
         g = dgl.graph((src, dst), num_nodes=num_nodes)
     else:
@@ -104,12 +113,19 @@ def preprocess_ondisk_dataset(
         # Construct the data dict.
         data_dict = {}
         for edge_info in input_config["graph"]["edges"]:
-            edge_data = pd.read_csv(
-                os.path.join(dataset_dir, edge_info["path"]),
-                names=["src", "dst"],
-            )
-            src = torch.tensor(edge_data["src"])
-            dst = torch.tensor(edge_data["dst"])
+            if edge_info["format"] == "numpy":
+                edge_data = read_data(
+                    os.path.join(dataset_dir, edge_info["path"]),
+                    edge_info["format"],
+                )
+                src, dst = edge_data
+            else:
+                edge_data = pd.read_csv(
+                    os.path.join(dataset_dir, edge_info["path"]),
+                    names=["src", "dst"],
+                )
+                src = torch.tensor(edge_data["src"])
+                dst = torch.tensor(edge_data["dst"])
             data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
         # Construct the heterograph.
         g = dgl.heterograph(data_dict, num_nodes_dict)
