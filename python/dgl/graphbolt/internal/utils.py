@@ -143,6 +143,5 @@ def read_edges(dataset_dir, edge_fmt, edge_path):
             os.path.join(dataset_dir, edge_path),
             names=["src", "dst"],
         )
-        src = torch.tensor(edge_data["src"])
-        dst = torch.tensor(edge_data["dst"])
+        src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
     return (src, dst)

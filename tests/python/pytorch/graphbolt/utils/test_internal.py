@@ -174,12 +174,14 @@ def test_read_edges(edge_fmt):
 
 
 def test_read_edges_error():
+    # 1. Unsupported file format.
     with pytest.raises(
         AssertionError,
         match="`numpy` or `csv` is expected when reading edges but got `fake-type`.",
     ):
         internal.read_edges("test_dir", "fake-type", "edge_path")
 
+    # 2. Unexpected shape of numpy array
     with tempfile.TemporaryDirectory() as test_dir:
         num_nodes = 40
         num_edges = 200
