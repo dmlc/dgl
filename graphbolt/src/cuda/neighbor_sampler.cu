@@ -43,7 +43,7 @@ template <
 __global__ void _ComputeRandoms(
     const int64_t num_edges, const indptr_t* const sliced_indptr,
     const indptr_t* const sub_indptr, const indices_t* const csr_rows,
-    const weights_t* const weights, const indices_t* const indices,
+    const weights_t* const sliced_weights, const indices_t* const indices,
     const uint64_t random_seed, float_t* random_arr, edge_id_t* edge_ids) {
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
@@ -65,7 +65,8 @@ __global__ void _ComputeRandoms(
     }
 
     const auto rnd = curand_uniform(&rng);
-    const auto prob = weights ? weights[in_idx] : static_cast<weights_t>(1);
+    const auto prob =
+        sliced_weights ? sliced_weights[i] : static_cast<weights_t>(1);
     const auto exp_rnd = -__logf(rnd);
     const float_t adjusted_rnd = prob > 0
                                      ? static_cast<float_t>(exp_rnd / prob)
@@ -76,6 +77,13 @@ __global__ void _ComputeRandoms(
     i += stride;
   }
 }
+
+struct IsPositive {
+  template <typename probs_t>
+  __host__ __device__ auto operator()(probs_t x) {
+    return x > 0;
+  }
+};
 
 template <typename indptr_t>
 struct MinInDegreeFanout {
@@ -152,7 +160,18 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
-  auto sub_indptr = ExclusiveCumSum(in_degree);
+  torch::Tensor sub_indptr;
+  // @todo mfbalin, refactor IndexSelectCSCImpl so that it does not have to take
+  // nodes as input
+  torch::optional<torch::Tensor> sliced_probs_or_mask;
+  if (probs_or_mask.has_value()) {
+    torch::Tensor sliced_probs_or_mask_tensor;
+    std::tie(sub_indptr, sliced_probs_or_mask_tensor) =
+        IndexSelectCSCImpl(indptr, probs_or_mask.value(), nodes);
+    sliced_probs_or_mask = sliced_probs_or_mask_tensor;
+  } else {
+    sub_indptr = ExclusiveCumSum(in_degree);
+  }
   if (fanouts.size() > 1) {
     torch::Tensor sliced_type_per_edge;
     std::tie(sub_indptr, sliced_type_per_edge) =
@@ -187,6 +206,29 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   AT_DISPATCH_INDEX_TYPES(
       indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
         using indptr_t = index_t;
+        if (probs_or_mask.has_value()) {  // Count nonzero probs into in_degree.
+          GRAPHBOLT_DISPATCH_ALL_TYPES(
+              probs_or_mask.value().scalar_type(),
+              "SampleNeighborsPositiveProbs", ([&] {
+                using probs_t = scalar_t;
+                auto is_nonzero = thrust::make_transform_iterator(
+                    sliced_probs_or_mask.value().data_ptr<probs_t>(),
+                    IsPositive{});
+                size_t tmp_storage_size = 0;
+                cub::DeviceSegmentedReduce::Sum(
+                    nullptr, tmp_storage_size, is_nonzero,
+                    in_degree.data_ptr<indptr_t>(), num_rows,
+                    sub_indptr.data_ptr<indptr_t>(),
+                    sub_indptr.data_ptr<indptr_t>() + 1, stream);
+                auto tmp_storage =
+                    allocator.AllocateStorage<char>(tmp_storage_size);
+                cub::DeviceSegmentedReduce::Sum(
+                    tmp_storage.get(), tmp_storage_size, is_nonzero,
+                    in_degree.data_ptr<indptr_t>(), num_rows,
+                    sub_indptr.data_ptr<indptr_t>(),
+                    sub_indptr.data_ptr<indptr_t>() + 1, stream);
+              }));
+        }
         thrust::counting_iterator<int64_t> iota(0);
         auto sampled_degree = thrust::make_transform_iterator(
             iota, MinInDegreeFanout<indptr_t>{
@@ -246,10 +288,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                         probs_or_mask_scalar_type, "SampleNeighborsProbs",
                         ([&] {
                           using probs_t = scalar_t;
-                          probs_t* probs_ptr = nullptr;
-                          if (probs_or_mask.has_value()) {
-                            probs_ptr =
-                                probs_or_mask.value().data_ptr<probs_t>();
+                          probs_t* sliced_probs_ptr = nullptr;
+                          if (sliced_probs_or_mask.has_value()) {
+                            sliced_probs_ptr = sliced_probs_or_mask.value()
+                                                   .data_ptr<probs_t>();
                           }
                           const indices_t* indices_ptr =
                               layer ? indices.data_ptr<indices_t>() : nullptr;
@@ -261,7 +303,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                               _ComputeRandoms, grid, block, 0, stream,
                               num_edges, sliced_indptr.data_ptr<indptr_t>(),
                               sub_indptr.data_ptr<indptr_t>(),
-                              coo_rows.data_ptr<indices_t>(), probs_ptr,
+                              coo_rows.data_ptr<indices_t>(), sliced_probs_ptr,
                               indices_ptr, random_seed, randoms.get(),
                               edge_id_segments.get());
                         }));

@@ -1797,10 +1797,6 @@ def test_sample_neighbors_fanouts(
     assert subgraph.sampled_csc["n2:e2:n1"].indptr.size(0) == 2
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Sampling with replacement not yet supported on GPU.",
-)
 @pytest.mark.parametrize(
     "replace, expected_sampled_num1, expected_sampled_num2",
     [(False, 2, 2), (True, 4, 4)],
@@ -1808,6 +1804,8 @@ def test_sample_neighbors_fanouts(
 def test_sample_neighbors_replace(
     replace, expected_sampled_num1, expected_sampled_num2
 ):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     """Original graph in COO:
     "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
     "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
@@ -1966,14 +1964,12 @@ def test_sample_neighbors_return_eids_hetero(labor):
         )
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Sampling with replacement not yet supported on GPU.",
-)
 @pytest.mark.parametrize("replace", [True, False])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize("probs_name", ["weight", "mask"])
 def test_sample_neighbors_probs(replace, labor, probs_name):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -2020,10 +2016,6 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
         assert sampled_num == 4
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Sampling with replacement not yet supported on GPU.",
-)
 @pytest.mark.parametrize("replace", [True, False])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize(
@@ -2034,6 +2026,8 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
     ],
 )
 def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     # Initialize data.
     total_num_nodes = 5
     total_num_edges = 12
@@ -2065,10 +2059,6 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
     assert sampled_num == 0
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Sampling with replacement not yet supported on GPU.",
-)
 @pytest.mark.parametrize("replace", [False, True])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize(
@@ -2089,6 +2079,8 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
     ],
 )
 def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     """Original graph in COO:
     1   1   1   1   1   1
     0   0   0   0   0   0
@@ -2150,10 +2142,6 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
                 assert sampled_num == min(fanouts[0], 6)
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Sampling with replacement not yet supported on GPU.",
-)
 @pytest.mark.parametrize("replace", [False, True])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize(
@@ -2171,6 +2159,8 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
 def test_sample_neighbors_hetero_pick_number(
     fanouts, replace, labor, probs_name
 ):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     # Initialize data.
     total_num_nodes = 10
     total_num_edges = 9
