@@ -12,8 +12,9 @@ import pydantic
 import pytest
 import torch
 import yaml
-
 from dgl import graphbolt as gb
+
+from dgl.base import DGLWarning
 
 from .. import gb_test_utils as gbt
 
@@ -2269,7 +2270,10 @@ def test_OnDiskDataset_load_tasks_selectively():
         assert dataset.tasks[0].metadata["name"] == "link_prediction"
 
         # Case3. Test load tasks with non-existent task name.
-        with pytest.warns(UserWarning):
+        with pytest.warns(
+            DGLWarning,
+            match="Below tasks are not found in YAML: {'fake-name'}. Skipped.",
+        ):
             dataset = gb.OnDiskDataset(test_dir).load(tasks=["fake-name"])
             assert len(dataset.tasks) == 0
 

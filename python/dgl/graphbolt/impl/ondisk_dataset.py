@@ -1,7 +1,6 @@
 """GraphBolt OnDiskDataset."""
 
 import os
-import warnings
 from copy import deepcopy
 from typing import Dict, List, Union
 
@@ -531,10 +530,10 @@ class OnDiskDataset(Dataset):
                 if selected_tasks:
                     task_names.add(task_name)
         if selected_tasks:
-            fake_task_name = set(selected_tasks) - task_names
-            if len(fake_task_name):
-                warnings.warn(
-                    f"The task name {fake_task_name} may not be feasible."
+            not_found_tasks = set(selected_tasks) - task_names
+            if len(not_found_tasks):
+                dgl_warning(
+                    f"Below tasks are not found in YAML: {not_found_tasks}. Skipped."
                 )
         return ret
 
