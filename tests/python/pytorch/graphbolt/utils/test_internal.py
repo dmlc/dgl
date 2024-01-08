@@ -1,8 +1,10 @@
 import os
+import re
 import tempfile
 
 import dgl.graphbolt.internal as internal
 import numpy as np
+import pandas as pd
 import pytest
 import torch
 
@@ -141,3 +143,58 @@ def test_copy_or_convert_data(data_fmt, save_fmt, is_feature):
         data = None
         tensor_data = None
         out_data = None
+
+
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_read_edges(edge_fmt):
+    with tempfile.TemporaryDirectory() as test_dir:
+        num_nodes = 40
+        num_edges = 200
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors], axis=1)
+        os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+        if edge_fmt == "csv":
+            # Wrtie into edges/edge.csv
+            edges = pd.DataFrame(edges, columns=["src", "dst"])
+            edge_path = os.path.join("edges", "edge.csv")
+            edges.to_csv(
+                os.path.join(test_dir, edge_path),
+                index=False,
+                header=False,
+            )
+        else:
+            # Wrtie into edges/edge.npy
+            edges = edges.T
+            edge_path = os.path.join("edges", "edge.npy")
+            np.save(os.path.join(test_dir, edge_path), edges)
+        src, dst = internal.read_edges(test_dir, edge_fmt, edge_path)
+        assert torch.equal(src, torch.tensor(nodes))
+        assert torch.equal(dst, torch.tensor(neighbors))
+
+
+def test_read_edges_error():
+    with pytest.raises(
+        AssertionError,
+        match="`numpy` or `csv` is expected when reading edges but got `fake-type`.",
+    ):
+        internal.read_edges("test_dir", "fake-type", "edge_path")
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        num_nodes = 40
+        num_edges = 200
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors, nodes], axis=1)
+        os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+        # Wrtie into edges/edge.npy
+        edges = edges.T
+        edge_path = os.path.join("edges", "edge.npy")
+        np.save(os.path.join(test_dir, edge_path), edges)
+        with pytest.raises(
+            AssertionError,
+            match=re.escape(
+                "The shape of edges should be (2, N), but got torch.Size([3, 200])."
+            ),
+        ):
+            internal.read_edges(test_dir, "numpy", edge_path)
