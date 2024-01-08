@@ -76,16 +76,22 @@ class GraphSAGE(torch.nn.Module):
     def forward(self, blocks, x, device):
         h = x
         for i, (layer, block) in enumerate(zip(self.layers, blocks)):
-            edge_index = block.edges()
-            edge_index = torch.stack([edge_index[0], edge_index[1]], dim=0)
+            # print(f"Layer {i}: Feature tensor shape before convolution: {h.shape}")
+            src, dst = block.edges()
+            edge_index = torch.stack([src, dst], dim=0)
             h = layer(h, edge_index)
+            # print(f"Layer {i}: Feature tensor shape after convolution: {h.shape}")
             if i != len(blocks) - 1:
                 h = F.relu(h)
+            # print(f"Layer {i}: Number of destination nodes: {block.number_of_dst_nodes()}")
+
             h = h[: block.number_of_dst_nodes()]
+            # print(f"Layer {i}: Feature tensor shape after slicing: {h.shape}")
+
         return h
 
 
-def create_dataloader(dataset_set, graph, feature, device, shuffle):
+def create_dataloader(dataset_set, graph, feature, device, is_train):
     #####################################################################
     # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
     #
@@ -103,26 +109,19 @@ def create_dataloader(dataset_set, graph, feature, device, shuffle):
     # Users are encouraged to explore these advanced features for potentially improved performance.
 
     # Initialize an ItemSampler to sample mini-batches from the dataset.
-    datapipe = gb.ItemSampler(dataset_set, batch_size=1024, shuffle=shuffle)
+    datapipe = gb.ItemSampler(
+        dataset_set, batch_size=1024, shuffle=is_train, drop_last=not is_train
+    )
     # Sample neighbors for each node in the mini-batch.
     datapipe = datapipe.sample_neighbor(graph, [10, 10, 10])
     # Fetch node features for the sampled subgraph.
-    datapipe = gb.FeatureFetcher(datapipe, feature, node_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     # Copy the data to the specified device.
-    datapipe = gb.CopyTo(datapipe, device=device)
+    datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     return dataloader
-
-    # item_sampler = gb.ItemSampler(dataset_set, batch_size=1024, shuffle=shuffle)
-    # neighbor_sampler = item_sampler.sample_neighbor(graph, [10, 10, 10])
-    # feature_fetcher = gb.FeatureFetcher(
-    #     neighbor_sampler, feature, node_feature_keys=["feat"]
-    # )
-    # datapipe = gb.CopyTo(feature_fetcher, device=device)
-    # data_loader = gb.DataLoader(datapipe, num_workers=0)
-    # return data_loader
 
 
 def compute_accuracy(logits, labels):
@@ -199,7 +198,7 @@ def layerwise_infer(graph, feature, test_set, model, num_classes, device):
         graph=graph,
         feature=feature,
         device=device,
-        shuffle=False,
+        is_train=False,
     )
     all_predictions = []
     all_labels = []
@@ -230,12 +229,14 @@ def main():
     num_classes = dataset.tasks[0].metadata["num_classes"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_dataloader = create_dataloader(
-        train_set, graph, feature, device, True
+        train_set, graph, feature, device, is_train=True
     )
     valid_dataloader = create_dataloader(
-        valid_set, graph, feature, device, False
+        valid_set, graph, feature, device, is_train=False
     )
-    test_dataloader = create_dataloader(test_set, graph, feature, device, False)
+    test_dataloader = create_dataloader(
+        test_set, graph, feature, device, is_train=False
+    )
     in_channels = feature.size("node", None, "feat")[0]
     hidden_channels = 128
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(device)
