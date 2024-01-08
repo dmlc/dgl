@@ -125,6 +125,9 @@ def get_attributes(_obj) -> list:
 
 def read_edges(dataset_dir, edge_fmt, edge_path):
     """Read egde data from numpy or csv."""
+    assert edge_fmt in ["numpy", "csv"], print(
+        "Only numpy and csv are supported for edges."
+    )
     if edge_fmt == "numpy":
         edge_data = read_data(
             os.path.join(dataset_dir, edge_path),

@@ -91,9 +91,6 @@ def preprocess_ondisk_dataset(
         # Homogeneous graph.
         num_nodes = input_config["graph"]["nodes"][0]["num"]
         edge_fmt = input_config["graph"]["edges"][0]["format"]
-        assert edge_fmt in ["numpy", "csv"], print(
-            "only numpy and csv are supported for edges."
-        )
         edge_path = input_config["graph"]["edges"][0]["path"]
         src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         g = dgl.graph((src, dst), num_nodes=num_nodes)
@@ -107,9 +104,6 @@ def preprocess_ondisk_dataset(
         data_dict = {}
         for edge_info in input_config["graph"]["edges"]:
             edge_fmt = edge_info["format"]
-            assert edge_fmt in ["numpy", "csv"], print(
-                "only numpy and csv are supported for edges."
-            )
             edge_path = edge_info["path"]
             src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
             data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
