@@ -96,6 +96,9 @@ def random_homo_graphbolt_graph(
     neighbors = np.random.randint(0, num_nodes, size=(num_edges))
     edges = np.stack([nodes, neighbors], axis=1)
     os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+    assert edge_fmt in ["numpy", "csv"], print(
+        "only numpy and csv are supported for edges."
+    )
     if edge_fmt == "csv":
         # Wrtie into edges/edge.csv
         edges = pd.DataFrame(edges, columns=["src", "dst"])
@@ -218,6 +221,9 @@ def genereate_raw_data_for_hetero_dataset(
         src = torch.randint(0, num_nodes[src_ntype], (num_edge,))
         dst = torch.randint(0, num_nodes[dst_ntype], (num_edge,))
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+        assert edge_fmt in ["numpy", "csv"], print(
+            "only numpy and csv are supported for edges."
+        )
         if edge_fmt == "csv":
             # Write into edges/edge.csv
             edges = pd.DataFrame(
