@@ -18,15 +18,10 @@ The model is a three-layer GraphSAGE network implemented using PyTorch Geometric
 python node_classification.py
 ```
 
-### Sample on CPU and train/infer on CPU
-
-```
-python node_classification.py --dataset ogbn-products
-```
 
 
 
-### Accuracies
+## Accuracies
 ```
 Final performance(for ogbn-arxiv): 
 All runs:
@@ -36,6 +31,17 @@ Final Train: 62.26
 Final Test: 52.78
 ```
 
+
+
+## Run on `ogbn-products` dataset
+
+### Sample on CPU and train/infer on CPU
+
+```
+python node_classification.py --dataset ogbn-products
+```
+
+## Accuracies
 ```
 Final performance(for ogbn-products): 
 All runs:

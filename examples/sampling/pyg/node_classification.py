@@ -49,12 +49,13 @@ main
 
 """
 
+import argparse
+
 import dgl.graphbolt as gb
 import torch
 import torch.nn.functional as F
 import torchmetrics.functional as MF
 from torch_geometric.nn import SAGEConv
-import argparse
 
 
 class GraphSAGE(torch.nn.Module):
@@ -220,8 +221,15 @@ def layerwise_infer(graph, feature, test_set, model, num_classes, device):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Which dataset are you going to use?')
-    parser.add_argument('--dataset', type=str, default='ogbn-arxiv', help='Name of the dataset to use (e.g., "ogbn-products", "ogbn-arxiv")')
+    parser = argparse.ArgumentParser(
+        description="Which dataset are you going to use?"
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-arxiv",
+        help='Name of the dataset to use (e.g., "ogbn-products", "ogbn-arxiv")',
+    )
     args = parser.parse_args()
     dataset_name = args.dataset
     dataset = gb.BuiltinDataset(dataset_name).load()
