@@ -860,6 +860,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             input_nodes_timestamp,
             fanouts.tolist(),
             replace,
+            False,
             has_original_eids,
             probs_name,
             node_timestamp_attr_name,
