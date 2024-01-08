@@ -54,6 +54,7 @@ import torch
 import torch.nn.functional as F
 import torchmetrics.functional as MF
 from torch_geometric.nn import SAGEConv
+import argparse
 
 
 class GraphSAGE(torch.nn.Module):
@@ -84,7 +85,6 @@ class GraphSAGE(torch.nn.Module):
             if i != len(blocks) - 1:
                 h = F.relu(h)
             # print(f"Layer {i}: Number of destination nodes: {block.number_of_dst_nodes()}")
-
             h = h[: block.number_of_dst_nodes()]
             # print(f"Layer {i}: Feature tensor shape after slicing: {h.shape}")
 
@@ -220,7 +220,11 @@ def layerwise_infer(graph, feature, test_set, model, num_classes, device):
 
 
 def main():
-    dataset = gb.BuiltinDataset("ogbn-arxiv").load()
+    parser = argparse.ArgumentParser(description='Which dataset are you going to use?')
+    parser.add_argument('--dataset', type=str, default='ogbn-arxiv', help='Name of the dataset to use (e.g., "ogbn-products", "ogbn-arxiv")')
+    args = parser.parse_args()
+    dataset_name = args.dataset
+    dataset = gb.BuiltinDataset(dataset_name).load()
     graph = dataset.graph
     feature = dataset.feature
     train_set = dataset.tasks[0].train_set
@@ -228,6 +232,7 @@ def main():
     test_set = dataset.tasks[0].test_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     train_dataloader = create_dataloader(
         train_set, graph, feature, device, is_train=True
     )

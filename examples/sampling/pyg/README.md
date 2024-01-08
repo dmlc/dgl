@@ -12,27 +12,38 @@ This example aims to demonstrate how to run node classification task on heteroge
 The model is a three-layer GraphSAGE network implemented using PyTorch Geometric's SAGEConv layers.
 
 
-## Training is performed with the following settings:
+## Default Run on `ogbn-arxiv` dataset
 
-Mini-batch size: 1024 Neighbor sampling: [10, 10, 10] Optimizer: Ada Learning Rate: 0.01 Weight Decay: 5e-4 Loss Function: CrossEntropyLoss Evaluation is done separately for validation and test datasets. The model's performance is measured in terms of accuracy using the torchmetrics.functional library.
-
-
-## Run on `ogbn-arxiv` dataset
-
+```
+python node_classification.py
+```
 
 ### Sample on CPU and train/infer on CPU
 
-python3 node_classification.py
+```
+python node_classification.py --dataset ogbn-products
+```
+
 
 
 ### Accuracies
-
-Final performance: 
+```
+Final performance(for ogbn-arxiv): 
 All runs:
 Highest Train: 62.26
 Highest Valid: 59.89
 Final Train: 62.26
 Final Test: 52.78
+```
+
+```
+Final performance(for ogbn-products): 
+All runs:
+Highest Train: 90.79
+Highest Valid: 89.86
+Final Train: 90.79
+Final Test: 75.24
+```
 
 
 
