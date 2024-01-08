@@ -137,7 +137,7 @@ def read_edges(dataset_dir, edge_fmt, edge_path):
         assert (
             edge_data.shape[0] == 2 and len(edge_data.shape) == 2
         ), f"The shape of edges should be (2, N), but got {edge_data.shape}."
-        src, dst = edge_data
+        src, dst = edge_data.numpy()
     else:
         edge_data = pd.read_csv(
             os.path.join(dataset_dir, edge_path),

@@ -169,8 +169,8 @@ def test_read_edges(edge_fmt):
             edge_path = os.path.join("edges", "edge.npy")
             np.save(os.path.join(test_dir, edge_path), edges)
         src, dst = internal.read_edges(test_dir, edge_fmt, edge_path)
-        assert torch.equal(src, torch.tensor(nodes))
-        assert torch.equal(dst, torch.tensor(neighbors))
+        assert src.all() == nodes.all()
+        assert dst.all() == neighbors.all()
 
 
 def test_read_edges_error():
