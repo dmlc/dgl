@@ -110,7 +110,7 @@ def create_dataloader(dataset_set, graph, feature, device, is_train):
 
     # Initialize an ItemSampler to sample mini-batches from the dataset.
     datapipe = gb.ItemSampler(
-        dataset_set, batch_size=1024, shuffle=is_train, drop_last=not is_train
+        dataset_set, batch_size=1024, shuffle=is_train, drop_last=is_train
     )
     # Sample neighbors for each node in the mini-batch.
     datapipe = datapipe.sample_neighbor(graph, [10, 10, 10])
