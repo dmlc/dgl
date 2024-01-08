@@ -4,6 +4,7 @@ import os
 import shutil
 
 import numpy as np
+import pandas as pd
 import torch
 from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
@@ -120,3 +121,24 @@ def get_attributes(_obj) -> list:
         and not callable(getattr(_obj, attribute))
     ]
     return attributes
+
+
+def read_edges(dataset_dir, edge_fmt, edge_path):
+    if edge_fmt == "numpy":
+        edge_data = read_data(
+            os.path.join(dataset_dir, edge_path),
+            edge_fmt,
+        )
+        assert edge_data.shape[0] == 2 and len(edge_data.shape) == 2, print(
+            "The shape of edges should be (2, N)."
+        )
+        src, dst = edge_data
+    else:
+        edge_data = pd.read_csv(
+            os.path.join(dataset_dir, edge_path),
+            names=["src", "dst"],
+        )
+        src, dst = torch.tensor(edge_data["src"]), torch.tensor(
+            edge_data["dst"]
+        )
+    return (src, dst)
