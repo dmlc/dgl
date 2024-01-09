@@ -223,11 +223,12 @@ def main():
         )
 
         valid_accuracy = evaluate(model, valid_dataloader, device, num_classes)
-        test_accuracy = evaluate(model, test_dataloader, device, num_classes)
         print(
             f"Epoch {epoch}, Train Loss: {train_loss:.4f}, Train Accuracy: {valid_accuracy:.4f}, "
-            f"Valid Accuracy: {valid_accuracy:.4f}, Test Accuracy: {test_accuracy:.4f}"
+            f"Valid Accuracy: {valid_accuracy:.4f}"
         )
+    test_accuracy = evaluate(model, test_dataloader, device, num_classes)
+    print(f"Test Accuracy: {test_accuracy:.4f}")
 
 
 if __name__ == "__main__":
