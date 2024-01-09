@@ -1095,7 +1095,8 @@ def test_OnDiskDataset_Metadata():
         assert dataset.dataset_name == dataset_name
 
 
-def test_OnDiskDataset_preprocess_homogeneous():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1111,6 +1112,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1160,6 +1162,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1527,7 +1530,8 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
             )
 
 
-def test_OnDiskDataset_load_name():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_name(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1543,6 +1547,7 @@ def test_OnDiskDataset_load_name():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1556,7 +1561,8 @@ def test_OnDiskDataset_load_name():
         dataset = None
 
 
-def test_OnDiskDataset_load_feature():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_feature(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1572,6 +1578,7 @@ def test_OnDiskDataset_load_feature():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1640,7 +1647,8 @@ def test_OnDiskDataset_load_feature():
         dataset = None
 
 
-def test_OnDiskDataset_load_graph():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_graph(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1656,6 +1664,7 @@ def test_OnDiskDataset_load_graph():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1723,6 +1732,7 @@ def test_OnDiskDataset_load_graph():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1739,7 +1749,8 @@ def test_OnDiskDataset_load_graph():
         dataset = None
 
 
-def test_OnDiskDataset_load_tasks():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_tasks(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1755,6 +1766,7 @@ def test_OnDiskDataset_load_tasks():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -2028,7 +2040,8 @@ def test_BuiltinDataset():
 
 
 @pytest.mark.parametrize("include_original_edge_id", [True, False])
-def test_OnDiskDataset_homogeneous(include_original_edge_id):
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_homogeneous(include_original_edge_id, edge_fmt):
     """Preprocess and instantiate OnDiskDataset for homogeneous graph."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -2044,6 +2057,7 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -2095,7 +2109,8 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
 
 
 @pytest.mark.parametrize("include_original_edge_id", [True, False])
-def test_OnDiskDataset_heterogeneous(include_original_edge_id):
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_heterogeneous(include_original_edge_id, edge_fmt):
     """Preprocess and instantiate OnDiskDataset for heterogeneous graph."""
     with tempfile.TemporaryDirectory() as test_dir:
         dataset_name = "OnDiskDataset_hetero"
@@ -2114,6 +2129,7 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
 
         dataset = gb.OnDiskDataset(

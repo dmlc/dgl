@@ -4,7 +4,6 @@ import os
 from copy import deepcopy
 from typing import Dict, List, Union
 
-import pandas as pd
 import torch
 import yaml
 
@@ -14,7 +13,12 @@ from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
-from ..internal import copy_or_convert_data, get_attributes, read_data
+from ..internal import (
+    copy_or_convert_data,
+    get_attributes,
+    read_data,
+    read_edges,
+)
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
@@ -86,14 +90,9 @@ def preprocess_ondisk_dataset(
     if is_homogeneous:
         # Homogeneous graph.
         num_nodes = input_config["graph"]["nodes"][0]["num"]
-        edge_data = pd.read_csv(
-            os.path.join(
-                dataset_dir, input_config["graph"]["edges"][0]["path"]
-            ),
-            names=["src", "dst"],
-        )
-        src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
-
+        edge_fmt = input_config["graph"]["edges"][0]["format"]
+        edge_path = input_config["graph"]["edges"][0]["path"]
+        src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         g = dgl.graph((src, dst), num_nodes=num_nodes)
     else:
         # Heterogeneous graph.
@@ -104,12 +103,9 @@ def preprocess_ondisk_dataset(
         # Construct the data dict.
         data_dict = {}
         for edge_info in input_config["graph"]["edges"]:
-            edge_data = pd.read_csv(
-                os.path.join(dataset_dir, edge_info["path"]),
-                names=["src", "dst"],
-            )
-            src = torch.tensor(edge_data["src"])
-            dst = torch.tensor(edge_data["dst"])
+            edge_fmt = edge_info["format"]
+            edge_path = edge_info["path"]
+            src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
             data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
         # Construct the heterograph.
         g = dgl.heterograph(data_dict, num_nodes_dict)
