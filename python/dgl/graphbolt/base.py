@@ -102,16 +102,42 @@ def apply_to(x, device):
 @functional_datapipe("copy_to")
 class CopyTo(IterDataPipe):
     """DataPipe that transfers each element yielded from the previous DataPipe
-    to the given device.
+    to the given device. For MiniBatch, only the related attributes
+    (automatically inferred) will be transferred by default. If you want to
+    transfer any other attributes, indicate them in the ``extra_attrs``.
 
     Functional name: :obj:`copy_to`.
 
-    This is equivalent to
+    When ``data`` has ``to`` method implemented, ``CopyTo`` will be equivalent
+    to
 
     .. code:: python
 
        for data in datapipe:
            yield data.to(device)
+
+    For :class:`~dgl.graphbolt.MiniBatch`, only a part of attributes will be
+    transferred to accelerate the process by default:
+
+    - When ``seed_nodes`` is not None and ``node_pairs`` is None, node related
+    task is inferred. Only ``labels``, ``sampled_subgraphs``, ``node_features``
+    and ``edge_features`` will be transferred.
+
+    - When ``node_pairs`` is not None and ``seed_nodes`` is None, edge/link
+    related task is inferred. Only ``labels``, ``compacted_node_pairs``,
+    ``compacted_negative_srcs``, ``compacted_negative_dsts``,
+    ``sampled_subgraphs``, ``node_features`` and ``edge_features`` will be
+    transferred.
+
+    - Otherwise, all attributes will be transferred.
+
+    - If you want some other attributes to be transferred as well, please
+    specify the name in the ``extra_attrs``. For instance, the following code
+    will copy ``seed_nodes`` to the GPU as well:
+
+    .. code:: python
+
+       datapipe = datapipe.copy_to(device="cuda", extra_attrs=["seed_nodes"])
 
     Parameters
     ----------
@@ -119,16 +145,31 @@ class CopyTo(IterDataPipe):
         The DataPipe.
     device : torch.device
         The PyTorch CUDA device.
+    extra_attrs: List[string]
+        The extra attributes of the data in the DataPipe you want to be carried
+        to the specific device. The attributes specified in the ``extra_attrs``
+        will be transferred regardless of the task inferred. It could also be
+        applied to classes other than :class:`~dgl.graphbolt.MiniBatch`.
     """
 
-    def __init__(self, datapipe, device):
+    def __init__(self, datapipe, device, extra_attrs=None):
         super().__init__()
         self.datapipe = datapipe
         self.device = device
+        self.extra_attrs = extra_attrs
 
     def __iter__(self):
         for data in self.datapipe:
             data = recursive_apply(data, apply_to, self.device)
+            if self.extra_attrs is not None:
+                for attr in self.extra_attrs:
+                    setattr(
+                        data,
+                        attr,
+                        recursive_apply(
+                            getattr(data, attr), apply_to, self.device
+                        ),
+                    )
             yield data
 
 
@@ -148,6 +189,14 @@ class CSCFormatBase:
     """
     indptr: torch.Tensor = None
     indices: torch.Tensor = None
+
+    def __init__(self, indptr: torch.Tensor, indices: torch.Tensor):
+        self.indptr = indptr
+        self.indices = indices
+        if not indptr.is_cuda:
+            assert self.indptr[-1] == len(
+                self.indices
+            ), "The last element of indptr should be the same as the length of indices."
 
     def __repr__(self) -> str:
         return _csc_format_base_str(self)

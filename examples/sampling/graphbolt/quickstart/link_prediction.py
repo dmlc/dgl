@@ -93,7 +93,9 @@ def evaluate(model, dataset, device):
         # Forward.
         y = model(data.blocks, x)
         logit = (
-            model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
+            model.predictor(
+                y[compacted_pairs[0].long()] * y[compacted_pairs[1].long()]
+            )
             .squeeze()
             .detach()
         )
@@ -132,7 +134,7 @@ def train(model, dataset, device):
             # Forward.
             y = model(data.blocks, x)
             logits = model.predictor(
-                y[compacted_pairs[0]] * y[compacted_pairs[1]]
+                y[compacted_pairs[0].long()] * y[compacted_pairs[1].long()]
             ).squeeze()
 
             # Compute loss.
