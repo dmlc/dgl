@@ -13,8 +13,7 @@ namespace graphbolt {
 namespace ops {
 
 torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
-  if (input.is_pinned() &&
-      (index.is_pinned() || index.device().type() == c10::DeviceType::CUDA)) {
+  if (utils::is_on_gpu(index) && input.is_pinned()) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "UVAIndexSelect",
         { return UVAIndexSelectImpl(input, index); });
