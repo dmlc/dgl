@@ -1168,9 +1168,9 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
-        # Test do not generate original_edge_id.
+        # Test generating original_edge_id.
         output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, include_original_edge_id=False
+            test_dir, include_original_edge_id=True
         )
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
@@ -1179,8 +1179,7 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         )
         assert (
             fused_csc_sampling_graph.edge_attributes is not None
-            and gb.ORIGINAL_EDGE_ID
-            not in fused_csc_sampling_graph.edge_attributes
+            and gb.ORIGINAL_EDGE_ID in fused_csc_sampling_graph.edge_attributes
         )
         fused_csc_sampling_graph = None
 
@@ -1825,11 +1824,13 @@ def test_OnDiskDataset_load_tasks(edge_fmt):
         # the absolute path segment.
         dataset = gb.OnDiskDataset(test_dir).load()
         original_train_set = dataset.tasks[0].train_set._items
-        dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
-            "path"
-        ] = os.path.join(
-            test_dir,
-            dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0]["path"],
+        dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0]["path"] = (
+            os.path.join(
+                test_dir,
+                dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
+                    "path"
+                ],
+            )
         )
         dataset.load()
         modify_train_set = dataset.tasks[0].train_set._items
