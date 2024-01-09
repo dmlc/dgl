@@ -165,6 +165,12 @@ def random_homo_graphbolt_graph(
                 - format: {edge_fmt}
                   path: {edge_path}
             feature_data:
+                - domain: node
+                  type: null
+                  name: feat
+                  format: numpy
+                  in_memory: true
+                  path: {node_feat_path}
                 - domain: edge
                   type: null
                   name: feat
@@ -250,6 +256,16 @@ def genereate_raw_data_for_hetero_dataset(
         np.save(os.path.join(test_dir, node_feat_path), node_feats)
         node_feats_path[ntype] = node_feat_path
 
+    # Generate edge features.
+    edge_feats_path = {}
+    os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
+    for etype, num_edge in num_edges.items():
+        etype = gb.etype_tuple_to_str(etype)
+        edge_feat_path = os.path.join("data", f"{etype}-feat.npy")
+        edge_feats = np.random.rand(num_edge, num_classes)
+        np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
+        edge_feats_path[etype] = edge_feat_path
+
     # Generate train/test/valid set.
     os.makedirs(os.path.join(test_dir, "set"), exist_ok=True)
     user_ids = torch.arange(num_nodes["user"])
@@ -285,6 +301,31 @@ def genereate_raw_data_for_hetero_dataset(
             - type: "user:click:item"
               format: {edge_fmt}
               path: {edges_path["click"]}
+          feature_data:
+            - domain: node
+              type: user
+              name: feat
+              format: numpy
+              in_memory: true
+              path: {node_feats_path["user"]}
+            - domain: node
+              type: item
+              name: feat
+              format: numpy
+              in_memory: true
+              path: {node_feats_path["item"]}
+            - domain: edge
+              type: "user:follow:user"
+              name: feat
+              format: numpy
+              in_memory: true
+              path: {edge_feats_path["user:follow:user"]}
+            - domain: edge
+              type: "user:click:item"
+              name: feat
+              format: numpy
+              in_memory: true
+              path: {edge_feats_path["user:click:item"]}
         feature_data:
           - domain: node
             type: user
