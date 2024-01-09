@@ -161,11 +161,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto max_in_degree = torch::empty(
       1,
       c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
-  AT_DISPATCH_INTEGRAL_TYPES(
+  AT_DISPATCH_INDEX_TYPES(
       indptr.scalar_type(), "SampleNeighborsInDegree", ([&] {
         CUB_CALL(
-            DeviceReduce::Max, in_degree.data_ptr<scalar_t>(),
-            max_in_degree.data_ptr<scalar_t>(), num_rows);
+            DeviceReduce::Max, in_degree.data_ptr<index_t>(),
+            max_in_degree.data_ptr<index_t>(), num_rows);
       }));
   auto coo_rows = CSRToCOO(sub_indptr, indices.scalar_type());
   const auto num_edges = coo_rows.size(0);
@@ -176,9 +176,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   torch::Tensor output_indices;
   torch::optional<torch::Tensor> output_type_per_edge;
 
-  AT_DISPATCH_INTEGRAL_TYPES(
+  AT_DISPATCH_INDEX_TYPES(
       indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
-        using indptr_t = scalar_t;
+        using indptr_t = index_t;
         thrust::counting_iterator<int64_t> iota(0);
         auto sampled_degree = thrust::make_transform_iterator(
             iota, MinInDegreeFanout<indptr_t>{
@@ -220,9 +220,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                   allocator.AllocateStorage<edge_id_t>(num_edges);
               auto sorted_edge_id_segments =
                   allocator.AllocateStorage<edge_id_t>(num_edges);
-              AT_DISPATCH_INTEGRAL_TYPES(
+              AT_DISPATCH_INDEX_TYPES(
                   indices.scalar_type(), "SampleNeighborsIndices", ([&] {
-                    using indices_t = scalar_t;
+                    using indices_t = index_t;
                     auto probs_or_mask_scalar_type = torch::kFloat32;
                     if (probs_or_mask.has_value()) {
                       probs_or_mask_scalar_type =
@@ -309,9 +309,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             picked_eids.options().dtype(indices.scalar_type()));
 
         // Compute: output_indices = indices.gather(0, picked_eids);
-        AT_DISPATCH_INTEGRAL_TYPES(
+        AT_DISPATCH_INDEX_TYPES(
             indices.scalar_type(), "SampleNeighborsOutputIndices", ([&] {
-              using indices_t = scalar_t;
+              using indices_t = index_t;
               THRUST_CALL(
                   gather, picked_eids.data_ptr<indptr_t>(),
                   picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),

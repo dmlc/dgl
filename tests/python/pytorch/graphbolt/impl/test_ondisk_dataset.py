@@ -12,8 +12,9 @@ import pydantic
 import pytest
 import torch
 import yaml
-
 from dgl import graphbolt as gb
+
+from dgl.base import DGLWarning
 
 from .. import gb_test_utils as gbt
 
@@ -1095,7 +1096,8 @@ def test_OnDiskDataset_Metadata():
         assert dataset.dataset_name == dataset_name
 
 
-def test_OnDiskDataset_preprocess_homogeneous():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1111,6 +1113,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1160,6 +1163,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1527,7 +1531,8 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
             )
 
 
-def test_OnDiskDataset_load_name():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_name(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1543,6 +1548,7 @@ def test_OnDiskDataset_load_name():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1556,7 +1562,8 @@ def test_OnDiskDataset_load_name():
         dataset = None
 
 
-def test_OnDiskDataset_load_feature():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_feature(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1572,6 +1579,7 @@ def test_OnDiskDataset_load_feature():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1640,7 +1648,8 @@ def test_OnDiskDataset_load_feature():
         dataset = None
 
 
-def test_OnDiskDataset_load_graph():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_graph(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1656,6 +1665,7 @@ def test_OnDiskDataset_load_graph():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1723,6 +1733,7 @@ def test_OnDiskDataset_load_graph():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1739,7 +1750,8 @@ def test_OnDiskDataset_load_graph():
         dataset = None
 
 
-def test_OnDiskDataset_load_tasks():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_tasks(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1755,6 +1767,7 @@ def test_OnDiskDataset_load_tasks():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -2028,7 +2041,8 @@ def test_BuiltinDataset():
 
 
 @pytest.mark.parametrize("include_original_edge_id", [True, False])
-def test_OnDiskDataset_homogeneous(include_original_edge_id):
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_homogeneous(include_original_edge_id, edge_fmt):
     """Preprocess and instantiate OnDiskDataset for homogeneous graph."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -2044,6 +2058,7 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -2095,7 +2110,8 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
 
 
 @pytest.mark.parametrize("include_original_edge_id", [True, False])
-def test_OnDiskDataset_heterogeneous(include_original_edge_id):
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_heterogeneous(include_original_edge_id, edge_fmt):
     """Preprocess and instantiate OnDiskDataset for heterogeneous graph."""
     with tempfile.TemporaryDirectory() as test_dir:
         dataset_name = "OnDiskDataset_hetero"
@@ -2114,6 +2130,7 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
 
         dataset = gb.OnDiskDataset(
@@ -2223,3 +2240,61 @@ def test_OnDiskTask_repr_heterogeneous():
 )"""
     )
     assert str(task) == expected_str, print(task)
+
+
+def test_OnDiskDataset_load_tasks_selectively():
+    """Test preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        train_path = os.path.join("set", "train.npy")
+
+        yaml_content += f"""      - name: node_classification
+            num_classes: {num_classes}
+            train_set:
+              - type: null
+                data:
+                  - format: numpy
+                    path: {train_path}
+        """
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # Case1. Test load all tasks.
+        dataset = gb.OnDiskDataset(test_dir).load()
+        assert len(dataset.tasks) == 2
+
+        # Case2. Test load tasks selectively.
+        dataset = gb.OnDiskDataset(test_dir).load(tasks="link_prediction")
+        assert len(dataset.tasks) == 1
+        assert dataset.tasks[0].metadata["name"] == "link_prediction"
+        dataset = gb.OnDiskDataset(test_dir).load(tasks=["link_prediction"])
+        assert len(dataset.tasks) == 1
+        assert dataset.tasks[0].metadata["name"] == "link_prediction"
+
+        # Case3. Test load tasks with non-existent task name.
+        with pytest.warns(
+            DGLWarning,
+            match="Below tasks are not found in YAML: {'fake-name'}. Skipped.",
+        ):
+            dataset = gb.OnDiskDataset(test_dir).load(tasks=["fake-name"])
+            assert len(dataset.tasks) == 0
+
+        # Case4. Test load tasks selectively with incorrect task type.
+        with pytest.raises(TypeError):
+            dataset = gb.OnDiskDataset(test_dir).load(tasks=2)
+
+        dataset = None
