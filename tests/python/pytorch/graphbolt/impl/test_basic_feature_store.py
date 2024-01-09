@@ -43,6 +43,9 @@ def test_basic_feature_store_homo():
     assert feature_store.metadata("node", None, "a") == metadata
     assert feature_store.metadata("node", None, "b") == {}
 
+    # Test get keys of the features.
+    assert feature_store.keys() == [("node", None, "a"), ("node", None, "b")]
+
 
 def test_basic_feature_store_hetero():
     a = torch.tensor([[1, 2, 4], [2, 5, 3]])
@@ -80,6 +83,12 @@ def test_basic_feature_store_hetero():
     # Test get metadata of the feature.
     assert feature_store.metadata("node", "author", "a") == metadata
     assert feature_store.metadata("edge", "paper:cites", "b") == {}
+
+    # Test get keys of the features.
+    assert feature_store.keys() == [
+        ("node", "author", "a"),
+        ("edge", "paper:cites", "b"),
+    ]
 
 
 def test_basic_feature_store_errors():
