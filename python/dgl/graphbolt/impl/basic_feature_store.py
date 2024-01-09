@@ -142,7 +142,8 @@ class BasicFeatureStore(FeatureStore):
 
         Returns
         -------
-        List[tuple(domain, type_name, feature_name)]
-            The keys of the features.
+        List[tuple]
+            The keys of the features. The tuples are in `(domain, type_name,
+            feat_name)` format.
         """
         return list(self._features.keys())
