@@ -20,6 +20,13 @@ inline bool is_accessible_from_gpu(torch::Tensor tensor) {
 }
 
 /**
+ * @brief Checks whether the tensor is stored on the GPU.
+ */
+inline bool is_on_gpu(torch::Tensor tensor) {
+  return tensor.device().type() == c10::DeviceType::CUDA;
+}
+
+/**
  * @brief Retrieves the value of the tensor at the given index.
  *
  * @note If the tensor is not contiguous, it will be copied to a contiguous
