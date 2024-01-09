@@ -411,14 +411,54 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self):
-        """Load the dataset."""
+    def load(self, tasks: List[str] = None):
+        """Load the dataset.
+
+        Parameters
+        ----------
+        tasks: List[str] = None
+            The name of the tasks to be loaded. For single task, the type of
+            tasks can be both string and List[str]. For multiple tasks, only
+            List[str] is acceptable.
+
+        Examples
+        --------
+        1. Loading via single task name "node_classification".
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks="node_classification")
+        >>> len(dataset.tasks)
+        1
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+
+        2. Loading via single task name ["node_classification"].
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks=["node_classification"])
+        >>> len(dataset.tasks)
+        1
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+
+        3. Loading via multiple task names ["node_classification",
+        "link_prediction"].
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks=["node_classification","link_prediction"])
+        >>> len(dataset.tasks)
+        2
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+        >>> dataset.tasks[1].metadata["name"]
+        "link_prediction"
+        """
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
-        self._tasks = self._init_tasks(self._meta.tasks)
+        self._tasks = self._init_tasks(self._meta.tasks, tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
         self._loaded = True
         return self
@@ -458,20 +498,39 @@ class OnDiskDataset(Dataset):
         self._check_loaded()
         return self._all_nodes_set
 
-    def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
+    def _init_tasks(
+        self, tasks: List[OnDiskTaskData], selected_tasks: List[str]
+    ) -> List[OnDiskTask]:
         """Initialize the tasks."""
+        if isinstance(selected_tasks, str):
+            selected_tasks = [selected_tasks]
+        if selected_tasks and not isinstance(selected_tasks, list):
+            raise TypeError(
+                f"The type of selected_task should be list, but got {type(selected_tasks)}"
+            )
         ret = []
         if tasks is None:
             return ret
+        task_names = set()
         for task in tasks:
-            ret.append(
-                OnDiskTask(
-                    task.extra_fields,
-                    self._init_tvt_set(task.train_set),
-                    self._init_tvt_set(task.validation_set),
-                    self._init_tvt_set(task.test_set),
+            task_name = task.extra_fields.get("name", None)
+            if selected_tasks is None or task_name in selected_tasks:
+                ret.append(
+                    OnDiskTask(
+                        task.extra_fields,
+                        self._init_tvt_set(task.train_set),
+                        self._init_tvt_set(task.validation_set),
+                        self._init_tvt_set(task.test_set),
+                    )
                 )
-            )
+                if selected_tasks:
+                    task_names.add(task_name)
+        if selected_tasks:
+            not_found_tasks = set(selected_tasks) - task_names
+            if len(not_found_tasks):
+                dgl_warning(
+                    f"Below tasks are not found in YAML: {not_found_tasks}. Skipped."
+                )
         return ret
 
     def _check_loaded(self):
