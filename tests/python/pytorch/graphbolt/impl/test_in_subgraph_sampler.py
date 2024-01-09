@@ -48,18 +48,22 @@ def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
         indices = indices.cuda()
     index = index.cuda()
 
-    gpu_indptr, gpu_indices = torch.ops.graphbolt.index_select_csc(
-        indptr, indices, index
-    )
+    output_size = None
+    for _ in range(2):
+        gpu_indptr, gpu_indices = torch.ops.graphbolt.index_select_csc(
+            indptr, indices, index, output_size
+        )
 
-    assert not cpu_indptr.is_cuda
-    assert not cpu_indices.is_cuda
+        assert not cpu_indptr.is_cuda
+        assert not cpu_indices.is_cuda
 
-    assert gpu_indptr.is_cuda
-    assert gpu_indices.is_cuda
+        assert gpu_indptr.is_cuda
+        assert gpu_indices.is_cuda
 
-    assert torch.equal(cpu_indptr, gpu_indptr.cpu())
-    assert torch.equal(cpu_indices, gpu_indices.cpu())
+        assert torch.equal(cpu_indptr, gpu_indptr.cpu())
+        assert torch.equal(cpu_indices, gpu_indices.cpu())
+
+        output_size = indptr[-1].item()
 
 
 def test_InSubgraphSampler_homo():

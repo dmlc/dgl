@@ -152,14 +152,17 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
-  auto sub_indptr = ExclusiveCumSum(in_degree);
+  torch::Tensor sub_indptr;
   if (fanouts.size() > 1) {
     torch::Tensor sliced_type_per_edge;
-    std::tie(sub_indptr, sliced_type_per_edge) =
-        IndexSelectCSCImpl(indptr, type_per_edge.value(), nodes);
+    std::tie(sub_indptr, sliced_type_per_edge) = IndexSelectCSCImpl(
+        in_degree, sliced_indptr, type_per_edge.value(), nodes,
+        indptr.size(0) - 2);
     std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
         sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
     num_rows = sliced_indptr.size(0);
+  } else {
+    sub_indptr = ExclusiveCumSum(in_degree);
   }
   auto max_in_degree = torch::empty(
       1,
