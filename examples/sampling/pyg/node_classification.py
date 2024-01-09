@@ -78,17 +78,12 @@ class GraphSAGE(torch.nn.Module):
     def forward(self, blocks, x, device):
         h = x
         for i, (layer, block) in enumerate(zip(self.layers, blocks)):
-            # print(f"Layer {i}: Feature tensor shape before convolution: {h.shape}")
             src, dst = block.edges()
             edge_index = torch.stack([src, dst], dim=0)
-            h = layer(h, edge_index)
-            # print(f"Layer {i}: Feature tensor shape after convolution: {h.shape}")
+            h_src, h_dst = h, h[: block.number_of_dst_nodes()]
+            h = layer((h_src, h_dst), edge_index)
             if i != len(blocks) - 1:
                 h = F.relu(h)
-            # print(f"Layer {i}: Number of destination nodes: {block.number_of_dst_nodes()}")
-            h = h[: block.number_of_dst_nodes()]
-            # print(f"Layer {i}: Feature tensor shape after slicing: {h.shape}")
-
         return h
 
 
