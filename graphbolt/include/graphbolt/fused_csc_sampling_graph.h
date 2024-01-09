@@ -325,7 +325,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Sample neighboring edges of the given nodes with a temporal
    * constraint. If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is
    * given, the sampled neighbors or edges of an input node must have a
-   * timestamp that is no later than that of the input node.
+   * timestamp that is smaller than that of the input node.
    *
    * @param nodes The nodes from which to sample neighbors.
    * @param input_nodes_timestamp The timestamp of the nodes.
@@ -335,6 +335,9 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @param replace Boolean indicating whether the sample is preformed with or
    * without replacement. If True, a value can be selected multiple times.
    * Otherwise, each value can be selected only once.
+   * @param layer Boolean indicating whether neighbors should be sampled in a
+   * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
+   * sampled edges, see arXiv:2210.13339.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
    * @param probs_name An optional string specifying the name of an edge
@@ -351,8 +354,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   c10::intrusive_ptr<FusedSampledSubgraph> TemporalSampleNeighbors(
       const torch::Tensor& input_nodes,
       const torch::Tensor& input_nodes_timestamp,
-      const std::vector<int64_t>& fanouts, bool replace, bool return_eids,
-      torch::optional<std::string> probs_name,
+      const std::vector<int64_t>& fanouts, bool replace, bool layer,
+      bool return_eids, torch::optional<std::string> probs_name,
       torch::optional<std::string> node_timestamp_attr_name,
       torch::optional<std::string> edge_timestamp_attr_name) const;
 
