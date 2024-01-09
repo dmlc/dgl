@@ -239,6 +239,13 @@ def test_torch_based_feature_store(in_memory):
             "edge", "paper:cites:paper", "b"
         ) == torch.Size([2, 2])
 
+        # Test get the keys of the features.
+        # assert 0, print(feature_store.keys())
+        assert feature_store.keys() == [
+            ("node", "paper", "a"),
+            ("edge", "paper:cites:paper", "b"),
+        ]
+
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None

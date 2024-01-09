@@ -136,3 +136,13 @@ class BasicFeatureStore(FeatureStore):
     def __len__(self):
         """Return the number of features."""
         return len(self._features)
+
+    def keys(self):
+        """Get the keys of the features.
+
+        Returns
+        -------
+        List[tuple]
+            The keys of the features.
+        """
+        return list(self._features.keys())

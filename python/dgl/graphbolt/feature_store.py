@@ -171,3 +171,13 @@ class FeatureStore:
             updated.
         """
         raise NotImplementedError
+
+    def keys(self):
+        """Get the keys of the features.
+
+        Returns
+        -------
+        List[tuple]
+            The keys of the features.
+        """
+        return []
