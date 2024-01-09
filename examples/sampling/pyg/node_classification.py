@@ -182,35 +182,6 @@ def evaluate(model, dataloader, device, num_classes):
     )
 
 
-@torch.no_grad()
-def layerwise_infer(graph, feature, test_set, model, num_classes, device):
-    model.eval()
-    dataloader = create_dataloader(
-        dataset_set=test_set,
-        graph=graph,
-        feature=feature,
-        device=device,
-        is_train=False,
-    )
-    all_predictions = []
-    all_labels = []
-
-    for minibatch in dataloader:
-        node_features = minibatch.node_features["feat"]
-        labels = minibatch.labels
-        blocks = minibatch.blocks
-        predictions = model(blocks, node_features, device)
-        all_predictions.append(predictions)
-        all_labels.append(labels)
-
-    all_predictions = torch.cat(all_predictions, dim=0)
-    all_labels = torch.cat(all_labels, dim=0)
-
-    return MF.accuracy(
-        all_predictions, all_labels, task="multiclass", num_classes=num_classes
-    )
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Which dataset are you going to use?"
@@ -250,13 +221,12 @@ def main():
         train_loss, train_accuracy = train(
             model, train_dataloader, optimizer, criterion, device, num_classes
         )
+
         valid_accuracy = evaluate(model, valid_dataloader, device, num_classes)
-        test_accuracy = layerwise_infer(
-            graph, feature, test_set, model, num_classes, device
-        )
+        test_accuracy = evaluate(model, test_dataloader, device, num_classes)
         print(
-            f"Epoch {epoch}, Train Loss: {train_loss}, Train Accuracy: {train_accuracy}, "
-            f"Valid Accuracy: {valid_accuracy}, Test Accuracy: {test_accuracy}"
+            f"Epoch {epoch}, Train Loss: {train_loss:.4f}, Train Accuracy: {valid_accuracy:.4f}, "
+            f"Valid Accuracy: {valid_accuracy:.4f}, Test Accuracy: {test_accuracy:.4f}"
         )
 
 
