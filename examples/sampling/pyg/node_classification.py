@@ -120,13 +120,7 @@ def create_dataloader(dataset_set, graph, feature, device, is_train):
     return dataloader
 
 
-def compute_accuracy(logits, labels):
-    _, predicted = torch.max(logits, dim=1)
-    correct = (predicted == labels).sum().item()
-    return correct / labels.size(0)
-
-
-def train(model, dataloader, optimizer, criterion, device):
+def train(model, dataloader, optimizer, criterion, device, num_classes):
     #####################################################################
     # (HIGHLIGHT) Train the model for one epoch.
     #
@@ -156,7 +150,9 @@ def train(model, dataloader, optimizer, criterion, device):
         out = model(minibatch.blocks, node_features, device)
         loss = criterion(out, labels)
         total_loss += loss.item()
-        total_correct += compute_accuracy(out, labels) * labels.size(0)
+        total_correct += MF.accuracy(
+            out, labels, task="multiclass", num_classes=num_classes
+        ) * labels.size(0)
         total_samples += labels.size(0)
         loss.backward()
         optimizer.step()
@@ -252,7 +248,7 @@ def main():
     criterion = torch.nn.CrossEntropyLoss()
     for epoch in range(10):
         train_loss, train_accuracy = train(
-            model, train_dataloader, optimizer, criterion, device
+            model, train_dataloader, optimizer, criterion, device, num_classes
         )
         valid_accuracy = evaluate(model, valid_dataloader, device, num_classes)
         test_accuracy = layerwise_infer(
