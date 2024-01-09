@@ -177,7 +177,7 @@ class FeatureStore:
 
         Returns
         -------
-        List[tuple]
+        List[tuple(domain, type_name, feature_name)]
             The keys of the features.
         """
-        return []
+        raise NotImplementedError
