@@ -260,11 +260,11 @@ def genereate_raw_data_for_hetero_dataset(
     edge_feats_path = {}
     os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
     for etype, num_edge in num_edges.items():
-        etype = gb.etype_tuple_to_str(etype)
-        edge_feat_path = os.path.join("data", f"{etype}-feat.npy")
+        src_ntype, etype_str, dst_ntype = etype
+        edge_feat_path = os.path.join("data", f"{etype_str}-feat.npy")
         edge_feats = np.random.rand(num_edge, num_classes)
         np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
-        edge_feats_path[etype] = edge_feat_path
+        edge_feats_path[etype_str] = edge_feat_path
 
     # Generate train/test/valid set.
     os.makedirs(os.path.join(test_dir, "set"), exist_ok=True)
@@ -319,13 +319,13 @@ def genereate_raw_data_for_hetero_dataset(
               name: feat
               format: numpy
               in_memory: true
-              path: {edge_feats_path["user:follow:user"]}
+              path: {edge_feats_path["follow"]}
             - domain: edge
               type: "user:click:item"
               name: feat
               format: numpy
               in_memory: true
-              path: {edge_feats_path["user:click:item"]}
+              path: {edge_feats_path["click"]}
         feature_data:
           - domain: node
             type: user
