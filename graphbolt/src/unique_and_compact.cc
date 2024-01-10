@@ -19,9 +19,8 @@ namespace sampling {
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor& src_ids, const torch::Tensor& dst_ids,
     const torch::Tensor unique_dst_ids) {
-  if (utils::is_accessible_from_gpu(src_ids) &&
-      utils::is_accessible_from_gpu(dst_ids) &&
-      utils::is_accessible_from_gpu(unique_dst_ids)) {
+  if (utils::is_on_gpu(src_ids) && utils::is_on_gpu(dst_ids) &&
+      utils::is_on_gpu(unique_dst_ids)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "unique_and_compact",
         { return ops::UniqueAndCompact(src_ids, dst_ids, unique_dst_ids); });
