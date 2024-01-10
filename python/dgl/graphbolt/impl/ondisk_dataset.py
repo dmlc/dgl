@@ -1,6 +1,7 @@
 """GraphBolt OnDiskDataset."""
 
 import os
+import shutil
 from copy import deepcopy
 from typing import Dict, List, Union
 
@@ -66,17 +67,19 @@ def preprocess_ondisk_dataset(
         )
 
     # 0. Check if the dataset is already preprocessed.
-    preprocess_metadata_path = os.path.join("preprocessed", "metadata.yaml")
+    processed_dir_prefix = "preprocessed"
+    preprocess_metadata_path = os.path.join(
+        processed_dir_prefix, "metadata.yaml"
+    )
     if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
         if force_reload:
-            os.remove(os.path.join(dataset_dir, preprocess_metadata_path))
+            shutil.rmtree(os.path.join(dataset_dir, processed_dir_prefix))
             print("The preprocessed dataset has been removed.")
         else:
             print("The dataset is already preprocessed.")
             return os.path.join(dataset_dir, preprocess_metadata_path)
 
     print("Start to preprocess the on-disk dataset.")
-    processed_dir_prefix = "preprocessed"
 
     # Check if the metadata.yaml exists.
     metadata_file_path = os.path.join(dataset_dir, "metadata.yaml")
