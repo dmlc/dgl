@@ -92,9 +92,9 @@ def create_dataloader(dataset_set, graph, feature, device, is_train):
     # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
     #
     # - 'ItemSampler' samples mini-batches of node IDs from the dataset.
+    # - 'CopyTo' copies the fetched data to the specified device.
     # - 'sample_neighbor' performs neighbor sampling on the graph.
     # - 'FeatureFetcher' fetches node features based on the sampled subgraph.
-    # - 'CopyTo' copies the fetched data to the specified device.
 
     #####################################################################
     # Create a datapipe for mini-batch sampling with a specific neighbor fanout.
@@ -108,12 +108,12 @@ def create_dataloader(dataset_set, graph, feature, device, is_train):
     datapipe = gb.ItemSampler(
         dataset_set, batch_size=1024, shuffle=is_train, drop_last=is_train
     )
+    # Copy the data to the specified device.
+    datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
     # Sample neighbors for each node in the mini-batch.
     datapipe = datapipe.sample_neighbor(graph, [10, 10, 10])
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    # Copy the data to the specified device.
-    datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
@@ -195,13 +195,13 @@ def main():
     args = parser.parse_args()
     dataset_name = args.dataset
     dataset = gb.BuiltinDataset(dataset_name).load()
-    graph = dataset.graph
-    feature = dataset.feature
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    graph = dataset.graph.to(device)
+    feature = dataset.feature.to(device)
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_dataloader = create_dataloader(
         train_set, graph, feature, device, is_train=True
