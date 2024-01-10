@@ -1531,6 +1531,54 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
             )
 
 
+def test_OnDiskDataset_preprocess_force_reload(capsys):
+    """Test preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+        gb.ondisk_dataset.preprocess_ondisk_dataset(
+            test_dir, include_original_edge_id=False, force_reload=False
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+
+        gb.ondisk_dataset.preprocess_ondisk_dataset(
+            test_dir, include_original_edge_id=False, force_reload=False
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == ["The dataset is already preprocessed.", ""]
+
+        gb.ondisk_dataset.preprocess_ondisk_dataset(
+            test_dir, include_original_edge_id=False, force_reload=True
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+
+
 @pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
 def test_OnDiskDataset_load_name(edge_fmt):
     """Test preprocess of OnDiskDataset."""

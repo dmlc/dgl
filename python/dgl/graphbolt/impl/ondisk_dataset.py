@@ -34,7 +34,9 @@ __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 
 def preprocess_ondisk_dataset(
-    dataset_dir: str, include_original_edge_id: bool = False
+    dataset_dir: str,
+    include_original_edge_id: bool = False,
+    force_reload: bool = False,
 ) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
@@ -64,8 +66,12 @@ def preprocess_ondisk_dataset(
     # 0. Check if the dataset is already preprocessed.
     preprocess_metadata_path = os.path.join("preprocessed", "metadata.yaml")
     if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
-        print("The dataset is already preprocessed.")
-        return os.path.join(dataset_dir, preprocess_metadata_path)
+        if force_reload:
+            os.remove(os.path.join(dataset_dir, preprocess_metadata_path))
+            print("The preprocessed dataset has been removed.")
+        else:
+            print("The dataset is already preprocessed.")
+            return os.path.join(dataset_dir, preprocess_metadata_path)
 
     print("Start to preprocess the on-disk dataset.")
     processed_dir_prefix = "preprocessed"
@@ -379,12 +385,17 @@ class OnDiskDataset(Dataset):
     """
 
     def __init__(
-        self, path: str, include_original_edge_id: bool = False
+        self,
+        path: str,
+        include_original_edge_id: bool = False,
+        force_reload: bool = False,
     ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         self._dataset_dir = path
-        yaml_path = preprocess_ondisk_dataset(path, include_original_edge_id)
+        yaml_path = preprocess_ondisk_dataset(
+            path, include_original_edge_id, force_reload
+        )
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
         self._loaded = False
