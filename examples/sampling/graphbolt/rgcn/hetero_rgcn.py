@@ -552,9 +552,7 @@ def train(
 
 def main(args):
     device = torch.device(
-        "cuda"
-        if args.num_gpus > 0 and torch.cuda.is_available()
-        else "cpu"
+        "cuda" if args.num_gpus > 0 and torch.cuda.is_available() else "cpu"
     )
 
     # Load dataset.

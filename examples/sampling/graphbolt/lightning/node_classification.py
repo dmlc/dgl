@@ -137,9 +137,7 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(
-        self, dataset, fanouts, batch_size, num_workers, device
-    ):
+    def __init__(self, dataset, fanouts, batch_size, num_workers, device):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
