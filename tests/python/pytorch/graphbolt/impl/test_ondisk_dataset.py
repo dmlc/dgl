@@ -1531,7 +1531,7 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
             )
 
 
-def test_OnDiskDataset_preprocess_force_reload(capsys):
+def test_OnDiskDataset_preprocess_force_preprocess(capsys):
     """Test force preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1551,8 +1551,12 @@ def test_OnDiskDataset_preprocess_force_reload(capsys):
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
-        gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, include_original_edge_id=False, force_reload=False
+
+        # First preprocess on-disk dataset.
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False, force_preprocess=False
+            )
         )
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
@@ -1560,23 +1564,44 @@ def test_OnDiskDataset_preprocess_force_reload(capsys):
             "Finish preprocessing the on-disk dataset.",
             "",
         ]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["tasks"][0]["name"] == "link_prediction"
 
-        gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, include_original_edge_id=False, force_reload=False
+        # Change yaml_data, but do not force preprocess on-disk dataset.
+        with open(yaml_file, "r") as f:
+            yaml_data = yaml.safe_load(f)
+        yaml_data["tasks"][0]["name"] = "fake_name"
+        with open(yaml_file, "w") as f:
+            yaml.dump(yaml_data, f)
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False, force_preprocess=False
+            )
         )
         captured = capsys.readouterr().out.split("\n")
         assert captured == ["The dataset is already preprocessed.", ""]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["tasks"][0]["name"] == "link_prediction"
 
-        gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, include_original_edge_id=False, force_reload=True
+        # Force preprocess on-disk dataset.
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False, force_preprocess=True
+            )
         )
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
-            "The preprocessed dataset has been removed.",
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
             "Start to preprocess the on-disk dataset.",
             "Finish preprocessing the on-disk dataset.",
             "",
         ]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["tasks"][0]["name"] == "fake_name"
 
 
 @pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
@@ -2226,6 +2251,73 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id, edge_fmt):
                 pass
 
         graph = None
+        tasks = None
+        dataset = None
+
+
+def test_OnDiskDataset_force_preprocess(capsys):
+    """Test force preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # First preprocess on-disk dataset.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False, force_preprocess=False
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        tasks = dataset.tasks
+        assert tasks[0].metadata["name"] == "link_prediction"
+
+        # Change yaml_data, but do not force preprocess on-disk dataset.
+        with open(yaml_file, "r") as f:
+            yaml_data = yaml.safe_load(f)
+        yaml_data["tasks"][0]["name"] = "fake_name"
+        with open(yaml_file, "w") as f:
+            yaml.dump(yaml_data, f)
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False, force_preprocess=False
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == ["The dataset is already preprocessed.", ""]
+        tasks = dataset.tasks
+        assert tasks[0].metadata["name"] == "link_prediction"
+
+        # Force preprocess on-disk dataset.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False, force_preprocess=True
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        tasks = dataset.tasks
+        assert tasks[0].metadata["name"] == "fake_name"
+
         tasks = None
         dataset = None
 
