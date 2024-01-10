@@ -950,7 +950,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         return self
 
-    def to(self, device: Union[torch.device, str]):
+    def to(
+        self, device: Union[torch.device, str]
+    ):  # pylint: disable=invalid-name
         """Copy `FusedCSCSamplingGraph` to the specified device."""
 
         def _to(x):
