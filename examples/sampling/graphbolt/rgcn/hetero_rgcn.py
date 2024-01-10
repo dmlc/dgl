@@ -551,10 +551,10 @@ def train(
 
 
 def main(args):
-    device = (
-        th.device("cuda")
-        if args.num_gpus > 0 and th.cuda.is_available()
-        else th.device("cpu")
+    device = torch.device(
+        "cuda"
+        if args.num_gpus > 0 and torch.cuda.is_available()
+        else "cpu"
     )
 
     # Load dataset.
@@ -568,7 +568,7 @@ def main(args):
     ) = load_dataset(args.dataset)
 
     # Move the dataset to the pinned memory to enable GPU access.
-    if device == th.device("cuda"):
+    if device == torch.device("cuda"):
         g.pin_memory_()
         features.pin_memory_()
 

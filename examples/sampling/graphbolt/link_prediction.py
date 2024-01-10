@@ -396,15 +396,10 @@ def main(args):
     print("Loading data")
     dataset = gb.BuiltinDataset("ogbl-citation2").load()
 
-    graph = dataset.graph
-    features = dataset.feature
     # Move the dataset to the selected storage.
-    if args.storage_device == "pinned":
-        graph.pin_memory_()
-        features.pin_memory_()
-    elif args.storage_device == "cuda":
-        graph = graph.to(args.device)
-        features.to_(args.device)
+    graph = dataset.graph.to(args.storage_device)
+    features = dataset.feature.to(args.storage_device)
+
     train_set = dataset.tasks[0].train_set
     args.fanout = list(map(int, args.fanout.split(",")))
 

@@ -168,9 +168,13 @@ class TorchBasedFeature(Feature):
         """In-place operation to copy the feature to pinned memory."""
         self._tensor = self._tensor.pin_memory()
 
-    def to_(self, device):
+    def to(self, device):
         """In-place operation to copy the feature to the given device."""
-        self._tensor = self._tensor.to(device)
+        if device == "pinned":
+            self.pin_memory_()
+        else:
+            self._tensor = self._tensor.to(device)
+        return self
 
     def __repr__(self) -> str:
         return _torch_based_feature_str(self)
@@ -239,10 +243,11 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         for feature in self._features.values():
             feature.pin_memory_()
 
-    def to_(self, device):
+    def to(self, device):
         """In-place operation to copy the feature store to the given device."""
         for feature in self._features.values():
-            feature.to_(device)
+            feature.to(device)
+        return self
 
     def __repr__(self) -> str:
         return _torch_based_feature_store_str(self._features)

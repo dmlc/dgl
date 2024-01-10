@@ -138,25 +138,18 @@ class SAGE(LightningModule):
 
 class DataModule(LightningDataModule):
     def __init__(
-        self, dataset, fanouts, batch_size, num_workers, num_gpus, use_uva
+        self, dataset, fanouts, batch_size, num_workers, device
     ):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.feature_store = dataset.feature
-        self.graph = dataset.graph
-        if num_gpus > 0:
-            if use_uva:
-                self.feature_store.pin_memory_()
-                self.graph.pin_memory_()
-            else:
-                self.feature_store.to_("cuda")
-                self.graph = self.graph.to("cuda")
+        self.feature_store = dataset.feature.to(device)
+        self.graph = dataset.graph.to(device)
+        self.device = "cuda" if device != "cpu" else "cpu"
         self.train_set = dataset.tasks[0].train_set
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
-        self.num_gpus = num_gpus
 
     def create_dataloader(self, node_set, is_train):
         datapipe = gb.ItemSampler(
@@ -165,8 +158,7 @@ class DataModule(LightningDataModule):
             shuffle=is_train,
             drop_last=is_train,
         )
-        if self.num_gpus > 0:
-            datapipe = datapipe.copy_to("cuda", ["seed_nodes"])
+        datapipe = datapipe.copy_to(self.device, ["seed_nodes"])
         sampler = (
             datapipe.sample_layer_neighbor
             if is_train
@@ -220,14 +212,16 @@ if __name__ == "__main__":
         help="number of workers (default: 0)",
     )
     parser.add_argument(
-        "--use_uva",
-        action="store_true",
-        help="Moves the dataset into the pinned memory.",
+        "--storage_device",
+        default="pinned",
+        choices=["cpu", "pinned", "cuda"],
+        help="Moves the dataset into the selected storage",
     )
     args = parser.parse_args()
 
     if not torch.cuda.is_available():
         args.num_gpus = 0
+        args.storage_device = "cpu"
 
     dataset = gb.BuiltinDataset("ogbn-products").load()
     datamodule = DataModule(
@@ -235,8 +229,7 @@ if __name__ == "__main__":
         [10, 10, 10],
         args.batch_size,
         args.num_workers,
-        args.num_gpus,
-        args.use_uva,
+        args.storage_device,
     )
     in_size = dataset.feature.size("node", None, "feat")[0]
     model = SAGE(in_size, 256, datamodule.num_classes)
