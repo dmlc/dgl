@@ -47,6 +47,8 @@ def preprocess_ondisk_dataset(
         The path to the dataset directory.
     include_original_edge_id : bool, optional
         Whether to include the original edge id in the FusedCSCSamplingGraph.
+    force_reload: bool, optional
+        Whether to force reload the ondisk dataset.
 
     Returns
     -------
@@ -382,6 +384,8 @@ class OnDiskDataset(Dataset):
         The YAML file path.
     include_original_edge_id: bool, optional
         Whether to include the original edge id in the FusedCSCSamplingGraph.
+    force_reload: bool, optional
+        Whether to force reload the ondisk dataset.
     """
 
     def __init__(
