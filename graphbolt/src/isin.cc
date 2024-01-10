@@ -48,8 +48,7 @@ torch::Tensor IsInCPU(
 
 torch::Tensor IsIn(
     const torch::Tensor& elements, const torch::Tensor& test_elements) {
-  if (utils::is_accessible_from_gpu(elements) &&
-      utils::is_accessible_from_gpu(test_elements)) {
+  if (utils::is_on_gpu(elements) && utils::is_on_gpu(test_elements)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "IsInOperation",
         { return ops::IsIn(elements, test_elements); });
