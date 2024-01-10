@@ -1532,7 +1532,7 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
 
 
 def test_OnDiskDataset_preprocess_force_reload(capsys):
-    """Test preprocess of OnDiskDataset."""
+    """Test force preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
         dataset_name = "graphbolt_test"
