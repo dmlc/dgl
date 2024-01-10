@@ -274,9 +274,8 @@ FusedCSCSamplingGraph::GetState() const {
 
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
-  if (utils::is_accessible_from_gpu(indptr_) &&
+  if (utils::is_on_gpu(nodes) && utils::is_accessible_from_gpu(indptr_) &&
       utils::is_accessible_from_gpu(indices_) &&
-      utils::is_accessible_from_gpu(nodes) &&
       (!type_per_edge_.has_value() ||
        utils::is_accessible_from_gpu(type_per_edge_.value()))) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(c10::DeviceType::CUDA, "InSubgraph", {
@@ -616,9 +615,9 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     probs_or_mask = this->EdgeAttribute(probs_name);
   }
 
-  if (!replace && utils::is_accessible_from_gpu(indptr_) &&
+  if (!replace && utils::is_on_gpu(nodes) &&
+      utils::is_accessible_from_gpu(indptr_) &&
       utils::is_accessible_from_gpu(indices_) &&
-      utils::is_accessible_from_gpu(nodes) &&
       (!probs_or_mask.has_value() ||
        utils::is_accessible_from_gpu(probs_or_mask.value())) &&
       (!type_per_edge_.has_value() ||
