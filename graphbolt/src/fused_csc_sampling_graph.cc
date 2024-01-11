@@ -692,18 +692,6 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
           edge_timestamp));
 }
 
-std::tuple<torch::Tensor, torch::Tensor>
-FusedCSCSamplingGraph::SampleNegativeEdgesUniform(
-    const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
-    int64_t negative_ratio, int64_t max_node_id) const {
-  torch::Tensor pos_src;
-  std::tie(pos_src, std::ignore) = node_pairs;
-  auto neg_len = pos_src.size(0) * negative_ratio;
-  auto neg_src = pos_src.repeat(negative_ratio);
-  auto neg_dst = torch::randint(0, max_node_id, {neg_len}, pos_src.options());
-  return std::make_tuple(neg_src, neg_dst);
-}
-
 static c10::intrusive_ptr<FusedCSCSamplingGraph>
 BuildGraphFromSharedMemoryHelper(SharedMemoryHelper&& helper) {
   helper.InitializeRead();
