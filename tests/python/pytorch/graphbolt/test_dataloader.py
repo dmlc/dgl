@@ -2,13 +2,17 @@ import backend as F
 
 import dgl
 import dgl.graphbolt
+
+import pytest
 import torch
 import torch.multiprocessing as mp
 
 from . import gb_test_utils
 
 
-def test_DataLoader():
+@pytest.mark.parametrize("num_workers", [0, 4])
+@pytest.mark.parametrize("persistent_workers", [True, False])
+def test_DataLoader(num_workers, persistent_workers):
     N = 40
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
@@ -34,6 +38,7 @@ def test_DataLoader():
 
     dataloader = dgl.graphbolt.DataLoader(
         device_transferrer,
-        num_workers=4,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
     )
     assert len(list(dataloader)) == N // B

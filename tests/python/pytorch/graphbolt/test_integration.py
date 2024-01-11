@@ -1,10 +1,13 @@
 import dgl
 import dgl.graphbolt as gb
 import dgl.sparse as dglsp
+import pytest
 import torch
 
 
-def test_integration_link_prediction():
+@pytest.mark.parametrize("num_workers", [0])
+@pytest.mark.parametrize("persistent_workers", [True, False])
+def test_integration_link_prediction(num_workers, persistent_workers):
     torch.manual_seed(926)
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
@@ -57,10 +60,11 @@ def test_integration_link_prediction():
     )
     dataloader = gb.DataLoader(
         datapipe,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
     )
     expected = [
-        str(
-            """MiniBatch(seed_nodes=None,
+        str("""MiniBatch(seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 1, 1, 1, 1, 2]),
                                                                          indices=tensor([0, 4]),
                                                            ),
@@ -208,7 +212,9 @@ def test_integration_link_prediction():
         assert expected[step] == str(data), print(data)
 
 
-def test_integration_node_classification():
+@pytest.mark.parametrize("num_workers", [0])
+@pytest.mark.parametrize("persistent_workers", [True, False])
+def test_integration_node_classification(num_workers, persistent_workers):
     torch.manual_seed(926)
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
@@ -259,10 +265,11 @@ def test_integration_node_classification():
     )
     dataloader = gb.DataLoader(
         datapipe,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
     )
     expected = [
-        str(
-            """MiniBatch(seed_nodes=None,
+        str("""MiniBatch(seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 2, 3, 4]),
                                                                          indices=tensor([4, 1, 0, 1]),
                                                            ),
@@ -300,10 +307,8 @@ def test_integration_node_classification():
           compacted_negative_dsts=None,
           blocks=[Block(num_src_nodes=5, num_dst_nodes=4, num_edges=4),
                  Block(num_src_nodes=4, num_dst_nodes=4, num_edges=4)],
-       )"""
-        ),
-        str(
-            """MiniBatch(seed_nodes=None,
+       )"""),
+        str("""MiniBatch(seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 2, 2]),
                                                                          indices=tensor([0, 2]),
                                                            ),
@@ -339,10 +344,8 @@ def test_integration_node_classification():
           compacted_negative_dsts=None,
           blocks=[Block(num_src_nodes=3, num_dst_nodes=3, num_edges=2),
                  Block(num_src_nodes=3, num_dst_nodes=3, num_edges=2)],
-       )"""
-        ),
-        str(
-            """MiniBatch(seed_nodes=None,
+       )"""),
+        str("""MiniBatch(seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 2]),
                                                                          indices=tensor([0, 2]),
                                                            ),
@@ -378,8 +381,7 @@ def test_integration_node_classification():
           compacted_negative_dsts=None,
           blocks=[Block(num_src_nodes=3, num_dst_nodes=2, num_edges=2),
                  Block(num_src_nodes=2, num_dst_nodes=2, num_edges=2)],
-       )"""
-        ),
+       )"""),
     ]
     for step, data in enumerate(dataloader):
         assert expected[step] == str(data), print(data)

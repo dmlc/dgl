@@ -48,10 +48,10 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
     persistent_workers : bool, optional
         If True, the data loader will not shut down the worker processes after a
         dataset has been consumed once. This allows to maintain the workers
-        instances alive.
+        instances alive. Default is False.
     """
 
-    def __init__(self, datapipe, num_workers=0, persistent_workers=True):
+    def __init__(self, datapipe, num_workers=0, persistent_workers=False):
         self.datapipe = datapipe
         self.dataloader = torch.utils.data.DataLoader(
             datapipe,
@@ -83,10 +83,10 @@ class DataLoader(torch.utils.data.DataLoader):
     persistent_workers : bool, optional
         If True, the data loader will not shut down the worker processes after a
         dataset has been consumed once. This allows to maintain the workers
-        instances alive.
+        instances alive. Default is False.
     """
 
-    def __init__(self, datapipe, num_workers=0, persistent_workers=True):
+    def __init__(self, datapipe, num_workers=0, persistent_workers=False):
         # Multiprocessing requires two modifications to the datapipe:
         #
         # 1. Insert a stage after ItemSampler to distribute the
