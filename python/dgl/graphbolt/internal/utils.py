@@ -183,12 +183,13 @@ def calculate_dir_hash(
 def check_dataset_change(dataset_dir):
     """Check whether dataset has been changed by checking its hash value."""
     hash_value_file = "dataset_hash_value.txt"
+    if not os.path.exists(os.path.join(dataset_dir, hash_value_file)):
+        return True
     with open(os.path.join(dataset_dir, hash_value_file), "r") as f:
         oringinal_hash_value = json.load(f)
     present_hash_value = calculate_dir_hash(dataset_dir, ignore=hash_value_file)
     if oringinal_hash_value == present_hash_value:
         force_preprocess = False
     else:
-        os.remove(os.path.join(dataset_dir, hash_value_file))
         force_preprocess = True
     return force_preprocess

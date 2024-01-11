@@ -1613,7 +1613,7 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
         assert target_yaml_data["tasks"][0]["name"] == "fake_name"
 
 
-def test_OnDiskDataset_auto_force_preprocess(capsys):
+def test_OnDiskDataset_preprocess_auto_force_preprocess(capsys):
     """Test force preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1690,11 +1690,10 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
             "Finish preprocessing the on-disk dataset.",
             "",
         ]
-        with open(
-            os.path.join(test_dir, "preprocessed", edge_feat_path), "r"
-        ) as file:
-            preprocessed_edge_feat = np.load(file)
-        assert preprocessed_edge_feat == edge_feats
+        preprocessed_edge_feat = np.load(
+            os.path.join(test_dir, "preprocessed", edge_feat_path)
+        )
+        assert preprocessed_edge_feat.all() == edge_feats.all()
         with open(preprocessed_metadata_path, "r") as f:
             target_yaml_data = yaml.safe_load(f)
         assert target_yaml_data["include_original_edge_id"] == False
@@ -1716,6 +1715,15 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         with open(preprocessed_metadata_path, "r") as f:
             target_yaml_data = yaml.safe_load(f)
         assert target_yaml_data["include_original_edge_id"] == True
+
+        # 4. Change nothing.
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=True
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == ["The dataset is already preprocessed.", ""]
 
 
 @pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
@@ -2540,6 +2548,13 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         ]
         graph = dataset.graph
         assert gb.ORIGINAL_EDGE_ID in graph.edge_attributes
+
+        # 4. Change Nothing.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == ["The dataset is already preprocessed.", ""]
 
         graph = None
         tasks = None

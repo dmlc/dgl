@@ -270,9 +270,12 @@ def preprocess_ondisk_dataset(
     print("Finish preprocessing the on-disk dataset.")
 
     # 10. Calculate and save the hash value of the dataset directory.
-    dir_hash = calculate_dir_hash(dataset_dir)
     hash_value_file = "dataset_hash_value.txt"
-    with open(os.path.join(dataset_dir, hash_value_file), "w") as f:
+    hash_value_file_path = os.path.join(dataset_dir, hash_value_file)
+    if os.path.exists(hash_value_file_path):
+        os.remove(hash_value_file_path)
+    dir_hash = calculate_dir_hash(dataset_dir)
+    with open(hash_value_file_path, "w") as f:
         f.write(json.dumps(dir_hash, indent=4))
 
     # 11. Return the absolute path of the preprocessing yaml file.
