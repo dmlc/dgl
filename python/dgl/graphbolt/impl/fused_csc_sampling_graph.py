@@ -876,7 +876,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         pairs according to a uniform distribution. For each edge ``(u, v)``,
         it is supposed to generate `negative_ratio` pairs of negative edges
         ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
-        the graph.
+        the graph. As ``u`` is exactly same as the corresponding positive edges,
+        it returns None for negative sources.
 
         Parameters
         ----------
@@ -908,8 +909,18 @@ class FusedCSCSamplingGraph(SamplingGraph):
             max_node_id = self.num_nodes[dst_ntype]
         else:
             max_node_id = self.total_num_nodes
-        num_negative = node_pairs[0].size(0) * negative_ratio
-        return (None, torch.randint(0, max_node_id, (num_negative,)))
+        pos_src, _ = node_pairs
+        num_negative = pos_src.size(0) * negative_ratio
+        return (
+            None,
+            torch.randint(
+                0,
+                max_node_id,
+                (num_negative,),
+                dtype=pos_src.dtype,
+                device=pos_src.device,
+            ),
+        )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
         """Copy the graph to shared memory.
