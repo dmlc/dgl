@@ -903,24 +903,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
             `edge_type`. Note that negative refers to false negatives, which
             means the edge could be present or not present in the graph.
         """
-        if edge_type is not None:
-            assert (
-                self.node_type_offset is not None
-            ), "The 'node_type_offset' array is necessary for performing \
-                negative sampling by edge type."
-            _, _, dst_node_type = etype_str_to_tuple(edge_type)
-            dst_node_type_id = self.node_type_to_id[dst_node_type]
-            offset = self._node_type_offset_list
-            max_node_id = (
-                offset[dst_node_type_id + 1] - offset[dst_node_type_id]
-            )
+        if edge_type:
+            _, _, dst_ntype = etype_str_to_tuple(edge_type)
+            max_node_id = self.num_nodes[dst_ntype]
         else:
             max_node_id = self.total_num_nodes
-        return self._c_csc_graph.sample_negative_edges_uniform(
-            node_pairs,
-            negative_ratio,
-            max_node_id,
-        )
+        num_negative = node_pairs[0].size(0) * negative_ratio
+        return (None, torch.randint(0, max_node_id, (num_negative,)))
 
     def copy_to_shared_memory(self, shared_memory_name: str):
         """Copy the graph to shared memory.
