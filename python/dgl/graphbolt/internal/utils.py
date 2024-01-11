@@ -1,7 +1,10 @@
 """Utility functions for GraphBolt."""
 
+import hashlib
+import json
 import os
 import shutil
+from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -145,3 +148,47 @@ def read_edges(dataset_dir, edge_fmt, edge_path):
         )
         src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
     return (src, dst)
+
+
+def calculate_file_hash(file_path, hash_algo="md5"):
+    """Calculate the hash value of a file."""
+    hash_algos = ["md5", "sha1", "sha224", "sha256", "sha384", "sha512"]
+    if hash_algo in hash_algos:
+        hash_obj = getattr(hashlib, hash_algo)()
+    else:
+        raise ValueError(
+            f"Hash algorithm must be one of: {hash_algos}, but got `{hash_algo}`."
+        )
+    with open(file_path, "rb") as file:
+        for chunk in iter(lambda: file.read(4096), b""):
+            hash_obj.update(chunk)
+    return hash_obj.hexdigest()
+
+
+def calculate_dir_hash(
+    dir_path, hash_algo="md5", ignore: Union[str, List[str]] = None
+):
+    """Calculte the hash values of all files under the directory."""
+    hashes = {}
+    for dirpath, _, filenames in os.walk(dir_path):
+        for filename in filenames:
+            if ignore and filename in ignore:
+                continue
+            filepath = os.path.join(dirpath, filename)
+            file_hash = calculate_file_hash(filepath, hash_algo=hash_algo)
+            hashes[filepath] = file_hash
+    return hashes
+
+
+def check_dataset_change(dataset_dir):
+    """Check whether dataset has been changed by checking its hash value."""
+    hash_value_file = "dataset_hash_value.txt"
+    with open(os.path.join(dataset_dir, hash_value_file), "r") as f:
+        oringinal_hash_value = json.load(f)
+    present_hash_value = calculate_dir_hash(dataset_dir, ignore=hash_value_file)
+    if oringinal_hash_value == present_hash_value:
+        force_preprocess = False
+    else:
+        os.remove(os.path.join(dataset_dir, hash_value_file))
+        force_preprocess = True
+    return force_preprocess

@@ -1,5 +1,6 @@
 """GraphBolt OnDiskDataset."""
 
+import json
 import os
 import shutil
 from copy import deepcopy
@@ -15,6 +16,8 @@ from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..internal import (
+    calculate_dir_hash,
+    check_dataset_change,
     copy_or_convert_data,
     get_attributes,
     read_data,
@@ -37,7 +40,7 @@ __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 def preprocess_ondisk_dataset(
     dataset_dir: str,
     include_original_edge_id: bool = False,
-    force_preprocess: bool = False,
+    force_preprocess: bool = None,
 ) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
@@ -72,13 +75,25 @@ def preprocess_ondisk_dataset(
         processed_dir_prefix, "metadata.yaml"
     )
     if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
+        if force_preprocess is None:
+            with open(
+                os.path.join(dataset_dir, preprocess_metadata_path), "r"
+            ) as f:
+                preprocess_config = yaml.safe_load(f)
+            if (
+                preprocess_config.get("include_original_edge_id", None)
+                == include_original_edge_id
+            ):
+                force_preprocess = check_dataset_change(dataset_dir)
+            else:
+                force_preprocess = True
         if force_preprocess:
             shutil.rmtree(os.path.join(dataset_dir, processed_dir_prefix))
             print(
                 "The on-disk dataset is re-preprocessing, so the existing "
                 + "preprocessed dataset has been removed."
             )
-        else:
+        elif force_preprocess is False:
             print("The dataset is already preprocessed.")
             return os.path.join(dataset_dir, preprocess_metadata_path)
 
@@ -180,7 +195,10 @@ def preprocess_ondisk_dataset(
         g, is_homogeneous, include_original_edge_id
     )
 
-    # 5. Save the FusedCSCSamplingGraph and modify the output_config.
+    # 5. Record value of include_original_edge_id.
+    output_config["include_original_edge_id"] = include_original_edge_id
+
+    # 6. Save the FusedCSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "FusedCSCSamplingGraph"
     output_config["graph_topology"]["path"] = os.path.join(
@@ -196,7 +214,7 @@ def preprocess_ondisk_dataset(
     )
     del output_config["graph"]
 
-    # 6. Load the node/edge features and do necessary conversion.
+    # 7. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
         for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
@@ -218,7 +236,7 @@ def preprocess_ondisk_dataset(
                 is_feature=True,
             )
 
-    # 7. Save tasks and train/val/test split according to the output_config.
+    # 8. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
@@ -245,13 +263,19 @@ def preprocess_ondisk_dataset(
                             output_data["format"],
                         )
 
-    # 8. Save the output_config.
+    # 9. Save the output_config.
     output_config_path = os.path.join(dataset_dir, preprocess_metadata_path)
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
 
-    # 9. Return the absolute path of the preprocessing yaml file.
+    # 10. Calculate and save the hash value of the dataset directory.
+    dir_hash = calculate_dir_hash(dataset_dir)
+    hash_value_file = "dataset_hash_value.txt"
+    with open(os.path.join(dataset_dir, hash_value_file), "w") as f:
+        f.write(json.dumps(dir_hash, indent=4))
+
+    # 11. Return the absolute path of the preprocessing yaml file.
     return output_config_path
 
 
@@ -398,7 +422,7 @@ class OnDiskDataset(Dataset):
         self,
         path: str,
         include_original_edge_id: bool = False,
-        force_preprocess: bool = False,
+        force_preprocess: bool = None,
     ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
