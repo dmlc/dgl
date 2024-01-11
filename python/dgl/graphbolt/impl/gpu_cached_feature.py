@@ -72,7 +72,7 @@ class GPUCachedFeature(Feature):
             The read feature.
         """
         if ids is None:
-            return self._fallback_feature.read().to("cuda")
+            return self._fallback_feature.read()
         values, missing_index, missing_keys = self._feature.query(ids)
         missing_values = self._fallback_feature.read(missing_keys).to("cuda")
         values[missing_index] = missing_values

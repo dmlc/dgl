@@ -28,17 +28,17 @@ from dgl import graphbolt as gb
     ],
 )
 def test_gpu_cached_feature(dtype):
-    a = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).to("cuda")
-    b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype).to(
-        "cuda"
+    a = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype, pin_memory=True)
+    b = torch.tensor(
+        [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype, pin_memory=True
     )
 
     feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), 2)
     feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), 1)
 
     # Test read the entire feature.
-    assert torch.equal(feat_store_a.read(), a)
-    assert torch.equal(feat_store_b.read(), b)
+    assert torch.equal(feat_store_a.read(), a.to("cuda"))
+    assert torch.equal(feat_store_b.read(), b.to("cuda"))
 
     # Test read with ids.
     assert torch.equal(
