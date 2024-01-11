@@ -1650,7 +1650,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
             target_yaml_data = yaml.safe_load(f)
         assert target_yaml_data["tasks"][0]["name"] == "link_prediction"
 
-        # Change yaml_data, automatically force preprocess on-disk dataset.
+        # 1. Change yaml_data.
         with open(yaml_file, "r") as f:
             yaml_data = yaml.safe_load(f)
         yaml_data["tasks"][0]["name"] = "fake_name"
@@ -1673,7 +1673,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
             target_yaml_data = yaml.safe_load(f)
         assert target_yaml_data["tasks"][0]["name"] == "fake_name"
 
-        # Change edge feature, automatically force preprocess on-disk dataset.
+        # 2. Change edge feature.
         edge_feats = np.random.rand(num_edges, num_classes)
         edge_feat_path = os.path.join("data", "edge-feat.npy")
         np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
@@ -1699,7 +1699,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
             target_yaml_data = yaml.safe_load(f)
         assert target_yaml_data["include_original_edge_id"] == False
 
-        # Change include_original_edge_id, automatically force preprocess on-disk dataset.
+        # 3. Change include_original_edge_id.
         preprocessed_metadata_path = (
             gb.ondisk_dataset.preprocess_ondisk_dataset(
                 test_dir, include_original_edge_id=True
@@ -2484,7 +2484,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         tasks = dataset.tasks
         assert tasks[0].metadata["name"] == "link_prediction"
 
-        # Change yaml_data, automatically force preprocess on-disk dataset.
+        # 1. Change yaml_data.
         with open(yaml_file, "r") as f:
             yaml_data = yaml.safe_load(f)
         yaml_data["tasks"][0]["name"] = "fake_name"
@@ -2504,7 +2504,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         tasks = dataset.tasks
         assert tasks[0].metadata["name"] == "fake_name"
 
-        # Change edge feature, automatically force preprocess on-disk dataset.
+        # 2. Change edge feature.
         edge_feats = np.random.rand(num_edges, num_classes)
         edge_feat_path = os.path.join("data", "edge-feat.npy")
         np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
@@ -2526,7 +2526,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         graph = dataset.graph
         assert gb.ORIGINAL_EDGE_ID not in graph.edge_attributes
 
-        # Change include_original_edge_id, automatically force preprocess on-disk dataset.
+        # 3. Change include_original_edge_id.
         dataset = gb.OnDiskDataset(
             test_dir, include_original_edge_id=True
         ).load()
