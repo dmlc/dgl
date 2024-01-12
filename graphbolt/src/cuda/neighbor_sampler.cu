@@ -206,19 +206,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                 auto is_nonzero = thrust::make_transform_iterator(
                     sliced_probs_or_mask.value().data_ptr<probs_t>(),
                     IsPositive{});
-                size_t tmp_storage_size = 0;
-                cub::DeviceSegmentedReduce::Sum(
-                    nullptr, tmp_storage_size, is_nonzero,
+                CUB_CALL(
+                    DeviceSegmentedReduce::Sum, is_nonzero,
                     in_degree.data_ptr<indptr_t>(), num_rows,
                     sub_indptr.data_ptr<indptr_t>(),
-                    sub_indptr.data_ptr<indptr_t>() + 1, stream);
-                auto tmp_storage =
-                    allocator.AllocateStorage<char>(tmp_storage_size);
-                cub::DeviceSegmentedReduce::Sum(
-                    tmp_storage.get(), tmp_storage_size, is_nonzero,
-                    in_degree.data_ptr<indptr_t>(), num_rows,
-                    sub_indptr.data_ptr<indptr_t>(),
-                    sub_indptr.data_ptr<indptr_t>() + 1, stream);
+                    sub_indptr.data_ptr<indptr_t>() + 1);
               }));
         }
         thrust::counting_iterator<int64_t> iota(0);
