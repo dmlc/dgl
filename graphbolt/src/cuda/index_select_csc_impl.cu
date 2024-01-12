@@ -5,11 +5,10 @@
  * @brief Index select csc operator implementation on CUDA.
  */
 #include <c10/core/ScalarType.h>
-#include <c10/cuda/CUDAStream.h>
 #include <graphbolt/cuda_ops.h>
-#include <thrust/execution_policy.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/zip_iterator.h>
 
 #include <cub/cub.cuh>
 #include <numeric>
@@ -88,7 +87,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
     torch::Tensor indices, const int64_t num_nodes,
     const indptr_t* const in_degree, const indptr_t* const sliced_indptr,
     const int64_t* const perm, torch::TensorOptions nodes_options,
-    torch::ScalarType indptr_scalar_type, cudaStream_t stream) {
+    torch::ScalarType indptr_scalar_type) {
   auto allocator = cuda::GetAllocator();
   thrust::counting_iterator<int64_t> iota(0);
 
@@ -109,14 +108,9 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
         output_indptr.data_ptr<indptr_t>(), output_indptr_aligned.get());
     thrust::tuple<indptr_t, indptr_t> zero_value{};
     // Compute the prefix sum over actual and modified indegrees.
-    size_t tmp_storage_size = 0;
-    CUDA_CALL(cub::DeviceScan::ExclusiveScan(
-        nullptr, tmp_storage_size, modified_in_degree, output_indptr_pair,
-        PairSum{}, zero_value, num_nodes + 1, stream));
-    auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-    CUDA_CALL(cub::DeviceScan::ExclusiveScan(
-        tmp_storage.get(), tmp_storage_size, modified_in_degree,
-        output_indptr_pair, PairSum{}, zero_value, num_nodes + 1, stream));
+    CUB_CALL(
+        DeviceScan::ExclusiveScan, modified_in_degree, output_indptr_pair,
+        PairSum{}, zero_value, num_nodes + 1);
   }
 
   // Copy the actual total number of edges.
@@ -138,7 +132,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   // Perform the actual copying, of the indices array into
   // output_indices in an aligned manner.
   CUDA_KERNEL_CALL(
-      _CopyIndicesAlignedKernel, grid, block, 0, stream,
+      _CopyIndicesAlignedKernel, grid, block, 0,
       static_cast<indptr_t>(edge_count_aligned), num_nodes, sliced_indptr,
       output_indptr.data_ptr<indptr_t>(), output_indptr_aligned.get(),
       reinterpret_cast<indices_t*>(indices.data_ptr()),
@@ -151,7 +145,6 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
   // Sorting nodes so that accesses over PCI-e are more regular.
   const auto sorted_idx =
       Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1)).second;
-  auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
 
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
@@ -167,7 +160,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
               return UVAIndexSelectCSCCopyIndices<indptr_t, element_size_t>(
                   indices, num_nodes, in_degree, sliced_indptr,
                   sorted_idx.data_ptr<int64_t>(), nodes.options(),
-                  indptr.scalar_type(), stream);
+                  indptr.scalar_type());
             }));
       }));
 }
@@ -191,9 +184,7 @@ template <typename indptr_t, typename indices_t>
 void IndexSelectCSCCopyIndices(
     const int64_t num_nodes, indices_t* const indices,
     indptr_t* const sliced_indptr, const indptr_t* const in_degree,
-    indptr_t* const output_indptr, indices_t* const output_indices,
-    cudaStream_t stream) {
-  auto allocator = cuda::GetAllocator();
+    indptr_t* const output_indptr, indices_t* const output_indices) {
   thrust::counting_iterator<int64_t> iota(0);
 
   auto input_buffer_it = thrust::make_transform_iterator(
@@ -206,21 +197,14 @@ void IndexSelectCSCCopyIndices(
 
   // Performs the copy from indices into output_indices.
   for (int64_t i = 0; i < num_nodes; i += max_copy_at_once) {
-    size_t tmp_storage_size = 0;
-    CUDA_CALL(cub::DeviceMemcpy::Batched(
-        nullptr, tmp_storage_size, input_buffer_it + i, output_buffer_it + i,
-        buffer_sizes + i, std::min(num_nodes - i, max_copy_at_once), stream));
-    auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-    CUDA_CALL(cub::DeviceMemcpy::Batched(
-        tmp_storage.get(), tmp_storage_size, input_buffer_it + i,
-        output_buffer_it + i, buffer_sizes + i,
-        std::min(num_nodes - i, max_copy_at_once), stream));
+    CUB_CALL(
+        DeviceMemcpy::Batched, input_buffer_it + i, output_buffer_it + i,
+        buffer_sizes + i, std::min(num_nodes - i, max_copy_at_once));
   }
 }
 
 std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
-  auto stream = cuda::GetCurrentStream();
   const int64_t num_nodes = nodes.size(0);
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   return AT_DISPATCH_INTEGRAL_TYPES(
@@ -234,17 +218,10 @@ std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
         torch::Tensor output_indptr = torch::empty(
             num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
 
-        {  // Compute the output indptr, output_indptr.
-          size_t tmp_storage_size = 0;
-          CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-              nullptr, tmp_storage_size, in_degree,
-              output_indptr.data_ptr<indptr_t>(), num_nodes + 1, stream));
-          auto allocator = cuda::GetAllocator();
-          auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-          CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-              tmp_storage.get(), tmp_storage_size, in_degree,
-              output_indptr.data_ptr<indptr_t>(), num_nodes + 1, stream));
-        }
+        // Compute the output indptr, output_indptr.
+        CUB_CALL(
+            DeviceScan::ExclusiveSum, in_degree,
+            output_indptr.data_ptr<indptr_t>(), num_nodes + 1);
 
         // Number of edges being copied.
         auto edge_count =
@@ -259,8 +236,7 @@ std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
               IndexSelectCSCCopyIndices<indptr_t, indices_t>(
                   num_nodes, reinterpret_cast<indices_t*>(indices.data_ptr()),
                   sliced_indptr, in_degree, output_indptr.data_ptr<indptr_t>(),
-                  reinterpret_cast<indices_t*>(output_indices.data_ptr()),
-                  stream);
+                  reinterpret_cast<indices_t*>(output_indices.data_ptr()));
             }));
         return std::make_tuple(output_indptr, output_indices);
       }));
