@@ -8,8 +8,6 @@
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/cuda_sampling_ops.h>
 
-#include <cub/cub.cuh>
-
 #include "./common.h"
 
 namespace graphbolt {
