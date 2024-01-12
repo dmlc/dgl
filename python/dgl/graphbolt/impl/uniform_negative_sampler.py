@@ -32,20 +32,23 @@ class UniformNegativeSampler(NegativeSampler):
     Examples
     --------
     >>> from dgl import graphbolt as gb
-    >>> indptr = torch.LongTensor([0, 2, 4, 5])
-    >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
+    >>> indptr = torch.LongTensor([0, 1, 2, 3, 4])
+    >>> indices = torch.LongTensor([1, 2, 3, 0])
     >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
-    >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
+    >>> node_pairs = torch.tensor([[0, 1], [1, 2], [2, 3], [3, 0]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
-    ...     item_set, batch_size=1,)
+    ...     item_set, batch_size=4,)
     >>> neg_sampler = gb.UniformNegativeSampler(
     ...     item_sampler, graph, 2)
     >>> for minibatch in neg_sampler:
     ...       print(minibatch.negative_srcs)
     ...       print(minibatch.negative_dsts)
-    (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([1, 0, 0]))
-    (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
+    None
+    tensor([[2, 1],
+        [2, 1],
+        [3, 2],
+        [1, 3]])
     """
 
     def __init__(

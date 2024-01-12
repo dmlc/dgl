@@ -9,9 +9,6 @@ from . import gb_test_utils
 
 
 def test_DataLoader():
-    # https://pytorch.org/docs/master/notes/multiprocessing.html#cuda-in-multiprocessing
-    mp.set_start_method("spawn", force=True)
-
     N = 40
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
