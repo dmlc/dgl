@@ -22,7 +22,10 @@ from .. import gb_test_utils
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("is_pinned", [False, True])
-def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
+@pytest.mark.parametrize("output_size", [None, True])
+def test_index_select_csc(
+    indptr_dtype, indices_dtype, idtype, is_pinned, output_size
+):
     """Original graph in COO:
     1   0   1   0   1   0
     1   0   0   1   0   1
@@ -38,7 +41,7 @@ def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
     index = torch.tensor([0, 5, 3], dtype=idtype)
 
     cpu_indptr, cpu_indices = torch.ops.graphbolt.index_select_csc(
-        indptr, indices, index
+        indptr, indices, index, None
     )
     if is_pinned:
         indptr = indptr.pin_memory()
@@ -48,10 +51,12 @@ def test_index_select_csc(indptr_dtype, indices_dtype, idtype, is_pinned):
         indices = indices.cuda()
     index = index.cuda()
 
-    gpu_indptr, gpu_indices = torch.ops.graphbolt.index_select_csc(
-        indptr, indices, index
-    )
+    if output_size:
+        output_size = len(cpu_indices)
 
+    gpu_indptr, gpu_indices = torch.ops.graphbolt.index_select_csc(
+        indptr, indices, index, output_size
+    )
     assert not cpu_indptr.is_cuda
     assert not cpu_indices.is_cuda
 

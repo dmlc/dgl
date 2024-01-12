@@ -86,14 +86,15 @@ template <typename indptr_t, typename indices_t>
 std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
     torch::Tensor indices, const int64_t num_nodes,
     const indptr_t* const in_degree, const indptr_t* const sliced_indptr,
-    const int64_t* const perm, torch::TensorOptions nodes_options,
-    torch::ScalarType indptr_scalar_type) {
+    const int64_t* const perm, torch::TensorOptions options,
+    torch::ScalarType indptr_scalar_type,
+    torch::optional<int64_t> output_size) {
   auto allocator = cuda::GetAllocator();
   thrust::counting_iterator<int64_t> iota(0);
 
   // Output indptr for the slice indexed by nodes.
   auto output_indptr =
-      torch::empty(num_nodes + 1, nodes_options.dtype(indptr_scalar_type));
+      torch::empty(num_nodes + 1, options.dtype(indptr_scalar_type));
 
   auto output_indptr_aligned =
       allocator.AllocateStorage<indptr_t>(num_nodes + 1);
@@ -114,16 +115,18 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   }
 
   // Copy the actual total number of edges.
-  auto edge_count =
-      cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
+  if (!output_size.has_value()) {
+    auto edge_count =
+        cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
+    output_size = static_cast<indptr_t>(edge_count);
+  }
   // Copy the modified number of edges.
   auto edge_count_aligned =
       cuda::CopyScalar{output_indptr_aligned.get() + num_nodes};
 
   // Allocate output array with actual number of edges.
-  torch::Tensor output_indices = torch::empty(
-      static_cast<indptr_t>(edge_count),
-      nodes_options.dtype(indices.scalar_type()));
+  torch::Tensor output_indices =
+      torch::empty(output_size.value(), options.dtype(indices.scalar_type()));
   const dim3 block(BLOCK_SIZE);
   const dim3 grid(
       (static_cast<indptr_t>(edge_count_aligned) + BLOCK_SIZE - 1) /
@@ -141,26 +144,22 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
 }
 
 std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
+    torch::Tensor in_degree, torch::Tensor sliced_indptr, torch::Tensor indices,
+    torch::Tensor nodes, int num_bits, torch::optional<int64_t> output_size) {
   // Sorting nodes so that accesses over PCI-e are more regular.
-  const auto sorted_idx =
-      Sort(nodes, cuda::NumberOfBits(indptr.size(0) - 1)).second;
+  const auto sorted_idx = Sort(nodes, num_bits).second;
   const int64_t num_nodes = nodes.size(0);
 
-  auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   return AT_DISPATCH_INTEGRAL_TYPES(
-      indptr.scalar_type(), "UVAIndexSelectCSCIndptr", ([&] {
+      sliced_indptr.scalar_type(), "UVAIndexSelectCSCIndptr", ([&] {
         using indptr_t = scalar_t;
-        auto in_degree =
-            std::get<0>(in_degree_and_sliced_indptr).data_ptr<indptr_t>();
-        auto sliced_indptr =
-            std::get<1>(in_degree_and_sliced_indptr).data_ptr<indptr_t>();
         return GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
             indices.element_size(), "UVAIndexSelectCSCCopyIndices", ([&] {
               return UVAIndexSelectCSCCopyIndices<indptr_t, element_size_t>(
-                  indices, num_nodes, in_degree, sliced_indptr,
+                  indices, num_nodes, in_degree.data_ptr<indptr_t>(),
+                  sliced_indptr.data_ptr<indptr_t>(),
                   sorted_idx.data_ptr<int64_t>(), nodes.options(),
-                  indptr.scalar_type());
+                  sliced_indptr.scalar_type(), output_size);
             }));
       }));
 }
@@ -204,38 +203,39 @@ void IndexSelectCSCCopyIndices(
 }
 
 std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
-  const int64_t num_nodes = nodes.size(0);
-  auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
+    torch::Tensor in_degree, torch::Tensor sliced_indptr, torch::Tensor indices,
+    torch::TensorOptions options, torch::optional<int64_t> output_size) {
+  const int64_t num_nodes = sliced_indptr.size(0);
   return AT_DISPATCH_INTEGRAL_TYPES(
-      indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
+      sliced_indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
         using indptr_t = scalar_t;
-        auto in_degree =
-            std::get<0>(in_degree_and_sliced_indptr).data_ptr<indptr_t>();
-        auto sliced_indptr =
-            std::get<1>(in_degree_and_sliced_indptr).data_ptr<indptr_t>();
+        auto in_degree_ptr = in_degree.data_ptr<indptr_t>();
+        auto sliced_indptr_ptr = sliced_indptr.data_ptr<indptr_t>();
         // Output indptr for the slice indexed by nodes.
         torch::Tensor output_indptr = torch::empty(
-            num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
+            num_nodes + 1, options.dtype(sliced_indptr.scalar_type()));
 
         // Compute the output indptr, output_indptr.
         CUB_CALL(
-            DeviceScan::ExclusiveSum, in_degree,
+            DeviceScan::ExclusiveSum, in_degree_ptr,
             output_indptr.data_ptr<indptr_t>(), num_nodes + 1);
 
         // Number of edges being copied.
-        auto edge_count =
-            cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
+        if (!output_size.has_value()) {
+          auto edge_count =
+              cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_nodes};
+          output_size = static_cast<indptr_t>(edge_count);
+        }
         // Allocate output array of size number of copied edges.
         torch::Tensor output_indices = torch::empty(
-            static_cast<indptr_t>(edge_count),
-            nodes.options().dtype(indices.scalar_type()));
+            output_size.value(), options.dtype(indices.scalar_type()));
         GRAPHBOLT_DISPATCH_ELEMENT_SIZES(
             indices.element_size(), "IndexSelectCSCCopyIndices", ([&] {
               using indices_t = element_size_t;
               IndexSelectCSCCopyIndices<indptr_t, indices_t>(
                   num_nodes, reinterpret_cast<indices_t*>(indices.data_ptr()),
-                  sliced_indptr, in_degree, output_indptr.data_ptr<indptr_t>(),
+                  sliced_indptr_ptr, in_degree_ptr,
+                  output_indptr.data_ptr<indptr_t>(),
                   reinterpret_cast<indices_t*>(output_indices.data_ptr()));
             }));
         return std::make_tuple(output_indptr, output_indices);
@@ -243,12 +243,26 @@ std::tuple<torch::Tensor, torch::Tensor> DeviceIndexSelectCSCImpl(
 }
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
+    torch::Tensor in_degree, torch::Tensor sliced_indptr, torch::Tensor indices,
+    torch::Tensor nodes, int64_t nodes_max,
+    torch::optional<int64_t> output_size) {
   if (indices.is_pinned()) {
-    return UVAIndexSelectCSCImpl(indptr, indices, nodes);
+    int num_bits = cuda::NumberOfBits(nodes_max + 1);
+    return UVAIndexSelectCSCImpl(
+        in_degree, sliced_indptr, indices, nodes, num_bits, output_size);
   } else {
-    return DeviceIndexSelectCSCImpl(indptr, indices, nodes);
+    return DeviceIndexSelectCSCImpl(
+        in_degree, sliced_indptr, indices, nodes.options(), output_size);
   }
+}
+
+std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
+    torch::optional<int64_t> output_size) {
+  auto [in_degree, sliced_indptr] = SliceCSCIndptr(indptr, nodes);
+  return IndexSelectCSCImpl(
+      in_degree, sliced_indptr, indices, nodes, indptr.size(0) - 2,
+      output_size);
 }
 
 }  //  namespace ops
