@@ -205,8 +205,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     num_rows = sliced_indptr.size(0);
     num_edges_ = sliced_type_per_edge.size(0);
   }
-  auto coo_rows =
-      CSCToCOOImpl(sub_indptr, indices.scalar_type(), num_edges_);
+  auto coo_rows = CSCToCOOImpl(sub_indptr, indices.scalar_type(), num_edges_);
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
