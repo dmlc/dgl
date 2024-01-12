@@ -9,8 +9,9 @@ from dgl import graphbolt as gb
 
 
 @unittest.skipIf(
-    F._default_context_str != "gpu",
-    reason="GPUCachedFeature requires a GPU.",
+    F._default_context_str != "gpu"
+    or torch.cuda.get_device_capability()[0] < 7,
+    reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
 )
 @pytest.mark.parametrize(
     "dtype",

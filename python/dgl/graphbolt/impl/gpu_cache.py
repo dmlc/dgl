@@ -6,6 +6,10 @@ class GPUCache(object):
     """High-level wrapper for GPU embedding cache"""
 
     def __init__(self, cache_shape, dtype):
+        major, _ = torch.cuda.get_device_capability()
+        assert (
+            major >= 7
+        ), "GPUCache is supported only on CUDA compute capability >= 70 (Volta)."
         self._cache = torch.ops.graphbolt.gpu_cache(cache_shape, dtype)
         self.total_miss = 0
         self.total_queries = 0
