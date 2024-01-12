@@ -5,12 +5,10 @@
  * @brief Index select operator implementation on CUDA.
  */
 #include <c10/core/ScalarType.h>
-#include <c10/cuda/CUDAStream.h>
 #include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/cuda_sampling_ops.h>
 #include <thrust/gather.h>
-#include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/iterator/transform_output_iterator.h>
@@ -18,7 +16,6 @@
 #include <algorithm>
 #include <array>
 #include <cub/cub.cuh>
-#include <cuda/std/tuple>
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -142,7 +139,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
   auto allocator = cuda::GetAllocator();
-  const auto stream = cuda::GetCurrentStream();
   auto num_rows = nodes.size(0);
   auto fanouts_pinned = torch::empty(
       fanouts.size(),
@@ -156,7 +152,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto fanouts_device = allocator.AllocateStorage<int64_t>(fanouts.size());
   CUDA_CALL(cudaMemcpyAsync(
       fanouts_device.get(), fanouts_pinned_ptr,
-      sizeof(int64_t) * fanouts.size(), cudaMemcpyHostToDevice, stream));
+      sizeof(int64_t) * fanouts.size(), cudaMemcpyHostToDevice,
+      cuda::GetCurrentStream()));
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
@@ -175,6 +172,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             max_in_degree.data_ptr<index_t>(), num_rows, stream);
       }));
   torch::Tensor sub_indptr;
+  torch::optional<int64_t> num_edges_;
   // @todo mfbalin, refactor IndexSelectCSCImpl so that it does not have to take
   // nodes as input
   torch::optional<torch::Tensor> sliced_probs_or_mask;
@@ -183,19 +181,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     std::tie(sub_indptr, sliced_probs_or_mask_tensor) =
         IndexSelectCSCImpl(indptr, probs_or_mask.value(), nodes);
     sliced_probs_or_mask = sliced_probs_or_mask_tensor;
+    num_edges_ = sliced_probs_or_mask_tensor.size(0);
   } else {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
-  if (fanouts.size() > 1) {
-    torch::Tensor sliced_type_per_edge;
-    std::tie(sub_indptr, sliced_type_per_edge) =
-        IndexSelectCSCImpl(indptr, type_per_edge.value(), nodes);
-    std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
-        sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
-    num_rows = sliced_indptr.size(0);
-  }
-
-  torch::optional<int64_t> num_edges_;
   if (fanouts.size() > 1) {
     torch::Tensor sliced_type_per_edge;
     std::tie(sub_indptr, sliced_type_per_edge) =
@@ -225,19 +214,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                 auto is_nonzero = thrust::make_transform_iterator(
                     sliced_probs_or_mask.value().data_ptr<probs_t>(),
                     IsPositive{});
-                size_t tmp_storage_size = 0;
-                cub::DeviceSegmentedReduce::Sum(
-                    nullptr, tmp_storage_size, is_nonzero,
+                CUB_CALL(
+                    DeviceSegmentedReduce::Sum, is_nonzero,
                     in_degree.data_ptr<indptr_t>(), num_rows,
                     sub_indptr.data_ptr<indptr_t>(),
-                    sub_indptr.data_ptr<indptr_t>() + 1, stream);
-                auto tmp_storage =
-                    allocator.AllocateStorage<char>(tmp_storage_size);
-                cub::DeviceSegmentedReduce::Sum(
-                    tmp_storage.get(), tmp_storage_size, is_nonzero,
-                    in_degree.data_ptr<indptr_t>(), num_rows,
-                    sub_indptr.data_ptr<indptr_t>(),
-                    sub_indptr.data_ptr<indptr_t>() + 1, stream);
+                    sub_indptr.data_ptr<indptr_t>() + 1);
               }));
         }
         thrust::counting_iterator<int64_t> iota(0);
@@ -246,16 +227,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                       in_degree.data_ptr<indptr_t>(), fanouts_device.get(),
                       fanouts.size()});
 
-        {  // Compute output_indptr.
-          size_t tmp_storage_size = 0;
-          cub::DeviceScan::ExclusiveSum(
-              nullptr, tmp_storage_size, sampled_degree,
-              output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
-          auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-          cub::DeviceScan::ExclusiveSum(
-              tmp_storage.get(), tmp_storage_size, sampled_degree,
-              output_indptr.data_ptr<indptr_t>(), num_rows + 1, stream);
-        }
+        // Compute output_indptr.
+        CUB_CALL(
+            DeviceScan::ExclusiveSum, sampled_degree,
+            output_indptr.data_ptr<indptr_t>(), num_rows + 1);
 
         auto num_sampled_edges =
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
@@ -312,8 +287,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                               (num_edges + BLOCK_SIZE - 1) / BLOCK_SIZE);
                           // Compute row and random number pairs.
                           CUDA_KERNEL_CALL(
-                              _ComputeRandoms, grid, block, 0, stream,
-                              num_edges, sliced_indptr.data_ptr<indptr_t>(),
+                              _ComputeRandoms, grid, block, 0, num_edges,
+                              sliced_indptr.data_ptr<indptr_t>(),
                               sub_indptr.data_ptr<indptr_t>(),
                               coo_rows.data_ptr<indices_t>(), sliced_probs_ptr,
                               indices_ptr, random_seed, randoms.get(),
@@ -324,21 +299,12 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               // Sort the random numbers along with edge ids, after
               // sorting the first fanout elements of each row will
               // give us the sampled edges.
-              size_t tmp_storage_size = 0;
-              CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
-                  nullptr, tmp_storage_size, randoms.get(),
+              CUB_CALL(
+                  DeviceSegmentedSort::SortPairs, randoms.get(),
                   randoms_sorted.get(), edge_id_segments.get(),
                   sorted_edge_id_segments.get(), num_edges, num_rows,
                   sub_indptr.data_ptr<indptr_t>(),
-                  sub_indptr.data_ptr<indptr_t>() + 1, stream));
-              auto tmp_storage =
-                  allocator.AllocateStorage<char>(tmp_storage_size);
-              CUDA_CALL(cub::DeviceSegmentedSort::SortPairs(
-                  tmp_storage.get(), tmp_storage_size, randoms.get(),
-                  randoms_sorted.get(), edge_id_segments.get(),
-                  sorted_edge_id_segments.get(), num_edges, num_rows,
-                  sub_indptr.data_ptr<indptr_t>(),
-                  sub_indptr.data_ptr<indptr_t>() + 1, stream));
+                  sub_indptr.data_ptr<indptr_t>() + 1);
 
               picked_eids = torch::empty(
                   static_cast<indptr_t>(num_sampled_edges),
@@ -353,19 +319,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                 auto sampled_segment_end_it = thrust::make_transform_iterator(
                     iota, SegmentEndFunc<indptr_t, decltype(sampled_degree)>{
                               sub_indptr.data_ptr<indptr_t>(), sampled_degree});
-                size_t tmp_storage_size = 0;
-                CUDA_CALL(cub::DeviceSegmentedSort::SortKeys(
-                    nullptr, tmp_storage_size, edge_id_segments.get(),
+                CUB_CALL(
+                    DeviceSegmentedSort::SortKeys, edge_id_segments.get(),
                     sorted_edge_id_segments.get(), picked_eids.size(0),
                     num_rows, sub_indptr.data_ptr<indptr_t>(),
-                    sampled_segment_end_it, stream));
-                auto tmp_storage =
-                    allocator.AllocateStorage<char>(tmp_storage_size);
-                CUDA_CALL(cub::DeviceSegmentedSort::SortKeys(
-                    tmp_storage.get(), tmp_storage_size, edge_id_segments.get(),
-                    sorted_edge_id_segments.get(), picked_eids.size(0),
-                    num_rows, sub_indptr.data_ptr<indptr_t>(),
-                    sampled_segment_end_it, stream));
+                    sampled_segment_end_it);
               }
 
               auto input_buffer_it = thrust::make_transform_iterator(
@@ -382,17 +340,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
               // Copy the sampled edge ids into picked_eids tensor.
               for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
-                size_t tmp_storage_size = 0;
-                CUDA_CALL(cub::DeviceCopy::Batched(
-                    nullptr, tmp_storage_size, input_buffer_it + i,
+                CUB_CALL(
+                    DeviceCopy::Batched, input_buffer_it + i,
                     output_buffer_it + i, sampled_degree + i,
-                    std::min(num_rows - i, max_copy_at_once), stream));
-                auto tmp_storage =
-                    allocator.AllocateStorage<char>(tmp_storage_size);
-                CUDA_CALL(cub::DeviceCopy::Batched(
-                    tmp_storage.get(), tmp_storage_size, input_buffer_it + i,
-                    output_buffer_it + i, sampled_degree + i,
-                    std::min(num_rows - i, max_copy_at_once), stream));
+                    std::min(num_rows - i, max_copy_at_once));
               }
             }));
 
@@ -404,10 +355,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         AT_DISPATCH_INDEX_TYPES(
             indices.scalar_type(), "SampleNeighborsOutputIndices", ([&] {
               using indices_t = index_t;
-              const auto exec_policy =
-                  thrust::cuda::par_nosync(allocator).on(stream);
-              thrust::gather(
-                  exec_policy, picked_eids.data_ptr<indptr_t>(),
+              THRUST_CALL(
+                  gather, picked_eids.data_ptr<indptr_t>(),
                   picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
                   indices.data_ptr<indices_t>(),
                   output_indices.data_ptr<indices_t>());
@@ -424,10 +373,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               picked_eids.options().dtype(types.scalar_type()));
           AT_DISPATCH_INTEGRAL_TYPES(
               types.scalar_type(), "SampleNeighborsOutputTypePerEdge", ([&] {
-                const auto exec_policy =
-                    thrust::cuda::par_nosync(allocator).on(stream);
-                thrust::gather(
-                    exec_policy, picked_eids.data_ptr<indptr_t>(),
+                THRUST_CALL(
+                    gather, picked_eids.data_ptr<indptr_t>(),
                     picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
                     types.data_ptr<scalar_t>(),
                     output_type_per_edge.value().data_ptr<scalar_t>());

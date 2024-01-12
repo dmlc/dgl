@@ -79,27 +79,14 @@ torch::Tensor CSCToCOOImpl(
                     auto buffer_sizes = thrust::make_transform_iterator(
                         iota, AdjacentDifference<indptr_t>{indptr_ptr});
 
-                    auto allocator = cuda::GetAllocator();
-                    auto stream = cuda::GetCurrentStream();
                     const auto num_rows = indptr.size(0) - 1;
-                    constexpr int64_t max_copy_at_once =
-                        std::numeric_limits<int32_t>::max();
-                    for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
-                      std::size_t tmp_storage_size = 0;
-                      CUDA_CALL(cub::DeviceCopy::Batched(
-                          nullptr, tmp_storage_size, input_buffer + i,
-                          output_buffer + i, buffer_sizes + i,
-                          std::min(num_rows - i, max_copy_at_once), stream));
-
-                      auto tmp_storage =
-                          allocator.AllocateStorage<char>(tmp_storage_size);
-
-                      CUDA_CALL(cub::DeviceCopy::Batched(
-                          tmp_storage.get(), tmp_storage_size, input_buffer + i,
-                          output_buffer + i, buffer_sizes + i,
-                          std::min(num_rows - i, max_copy_at_once), stream));
-                    }
-                  }));
+              constexpr int64_t max_copy_at_once =
+                  std::numeric_limits<int32_t>::max();
+              for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
+                CUB_CALL(
+                    DeviceCopy::Batched, input_buffer + i, output_buffer + i,
+                    buffer_sizes + i, std::min(num_rows - i, max_copy_at_once));
+              }
             }));
       }));
   return csc_rows;
