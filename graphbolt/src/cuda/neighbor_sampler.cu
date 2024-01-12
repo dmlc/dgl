@@ -162,14 +162,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
   AT_DISPATCH_INDEX_TYPES(
       indptr.scalar_type(), "SampleNeighborsMaxInDegree", ([&] {
-        size_t tmp_storage_size = 0;
-        cub::DeviceReduce::Max(
-            nullptr, tmp_storage_size, in_degree.data_ptr<index_t>(),
-            max_in_degree.data_ptr<index_t>(), num_rows, stream);
-        auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-        cub::DeviceReduce::Max(
-            tmp_storage.get(), tmp_storage_size, in_degree.data_ptr<index_t>(),
-            max_in_degree.data_ptr<index_t>(), num_rows, stream);
+        CUB_CALL(
+            DeviceReduce::Max, in_degree.data_ptr<index_t>(),
+            max_in_degree.data_ptr<index_t>(), num_rows);
       }));
   torch::Tensor sub_indptr;
   torch::optional<int64_t> num_edges_;

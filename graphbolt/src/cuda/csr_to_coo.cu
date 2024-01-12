@@ -80,13 +80,15 @@ torch::Tensor CSCToCOOImpl(
                         iota, AdjacentDifference<indptr_t>{indptr_ptr});
 
                     const auto num_rows = indptr.size(0) - 1;
-              constexpr int64_t max_copy_at_once =
-                  std::numeric_limits<int32_t>::max();
-              for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
-                CUB_CALL(
-                    DeviceCopy::Batched, input_buffer + i, output_buffer + i,
-                    buffer_sizes + i, std::min(num_rows - i, max_copy_at_once));
-              }
+                    constexpr int64_t max_copy_at_once =
+                        std::numeric_limits<int32_t>::max();
+                    for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
+                      CUB_CALL(
+                          DeviceCopy::Batched, input_buffer + i,
+                          output_buffer + i, buffer_sizes + i,
+                          std::min(num_rows - i, max_copy_at_once));
+                    }
+                  }));
             }));
       }));
   return csc_rows;
