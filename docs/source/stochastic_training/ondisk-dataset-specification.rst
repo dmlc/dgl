@@ -122,8 +122,10 @@ The ``graph`` field is used to specify the graph structure. It has two fields:
       homogeneous graphs. For heterogeneous graphs, it is the edge type.
     - ``format``: ``string``
 
-      The ``format`` field is used to specify the format of the edge data. It can
-      only be ``csv`` for now.
+      The ``format`` field is used to specify the format of the edge data. It
+      can be ``csv`` or ``numpy``. If it is ``csv``, no ``index`` and ``header``
+      fields are needed. If it is ``numpy``, the array requires to be in shape
+      of ``(2, num_edges)``. ``numpy`` format is recommended for large graphs.
     - ``path``: ``string``
 
       The ``path`` field is used to specify the path of the edge data. It is
