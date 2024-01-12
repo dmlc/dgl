@@ -7,7 +7,7 @@ import torch
 
 @pytest.mark.parametrize("num_workers", [0])
 @pytest.mark.parametrize("persistent_workers", [True, False])
-def test_integration_link_prediction():
+def test_integration_link_prediction(num_workers, persistent_workers):
     torch.manual_seed(926)
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
@@ -60,6 +60,8 @@ def test_integration_link_prediction():
     )
     dataloader = gb.DataLoader(
         datapipe,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
     )
     expected = [
         str(
@@ -213,7 +215,7 @@ def test_integration_link_prediction():
 
 @pytest.mark.parametrize("num_workers", [0])
 @pytest.mark.parametrize("persistent_workers", [True, False])
-def test_integration_node_classification():
+def test_integration_node_classification(num_workers, persistent_workers):
     torch.manual_seed(926)
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
@@ -264,6 +266,8 @@ def test_integration_node_classification():
     )
     dataloader = gb.DataLoader(
         datapipe,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
     )
     expected = [
         str(
