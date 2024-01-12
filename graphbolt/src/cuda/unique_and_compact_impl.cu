@@ -4,15 +4,11 @@
  * @file cuda/unique_and_compact_impl.cu
  * @brief Unique and compact operator implementation on CUDA.
  */
-#include <c10/cuda/CUDAStream.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
 #include <thrust/functional.h>
 #include <thrust/gather.h>
-#include <thrust/iterator/discard_iterator.h>
 #include <thrust/logical.h>
-#include <thrust/reduce.h>
-#include <thrust/remove.h>
 
 #include <cub/cub.cuh>
 #include <type_traits>
@@ -33,23 +29,17 @@ struct EqualityFunc {
   }
 };
 
-#define DefineReductionFunction(reduce_fn, name)                               \
-  template <typename scalar_iterator_t>                                        \
-  auto name(const scalar_iterator_t input, int64_t size) {                     \
-    auto allocator = cuda::GetAllocator();                                     \
-    auto stream = cuda::GetCurrentStream();                                    \
-    using scalar_t = std::remove_reference_t<decltype(input[0])>;              \
-    cuda::CopyScalar<scalar_t> result;                                         \
-    size_t workspace_size = 0;                                                 \
-    reduce_fn(nullptr, workspace_size, input, result.get(), size, stream);     \
-    auto tmp_storage = allocator.AllocateStorage<char>(workspace_size);        \
-    reduce_fn(                                                                 \
-        tmp_storage.get(), workspace_size, input, result.get(), size, stream); \
-    return result;                                                             \
+#define DefineCubReductionFunction(cub_reduce_fn, name)           \
+  template <typename scalar_iterator_t>                           \
+  auto name(const scalar_iterator_t input, int64_t size) {        \
+    using scalar_t = std::remove_reference_t<decltype(input[0])>; \
+    cuda::CopyScalar<scalar_t> result;                            \
+    CUB_CALL(cub_reduce_fn, input, result.get(), size);           \
+    return result;                                                \
   }
 
-DefineReductionFunction(cub::DeviceReduce::Max, Max);
-DefineReductionFunction(cub::DeviceReduce::Min, Min);
+DefineCubReductionFunction(DeviceReduce::Max, Max);
+DefineCubReductionFunction(DeviceReduce::Min, Min);
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
@@ -60,7 +50,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
       "Dtypes of tensors passed to UniqueAndCompact need to be identical.");
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
-  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
   return AT_DISPATCH_INTEGRAL_TYPES(
       src_ids.scalar_type(), "unique_and_compact", ([&] {
         auto src_ids_ptr = src_ids.data_ptr<scalar_t>();
@@ -84,8 +73,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
         // Mark dst nodes in the src_ids tensor.
         auto is_dst = allocator.AllocateStorage<bool>(src_ids.size(0));
-        thrust::binary_search(
-            exec_policy, sorted_unique_dst_ids_ptr,
+        THRUST_CALL(
+            binary_search, sorted_unique_dst_ids_ptr,
             sorted_unique_dst_ids_ptr + unique_dst_ids.size(0), src_ids_ptr,
             src_ids_ptr + src_ids.size(0), is_dst.get());
 
@@ -96,16 +85,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
           auto is_src = thrust::make_transform_iterator(
               is_dst.get(), thrust::logical_not<bool>{});
           cuda::CopyScalar<int64_t> only_src_size;
-          size_t workspace_size = 0;
-          cub::DeviceSelect::Flagged(
-              nullptr, workspace_size, src_ids_ptr, is_src,
+          CUB_CALL(
+              DeviceSelect::Flagged, src_ids_ptr, is_src,
               only_src.data_ptr<scalar_t>(), only_src_size.get(),
-              src_ids.size(0), stream);
-          auto tmp_storage = allocator.AllocateStorage<char>(workspace_size);
-          cub::DeviceSelect::Flagged(
-              tmp_storage.get(), workspace_size, src_ids_ptr, is_src,
-              only_src.data_ptr<scalar_t>(), only_src_size.get(),
-              src_ids.size(0), stream);
+              src_ids.size(0));
           stream.synchronize();
           only_src = only_src.slice(0, 0, static_cast<int64_t>(only_src_size));
         }
@@ -129,16 +112,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
         {  // Compute the unique operation on the only_src tensor.
           cuda::CopyScalar<int64_t> unique_only_src_size;
-          size_t workspace_size = 0;
-          CUDA_CALL(cub::DeviceSelect::Unique(
-              nullptr, workspace_size, sorted_only_src.data_ptr<scalar_t>(),
-              unique_only_src_ptr, unique_only_src_size.get(), only_src.size(0),
-              stream));
-          auto tmp_storage = allocator.AllocateStorage<char>(workspace_size);
-          CUDA_CALL(cub::DeviceSelect::Unique(
-              tmp_storage.get(), workspace_size,
-              sorted_only_src.data_ptr<scalar_t>(), unique_only_src_ptr,
-              unique_only_src_size.get(), only_src.size(0), stream));
+          CUB_CALL(
+              DeviceSelect::Unique, sorted_only_src.data_ptr<scalar_t>(),
+              unique_only_src_ptr, unique_only_src_size.get(),
+              only_src.size(0));
           stream.synchronize();
           unique_only_src = unique_only_src.slice(
               0, 0, static_cast<int64_t>(unique_only_src_size));
@@ -146,7 +123,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
         auto real_order = torch::cat({unique_dst_ids, unique_only_src});
         // Sort here so that binary search can be used to lookup new_ids.
-        auto [sorted_order, new_ids] = Sort(real_order, num_bits);
+        torch::Tensor sorted_order, new_ids;
+        std::tie(sorted_order, new_ids) = Sort(real_order, num_bits);
         auto sorted_order_ptr = sorted_order.data_ptr<scalar_t>();
         auto new_ids_ptr = new_ids.data_ptr<int64_t>();
         // Holds the found locations of the src and dst ids in the sorted_order.
@@ -154,8 +132,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
         // tensors.
         auto new_dst_ids_loc =
             allocator.AllocateStorage<scalar_t>(dst_ids.size(0));
-        thrust::lower_bound(
-            exec_policy, sorted_order_ptr,
+        THRUST_CALL(
+            lower_bound, sorted_order_ptr,
             sorted_order_ptr + sorted_order.size(0), dst_ids_ptr,
             dst_ids_ptr + dst_ids.size(0), new_dst_ids_loc.get());
 
@@ -172,16 +150,16 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
         auto new_src_ids_loc =
             allocator.AllocateStorage<scalar_t>(src_ids.size(0));
-        thrust::lower_bound(
-            exec_policy, sorted_order_ptr,
+        THRUST_CALL(
+            lower_bound, sorted_order_ptr,
             sorted_order_ptr + sorted_order.size(0), src_ids_ptr,
             src_ids_ptr + src_ids.size(0), new_src_ids_loc.get());
 
         // Finally, lookup the new compact ids of the src and dst tensors via
         // gather operations.
         auto new_src_ids = torch::empty_like(src_ids);
-        thrust::gather(
-            exec_policy, new_src_ids_loc.get(),
+        THRUST_CALL(
+            gather, new_src_ids_loc.get(),
             new_src_ids_loc.get() + src_ids.size(0),
             new_ids.data_ptr<int64_t>(), new_src_ids.data_ptr<scalar_t>());
         // Perform check before we gather for the dst indices.
@@ -189,8 +167,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
           throw std::out_of_range("Some ids not found.");
         }
         auto new_dst_ids = torch::empty_like(dst_ids);
-        thrust::gather(
-            exec_policy, new_dst_ids_loc.get(),
+        THRUST_CALL(
+            gather, new_dst_ids_loc.get(),
             new_dst_ids_loc.get() + dst_ids.size(0),
             new_ids.data_ptr<int64_t>(), new_dst_ids.data_ptr<scalar_t>());
         return std::make_tuple(real_order, new_src_ids, new_dst_ids);
