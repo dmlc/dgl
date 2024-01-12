@@ -87,7 +87,8 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
     torch::Tensor indices, const int64_t num_nodes,
     const indptr_t* const in_degree, const indptr_t* const sliced_indptr,
     const int64_t* const perm, torch::TensorOptions options,
-    torch::ScalarType indptr_scalar_type, torch::optional<int64_t> output_size) {
+    torch::ScalarType indptr_scalar_type,
+    torch::optional<int64_t> output_size) {
   auto allocator = cuda::GetAllocator();
   thrust::counting_iterator<int64_t> iota(0);
 
