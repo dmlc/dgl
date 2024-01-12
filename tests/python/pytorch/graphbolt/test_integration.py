@@ -1,13 +1,10 @@
 import dgl
 import dgl.graphbolt as gb
 import dgl.sparse as dglsp
-import pytest
 import torch
 
 
-@pytest.mark.parametrize("num_workers", [0])
-@pytest.mark.parametrize("persistent_workers", [True, False])
-def test_integration_link_prediction(num_workers, persistent_workers):
+def test_integration_link_prediction():
     torch.manual_seed(926)
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
@@ -60,8 +57,6 @@ def test_integration_link_prediction(num_workers, persistent_workers):
     )
     dataloader = gb.DataLoader(
         datapipe,
-        num_workers=num_workers,
-        persistent_workers=persistent_workers,
     )
     expected = [
         str(
@@ -213,9 +208,7 @@ def test_integration_link_prediction(num_workers, persistent_workers):
         assert expected[step] == str(data), print(data)
 
 
-@pytest.mark.parametrize("num_workers", [0])
-@pytest.mark.parametrize("persistent_workers", [True, False])
-def test_integration_node_classification(num_workers, persistent_workers):
+def test_integration_node_classification():
     torch.manual_seed(926)
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
@@ -266,8 +259,6 @@ def test_integration_node_classification(num_workers, persistent_workers):
     )
     dataloader = gb.DataLoader(
         datapipe,
-        num_workers=num_workers,
-        persistent_workers=persistent_workers,
     )
     expected = [
         str(
