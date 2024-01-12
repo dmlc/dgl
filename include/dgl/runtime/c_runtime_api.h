@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "2.0"
+#define DGL_VERSION "2.1"
 
 #ifdef __cplusplus
 extern "C" {
