@@ -7,7 +7,7 @@ import torch
 
 @pytest.mark.parametrize("num_workers", [0])
 @pytest.mark.parametrize("persistent_workers", [True, False])
-def test_integration_link_prediction(num_workers, persistent_workers):
+def test_integration_link_prediction():
     torch.manual_seed(926)
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
@@ -51,11 +51,7 @@ def test_integration_link_prediction(num_workers, persistent_workers):
     }
     feature_store = gb.BasicFeatureStore(features)
     datapipe = gb.ItemSampler(item_set, batch_size=4)
-<<<<<<< HEAD
     datapipe = datapipe.sample_uniform_negative(graph, 2)
-=======
-    datapipe = datapipe.sample_uniform_negative(graph, 1)
->>>>>>> 9e836de2... fix lint
     fanouts = torch.LongTensor([1])
     datapipe = datapipe.sample_neighbor(graph, [fanouts, fanouts], replace=True)
     datapipe = datapipe.transform(gb.exclude_seed_edges)
@@ -64,8 +60,6 @@ def test_integration_link_prediction(num_workers, persistent_workers):
     )
     dataloader = gb.DataLoader(
         datapipe,
-        num_workers=num_workers,
-        persistent_workers=persistent_workers,
     )
     expected = [
         str(
@@ -115,22 +109,13 @@ def test_integration_link_prediction(num_workers, persistent_workers):
                                           [0, 1],
                                           [1, 5]]),
           blocks=[Block(num_src_nodes=6, num_dst_nodes=6, num_edges=2),
-<<<<<<< HEAD
                  Block(num_src_nodes=6, num_dst_nodes=6, num_edges=2)],
-=======
-                 Block(num_src_nodes=6, num_dst_nodes=5, num_edges=1)],
->>>>>>> 9e836de2... fix lint
        )"""
         ),
         str(
             """MiniBatch(seed_nodes=None,
-<<<<<<< HEAD
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 0, 0, 0, 1, 2, 3]),
                                                                          indices=tensor([4, 1, 0]),
-=======
-          sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 0, 0, 0, 1, 2]),
-                                                                         indices=tensor([1, 3]),
->>>>>>> 9e836de2... fix lint
                                                            ),
                                                original_row_node_ids=tensor([3, 4, 0, 1, 5, 2]),
                                                original_edge_ids=None,
@@ -168,7 +153,6 @@ def test_integration_link_prediction(num_workers, persistent_workers):
                         {}],
           compacted_node_pairs=(tensor([0, 1, 1, 2]),
                                tensor([0, 0, 1, 1])),
-<<<<<<< HEAD
           compacted_negative_srcs=None,
           compacted_negative_dsts=tensor([[3, 4],
                                           [5, 4],
@@ -176,29 +160,12 @@ def test_integration_link_prediction(num_workers, persistent_workers):
                                           [3, 4]]),
           blocks=[Block(num_src_nodes=6, num_dst_nodes=6, num_edges=3),
                  Block(num_src_nodes=6, num_dst_nodes=6, num_edges=3)],
-=======
-          compacted_negative_srcs=tensor([[0],
-                                          [1],
-                                          [1],
-                                          [2]]),
-          compacted_negative_dsts=tensor([[1],
-                                          [1],
-                                          [3],
-                                          [4]]),
-          blocks=[Block(num_src_nodes=5, num_dst_nodes=5, num_edges=2),
-                 Block(num_src_nodes=5, num_dst_nodes=5, num_edges=2)],
->>>>>>> 9e836de2... fix lint
        )"""
         ),
         str(
             """MiniBatch(seed_nodes=None,
-<<<<<<< HEAD
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 0, 1, 1, 2]),
                                                                          indices=tensor([1, 0]),
-=======
-          sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 0, 1]),
-                                                                         indices=tensor([1]),
->>>>>>> 9e836de2... fix lint
                                                            ),
                                                original_row_node_ids=tensor([5, 4, 0, 1]),
                                                original_edge_ids=None,
@@ -232,20 +199,11 @@ def test_integration_link_prediction(num_workers, persistent_workers):
                         {}],
           compacted_node_pairs=(tensor([0, 1]),
                                tensor([0, 0])),
-<<<<<<< HEAD
           compacted_negative_srcs=None,
           compacted_negative_dsts=tensor([[2, 1],
                                           [2, 3]]),
           blocks=[Block(num_src_nodes=4, num_dst_nodes=4, num_edges=2),
                  Block(num_src_nodes=4, num_dst_nodes=4, num_edges=2)],
-=======
-          compacted_negative_srcs=tensor([[0],
-                                          [1]]),
-          compacted_negative_dsts=tensor([[0],
-                                          [0]]),
-          blocks=[Block(num_src_nodes=2, num_dst_nodes=2, num_edges=1),
-                 Block(num_src_nodes=2, num_dst_nodes=2, num_edges=1)],
->>>>>>> 9e836de2... fix lint
        )"""
         ),
     ]
@@ -255,7 +213,7 @@ def test_integration_link_prediction(num_workers, persistent_workers):
 
 @pytest.mark.parametrize("num_workers", [0])
 @pytest.mark.parametrize("persistent_workers", [True, False])
-def test_integration_node_classification(num_workers, persistent_workers):
+def test_integration_node_classification():
     torch.manual_seed(926)
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
@@ -306,8 +264,6 @@ def test_integration_node_classification(num_workers, persistent_workers):
     )
     dataloader = gb.DataLoader(
         datapipe,
-        num_workers=num_workers,
-        persistent_workers=persistent_workers,
     )
     expected = [
         str(
