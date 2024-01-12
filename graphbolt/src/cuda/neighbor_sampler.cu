@@ -166,28 +166,30 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             DeviceReduce::Max, in_degree.data_ptr<index_t>(),
             max_in_degree.data_ptr<index_t>(), num_rows);
       }));
-  torch::Tensor sub_indptr;
   torch::optional<int64_t> num_edges_;
-  // @todo mfbalin, refactor IndexSelectCSCImpl so that it does not have to take
-  // nodes as input
+  torch::Tensor sub_indptr;
   torch::optional<torch::Tensor> sliced_probs_or_mask;
   if (probs_or_mask.has_value()) {
     torch::Tensor sliced_probs_or_mask_tensor;
-    std::tie(sub_indptr, sliced_probs_or_mask_tensor) =
-        IndexSelectCSCImpl(indptr, probs_or_mask.value(), nodes);
+    std::tie(sub_indptr, sliced_probs_or_mask_tensor) = IndexSelectCSCImpl(
+        in_degree, sliced_indptr, probs_or_mask.value(), nodes,
+        indptr.size(0) - 2, num_edges_);
     sliced_probs_or_mask = sliced_probs_or_mask_tensor;
     num_edges_ = sliced_probs_or_mask_tensor.size(0);
-  } else {
-    sub_indptr = ExclusiveCumSum(in_degree);
   }
   if (fanouts.size() > 1) {
     torch::Tensor sliced_type_per_edge;
-    std::tie(sub_indptr, sliced_type_per_edge) =
-        IndexSelectCSCImpl(indptr, type_per_edge.value(), nodes);
+    std::tie(sub_indptr, sliced_type_per_edge) = IndexSelectCSCImpl(
+        in_degree, sliced_indptr, type_per_edge.value(), nodes,
+        indptr.size(0) - 2, num_edges_);
     std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
         sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
     num_rows = sliced_indptr.size(0);
     num_edges_ = sliced_type_per_edge.size(0);
+  }
+  // If sub_indptr was not computed in the two code blocks above:
+  if (!probs_or_mask.has_value() && fanouts.size() <= 1) {
+    sub_indptr = ExclusiveCumSum(in_degree);
   }
   auto coo_rows = CSCToCOOImpl(sub_indptr, indices.scalar_type(), num_edges_);
   const auto num_edges = coo_rows.size(0);
