@@ -587,7 +587,7 @@ def test_ItemSetDict_repr():
             ),
         }
     )
-    expected_str = str(
+    expected_str = (
         "ItemSetDict(\n"
         "    itemsets={'user': ItemSet(\n"
         "                 items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
