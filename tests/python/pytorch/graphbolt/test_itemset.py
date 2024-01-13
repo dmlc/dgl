@@ -572,7 +572,7 @@ def test_ItemSetDict_repr():
         "    names=('seed_nodes',),\n"
         ")"
     )
-    assert str(item_set) == expected_str, f"\n\n\n\n{item_set}\n\n\n"
+    assert str(item_set) == expected_str, item_set
 
     # ItemSetDict with multiple names.
     item_set = gb.ItemSetDict(
@@ -599,4 +599,4 @@ def test_ItemSetDict_repr():
         "    names=('seed_nodes', 'labels'),\n"
         ")"
     )
-    assert str(item_set) == expected_str, f"\n\n\n\n{item_set}"
+    assert str(item_set) == expected_str, item_set
