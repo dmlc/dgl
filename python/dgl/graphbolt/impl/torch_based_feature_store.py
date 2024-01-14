@@ -1,4 +1,6 @@
 """Torch-based feature store for GraphBolt."""
+
+import textwrap
 from typing import Dict, List
 
 import numpy as np
@@ -169,7 +171,37 @@ class TorchBasedFeature(Feature):
         self._tensor = self._tensor.pin_memory()
 
     def __repr__(self) -> str:
-        return _torch_based_feature_str(self)
+        ret = (
+            "TorchBasedFeature(\n"
+            "    feature={feature},\n"
+            "    metadata={metadata},\n"
+            ")"
+        )
+
+        feature_str = str(self._tensor)
+        feature_str_lines = feature_str.splitlines()
+        if len(feature_str_lines) > 1:
+            feature_str = (
+                feature_str_lines[0]
+                + "\n"
+                + textwrap.indent(
+                    "\n".join(feature_str_lines[1:]), " " * len("    feature=")
+                )
+            )
+
+        metadata_str = str(self.metadata())
+        metadata_str_lines = metadata_str.splitlines()
+        if len(metadata_str_lines) > 1:
+            metadata_str = (
+                metadata_str_lines[0]
+                + "\n"
+                + textwrap.indent(
+                    "\n".join(metadata_str_lines[1:]),
+                    " " * len("    metadata="),
+                )
+            )
+
+        return ret.format(feature=feature_str, metadata=metadata_str)
 
 
 class TorchBasedFeatureStore(BasicFeatureStore):
@@ -236,40 +268,17 @@ class TorchBasedFeatureStore(BasicFeatureStore):
             feature.pin_memory_()
 
     def __repr__(self) -> str:
-        return _torch_based_feature_store_str(self._features)
+        ret = "TorchBasedFeatureStore(\n" + "    {features}\n" + ")"
 
+        features_str = str(self._features)
+        features_str_lines = features_str.splitlines()
+        if len(features_str_lines) > 1:
+            features_str = (
+                features_str_lines[0]
+                + "\n"
+                + textwrap.indent(
+                    "\n".join(features_str_lines[1:]), " " * len("    ")
+                )
+            )
 
-def _torch_based_feature_str(feature: TorchBasedFeature) -> str:
-    final_str = "TorchBasedFeature("
-    indent_len = len(final_str)
-
-    def _add_indent(_str, indent):
-        lines = _str.split("\n")
-        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-        return "\n".join(lines)
-
-    feature_str = "feature=" + _add_indent(
-        str(feature._tensor), indent_len + len("feature=")
-    )
-    final_str += feature_str + ",\n" + " " * indent_len
-    metadata_str = "metadata=" + _add_indent(
-        str(feature.metadata()), indent_len + len("metadata=")
-    )
-    final_str += metadata_str + ",\n)"
-    return final_str
-
-
-def _torch_based_feature_store_str(
-    features: Dict[str, TorchBasedFeature]
-) -> str:
-    final_str = "TorchBasedFeatureStore"
-    indent_len = len(final_str)
-
-    def _add_indent(_str, indent):
-        lines = _str.split("\n")
-        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-        return "\n".join(lines)
-
-    features_str = _add_indent(str(features), indent_len)
-    final_str += features_str
-    return final_str
+        return ret.format(features=features_str)
