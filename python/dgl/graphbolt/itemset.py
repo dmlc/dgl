@@ -345,12 +345,8 @@ class ItemSetDict:
             ")"
         )
 
-        itemsets_str = repr(self._itemsets)
-        lines = itemsets_str.splitlines()
-        itemsets_str = (
-            lines[0]
-            + "\n"
-            + textwrap.indent("\n".join(lines[1:]), " " * len("    itemsets="))
-        )
+        itemsets_str = textwrap.indent(
+            repr(self._itemsets), " " * len("    itemsets=")
+        ).strip()
 
         return ret.format(itemsets=itemsets_str, names=self._names)

@@ -178,28 +178,12 @@ class TorchBasedFeature(Feature):
             ")"
         )
 
-        feature_str = str(self._tensor)
-        feature_str_lines = feature_str.splitlines()
-        if len(feature_str_lines) > 1:
-            feature_str = (
-                feature_str_lines[0]
-                + "\n"
-                + textwrap.indent(
-                    "\n".join(feature_str_lines[1:]), " " * len("    feature=")
-                )
-            )
-
-        metadata_str = str(self.metadata())
-        metadata_str_lines = metadata_str.splitlines()
-        if len(metadata_str_lines) > 1:
-            metadata_str = (
-                metadata_str_lines[0]
-                + "\n"
-                + textwrap.indent(
-                    "\n".join(metadata_str_lines[1:]),
-                    " " * len("    metadata="),
-                )
-            )
+        feature_str = textwrap.indent(
+            str(self._tensor), " " * len("    feature=")
+        ).strip()
+        metadata_str = textwrap.indent(
+            str(self.metadata()), " " * len("    metadata=")
+        ).strip()
 
         return ret.format(feature=feature_str, metadata=metadata_str)
 
@@ -269,16 +253,5 @@ class TorchBasedFeatureStore(BasicFeatureStore):
 
     def __repr__(self) -> str:
         ret = "TorchBasedFeatureStore(\n" + "    {features}\n" + ")"
-
-        features_str = str(self._features)
-        features_str_lines = features_str.splitlines()
-        if len(features_str_lines) > 1:
-            features_str = (
-                features_str_lines[0]
-                + "\n"
-                + textwrap.indent(
-                    "\n".join(features_str_lines[1:]), " " * len("    ")
-                )
-            )
-
+        features_str = textwrap.indent(str(self._features), "    ").strip()
         return ret.format(features=features_str)
