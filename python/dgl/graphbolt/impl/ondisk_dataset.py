@@ -84,7 +84,9 @@ def preprocess_ondisk_dataset(
                 preprocess_config.get("include_original_edge_id", None)
                 == include_original_edge_id
             ):
-                force_preprocess = check_dataset_change(dataset_dir)
+                force_preprocess = check_dataset_change(
+                    dataset_dir, processed_dir_prefix
+                )
             else:
                 force_preprocess = True
         if force_preprocess:
@@ -271,7 +273,9 @@ def preprocess_ondisk_dataset(
 
     # 10. Calculate and save the hash value of the dataset directory.
     hash_value_file = "dataset_hash_value.txt"
-    hash_value_file_path = os.path.join(dataset_dir, hash_value_file)
+    hash_value_file_path = os.path.join(
+        dataset_dir, processed_dir_prefix, hash_value_file
+    )
     if os.path.exists(hash_value_file_path):
         os.remove(hash_value_file_path)
     dir_hash = calculate_dir_hash(dataset_dir)

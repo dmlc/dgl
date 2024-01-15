@@ -180,12 +180,15 @@ def calculate_dir_hash(
     return hashes
 
 
-def check_dataset_change(dataset_dir):
+def check_dataset_change(dataset_dir, processed_dir):
     """Check whether dataset has been changed by checking its hash value."""
     hash_value_file = "dataset_hash_value.txt"
-    if not os.path.exists(os.path.join(dataset_dir, hash_value_file)):
+    hash_value_file_path = os.path.join(
+        dataset_dir, processed_dir, hash_value_file
+    )
+    if not os.path.exists(hash_value_file_path):
         return True
-    with open(os.path.join(dataset_dir, hash_value_file), "r") as f:
+    with open(hash_value_file_path, "r") as f:
         oringinal_hash_value = json.load(f)
     present_hash_value = calculate_dir_hash(dataset_dir, ignore=hash_value_file)
     if oringinal_hash_value == present_hash_value:

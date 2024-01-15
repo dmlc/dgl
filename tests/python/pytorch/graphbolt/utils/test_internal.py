@@ -254,11 +254,15 @@ def test_check_dataset_change():
             file.write("test contents of directory")
         hash_value = internal.calculate_dir_hash(test_dir, hash_algo="md5")
         hash_value_file = "dataset_hash_value.txt"
-        with open(os.path.join(test_dir, hash_value_file), "w") as file:
+        hash_value_file_paht = os.path.join(
+            test_dir, "preprocessed", hash_value_file
+        )
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        with open(hash_value_file_paht, "w") as file:
             file.write(json.dumps(hash_value, indent=4))
 
         # Modify the content of a file.
         with open(test_file_path_2, "w") as file:
             file.write("test contents of directory changed")
 
-        assert internal.check_dataset_change(test_dir)
+        assert internal.check_dataset_change(test_dir, "preprocessed")
