@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple, Union
 
 import torch
+from torch_geometric.data import Data
 
 import dgl
 from dgl.utils import recursive_apply
@@ -470,6 +471,27 @@ class MiniBatch:
                 continue
 
         return self
+
+    def to_pyg_data(self, device: torch.device):
+        def construct_edge_index(csc, device):
+            indices = csc.indices.to(device)
+            indptr = csc.indptr.to(device)
+            target_nodes = torch.arange(
+                0, len(indptr) - 1, device=device
+            ).repeat_interleave(indptr[1:] - indptr[:-1])
+            edge_index = torch.stack([indices, target_nodes], dim=0)
+            return edge_index
+
+        x = self.node_features.get("feat", None)
+        edge_index = None
+        if self.sampled_subgraphs:
+            subgraph = self.sampled_subgraphs[0]
+            if hasattr(subgraph, "node_pairs"):
+                csc = subgraph.node_pairs
+                edge_index = construct_edge_index(csc, device)
+        labels = self.labels
+        data = Data(x=x, edge_index=edge_index, y=labels)
+        return data
 
 
 def _minibatch_str(minibatch: MiniBatch) -> str:

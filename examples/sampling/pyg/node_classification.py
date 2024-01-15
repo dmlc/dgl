@@ -283,16 +283,31 @@ class GraphSAGE(torch.nn.Module):
         return h
 
 
-def graphbolt_to_pyg_adapter(minibatch):
-    pyg_data_list = []
-    for block in minibatch.blocks:
-        src, dst = block.edges()
-        edge_index = torch.stack([src, dst], dim=0)
-        x = minibatch.node_features["feat"]
-        labels = minibatch.labels
-        pyg_data = Data(x=x, edge_index=edge_index, y=labels)
-        pyg_data_list.append(pyg_data)
-    return pyg_data_list
+def construct_edge_index(csc, device):
+    indices = csc.indices.to(device)
+    indptr = csc.indptr.to(device)
+    target_nodes = torch.arange(
+        0, len(indptr) - 1, device=device
+    ).repeat_interleave(indptr[1:] - indptr[:-1])
+    edge_index = torch.stack([indices, target_nodes], dim=0)
+    return edge_index
+
+
+def graphbolt_to_pyg_adapter(minibatch, device):
+    x = minibatch.node_features.get("feat", None)
+
+    edge_index = None
+    if minibatch.sampled_subgraphs:
+        subgraph = minibatch.sampled_subgraphs[0]
+        if hasattr(subgraph, "node_pairs"):
+            csc = subgraph.node_pairs
+            edge_index = construct_edge_index(csc, device)
+
+    labels = minibatch.labels
+
+    data = Data(x=x, edge_index=edge_index, y=labels)
+
+    return data
 
 
 def create_dataloader(dataset_set, graph, feature, device, is_train):
@@ -313,21 +328,20 @@ def train(model, dataloader, optimizer, criterion, device, num_classes):
     total_samples = 0
 
     for minibatch in dataloader:
-        pyg_data_list = graphbolt_to_pyg_adapter(minibatch)
-        for pyg_data in pyg_data_list:
-            pyg_data.to(device)
-            optimizer.zero_grad()
-            out = model(pyg_data.x, pyg_data.edge_index)
-            y = pyg_data.y.view(-1)
-            out = out[: y.size(0)]
-            loss = criterion(out, y)
-            loss.backward()
-            optimizer.step()
-            batch_accuracy = MF.accuracy(
-                out, y, num_classes=num_classes, task="multiclass"
-            )
-            total_correct += batch_accuracy.item() * y.size(0)
-            total_samples += y.size(0)
+        pyg_data = graphbolt_to_pyg_adapter(minibatch, device)
+        pyg_data.to(device)
+        optimizer.zero_grad()
+        out = model(pyg_data.x, pyg_data.edge_index)
+        y = pyg_data.y.view(-1)
+        out = out[: y.size(0)]
+        loss = criterion(out, y)
+        loss.backward()
+        optimizer.step()
+        batch_accuracy = MF.accuracy(
+            out, y, num_classes=num_classes, task="multiclass"
+        )
+        total_correct += batch_accuracy.item() * y.size(0)
+        total_samples += y.size(0)
 
     avg_loss = total_loss / total_samples
     avg_accuracy = total_correct / total_samples
@@ -341,19 +355,18 @@ def evaluate(model, dataloader, device, num_classes):
     total_samples = 0
 
     for minibatch in dataloader:
-        pyg_data_list = graphbolt_to_pyg_adapter(minibatch)
-        for pyg_data in pyg_data_list:
-            pyg_data.to(device)
-            out = model(pyg_data.x, pyg_data.edge_index)
-            y = pyg_data.y.squeeze()
-            min_len = min(out.shape[0], y.shape[0])
-            out = out[:min_len]
-            y = y[:min_len]
-            batch_accuracy = MF.accuracy(
-                out, y, num_classes=num_classes, task="multiclass"
-            )
-            total_accuracy += batch_accuracy * y.size(0)
-            total_samples += y.size(0)
+        pyg_data = graphbolt_to_pyg_adapter(minibatch, device)
+        pyg_data.to(device)
+        out = model(pyg_data.x, pyg_data.edge_index)
+        y = pyg_data.y.squeeze()
+        min_len = min(out.shape[0], y.shape[0])
+        out = out[:min_len]
+        y = y[:min_len]
+        batch_accuracy = MF.accuracy(
+            out, y, num_classes=num_classes, task="multiclass"
+        )
+        total_accuracy += batch_accuracy * y.size(0)
+        total_samples += y.size(0)
 
     return total_accuracy / total_samples
 
@@ -378,14 +391,12 @@ def main():
     test_set = dataset.tasks[0].test_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = "cpu"
+    print("devic is: ", device)
     start_dataloader_time = time.time()
     train_dataloader = create_dataloader(
         train_set, graph, feature, device, True
     )
-    end_dataloader_time = (
-        time.time()
-    )  # End timing after calling create_dataloader
+    end_dataloader_time = time.time()
 
     dataloader_creation_time = end_dataloader_time - start_dataloader_time
     print(f"Dataloader Creation Time: {dataloader_creation_time} seconds")
@@ -424,9 +435,11 @@ def main():
     final_mem = torch.cuda.memory_allocated()
     peak_mem_during_training = torch.cuda.max_memory_allocated()
 
-    print(f"Initial Memory: {initial_mem}")
-    print(f"Final Memory: {final_mem}")
-    print(f"Peak Memory during Training: {peak_mem_during_training}")
+    print(f"Initial Memory: {initial_mem / 1024 / 1024} MB")
+    print(f"Final Memory: {final_mem / 1024 / 1024} MB")
+    print(
+        f"Peak Memory during Training: {peak_mem_during_training / 1024 / 1024} MB"
+    )
 
 
 if __name__ == "__main__":

@@ -35,10 +35,14 @@ Final Test: 52.78
 ### Resource usage and time cost
 Below results are roughly collected from an AWS EC2 **g4dn.4xlarge**, an Intel(R) Xeon(R) Platinum 8259CL CPU with 62 GB of RAM, NVIDIA Tesla T4 GPU, boasting a total memory of 15360 MB. During observation. CPU RAM usage is the peak value recorded by `memory_usage` command.
 
-| Dataset Size | CPU RAM Usage | Num of GPUs | Total(Training) Time     | 
-| ------------ | ------------- | ----------- | ------------------------ |
-| ~80.7MB      | ~14774MB      | 0           | ~866s                    |
-| ~80.7MB      | ~2451MB       | 1           | ~1143s                   |
+
+
+| Dataset Size           | CPU RAM Usage | GPU RAM Usage | Num of GPUs | Total(Training) Time     | 
+| ---------------------- | ------------- | ------------- | ----------- | ------------------------ |
+| ~80.7MB(Pure PyG)      | ~609  MB      | ~0MB          | 0           | ~125s                    | 
+| ~80.7MB(Pure PyG)      | ~849MB        | ~260MB        | 1           | ~39s                     |
+| ~80.7MB                | ~645  MB      | ~0MB          | 0           | ~97s                     | 
+| ~80.7MB                | ~765MB        | ~156MB        | 1           | ~37s                     |
 
 
 
@@ -64,10 +68,12 @@ Final Test: 75.24
 ### Resource usage and time cost
 Below results are roughly collected from an AWS EC2 **g4dn.4xlarge**, an Intel(R) Xeon(R) Platinum 8259CL CPU with 62 GB of RAM, NVIDIA Tesla T4 GPU, boasting a total memory of 15360 MB. During observation. CPU RAM usage is the peak value recorded by `memory_usage` command.
 
-| Dataset Size | CPU RAM Usage | Num of GPUs | Total(Training) Time     | 
-| ------------ | ------------- | ----------- | ------------------------ |
-| ~1.4GB       | ~10977MB      | 0           | ~2073s                   |
-| ~1.4GB       | ~2451MB       | 1           | ~866s                   |
+| Dataset Size          | CPU RAM Usage | GPU RAM Usage | Num of GPUs | Total(Training) Time     | 
+| --------------------  | ------------- | ------------- | ----------- | ------------------------ |
+| ~1.4GB(Pure PyG)      | ~10977MB      | ~0MB          | 0           | ~8726s                   |
+| ~1.4GB(Pure PyG)      | ~14774MB      | ~5166MB       | 1           | ~1141s                   |
+| ~1.4GB                | ~10977MB      |               | 0           | ~2073s                   |
+| ~1.4GB                | ~2451MB       | ~2343MB       | 1           | ~651s                    |
 
 
 

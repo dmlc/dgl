@@ -84,11 +84,11 @@ def main():
     )
     args = parser.parse_args()
     start_time = time.time()
-
+    initial_mem = torch.cuda.memory_allocated()
     mem_usage_start = memory_usage(-1, interval=1, timeout=1)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("device is: ", device)
+    print("Loading data")
     dataset = PygNodePropPredDataset(name=args.dataset)
     data = dataset[0].to(device)
     split_idx = dataset.get_idx_split()
@@ -142,6 +142,15 @@ def main():
 
     print(f"Total Training Time: {total_training_time} seconds")
     print(f"Peak Memory Usage: {peak_memory_usage} MiB")
+
+    final_mem = torch.cuda.memory_allocated()
+    peak_mem_during_training = torch.cuda.max_memory_allocated()
+
+    print(f"Initial Memory: {initial_mem / 1024 / 1024} MB")
+    print(f"Final Memory: {final_mem / 1024 / 1024} MB")
+    print(
+        f"Peak Memory during Training: {peak_mem_during_training / 1024 / 1024} MB"
+    )
 
 
 if __name__ == "__main__":
