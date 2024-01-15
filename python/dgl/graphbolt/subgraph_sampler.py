@@ -130,10 +130,16 @@ class SubgraphSampler(MiniBatchTransformer):
                 for etype, _ in neg_src.items():
                     src_type, _, _ = etype_str_to_tuple(etype)
                     compacted_negative_srcs[etype] = compacted[src_type].pop(0)
+                    compacted_negative_srcs[etype] = compacted_negative_srcs[
+                        etype
+                    ].view(neg_src[etype].shape)
             if has_neg_dst:
                 for etype, _ in neg_dst.items():
                     _, _, dst_type = etype_str_to_tuple(etype)
                     compacted_negative_dsts[etype] = compacted[dst_type].pop(0)
+                    compacted_negative_dsts[etype] = compacted_negative_dsts[
+                        etype
+                    ].view(neg_dst[etype].shape)
         else:
             # Collect nodes from all types of input.
             nodes = list(node_pairs)
