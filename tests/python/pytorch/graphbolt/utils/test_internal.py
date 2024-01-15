@@ -212,7 +212,7 @@ def test_calculate_file_hash():
             test_file_path, hash_algo="md5"
         )
         expected_hash_value = "9473fdd0d880a43c21b7778d34872157"
-        assert expected_hash_value == hash_value, print(hash_value)
+        assert expected_hash_value == hash_value
         with pytest.raises(
             ValueError,
             match=re.escape(

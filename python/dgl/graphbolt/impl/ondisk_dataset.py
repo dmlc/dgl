@@ -93,7 +93,7 @@ def preprocess_ondisk_dataset(
                 "The on-disk dataset is re-preprocessing, so the existing "
                 + "preprocessed dataset has been removed."
             )
-        elif force_preprocess is False:
+        else:
             print("The dataset is already preprocessed.")
             return os.path.join(dataset_dir, preprocess_metadata_path)
 
@@ -747,7 +747,7 @@ class BuiltinDataset(OnDiskDataset):
             download(url, path=zip_file_path)
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
-        super().__init__(dataset_dir)
+        super().__init__(dataset_dir, force_preprocess=False)
 
 
 def _ondisk_task_str(task: OnDiskTask) -> str:
