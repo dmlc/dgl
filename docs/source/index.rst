@@ -26,6 +26,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
    guide/index
    guide_cn/index
    guide_ko/index
+   graphtransformer/index
    notebooks/sparse/index
    tutorials/cpu/index
    tutorials/multi/index

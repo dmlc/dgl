@@ -1,10 +1,10 @@
 """GraphBolt OnDiskDataset."""
 
 import os
+import shutil
 from copy import deepcopy
 from typing import Dict, List, Union
 
-import pandas as pd
 import torch
 import yaml
 
@@ -14,7 +14,12 @@ from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
-from ..internal import copy_or_convert_data, get_attributes, read_data
+from ..internal import (
+    copy_or_convert_data,
+    get_attributes,
+    read_data,
+    read_edges,
+)
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
@@ -30,7 +35,9 @@ __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 
 def preprocess_ondisk_dataset(
-    dataset_dir: str, include_original_edge_id: bool = False
+    dataset_dir: str,
+    include_original_edge_id: bool = False,
+    force_preprocess: bool = False,
 ) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
@@ -41,6 +48,8 @@ def preprocess_ondisk_dataset(
         The path to the dataset directory.
     include_original_edge_id : bool, optional
         Whether to include the original edge id in the FusedCSCSamplingGraph.
+    force_preprocess: bool, optional
+        Whether to force reload the ondisk dataset.
 
     Returns
     -------
@@ -58,13 +67,22 @@ def preprocess_ondisk_dataset(
         )
 
     # 0. Check if the dataset is already preprocessed.
-    preprocess_metadata_path = os.path.join("preprocessed", "metadata.yaml")
+    processed_dir_prefix = "preprocessed"
+    preprocess_metadata_path = os.path.join(
+        processed_dir_prefix, "metadata.yaml"
+    )
     if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
-        print("The dataset is already preprocessed.")
-        return os.path.join(dataset_dir, preprocess_metadata_path)
+        if force_preprocess:
+            shutil.rmtree(os.path.join(dataset_dir, processed_dir_prefix))
+            print(
+                "The on-disk dataset is re-preprocessing, so the existing "
+                + "preprocessed dataset has been removed."
+            )
+        else:
+            print("The dataset is already preprocessed.")
+            return os.path.join(dataset_dir, preprocess_metadata_path)
 
     print("Start to preprocess the on-disk dataset.")
-    processed_dir_prefix = "preprocessed"
 
     # Check if the metadata.yaml exists.
     metadata_file_path = os.path.join(dataset_dir, "metadata.yaml")
@@ -86,14 +104,9 @@ def preprocess_ondisk_dataset(
     if is_homogeneous:
         # Homogeneous graph.
         num_nodes = input_config["graph"]["nodes"][0]["num"]
-        edge_data = pd.read_csv(
-            os.path.join(
-                dataset_dir, input_config["graph"]["edges"][0]["path"]
-            ),
-            names=["src", "dst"],
-        )
-        src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
-
+        edge_fmt = input_config["graph"]["edges"][0]["format"]
+        edge_path = input_config["graph"]["edges"][0]["path"]
+        src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         g = dgl.graph((src, dst), num_nodes=num_nodes)
     else:
         # Heterogeneous graph.
@@ -104,12 +117,9 @@ def preprocess_ondisk_dataset(
         # Construct the data dict.
         data_dict = {}
         for edge_info in input_config["graph"]["edges"]:
-            edge_data = pd.read_csv(
-                os.path.join(dataset_dir, edge_info["path"]),
-                names=["src", "dst"],
-            )
-            src = torch.tensor(edge_data["src"])
-            dst = torch.tensor(edge_data["dst"])
+            edge_fmt = edge_info["format"]
+            edge_path = edge_info["path"]
+            src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
             data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
         # Construct the heterograph.
         g = dgl.heterograph(data_dict, num_nodes_dict)
@@ -129,14 +139,41 @@ def preprocess_ondisk_dataset(
                     graph_feature["format"],
                     in_memory=in_memory,
                 )
-                g.ndata[graph_feature["name"]] = node_data
+                if is_homogeneous:
+                    g.ndata[graph_feature["name"]] = node_data
+                else:
+                    g.nodes[graph_feature["type"]].data[
+                        graph_feature["name"]
+                    ] = node_data
             if graph_feature["domain"] == "edge":
                 edge_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
                     in_memory=in_memory,
                 )
-                g.edata[graph_feature["name"]] = edge_data
+                if is_homogeneous:
+                    g.edata[graph_feature["name"]] = edge_data
+                else:
+                    g.edges[etype_str_to_tuple(graph_feature["type"])].data[
+                        graph_feature["name"]
+                    ] = edge_data
+        if not is_homogeneous:
+            # For heterogenous graph, a node/edge feature must cover all
+            # node/edge types.
+            for feat_name, feat_data in g.ndata.items():
+                existing_types = set(feat_data.keys())
+                assert existing_types == set(g.ntypes), (
+                    f"Node feature {feat_name} does not cover all node types."
+                    + f"Existing types: {existing_types}."
+                    + f"Expected types: {g.ntypes}."
+                )
+            for feat_name, feat_data in g.edata.items():
+                existing_types = set(feat_data.keys())
+                assert existing_types == set(g.canonical_etypes), (
+                    f"Edge feature {feat_name} does not cover all edge types."
+                    + f"Existing types: {existing_types}."
+                    + f"Expected types: {g.etypes}."
+                )
 
     # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
     fused_csc_sampling_graph = from_dglgraph(
@@ -353,15 +390,22 @@ class OnDiskDataset(Dataset):
         The YAML file path.
     include_original_edge_id: bool, optional
         Whether to include the original edge id in the FusedCSCSamplingGraph.
+    force_preprocess: bool, optional
+        Whether to force reload the ondisk dataset.
     """
 
     def __init__(
-        self, path: str, include_original_edge_id: bool = False
+        self,
+        path: str,
+        include_original_edge_id: bool = False,
+        force_preprocess: bool = False,
     ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         self._dataset_dir = path
-        yaml_path = preprocess_ondisk_dataset(path, include_original_edge_id)
+        yaml_path = preprocess_ondisk_dataset(
+            path, include_original_edge_id, force_preprocess
+        )
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
         self._loaded = False
@@ -388,14 +432,54 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self):
-        """Load the dataset."""
+    def load(self, tasks: List[str] = None):
+        """Load the dataset.
+
+        Parameters
+        ----------
+        tasks: List[str] = None
+            The name of the tasks to be loaded. For single task, the type of
+            tasks can be both string and List[str]. For multiple tasks, only
+            List[str] is acceptable.
+
+        Examples
+        --------
+        1. Loading via single task name "node_classification".
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks="node_classification")
+        >>> len(dataset.tasks)
+        1
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+
+        2. Loading via single task name ["node_classification"].
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks=["node_classification"])
+        >>> len(dataset.tasks)
+        1
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+
+        3. Loading via multiple task names ["node_classification",
+        "link_prediction"].
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks=["node_classification","link_prediction"])
+        >>> len(dataset.tasks)
+        2
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+        >>> dataset.tasks[1].metadata["name"]
+        "link_prediction"
+        """
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
-        self._tasks = self._init_tasks(self._meta.tasks)
+        self._tasks = self._init_tasks(self._meta.tasks, tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
         self._loaded = True
         return self
@@ -435,20 +519,39 @@ class OnDiskDataset(Dataset):
         self._check_loaded()
         return self._all_nodes_set
 
-    def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
+    def _init_tasks(
+        self, tasks: List[OnDiskTaskData], selected_tasks: List[str]
+    ) -> List[OnDiskTask]:
         """Initialize the tasks."""
+        if isinstance(selected_tasks, str):
+            selected_tasks = [selected_tasks]
+        if selected_tasks and not isinstance(selected_tasks, list):
+            raise TypeError(
+                f"The type of selected_task should be list, but got {type(selected_tasks)}"
+            )
         ret = []
         if tasks is None:
             return ret
+        task_names = set()
         for task in tasks:
-            ret.append(
-                OnDiskTask(
-                    task.extra_fields,
-                    self._init_tvt_set(task.train_set),
-                    self._init_tvt_set(task.validation_set),
-                    self._init_tvt_set(task.test_set),
+            task_name = task.extra_fields.get("name", None)
+            if selected_tasks is None or task_name in selected_tasks:
+                ret.append(
+                    OnDiskTask(
+                        task.extra_fields,
+                        self._init_tvt_set(task.train_set),
+                        self._init_tvt_set(task.validation_set),
+                        self._init_tvt_set(task.test_set),
+                    )
                 )
-            )
+                if selected_tasks:
+                    task_names.add(task_name)
+        if selected_tasks:
+            not_found_tasks = set(selected_tasks) - task_names
+            if len(not_found_tasks):
+                dgl_warning(
+                    f"Below tasks are not found in YAML: {not_found_tasks}. Skipped."
+                )
         return ret
 
     def _check_loaded(self):

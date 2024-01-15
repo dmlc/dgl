@@ -125,8 +125,12 @@ def test_minibatch_representation_homo():
           negative_srcs=tensor([[8],
                                 [1],
                                 [6]]),
-          negative_node_pairs=(tensor([0, 1, 2]),
-                              tensor([6, 0, 0])),
+          negative_node_pairs=(tensor([[0],
+                                      [1],
+                                      [2]]),
+                              tensor([[6],
+                                      [0],
+                                      [0]])),
           negative_dsts=tensor([[2],
                                 [8],
                                 [8]]),
@@ -278,7 +282,11 @@ def test_minibatch_representation_hetero():
           negative_srcs={'B': tensor([[8],
                                 [1],
                                 [6]])},
-          negative_node_pairs={'A:r:B': (tensor([0, 1, 2]), tensor([6, 0, 0]))},
+          negative_node_pairs={'A:r:B': (tensor([[0],
+                                      [1],
+                                      [2]]), tensor([[6],
+                                      [0],
+                                      [0]]))},
           negative_dsts={'B': tensor([[2],
                                 [8],
                                 [8]])},
@@ -664,10 +672,7 @@ def check_dgl_blocks_hetero(minibatch, blocks):
         edges = block.edges(etype=etype)
         dst_ndoes = torch.arange(
             0, len(sampled_csc[i][relation].indptr) - 1
-        ).repeat_interleave(
-            sampled_csc[i][relation].indptr[1:]
-            - sampled_csc[i][relation].indptr[:-1]
-        )
+        ).repeat_interleave(sampled_csc[i][relation].indptr.diff())
         assert torch.equal(edges[0], sampled_csc[i][relation].indices)
         assert torch.equal(edges[1], dst_ndoes)
         assert torch.equal(
@@ -676,10 +681,7 @@ def check_dgl_blocks_hetero(minibatch, blocks):
     edges = blocks[0].edges(etype=gb.etype_str_to_tuple(reverse_relation))
     dst_ndoes = torch.arange(
         0, len(sampled_csc[0][reverse_relation].indptr) - 1
-    ).repeat_interleave(
-        sampled_csc[0][reverse_relation].indptr[1:]
-        - sampled_csc[0][reverse_relation].indptr[:-1]
-    )
+    ).repeat_interleave(sampled_csc[0][reverse_relation].indptr.diff())
     assert torch.equal(edges[0], sampled_csc[0][reverse_relation].indices)
     assert torch.equal(edges[1], dst_ndoes)
     assert torch.equal(
@@ -704,9 +706,7 @@ def check_dgl_blocks_homo(minibatch, blocks):
     for i, block in enumerate(blocks):
         dst_ndoes = torch.arange(
             0, len(sampled_csc[i].indptr) - 1
-        ).repeat_interleave(
-            sampled_csc[i].indptr[1:] - sampled_csc[i].indptr[:-1]
-        )
+        ).repeat_interleave(sampled_csc[i].indptr.diff())
         assert torch.equal(block.edges()[0], sampled_csc[i].indices), print(
             block.edges()
         )
@@ -781,12 +781,12 @@ def test_dgl_link_predication_homo(mode):
     if mode == "neg_graph" or mode == "neg_src":
         assert torch.equal(
             minibatch.negative_node_pairs[0],
-            minibatch.compacted_negative_srcs.view(-1),
+            minibatch.compacted_negative_srcs,
         )
     if mode == "neg_graph" or mode == "neg_dst":
         assert torch.equal(
             minibatch.negative_node_pairs[1],
-            minibatch.compacted_negative_dsts.view(-1),
+            minibatch.compacted_negative_dsts,
         )
     (
         node_pairs,
@@ -842,11 +842,11 @@ def test_dgl_link_predication_hetero(mode):
         for etype, src in minibatch.compacted_negative_srcs.items():
             assert torch.equal(
                 minibatch.negative_node_pairs[etype][0],
-                src.view(-1),
+                src,
             )
     if mode == "neg_graph" or mode == "neg_dst":
         for etype, dst in minibatch.compacted_negative_dsts.items():
             assert torch.equal(
                 minibatch.negative_node_pairs[etype][1],
-                minibatch.compacted_negative_dsts[etype].view(-1),
+                minibatch.compacted_negative_dsts[etype],
             )

@@ -325,7 +325,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Sample neighboring edges of the given nodes with a temporal
    * constraint. If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is
    * given, the sampled neighbors or edges of an input node must have a
-   * timestamp that is no later than that of the input node.
+   * timestamp that is smaller than that of the input node.
    *
    * @param nodes The nodes from which to sample neighbors.
    * @param input_nodes_timestamp The timestamp of the nodes.
@@ -335,6 +335,9 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @param replace Boolean indicating whether the sample is preformed with or
    * without replacement. If True, a value can be selected multiple times.
    * Otherwise, each value can be selected only once.
+   * @param layer Boolean indicating whether neighbors should be sampled in a
+   * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
+   * sampled edges, see arXiv:2210.13339.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
    * @param probs_name An optional string specifying the name of an edge
@@ -351,36 +354,10 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   c10::intrusive_ptr<FusedSampledSubgraph> TemporalSampleNeighbors(
       const torch::Tensor& input_nodes,
       const torch::Tensor& input_nodes_timestamp,
-      const std::vector<int64_t>& fanouts, bool replace, bool return_eids,
-      torch::optional<std::string> probs_name,
+      const std::vector<int64_t>& fanouts, bool replace, bool layer,
+      bool return_eids, torch::optional<std::string> probs_name,
       torch::optional<std::string> node_timestamp_attr_name,
       torch::optional<std::string> edge_timestamp_attr_name) const;
-
-  /**
-   * @brief Sample negative edges by randomly choosing negative
-   * source-destination pairs according to a uniform distribution. For each edge
-   * ``(u, v)``, it is supposed to generate `negative_ratio` pairs of negative
-   * edges ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
-   * the graph.
-   *
-   * @param node_pairs A tuple of two 1D tensors that represent the source and
-   * destination of positive edges, with 'positive' indicating that these edges
-   * are present in the graph. It's important to note that within the context of
-   * a heterogeneous graph, the ids in these tensors signify heterogeneous ids.
-   * @param negative_ratio The ratio of the number of negative samples to
-   * positive samples.
-   * @param max_node_id The maximum ID of the node to be selected. It
-   * should correspond to the number of nodes of a specific type.
-   *
-   * @return A tuple consisting of two 1D tensors represents the source and
-   * destination of negative edges. In the context of a heterogeneous
-   * graph, both the input nodes and the selected nodes are represented
-   * by heterogeneous IDs. Note that negative refers to false negatives,
-   * which means the edge could be present or not present in the graph.
-   */
-  std::tuple<torch::Tensor, torch::Tensor> SampleNegativeEdgesUniform(
-      const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
-      int64_t negative_ratio, int64_t max_node_id) const;
 
   /**
    * @brief Copy the graph to shared memory.

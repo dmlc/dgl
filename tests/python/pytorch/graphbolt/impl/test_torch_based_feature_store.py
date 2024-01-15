@@ -239,6 +239,12 @@ def test_torch_based_feature_store(in_memory):
             "edge", "paper:cites:paper", "b"
         ) == torch.Size([2, 2])
 
+        # Test get the keys of the features.
+        assert feature_store.keys() == [
+            ("node", "paper", "a"),
+            ("edge", "paper:cites:paper", "b"),
+        ]
+
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None
@@ -290,23 +296,27 @@ def test_torch_based_feature_repr(in_memory):
         feature_a = gb.TorchBasedFeature(a, metadata=metadata)
         feature_b = gb.TorchBasedFeature(b)
 
-        expected_str_feature_a = str(
-            """TorchBasedFeature(feature=tensor([[1, 2, 3],
-                                  [4, 5, 6]]),
-                  metadata={'max_value': 3},
-)"""
+        expected_str_feature_a = (
+            "TorchBasedFeature(\n"
+            "    feature=tensor([[1, 2, 3],\n"
+            "                    [4, 5, 6]]),\n"
+            "    metadata={'max_value': 3},\n"
+            ")"
         )
-        expected_str_feature_b = str(
-            """TorchBasedFeature(feature=tensor([[[1, 2],
-                                   [3, 4]],
-                          
-                                  [[4, 5],
-                                   [6, 7]]]),
-                  metadata={},
-)"""
+        expected_str_feature_b = (
+            "TorchBasedFeature(\n"
+            "    feature=tensor([[[1, 2],\n"
+            "                     [3, 4]],\n"
+            "\n"
+            "                    [[4, 5],\n"
+            "                     [6, 7]]]),\n"
+            "    metadata={},\n"
+            ")"
         )
-        assert str(feature_a) == expected_str_feature_a
-        assert str(feature_b) == expected_str_feature_b
+
+        assert repr(feature_a) == expected_str_feature_a, feature_a
+        assert repr(feature_b) == expected_str_feature_b, feature_b
+
         a = b = metadata = None
         feature_a = feature_b = None
         expected_str_feature_a = expected_str_feature_b = None
@@ -339,21 +349,24 @@ def test_torch_based_feature_store_repr(in_memory):
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
 
-        expected_feature_store_str = str(
-            """TorchBasedFeatureStore{(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(feature=tensor([[1, 2, 4],
-                                                        [2, 5, 3]]),
-                                        metadata={},
-                      ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(feature=tensor([[[1, 2],
-                                                         [3, 4]],
-                                                
-                                                        [[2, 5],
-                                                         [3, 4]]]),
-                                        metadata={},
-                      )}"""
+        expected_feature_store_str = (
+            "TorchBasedFeatureStore(\n"
+            "    {(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(\n"
+            "        feature=tensor([[1, 2, 4],\n"
+            "                        [2, 5, 3]]),\n"
+            "        metadata={},\n"
+            "    ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(\n"
+            "        feature=tensor([[[1, 2],\n"
+            "                         [3, 4]],\n"
+            "\n"
+            "                        [[2, 5],\n"
+            "                         [3, 4]]]),\n"
+            "        metadata={},\n"
+            "    )}\n"
+            ")"
         )
-        assert str(feature_store) == expected_feature_store_str, print(
-            feature_store
-        )
+
+        assert repr(feature_store) == expected_feature_store_str, feature_store
 
         a = b = feature_data = None
         feature_store = expected_feature_store_str = None

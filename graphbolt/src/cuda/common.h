@@ -10,6 +10,7 @@
 #include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
+#include <c10/cuda/CUDAStream.h>
 #include <cuda_runtime.h>
 #include <torch/script.h>
 
@@ -82,14 +83,33 @@ inline bool is_zero<dim3>(dim3 size) {
 
 #define CUDA_CALL(func) C10_CUDA_CHECK((func))
 
-#define CUDA_KERNEL_CALL(kernel, nblks, nthrs, shmem, stream, ...)    \
-  {                                                                   \
-    if (!graphbolt::cuda::is_zero((nblks)) &&                         \
-        !graphbolt::cuda::is_zero((nthrs))) {                         \
-      (kernel)<<<(nblks), (nthrs), (shmem), (stream)>>>(__VA_ARGS__); \
-      C10_CUDA_KERNEL_LAUNCH_CHECK();                                 \
-    }                                                                 \
+#define CUDA_KERNEL_CALL(kernel, nblks, nthrs, shmem, ...)          \
+  {                                                                 \
+    if (!graphbolt::cuda::is_zero((nblks)) &&                       \
+        !graphbolt::cuda::is_zero((nthrs))) {                       \
+      auto stream = graphbolt::cuda::GetCurrentStream();            \
+      (kernel)<<<(nblks), (nthrs), (shmem), stream>>>(__VA_ARGS__); \
+      C10_CUDA_KERNEL_LAUNCH_CHECK();                               \
+    }                                                               \
   }
+
+#define CUB_CALL(fn, ...)                                                     \
+  {                                                                           \
+    auto allocator = graphbolt::cuda::GetAllocator();                         \
+    auto stream = graphbolt::cuda::GetCurrentStream();                        \
+    size_t workspace_size = 0;                                                \
+    CUDA_CALL(cub::fn(nullptr, workspace_size, __VA_ARGS__, stream));         \
+    auto workspace = allocator.AllocateStorage<char>(workspace_size);         \
+    CUDA_CALL(cub::fn(workspace.get(), workspace_size, __VA_ARGS__, stream)); \
+  }
+
+#define THRUST_CALL(fn, ...)                                                 \
+  [&] {                                                                      \
+    auto allocator = graphbolt::cuda::GetAllocator();                        \
+    auto stream = graphbolt::cuda::GetCurrentStream();                       \
+    const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream); \
+    return thrust::fn(exec_policy, __VA_ARGS__);                             \
+  }()
 
 /**
  * @brief This class is designed to handle the copy operation of a single
