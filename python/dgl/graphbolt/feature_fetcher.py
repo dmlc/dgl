@@ -56,7 +56,7 @@ class FeatureFetcher(MiniBatchTransformer):
         self.edge_feature_keys = edge_feature_keys
         self.stream = None
 
-    def _read_helper(self, data):
+    def _read_helper(self, data, stream):
         """
         Fill in the node/edge features field in data.
 
@@ -95,6 +95,9 @@ class FeatureFetcher(MiniBatchTransformer):
                             feature_name,
                             nodes,
                         )
+                        node_features[
+                            (type_name, feature_name)
+                        ].record_stream(stream)
             else:
                 for feature_name in self.node_feature_keys:
                     node_features[feature_name] = self.feature_store.read(
@@ -103,6 +106,7 @@ class FeatureFetcher(MiniBatchTransformer):
                         feature_name,
                         input_nodes,
                     )
+                    node_features[feature_name].record_stream(stream)
         # Read Edge features.
         if self.edge_feature_keys and num_layers > 0:
             for i in range(num_layers):
@@ -130,6 +134,9 @@ class FeatureFetcher(MiniBatchTransformer):
                             ] = self.feature_store.read(
                                 "edge", type_name, feature_name, edges
                             )
+                            edge_features[i][
+                                (type_name, feature_name)
+                            ].record_stream(stream)
                 else:
                     for feature_name in self.edge_feature_keys:
                         edge_features[i][
@@ -140,12 +147,15 @@ class FeatureFetcher(MiniBatchTransformer):
                             feature_name,
                             original_edge_ids,
                         )
+                        edge_features[i][
+                            feature_name
+                        ].record_stream(stream)
         data.set_node_features(node_features)
         data.set_edge_features(edge_features)
         return data
 
     def _read(self, data):
-        if isinstance(data, tuple) and isinstance(data[0], torch.cuda.Event):
+        if isinstance(data, tuple) and isinstance(data[1], torch.cuda.Event):
             data, event = data
             if self.stream is None:
                 self.stream = torch.cuda.Stream()

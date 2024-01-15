@@ -38,24 +38,22 @@ def _find_and_wrap_parent(
             )
 
 
-class CUDAStreamPrefetcher(dp.iter.IterDataPipe):
-    def __init__(self, datapipe, buffer_size = 2):
+class CUDAStreamChanger(dp.iter.IterDataPipe):
+    def __init__(self, datapipe):
         self.datapipe = datapipe
-        if buffer_size <= 0:
-            raise ValueError("'buffer_size' is required to be a positive integer.")
-        self.buffer = Queue(buffer_size)
 
     def __iter__(self):
         for data in self.datapipe:
             data = (data, torch.cuda.current_stream().record_event())
-            if not self.buffer.full():
-                self.buffer.put(data)
-            else:
-                return_data = self.buffer.get()
-                self.buffer.put(data)
-                yield return_data
-        while not self.buffer.empty():
-            yield self.buffer.get()
+            yield data
+
+class EndMarker(dp.iter.IterDataPipe):
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        for data in self.datapipe:
+            yield data
 
 class Bufferer(dp.iter.IterDataPipe):
     def __init__(self, datapipe, buffer_size = 2):
@@ -134,7 +132,7 @@ class DataLoader(torch.utils.data.DataLoader):
         # 2. Cut the datapipe at FeatureFetcher, and wrap the inner datapipe
         #    of the FeatureFetcher with a multiprocessing PyTorch DataLoader.
 
-        datapipe = datapipe.repeat(1)
+        datapipe = EndMarker(datapipe)
         datapipe_graph = dp_utils.traverse_dps(datapipe)
         datapipe_adjlist = datapipe_graph_to_adjlist(datapipe_graph)
 
@@ -159,13 +157,12 @@ class DataLoader(torch.utils.data.DataLoader):
                 datapipe_graph,
                 datapipe_adjlist,
                 FeatureFetcher,
-                CUDAStreamPrefetcher,
-                buffer_size=2,
+                CUDAStreamChanger,
             )
             _find_and_wrap_parent(
                 datapipe_graph,
                 datapipe_adjlist,
-                dp.iter.Repeater,
+                EndMarker,
                 Bufferer,
                 buffer_size=2,
             )

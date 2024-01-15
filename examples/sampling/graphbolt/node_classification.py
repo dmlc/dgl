@@ -92,6 +92,18 @@ def create_dataloader(
 
     ############################################################################
     # [Step-2]:
+    # self.copy_to()
+    # [Input]:
+    # 'device': The device to copy the data to.
+    # 'extra_attrs': The extra attributes to copy.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device.
+    ############################################################################
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+
+    ############################################################################
+    # [Step-3]:
     # self.sample_neighbor()
     # [Input]:
     # 'graph': The network topology for sampling.
@@ -109,7 +121,7 @@ def create_dataloader(
     )
 
     ############################################################################
-    # [Step-3]:
+    # [Step-4]:
     # self.fetch_feature()
     # [Input]:
     # 'features': The node features.
@@ -125,17 +137,18 @@ def create_dataloader(
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
-    # [Step-4]:
+    # [Step-5]:
     # self.copy_to()
     # [Input]:
     # 'device': The device to copy the data to.
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=device)
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
-    # [Step-5]:
+    # [Step-6]:
     # gb.DataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
@@ -259,7 +272,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         job="evaluate",
     )
 
-    for step, data in tqdm(enumerate(dataloader)):
+    for step, data in tqdm(enumerate(dataloader), "Evaluating"):
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
@@ -289,7 +302,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         t0 = time.time()
         model.train()
         total_loss = 0
-        for step, data in enumerate(dataloader):
+        for step, data in tqdm(enumerate(dataloader), "Training"):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -309,9 +322,9 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
 
             total_loss += loss.item()
 
-        t1 = time.time()
         # Evaluate the model.
         acc = evaluate(args, model, graph, features, valid_set, num_classes)
+        t1 = time.time()
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (step + 1):.4f} | "
             f"Accuracy {acc.item():.4f} | Time {t1 - t0:.4f}"
@@ -349,28 +362,31 @@ def parse_args():
         " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
-        "--device",
-        default="cpu",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.storage_device, args.device = args.mode.split("-")
     args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data...")
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
-    graph = dataset.graph
-    # Currently the neighbor-sampling process can only be done on the CPU,
-    # therefore there is no need to copy the graph to the GPU.
+    # Move the dataset to the selected storage.
+    graph = dataset.graph.to("cuda:0")
     features = dataset.feature
+    features.pin_memory_()
+
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
