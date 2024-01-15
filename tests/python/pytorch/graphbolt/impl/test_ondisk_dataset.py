@@ -2348,18 +2348,21 @@ def test_OnDiskTask_repr_homogeneous():
     )
     metadata = {"name": "node_classification"}
     task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
-    expected_str = str(
-        """OnDiskTask(validation_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
-                                  names=('seed_nodes', 'labels'),
-                          ),
-           train_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
-                             names=('seed_nodes', 'labels'),
-                     ),
-           test_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
-                            names=('seed_nodes', 'labels'),
-                    ),
-           metadata={'name': 'node_classification'},
-)"""
+    expected_str = (
+        "OnDiskTask(validation_set=ItemSet(\n"
+        "                              items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "                              names=('seed_nodes', 'labels'),\n"
+        "                          ),\n"
+        "           train_set=ItemSet(\n"
+        "                         items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "                         names=('seed_nodes', 'labels'),\n"
+        "                     ),\n"
+        "           test_set=ItemSet(\n"
+        "                        items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "                        names=('seed_nodes', 'labels'),\n"
+        "                    ),\n"
+        "           metadata={'name': 'node_classification'},\n"
+        ")"
     )
     assert str(task) == expected_str, print(task)
 
@@ -2373,30 +2376,39 @@ def test_OnDiskTask_repr_heterogeneous():
     )
     metadata = {"name": "node_classification"}
     task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
-    expected_str = str(
-        """OnDiskTask(validation_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
-                                                    names=('seed_nodes',),
-                                            ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
-                                                    names=('seed_nodes',),
-                                            )},
-                                      names=('seed_nodes',),
-                          ),
-           train_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
-                                               names=('seed_nodes',),
-                                       ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
-                                               names=('seed_nodes',),
-                                       )},
-                                 names=('seed_nodes',),
-                     ),
-           test_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
-                                              names=('seed_nodes',),
-                                      ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
-                                              names=('seed_nodes',),
-                                      )},
-                                names=('seed_nodes',),
-                    ),
-           metadata={'name': 'node_classification'},
-)"""
+    expected_str = (
+        "OnDiskTask(validation_set=ItemSetDict(\n"
+        "                              itemsets={'user': ItemSet(\n"
+        "                                           items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                                           names=('seed_nodes',),\n"
+        "                                       ), 'item': ItemSet(\n"
+        "                                           items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                                           names=('seed_nodes',),\n"
+        "                                       )},\n"
+        "                              names=('seed_nodes',),\n"
+        "                          ),\n"
+        "           train_set=ItemSetDict(\n"
+        "                         itemsets={'user': ItemSet(\n"
+        "                                      items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                                      names=('seed_nodes',),\n"
+        "                                  ), 'item': ItemSet(\n"
+        "                                      items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                                      names=('seed_nodes',),\n"
+        "                                  )},\n"
+        "                         names=('seed_nodes',),\n"
+        "                     ),\n"
+        "           test_set=ItemSetDict(\n"
+        "                        itemsets={'user': ItemSet(\n"
+        "                                     items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                                     names=('seed_nodes',),\n"
+        "                                 ), 'item': ItemSet(\n"
+        "                                     items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                                     names=('seed_nodes',),\n"
+        "                                 )},\n"
+        "                        names=('seed_nodes',),\n"
+        "                    ),\n"
+        "           metadata={'name': 'node_classification'},\n"
+        ")"
     )
     assert str(task) == expected_str, print(task)
 
