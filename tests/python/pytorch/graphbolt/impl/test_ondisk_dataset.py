@@ -1136,9 +1136,14 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         assert fused_csc_sampling_graph.total_num_nodes == num_nodes
         assert fused_csc_sampling_graph.total_num_edges == num_edges
         assert (
-            fused_csc_sampling_graph.edge_attributes is None
-            or gb.ORIGINAL_EDGE_ID
+            fused_csc_sampling_graph.node_attributes is not None
+            and "feat" in fused_csc_sampling_graph.node_attributes
+        )
+        assert (
+            fused_csc_sampling_graph.edge_attributes is not None
+            and gb.ORIGINAL_EDGE_ID
             not in fused_csc_sampling_graph.edge_attributes
+            and "feat" in fused_csc_sampling_graph.edge_attributes
         )
 
         num_samples = 100
@@ -2147,7 +2152,14 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id, edge_fmt):
         assert isinstance(graph, gb.FusedCSCSamplingGraph)
         assert graph.total_num_nodes == num_nodes
         assert graph.total_num_edges == num_edges
-        assert graph.edge_attributes is not None
+        assert (
+            graph.node_attributes is not None
+            and "feat" in graph.node_attributes
+        )
+        assert (
+            graph.edge_attributes is not None
+            and "feat" in graph.edge_attributes
+        )
         assert (
             not include_original_edge_id
         ) or gb.ORIGINAL_EDGE_ID in graph.edge_attributes
@@ -2220,7 +2232,14 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id, edge_fmt):
         assert graph.total_num_edges == sum(
             num_edge for num_edge in num_edges.values()
         )
-        assert graph.edge_attributes is not None
+        assert (
+            graph.node_attributes is not None
+            and "feat" in graph.node_attributes
+        )
+        assert (
+            graph.edge_attributes is not None
+            and "feat" in graph.edge_attributes
+        )
         assert (
             not include_original_edge_id
         ) or gb.ORIGINAL_EDGE_ID in graph.edge_attributes

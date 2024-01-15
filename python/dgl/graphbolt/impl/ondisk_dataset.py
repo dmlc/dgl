@@ -158,7 +158,7 @@ def preprocess_ondisk_dataset(
                         graph_feature["name"]
                     ] = edge_data
         if not is_homogeneous:
-            # For homogeneous graph, a node/edge feature must cover all
+            # For heterogenous graph, a node/edge feature must cover all
             # node/edge types.
             for feat_name, feat_data in g.ndata.items():
                 existing_types = set(feat_data.keys())
