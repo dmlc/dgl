@@ -163,6 +163,10 @@ def preprocess_ondisk_dataset(
                         graph_feature["name"]
                     ] = node_data
             if graph_feature["domain"] == "edge":
+                if not include_original_edge_id:
+                    dgl_warning(
+                        "Edge feature is stored, but edge IDs are not saved."
+                    )
                 edge_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
