@@ -9,7 +9,9 @@
 #include <graphbolt/serialize.h>
 #include <graphbolt/unique_and_compact.h>
 
+#ifdef GRAPHBOLT_USE_CUDA
 #include "./cuda/max_uva_threads.h"
+#endif
 #include "./index_select.h"
 #include "./random.h"
 
@@ -76,7 +78,9 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("set_seed", &RandomEngine::SetManualSeed);
+#ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
+#endif
 }
 
 }  // namespace sampling

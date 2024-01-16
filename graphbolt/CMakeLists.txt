@@ -49,10 +49,10 @@ set(BOLT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(BOLT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 file(GLOB BOLT_HEADERS ${BOLT_INCLUDE})
 file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
-file(GLOB BOLT_SRC ${BOLT_DIR}/cuda/*.cc)
 if(USE_CUDA)
   file(GLOB BOLT_CUDA_SRC
     ${BOLT_DIR}/cuda/*.cu
+    ${BOLT_DIR}/cuda/*.cc
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
   if(DEFINED ENV{CUDAARCHS})
