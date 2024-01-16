@@ -1,5 +1,4 @@
 """CSC format sampling graph."""
-import copy
 
 # pylint: disable= invalid-name
 from typing import Dict, Optional, Union
