@@ -25,7 +25,10 @@ class ItemSet:
         items.
     names: Union[str, Tuple[str]], optional
         The names of the items. If it is a tuple, each name corresponds to an
-        item in the tuple.
+        item in the tuple. The naming is arbitrary, but in general practice,
+        the names should be chosen from ['seed_nodes', 'node_pairs', 'labels',
+        'negative_srcs', 'negative_dsts'] to align with the attributes of
+        class `dgl.graphbolt.MiniBatch`.
 
     Examples
     --------
@@ -177,7 +180,7 @@ class ItemSet:
 
     def __repr__(self) -> str:
         ret = (
-            f"ItemSet(\n"
+            f"{self.__class__.__name__}(\n"
             f"    items={self._items},\n"
             f"    names={self._names},\n"
             f")"
@@ -339,18 +342,18 @@ class ItemSetDict:
 
     def __repr__(self) -> str:
         ret = (
-            "ItemSetDict(\n"
+            "{Classname}(\n"
             "    itemsets={itemsets},\n"
             "    names={names},\n"
             ")"
         )
 
-        itemsets_str = repr(self._itemsets)
-        lines = itemsets_str.splitlines()
-        itemsets_str = (
-            lines[0]
-            + "\n"
-            + textwrap.indent("\n".join(lines[1:]), " " * len("    itemsets="))
-        )
+        itemsets_str = textwrap.indent(
+            repr(self._itemsets), " " * len("    itemsets=")
+        ).strip()
 
-        return ret.format(itemsets=itemsets_str, names=self._names)
+        return ret.format(
+            Classname=self.__class__.__name__,
+            itemsets=itemsets_str,
+            names=self._names,
+        )

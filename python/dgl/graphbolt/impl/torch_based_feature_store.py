@@ -172,36 +172,24 @@ class TorchBasedFeature(Feature):
 
     def __repr__(self) -> str:
         ret = (
-            "TorchBasedFeature(\n"
+            "{Classname}(\n"
             "    feature={feature},\n"
             "    metadata={metadata},\n"
             ")"
         )
 
-        feature_str = str(self._tensor)
-        feature_str_lines = feature_str.splitlines()
-        if len(feature_str_lines) > 1:
-            feature_str = (
-                feature_str_lines[0]
-                + "\n"
-                + textwrap.indent(
-                    "\n".join(feature_str_lines[1:]), " " * len("    feature=")
-                )
-            )
+        feature_str = textwrap.indent(
+            str(self._tensor), " " * len("    feature=")
+        ).strip()
+        metadata_str = textwrap.indent(
+            str(self.metadata()), " " * len("    metadata=")
+        ).strip()
 
-        metadata_str = str(self.metadata())
-        metadata_str_lines = metadata_str.splitlines()
-        if len(metadata_str_lines) > 1:
-            metadata_str = (
-                metadata_str_lines[0]
-                + "\n"
-                + textwrap.indent(
-                    "\n".join(metadata_str_lines[1:]),
-                    " " * len("    metadata="),
-                )
-            )
-
-        return ret.format(feature=feature_str, metadata=metadata_str)
+        return ret.format(
+            Classname=self.__class__.__name__,
+            feature=feature_str,
+            metadata=metadata_str,
+        )
 
 
 class TorchBasedFeatureStore(BasicFeatureStore):
@@ -268,17 +256,8 @@ class TorchBasedFeatureStore(BasicFeatureStore):
             feature.pin_memory_()
 
     def __repr__(self) -> str:
-        ret = "TorchBasedFeatureStore(\n" + "    {features}\n" + ")"
-
-        features_str = str(self._features)
-        features_str_lines = features_str.splitlines()
-        if len(features_str_lines) > 1:
-            features_str = (
-                features_str_lines[0]
-                + "\n"
-                + textwrap.indent(
-                    "\n".join(features_str_lines[1:]), " " * len("    ")
-                )
-            )
-
-        return ret.format(features=features_str)
+        ret = "{Classname}(\n" + "    {features}\n" + ")"
+        features_str = textwrap.indent(str(self._features), "    ").strip()
+        return ret.format(
+            Classname=self.__class__.__name__, features=features_str
+        )
