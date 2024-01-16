@@ -46,6 +46,7 @@ class CUDAStreamRecorder(dp.iter.IterDataPipe):
         for data in self.datapipe:
             yield data, torch.cuda.current_stream().record_event()
 
+
 class EndMarker(dp.iter.IterDataPipe):
     def __init__(self, datapipe):
         self.datapipe = datapipe
@@ -54,11 +55,14 @@ class EndMarker(dp.iter.IterDataPipe):
         for data in self.datapipe:
             yield data
 
+
 class Bufferer(dp.iter.IterDataPipe):
-    def __init__(self, datapipe, buffer_size = 2):
+    def __init__(self, datapipe, buffer_size=2):
         self.datapipe = datapipe
         if buffer_size <= 0:
-            raise ValueError("'buffer_size' is required to be a positive integer.")
+            raise ValueError(
+                "'buffer_size' is required to be a positive integer."
+            )
         self.buffer = Queue(buffer_size)
 
     def __iter__(self):
@@ -72,14 +76,16 @@ class Bufferer(dp.iter.IterDataPipe):
         while not self.buffer.empty():
             yield self.buffer.get()
 
+
 class Awaiter(dp.iter.IterDataPipe):
     def __init__(self, datapipe):
         self.datapipe = datapipe
-    
+
     def __iter__(self):
         for data in self.datapipe:
             data.wait()
             yield data
+
 
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
@@ -132,7 +138,14 @@ class DataLoader(torch.utils.data.DataLoader):
         instances alive.
     """
 
-    def __init__(self, datapipe, num_workers=0, persistent_workers=True, overlap_feature_fetch=True):
+    def __init__(
+        self,
+        datapipe,
+        num_workers=0,
+        persistent_workers=True,
+        overlap_feature_fetch=True,
+        max_uva_threads=6144,
+    ):
         # Multiprocessing requires two modifications to the datapipe:
         #
         # 1. Insert a stage after ItemSampler to distribute the
@@ -160,9 +173,13 @@ class DataLoader(torch.utils.data.DataLoader):
             )
 
         # (2) Cut datapipe at FeatureFetcher and wrap.
-        if overlap_feature_fetch and num_workers == 0 and torch.cuda.is_available():
+        if (
+            overlap_feature_fetch
+            and num_workers == 0
+            and torch.cuda.is_available()
+        ):
             self.uva_stream = torch.cuda.Stream(priority=-1)
-            torch.ops.graphbolt.set_max_uva_threads(6144)
+            torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
             feature_fetchers = dp_utils.find_dps(
                 datapipe_graph,
                 FeatureFetcher,
