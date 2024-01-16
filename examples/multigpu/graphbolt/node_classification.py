@@ -126,9 +126,6 @@ def create_dataloader(
         shuffle=shuffle,
         drop_uneven_inputs=drop_uneven_inputs,
     )
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
-    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
-
     ############################################################################
     # [Note]:
     # datapipe.copy_to() / gb.CopyTo()
@@ -137,8 +134,11 @@ def create_dataloader(
     # [Output]:
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
-    datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=args.num_workers)
+    datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+
+    dataloader = gb.DataLoader(datapipe)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -272,8 +272,10 @@ def run(rank, world_size, args, devices, dataset):
         rank=rank,
     )
 
-    graph = dataset.graph
-    features = dataset.feature
+    # Pin the graph and features to enable GPU access.
+    graph = dataset.graph.to("pinned")
+    features = dataset.feature.to("pinned")
+
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
@@ -383,9 +385,6 @@ def parse_args():
         default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
         " identical with the number of layers in your model. Default: 15,10,5",
-    )
-    parser.add_argument(
-        "--num-workers", type=int, default=0, help="The number of processes."
     )
     return parser.parse_args()
 
