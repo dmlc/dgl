@@ -1,4 +1,7 @@
 """Torch-based feature store for GraphBolt."""
+
+import copy
+import textwrap
 from typing import Dict, List
 
 import numpy as np
@@ -168,8 +171,36 @@ class TorchBasedFeature(Feature):
         """In-place operation to copy the feature to pinned memory."""
         self._tensor = self._tensor.pin_memory()
 
+    def to(self, device):  # pylint: disable=invalid-name
+        """Copy `TorchBasedFeature` to the specified device."""
+        # copy.copy is a shallow copy so it does not copy tensor memory.
+        self2 = copy.copy(self)
+        if device == "pinned":
+            self2.pin_memory_()
+        else:
+            self2._tensor = self2._tensor.to(device)
+        return self2
+
     def __repr__(self) -> str:
-        return _torch_based_feature_str(self)
+        ret = (
+            "{Classname}(\n"
+            "    feature={feature},\n"
+            "    metadata={metadata},\n"
+            ")"
+        )
+
+        feature_str = textwrap.indent(
+            str(self._tensor), " " * len("    feature=")
+        ).strip()
+        metadata_str = textwrap.indent(
+            str(self.metadata()), " " * len("    metadata=")
+        ).strip()
+
+        return ret.format(
+            Classname=self.__class__.__name__,
+            feature=feature_str,
+            metadata=metadata_str,
+        )
 
 
 class TorchBasedFeatureStore(BasicFeatureStore):
@@ -235,41 +266,16 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         for feature in self._features.values():
             feature.pin_memory_()
 
+    def to(self, device):  # pylint: disable=invalid-name
+        """Copy `TorchBasedFeatureStore` to the specified device."""
+        # copy.copy is a shallow copy so it does not copy tensor memory.
+        self2 = copy.copy(self)
+        self2._features = {k: v.to(device) for k, v in self2._features.items()}
+        return self2
+
     def __repr__(self) -> str:
-        return _torch_based_feature_store_str(self._features)
-
-
-def _torch_based_feature_str(feature: TorchBasedFeature) -> str:
-    final_str = "TorchBasedFeature("
-    indent_len = len(final_str)
-
-    def _add_indent(_str, indent):
-        lines = _str.split("\n")
-        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-        return "\n".join(lines)
-
-    feature_str = "feature=" + _add_indent(
-        str(feature._tensor), indent_len + len("feature=")
-    )
-    final_str += feature_str + ",\n" + " " * indent_len
-    metadata_str = "metadata=" + _add_indent(
-        str(feature.metadata()), indent_len + len("metadata=")
-    )
-    final_str += metadata_str + ",\n)"
-    return final_str
-
-
-def _torch_based_feature_store_str(
-    features: Dict[str, TorchBasedFeature]
-) -> str:
-    final_str = "TorchBasedFeatureStore"
-    indent_len = len(final_str)
-
-    def _add_indent(_str, indent):
-        lines = _str.split("\n")
-        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-        return "\n".join(lines)
-
-    features_str = _add_indent(str(features), indent_len)
-    final_str += features_str
-    return final_str
+        ret = "{Classname}(\n" + "    {features}\n" + ")"
+        features_str = textwrap.indent(str(self._features), "    ").strip()
+        return ret.format(
+            Classname=self.__class__.__name__, features=features_str
+        )
