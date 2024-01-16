@@ -1175,9 +1175,9 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
-        # Test do not generate original_edge_id.
+        # Test generating original_edge_id.
         output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, include_original_edge_id=False
+            test_dir, include_original_edge_id=True
         )
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
@@ -1186,8 +1186,7 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         )
         assert (
             fused_csc_sampling_graph.edge_attributes is not None
-            and gb.ORIGINAL_EDGE_ID
-            not in fused_csc_sampling_graph.edge_attributes
+            and gb.ORIGINAL_EDGE_ID in fused_csc_sampling_graph.edge_attributes
         )
         fused_csc_sampling_graph = None
 
@@ -1724,6 +1723,35 @@ def test_OnDiskDataset_preprocess_auto_force_preprocess(capsys):
         )
         captured = capsys.readouterr().out.split("\n")
         assert captured == ["The dataset is already preprocessed.", ""]
+
+
+def test_OnDiskDataset_preprocess_not_include_eids():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        with pytest.warns(
+            DGLWarning,
+            match="Edge feature is stored, but edge IDs are not saved.",
+        ):
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False
+            )
 
 
 @pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
@@ -2570,21 +2598,47 @@ def test_OnDiskTask_repr_homogeneous():
     task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
     expected_str = (
         "OnDiskTask(validation_set=ItemSet(\n"
-        "                              items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
-        "                              names=('seed_nodes', 'labels'),\n"
-        "                          ),\n"
+        "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "               names=('seed_nodes', 'labels'),\n"
+        "           ),\n"
         "           train_set=ItemSet(\n"
-        "                         items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
-        "                         names=('seed_nodes', 'labels'),\n"
-        "                     ),\n"
+        "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "               names=('seed_nodes', 'labels'),\n"
+        "           ),\n"
         "           test_set=ItemSet(\n"
-        "                        items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
-        "                        names=('seed_nodes', 'labels'),\n"
-        "                    ),\n"
-        "           metadata={'name': 'node_classification'},\n"
-        ")"
+        "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "               names=('seed_nodes', 'labels'),\n"
+        "           ),\n"
+        "           metadata={'name': 'node_classification'},)"
     )
-    assert str(task) == expected_str, print(task)
+    assert repr(task) == expected_str, task
+
+
+def test_OnDiskDataset_not_include_eids():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        with pytest.warns(
+            DGLWarning,
+            match="Edge feature is stored, but edge IDs are not saved.",
+        ):
+            gb.OnDiskDataset(test_dir, include_original_edge_id=False)
 
 
 def test_OnDiskTask_repr_heterogeneous():
@@ -2598,39 +2652,38 @@ def test_OnDiskTask_repr_heterogeneous():
     task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
     expected_str = (
         "OnDiskTask(validation_set=ItemSetDict(\n"
-        "                              itemsets={'user': ItemSet(\n"
-        "                                           items=(tensor([0, 1, 2, 3, 4]),),\n"
-        "                                           names=('seed_nodes',),\n"
-        "                                       ), 'item': ItemSet(\n"
-        "                                           items=(tensor([5, 6, 7, 8, 9]),),\n"
-        "                                           names=('seed_nodes',),\n"
-        "                                       )},\n"
-        "                              names=('seed_nodes',),\n"
-        "                          ),\n"
+        "               itemsets={'user': ItemSet(\n"
+        "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        ), 'item': ItemSet(\n"
+        "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        )},\n"
+        "               names=('seed_nodes',),\n"
+        "           ),\n"
         "           train_set=ItemSetDict(\n"
-        "                         itemsets={'user': ItemSet(\n"
-        "                                      items=(tensor([0, 1, 2, 3, 4]),),\n"
-        "                                      names=('seed_nodes',),\n"
-        "                                  ), 'item': ItemSet(\n"
-        "                                      items=(tensor([5, 6, 7, 8, 9]),),\n"
-        "                                      names=('seed_nodes',),\n"
-        "                                  )},\n"
-        "                         names=('seed_nodes',),\n"
-        "                     ),\n"
+        "               itemsets={'user': ItemSet(\n"
+        "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        ), 'item': ItemSet(\n"
+        "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        )},\n"
+        "               names=('seed_nodes',),\n"
+        "           ),\n"
         "           test_set=ItemSetDict(\n"
-        "                        itemsets={'user': ItemSet(\n"
-        "                                     items=(tensor([0, 1, 2, 3, 4]),),\n"
-        "                                     names=('seed_nodes',),\n"
-        "                                 ), 'item': ItemSet(\n"
-        "                                     items=(tensor([5, 6, 7, 8, 9]),),\n"
-        "                                     names=('seed_nodes',),\n"
-        "                                 )},\n"
-        "                        names=('seed_nodes',),\n"
-        "                    ),\n"
-        "           metadata={'name': 'node_classification'},\n"
-        ")"
+        "               itemsets={'user': ItemSet(\n"
+        "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        ), 'item': ItemSet(\n"
+        "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        )},\n"
+        "               names=('seed_nodes',),\n"
+        "           ),\n"
+        "           metadata={'name': 'node_classification'},)"
     )
-    assert str(task) == expected_str, print(task)
+    assert repr(task) == expected_str, task
 
 
 def test_OnDiskDataset_load_tasks_selectively():
