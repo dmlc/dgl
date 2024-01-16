@@ -113,15 +113,12 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
         yield from self.dataloader
 
 
+# There needs to be a single instance of the uva_stream, if it is created
+# multiple times, it leads to multiple CUDA memory pools and memory leaks.
 def _get_uva_stream():
-    if _get_uva_stream.stream is None:
+    if not hasattr(_get_uva_stream, "stream"):
         _get_uva_stream.stream = torch.cuda.Stream(priority=-1)
     return _get_uva_stream.stream
-
-
-# There needs to be a single instance of the UVA_STREAM, if it is created
-# multiple times, it leads to multiple CUDA memory pools and memory leaks.
-_get_uva_stream.stream = None
 
 
 class DataLoader(torch.utils.data.DataLoader):
