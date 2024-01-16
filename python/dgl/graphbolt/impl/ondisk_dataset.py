@@ -736,4 +736,4 @@ class BuiltinDataset(OnDiskDataset):
             download(url, path=zip_file_path)
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
-        super().__init__(dataset_dir, force_preprocess=False)
+        super().__init__(dataset_dir)
