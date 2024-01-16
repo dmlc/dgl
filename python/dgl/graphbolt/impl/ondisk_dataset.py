@@ -768,25 +768,3 @@ class BuiltinDataset(OnDiskDataset):
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
         super().__init__(dataset_dir, force_preprocess=False)
-
-
-def _ondisk_task_str(task: OnDiskTask) -> str:
-    final_str = "OnDiskTask("
-    indent_len = len(final_str)
-
-    def _add_indent(_str, indent):
-        lines = _str.split("\n")
-        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-        return "\n".join(lines)
-
-    attributes = get_attributes(task)
-    attributes.reverse()
-    for name in attributes:
-        if name[0] == "_":
-            continue
-        val = getattr(task, name)
-        final_str += (
-            f"{name}={_add_indent(str(val), indent_len + len(name) + 1)},\n"
-            + " " * indent_len
-        )
-    return final_str[:-indent_len] + ")"
