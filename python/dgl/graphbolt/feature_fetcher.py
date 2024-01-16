@@ -157,9 +157,13 @@ class FeatureFetcher(MiniBatchTransformer):
     def _read(self, data):
         if isinstance(data, tuple) and isinstance(data[1], torch.cuda.Event):
             data, event = data
-            if self.stream is None:
-                self.stream = torch.cuda.Stream()
             event.wait(self.stream)
         current_stream = torch.cuda.current_stream()
         with torch.cuda.stream(self.stream):
-            return self._read_helper(data, current_stream)
+            data = self._read_helper(data, current_stream)
+            if self.stream is not None:
+                event = torch.cuda.current_stream().record_event()
+                def _wait():
+                    event.wait()
+                data.wait = _wait
+            return data

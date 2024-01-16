@@ -10,6 +10,7 @@
 #include <graphbolt/unique_and_compact.h>
 
 #include "./index_select.h"
+#include "./max_uva_threads.h"
 #include "./random.h"
 
 namespace graphbolt {
@@ -75,6 +76,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("set_seed", &RandomEngine::SetManualSeed);
+  m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
 }
 
 }  // namespace sampling

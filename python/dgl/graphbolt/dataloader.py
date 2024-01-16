@@ -38,14 +38,13 @@ def _find_and_wrap_parent(
             )
 
 
-class CUDAStreamChanger(dp.iter.IterDataPipe):
+class CUDAStreamRecorder(dp.iter.IterDataPipe):
     def __init__(self, datapipe):
         self.datapipe = datapipe
 
     def __iter__(self):
         for data in self.datapipe:
-            data = (data, torch.cuda.current_stream().record_event())
-            yield data
+            yield data, torch.cuda.current_stream().record_event()
 
 class EndMarker(dp.iter.IterDataPipe):
     def __init__(self, datapipe):
@@ -72,6 +71,15 @@ class Bufferer(dp.iter.IterDataPipe):
                 yield return_data
         while not self.buffer.empty():
             yield self.buffer.get()
+
+class Awaiter(dp.iter.IterDataPipe):
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+    
+    def __iter__(self):
+        for data in self.datapipe:
+            data.wait()
+            yield data
 
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
@@ -124,7 +132,7 @@ class DataLoader(torch.utils.data.DataLoader):
         instances alive.
     """
 
-    def __init__(self, datapipe, num_workers=0, persistent_workers=True):
+    def __init__(self, datapipe, num_workers=0, persistent_workers=True, overlap_feature_fetch=True):
         # Multiprocessing requires two modifications to the datapipe:
         #
         # 1. Insert a stage after ItemSampler to distribute the
@@ -152,12 +160,20 @@ class DataLoader(torch.utils.data.DataLoader):
             )
 
         # (2) Cut datapipe at FeatureFetcher and wrap.
-        if num_workers == 0 and torch.cuda.is_available():
+        if overlap_feature_fetch and num_workers == 0 and torch.cuda.is_available():
+            self.uva_stream = torch.cuda.Stream(priority=-1)
+            torch.ops.graphbolt.set_max_uva_threads(6144)
+            feature_fetchers = dp_utils.find_dps(
+                datapipe_graph,
+                FeatureFetcher,
+            )
+            for feature_fetcher in feature_fetchers:
+                feature_fetcher.stream = self.uva_stream
             _find_and_wrap_parent(
                 datapipe_graph,
                 datapipe_adjlist,
                 FeatureFetcher,
-                CUDAStreamChanger,
+                CUDAStreamRecorder,
             )
             _find_and_wrap_parent(
                 datapipe_graph,
@@ -165,6 +181,12 @@ class DataLoader(torch.utils.data.DataLoader):
                 EndMarker,
                 Bufferer,
                 buffer_size=2,
+            )
+            _find_and_wrap_parent(
+                datapipe_graph,
+                datapipe_adjlist,
+                EndMarker,
+                Awaiter,
             )
         else:
             _find_and_wrap_parent(
