@@ -39,6 +39,10 @@ def _find_and_wrap_parent(
 
 
 class CUDAStreamRecorder(dp.iter.IterDataPipe):
+    """Records a CUDA event at the current stream and returns it as the second
+    argument of a tuple.
+    """
+
     def __init__(self, datapipe):
         self.datapipe = datapipe
 
@@ -48,6 +52,8 @@ class CUDAStreamRecorder(dp.iter.IterDataPipe):
 
 
 class EndMarker(dp.iter.IterDataPipe):
+    """Used to mark the end of a datapipe."""
+
     def __init__(self, datapipe):
         self.datapipe = datapipe
 
@@ -57,6 +63,8 @@ class EndMarker(dp.iter.IterDataPipe):
 
 
 class Bufferer(dp.iter.IterDataPipe):
+    """Buffers items before yielding them."""
+
     def __init__(self, datapipe, buffer_size=2):
         self.datapipe = datapipe
         if buffer_size <= 0:
@@ -78,6 +86,8 @@ class Bufferer(dp.iter.IterDataPipe):
 
 
 class Awaiter(dp.iter.IterDataPipe):
+    """Calls the wait function of all items."""
+
     def __init__(self, datapipe):
         self.datapipe = datapipe
 
