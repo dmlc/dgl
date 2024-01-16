@@ -173,7 +173,7 @@ class TorchBasedFeature(Feature):
 
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `TorchBasedFeature` to the specified device."""
-        self2 = copy.deepcopy(self)
+        self2 = copy.copy(self)
         if device == "pinned":
             self2.pin_memory_()
         else:
@@ -267,7 +267,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
 
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `TorchBasedFeatureStore` to the specified device."""
-        self2 = copy.deepcopy(self)
+        self2 = copy.copy(self)
         self2._features = {k: v.to(device) for k, v in self2._features.items()}
         return self2
 
