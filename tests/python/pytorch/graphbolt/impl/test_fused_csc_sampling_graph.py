@@ -1553,7 +1553,6 @@ def create_fused_csc_sampling_graph():
 
 
 def is_graph_on_device_type(graph, device_type):
-    # Check.
     assert graph.csc_indptr.device.type == device_type
     assert graph.indices.device.type == device_type
     assert graph.node_type_offset.device.type == device_type
@@ -1564,7 +1563,6 @@ def is_graph_on_device_type(graph, device_type):
 
 
 def is_graph_pinned(graph):
-    # Check.
     assert graph.csc_indptr.is_pinned()
     assert graph.indices.is_pinned()
     assert graph.node_type_offset.is_pinned()
