@@ -80,6 +80,12 @@ class FeatureFetcher(MiniBatchTransformer):
         ) or isinstance(self.edge_feature_keys, Dict)
         # Read Node features.
         input_nodes = data.node_ids()
+
+        def record_stream(tensor):
+            if stream is not None:
+                tensor.record_stream(stream)
+            return tensor
+
         if self.node_feature_keys and input_nodes is not None:
             if is_heterogeneous:
                 for type_name, feature_names in self.node_feature_keys.items():
@@ -89,26 +95,24 @@ class FeatureFetcher(MiniBatchTransformer):
                     for feature_name in feature_names:
                         node_features[
                             (type_name, feature_name)
-                        ] = self.feature_store.read(
-                            "node",
-                            type_name,
-                            feature_name,
-                            nodes,
+                        ] = record_stream(
+                            self.feature_store.read(
+                                "node",
+                                type_name,
+                                feature_name,
+                                nodes,
+                            )
                         )
-                        if stream is not None:
-                            node_features[
-                                (type_name, feature_name)
-                            ].record_stream(stream)
             else:
                 for feature_name in self.node_feature_keys:
-                    node_features[feature_name] = self.feature_store.read(
-                        "node",
-                        None,
-                        feature_name,
-                        input_nodes,
+                    node_features[feature_name] = record_stream(
+                        self.feature_store.read(
+                            "node",
+                            None,
+                            feature_name,
+                            input_nodes,
+                        )
                     )
-                    if stream is not None:
-                        node_features[feature_name].record_stream(stream)
         # Read Edge features.
         if self.edge_feature_keys and num_layers > 0:
             for i in range(num_layers):
@@ -133,25 +137,21 @@ class FeatureFetcher(MiniBatchTransformer):
                         for feature_name in feature_names:
                             edge_features[i][
                                 (type_name, feature_name)
-                            ] = self.feature_store.read(
-                                "edge", type_name, feature_name, edges
+                            ] = record_stream(
+                                self.feature_store.read(
+                                    "edge", type_name, feature_name, edges
+                                )
                             )
-                            if stream is not None:
-                                edge_features[i][
-                                    (type_name, feature_name)
-                                ].record_stream(stream)
                 else:
                     for feature_name in self.edge_feature_keys:
-                        edge_features[i][
-                            feature_name
-                        ] = self.feature_store.read(
-                            "edge",
-                            None,
-                            feature_name,
-                            original_edge_ids,
+                        edge_features[i][feature_name] = record_stream(
+                            self.feature_store.read(
+                                "edge",
+                                None,
+                                feature_name,
+                                original_edge_ids,
+                            )
                         )
-                        if stream is not None:
-                            edge_features[i][feature_name].record_stream(stream)
         data.set_node_features(node_features)
         data.set_edge_features(edge_features)
         return data
