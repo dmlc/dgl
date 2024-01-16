@@ -424,5 +424,7 @@ def main(args):
 
 
 if __name__ == "__main__":
+    torch.cuda.memory._record_memory_history()
     args = parse_args()
     main(args)
+    torch.cuda.memory._dump_snapshot()
