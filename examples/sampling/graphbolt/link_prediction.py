@@ -146,6 +146,16 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Input]:
+    # 'device': The device to copy the data to.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device. Copying here
+    # ensures that the rest of the operations run on the GPU.
+    ############################################################################
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
+
+    ############################################################################
+    # [Input]:
     # 'args.neg_ratio': Specify the ratio of negative to positive samples.
     # (E.g., if neg_ratio is 1, for each positive sample there will be 1
     # negative sample.)
@@ -216,7 +226,8 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=args.device)
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
 
     ############################################################################
     # [Input]:
@@ -304,11 +315,11 @@ def train(args, model, graph, features, train_set):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(args, graph, features, train_set)
 
-    for epoch in tqdm.trange(args.epochs):
+    for epoch in range(args.epochs):
         model.train()
         total_loss = 0
         start_epoch_time = time.time()
-        for step, data in enumerate(dataloader):
+        for step, data in tqdm.tqdm(enumerate(dataloader)):
             # Get node pairs with labels for loss calculation.
             compacted_pairs, labels = data.node_pairs_with_labels
 
@@ -366,24 +377,30 @@ def parse_args():
         help="Whether to exclude reverse edges during sampling. Default: 1",
     )
     parser.add_argument(
-        "--device",
-        default="cpu",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.storage_device, args.device = args.mode.split("-")
+    args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data")
     dataset = gb.BuiltinDataset("ogbl-citation2").load()
-    graph = dataset.graph
-    features = dataset.feature
+
+    # Move the dataset to the selected storage.
+    graph = dataset.graph.to(args.storage_device)
+    features = dataset.feature.to(args.storage_device)
+
     train_set = dataset.tasks[0].train_set
     args.fanout = list(map(int, args.fanout.split(",")))
 

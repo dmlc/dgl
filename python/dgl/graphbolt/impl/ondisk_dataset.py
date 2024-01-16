@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import textwrap
 from copy import deepcopy
 from typing import Dict, List, Union
 
@@ -218,6 +219,7 @@ def preprocess_ondisk_dataset(
 
     # 7. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
+        has_edge_feature_data = False
         for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
         ):
@@ -229,6 +231,8 @@ def preprocess_ondisk_dataset(
             in_memory = (
                 True if "in_memory" not in feature else feature["in_memory"]
             )
+            if not has_edge_feature_data and feature["domain"] == "edge":
+                has_edge_feature_data = True
             copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
                 os.path.join(dataset_dir, out_feature["path"]),
@@ -237,6 +241,8 @@ def preprocess_ondisk_dataset(
                 in_memory=in_memory,
                 is_feature=True,
             )
+        if has_edge_feature_data and not include_original_edge_id:
+            dgl_warning("Edge feature is stored, but edge IDs are not saved.")
 
     # 8. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
@@ -339,7 +345,24 @@ class OnDiskTask:
         return self._test_set
 
     def __repr__(self) -> str:
-        return _ondisk_task_str(self)
+        ret = "{Classname}({attributes})"
+
+        attributes_str = ""
+
+        attributes = get_attributes(self)
+        attributes.reverse()
+        for attribute in attributes:
+            if attribute[0] == "_":
+                continue
+            value = getattr(self, attribute)
+            attributes_str += f"{attribute}={value},\n"
+        attributes_str = textwrap.indent(
+            attributes_str, " " * len("OnDiskTask(")
+        ).strip()
+
+        return ret.format(
+            Classname=self.__class__.__name__, attributes=attributes_str
+        )
 
 
 class OnDiskDataset(Dataset):
@@ -752,25 +775,3 @@ class BuiltinDataset(OnDiskDataset):
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
         super().__init__(dataset_dir, force_preprocess=False)
-
-
-def _ondisk_task_str(task: OnDiskTask) -> str:
-    final_str = "OnDiskTask("
-    indent_len = len(final_str)
-
-    def _add_indent(_str, indent):
-        lines = _str.split("\n")
-        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-        return "\n".join(lines)
-
-    attributes = get_attributes(task)
-    attributes.reverse()
-    for name in attributes:
-        if name[0] == "_":
-            continue
-        val = getattr(task, name)
-        final_str += (
-            f"{name}={_add_indent(str(val), indent_len + len(name) + 1)},\n"
-            + " " * indent_len
-        )
-    return final_str[:-indent_len] + ")"

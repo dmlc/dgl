@@ -98,7 +98,8 @@ def create_dataloader(
     # 'device': The device to copy the data to.
     # 'extra_attrs': The extra attributes to copy.
     # [Output]:
-    # A CopyTo object to copy the data to the specified device.
+    # A CopyTo object to copy the data to the specified device. Copying here
+    # ensures that the rest of the operations run on the GPU.
     ############################################################################
     if args.storage_device != "cpu":
         datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
@@ -385,9 +386,8 @@ def main(args):
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
     # Move the dataset to the selected storage.
-    graph = dataset.graph.to("cuda:0")
-    features = dataset.feature
-    features.pin_memory_()
+    graph = dataset.graph.to(args.storage_device)
+    features = dataset.feature.to(args.storage_device)
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set

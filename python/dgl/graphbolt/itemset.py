@@ -180,7 +180,7 @@ class ItemSet:
 
     def __repr__(self) -> str:
         ret = (
-            f"ItemSet(\n"
+            f"{self.__class__.__name__}(\n"
             f"    items={self._items},\n"
             f"    names={self._names},\n"
             f")"
@@ -342,18 +342,18 @@ class ItemSetDict:
 
     def __repr__(self) -> str:
         ret = (
-            "ItemSetDict(\n"
+            "{Classname}(\n"
             "    itemsets={itemsets},\n"
             "    names={names},\n"
             ")"
         )
 
-        itemsets_str = repr(self._itemsets)
-        lines = itemsets_str.splitlines()
-        itemsets_str = (
-            lines[0]
-            + "\n"
-            + textwrap.indent("\n".join(lines[1:]), " " * len("    itemsets="))
-        )
+        itemsets_str = textwrap.indent(
+            repr(self._itemsets), " " * len("    itemsets=")
+        ).strip()
 
-        return ret.format(itemsets=itemsets_str, names=self._names)
+        return ret.format(
+            Classname=self.__class__.__name__,
+            itemsets=itemsets_str,
+            names=self._names,
+        )
