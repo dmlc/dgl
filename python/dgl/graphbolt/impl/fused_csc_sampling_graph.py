@@ -1,5 +1,4 @@
 """CSC format sampling graph."""
-
 # pylint: disable= invalid-name
 from typing import Dict, Optional, Union
 
