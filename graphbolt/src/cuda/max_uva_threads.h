@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file max_uva_threads.h
+ * @file cuda/max_uva_threads.h
  * @brief Max uva threads variable declaration.
  */
 #ifndef GRAPHBOLT_MAX_UVA_THREADS_H_

@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file max_uva_threads.cc
+ * @file cuda/max_uva_threads.cc
  * @brief Max uva threads variable setter function.
  */
 #include "./max_uva_threads.h"
