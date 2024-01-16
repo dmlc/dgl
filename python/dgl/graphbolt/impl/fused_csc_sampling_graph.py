@@ -950,23 +950,21 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         return self
 
-    def to(
-        self, device: Union[torch.device, str]
-    ):  # pylint: disable=invalid-name
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `FusedCSCSamplingGraph` to the specified device."""
 
         def _to(x):
             return x.to(device) if hasattr(x, "to") else x
 
-        def _pin(x):
-            return x.pin_memory() if hasattr(x, "pin_memory") else x
-
-        return self._apply_to_members(_pin if device == "pinned" else _to)
+        return self._apply_to_members(_to)
 
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""
 
-        self.to("pinned")
+        def _pin(x):
+            return x.pin_memory() if hasattr(x, "pin_memory") else x
+
+        self._apply_to_members(_pin)
 
 
 def fused_csc_sampling_graph(
