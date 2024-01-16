@@ -136,6 +136,59 @@ def test_torch_based_feature(in_memory):
         feature_a = feature_b = None
 
 
+def is_feature_store_pinned(store):
+    for feature in store._features.values():
+        assert feature._tensor.is_pinned()
+
+
+def is_feature_store_on_cuda(store):
+    for feature in store._features.values():
+        assert feature._tensor.is_cuda
+
+
+def is_feature_store_on_cpu(store):
+    for feature in store._features.values():
+        assert not feature._tensor.is_cuda
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
+@pytest.mark.parametrize("device", ["pinned", "cuda"])
+def test_feature_store_to_device(device):
+    with tempfile.TemporaryDirectory() as test_dir:
+        a = torch.tensor([[1, 2, 4], [2, 5, 3]])
+        b = torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]])
+        write_tensor_to_disk(test_dir, "a", a, fmt="torch")
+        write_tensor_to_disk(test_dir, "b", b, fmt="numpy")
+        feature_data = [
+            gb.OnDiskFeatureData(
+                domain="node",
+                type="paper",
+                name="a",
+                format="torch",
+                path=os.path.join(test_dir, "a.pt"),
+            ),
+            gb.OnDiskFeatureData(
+                domain="edge",
+                type="paper:cites:paper",
+                name="b",
+                format="numpy",
+                path=os.path.join(test_dir, "b.npy"),
+            ),
+        ]
+        feature_store = gb.TorchBasedFeatureStore(feature_data)
+        feature_store2 = feature_store.to(device)
+        if device == "pinned":
+            is_feature_store_pinned(feature_store2)
+        elif device == "cuda":
+            is_feature_store_on_cuda(feature_store2)
+
+        # The original variable should be untouched.
+        is_feature_store_on_cpu(feature_store)
+
+
 @unittest.skipIf(
     F._default_context_str == "cpu",
     reason="Tests for pinned memory are only meaningful on GPU.",
@@ -296,23 +349,27 @@ def test_torch_based_feature_repr(in_memory):
         feature_a = gb.TorchBasedFeature(a, metadata=metadata)
         feature_b = gb.TorchBasedFeature(b)
 
-        expected_str_feature_a = str(
-            """TorchBasedFeature(feature=tensor([[1, 2, 3],
-                                  [4, 5, 6]]),
-                  metadata={'max_value': 3},
-)"""
+        expected_str_feature_a = (
+            "TorchBasedFeature(\n"
+            "    feature=tensor([[1, 2, 3],\n"
+            "                    [4, 5, 6]]),\n"
+            "    metadata={'max_value': 3},\n"
+            ")"
         )
-        expected_str_feature_b = str(
-            """TorchBasedFeature(feature=tensor([[[1, 2],
-                                   [3, 4]],
-                          
-                                  [[4, 5],
-                                   [6, 7]]]),
-                  metadata={},
-)"""
+        expected_str_feature_b = (
+            "TorchBasedFeature(\n"
+            "    feature=tensor([[[1, 2],\n"
+            "                     [3, 4]],\n"
+            "\n"
+            "                    [[4, 5],\n"
+            "                     [6, 7]]]),\n"
+            "    metadata={},\n"
+            ")"
         )
-        assert str(feature_a) == expected_str_feature_a
-        assert str(feature_b) == expected_str_feature_b
+
+        assert repr(feature_a) == expected_str_feature_a, feature_a
+        assert repr(feature_b) == expected_str_feature_b, feature_b
+
         a = b = metadata = None
         feature_a = feature_b = None
         expected_str_feature_a = expected_str_feature_b = None
@@ -345,21 +402,24 @@ def test_torch_based_feature_store_repr(in_memory):
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
 
-        expected_feature_store_str = str(
-            """TorchBasedFeatureStore{(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(feature=tensor([[1, 2, 4],
-                                                        [2, 5, 3]]),
-                                        metadata={},
-                      ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(feature=tensor([[[1, 2],
-                                                         [3, 4]],
-                                                
-                                                        [[2, 5],
-                                                         [3, 4]]]),
-                                        metadata={},
-                      )}"""
+        expected_feature_store_str = (
+            "TorchBasedFeatureStore(\n"
+            "    {(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(\n"
+            "        feature=tensor([[1, 2, 4],\n"
+            "                        [2, 5, 3]]),\n"
+            "        metadata={},\n"
+            "    ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(\n"
+            "        feature=tensor([[[1, 2],\n"
+            "                         [3, 4]],\n"
+            "\n"
+            "                        [[2, 5],\n"
+            "                         [3, 4]]]),\n"
+            "        metadata={},\n"
+            "    )}\n"
+            ")"
         )
-        assert str(feature_store) == expected_feature_store_str, print(
-            feature_store
-        )
+
+        assert repr(feature_store) == expected_feature_store_str, feature_store
 
         a = b = feature_data = None
         feature_store = expected_feature_store_str = None

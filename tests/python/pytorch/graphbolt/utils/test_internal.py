@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import tempfile
@@ -200,3 +201,68 @@ def test_read_edges_error():
             ),
         ):
             internal.read_edges(test_dir, "numpy", edge_path)
+
+
+def test_calculate_file_hash():
+    with tempfile.TemporaryDirectory() as test_dir:
+        test_file_path = os.path.join(test_dir, "test.txt")
+        with open(test_file_path, "w") as file:
+            file.write("test content")
+        hash_value = internal.calculate_file_hash(
+            test_file_path, hash_algo="md5"
+        )
+        expected_hash_value = "9473fdd0d880a43c21b7778d34872157"
+        assert expected_hash_value == hash_value
+        with pytest.raises(
+            ValueError,
+            match=re.escape(
+                "Hash algorithm must be one of: ['md5', 'sha1', 'sha224', "
+                + "'sha256', 'sha384', 'sha512'], but got `fake`."
+            ),
+        ):
+            hash_value = internal.calculate_file_hash(
+                test_file_path, hash_algo="fake"
+            )
+
+
+def test_calculate_dir_hash():
+    with tempfile.TemporaryDirectory() as test_dir:
+        test_file_path_1 = os.path.join(test_dir, "test_1.txt")
+        test_file_path_2 = os.path.join(test_dir, "test_2.txt")
+        with open(test_file_path_1, "w") as file:
+            file.write("test content")
+        with open(test_file_path_2, "w") as file:
+            file.write("test contents of directory")
+        hash_value = internal.calculate_dir_hash(test_dir, hash_algo="md5")
+        expected_hash_value = [
+            "56e708a2bdf92887d4a7f25cbc13c555",
+            "9473fdd0d880a43c21b7778d34872157",
+        ]
+        assert len(hash_value) == 2
+        for val in hash_value.values():
+            assert val in expected_hash_value
+
+
+def test_check_dataset_change():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # Generate directory and record its hash value.
+        test_file_path_1 = os.path.join(test_dir, "test_1.txt")
+        test_file_path_2 = os.path.join(test_dir, "test_2.txt")
+        with open(test_file_path_1, "w") as file:
+            file.write("test content")
+        with open(test_file_path_2, "w") as file:
+            file.write("test contents of directory")
+        hash_value = internal.calculate_dir_hash(test_dir, hash_algo="md5")
+        hash_value_file = "dataset_hash_value.txt"
+        hash_value_file_paht = os.path.join(
+            test_dir, "preprocessed", hash_value_file
+        )
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        with open(hash_value_file_paht, "w") as file:
+            file.write(json.dumps(hash_value, indent=4))
+
+        # Modify the content of a file.
+        with open(test_file_path_2, "w") as file:
+            file.write("test contents of directory changed")
+
+        assert internal.check_dataset_change(test_dir, "preprocessed")
