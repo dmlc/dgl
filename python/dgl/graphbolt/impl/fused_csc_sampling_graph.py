@@ -956,7 +956,21 @@ class FusedCSCSamplingGraph(SamplingGraph):
         def _to(x):
             return x.to(device) if hasattr(x, "to") else x
 
-        return self._apply_to_members(_to)
+        def _pin(x):
+            return x.pin_memory() if hasattr(x, "pin_memory") else x
+
+        # Create a copy of self.
+        self2 = fused_csc_sampling_graph(
+            self.csc_indptr,
+            self.indices,
+            self.node_type_offset,
+            self.type_per_edge,
+            self.node_type_to_id,
+            self.edge_type_to_id,
+            self.node_attributes,
+            self.edge_attributes,
+        )
+        return self2._apply_to_members(_pin if device == "pinned" else _to)
 
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""
