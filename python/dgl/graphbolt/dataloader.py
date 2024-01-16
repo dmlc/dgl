@@ -113,9 +113,15 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
         yield from self.dataloader
 
 
+def _get_uva_stream():
+    if _get_uva_stream.stream is None:
+        _get_uva_stream.stream = torch.cuda.Stream(priority=-1)
+    return _get_uva_stream.stream
+
+
 # There needs to be a single instance of the UVA_STREAM, if it is created
 # multiple times, it leads to multiple CUDA memory pools and memory leaks.
-UVA_STREAM = None
+_get_uva_stream.stream = None
 
 
 class DataLoader(torch.utils.data.DataLoader):
@@ -191,16 +197,13 @@ class DataLoader(torch.utils.data.DataLoader):
             and num_workers == 0
             and torch.cuda.is_available()
         ):
-            global UVA_STREAM
-            if UVA_STREAM is None:
-                UVA_STREAM = torch.cuda.Stream(priority=-1)
             torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
             feature_fetchers = dp_utils.find_dps(
                 datapipe_graph,
                 FeatureFetcher,
             )
             for feature_fetcher in feature_fetchers:
-                feature_fetcher.stream = UVA_STREAM
+                feature_fetcher.stream = _get_uva_stream()
             _find_and_wrap_parent(
                 datapipe_graph,
                 datapipe_adjlist,
