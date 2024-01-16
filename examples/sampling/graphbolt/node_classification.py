@@ -322,9 +322,9 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
 
             total_loss += loss.item()
 
+        t1 = time.time()
         # Evaluate the model.
         acc = evaluate(args, model, graph, features, valid_set, num_classes)
-        t1 = time.time()
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (step + 1):.4f} | "
             f"Accuracy {acc.item():.4f} | Time {t1 - t0:.4f}"
