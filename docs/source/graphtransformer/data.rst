@@ -5,6 +5,7 @@ In this section, we will prepare the data for the Graphormer model introduced be
 
 
 .. code:: python
+
     def collate(graphs):
         # compute shortest path features, can be done in advance
         for g in graphs:
