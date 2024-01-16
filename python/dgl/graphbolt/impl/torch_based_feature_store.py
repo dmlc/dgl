@@ -1,5 +1,6 @@
 """Torch-based feature store for GraphBolt."""
 
+import copy
 import textwrap
 from typing import Dict, List
 
@@ -170,6 +171,15 @@ class TorchBasedFeature(Feature):
         """In-place operation to copy the feature to pinned memory."""
         self._tensor = self._tensor.pin_memory()
 
+    def to(self, device):  # pylint: disable=invalid-name
+        """Copy `TorchBasedFeature` to the specified device."""
+        self2 = copy.deepcopy(self)
+        if device == "pinned":
+            self2.pin_memory_()
+        else:
+            self2._tensor = self2._tensor.to(device)
+        return self2
+
     def __repr__(self) -> str:
         ret = (
             "TorchBasedFeature(\n"
@@ -266,6 +276,12 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         """In-place operation to copy the feature store to pinned memory."""
         for feature in self._features.values():
             feature.pin_memory_()
+
+    def to(self, device):  # pylint: disable=invalid-name
+        """Copy `TorchBasedFeatureStore` to the specified device."""
+        self2 = copy.deepcopy(self)
+        self2._features = {k: v.to(device) for k, v in self2._features.items()}
+        return self2
 
     def __repr__(self) -> str:
         ret = "TorchBasedFeatureStore(\n" + "    {features}\n" + ")"

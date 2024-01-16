@@ -1,4 +1,6 @@
 """CSC format sampling graph."""
+import copy
+
 # pylint: disable= invalid-name
 from typing import Dict, Optional, Union
 
@@ -956,7 +958,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
         def _to(x):
             return x.to(device) if hasattr(x, "to") else x
 
-        return self._apply_to_members(_to)
+        def _pin(x):
+            return x.pin_memory() if hasattr(x, "pin_memory") else x
+
+        self2 = copy.deepcopy(self)
+        return self2._apply_to_members(_pin if device == "pinned" else _to)
 
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""

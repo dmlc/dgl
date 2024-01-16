@@ -1552,25 +1552,48 @@ def create_fused_csc_sampling_graph():
     )
 
 
+def is_graph_on_device_type(graph, device_type):
+    # Check.
+    assert graph.csc_indptr.device.type == device_type
+    assert graph.indices.device.type == device_type
+    assert graph.node_type_offset.device.type == device_type
+    assert graph.type_per_edge.device.type == device_type
+    assert graph.csc_indptr.device.type == device_type
+    for key in graph.edge_attributes:
+        assert graph.edge_attributes[key].device.type == device_type
+
+
+def is_graph_pinned(graph):
+    # Check.
+    assert graph.csc_indptr.is_pinned()
+    assert graph.indices.is_pinned()
+    assert graph.node_type_offset.is_pinned()
+    assert graph.type_per_edge.is_pinned()
+    assert graph.csc_indptr.is_pinned()
+    for key in graph.edge_attributes:
+        assert graph.edge_attributes[key].is_pinned()
+
+
 @unittest.skipIf(
     F._default_context_str == "cpu",
     reason="`to` function needs GPU to test.",
 )
-def test_csc_sampling_graph_to_device():
+@pytest.mark.parametrize("device", ["pinned", "cuda"])
+def test_csc_sampling_graph_to_device(device):
     # Construct FusedCSCSamplingGraph.
     graph = create_fused_csc_sampling_graph()
 
     # Copy to device.
-    graph = graph.to("cuda")
+    graph2 = graph.to(device)
 
-    # Check.
-    assert graph.csc_indptr.device.type == "cuda"
-    assert graph.indices.device.type == "cuda"
-    assert graph.node_type_offset.device.type == "cuda"
-    assert graph.type_per_edge.device.type == "cuda"
-    assert graph.csc_indptr.device.type == "cuda"
-    for key in graph.edge_attributes:
-        assert graph.edge_attributes[key].device.type == "cuda"
+    if device == "cuda":
+        is_graph_on_device_type(graph2, "cuda")
+    elif device == "pinned":
+        is_graph_on_device_type(graph2, "cpu")
+        is_graph_pinned(graph2)
+
+    # The original variable should be untouched.
+    is_graph_on_device_type(graph, "cpu")
 
 
 @unittest.skipIf(
@@ -1584,14 +1607,8 @@ def test_csc_sampling_graph_to_pinned_memory():
     # Copy to pinned_memory in-place.
     graph.pin_memory_()
 
-    # Check.
-    assert graph.csc_indptr.is_pinned()
-    assert graph.indices.is_pinned()
-    assert graph.node_type_offset.is_pinned()
-    assert graph.type_per_edge.is_pinned()
-    assert graph.csc_indptr.is_pinned()
-    for key in graph.edge_attributes:
-        assert graph.edge_attributes[key].is_pinned()
+    is_graph_on_device_type(graph, "cpu")
+    is_graph_pinned(graph)
 
 
 @pytest.mark.parametrize("labor", [False, True])
