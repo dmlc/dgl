@@ -82,7 +82,7 @@ class FeatureFetcher(MiniBatchTransformer):
         input_nodes = data.node_ids()
 
         def record_stream(tensor):
-            if stream is not None:
+            if stream is not None and tensor.is_cuda:
                 tensor.record_stream(stream)
             return tensor
 

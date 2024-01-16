@@ -170,6 +170,17 @@ class DataLoader(torch.utils.data.DataLoader):
             )
 
         # (2) Cut datapipe at FeatureFetcher and wrap.
+        _find_and_wrap_parent(
+            datapipe_graph,
+            datapipe_adjlist,
+            FeatureFetcher,
+            MultiprocessingWrapper,
+            num_workers=num_workers,
+            persistent_workers=persistent_workers,
+        )
+
+        # (3) Overlap UVA feature fetching by buffering and using an alternative
+        # stream.
         if (
             overlap_feature_fetch
             and num_workers == 0
@@ -196,17 +207,8 @@ class DataLoader(torch.utils.data.DataLoader):
                 EndMarker,
                 Awaiter,
             )
-        else:
-            _find_and_wrap_parent(
-                datapipe_graph,
-                datapipe_adjlist,
-                FeatureFetcher,
-                MultiprocessingWrapper,
-                num_workers=num_workers,
-                persistent_workers=persistent_workers,
-            )
 
-        # (3) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
+        # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
         # data pipeline up to the CopyTo operation to run in a separate thread.
         _find_and_wrap_parent(
             datapipe_graph,
