@@ -148,7 +148,8 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Input]:
     # 'device': The device to copy the data to.
     # [Output]:
-    # A CopyTo object to copy the data to the specified device.
+    # A CopyTo object to copy the data to the specified device. Copying here
+    # ensures that the rest of the operations run on the GPU.
     ############################################################################
     if args.storage_device != "cpu":
         datapipe = datapipe.copy_to(device=args.device)
