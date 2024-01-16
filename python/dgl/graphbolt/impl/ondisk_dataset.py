@@ -340,7 +340,7 @@ class OnDiskTask:
         return self._test_set
 
     def __repr__(self) -> str:
-        ret = "OnDiskTask({attributes})"
+        ret = "{Classname}({attributes})"
 
         attributes_str = ""
 
@@ -355,7 +355,9 @@ class OnDiskTask:
             attributes_str, " " * len("OnDiskTask(")
         ).strip()
 
-        return ret.format(attributes=attributes_str)
+        return ret.format(
+            Classname=self.__class__.__name__, attributes=attributes_str
+        )
 
 
 class OnDiskDataset(Dataset):

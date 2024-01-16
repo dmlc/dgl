@@ -172,7 +172,7 @@ class TorchBasedFeature(Feature):
 
     def __repr__(self) -> str:
         ret = (
-            "TorchBasedFeature(\n"
+            "{Classname}(\n"
             "    feature={feature},\n"
             "    metadata={metadata},\n"
             ")"
@@ -185,7 +185,11 @@ class TorchBasedFeature(Feature):
             str(self.metadata()), " " * len("    metadata=")
         ).strip()
 
-        return ret.format(feature=feature_str, metadata=metadata_str)
+        return ret.format(
+            Classname=self.__class__.__name__,
+            feature=feature_str,
+            metadata=metadata_str,
+        )
 
 
 class TorchBasedFeatureStore(BasicFeatureStore):
@@ -252,6 +256,8 @@ class TorchBasedFeatureStore(BasicFeatureStore):
             feature.pin_memory_()
 
     def __repr__(self) -> str:
-        ret = "TorchBasedFeatureStore(\n" + "    {features}\n" + ")"
+        ret = "{Classname}(\n" + "    {features}\n" + ")"
         features_str = textwrap.indent(str(self._features), "    ").strip()
-        return ret.format(features=features_str)
+        return ret.format(
+            Classname=self.__class__.__name__, features=features_str
+        )
