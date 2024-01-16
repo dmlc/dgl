@@ -9,8 +9,8 @@
 #include <graphbolt/serialize.h>
 #include <graphbolt/unique_and_compact.h>
 
+#include "./cuda/max_uva_threads.h"
 #include "./index_select.h"
-#include "./max_uva_threads.h"
 #include "./random.h"
 
 namespace graphbolt {

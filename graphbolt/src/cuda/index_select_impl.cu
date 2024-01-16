@@ -9,8 +9,8 @@
 
 #include <numeric>
 
-#include "../max_uva_threads.h"
 #include "./common.h"
+#include "./max_uva_threads.h"
 #include "./utils.h"
 
 namespace graphbolt {
