@@ -18,7 +18,7 @@ from torcheval.metrics import BinaryAUROC
 ############################################################################
 # (HIGHLIGHT) Create a single process dataloader with dgl graphbolt package.
 ############################################################################
-def create_dataloader(dateset, device, is_train=True):
+def create_dataloader(dataset, device, is_train=True):
     # The second of two tasks in the dataset is link prediction.
     task = dataset.tasks[1]
     itemset = task.train_set if is_train else task.test_set
