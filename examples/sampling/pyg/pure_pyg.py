@@ -88,6 +88,8 @@ def main():
     mem_usage_start = memory_usage(-1, interval=1, timeout=1)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = "cpu"
+    print("device is: ", device)
     print("Loading data")
     dataset = PygNodePropPredDataset(name=args.dataset)
     data = dataset[0].to(device)

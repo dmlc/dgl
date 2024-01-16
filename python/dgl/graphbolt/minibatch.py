@@ -472,23 +472,24 @@ class MiniBatch:
 
         return self
 
-    def to_pyg_data(self, device: torch.device):
-        def construct_edge_index(csc, device):
+    def to_pyg_adapter(self, device):
+        def construct_edge_index(sampled_subgraph, device):
+            csc = sampled_subgraph.sampled_csc
             indices = csc.indices.to(device)
             indptr = csc.indptr.to(device)
-            target_nodes = torch.arange(
-                0, len(indptr) - 1, device=device
-            ).repeat_interleave(indptr[1:] - indptr[:-1])
-            edge_index = torch.stack([indices, target_nodes], dim=0)
+            rows = torch.arange(
+                len(indptr) - 1, device=device
+            ).repeat_interleave(indptr.diff())
+            # indptr.diff()
+            cols = indices
+            edge_index = torch.stack([rows, cols], dim=0)
             return edge_index
 
         x = self.node_features.get("feat", None)
         edge_index = None
         if self.sampled_subgraphs:
             subgraph = self.sampled_subgraphs[0]
-            if hasattr(subgraph, "node_pairs"):
-                csc = subgraph.node_pairs
-                edge_index = construct_edge_index(csc, device)
+            edge_index = construct_edge_index(subgraph, device)
         labels = self.labels
         data = Data(x=x, edge_index=edge_index, y=labels)
         return data

@@ -52,6 +52,8 @@ main
 import argparse
 import time
 
+import dgl
+
 import dgl.graphbolt as gb
 
 # import argparse
@@ -283,33 +285,6 @@ class GraphSAGE(torch.nn.Module):
         return h
 
 
-def construct_edge_index(csc, device):
-    indices = csc.indices.to(device)
-    indptr = csc.indptr.to(device)
-    target_nodes = torch.arange(
-        0, len(indptr) - 1, device=device
-    ).repeat_interleave(indptr[1:] - indptr[:-1])
-    edge_index = torch.stack([indices, target_nodes], dim=0)
-    return edge_index
-
-
-def graphbolt_to_pyg_adapter(minibatch, device):
-    x = minibatch.node_features.get("feat", None)
-
-    edge_index = None
-    if minibatch.sampled_subgraphs:
-        subgraph = minibatch.sampled_subgraphs[0]
-        if hasattr(subgraph, "node_pairs"):
-            csc = subgraph.node_pairs
-            edge_index = construct_edge_index(csc, device)
-
-    labels = minibatch.labels
-
-    data = Data(x=x, edge_index=edge_index, y=labels)
-
-    return data
-
-
 def create_dataloader(dataset_set, graph, feature, device, is_train):
     datapipe = gb.ItemSampler(
         dataset_set, batch_size=1024, shuffle=is_train, drop_last=is_train
@@ -328,7 +303,8 @@ def train(model, dataloader, optimizer, criterion, device, num_classes):
     total_samples = 0
 
     for minibatch in dataloader:
-        pyg_data = graphbolt_to_pyg_adapter(minibatch, device)
+        pyg_data = minibatch.to_pyg_adapter(device)
+
         pyg_data.to(device)
         optimizer.zero_grad()
         out = model(pyg_data.x, pyg_data.edge_index)
@@ -355,7 +331,7 @@ def evaluate(model, dataloader, device, num_classes):
     total_samples = 0
 
     for minibatch in dataloader:
-        pyg_data = graphbolt_to_pyg_adapter(minibatch, device)
+        pyg_data = minibatch.to_pyg_adapter(device)
         pyg_data.to(device)
         out = model(pyg_data.x, pyg_data.edge_index)
         y = pyg_data.y.squeeze()
@@ -372,6 +348,7 @@ def evaluate(model, dataloader, device, num_classes):
 
 
 def main():
+    print(dgl.__file__)
     parser = argparse.ArgumentParser(description="GraphSAGE with PyG")
     parser.add_argument(
         "--dataset", type=str, default="ogbn-arxiv", help="Dataset name"

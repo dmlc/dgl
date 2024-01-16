@@ -41,8 +41,8 @@ Below results are roughly collected from an AWS EC2 **g4dn.4xlarge**, an Intel(R
 | ---------------------- | ------------- | ------------- | ----------- | ------------------------ |
 | ~80.7MB(Pure PyG)      | ~609  MB      | ~0MB          | 0           | ~125s                    | 
 | ~80.7MB(Pure PyG)      | ~849MB        | ~260MB        | 1           | ~39s                     |
-| ~80.7MB                | ~645  MB      | ~0MB          | 0           | ~97s                     | 
-| ~80.7MB                | ~765MB        | ~156MB        | 1           | ~37s                     |
+| ~80.7MB                | ~645  MB      | ~0MB          | 0           | ~48s                     | 
+| ~80.7MB                | ~765MB        | ~156MB        | 1           | ~14s                     |
 
 
 
@@ -72,8 +72,8 @@ Below results are roughly collected from an AWS EC2 **g4dn.4xlarge**, an Intel(R
 | --------------------  | ------------- | ------------- | ----------- | ------------------------ |
 | ~1.4GB(Pure PyG)      | ~10977MB      | ~0MB          | 0           | ~8726s                   |
 | ~1.4GB(Pure PyG)      | ~14774MB      | ~5166MB       | 1           | ~1141s                   |
-| ~1.4GB                | ~10977MB      |               | 0           | ~2073s                   |
-| ~1.4GB                | ~2451MB       | ~2343MB       | 1           | ~651s                    |
+| ~1.4GB                | ~2018MB       | ~0MB          | 0           | ~5360s                   |
+| ~1.4GB                | ~2451MB       | ~2343MB       | 1           | ~466s                    |
 
 
 
