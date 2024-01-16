@@ -29,7 +29,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
     r"""A sampling graph in CSC format."""
 
     def __repr__(self):
-        # return _csc_sampling_graph_str(self)
         final_str = (
             "{Classname}(csc_indptr={csc_indptr},\n"
             "indices={indices},\n"
