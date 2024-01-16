@@ -219,6 +219,7 @@ def preprocess_ondisk_dataset(
 
     # 7. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
+        has_edge_feature_data = False
         for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
         ):
@@ -230,6 +231,8 @@ def preprocess_ondisk_dataset(
             in_memory = (
                 True if "in_memory" not in feature else feature["in_memory"]
             )
+            if not has_edge_feature_data and feature["domain"] == "edge":
+                has_edge_feature_data = True
             copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
                 os.path.join(dataset_dir, out_feature["path"]),
@@ -238,6 +241,8 @@ def preprocess_ondisk_dataset(
                 in_memory=in_memory,
                 is_feature=True,
             )
+        if has_edge_feature_data and not include_original_edge_id:
+            dgl_warning("Edge feature is stored, but edge IDs are not saved.")
 
     # 8. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
