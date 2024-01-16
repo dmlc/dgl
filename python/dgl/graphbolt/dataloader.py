@@ -38,19 +38,6 @@ def _find_and_wrap_parent(
             )
 
 
-class CUDAStreamRecorder(dp.iter.IterDataPipe):
-    """Records a CUDA event at the current stream and returns it as the second
-    argument of a tuple.
-    """
-
-    def __init__(self, datapipe):
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        for data in self.datapipe:
-            yield data, torch.cuda.current_stream().record_event()
-
-
 class EndMarker(dp.iter.IterDataPipe):
     """Used to mark the end of a datapipe."""
 
@@ -196,12 +183,6 @@ class DataLoader(torch.utils.data.DataLoader):
             )
             for feature_fetcher in feature_fetchers:
                 feature_fetcher.stream = self.uva_stream
-            _find_and_wrap_parent(
-                datapipe_graph,
-                datapipe_adjlist,
-                FeatureFetcher,
-                CUDAStreamRecorder,
-            )
             _find_and_wrap_parent(
                 datapipe_graph,
                 datapipe_adjlist,
