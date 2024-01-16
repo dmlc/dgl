@@ -437,7 +437,7 @@ def evaluate(
         item_set,
         device,
         batch_size=4096,
-        fanouts=[25, 10],
+        fanouts=[torch.full((7,), 25), torch.full((7,), 10)],
         shuffle=False,
         num_workers=num_workers,
     )
@@ -498,7 +498,7 @@ def train(
         train_set,
         device,
         batch_size=1024,
-        fanouts=[25, 10],
+        fanouts=[torch.full((7,), 25), torch.full((7,), 10)],
         shuffle=True,
         num_workers=num_workers,
     )
