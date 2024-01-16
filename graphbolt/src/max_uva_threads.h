@@ -7,7 +7,6 @@
 #ifndef GRAPHBOLT_MAX_UVA_THREADS_H_
 #define GRAPHBOLT_MAX_UVA_THREADS_H_
 
-#include <limits>
 #include <optional>
 
 namespace graphbolt {
