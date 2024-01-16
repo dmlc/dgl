@@ -42,6 +42,7 @@ import time
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
+import nvtx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -303,24 +304,25 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         model.train()
         total_loss = 0
         for step, data in tqdm(enumerate(dataloader), "Training"):
-            # The input features from the source nodes in the first layer's
-            # computation graph.
-            x = data.node_features["feat"]
+            with nvtx.annotate("forward/backward"):
+                # The input features from the source nodes in the first layer's
+                # computation graph.
+                x = data.node_features["feat"]
 
-            # The ground truth labels from the destination nodes
-            # in the last layer's computation graph.
-            y = data.labels
+                # The ground truth labels from the destination nodes
+                # in the last layer's computation graph.
+                y = data.labels
 
-            y_hat = model(data.blocks, x)
+                y_hat = model(data.blocks, x)
 
-            # Compute loss.
-            loss = F.cross_entropy(y_hat, y)
+                # Compute loss.
+                loss = F.cross_entropy(y_hat, y)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-            total_loss += loss.item()
+                total_loss += loss.item()
 
         # Evaluate the model.
         acc = evaluate(args, model, graph, features, valid_set, num_classes)
