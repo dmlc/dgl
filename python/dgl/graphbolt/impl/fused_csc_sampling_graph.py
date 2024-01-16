@@ -35,7 +35,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             "{metadata})"
         )
 
-        Classname_str = self.__class__.__name__
+        classname_str = self.__class__.__name__
         csc_indptr_str = str(self.csc_indptr)
         indices_str = str(self.indices)
         meta_str = f"total_num_nodes={self.total_num_nodes}, num_edges={self.num_edges},"
@@ -51,16 +51,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
             meta_str += f"\nnode_attributes={self.node_attributes},"
         if self.edge_attributes is not None:
             meta_str += f"\nedge_attributes={self.edge_attributes},"
-        # meta_str = textwrap.indent(meta_str, " "*(len(Classname_str)+1)).strip()
 
         final_str = final_str.format(
-            Classname=Classname_str,
+            Classname=classname_str,
             csc_indptr=csc_indptr_str,
             indices=indices_str,
             metadata=meta_str,
         )
         return textwrap.indent(
-            final_str, " " * (len(Classname_str) + 1)
+            final_str, " " * (len(classname_str) + 1)
         ).strip()
 
     def __init__(
