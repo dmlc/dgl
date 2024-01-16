@@ -95,9 +95,10 @@ class FeatureFetcher(MiniBatchTransformer):
                             feature_name,
                             nodes,
                         )
-                        node_features[(type_name, feature_name)].record_stream(
-                            stream
-                        )
+                        if stream is not None:
+                            node_features[
+                                (type_name, feature_name)
+                            ].record_stream(stream)
             else:
                 for feature_name in self.node_feature_keys:
                     node_features[feature_name] = self.feature_store.read(
@@ -106,7 +107,8 @@ class FeatureFetcher(MiniBatchTransformer):
                         feature_name,
                         input_nodes,
                     )
-                    node_features[feature_name].record_stream(stream)
+                    if stream is not None:
+                        node_features[feature_name].record_stream(stream)
         # Read Edge features.
         if self.edge_feature_keys and num_layers > 0:
             for i in range(num_layers):
@@ -134,9 +136,10 @@ class FeatureFetcher(MiniBatchTransformer):
                             ] = self.feature_store.read(
                                 "edge", type_name, feature_name, edges
                             )
-                            edge_features[i][
-                                (type_name, feature_name)
-                            ].record_stream(stream)
+                            if stream is not None:
+                                edge_features[i][
+                                    (type_name, feature_name)
+                                ].record_stream(stream)
                 else:
                     for feature_name in self.edge_feature_keys:
                         edge_features[i][
@@ -147,14 +150,16 @@ class FeatureFetcher(MiniBatchTransformer):
                             feature_name,
                             original_edge_ids,
                         )
-                        edge_features[i][feature_name].record_stream(stream)
+                        if stream is not None:
+                            edge_features[i][feature_name].record_stream(stream)
         data.set_node_features(node_features)
         data.set_edge_features(edge_features)
         return data
 
     def _read(self, data):
-        current_stream = torch.cuda.current_stream()
+        current_stream = None
         if self.stream is not None:
+            current_stream = torch.cuda.current_stream()
             self.stream.wait_stream(current_stream)
         with torch.cuda.stream(self.stream):
             data = self._read_helper(data, current_stream)
