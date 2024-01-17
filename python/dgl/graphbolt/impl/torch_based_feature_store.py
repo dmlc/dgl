@@ -187,6 +187,7 @@ class TorchBasedFeature(Feature):
             )
 
             self._is_inplace_pinned.add(x)
+        return self
 
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `TorchBasedFeature` to the specified device."""
@@ -282,6 +283,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         """In-place operation to copy the feature store to pinned memory."""
         for feature in self._features.values():
             feature.pin_memory_()
+        return self
 
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `TorchBasedFeatureStore` to the specified device."""

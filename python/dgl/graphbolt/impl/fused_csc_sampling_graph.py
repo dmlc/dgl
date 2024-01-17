@@ -1006,7 +1006,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
             return x
 
-        self._apply_to_members(_pin)
+        return self._apply_to_members(_pin)
 
 
 def fused_csc_sampling_graph(
