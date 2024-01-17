@@ -1,7 +1,9 @@
 """GraphBolt OnDiskDataset."""
 
+import json
 import os
 import shutil
+import textwrap
 from copy import deepcopy
 from typing import Dict, List, Union
 
@@ -15,6 +17,8 @@ from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..internal import (
+    calculate_dir_hash,
+    check_dataset_change,
     copy_or_convert_data,
     get_attributes,
     read_data,
@@ -37,7 +41,7 @@ __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 def preprocess_ondisk_dataset(
     dataset_dir: str,
     include_original_edge_id: bool = False,
-    force_preprocess: bool = False,
+    force_preprocess: bool = None,
 ) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
@@ -72,6 +76,20 @@ def preprocess_ondisk_dataset(
         processed_dir_prefix, "metadata.yaml"
     )
     if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
+        if force_preprocess is None:
+            with open(
+                os.path.join(dataset_dir, preprocess_metadata_path), "r"
+            ) as f:
+                preprocess_config = yaml.safe_load(f)
+            if (
+                preprocess_config.get("include_original_edge_id", None)
+                == include_original_edge_id
+            ):
+                force_preprocess = check_dataset_change(
+                    dataset_dir, processed_dir_prefix
+                )
+            else:
+                force_preprocess = True
         if force_preprocess:
             shutil.rmtree(os.path.join(dataset_dir, processed_dir_prefix))
             print(
@@ -158,7 +176,7 @@ def preprocess_ondisk_dataset(
                         graph_feature["name"]
                     ] = edge_data
         if not is_homogeneous:
-            # For homogeneous graph, a node/edge feature must cover all
+            # For heterogenous graph, a node/edge feature must cover all
             # node/edge types.
             for feat_name, feat_data in g.ndata.items():
                 existing_types = set(feat_data.keys())
@@ -180,7 +198,10 @@ def preprocess_ondisk_dataset(
         g, is_homogeneous, include_original_edge_id
     )
 
-    # 5. Save the FusedCSCSamplingGraph and modify the output_config.
+    # 5. Record value of include_original_edge_id.
+    output_config["include_original_edge_id"] = include_original_edge_id
+
+    # 6. Save the FusedCSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "FusedCSCSamplingGraph"
     output_config["graph_topology"]["path"] = os.path.join(
@@ -196,8 +217,9 @@ def preprocess_ondisk_dataset(
     )
     del output_config["graph"]
 
-    # 6. Load the node/edge features and do necessary conversion.
+    # 7. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
+        has_edge_feature_data = False
         for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
         ):
@@ -209,6 +231,8 @@ def preprocess_ondisk_dataset(
             in_memory = (
                 True if "in_memory" not in feature else feature["in_memory"]
             )
+            if not has_edge_feature_data and feature["domain"] == "edge":
+                has_edge_feature_data = True
             copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
                 os.path.join(dataset_dir, out_feature["path"]),
@@ -217,8 +241,10 @@ def preprocess_ondisk_dataset(
                 in_memory=in_memory,
                 is_feature=True,
             )
+        if has_edge_feature_data and not include_original_edge_id:
+            dgl_warning("Edge feature is stored, but edge IDs are not saved.")
 
-    # 7. Save tasks and train/val/test split according to the output_config.
+    # 8. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
@@ -245,13 +271,24 @@ def preprocess_ondisk_dataset(
                             output_data["format"],
                         )
 
-    # 8. Save the output_config.
+    # 9. Save the output_config.
     output_config_path = os.path.join(dataset_dir, preprocess_metadata_path)
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
 
-    # 9. Return the absolute path of the preprocessing yaml file.
+    # 10. Calculate and save the hash value of the dataset directory.
+    hash_value_file = "dataset_hash_value.txt"
+    hash_value_file_path = os.path.join(
+        dataset_dir, processed_dir_prefix, hash_value_file
+    )
+    if os.path.exists(hash_value_file_path):
+        os.remove(hash_value_file_path)
+    dir_hash = calculate_dir_hash(dataset_dir)
+    with open(hash_value_file_path, "w") as f:
+        f.write(json.dumps(dir_hash, indent=4))
+
+    # 11. Return the absolute path of the preprocessing yaml file.
     return output_config_path
 
 
@@ -308,7 +345,24 @@ class OnDiskTask:
         return self._test_set
 
     def __repr__(self) -> str:
-        return _ondisk_task_str(self)
+        ret = "{Classname}({attributes})"
+
+        attributes_str = ""
+
+        attributes = get_attributes(self)
+        attributes.reverse()
+        for attribute in attributes:
+            if attribute[0] == "_":
+                continue
+            value = getattr(self, attribute)
+            attributes_str += f"{attribute}={value},\n"
+        attributes_str = textwrap.indent(
+            attributes_str, " " * len("OnDiskTask(")
+        ).strip()
+
+        return ret.format(
+            Classname=self.__class__.__name__, attributes=attributes_str
+        )
 
 
 class OnDiskDataset(Dataset):
@@ -398,7 +452,7 @@ class OnDiskDataset(Dataset):
         self,
         path: str,
         include_original_edge_id: bool = False,
-        force_preprocess: bool = False,
+        force_preprocess: bool = None,
     ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
@@ -720,26 +774,4 @@ class BuiltinDataset(OnDiskDataset):
             download(url, path=zip_file_path)
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
-        super().__init__(dataset_dir)
-
-
-def _ondisk_task_str(task: OnDiskTask) -> str:
-    final_str = "OnDiskTask("
-    indent_len = len(final_str)
-
-    def _add_indent(_str, indent):
-        lines = _str.split("\n")
-        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-        return "\n".join(lines)
-
-    attributes = get_attributes(task)
-    attributes.reverse()
-    for name in attributes:
-        if name[0] == "_":
-            continue
-        val = getattr(task, name)
-        final_str += (
-            f"{name}={_add_indent(str(val), indent_len + len(name) + 1)},\n"
-            + " " * indent_len
-        )
-    return final_str[:-indent_len] + ")"
+        super().__init__(dataset_dir, force_preprocess=False)
