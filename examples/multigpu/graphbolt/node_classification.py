@@ -273,8 +273,8 @@ def run(rank, world_size, args, devices, dataset):
     )
 
     # Pin the graph and features to enable GPU access.
-    graph = dataset.graph.to("pinned")
-    features = dataset.feature.to("pinned")
+    graph = dataset.graph.pin_memory_()
+    features = dataset.feature.pin_memory_()
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
