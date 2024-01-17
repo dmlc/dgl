@@ -975,8 +975,37 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""
 
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        cudart = torch.cuda.cudart()
+
         def _pin(x):
-            return x.pin_memory() if hasattr(x, "pin_memory") else x
+            if hasattr(x, "pin_memory_"):
+                x.pin_memory_()
+            elif (
+                isinstance(x, torch.Tensor)
+                and not x.is_pinned()
+                and not x.is_cuda
+                and x.is_contiguous()
+            ):
+                # x.share_memory_()
+                ptr = x.data_ptr()
+                assert (
+                    cudart.cudaHostRegister(
+                        ptr, x.numel() * x.element_size(), 0
+                    )
+                    == 0
+                )
+                # assert x.is_shared()
+                assert x.is_pinned()
+                print(x.is_pinned(), x.is_shared())
+
+                def new_del(self):
+                    assert cudart.cudaHostUnregister(ptr) == 0
+                    torch.Tensor.__del__(self)
+
+                x.__del__ = new_del
+
+            return x
 
         self._apply_to_members(_pin)
 
