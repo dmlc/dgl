@@ -46,8 +46,7 @@ def test_UniformNegativeSampler_invoke():
     def _verify(negative_sampler):
         for data in negative_sampler:
             # Assertation
-            assert data.negative_srcs.size(0) == batch_size
-            assert data.negative_srcs.size(1) == negative_ratio
+            assert data.negative_srcs is None
             assert data.negative_dsts.size(0) == batch_size
             assert data.negative_dsts.size(1) == negative_ratio
 
@@ -90,12 +89,9 @@ def test_Uniform_NegativeSampler(negative_ratio):
         # Assertation
         assert len(pos_src) == batch_size
         assert len(pos_dst) == batch_size
-        assert len(neg_src) == batch_size
         assert len(neg_dst) == batch_size
-        assert neg_src.numel() == batch_size * negative_ratio
+        assert neg_src is None
         assert neg_dst.numel() == batch_size * negative_ratio
-        expected_src = pos_src.repeat(negative_ratio).view(-1, negative_ratio)
-        assert torch.equal(expected_src, neg_src)
 
 
 def get_hetero_graph():
