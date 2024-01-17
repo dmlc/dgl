@@ -54,6 +54,19 @@ class MiniBatch:
       value should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
     """
 
+    seeds: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None
+    """
+    Representation of seed node pairs utilized in link prediction tasks and
+    hyperedge tasks.
+    - If `seeds` is a tensor: It indicates a homogeneous graph where the shape
+      of `seeds` is `N*D` representing N node pairs each with D nodes.
+    - If `seeds` is a dictionary: The keys should be edge type, and the
+      value should be a tensor representing node pairs of the given type.
+    """
+
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the head nodes in the link

@@ -376,6 +376,134 @@ def test_ItemSet_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
     assert torch.all(negs_ids[:-1, 1] <= negs_ids[1:, 1]) is not shuffle
 
 
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSet_seeds(batch_size, shuffle, drop_last):
+    # Node pairs.
+    num_ids = 103
+    seeds = torch.arange(0, 3 * num_ids).reshape(-1, 3)
+    item_set = gb.ItemSet(seeds, names="seeds")
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    seeds_ids = []
+    for i, minibatch in enumerate(item_sampler):
+        assert minibatch.seeds is not None
+        assert isinstance(minibatch.seeds, torch.Tensor)
+        assert minibatch.labels is None
+        is_last = (i + 1) * batch_size >= num_ids
+        if not is_last or num_ids % batch_size == 0:
+            expected_batch_size = batch_size
+        else:
+            if not drop_last:
+                expected_batch_size = num_ids % batch_size
+            else:
+                assert False
+        assert minibatch.seeds.shape == (expected_batch_size, 3)
+        # Verify seeds match.
+        assert torch.equal(minibatch.seeds[:, 0] + 1, minibatch.seeds[:, 1])
+        assert torch.equal(minibatch.seeds[:, 1] + 1, minibatch.seeds[:, 2])
+        # Archive batch.
+        seeds_ids.append(minibatch.seeds)
+    seeds_ids = torch.cat(seeds_ids)
+    assert torch.all(seeds_ids[:-1, 0] <= seeds_ids[1:, 0]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 1] <= seeds_ids[1:, 1]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 2] <= seeds_ids[1:, 2]) is not shuffle
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSet_seeds_labels(batch_size, shuffle, drop_last):
+    # Node pairs and labels
+    num_ids = 103
+    seeds = torch.arange(0, 3 * num_ids).reshape(-1, 3)
+    labels = seeds[:, 0]
+    item_set = gb.ItemSet((seeds, labels), names=("seeds", "labels"))
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    seeds_ids = []
+    labels = []
+    for i, minibatch in enumerate(item_sampler):
+        assert minibatch.seeds is not None
+        assert isinstance(minibatch.seeds, torch.Tensor)
+        assert minibatch.labels is not None
+        label = minibatch.labels
+        assert len(minibatch.seeds) == len(label)
+        is_last = (i + 1) * batch_size >= num_ids
+        if not is_last or num_ids % batch_size == 0:
+            expected_batch_size = batch_size
+        else:
+            if not drop_last:
+                expected_batch_size = num_ids % batch_size
+            else:
+                assert False
+        assert minibatch.seeds.shape == (expected_batch_size, 3)
+        assert len(label) == expected_batch_size
+        # Verify seeds and labels match.
+        assert torch.equal(minibatch.seeds[:, 0] + 1, minibatch.seeds[:, 1])
+        assert torch.equal(minibatch.seeds[:, 1] + 1, minibatch.seeds[:, 2])
+        # Archive batch.
+        seeds_ids.append(minibatch.seeds)
+        labels.append(label)
+    seeds_ids = torch.cat(seeds_ids)
+    labels = torch.cat(labels)
+    assert torch.all(seeds_ids[:-1, 0] <= seeds_ids[1:, 0]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 1] <= seeds_ids[1:, 1]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 2] <= seeds_ids[1:, 2]) is not shuffle
+    assert torch.all(labels[:-1] <= labels[1:]) is not shuffle
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSet_seeds_negative_dsts(batch_size, shuffle, drop_last):
+    # Node pairs and negative destinations.
+    num_ids = 103
+    num_negs = 2
+    seeds = torch.arange(0, 2 * num_ids).reshape(-1, 2)
+    neg_dsts = torch.arange(
+        2 * num_ids, 2 * num_ids + num_ids * num_negs
+    ).reshape(-1, num_negs)
+    item_set = gb.ItemSet((seeds, neg_dsts), names=("seeds", "negative_dsts"))
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    seeds_ids = []
+    negs_ids = []
+    for i, minibatch in enumerate(item_sampler):
+        assert minibatch.seeds is not None
+        assert isinstance(minibatch.seeds, torch.Tensor)
+        assert minibatch.negative_dsts is not None
+        negs = minibatch.negative_dsts
+        is_last = (i + 1) * batch_size >= num_ids
+        if not is_last or num_ids % batch_size == 0:
+            expected_batch_size = batch_size
+        else:
+            if not drop_last:
+                expected_batch_size = num_ids % batch_size
+            else:
+                assert False
+        assert minibatch.seeds.shape == (expected_batch_size, 2)
+        assert negs.dim() == 2
+        assert negs.shape[0] == expected_batch_size
+        assert negs.shape[1] == num_negs
+        # Verify seeds and negative destinations.
+        assert torch.equal(minibatch.seeds[:, 0] + 1, minibatch.seeds[:, 1])
+        assert torch.equal(negs[:, 0] + 1, negs[:, 1])
+        # Archive batch.
+        seeds_ids.append(minibatch.seeds)
+        negs_ids.append(negs)
+    seeds_ids = torch.cat(seeds_ids)
+    negs_ids = torch.cat(negs_ids)
+    assert torch.all(seeds_ids[:-1, 0] <= seeds_ids[1:, 0]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 1] <= seeds_ids[1:, 1]) is not shuffle
+    assert torch.all(negs_ids[:-1, 0] <= negs_ids[1:, 0]) is not shuffle
+    assert torch.all(negs_ids[:-1, 1] <= negs_ids[1:, 1]) is not shuffle
+
+
 def test_append_with_other_datapipes():
     num_ids = 100
     batch_size = 4
@@ -720,6 +848,181 @@ def test_ItemSetDict_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
     negs_ids = torch.cat(negs_ids)
     assert torch.all(src_ids[:-1] <= src_ids[1:]) is not shuffle
     assert torch.all(dst_ids[:-1] <= dst_ids[1:]) is not shuffle
+    assert torch.all(negs_ids[:-1] <= negs_ids[1:]) is not shuffle
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSetDict_seeds(batch_size, shuffle, drop_last):
+    # Node pairs.
+    num_ids = 103
+    total_pairs = 2 * num_ids
+    seeds_like = torch.arange(0, num_ids * 3).reshape(-1, 3)
+    seeds_follow = torch.arange(num_ids * 3, num_ids * 6).reshape(-1, 3)
+    seeds_dict = {
+        "user:like:item": gb.ItemSet(seeds_like, names="seeds"),
+        "user:follow:user": gb.ItemSet(seeds_follow, names="seeds"),
+    }
+    item_set = gb.ItemSetDict(seeds_dict)
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    seeds_ids = []
+    for i, minibatch in enumerate(item_sampler):
+        assert isinstance(minibatch, gb.MiniBatch)
+        assert minibatch.seeds is not None
+        assert minibatch.labels is None
+        is_last = (i + 1) * batch_size >= total_pairs
+        if not is_last or total_pairs % batch_size == 0:
+            expected_batch_size = batch_size
+        else:
+            if not drop_last:
+                expected_batch_size = total_pairs % batch_size
+            else:
+                assert False
+        seeds_lst = []
+        for _, (seeds) in minibatch.seeds.items():
+            assert isinstance(seeds, torch.Tensor)
+            seeds_lst.append(seeds)
+        seeds_lst = torch.cat(seeds_lst)
+        assert seeds_lst.shape == (expected_batch_size, 3)
+        seeds_ids.append(seeds_lst)
+        assert torch.equal(seeds_lst[:, 0] + 1, seeds_lst[:, 1])
+        assert torch.equal(seeds_lst[:, 1] + 1, seeds_lst[:, 2])
+    seeds_ids = torch.cat(seeds_ids)
+    assert torch.all(seeds_ids[:-1, 0] <= seeds_ids[1:, 0]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 1] <= seeds_ids[1:, 1]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 2] <= seeds_ids[1:, 2]) is not shuffle
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSetDict_seeds_labels(batch_size, shuffle, drop_last):
+    # Node pairs and labels
+    num_ids = 103
+    total_ids = 2 * num_ids
+    seeds_like = torch.arange(0, num_ids * 3).reshape(-1, 3)
+    seeds_follow = torch.arange(num_ids * 3, num_ids * 6).reshape(-1, 3)
+    seeds_dict = {
+        "user:like:item": gb.ItemSet(
+            (seeds_like, seeds_like[:, 0]),
+            names=("seeds", "labels"),
+        ),
+        "user:follow:user": gb.ItemSet(
+            (seeds_follow, seeds_follow[:, 0]),
+            names=("seeds", "labels"),
+        ),
+    }
+    item_set = gb.ItemSetDict(seeds_dict)
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    seeds_ids = []
+    labels = []
+    for i, minibatch in enumerate(item_sampler):
+        assert isinstance(minibatch, gb.MiniBatch)
+        assert minibatch.seeds is not None
+        assert minibatch.labels is not None
+        is_last = (i + 1) * batch_size >= total_ids
+        if not is_last or total_ids % batch_size == 0:
+            expected_batch_size = batch_size
+        else:
+            if not drop_last:
+                expected_batch_size = total_ids % batch_size
+            else:
+                assert False
+        seeds_lst = []
+        label = []
+        for _, seeds in minibatch.seeds.items():
+            assert isinstance(seeds, torch.Tensor)
+            seeds_lst.append(seeds)
+        for _, v_label in minibatch.labels.items():
+            label.append(v_label)
+        seeds_lst = torch.cat(seeds_lst)
+        label = torch.cat(label)
+        assert seeds_lst.shape == (expected_batch_size, 3)
+        assert len(label) == expected_batch_size
+        seeds_ids.append(seeds_lst)
+        labels.append(label)
+        assert torch.equal(seeds_lst[:, 0] + 1, seeds_lst[:, 1])
+        assert torch.equal(seeds_lst[:, 1] + 1, seeds_lst[:, 2])
+        assert torch.equal(seeds_lst[:, 0], label)
+    seeds_ids = torch.cat(seeds_ids)
+    labels = torch.cat(labels)
+    assert torch.all(seeds_ids[:-1, 0] <= seeds_ids[1:, 0]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 1] <= seeds_ids[1:, 1]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 2] <= seeds_ids[1:, 2]) is not shuffle
+    assert torch.all(labels[:-1] <= labels[1:]) is not shuffle
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSetDict_seeds_negative_dsts(batch_size, shuffle, drop_last):
+    # Head, tail and negative tails.
+    num_ids = 103
+    total_ids = 2 * num_ids
+    num_negs = 2
+    seeds_like = torch.arange(0, num_ids * 2).reshape(-1, 2)
+    seeds_follow = torch.arange(num_ids * 2, num_ids * 4).reshape(-1, 2)
+    neg_dsts_like = torch.arange(
+        num_ids * 4, num_ids * 4 + num_ids * num_negs
+    ).reshape(-1, num_negs)
+    neg_dsts_follow = torch.arange(
+        num_ids * 4 + num_ids * num_negs, num_ids * 4 + num_ids * num_negs * 2
+    ).reshape(-1, num_negs)
+    data_dict = {
+        "user:like:item": gb.ItemSet(
+            (seeds_like, neg_dsts_like),
+            names=("seeds", "negative_dsts"),
+        ),
+        "user:follow:user": gb.ItemSet(
+            (seeds_follow, neg_dsts_follow),
+            names=("seeds", "negative_dsts"),
+        ),
+    }
+    item_set = gb.ItemSetDict(data_dict)
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    seeds_ids = []
+    negs_ids = []
+    for i, minibatch in enumerate(item_sampler):
+        assert isinstance(minibatch, gb.MiniBatch)
+        assert minibatch.seeds is not None
+        assert minibatch.negative_dsts is not None
+        is_last = (i + 1) * batch_size >= total_ids
+        if not is_last or total_ids % batch_size == 0:
+            expected_batch_size = batch_size
+        else:
+            if not drop_last:
+                expected_batch_size = total_ids % batch_size
+            else:
+                assert False
+        seeds_lst = []
+        negs = []
+        for _, seeds in minibatch.seeds.items():
+            assert isinstance(seeds, torch.Tensor)
+            seeds_lst.append(seeds)
+        for _, v_negs in minibatch.negative_dsts.items():
+            negs.append(v_negs)
+        seeds_lst = torch.cat(seeds_lst)
+        negs = torch.cat(negs)
+        assert seeds_lst.shape == (expected_batch_size, 2)
+        assert len(negs) == expected_batch_size
+        seeds_ids.append(seeds_lst)
+        negs_ids.append(negs)
+        assert negs.dim() == 2
+        assert negs.shape[0] == expected_batch_size
+        assert negs.shape[1] == num_negs
+        assert torch.equal(seeds_lst[:, 0] + 1, seeds_lst[:, 1])
+        assert torch.equal(negs[:, 0] + 1, negs[:, 1])
+    seeds_ids = torch.cat(seeds_ids)
+    negs_ids = torch.cat(negs_ids)
+    assert torch.all(seeds_ids[:-1, 0] <= seeds_ids[1:, 0]) is not shuffle
+    assert torch.all(seeds_ids[:-1, 1] <= seeds_ids[1:, 1]) is not shuffle
     assert torch.all(negs_ids[:-1] <= negs_ids[1:]) is not shuffle
 
 
