@@ -240,7 +240,9 @@ def unique_and_compact_csc_formats(
 def _broadcast_timestamps(csc, dst_timestamps):
     """Broadcast the timestamp of each destination node to its corresponding
     source nodes."""
-    return csc_indptr_to_coo_dst(csc.indptr, dst_timestamps, output_size=len(csc.indices))
+    return csc_indptr_to_coo_dst(
+        csc.indptr, dst_timestamps, output_size=len(csc.indices)
+    )
 
 
 def compact_csc_format(

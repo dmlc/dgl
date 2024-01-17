@@ -271,7 +271,9 @@ def test_csc_indptr_to_coo_dst(nodes, dtype):
         torch_result = torch_csc_indptr_to_coo_dst(indptr, dtype, nodes)
         gb_result = gb.csc_indptr_to_coo_dst(indptr, nodes, dtype)
         assert torch.equal(torch_result, gb_result)
-        gb_result = gb.csc_indptr_to_coo_dst(indptr, nodes, dtype, indptr[-1].item())
+        gb_result = gb.csc_indptr_to_coo_dst(
+            indptr, nodes, dtype, indptr[-1].item()
+        )
         assert torch.equal(torch_result, gb_result)
 
 

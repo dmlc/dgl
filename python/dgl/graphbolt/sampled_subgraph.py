@@ -7,7 +7,13 @@ import torch
 
 from dgl.utils import recursive_apply
 
-from .base import apply_to, csc_indptr_to_coo_dst, CSCFormatBase, etype_str_to_tuple, isin
+from .base import (
+    apply_to,
+    csc_indptr_to_coo_dst,
+    CSCFormatBase,
+    etype_str_to_tuple,
+    isin,
+)
 
 
 __all__ = ["SampledSubgraph"]
