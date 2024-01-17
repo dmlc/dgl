@@ -8,7 +8,7 @@ import torch
 import dgl
 from dgl.utils import recursive_apply
 
-from .base import CSCFormatBase, etype_str_to_tuple
+from .base import etype_str_to_tuple
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
@@ -180,7 +180,7 @@ class MiniBatch:
             return None
 
         is_heterogeneous = isinstance(
-            self.sampled_subgraphs[0].node_pairs, Dict
+            self.sampled_subgraphs[0].sampled_csc, Dict
         )
 
         blocks = []
@@ -194,30 +194,22 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
-                if isinstance(
-                    list(subgraph.node_pairs.values())[0], CSCFormatBase
-                ):
-                    node_pairs = {
-                        etype_str_to_tuple(etype): (
-                            "csc",
-                            (
-                                v.indptr,
-                                v.indices,
-                                torch.arange(
-                                    0,
-                                    v.indptr[-1],
-                                    device=v.indptr.device,
-                                    dtype=v.indptr.dtype,
-                                ),
+                sampled_csc = {
+                    etype_str_to_tuple(etype): (
+                        "csc",
+                        (
+                            v.indptr,
+                            v.indices,
+                            torch.arange(
+                                0,
+                                len(v.indices),
+                                device=v.indptr.device,
+                                dtype=v.indptr.dtype,
                             ),
-                        )
-                        for etype, v in subgraph.node_pairs.items()
-                    }
-                else:
-                    node_pairs = {
-                        etype_str_to_tuple(etype): v
-                        for etype, v in subgraph.node_pairs.items()
-                    }
+                        ),
+                    )
+                    for etype, v in subgraph.sampled_csc.items()
+                }
                 num_src_nodes = {
                     ntype: nodes.size(0)
                     for ntype, nodes in original_row_node_ids.items()
@@ -227,26 +219,25 @@ class MiniBatch:
                     for ntype, nodes in original_column_node_ids.items()
                 }
             else:
-                node_pairs = subgraph.node_pairs
-                if isinstance(subgraph.node_pairs, CSCFormatBase):
-                    node_pairs = (
-                        "csc",
-                        (
-                            node_pairs.indptr,
-                            node_pairs.indices,
-                            torch.arange(
-                                0,
-                                node_pairs.indptr[-1],
-                                device=node_pairs.indptr.device,
-                                dtype=node_pairs.indptr.dtype,
-                            ),
+                sampled_csc = subgraph.sampled_csc
+                sampled_csc = (
+                    "csc",
+                    (
+                        sampled_csc.indptr,
+                        sampled_csc.indices,
+                        torch.arange(
+                            0,
+                            len(sampled_csc.indices),
+                            device=sampled_csc.indptr.device,
+                            dtype=sampled_csc.indptr.dtype,
                         ),
-                    )
+                    ),
+                )
                 num_src_nodes = original_row_node_ids.size(0)
                 num_dst_nodes = original_column_node_ids.size(0)
             blocks.append(
                 dgl.create_block(
-                    node_pairs,
+                    sampled_csc,
                     num_src_nodes=num_src_nodes,
                     num_dst_nodes=num_dst_nodes,
                 )
@@ -308,15 +299,15 @@ class MiniBatch:
             # For homogeneous graph.
             if isinstance(self.compacted_negative_srcs, torch.Tensor):
                 negative_node_pairs = (
-                    self.compacted_negative_srcs.view(-1),
-                    self.compacted_negative_dsts.view(-1),
+                    self.compacted_negative_srcs,
+                    self.compacted_negative_dsts,
                 )
             # For heterogeneous graph.
             else:
                 negative_node_pairs = {
                     etype: (
-                        neg_src.view(-1),
-                        self.compacted_negative_dsts[etype].view(-1),
+                        neg_src,
+                        self.compacted_negative_dsts[etype],
                     )
                     for etype, neg_src in self.compacted_negative_srcs.items()
                 }
@@ -328,10 +319,10 @@ class MiniBatch:
             if isinstance(self.compacted_negative_srcs, torch.Tensor):
                 negative_ratio = self.compacted_negative_srcs.size(1)
                 negative_node_pairs = (
-                    self.compacted_negative_srcs.view(-1),
-                    self.compacted_node_pairs[1].repeat_interleave(
-                        negative_ratio
-                    ),
+                    self.compacted_negative_srcs,
+                    self.compacted_node_pairs[1]
+                    .repeat_interleave(negative_ratio)
+                    .view(-1, negative_ratio),
                 )
             # For heterogeneous graph.
             else:
@@ -340,10 +331,10 @@ class MiniBatch:
                 ].size(1)
                 negative_node_pairs = {
                     etype: (
-                        neg_src.view(-1),
-                        self.compacted_node_pairs[etype][1].repeat_interleave(
-                            negative_ratio
-                        ),
+                        neg_src,
+                        self.compacted_node_pairs[etype][1]
+                        .repeat_interleave(negative_ratio)
+                        .view(-1, negative_ratio),
                     )
                     for etype, neg_src in self.compacted_negative_srcs.items()
                 }
@@ -355,10 +346,10 @@ class MiniBatch:
             if isinstance(self.compacted_negative_dsts, torch.Tensor):
                 negative_ratio = self.compacted_negative_dsts.size(1)
                 negative_node_pairs = (
-                    self.compacted_node_pairs[0].repeat_interleave(
-                        negative_ratio
-                    ),
-                    self.compacted_negative_dsts.view(-1),
+                    self.compacted_node_pairs[0]
+                    .repeat_interleave(negative_ratio)
+                    .view(-1, negative_ratio),
+                    self.compacted_negative_dsts,
                 )
             # For heterogeneous graph.
             else:
@@ -367,10 +358,10 @@ class MiniBatch:
                 ].size(1)
                 negative_node_pairs = {
                     etype: (
-                        self.compacted_node_pairs[etype][0].repeat_interleave(
-                            negative_ratio
-                        ),
-                        neg_dst.view(-1),
+                        self.compacted_node_pairs[etype][0]
+                        .repeat_interleave(negative_ratio)
+                        .view(-1, negative_ratio),
+                        neg_dst,
                     )
                     for etype, neg_dst in self.compacted_negative_dsts.items()
                 }
@@ -405,6 +396,7 @@ class MiniBatch:
                 for etype in positive_node_pairs:
                     pos_src, pos_dst = positive_node_pairs[etype]
                     neg_src, neg_dst = negative_node_pairs[etype]
+                    neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
                     node_pairs_by_etype[etype] = (
                         torch.cat((pos_src, neg_src), dim=0),
                         torch.cat((pos_dst, neg_dst), dim=0),
@@ -419,6 +411,7 @@ class MiniBatch:
                 # Homogeneous graph.
                 pos_src, pos_dst = positive_node_pairs
                 neg_src, neg_dst = negative_node_pairs
+                neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
                 node_pairs = (
                     torch.cat((pos_src, neg_src), dim=0),
                     torch.cat((pos_dst, neg_dst), dim=0),
@@ -433,25 +426,50 @@ class MiniBatch:
         else:
             return None
 
-    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+    def to(self, device: torch.device):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
 
         def _to(x, device):
             return x.to(device) if hasattr(x, "to") else x
 
-        for attr in dir(self):
+        def apply_to(x, device):
+            return recursive_apply(x, lambda x: _to(x, device))
+
+        if self.seed_nodes is not None and self.compacted_node_pairs is None:
+            # Node related tasks.
+            transfer_attrs = [
+                "labels",
+                "sampled_subgraphs",
+                "node_features",
+                "edge_features",
+            ]
+            if self.labels is None:
+                # Layerwise inference
+                transfer_attrs.append("seed_nodes")
+        elif self.seed_nodes is None and self.compacted_node_pairs is not None:
+            # Link/edge related tasks.
+            transfer_attrs = [
+                "labels",
+                "compacted_node_pairs",
+                "compacted_negative_srcs",
+                "compacted_negative_dsts",
+                "sampled_subgraphs",
+                "node_features",
+                "edge_features",
+            ]
+        else:
+            # Otherwise copy all the attributes to the device.
+            transfer_attrs = get_attributes(self)
+
+        for attr in transfer_attrs:
             # Only copy member variables.
-            if not callable(getattr(self, attr)) and not attr.startswith("__"):
-                try:
-                    setattr(
-                        self,
-                        attr,
-                        recursive_apply(
-                            getattr(self, attr), lambda x: _to(x, device)
-                        ),
-                    )
-                except AttributeError:
-                    continue
+            try:
+                # For read-only attributes such as blocks and
+                # node_pairs_with_labels, setattr will throw an AttributeError.
+                # We catch these exceptions and skip those attributes.
+                setattr(self, attr, apply_to(getattr(self, attr), device))
+            except AttributeError:
+                continue
 
         return self
 

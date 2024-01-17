@@ -4,6 +4,7 @@
  * @brief Source file of sampling graph.
  */
 
+#include <graphbolt/cuda_sampling_ops.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
@@ -16,6 +17,7 @@
 #include <tuple>
 #include <vector>
 
+#include "./macro.h"
 #include "./random.h"
 #include "./shared_memory_helper.h"
 #include "./utils.h"
@@ -272,6 +274,14 @@ FusedCSCSamplingGraph::GetState() const {
 
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
+  if (utils::is_on_gpu(nodes) && utils::is_accessible_from_gpu(indptr_) &&
+      utils::is_accessible_from_gpu(indices_) &&
+      (!type_per_edge_.has_value() ||
+       utils::is_accessible_from_gpu(type_per_edge_.value()))) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(c10::DeviceType::CUDA, "InSubgraph", {
+      return ops::InSubgraph(indptr_, indices_, nodes, type_per_edge_);
+    });
+  }
   using namespace torch::indexing;
   const int32_t kDefaultGrainSize = 100;
   const auto num_seeds = nodes.size(0);
@@ -282,14 +292,14 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
   std::vector<torch::Tensor> edge_ids_arr(num_seeds);
   std::vector<torch::Tensor> type_per_edge_arr(num_seeds);
 
-  AT_DISPATCH_INTEGRAL_TYPES(
+  AT_DISPATCH_INDEX_TYPES(
       indptr_.scalar_type(), "InSubgraph", ([&] {
         torch::parallel_for(
             0, num_seeds, kDefaultGrainSize, [&](size_t start, size_t end) {
               for (size_t i = start; i < end; ++i) {
-                const auto node_id = nodes[i].item<scalar_t>();
-                const auto start_idx = indptr_[node_id].item<scalar_t>();
-                const auto end_idx = indptr_[node_id + 1].item<scalar_t>();
+                const auto node_id = nodes[i].item<index_t>();
+                const auto start_idx = indptr_[node_id].item<index_t>();
+                const auto end_idx = indptr_[node_id + 1].item<index_t>();
                 indptr[i + 1] = end_idx - start_idx;
                 original_column_node_ids[i] = node_id;
                 indices_arr[i] = indices_.slice(0, start_idx, end_idx);
@@ -426,6 +436,7 @@ auto GetPickFn(
   };
 }
 
+template <SamplerType S>
 auto GetTemporalPickFn(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     const std::vector<int64_t>& fanouts, bool replace,
@@ -433,30 +444,31 @@ auto GetTemporalPickFn(
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
-    const torch::optional<torch::Tensor>& edge_timestamp) {
-  return [&seed_timestamp, &csc_indices, &fanouts, replace, &options,
-          &type_per_edge, &probs_or_mask, &node_timestamp, &edge_timestamp](
-             int64_t seed_offset, int64_t offset, int64_t num_neighbors,
-             auto picked_data_ptr) {
-    // If fanouts.size() > 1, perform sampling for each edge type of each
-    // node; otherwise just sample once for each node with no regard of edge
-    // types.
-    if (fanouts.size() > 1) {
-      return TemporalPickByEtype(
-          seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
-          fanouts, replace, options, type_per_edge.value(), probs_or_mask,
-          node_timestamp, edge_timestamp, picked_data_ptr);
-    } else {
-      int64_t num_sampled = TemporalPick(
-          seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
-          fanouts[0], replace, options, probs_or_mask, node_timestamp,
-          edge_timestamp, picked_data_ptr);
-      if (type_per_edge) {
-        std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
-      }
-      return num_sampled;
-    }
-  };
+    const torch::optional<torch::Tensor>& edge_timestamp, SamplerArgs<S> args) {
+  return
+      [&seed_timestamp, &csc_indices, &fanouts, replace, &options,
+       &type_per_edge, &probs_or_mask, &node_timestamp, &edge_timestamp, args](
+          int64_t seed_offset, int64_t offset, int64_t num_neighbors,
+          auto picked_data_ptr) {
+        // If fanouts.size() > 1, perform sampling for each edge type of each
+        // node; otherwise just sample once for each node with no regard of edge
+        // types.
+        if (fanouts.size() > 1) {
+          return TemporalPickByEtype(
+              seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
+              fanouts, replace, options, type_per_edge.value(), probs_or_mask,
+              node_timestamp, edge_timestamp, args, picked_data_ptr);
+        } else {
+          int64_t num_sampled = TemporalPick(
+              seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
+              fanouts[0], replace, options, probs_or_mask, node_timestamp,
+              edge_timestamp, args, picked_data_ptr);
+          if (type_per_edge.has_value()) {
+            std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
+          }
+          return num_sampled;
+        }
+      };
 }
 
 template <typename NumPickFn, typename PickFn>
@@ -477,12 +489,12 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   torch::Tensor subgraph_indices;
   torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
 
-  AT_DISPATCH_INTEGRAL_TYPES(
+  AT_DISPATCH_INDEX_TYPES(
       indptr_.scalar_type(), "SampleNeighborsImplWrappedWithIndptr", ([&] {
-        using indptr_t = scalar_t;
-        AT_DISPATCH_INTEGRAL_TYPES(
+        using indptr_t = index_t;
+        AT_DISPATCH_INDEX_TYPES(
             nodes.scalar_type(), "SampleNeighborsImplWrappedWithNodes", ([&] {
-              using nodes_t = scalar_t;
+              using nodes_t = index_t;
               const auto indptr_data = indptr_.data_ptr<indptr_t>();
               auto num_picked_neighbors_data_ptr =
                   num_picked_neighbors_per_node.data_ptr<indptr_t>();
@@ -550,13 +562,13 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 
                         // Step 5. Calculate other attributes and return the
                         // subgraph.
-                        AT_DISPATCH_INTEGRAL_TYPES(
+                        AT_DISPATCH_INDEX_TYPES(
                             subgraph_indices.scalar_type(),
                             "IndexSelectSubgraphIndices", ([&] {
                               auto subgraph_indices_data_ptr =
-                                  subgraph_indices.data_ptr<scalar_t>();
+                                  subgraph_indices.data_ptr<index_t>();
                               auto indices_data_ptr =
-                                  indices_.data_ptr<scalar_t>();
+                                  indices_.data_ptr<index_t>();
                               for (auto i = picked_offset;
                                    i < picked_offset + picked_number; ++i) {
                                 subgraph_indices_data_ptr[i] =
@@ -598,8 +610,27 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
-  auto probs_or_mask = this->EdgeAttribute(probs_name);
-  if (probs_name.has_value()) {
+  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
+  if (probs_name.has_value() && !probs_name.value().empty()) {
+    probs_or_mask = this->EdgeAttribute(probs_name);
+  }
+
+  if (!replace && utils::is_on_gpu(nodes) &&
+      utils::is_accessible_from_gpu(indptr_) &&
+      utils::is_accessible_from_gpu(indices_) &&
+      (!probs_or_mask.has_value() ||
+       utils::is_accessible_from_gpu(probs_or_mask.value())) &&
+      (!type_per_edge_.has_value() ||
+       utils::is_accessible_from_gpu(type_per_edge_.value()))) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+        c10::DeviceType::CUDA, "SampleNeighbors", {
+          return ops::SampleNeighbors(
+              indptr_, indices_, nodes, fanouts, replace, layer, return_eids,
+              type_per_edge_, probs_or_mask);
+        });
+  }
+
+  if (probs_or_mask.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
     // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
     // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
@@ -634,8 +665,8 @@ c10::intrusive_ptr<FusedSampledSubgraph>
 FusedCSCSamplingGraph::TemporalSampleNeighbors(
     const torch::Tensor& input_nodes,
     const torch::Tensor& input_nodes_timestamp,
-    const std::vector<int64_t>& fanouts, bool replace, bool return_eids,
-    torch::optional<std::string> probs_name,
+    const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool return_eids, torch::optional<std::string> probs_name,
     torch::optional<std::string> node_timestamp_attr_name,
     torch::optional<std::string> edge_timestamp_attr_name) const {
   // 1. Get probs_or_mask.
@@ -654,27 +685,31 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
   // 3. Get the timestamp attribute for edges of the graph
   auto edge_timestamp = this->EdgeAttribute(edge_timestamp_attr_name);
   // 4. Call SampleNeighborsImpl
-  return SampleNeighborsImpl(
-      input_nodes, return_eids,
-      GetTemporalNumPickFn(
-          input_nodes_timestamp, this->indices_, fanouts, replace,
-          type_per_edge_, probs_or_mask, node_timestamp, edge_timestamp),
-      GetTemporalPickFn(
-          input_nodes_timestamp, this->indices_, fanouts, replace,
-          indptr_.options(), type_per_edge_, probs_or_mask, node_timestamp,
-          edge_timestamp));
-}
-
-std::tuple<torch::Tensor, torch::Tensor>
-FusedCSCSamplingGraph::SampleNegativeEdgesUniform(
-    const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
-    int64_t negative_ratio, int64_t max_node_id) const {
-  torch::Tensor pos_src;
-  std::tie(pos_src, std::ignore) = node_pairs;
-  auto neg_len = pos_src.size(0) * negative_ratio;
-  auto neg_src = pos_src.repeat(negative_ratio);
-  auto neg_dst = torch::randint(0, max_node_id, {neg_len}, pos_src.options());
-  return std::make_tuple(neg_src, neg_dst);
+  if (layer) {
+    const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
+        static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
+    SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
+    return SampleNeighborsImpl(
+        input_nodes, return_eids,
+        GetTemporalNumPickFn(
+            input_nodes_timestamp, this->indices_, fanouts, replace,
+            type_per_edge_, probs_or_mask, node_timestamp, edge_timestamp),
+        GetTemporalPickFn(
+            input_nodes_timestamp, this->indices_, fanouts, replace,
+            indptr_.options(), type_per_edge_, probs_or_mask, node_timestamp,
+            edge_timestamp, args));
+  } else {
+    SamplerArgs<SamplerType::NEIGHBOR> args;
+    return SampleNeighborsImpl(
+        input_nodes, return_eids,
+        GetTemporalNumPickFn(
+            input_nodes_timestamp, this->indices_, fanouts, replace,
+            type_per_edge_, probs_or_mask, node_timestamp, edge_timestamp),
+        GetTemporalPickFn(
+            input_nodes_timestamp, this->indices_, fanouts, replace,
+            indptr_.options(), type_per_edge_, probs_or_mask, node_timestamp,
+            edge_timestamp, args));
+  }
 }
 
 static c10::intrusive_ptr<FusedCSCSamplingGraph>
@@ -756,10 +791,10 @@ torch::Tensor TemporalMask(
   if (node_timestamp.has_value()) {
     auto neighbor_timestamp =
         node_timestamp.value().index_select(0, csc_indices.slice(0, l, r));
-    mask &= neighbor_timestamp <= seed_timestamp;
+    mask &= neighbor_timestamp < seed_timestamp;
   }
   if (edge_timestamp.has_value()) {
-    mask &= edge_timestamp.value().slice(0, l, r) <= seed_timestamp;
+    mask &= edge_timestamp.value().slice(0, l, r) < seed_timestamp;
   }
   if (probs_or_mask.has_value()) {
     mask &= probs_or_mask.value().slice(0, l, r) != 0;
@@ -1100,11 +1135,12 @@ static torch::Tensor NonUniformPickOp(
 template <typename PickedType>
 inline int64_t NonUniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
-    const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
+    const torch::TensorOptions& options, const torch::Tensor& probs_or_mask,
     PickedType* picked_data_ptr) {
   auto local_probs =
-      probs_or_mask.value().slice(0, offset, offset + num_neighbors);
+      probs_or_mask.size(0) > num_neighbors
+          ? probs_or_mask.slice(0, offset, offset + num_neighbors)
+          : probs_or_mask;
   auto picked_indices = NonUniformPickOp(local_probs, fanout, replace);
   auto picked_indices_ptr = picked_indices.data_ptr<int64_t>();
   for (int i = 0; i < picked_indices.numel(); ++i) {
@@ -1122,7 +1158,7 @@ int64_t Pick(
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr) {
   if (probs_or_mask.has_value()) {
     return NonUniformPick(
-        offset, num_neighbors, fanout, replace, options, probs_or_mask,
+        offset, num_neighbors, fanout, replace, options, probs_or_mask.value(),
         picked_data_ptr);
   } else {
     return UniformPick(
@@ -1130,14 +1166,14 @@ int64_t Pick(
   }
 }
 
-template <typename PickedType>
+template <SamplerType S, typename PickedType>
 int64_t TemporalPick(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     int64_t seed_offset, int64_t offset, int64_t num_neighbors, int64_t fanout,
     bool replace, const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
-    const torch::optional<torch::Tensor>& edge_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp, SamplerArgs<S> args,
     PickedType* picked_data_ptr) {
   auto mask = TemporalMask(
       utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset), csc_indices,
@@ -1150,13 +1186,20 @@ int64_t TemporalPick(
   } else {
     masked_prob = mask.to(torch::kFloat32);
   }
-  auto picked_indices = NonUniformPickOp(masked_prob, fanout, replace);
-  auto picked_indices_ptr = picked_indices.data_ptr<int64_t>();
-  for (int i = 0; i < picked_indices.numel(); ++i) {
-    picked_data_ptr[i] =
-        static_cast<PickedType>(picked_indices_ptr[i]) + offset;
+  if constexpr (S == SamplerType::NEIGHBOR) {
+    auto picked_indices = NonUniformPickOp(masked_prob, fanout, replace);
+    auto picked_indices_ptr = picked_indices.data_ptr<int64_t>();
+    for (int i = 0; i < picked_indices.numel(); ++i) {
+      picked_data_ptr[i] =
+          static_cast<PickedType>(picked_indices_ptr[i]) + offset;
+    }
+    return picked_indices.numel();
   }
-  return picked_indices.numel();
+  if constexpr (S == SamplerType::LABOR) {
+    return Pick(
+        offset, num_neighbors, fanout, replace, options, masked_prob, args,
+        picked_data_ptr);
+  }
 }
 
 template <SamplerType S, typename PickedType>
@@ -1196,7 +1239,7 @@ int64_t PickByEtype(
   return pick_offset;
 }
 
-template <typename PickedType>
+template <SamplerType S, typename PickedType>
 int64_t TemporalPickByEtype(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     int64_t seed_offset, int64_t offset, int64_t num_neighbors,
@@ -1204,7 +1247,7 @@ int64_t TemporalPickByEtype(
     const torch::TensorOptions& options, const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
-    const torch::optional<torch::Tensor>& edge_timestamp,
+    const torch::optional<torch::Tensor>& edge_timestamp, SamplerArgs<S> args,
     PickedType* picked_data_ptr) {
   int64_t etype_begin = offset;
   int64_t etype_end = offset;
@@ -1228,7 +1271,7 @@ int64_t TemporalPickByEtype(
             int64_t picked_count = TemporalPick(
                 seed_timestamp, csc_indices, seed_offset, etype_begin,
                 etype_end - etype_begin, fanout, replace, options,
-                probs_or_mask, node_timestamp, edge_timestamp,
+                probs_or_mask, node_timestamp, edge_timestamp, args,
                 picked_data_ptr + pick_offset);
             pick_offset += picked_count;
           }
@@ -1248,8 +1291,8 @@ int64_t Pick(
   if (probs_or_mask.has_value()) {
     if (fanout < 0) {
       return NonUniformPick(
-          offset, num_neighbors, fanout, replace, options, probs_or_mask,
-          picked_data_ptr);
+          offset, num_neighbors, fanout, replace, options,
+          probs_or_mask.value(), picked_data_ptr);
     } else {
       int64_t picked_count;
       AT_DISPATCH_FLOATING_TYPES(
@@ -1335,10 +1378,13 @@ inline int64_t LaborPick(
   const ProbsType* local_probs_data =
       NonUniform ? probs_or_mask.value().data_ptr<ProbsType>() + offset
                  : nullptr;
-  AT_DISPATCH_INTEGRAL_TYPES(
+  if (NonUniform && probs_or_mask.value().size(0) <= num_neighbors) {
+    local_probs_data -= offset;
+  }
+  AT_DISPATCH_INDEX_TYPES(
       args.indices.scalar_type(), "LaborPickMain", ([&] {
-        const scalar_t* local_indices_data =
-            args.indices.data_ptr<scalar_t>() + offset;
+        const index_t* local_indices_data =
+            args.indices.data_ptr<index_t>() + offset;
         if constexpr (Replace) {
           // [Algorithm] @mfbalin
           // Use a max-heap to get rid of the big random numbers and filter the
@@ -1372,7 +1418,7 @@ inline int64_t LaborPick(
           auto heap_end = heap_data;
           const auto init_count = (num_neighbors + fanout - 1) / num_neighbors;
           auto sample_neighbor_i_with_index_t_jth_time =
-              [&](scalar_t t, int64_t j, uint32_t i) {
+              [&](index_t t, int64_t j, uint32_t i) {
                 auto rnd = labor::jth_sorted_uniform_random(
                     args.random_seed, t, args.num_nodes, j, remaining_data[i],
                     fanout - j);  // r_t

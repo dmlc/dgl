@@ -18,13 +18,16 @@ from torcheval.metrics import BinaryAUROC
 ############################################################################
 # (HIGHLIGHT) Create a single process dataloader with dgl graphbolt package.
 ############################################################################
-def create_dataloader(dateset, device, is_train=True):
+def create_dataloader(dataset, device, is_train=True):
     # The second of two tasks in the dataset is link prediction.
     task = dataset.tasks[1]
     itemset = task.train_set if is_train else task.test_set
 
     # Sample seed edges from the itemset.
     datapipe = gb.ItemSampler(itemset, batch_size=256)
+
+    # Copy the mini-batch to the designated device for sampling and training.
+    datapipe = datapipe.copy_to(device)
 
     if is_train:
         # Sample negative edges for the seed edges.
@@ -46,9 +49,6 @@ def create_dataloader(dateset, device, is_train=True):
     datapipe = datapipe.fetch_feature(
         dataset.feature, node_feature_keys=["feat"]
     )
-
-    # Copy the mini-batch to the designated device for training.
-    datapipe = datapipe.copy_to(device)
 
     # Initiate the dataloader for the datapipe.
     return gb.DataLoader(datapipe)
@@ -93,7 +93,9 @@ def evaluate(model, dataset, device):
         # Forward.
         y = model(data.blocks, x)
         logit = (
-            model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
+            model.predictor(
+                y[compacted_pairs[0].long()] * y[compacted_pairs[1].long()]
+            )
             .squeeze()
             .detach()
         )
@@ -132,7 +134,7 @@ def train(model, dataset, device):
             # Forward.
             y = model(data.blocks, x)
             logits = model.predictor(
-                y[compacted_pairs[0]] * y[compacted_pairs[1]]
+                y[compacted_pairs[0].long()] * y[compacted_pairs[1].long()]
             ).squeeze()
 
             # Compute loss.
@@ -155,6 +157,12 @@ if __name__ == "__main__":
     # Load and preprocess dataset.
     print("Loading data...")
     dataset = gb.BuiltinDataset("cora").load()
+
+    # If a CUDA device is selected, we pin the graph and the features so that
+    # the GPU can access them.
+    if device == torch.device("cuda:0"):
+        dataset.graph.pin_memory_()
+        dataset.feature.pin_memory_()
 
     in_size = dataset.feature.size("node", None, "feat")[0]
     model = GraphSAGE(in_size).to(device)

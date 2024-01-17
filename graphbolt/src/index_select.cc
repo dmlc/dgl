@@ -13,8 +13,7 @@ namespace graphbolt {
 namespace ops {
 
 torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
-  if (input.is_pinned() &&
-      (index.is_pinned() || index.device().type() == c10::DeviceType::CUDA)) {
+  if (utils::is_on_gpu(index) && input.is_pinned()) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "UVAIndexSelect",
         { return UVAIndexSelectImpl(input, index); });
@@ -23,21 +22,15 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
 }
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes) {
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
+    torch::optional<int64_t> output_size) {
   TORCH_CHECK(
       indices.sizes().size() == 1, "IndexSelectCSC only supports 1d tensors");
-  if (indices.is_pinned() && utils::is_accessible_from_gpu(indptr) &&
-      utils::is_accessible_from_gpu(nodes)) {
+  if (utils::is_on_gpu(nodes) && utils::is_accessible_from_gpu(indptr) &&
+      utils::is_accessible_from_gpu(indices)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "UVAIndexSelectCSC",
-        { return UVAIndexSelectCSCImpl(indptr, indices, nodes); });
-  } else if (
-      indices.device().type() == c10::DeviceType::CUDA &&
-      utils::is_accessible_from_gpu(indptr) &&
-      utils::is_accessible_from_gpu(nodes)) {
-    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "nodesSelectCSC",
-        { return IndexSelectCSCImpl(indptr, indices, nodes); });
+        c10::DeviceType::CUDA, "IndexSelectCSCImpl",
+        { return IndexSelectCSCImpl(indptr, indices, nodes, output_size); });
   }
   // @todo: The CPU supports only integer dtypes for indices tensor.
   TORCH_CHECK(

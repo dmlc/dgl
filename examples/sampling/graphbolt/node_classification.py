@@ -50,15 +50,7 @@ from tqdm import tqdm
 
 
 def create_dataloader(
-    graph,
-    features,
-    itemset,
-    batch_size,
-    fanout,
-    device,
-    num_workers,
-    job,
-    output_cscformat,
+    graph, features, itemset, batch_size, fanout, device, num_workers, job
 ):
     """
     [HIGHLIGHT]
@@ -100,6 +92,19 @@ def create_dataloader(
 
     ############################################################################
     # [Step-2]:
+    # self.copy_to()
+    # [Input]:
+    # 'device': The device to copy the data to.
+    # 'extra_attrs': The extra attributes to copy.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device. Copying here
+    # ensures that the rest of the operations run on the GPU.
+    ############################################################################
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+
+    ############################################################################
+    # [Step-3]:
     # self.sample_neighbor()
     # [Input]:
     # 'graph': The network topology for sampling.
@@ -113,13 +118,11 @@ def create_dataloader(
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
     datapipe = datapipe.sample_neighbor(
-        graph,
-        fanout if job != "infer" else [-1],
-        output_cscformat=(output_cscformat == "True"),
+        graph, fanout if job != "infer" else [-1]
     )
 
     ############################################################################
-    # [Step-3]:
+    # [Step-4]:
     # self.fetch_feature()
     # [Input]:
     # 'features': The node features.
@@ -135,17 +138,18 @@ def create_dataloader(
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
-    # [Step-4]:
+    # [Step-5]:
     # self.copy_to()
     # [Input]:
     # 'device': The device to copy the data to.
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=device)
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
-    # [Step-5]:
+    # [Step-6]:
     # gb.DataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
@@ -240,7 +244,6 @@ def layerwise_infer(
         device=args.device,
         num_workers=args.num_workers,
         job="infer",
-        output_cscformat=args.output_cscformat,
     )
     pred = model.inference(graph, features, dataloader, args.device)
     pred = pred[test_set._items[0]]
@@ -268,10 +271,9 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         device=args.device,
         num_workers=args.num_workers,
         job="evaluate",
-        output_cscformat=args.output_cscformat,
     )
 
-    for step, data in tqdm(enumerate(dataloader)):
+    for step, data in tqdm(enumerate(dataloader), "Evaluating"):
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
@@ -295,14 +297,13 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         device=args.device,
         num_workers=args.num_workers,
         job="train",
-        output_cscformat=args.output_cscformat,
     )
 
     for epoch in range(args.epochs):
         t0 = time.time()
         model.train()
         total_loss = 0
-        for step, data in enumerate(dataloader):
+        for step, data in tqdm(enumerate(dataloader), "Training"):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -362,34 +363,30 @@ def parse_args():
         " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
-        "--device",
-        default="cpu",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
-    )
-    parser.add_argument(
-        "--output_cscformat",
-        default="False",
-        choices=["False", "True"],
-        help="Output type of SampledSubgraph. True for csc_formats, False for node_pairs.",
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.storage_device, args.device = args.mode.split("-")
     args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data...")
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
-    graph = dataset.graph
-    # Currently the neighbor-sampling process can only be done on the CPU,
-    # therefore there is no need to copy the graph to the GPU.
-    features = dataset.feature
+    # Move the dataset to the selected storage.
+    graph = dataset.graph.to(args.storage_device)
+    features = dataset.feature.to(args.storage_device)
+
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set

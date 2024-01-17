@@ -5,6 +5,7 @@ from .gpu_cached_feature import *
 from .in_subgraph_sampler import *
 from .legacy_dataset import *
 from .neighbor_sampler import *
+from .temporal_neighbor_sampler import *
 from .ondisk_dataset import *
 from .ondisk_metadata import *
 from .sampled_subgraph_impl import *

@@ -47,7 +47,7 @@ class Graphormer(nn.Module):
         self.spatial_encoder = SpatialEncoder(
             max_dist=num_spatial, num_heads=num_attention_heads
         )
-        self.graph_token_virtual_dist = nn.Embedding(1, num_attention_heads)
+        self.graph_token_virtual_distance = nn.Embedding(1, num_attention_heads)
 
         self.emb_layer_norm = nn.LayerNorm(self.embedding_dim)
 
@@ -112,7 +112,9 @@ class Graphormer(nn.Module):
         attn_bias[:, 1:, 1:, :] = path_encoding + spatial_encoding
 
         # spatial encoding of the virtual node
-        t = self.graph_token_virtual_dist.weight.reshape(1, 1, self.num_heads)
+        t = self.graph_token_virtual_distance.weight.reshape(
+            1, 1, self.num_heads
+        )
         # Since the virtual node comes first, the spatial encodings between it
         # and other nodes will fill the 1st row and 1st column (omit num_graphs
         # and num_heads dimensions) of attn_bias matrix by broadcasting.

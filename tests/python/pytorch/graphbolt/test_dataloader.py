@@ -3,6 +3,7 @@ import backend as F
 import dgl
 import dgl.graphbolt
 import torch
+import torch.multiprocessing as mp
 
 from . import gb_test_utils
 

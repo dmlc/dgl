@@ -1,9 +1,13 @@
 """Utility functions for GraphBolt."""
 
+import hashlib
+import json
 import os
 import shutil
+from typing import List, Union
 
 import numpy as np
+import pandas as pd
 import torch
 from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
@@ -120,3 +124,75 @@ def get_attributes(_obj) -> list:
         and not callable(getattr(_obj, attribute))
     ]
     return attributes
+
+
+def read_edges(dataset_dir, edge_fmt, edge_path):
+    """Read egde data from numpy or csv."""
+    assert edge_fmt in [
+        "numpy",
+        "csv",
+    ], f"`numpy` or `csv` is expected when reading edges but got `{edge_fmt}`."
+    if edge_fmt == "numpy":
+        edge_data = read_data(
+            os.path.join(dataset_dir, edge_path),
+            edge_fmt,
+        )
+        assert (
+            edge_data.shape[0] == 2 and len(edge_data.shape) == 2
+        ), f"The shape of edges should be (2, N), but got {edge_data.shape}."
+        src, dst = edge_data.numpy()
+    else:
+        edge_data = pd.read_csv(
+            os.path.join(dataset_dir, edge_path),
+            names=["src", "dst"],
+        )
+        src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
+    return (src, dst)
+
+
+def calculate_file_hash(file_path, hash_algo="md5"):
+    """Calculate the hash value of a file."""
+    hash_algos = ["md5", "sha1", "sha224", "sha256", "sha384", "sha512"]
+    if hash_algo in hash_algos:
+        hash_obj = getattr(hashlib, hash_algo)()
+    else:
+        raise ValueError(
+            f"Hash algorithm must be one of: {hash_algos}, but got `{hash_algo}`."
+        )
+    with open(file_path, "rb") as file:
+        for chunk in iter(lambda: file.read(4096), b""):
+            hash_obj.update(chunk)
+    return hash_obj.hexdigest()
+
+
+def calculate_dir_hash(
+    dir_path, hash_algo="md5", ignore: Union[str, List[str]] = None
+):
+    """Calculte the hash values of all files under the directory."""
+    hashes = {}
+    for dirpath, _, filenames in os.walk(dir_path):
+        for filename in filenames:
+            if ignore and filename in ignore:
+                continue
+            filepath = os.path.join(dirpath, filename)
+            file_hash = calculate_file_hash(filepath, hash_algo=hash_algo)
+            hashes[filepath] = file_hash
+    return hashes
+
+
+def check_dataset_change(dataset_dir, processed_dir):
+    """Check whether dataset has been changed by checking its hash value."""
+    hash_value_file = "dataset_hash_value.txt"
+    hash_value_file_path = os.path.join(
+        dataset_dir, processed_dir, hash_value_file
+    )
+    if not os.path.exists(hash_value_file_path):
+        return True
+    with open(hash_value_file_path, "r") as f:
+        oringinal_hash_value = json.load(f)
+    present_hash_value = calculate_dir_hash(dataset_dir, ignore=hash_value_file)
+    if oringinal_hash_value == present_hash_value:
+        force_preprocess = False
+    else:
+        force_preprocess = True
+    return force_preprocess
