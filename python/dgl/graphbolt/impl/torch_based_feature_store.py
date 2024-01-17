@@ -85,6 +85,9 @@ class TorchBasedFeature(Feature):
         self._metadata = metadata
 
     def __del__(self):
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
         if hasattr(self, "_is_inplace_pinned"):
             cudart = torch.cuda.cudart()
@@ -177,6 +180,9 @@ class TorchBasedFeature(Feature):
     def pin_memory_(self):
         """In-place operation to copy the feature to pinned memory."""
         self._is_inplace_pinned = set()
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
         x = self._tensor
         if not x.is_pinned() and x.device.type == "cpu" and x.is_contiguous():
