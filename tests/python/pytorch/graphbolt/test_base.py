@@ -248,7 +248,7 @@ def test_isin_non_1D_dim():
         gb.isin(elements, test_elements)
 
 
-def torch_csc_to_coo(indptr, dtype, nodes=None):
+def torch_csc_indptr_to_coo_dst(indptr, dtype, nodes=None):
     if nodes is None:
         nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
     return nodes.to(dtype).repeat_interleave(indptr.diff())
@@ -256,7 +256,7 @@ def torch_csc_to_coo(indptr, dtype, nodes=None):
 
 @pytest.mark.parametrize("nodes", [None, True])
 @pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
-def test_csc_to_coo(nodes, dtype):
+def test_csc_indptr_to_coo_dst(nodes, dtype):
     num_nodes = 13
     if nodes:
         nodes = torch.randint(0, 199, [num_nodes], dtype=dtype, device=F.ctx())
@@ -268,10 +268,10 @@ def test_csc_to_coo(nodes, dtype):
                 degrees.cumsum(0),
             )
         )
-        torch_result = torch_csc_to_coo(indptr, dtype, nodes)
-        gb_result = gb.csc_to_coo(indptr, nodes, dtype)
+        torch_result = torch_csc_indptr_to_coo_dst(indptr, dtype, nodes)
+        gb_result = gb.csc_indptr_to_coo_dst(indptr, nodes, dtype)
         assert torch.equal(torch_result, gb_result)
-        gb_result = gb.csc_to_coo(indptr, nodes, dtype, indptr[-1].item())
+        gb_result = gb.csc_indptr_to_coo_dst(indptr, nodes, dtype, indptr[-1].item())
         assert torch.equal(torch_result, gb_result)
 
 
