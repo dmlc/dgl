@@ -480,18 +480,24 @@ class MiniBatch:
             rows = torch.arange(
                 len(indptr) - 1, device=device
             ).repeat_interleave(indptr.diff())
-            # indptr.diff()
             cols = indices
             edge_index = torch.stack([rows, cols], dim=0)
             return edge_index
 
-        x = self.node_features.get("feat", None)
-        edge_index = None
-        if self.sampled_subgraphs:
-            subgraph = self.sampled_subgraphs[0]
+        edge_indices = []
+        for subgraph in self.sampled_subgraphs:
             edge_index = construct_edge_index(subgraph, device)
+            edge_indices.append(edge_index)
+
+        if edge_indices:
+            combined_edge_index = torch.cat(edge_indices, dim=1)
+        else:
+            combined_edge_index = torch.tensor(
+                [], dtype=torch.long, device=device
+            ).reshape(2, 0)
+        x = self.node_features.get("feat", None)
         labels = self.labels
-        data = Data(x=x, edge_index=edge_index, y=labels)
+        data = Data(x=x, edge_index=combined_edge_index, y=labels)
         return data
 
 
