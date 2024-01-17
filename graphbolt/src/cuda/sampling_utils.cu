@@ -4,7 +4,7 @@
  * @file cuda/sampling_utils.cu
  * @brief Sampling utility function implementations on CUDA.
  */
-#include <thrust/execution_policy.h>
+#include <thrust/for_each.h>
 #include <thrust/iterator/counting_iterator.h>
 
 #include <cub/cub.cuh>
@@ -36,9 +36,6 @@ struct SliceFunc {
 // Returns (indptr[nodes + 1] - indptr[nodes], indptr[nodes])
 std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
     torch::Tensor indptr, torch::Tensor nodes) {
-  auto allocator = cuda::GetAllocator();
-  const auto exec_policy =
-      thrust::cuda::par_nosync(allocator).on(cuda::GetCurrentStream());
   const int64_t num_nodes = nodes.size(0);
   // Read indptr only once in case it is pinned and access is slow.
   auto sliced_indptr =
@@ -53,8 +50,8 @@ std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
         AT_DISPATCH_INDEX_TYPES(
             nodes.scalar_type(), "IndexSelectCSCNodes", ([&] {
               using nodes_t = index_t;
-              thrust::for_each(
-                  exec_policy, iota, iota + num_nodes,
+              THRUST_CALL(
+                  for_each, iota, iota + num_nodes,
                   SliceFunc<indptr_t, nodes_t>{
                       nodes.data_ptr<nodes_t>(), indptr.data_ptr<indptr_t>(),
                       in_degree.data_ptr<indptr_t>(),
@@ -92,9 +89,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
   auto new_sub_indptr = torch::empty(num_rows + 1, sub_indptr.options());
   auto new_indegree = torch::empty(num_rows + 2, sub_indptr.options());
   auto new_sliced_indptr = torch::empty(num_rows, sliced_indptr.options());
-  auto allocator = cuda::GetAllocator();
-  auto stream = cuda::GetCurrentStream();
-  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
   thrust::counting_iterator<int64_t> iota(0);
   AT_DISPATCH_INTEGRAL_TYPES(
       sub_indptr.scalar_type(), "SliceCSCIndptrHeteroIndptr", ([&] {
@@ -102,8 +96,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
         AT_DISPATCH_INTEGRAL_TYPES(
             etypes.scalar_type(), "SliceCSCIndptrHeteroTypePerEdge", ([&] {
               using etype_t = scalar_t;
-              thrust::for_each(
-                  exec_policy, iota, iota + num_rows,
+              THRUST_CALL(
+                  for_each, iota, iota + num_rows,
                   EdgeTypeSearch<indptr_t, etype_t>{
                       sub_indptr.data_ptr<indptr_t>(),
                       sliced_indptr.data_ptr<indptr_t>(),
@@ -111,17 +105,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
                       new_sub_indptr.data_ptr<indptr_t>(),
                       new_sliced_indptr.data_ptr<indptr_t>()});
             }));
-        size_t tmp_storage_size = 0;
-        cub::DeviceAdjacentDifference::SubtractLeftCopy(
-            nullptr, tmp_storage_size, new_sub_indptr.data_ptr<indptr_t>(),
-            new_indegree.data_ptr<indptr_t>(), num_rows + 1, cub::Difference{},
-            stream);
-        auto tmp_storage = allocator.AllocateStorage<char>(tmp_storage_size);
-        cub::DeviceAdjacentDifference::SubtractLeftCopy(
-            tmp_storage.get(), tmp_storage_size,
+        CUB_CALL(
+            DeviceAdjacentDifference::SubtractLeftCopy,
             new_sub_indptr.data_ptr<indptr_t>(),
-            new_indegree.data_ptr<indptr_t>(), num_rows + 1, cub::Difference{},
-            stream);
+            new_indegree.data_ptr<indptr_t>(), num_rows + 1, cub::Difference{});
       }));
   // Discard the first element of the SubtractLeftCopy result and ensure that
   // new_indegree tensor has size num_rows + 1 so that its ExclusiveCumSum is

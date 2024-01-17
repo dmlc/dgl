@@ -52,9 +52,6 @@ TORCH_LIBRARY(graphbolt, m) {
       .def(
           "temporal_sample_neighbors",
           &FusedCSCSamplingGraph::TemporalSampleNeighbors)
-      .def(
-          "sample_negative_edges_uniform",
-          &FusedCSCSamplingGraph::SampleNegativeEdgesUniform)
       .def("copy_to_shared_memory", &FusedCSCSamplingGraph::CopyToSharedMemory)
       .def_pickle(
           // __getstate__

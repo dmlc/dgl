@@ -876,7 +876,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         pairs according to a uniform distribution. For each edge ``(u, v)``,
         it is supposed to generate `negative_ratio` pairs of negative edges
         ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
-        the graph.
+        the graph. As ``u`` is exactly same as the corresponding positive edges,
+        it returns None for negative sources.
 
         Parameters
         ----------
@@ -903,23 +904,22 @@ class FusedCSCSamplingGraph(SamplingGraph):
             `edge_type`. Note that negative refers to false negatives, which
             means the edge could be present or not present in the graph.
         """
-        if edge_type is not None:
-            assert (
-                self.node_type_offset is not None
-            ), "The 'node_type_offset' array is necessary for performing \
-                negative sampling by edge type."
-            _, _, dst_node_type = etype_str_to_tuple(edge_type)
-            dst_node_type_id = self.node_type_to_id[dst_node_type]
-            offset = self._node_type_offset_list
-            max_node_id = (
-                offset[dst_node_type_id + 1] - offset[dst_node_type_id]
-            )
+        if edge_type:
+            _, _, dst_ntype = etype_str_to_tuple(edge_type)
+            max_node_id = self.num_nodes[dst_ntype]
         else:
             max_node_id = self.total_num_nodes
-        return self._c_csc_graph.sample_negative_edges_uniform(
-            node_pairs,
-            negative_ratio,
-            max_node_id,
+        pos_src, _ = node_pairs
+        num_negative = pos_src.size(0) * negative_ratio
+        return (
+            None,
+            torch.randint(
+                0,
+                max_node_id,
+                (num_negative,),
+                dtype=pos_src.dtype,
+                device=pos_src.device,
+            ),
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
@@ -956,7 +956,21 @@ class FusedCSCSamplingGraph(SamplingGraph):
         def _to(x):
             return x.to(device) if hasattr(x, "to") else x
 
-        return self._apply_to_members(_to)
+        def _pin(x):
+            return x.pin_memory() if hasattr(x, "pin_memory") else x
+
+        # Create a copy of self.
+        self2 = fused_csc_sampling_graph(
+            self.csc_indptr,
+            self.indices,
+            self.node_type_offset,
+            self.type_per_edge,
+            self.node_type_to_id,
+            self.edge_type_to_id,
+            self.node_attributes,
+            self.edge_attributes,
+        )
+        return self2._apply_to_members(_pin if device == "pinned" else _to)
 
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""

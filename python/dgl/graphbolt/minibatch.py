@@ -299,15 +299,15 @@ class MiniBatch:
             # For homogeneous graph.
             if isinstance(self.compacted_negative_srcs, torch.Tensor):
                 negative_node_pairs = (
-                    self.compacted_negative_srcs.view(-1),
-                    self.compacted_negative_dsts.view(-1),
+                    self.compacted_negative_srcs,
+                    self.compacted_negative_dsts,
                 )
             # For heterogeneous graph.
             else:
                 negative_node_pairs = {
                     etype: (
-                        neg_src.view(-1),
-                        self.compacted_negative_dsts[etype].view(-1),
+                        neg_src,
+                        self.compacted_negative_dsts[etype],
                     )
                     for etype, neg_src in self.compacted_negative_srcs.items()
                 }
@@ -319,10 +319,10 @@ class MiniBatch:
             if isinstance(self.compacted_negative_srcs, torch.Tensor):
                 negative_ratio = self.compacted_negative_srcs.size(1)
                 negative_node_pairs = (
-                    self.compacted_negative_srcs.view(-1),
-                    self.compacted_node_pairs[1].repeat_interleave(
-                        negative_ratio
-                    ),
+                    self.compacted_negative_srcs,
+                    self.compacted_node_pairs[1]
+                    .repeat_interleave(negative_ratio)
+                    .view(-1, negative_ratio),
                 )
             # For heterogeneous graph.
             else:
@@ -331,10 +331,10 @@ class MiniBatch:
                 ].size(1)
                 negative_node_pairs = {
                     etype: (
-                        neg_src.view(-1),
-                        self.compacted_node_pairs[etype][1].repeat_interleave(
-                            negative_ratio
-                        ),
+                        neg_src,
+                        self.compacted_node_pairs[etype][1]
+                        .repeat_interleave(negative_ratio)
+                        .view(-1, negative_ratio),
                     )
                     for etype, neg_src in self.compacted_negative_srcs.items()
                 }
@@ -346,10 +346,10 @@ class MiniBatch:
             if isinstance(self.compacted_negative_dsts, torch.Tensor):
                 negative_ratio = self.compacted_negative_dsts.size(1)
                 negative_node_pairs = (
-                    self.compacted_node_pairs[0].repeat_interleave(
-                        negative_ratio
-                    ),
-                    self.compacted_negative_dsts.view(-1),
+                    self.compacted_node_pairs[0]
+                    .repeat_interleave(negative_ratio)
+                    .view(-1, negative_ratio),
+                    self.compacted_negative_dsts,
                 )
             # For heterogeneous graph.
             else:
@@ -358,10 +358,10 @@ class MiniBatch:
                 ].size(1)
                 negative_node_pairs = {
                     etype: (
-                        self.compacted_node_pairs[etype][0].repeat_interleave(
-                            negative_ratio
-                        ),
-                        neg_dst.view(-1),
+                        self.compacted_node_pairs[etype][0]
+                        .repeat_interleave(negative_ratio)
+                        .view(-1, negative_ratio),
+                        neg_dst,
                     )
                     for etype, neg_dst in self.compacted_negative_dsts.items()
                 }
@@ -396,6 +396,7 @@ class MiniBatch:
                 for etype in positive_node_pairs:
                     pos_src, pos_dst = positive_node_pairs[etype]
                     neg_src, neg_dst = negative_node_pairs[etype]
+                    neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
                     node_pairs_by_etype[etype] = (
                         torch.cat((pos_src, neg_src), dim=0),
                         torch.cat((pos_dst, neg_dst), dim=0),
@@ -410,6 +411,7 @@ class MiniBatch:
                 # Homogeneous graph.
                 pos_src, pos_dst = positive_node_pairs
                 neg_src, neg_dst = negative_node_pairs
+                neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
                 node_pairs = (
                     torch.cat((pos_src, neg_src), dim=0),
                     torch.cat((pos_dst, neg_dst), dim=0),
