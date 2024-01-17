@@ -195,7 +195,7 @@ class TorchBasedFeature(Feature):
         # copy.copy is a shallow copy so it does not copy tensor memory.
         self2 = copy.copy(self)
         if device == "pinned":
-            self2._tensor = self2.pin_memory()
+            self2._tensor = self2._tensor.pin_memory()
         else:
             self2._tensor = self2._tensor.to(device)
         return self2
