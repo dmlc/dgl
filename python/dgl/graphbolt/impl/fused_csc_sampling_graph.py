@@ -990,8 +990,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             if hasattr(x, "pin_memory_"):
                 x.pin_memory_()
             elif (
-                isinstance(x, torch.Tensor)
-                and not x.is_pinned()
+                not x.is_pinned()
                 and x.device.type == "cpu"
                 and x.is_contiguous()
             ):
