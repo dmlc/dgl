@@ -141,6 +141,16 @@ class DataLoader(torch.utils.data.DataLoader):
         If True, the data loader will not shut down the worker processes after a
         dataset has been consumed once. This allows to maintain the workers
         instances alive.
+    overlap_feature_fetch : bool, optional
+        If True, the data loader will overlap the UVA feature fetcher operations
+        with the rest of operations by using an alternative CUDA stream. Default
+        is True.
+    max_uva_threads : int, optional
+        Limits the number of CUDA threads used for UVA copies so that the rest
+        of the computations can run simultaneously with it. Setting it to a too
+        high value will limit the amount of overlap while setting it too low may
+        cause the PCI-e bandwidth to not get fully utilized. Manually tuned
+        default is 6144, meaning around 3-4 Streaming Multiprocessors.
     """
 
     def __init__(

@@ -56,7 +56,7 @@ class FeatureFetcher(MiniBatchTransformer):
         self.edge_feature_keys = edge_feature_keys
         self.stream = None
 
-    def _read_helper(self, data, stream):
+    def _read_data(self, data, stream):
         """
         Fill in the node/edge features field in data.
 
@@ -162,7 +162,7 @@ class FeatureFetcher(MiniBatchTransformer):
             current_stream = torch.cuda.current_stream()
             self.stream.wait_stream(current_stream)
         with torch.cuda.stream(self.stream):
-            data = self._read_helper(data, current_stream)
+            data = self._read_data(data, current_stream)
             if self.stream is not None:
                 event = torch.cuda.current_stream().record_event()
 
