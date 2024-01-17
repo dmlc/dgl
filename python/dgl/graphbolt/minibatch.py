@@ -59,12 +59,25 @@ class MiniBatch:
         Dict[str, torch.Tensor],
     ] = None
     """
-    Representation of seed node pairs utilized in link prediction tasks and
-    hyperedge tasks.
-    - If `seeds` is a tensor: It indicates a homogeneous graph where the shape
-      of `seeds` is `N*D` representing N node pairs each with D nodes.
-    - If `seeds` is a dictionary: The keys should be edge type, and the
-      value should be a tensor representing node pairs of the given type.
+    Representation of seed items utilized in node classification tasks, link
+    prediction tasks and hyperlinks tasks.
+    - If `seeds` is a tensor: it indicates that the seeds originate from a
+      homogeneous graph. It can be either a 1-dimensional or 2-dimensional
+      tensor:
+        - 1-dimensional tensor: Each element directly represents a seed node
+          within the graph.
+        - 2-dimensional tensor: Each row designates a seed item, which can
+          encompass various entities such as edges, hyperlinks, or other graph
+          components depending on the specific context.
+    - If `seeds` is a dictionary: it indicates that the seeds originate from a
+      heterogeneous graph. The keys should be edge or node type, and the value
+      should be a tensor, which can be either a 1-dimensional or 2-dimensional
+      tensor:
+        - 1-dimensional tensor: Each element directly represents a seed node
+        of the given type within the graph.
+        - 2-dimensional tensor: Each row designates a seed item of the given
+          type, which can encompass various entities such as edges, hyperlinks,
+          or other graph components depending on the specific context.
     """
 
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
