@@ -84,6 +84,13 @@ class TorchBasedFeature(Feature):
         self._tensor = torch_feature.contiguous()
         self._metadata = metadata
 
+    def __del__(self):
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        if hasattr(self, "_is_inplace_pinned"):
+            cudart = torch.cuda.cudart()
+            for tensor in self._is_inplace_pinned:
+                assert cudart.cudaHostUnregister(tensor.data_ptr()) == 0
+
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
 
@@ -169,14 +176,24 @@ class TorchBasedFeature(Feature):
 
     def pin_memory_(self):
         """In-place operation to copy the feature to pinned memory."""
-        self._tensor = self._tensor.pin_memory()
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        x = self._tensor
+        if not x.is_pinned() and x.device.type == "cpu" and x.is_contiguous():
+            assert (
+                torch.cuda.cudart().cudaHostRegister(
+                    x.data_ptr(), x.numel() * x.element_size(), 0
+                )
+                == 0
+            )
+
+            self._is_inplace_pinned.add(x)
 
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `TorchBasedFeature` to the specified device."""
         # copy.copy is a shallow copy so it does not copy tensor memory.
         self2 = copy.copy(self)
         if device == "pinned":
-            self2.pin_memory_()
+            self2._tensor = self2.pin_memory()
         else:
             self2._tensor = self2._tensor.to(device)
         return self2

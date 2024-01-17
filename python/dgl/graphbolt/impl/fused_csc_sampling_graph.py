@@ -35,6 +35,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
         super().__init__()
         self._c_csc_graph = c_csc_graph
 
+    def __del__(self):
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        if hasattr(self, "_is_inplace_pinned"):
+            cudart = torch.cuda.cudart()
+            for tensor in self._is_inplace_pinned:
+                assert cudart.cudaHostUnregister(tensor.data_ptr()) == 0
+
     @property
     def total_num_nodes(self) -> int:
         """Returns the number of nodes in the graph.
@@ -974,6 +981,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""
+        self._is_inplace_pinned = set()
 
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
         cudart = torch.cuda.cudart()
@@ -984,26 +992,17 @@ class FusedCSCSamplingGraph(SamplingGraph):
             elif (
                 isinstance(x, torch.Tensor)
                 and not x.is_pinned()
-                and not x.is_cuda
+                and x.device.type == "cpu"
                 and x.is_contiguous()
             ):
-                # x.share_memory_()
-                ptr = x.data_ptr()
                 assert (
                     cudart.cudaHostRegister(
-                        ptr, x.numel() * x.element_size(), 0
+                        x.data_ptr(), x.numel() * x.element_size(), 0
                     )
                     == 0
                 )
-                # assert x.is_shared()
-                assert x.is_pinned()
-                print(x.is_pinned(), x.is_shared())
 
-                def new_del(self):
-                    assert cudart.cudaHostUnregister(ptr) == 0
-                    torch.Tensor.__del__(self)
-
-                x.__del__ = new_del
+                self._is_inplace_pinned.add(x)
 
             return x
 
