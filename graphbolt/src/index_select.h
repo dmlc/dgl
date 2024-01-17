@@ -25,11 +25,13 @@ namespace ops {
  * @param indptr Indptr tensor containing offsets with shape (N,).
  * @param indices Indices tensor with edge information of shape (indptr[N],).
  * @param nodes Nodes tensor with shape (M,).
+ * @param output_size The total number of edges being copied.
  * @return (torch::Tensor, torch::Tensor) Output indptr and indices tensors of
  * shapes (M + 1,) and ((indptr[nodes + 1] - indptr[nodes]).sum(),).
  */
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
+    torch::optional<int64_t> output_size = torch::nullopt);
 
 /**
  * @brief Select rows from input tensor according to index tensor.
