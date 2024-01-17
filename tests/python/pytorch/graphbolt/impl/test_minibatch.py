@@ -2,6 +2,7 @@ import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
+from torch_geometric.data import Data
 
 
 relation = "A:r:B"
@@ -57,8 +58,7 @@ def test_minibatch_representation_homo():
     labels = torch.tensor([0.0, 1.0, 2.0])
     # Test minibatch without data.
     minibatch = gb.MiniBatch()
-    expect_result = str(
-        """MiniBatch(seed_nodes=None,
+    expect_result = str("""MiniBatch(seed_nodes=None,
           sampled_subgraphs=None,
           positive_node_pairs=None,
           node_pairs_with_labels=None,
@@ -74,8 +74,7 @@ def test_minibatch_representation_homo():
           compacted_negative_srcs=None,
           compacted_negative_dsts=None,
           blocks=None,
-       )"""
-    )
+       )""")
     result = str(minibatch)
     assert result == expect_result, print(len(expect_result), len(result))
     # Test minibatch with all attributes.
@@ -92,8 +91,7 @@ def test_minibatch_representation_homo():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    expect_result = str(
-        """MiniBatch(seed_nodes=None,
+    expect_result = str("""MiniBatch(seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6]),
                                                                          indices=tensor([0, 1, 2, 2, 1, 2]),
                                                            ),
@@ -149,8 +147,7 @@ def test_minibatch_representation_homo():
                                           [0]]),
           blocks=[Block(num_src_nodes=4, num_dst_nodes=4, num_edges=6),
                  Block(num_src_nodes=3, num_dst_nodes=2, num_edges=3)],
-       )"""
-    )
+       )""")
     result = str(minibatch)
     assert result == expect_result, print(expect_result, result)
 
@@ -241,8 +238,7 @@ def test_minibatch_representation_hetero():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    expect_result = str(
-        """MiniBatch(seed_nodes={'B': tensor([10, 15])},
+    expect_result = str("""MiniBatch(seed_nodes={'B': tensor([10, 15])},
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
                                                                          indices=tensor([0, 1, 1]),
                                                            ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2]),
@@ -313,8 +309,7 @@ def test_minibatch_representation_hetero():
                        num_dst_nodes={'B': 2},
                        num_edges={('A', 'r', 'B'): 2},
                        metagraph=[('A', 'B', 'r')])],
-       )"""
-    )
+       )""")
     result = str(minibatch)
     assert result == expect_result, print(result)
 
@@ -486,15 +481,13 @@ def test_get_dgl_blocks_hetero():
         compacted_negative_dsts=compacted_negative_dsts,
     )
     dgl_blocks = minibatch.blocks
-    expect_result = str(
-        """[Block(num_src_nodes={'A': 4, 'B': 3},
+    expect_result = str("""[Block(num_src_nodes={'A': 4, 'B': 3},
       num_dst_nodes={'A': 4, 'B': 3},
       num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
       metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]), Block(num_src_nodes={'A': 2, 'B': 2},
       num_dst_nodes={'B': 2},
       num_edges={('A', 'r', 'B'): 2},
-      metagraph=[('A', 'B', 'r')])]"""
-    )
+      metagraph=[('A', 'B', 'r')])]""")
     result = str(dgl_blocks)
     assert result == expect_result, print(result)
 
@@ -850,3 +843,49 @@ def test_dgl_link_predication_hetero(mode):
                 minibatch.negative_node_pairs[etype][1],
                 minibatch.compacted_negative_dsts[etype],
             )
+
+
+def test_to_pyg_adapter():
+    def construct_edge_index(sampled_subgraph, device):
+        csc = sampled_subgraph.sampled_csc
+        indices = csc.indices.to(device)
+        indptr = csc.indptr.to(device)
+        rows = torch.arange(len(indptr) - 1, device=device).repeat_interleave(
+            indptr.diff()
+        )
+        cols = indices
+        edge_index = torch.stack([rows, cols], dim=0)
+        return edge_index
+
+    minibatch = create_homo_minibatch()
+    minibatch.node_features = {"feat": torch.randint(0, 10, (4,))}
+    node_features = minibatch.node_features["feat"]
+    labels = minibatch.labels
+    pyg_data = minibatch.to_pyg_adapter(device=torch.device("cpu"))
+    assert isinstance(pyg_data, Data), "The result should be a PyG Data object."
+    assert pyg_data.x is not None, "Node features in PyG Data object is None"
+    assert torch.equal(
+        pyg_data.x, node_features
+    ), "Node features not correctly converted."
+
+    if labels is not None:
+        assert pyg_data.y is not None, "Labels in PyG Data object is None"
+        assert torch.equal(
+            pyg_data.y, labels
+        ), "Labels not correctly converted."
+    else:
+        assert pyg_data.y is None, "Labels should be None in PyG Data object"
+
+    edge_index_list = []
+    for subgraph in minibatch.sampled_subgraphs:
+        edge_index = construct_edge_index(subgraph, "cpu")
+        edge_index_list.append(edge_index)
+
+    edge_index = torch.cat(edge_index_list, dim=1)
+
+    assert torch.equal(
+        pyg_data.edge_index, edge_index
+    ), "Edge index not correctly converted."
+
+
+test_to_pyg_adapter()
