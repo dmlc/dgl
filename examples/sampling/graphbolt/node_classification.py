@@ -384,10 +384,8 @@ def main(args):
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
     # Move the dataset to the selected storage.
-    # graph = dataset.graph.to(args.storage_device)
+    graph = dataset.graph.to(args.storage_device)
     features = dataset.feature.to(args.storage_device)
-    dataset.graph.pin_memory_()
-    graph = dataset.graph
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set

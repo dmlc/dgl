@@ -176,6 +176,7 @@ class TorchBasedFeature(Feature):
 
     def pin_memory_(self):
         """In-place operation to copy the feature to pinned memory."""
+        self._is_inplace_pinned = set()
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
         x = self._tensor
         if not x.is_pinned() and x.device.type == "cpu" and x.is_contiguous():
