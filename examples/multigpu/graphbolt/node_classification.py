@@ -273,8 +273,8 @@ def run(rank, world_size, args, devices, dataset):
     )
 
     # Pin the graph and features to enable GPU access.
-    graph = dataset.graph.pin_memory_()
-    features = dataset.feature.pin_memory_()
+    dataset.graph.pin_memory_()
+    dataset.feature.pin_memory_()
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
@@ -282,7 +282,7 @@ def run(rank, world_size, args, devices, dataset):
     args.fanout = list(map(int, args.fanout.split(",")))
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    in_size = features.size("node", None, "feat")[0]
+    in_size = dataset.feature.size("node", None, "feat")[0]
     hidden_size = 256
     out_size = num_classes
 
@@ -293,8 +293,8 @@ def run(rank, world_size, args, devices, dataset):
     # Create data loaders.
     train_dataloader = create_dataloader(
         args,
-        graph,
-        features,
+        dataset.graph,
+        dataset.feature,
         train_set,
         device,
         drop_last=False,
@@ -303,8 +303,8 @@ def run(rank, world_size, args, devices, dataset):
     )
     valid_dataloader = create_dataloader(
         args,
-        graph,
-        features,
+        dataset.graph,
+        dataset.feature,
         valid_set,
         device,
         drop_last=False,
@@ -313,8 +313,8 @@ def run(rank, world_size, args, devices, dataset):
     )
     test_dataloader = create_dataloader(
         args,
-        graph,
-        features,
+        dataset.graph,
+        dataset.feature,
         test_set,
         device,
         drop_last=False,
