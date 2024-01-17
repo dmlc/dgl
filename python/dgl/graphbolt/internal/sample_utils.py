@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 
-from ..base import csc_indptr_to_coo_dst, CSCFormatBase, etype_str_to_tuple
+from ..base import CSCFormatBase, etype_str_to_tuple, expand_indptr
 
 
 def unique_and_compact(
@@ -240,7 +240,7 @@ def unique_and_compact_csc_formats(
 def _broadcast_timestamps(csc, dst_timestamps):
     """Broadcast the timestamp of each destination node to its corresponding
     source nodes."""
-    return csc_indptr_to_coo_dst(
+    return expand_indptr(
         csc.indptr, dst_timestamps, output_size=len(csc.indices)
     )
 

@@ -15,7 +15,7 @@ __all__ = [
     "etype_tuple_to_str",
     "CopyTo",
     "isin",
-    "csc_indptr_to_coo_dst",
+    "expand_indptr",
     "CSCFormatBase",
     "seed",
 ]
@@ -57,7 +57,7 @@ def isin(elements, test_elements):
     return torch.ops.graphbolt.isin(elements, test_elements)
 
 
-def csc_indptr_to_coo_dst(indptr, node_ids=None, dtype=None, output_size=None):
+def expand_indptr(indptr, node_ids=None, dtype=None, output_size=None):
     """Converts a given indptr offset tensor to a COO format tensor. If
     node_ids is not given, it is assumed to be equal to
     torch.arange(indptr.size(0) - 1, dtype=dtype, device=indptr.device).
