@@ -208,6 +208,10 @@ class TorchBasedFeature(Feature):
             self2._tensor = self2._tensor.to(device)
         return self2
 
+    def record_stream(self, stream):
+        """Record the given stream in the Feature."""
+        self._tensor.record_stream(stream)
+
     def __repr__(self) -> str:
         ret = (
             "{Classname}(\n"
@@ -299,6 +303,11 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         self2 = copy.copy(self)
         self2._features = {k: v.to(device) for k, v in self2._features.items()}
         return self2
+
+    def record_stream(self, stream):
+        """Record the given stream in all the stored Features."""
+        for feature in self._features.values():
+            feature.record_stream(stream)
 
     def __repr__(self) -> str:
         ret = "{Classname}(\n" + "    {features}\n" + ")"
