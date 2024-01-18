@@ -8,7 +8,7 @@ import torch
 import dgl
 from dgl.utils import recursive_apply
 
-from .base import etype_str_to_tuple
+from .base import etype_str_to_tuple,expand_indptr
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
@@ -522,9 +522,7 @@ class MiniBatch:
             csc_matrix = subgraph.sampled_csc
             indices = csc_matrix.indices.to(device)
             indptr = csc_matrix.indptr.to(device)
-            row_indices = torch.arange(
-                len(indptr) - 1, device=device
-            ).repeat_interleave(indptr.diff())
+            row_indices = expand_indptr(indptr, dtype=indices.dtype, output_size=len(indices))
             col_indices = indices
             return torch.stack([row_indices, col_indices], dim=0)
 
