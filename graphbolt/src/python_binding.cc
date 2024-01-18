@@ -15,6 +15,10 @@
 #include "./index_select.h"
 #include "./random.h"
 
+#ifdef GRAPHBOLT_USE_CUDA
+#include "./cuda/gpu_cache.h"
+#endif
+
 namespace graphbolt {
 namespace sampling {
 
@@ -70,6 +74,12 @@ TORCH_LIBRARY(graphbolt, m) {
             g->SetState(state);
             return g;
           });
+#ifdef GRAPHBOLT_USE_CUDA
+  m.class_<cuda::GpuCache>("GpuCache")
+      .def("query", &cuda::GpuCache::Query)
+      .def("replace", &cuda::GpuCache::Replace);
+  m.def("gpu_cache", &cuda::GpuCache::Create);
+#endif
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
