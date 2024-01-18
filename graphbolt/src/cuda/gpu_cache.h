@@ -46,17 +46,19 @@ class GpuCache : public torch::CustomClassHolder {
       const std::vector<int64_t>& shape, torch::ScalarType dtype);
 
  private:
-  std::vector<int64_t> shape;
-  torch::ScalarType dtype;
-  std::unique_ptr<gpu_cache_t> cache;
-  int64_t num_bytes;
-  int64_t num_float_feats;
-  torch::DeviceIndex device_id;
+  std::vector<int64_t> shape_;
+  torch::ScalarType dtype_;
+  std::unique_ptr<gpu_cache_t> cache_;
+  int64_t num_bytes_;
+  int64_t num_float_feats_;
+  torch::DeviceIndex device_id_;
 };
 
 // The cu file in HugeCTR gpu cache uses unsigned int and long long.
 // Changing to int64_t results in a mismatch of template arguments.
-static_assert(sizeof(long long) == 8);  // NOLINT
+static_assert(
+    sizeof(long long) == sizeof(int64_t),
+    "long long and int64_t needs to have the same size.");  // NOLINT
 
 }  // namespace cuda
 }  // namespace graphbolt
