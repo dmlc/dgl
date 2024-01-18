@@ -679,6 +679,27 @@ inline std::vector<T> ListValueToVector(const List<Value>& list) {
   return ret;
 }
 
+/**
+ * @brief Helper function to convert a Map<std::string, Value> object to an
+ * unordered map.
+ * @tparam V value type
+ * @param map Input map object.
+ * @return std unordered map
+ */
+template <typename V>
+inline std::unordered_map<std::string, V> MapValueToUnorderedMap(
+    const Map<std::string, Value>& map) {
+  std::unordered_map<std::string, V> ret;
+  ret.reserve(map.size());
+  for (std::pair<std::string, Value> item : map) {
+    // (BarclayII) apparently MSVC 2017 CL 19.10 had trouble parsing
+    //     ret.push_back(val->data)
+    // So I kindly tell it how to properly parse it.
+    ret[item.first] = item.second->data.operator V();
+  }
+  return ret;
+}
+
 }  // namespace runtime
 }  // namespace dgl
 
