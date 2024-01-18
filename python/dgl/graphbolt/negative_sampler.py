@@ -31,13 +31,10 @@ class NegativeSampler(MiniBatchTransformer):
         self,
         datapipe,
         negative_ratio,
-        # TODO: clean up once refactor is donw.
-        use_seeds=False,
     ):
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
         self.negative_ratio = negative_ratio
-        self.use_seeds = use_seeds
 
     def _sample(self, minibatch):
         """
@@ -58,7 +55,7 @@ class NegativeSampler(MiniBatchTransformer):
             An instance of 'MiniBatch' encompasses both positive and negative
             samples.
         """
-        if not self.use_seeds:
+        if minibatch.seeds is None:
             node_pairs = minibatch.node_pairs
             assert node_pairs is not None
             if isinstance(node_pairs, Mapping):
@@ -110,7 +107,7 @@ class NegativeSampler(MiniBatchTransformer):
         etype : str
             Canonical edge type.
         """
-        if not self.use_seeds:
+        if minibatch.seeds is None:
             neg_src, neg_dst = neg_pairs
             if neg_src is not None:
                 neg_src = neg_src.view(-1, self.negative_ratio)

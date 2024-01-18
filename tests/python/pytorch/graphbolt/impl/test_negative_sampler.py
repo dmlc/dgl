@@ -36,7 +36,7 @@ def test_UniformNegativeSampler_seeds_invoke():
     graph = gb_test_utils.rand_csc_graph(100, 0.05, bidirection_edge=True)
     num_seeds = 30
     item_set = gb.ItemSet(
-        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
+        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="seeds"
     )
     batch_size = 10
     item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
@@ -46,7 +46,6 @@ def test_UniformNegativeSampler_seeds_invoke():
         item_sampler,
         graph,
         negative_ratio,
-        use_seeds=True,
     )
     with pytest.raises(NotImplementedError):
         next(iter(negative_sampler))
@@ -54,7 +53,6 @@ def test_UniformNegativeSampler_seeds_invoke():
     negative_sampler = item_sampler.sample_uniform_negative(
         graph,
         negative_ratio,
-        use_seeds=True,
     )
     with pytest.raises(NotImplementedError):
         next(iter(negative_sampler))
