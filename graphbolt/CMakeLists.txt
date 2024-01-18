@@ -52,6 +52,7 @@ file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
 if(USE_CUDA)
   file(GLOB BOLT_CUDA_SRC
     ${BOLT_DIR}/cuda/*.cu
+    ${BOLT_DIR}/cuda/*.cc
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
   if(DEFINED ENV{CUDAARCHS})
