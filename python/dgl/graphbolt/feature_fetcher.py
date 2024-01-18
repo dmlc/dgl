@@ -171,7 +171,6 @@ class FeatureFetcher(MiniBatchTransformer):
         if self.stream is not None:
             current_stream = torch.cuda.current_stream()
             self.stream.wait_stream(current_stream)
-            self.feature_store.record_stream(self.stream)
         with torch.cuda.stream(self.stream):
             data = self._read_data(data, current_stream)
             if self.stream is not None:
