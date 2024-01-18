@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file csc_to_coo.cc
+ * @file expand_indptr.cc
  * @brief ExpandIndptr operators.
  */
 #include <graphbolt/cuda_ops.h>

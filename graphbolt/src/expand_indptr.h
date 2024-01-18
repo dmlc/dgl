@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file csc_to_coo.h
+ * @file expand_indptr.h
  * @brief ExpandIndptr operators.
  */
 #ifndef GRAPHBOLT_CSC_TO_COO_H_

@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
- * @file cuda/csc_to_coo.cu
+ * @file cuda/expand_indptr.cu
  * @brief ExpandIndptr operator implementation on CUDA.
  */
 #include <thrust/iterator/constant_iterator.h>

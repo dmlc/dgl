@@ -9,7 +9,7 @@
 #include <graphbolt/serialize.h>
 #include <graphbolt/unique_and_compact.h>
 
-#include "./csc_to_coo.h"
+#include "./expand_indptr.h"
 #include "./index_select.h"
 #include "./random.h"
 
@@ -75,7 +75,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
-  m.def("csc_to_coo", &ops::ExpandIndptr);
+  m.def("expand_indptr", &ops::ExpandIndptr);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 }
 
