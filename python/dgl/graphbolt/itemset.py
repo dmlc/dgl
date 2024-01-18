@@ -27,8 +27,8 @@ class ItemSet:
         The names of the items. If it is a tuple, each name corresponds to an
         item in the tuple. The naming is arbitrary, but in general practice,
         the names should be chosen from ['seed_nodes', 'node_pairs', 'labels',
-        'negative_srcs', 'negative_dsts'] to align with the attributes of
-        class `dgl.graphbolt.MiniBatch`.
+        'seeds', 'negative_srcs', 'negative_dsts'] to align with the attributes
+        of class `dgl.graphbolt.MiniBatch`.
 
     Examples
     --------
