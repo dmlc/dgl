@@ -112,8 +112,7 @@ def create_dataloader(
     # 'shuffle': Determines if the items should be shuffled.
     # 'num_replicas': Specifies the number of replicas.
     # 'drop_uneven_inputs': Determines whether the numbers of minibatches on all
-    # ranks should be kept the same by dropping uneven minibatches. We set it to
-    # True when training so that training does not hang.
+    # ranks should be kept the same by dropping uneven minibatches.
     # [Output]:
     # An DistributedItemSampler object for handling mini-batch sampling on
     # multiple replicas.
@@ -187,31 +186,46 @@ def train(
 
         model.train()
         total_loss = torch.tensor(0, dtype=torch.float, device=device)
-        for step, data in (
-            tqdm.tqdm(enumerate(train_dataloader))
-            if rank == 0
-            else enumerate(train_dataloader)
-        ):
-            # The input features are from the source nodes in the first
-            # layer's computation graph.
-            x = data.node_features["feat"]
+        ########################################################################
+        # (HIGHLIGHT) Use Join Context Manager to solve uneven input problem.
+        #
+        # The mechanics of Distributed Data Parallel (DDP) training in PyTorch
+        # requires the number of inputs are the same for all ranks, otherwise
+        # the program may error or hang. To solve it, PyTorch provides Join
+        # Context Manager. Please refer to
+        # https://pytorch.org/tutorials/advanced/generic_join.html for detailed
+        # information.
+        #
+        # Another method is to set `drop_uneven_inputs` as True in GraphBolt's
+        # DistributedItemSampler, which will solve this problem by dropping
+        # uneven inputs.
+        ########################################################################
+        with Join([model]):
+            for step, data in (
+                tqdm.tqdm(enumerate(train_dataloader))
+                if rank == 0
+                else enumerate(train_dataloader)
+            ):
+                # The input features are from the source nodes in the first
+                # layer's computation graph.
+                x = data.node_features["feat"]
 
-            # The ground truth labels are from the destination nodes
-            # in the last layer's computation graph.
-            y = data.labels
+                # The ground truth labels are from the destination nodes
+                # in the last layer's computation graph.
+                y = data.labels
 
-            blocks = data.blocks
+                blocks = data.blocks
 
-            y_hat = model(blocks, x)
+                y_hat = model(blocks, x)
 
-            # Compute loss.
-            loss = F.cross_entropy(y_hat, y)
+                # Compute loss.
+                loss = F.cross_entropy(y_hat, y)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-            total_loss += loss.detach()
+                total_loss += loss.detach()
 
         # Evaluate the model.
         if rank == 0:
