@@ -34,6 +34,17 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ):
         super().__init__()
         self._c_csc_graph = c_csc_graph
+        self._is_inplace_pinned = set()
+
+    def __del__(self):
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        for tensor in self._is_inplace_pinned:
+            assert (
+                torch.cuda.cudart().cudaHostUnregister(tensor.data_ptr()) == 0
+            )
 
     @property
     def total_num_nodes(self) -> int:
@@ -974,9 +985,33 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        cudart = torch.cuda.cudart()
 
         def _pin(x):
-            return x.pin_memory() if hasattr(x, "pin_memory") else x
+            if hasattr(x, "pin_memory_"):
+                x.pin_memory_()
+            elif (
+                isinstance(x, torch.Tensor)
+                and not x.is_pinned()
+                and x.device.type == "cpu"
+            ):
+                assert (
+                    x.is_contiguous()
+                ), "Tensor pinning is only supported for contiguous tensors."
+                assert (
+                    cudart.cudaHostRegister(
+                        x.data_ptr(), x.numel() * x.element_size(), 0
+                    )
+                    == 0
+                )
+
+                self._is_inplace_pinned.add(x)
+
+            return x
 
         self._apply_to_members(_pin)
 

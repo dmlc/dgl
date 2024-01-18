@@ -54,6 +54,32 @@ class MiniBatch:
       value should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
     """
 
+    seeds: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None
+    """
+    Representation of seed items utilized in node classification tasks, link
+    prediction tasks and hyperlinks tasks.
+    - If `seeds` is a tensor: it indicates that the seeds originate from a
+      homogeneous graph. It can be either a 1-dimensional or 2-dimensional
+      tensor:
+        - 1-dimensional tensor: Each element directly represents a seed node
+          within the graph.
+        - 2-dimensional tensor: Each row designates a seed item, which can
+          encompass various entities such as edges, hyperlinks, or other graph
+          components depending on the specific context.
+    - If `seeds` is a dictionary: it indicates that the seeds originate from a
+      heterogeneous graph. The keys should be edge or node type, and the value
+      should be a tensor, which can be either a 1-dimensional or 2-dimensional
+      tensor:
+        - 1-dimensional tensor: Each element directly represents a seed node
+        of the given type within the graph.
+        - 2-dimensional tensor: Each row designates a seed item of the given
+          type, which can encompass various entities such as edges, hyperlinks,
+          or other graph components depending on the specific context.
+    """
+
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the head nodes in the link
