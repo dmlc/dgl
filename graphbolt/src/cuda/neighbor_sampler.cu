@@ -191,7 +191,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   if (!probs_or_mask.has_value() && fanouts.size() <= 1) {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
-  auto coo_rows = CSCToCOOImpl(sub_indptr, indices.scalar_type(), num_edges_);
+  auto coo_rows =
+      ExpandIndptrImpl(sub_indptr, indices.scalar_type(), num_edges_);
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
@@ -233,7 +234,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
 
         // Find the smallest integer type to store the edge id offsets.
-        // CSCToCOO or IndexSelectCSCImpl had synch inside, so it is safe to
+        // ExpandIndptr or IndexSelectCSCImpl had synch inside, so it is safe to
         // read max_in_degree now.
         const int num_bits =
             cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);

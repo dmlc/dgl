@@ -2,7 +2,7 @@
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  * @file csc_to_coo.cc
- * @brief CSCToCOO operators.
+ * @brief ExpandIndptr operators.
  */
 #include <graphbolt/cuda_ops.h>
 
@@ -12,15 +12,15 @@
 namespace graphbolt {
 namespace ops {
 
-torch::Tensor CSCToCOO(
+torch::Tensor ExpandIndptr(
     torch::Tensor indptr, torch::ScalarType output_dtype,
     torch::optional<int64_t> num_edges,
     torch::optional<torch::Tensor> original_column_node_ids) {
   if (utils::is_on_gpu(indptr) &&
       (!original_column_node_ids.has_value() ||
        utils::is_on_gpu(original_column_node_ids.value()))) {
-    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(c10::DeviceType::CUDA, "CSCToCOO", {
-      return CSCToCOOImpl(
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(c10::DeviceType::CUDA, "ExpandIndptr", {
+      return ExpandIndptrImpl(
           indptr, output_dtype, num_edges, original_column_node_ids);
     });
   }

@@ -75,7 +75,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
-  m.def("csc_to_coo", &ops::CSCToCOO);
+  m.def("csc_to_coo", &ops::ExpandIndptr);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 }
 

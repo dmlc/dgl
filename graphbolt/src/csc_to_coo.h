@@ -2,7 +2,7 @@
  *  Copyright (c) 2023 by Contributors
  *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  * @file csc_to_coo.h
- * @brief CSCToCOO operators.
+ * @brief ExpandIndptr operators.
  */
 #ifndef GRAPHBOLT_CSC_TO_COO_H_
 #define GRAPHBOLT_CSC_TO_COO_H_
@@ -13,9 +13,9 @@ namespace graphbolt {
 namespace ops {
 
 /**
- * @brief CSCToCOO implements conversion from a given indptr offset tensor to a
- * COO format tensor. If original_column_node_ids is not given, it is assumed to
- * be equal to torch::arange(indptr.size(0) - 1, dtype=output_dtype).
+ * @brief ExpandIndptr implements conversion from a given indptr offset tensor
+ * to a COO format tensor. If original_column_node_ids is not given, it is
+ * assumed to be equal to torch::arange(indptr.size(0) - 1, dtype=output_dtype).
  *
  * @param indptr                 The indptr offset tensor.
  * @param output_dtype           Dtype of output.
@@ -24,7 +24,7 @@ namespace ops {
  *
  * @return The resulting tensor with output_dtype.
  */
-torch::Tensor CSCToCOO(
+torch::Tensor ExpandIndptr(
     torch::Tensor indptr, torch::ScalarType output_dtype,
     torch::optional<int64_t> num_edges = torch::nullopt,
     torch::optional<torch::Tensor> original_column_node_ids = torch::nullopt);

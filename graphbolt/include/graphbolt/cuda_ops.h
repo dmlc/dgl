@@ -175,7 +175,7 @@ torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
  *
  * @return The resulting tensor with output_dtype.
  */
-torch::Tensor CSCToCOOImpl(
+torch::Tensor ExpandIndptrImpl(
     torch::Tensor indptr, torch::ScalarType output_dtype,
     torch::optional<int64_t> num_edges = torch::nullopt,
     torch::optional<torch::Tensor> original_column_node_ids = torch::nullopt);
