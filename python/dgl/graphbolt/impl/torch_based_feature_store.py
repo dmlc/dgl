@@ -185,7 +185,10 @@ class TorchBasedFeature(Feature):
         # cudaHostUnregister to unpin the tensor in the destructor.
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
         x = self._tensor
-        if not x.is_pinned() and x.device.type == "cpu" and x.is_contiguous():
+        if not x.is_pinned() and x.device.type == "cpu":
+            assert (
+                x.is_contiguous()
+            ), "Tensor pinning is only supported for contiguous tensors."
             assert (
                 torch.cuda.cudart().cudaHostRegister(
                     x.data_ptr(), x.numel() * x.element_size(), 0

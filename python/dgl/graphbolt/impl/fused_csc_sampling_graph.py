@@ -998,8 +998,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 isinstance(x, torch.Tensor)
                 and not x.is_pinned()
                 and x.device.type == "cpu"
-                and x.is_contiguous()
             ):
+                assert (
+                    x.is_contiguous()
+                ), "Tensor pinning is only supported for contiguous tensors."
                 assert (
                     cudart.cudaHostRegister(
                         x.data_ptr(), x.numel() * x.element_size(), 0
