@@ -4,6 +4,8 @@
  * @file graphbolt/cuda_sampling_ops.h
  * @brief Available CUDA sampling operations in Graphbolt.
  */
+#ifndef GRAPHBOLT_CUDA_SAMPLING_OPS_H_
+#define GRAPHBOLT_CUDA_SAMPLING_OPS_H_
 
 #include <graphbolt/fused_sampled_subgraph.h>
 #include <torch/script.h>
@@ -65,3 +67,5 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> InSubgraph(
 
 }  //  namespace ops
 }  //  namespace graphbolt
+
+#endif  // GRAPHBOLT_CUDA_SAMPLING_OPS_H_
