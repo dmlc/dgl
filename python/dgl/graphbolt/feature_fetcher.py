@@ -92,6 +92,8 @@ class FeatureFetcher(MiniBatchTransformer):
                     nodes = input_nodes[type_name]
                     if nodes is None:
                         continue
+                    if nodes.is_cuda:
+                        nodes.record_stream(torch.cuda.current_stream())
                     for feature_name in feature_names:
                         node_features[
                             (type_name, feature_name)
@@ -104,6 +106,8 @@ class FeatureFetcher(MiniBatchTransformer):
                             )
                         )
             else:
+                if input_nodes.is_cuda:
+                    input_nodes.record_stream(torch.cuda.current_stream())
                 for feature_name in self.node_feature_keys:
                     node_features[feature_name] = record_stream(
                         self.feature_store.read(
