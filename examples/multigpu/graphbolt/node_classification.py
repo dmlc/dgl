@@ -89,9 +89,7 @@ def create_dataloader(
     features,
     itemset,
     device,
-    drop_last=False,
-    shuffle=True,
-    drop_uneven_inputs=False,
+    is_train,
 ):
     ############################################################################
     # [HIGHLIGHT]
@@ -114,7 +112,8 @@ def create_dataloader(
     # 'shuffle': Determines if the items should be shuffled.
     # 'num_replicas': Specifies the number of replicas.
     # 'drop_uneven_inputs': Determines whether the numbers of minibatches on all
-    # ranks should be kept the same by dropping uneven minibatches.
+    # ranks should be kept the same by dropping uneven minibatches. We set it to
+    # True when training so that training does not hang.
     # [Output]:
     # An DistributedItemSampler object for handling mini-batch sampling on
     # multiple replicas.
@@ -122,9 +121,9 @@ def create_dataloader(
     datapipe = gb.DistributedItemSampler(
         item_set=itemset,
         batch_size=args.batch_size,
-        drop_last=drop_last,
-        shuffle=shuffle,
-        drop_uneven_inputs=drop_uneven_inputs,
+        drop_last=is_train,
+        shuffle=is_train,
+        drop_uneven_inputs=is_train,
     )
     ############################################################################
     # [Note]:
@@ -187,60 +186,42 @@ def train(
         epoch_start = time.time()
 
         model.train()
-        total_loss = torch.tensor(0, dtype=torch.float).to(device)
-        ########################################################################
-        # (HIGHLIGHT) Use Join Context Manager to solve uneven input problem.
-        #
-        # The mechanics of Distributed Data Parallel (DDP) training in PyTorch
-        # requires the number of inputs are the same for all ranks, otherwise
-        # the program may error or hang. To solve it, PyTorch provides Join
-        # Context Manager. Please refer to
-        # https://pytorch.org/tutorials/advanced/generic_join.html for detailed
-        # information.
-        #
-        # Another method is to set `drop_uneven_inputs` as True in GraphBolt's
-        # DistributedItemSampler, which will solve this problem by dropping
-        # uneven inputs.
-        ########################################################################
-        with Join([model]):
-            for step, data in (
-                tqdm.tqdm(enumerate(train_dataloader))
-                if rank == 0
-                else enumerate(train_dataloader)
-            ):
-                # The input features are from the source nodes in the first
-                # layer's computation graph.
-                x = data.node_features["feat"]
+        total_loss = torch.tensor(0, dtype=torch.float, device=device)
+        for step, data in (
+            tqdm.tqdm(enumerate(train_dataloader))
+            if rank == 0
+            else enumerate(train_dataloader)
+        ):
+            # The input features are from the source nodes in the first
+            # layer's computation graph.
+            x = data.node_features["feat"]
 
-                # The ground truth labels are from the destination nodes
-                # in the last layer's computation graph.
-                y = data.labels
+            # The ground truth labels are from the destination nodes
+            # in the last layer's computation graph.
+            y = data.labels
 
-                blocks = data.blocks
+            blocks = data.blocks
 
-                y_hat = model(blocks, x)
+            y_hat = model(blocks, x)
 
-                # Compute loss.
-                loss = F.cross_entropy(y_hat, y)
+            # Compute loss.
+            loss = F.cross_entropy(y_hat, y)
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-                total_loss += loss
+            total_loss += loss.detach()
 
         # Evaluate the model.
         if rank == 0:
             print("Validating...")
-        acc = (
-            evaluate(
-                rank,
-                model,
-                valid_dataloader,
-                num_classes,
-                device,
-            )
-            / world_size
+        acc = evaluate(
+            rank,
+            model,
+            valid_dataloader,
+            num_classes,
+            device,
         )
         ########################################################################
         # (HIGHLIGHT) Collect accuracy and loss values from sub-processes and
@@ -252,14 +233,13 @@ def train(
         dist.reduce(tensor=acc, dst=0)
         total_loss /= step + 1
         dist.reduce(tensor=total_loss, dst=0)
-        dist.barrier()
 
         epoch_end = time.time()
         if rank == 0:
             print(
                 f"Epoch {epoch:05d} | "
                 f"Average Loss {total_loss.item() / world_size:.4f} | "
-                f"Accuracy {acc.item():.4f} | "
+                f"Accuracy {acc.item() / world_size:.4f} | "
                 f"Time {epoch_end - epoch_start:.4f}"
             )
 
@@ -301,9 +281,7 @@ def run(rank, world_size, args, devices, dataset):
         dataset.feature,
         train_set,
         device,
-        drop_last=False,
-        shuffle=True,
-        drop_uneven_inputs=False,
+        is_train=True,
     )
     valid_dataloader = create_dataloader(
         args,
@@ -311,9 +289,7 @@ def run(rank, world_size, args, devices, dataset):
         dataset.feature,
         valid_set,
         device,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
+        is_train=False,
     )
     test_dataloader = create_dataloader(
         args,
@@ -321,9 +297,7 @@ def run(rank, world_size, args, devices, dataset):
         dataset.feature,
         test_set,
         device,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
+        is_train=False,
     )
 
     # Model training.
@@ -354,7 +328,7 @@ def run(rank, world_size, args, devices, dataset):
         / world_size
     )
     dist.reduce(tensor=test_acc, dst=0)
-    dist.barrier()
+    torch.cuda.synchronize()
     if rank == 0:
         print(f"Test Accuracy {test_acc.item():.4f}")
 
