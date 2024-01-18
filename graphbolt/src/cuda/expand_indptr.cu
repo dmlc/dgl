@@ -40,30 +40,30 @@ struct AdjacentDifference {
 };
 
 torch::Tensor ExpandIndptrImpl(
-    torch::Tensor indptr, torch::ScalarType output_dtype,
-    torch::optional<int64_t> num_edges, torch::optional<torch::Tensor> nodes) {
-  if (!num_edges.has_value()) {
-    num_edges = AT_DISPATCH_INTEGRAL_TYPES(
+    torch::Tensor indptr, torch::ScalarType dtype,
+    torch::optional<torch::Tensor> nodes,
+    torch::optional<int64_t> output_size) {
+  if (!output_size.has_value()) {
+    output_size = AT_DISPATCH_INTEGRAL_TYPES(
         indptr.scalar_type(), "ExpandIndptrIndptr[-1]", ([&]() -> int64_t {
           auto indptr_ptr = indptr.data_ptr<scalar_t>();
-          auto num_edges = cuda::CopyScalar{indptr_ptr + indptr.size(0) - 1};
-          return static_cast<scalar_t>(num_edges);
+          auto output_size = cuda::CopyScalar{indptr_ptr + indptr.size(0) - 1};
+          return static_cast<scalar_t>(output_size);
         }));
   }
   auto csc_rows =
-      torch::empty(num_edges.value(), indptr.options().dtype(output_dtype));
+      torch::empty(output_size.value(), indptr.options().dtype(dtype));
 
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr.scalar_type(), "ExpandIndptrIndptr", ([&] {
         using indptr_t = scalar_t;
         auto indptr_ptr = indptr.data_ptr<indptr_t>();
         AT_DISPATCH_INTEGRAL_TYPES(
-            output_dtype, "ExpandIndptrIndices", ([&] {
+            dtype, "ExpandIndptrIndices", ([&] {
               using indices_t = scalar_t;
               auto csc_rows_ptr = csc_rows.data_ptr<indices_t>();
 
-              auto nodes_dtype =
-                  nodes ? nodes.value().scalar_type() : output_dtype;
+              auto nodes_dtype = nodes ? nodes.value().scalar_type() : dtype;
               AT_DISPATCH_INTEGRAL_TYPES(
                   nodes_dtype, "ExpandIndptrNodes", ([&] {
                     using nodes_t = scalar_t;

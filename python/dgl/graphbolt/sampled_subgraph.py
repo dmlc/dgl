@@ -233,7 +233,7 @@ def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
             original_row_node_ids, dim=0, index=indices
         )
     indptr = expand_indptr(
-        indptr, original_column_node_ids, indices.dtype, len(indices)
+        indptr, indices.dtype, original_column_node_ids, len(indices)
     )
     return (indices, indptr)
 

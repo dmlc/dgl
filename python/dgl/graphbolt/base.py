@@ -57,7 +57,7 @@ def isin(elements, test_elements):
     return torch.ops.graphbolt.isin(elements, test_elements)
 
 
-def expand_indptr(indptr, node_ids=None, dtype=None, output_size=None):
+def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
     """Converts a given indptr offset tensor to a COO format tensor. If
     node_ids is not given, it is assumed to be equal to
     torch.arange(indptr.size(0) - 1, dtype=dtype, device=indptr.device).
@@ -74,11 +74,11 @@ def expand_indptr(indptr, node_ids=None, dtype=None, output_size=None):
     ----------
     indptr : torch.Tensor
         A 1D tensor represents the csc_indptr tensor.
+    dtype : Optional[torch.dtype]
+        The dtype of the returned output tensor.
     node_ids : Optional[torch.Tensor]
         A 1D tensor represents the column node ids that the returned tensor will
         be populated with.
-    dtype : Optional[torch.dtype]
-        The dtype of the returned output tensor.
     output_size : Optional[int]
         The size of the output tensor. Should be equal to indptr[-1]. Using this
         argument avoids a stream synchronization to calculate the output shape.
@@ -98,7 +98,7 @@ def expand_indptr(indptr, node_ids=None, dtype=None, output_size=None):
     if dtype is None:
         dtype = node_ids.dtype
     return torch.ops.graphbolt.expand_indptr(
-        indptr, dtype, output_size, node_ids
+        indptr, dtype, node_ids, output_size
     )
 
 

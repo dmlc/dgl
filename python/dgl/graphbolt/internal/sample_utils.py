@@ -241,7 +241,7 @@ def _broadcast_timestamps(csc, dst_timestamps):
     """Broadcast the timestamp of each destination node to its corresponding
     source nodes."""
     return expand_indptr(
-        csc.indptr, dst_timestamps, output_size=len(csc.indices)
+        csc.indptr, node_ids=dst_timestamps, output_size=len(csc.indices)
     )
 
 

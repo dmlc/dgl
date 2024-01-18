@@ -191,8 +191,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   if (!probs_or_mask.has_value() && fanouts.size() <= 1) {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
-  auto coo_rows =
-      ExpandIndptrImpl(sub_indptr, indices.scalar_type(), num_edges_);
+  auto coo_rows = ExpandIndptrImpl(
+      sub_indptr, indices.scalar_type(), torch::nullopt, num_edges_);
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());

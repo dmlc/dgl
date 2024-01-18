@@ -4,8 +4,8 @@
  * @file expand_indptr.h
  * @brief ExpandIndptr operators.
  */
-#ifndef GRAPHBOLT_CSC_TO_COO_H_
-#define GRAPHBOLT_CSC_TO_COO_H_
+#ifndef GRAPHBOLT_EXPAND_INDPTR_H_
+#define GRAPHBOLT_EXPAND_INDPTR_H_
 
 #include <torch/script.h>
 
@@ -13,23 +13,24 @@ namespace graphbolt {
 namespace ops {
 
 /**
- * @brief ExpandIndptr implements conversion from a given indptr offset tensor
- * to a COO format tensor. If original_column_node_ids is not given, it is
- * assumed to be equal to torch::arange(indptr.size(0) - 1, dtype=output_dtype).
+ * @brief ExpandIndptr implements conversion from a given indptr offset
+ * tensor to a COO format tensor. If node_ids is not given, it is assumed to be
+ * equal to torch::arange(indptr.size(0) - 1, dtype=dtype).
  *
- * @param indptr                 The indptr offset tensor.
- * @param output_dtype           Dtype of output.
- * @param num_edges              Optional number of edges, equal to indptr[-1].
- * @param original_column_node_ids  Optional original row ids for indptr.
+ * @param indptr       The indptr offset tensor.
+ * @param dtype        The dtype of the returned output tensor.
+ * @param node_ids     1D tensor represents the node ids.
+ * @param output_size  Optional, value of indptr[-1]. Passing it eliminates CPU
+ * GPU synchronization.
  *
- * @return The resulting tensor with output_dtype.
+ * @return The resulting tensor.
  */
 torch::Tensor ExpandIndptr(
-    torch::Tensor indptr, torch::ScalarType output_dtype,
-    torch::optional<int64_t> num_edges = torch::nullopt,
-    torch::optional<torch::Tensor> original_column_node_ids = torch::nullopt);
+    torch::Tensor indptr, torch::ScalarType dtype,
+    torch::optional<torch::Tensor> node_ids = torch::nullopt,
+    torch::optional<int64_t> output_size = torch::nullopt);
 
 }  // namespace ops
 }  // namespace graphbolt
 
-#endif  // GRAPHBOLT_CSC_TO_COO_H_
+#endif  // GRAPHBOLT_EXPAND_INDPTR_H_

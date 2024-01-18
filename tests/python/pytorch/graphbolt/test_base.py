@@ -269,9 +269,9 @@ def test_expand_indptr(nodes, dtype):
             )
         )
         torch_result = torch_expand_indptr(indptr, dtype, nodes)
-        gb_result = gb.expand_indptr(indptr, nodes, dtype)
+        gb_result = gb.expand_indptr(indptr, dtype, nodes)
         assert torch.equal(torch_result, gb_result)
-        gb_result = gb.expand_indptr(indptr, nodes, dtype, indptr[-1].item())
+        gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
         assert torch.equal(torch_result, gb_result)
 
 
