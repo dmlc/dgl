@@ -848,7 +848,8 @@ def test_dgl_link_predication_hetero(mode):
 def test_to_pyg_adapter():
     test_subgraph = gb.SampledSubgraphImpl(
         sampled_csc=gb.CSCFormatBase(
-            indptr=torch.tensor([0, 2, 3]), indices=torch.tensor([0, 1, 1])
+            indptr=torch.tensor([0, 2, 3]), 
+            indices=torch.tensor([0, 1, 1])
         ),
         original_column_node_ids=torch.tensor([0, 1]),
         original_row_node_ids=torch.tensor([0, 1]),
@@ -863,12 +864,35 @@ def test_to_pyg_adapter():
         labels=expected_labels,
     )
     pyg_data = test_minibatch.to_pyg_adapter(device=torch.device("cpu"))
-    assert torch.equal(
-        pyg_data.edge_index, expected_edge_index
-    ), "Edge index is not correctly constructed."
-    assert torch.equal(
-        pyg_data.x, expected_node_features
-    ), "Node features are not correctly set."
-    assert torch.equal(
-        pyg_data.y, expected_labels
-    ), "Labels are not correctly set."
+    assert torch.equal(pyg_data.edge_index, expected_edge_index), "Edge index is not correctly constructed."
+    assert torch.equal(pyg_data.x, expected_node_features), "Node features are not correctly set."
+    assert torch.equal(pyg_data.y, expected_labels), "Labels are not correctly set."
+
+    # Test with sampled_csc as None
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[None],
+        node_features={"feat": expected_node_features},
+        labels=expected_labels,
+    )
+    pyg_data = test_minibatch.to_pyg_adapter(device=torch.device("cpu"))
+    assert pyg_data.edge_index.numel() == 0, "Edge index should be empty."
+
+    # Test with node_features as None
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph],
+        node_features=None,
+        labels=expected_labels,
+    )
+    pyg_data = test_minibatch.to_pyg_adapter(device=torch.device("cpu"))
+    assert pyg_data.x is None, "Node features should be None."
+
+    # Test with labels as None
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph],
+        node_features={"feat": expected_node_features},
+        labels=None,
+    )
+    pyg_data = test_minibatch.to_pyg_adapter(device=torch.device("cpu"))
+    assert pyg_data.y is None, "Labels should be None."
+
+test_to_pyg_adapter()

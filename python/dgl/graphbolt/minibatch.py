@@ -475,8 +475,23 @@ class MiniBatch:
 
 
     def to_pyg_adapter(self, device):
+        """
+        Converts the MiniBatch instance to a PyTorch Geometric (PyG) Data object.
+         This function is responsible for transforming the graph data contained in 
+        the MiniBatch instance into the format required by PyG. It constructs edge 
+        indices for each subgraph in the minibatch and combines them. It also 
+        prepares node features and labels to be compatible with the PyG Data object.
+        - Args: 
+        device (torch.device): The device (CPU or GPU) where the tensors will 
+        be allocated.
+        -  Returns:
+        Data: A PyTorch Geometric Data object containing graph information such as 
+        node features, edge indices, and labels.
+        Example Usage:
+        # Assuming `minibatch` is an instance of `MiniBatch`
+        pyg_data = minibatch.to_pyg_adapter(device=torch.device('cpu'))
+        """
         from torch_geometric.data import Data
-
         def construct_edge_index(subgraph, device):
             csc_matrix = subgraph.sampled_csc
             indices = csc_matrix.indices.to(device)
@@ -489,15 +504,16 @@ class MiniBatch:
 
         all_edge_indices = []
         for subgraph in self.sampled_subgraphs:
-            edge_index = construct_edge_index(subgraph, device)
-            all_edge_indices.append(edge_index)
+            if subgraph is not None:
+                edge_index = construct_edge_index(subgraph, device)
+                all_edge_indices.append(edge_index)
 
         combined_edge_index = (
             torch.cat(all_edge_indices, dim=1) if all_edge_indices 
             else torch.empty((2, 0), dtype=torch.long, device=device)
         )
 
-        node_features = self.node_features.get("feat", None)
+        node_features = self.node_features["feat"] if self.node_features else None
         graph_labels = self.labels
         pyg_data = Data(x=node_features, edge_index=combined_edge_index, y=graph_labels)
         return pyg_data
