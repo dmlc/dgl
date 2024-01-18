@@ -72,7 +72,7 @@ class NegativeSampler(MiniBatchTransformer):
             raise NotImplementedError("Not implemented yet.")
         return minibatch
 
-    def _sample_with_etype(self, node_pairs, etype=None):
+    def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
         """Generate negative pairs for a given etype form positive pairs
         for a given etype.
 
