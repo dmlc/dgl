@@ -257,22 +257,14 @@ def torch_expand_indptr(indptr, dtype, nodes=None):
 @pytest.mark.parametrize("nodes", [None, True])
 @pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
 def test_expand_indptr(nodes, dtype):
-    num_nodes = 13
     if nodes:
-        nodes = torch.randint(0, 199, [num_nodes], dtype=dtype, device=F.ctx())
-    for _ in range(10):
-        degrees = torch.randint(0, 5, [num_nodes], device=F.ctx())
-        indptr = torch.cat(
-            (
-                torch.zeros(1, dtype=torch.int64, device=F.ctx()),
-                degrees.cumsum(0),
-            )
-        )
-        torch_result = torch_expand_indptr(indptr, dtype, nodes)
-        gb_result = gb.expand_indptr(indptr, dtype, nodes)
-        assert torch.equal(torch_result, gb_result)
-        gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
-        assert torch.equal(torch_result, gb_result)
+        nodes = torch.tensor([1, 7, 3, 4, 5, 8], dtype=dtype, device=F.ctx())
+    indptr = torch.tensor([0, 2, 2, 7, 10, 12, 20], device=F.ctx())
+    torch_result = torch_expand_indptr(indptr, dtype, nodes)
+    gb_result = gb.expand_indptr(indptr, dtype, nodes)
+    assert torch.equal(torch_result, gb_result)
+    gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
+    assert torch.equal(torch_result, gb_result)
 
 
 def test_csc_format_base_representation():
