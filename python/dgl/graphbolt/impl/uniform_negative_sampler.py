@@ -56,13 +56,18 @@ class UniformNegativeSampler(NegativeSampler):
         datapipe,
         graph,
         negative_ratio,
+        # TODO: clean up once refactor is donw.
+        use_seeds=False,
     ):
-        super().__init__(datapipe, negative_ratio)
+        super().__init__(datapipe, negative_ratio, use_seeds)
         self.graph = graph
 
     def _sample_with_etype(self, node_pairs, etype=None):
-        return self.graph.sample_negative_edges_uniform(
-            etype,
-            node_pairs,
-            self.negative_ratio,
-        )
+        if not self.use_seeds:
+            return self.graph.sample_negative_edges_uniform(
+                etype,
+                node_pairs,
+                self.negative_ratio,
+            )
+        else:
+            raise NotImplementedError("Not implemented yet.")

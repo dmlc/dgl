@@ -31,10 +31,13 @@ class NegativeSampler(MiniBatchTransformer):
         self,
         datapipe,
         negative_ratio,
+        # TODO: clean up once refactor is donw.
+        use_seeds=False,
     ):
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
         self.negative_ratio = negative_ratio
+        self.use_seeds = use_seeds
 
     def _sample(self, minibatch):
         """
@@ -55,16 +58,21 @@ class NegativeSampler(MiniBatchTransformer):
             An instance of 'MiniBatch' encompasses both positive and negative
             samples.
         """
-        node_pairs = minibatch.node_pairs
-        assert node_pairs is not None
-        if isinstance(node_pairs, Mapping):
-            minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
-            for etype, pos_pairs in node_pairs.items():
-                self._collate(
-                    minibatch, self._sample_with_etype(pos_pairs, etype), etype
-                )
+        if not self.use_seeds:
+            node_pairs = minibatch.node_pairs
+            assert node_pairs is not None
+            if isinstance(node_pairs, Mapping):
+                minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
+                for etype, pos_pairs in node_pairs.items():
+                    self._collate(
+                        minibatch,
+                        self._sample_with_etype(pos_pairs, etype),
+                        etype,
+                    )
+            else:
+                self._collate(minibatch, self._sample_with_etype(node_pairs))
         else:
-            self._collate(minibatch, self._sample_with_etype(node_pairs))
+            raise NotImplementedError("Not implemented yet.")
         return minibatch
 
     def _sample_with_etype(self, node_pairs, etype=None):
@@ -102,14 +110,17 @@ class NegativeSampler(MiniBatchTransformer):
         etype : str
             Canonical edge type.
         """
-        neg_src, neg_dst = neg_pairs
-        if neg_src is not None:
-            neg_src = neg_src.view(-1, self.negative_ratio)
-        if neg_dst is not None:
-            neg_dst = neg_dst.view(-1, self.negative_ratio)
-        if etype is not None:
-            minibatch.negative_srcs[etype] = neg_src
-            minibatch.negative_dsts[etype] = neg_dst
+        if not self.use_seeds:
+            neg_src, neg_dst = neg_pairs
+            if neg_src is not None:
+                neg_src = neg_src.view(-1, self.negative_ratio)
+            if neg_dst is not None:
+                neg_dst = neg_dst.view(-1, self.negative_ratio)
+            if etype is not None:
+                minibatch.negative_srcs[etype] = neg_src
+                minibatch.negative_dsts[etype] = neg_dst
+            else:
+                minibatch.negative_srcs = neg_src
+                minibatch.negative_dsts = neg_dst
         else:
-            minibatch.negative_srcs = neg_src
-            minibatch.negative_dsts = neg_dst
+            raise NotImplementedError("Not implemented yet.")
