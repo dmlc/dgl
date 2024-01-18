@@ -97,7 +97,9 @@ def expand_indptr(indptr, node_ids=None, dtype=None, output_size=None):
     ), "Node_ids should be 1D tensor."
     if dtype is None:
         dtype = node_ids.dtype
-    return torch.ops.graphbolt.csc_to_coo(indptr, dtype, output_size, node_ids)
+    return torch.ops.graphbolt.expand_indptr(
+        indptr, dtype, output_size, node_ids
+    )
 
 
 def etype_tuple_to_str(c_etype):
