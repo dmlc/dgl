@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple, Union
 
 import torch
-from torch_geometric.data import Data
 
 import dgl
 from dgl.utils import recursive_apply
@@ -474,36 +473,36 @@ class MiniBatch:
 
         return self
 
+
     def to_pyg_adapter(self, device):
-        def construct_edge_index(sampled_subgraph, device):
-            csc = sampled_subgraph.sampled_csc
-            indices = csc.indices.to(device)
-            indptr = csc.indptr.to(device)
-            rows = torch.arange(
+        from torch_geometric.data import Data
+
+        def construct_edge_index(subgraph, device):
+            csc_matrix = subgraph.sampled_csc
+            indices = csc_matrix.indices.to(device)
+            indptr = csc_matrix.indptr.to(device)
+            row_indices = torch.arange(
                 len(indptr) - 1, device=device
             ).repeat_interleave(indptr.diff())
-            cols = indices
-            edge_index = torch.stack([rows, cols], dim=0)
-            return edge_index
+            col_indices = indices
+            return torch.stack([row_indices, col_indices], dim=0)
 
-        edge_indices = []
+        all_edge_indices = []
         for subgraph in self.sampled_subgraphs:
             edge_index = construct_edge_index(subgraph, device)
-            edge_indices.append(edge_index)
+            all_edge_indices.append(edge_index)
 
-        if edge_indices:
-            combined_edge_index = torch.cat(edge_indices, dim=1)
-        else:
-            combined_edge_index = torch.tensor(
-                [], dtype=torch.long, device=device
-            ).reshape(2, 0)
+        combined_edge_index = (
+            torch.cat(all_edge_indices, dim=1) if all_edge_indices 
+            else torch.empty((2, 0), dtype=torch.long, device=device)
+        )
 
-        x = self.node_features.get("feat", None)
-        labels = self.labels
-        data = Data(x=x, edge_index=combined_edge_index, y=labels)
-        return data
+        node_features = self.node_features.get("feat", None)
+        graph_labels = self.labels
+        pyg_data = Data(x=node_features, edge_index=combined_edge_index, y=graph_labels)
+        return pyg_data
 
-
+    
 def _minibatch_str(minibatch: MiniBatch) -> str:
     final_str = ""
     # Get all attributes in the class except methods.

@@ -1,7 +1,6 @@
 """
 This script trains and tests a GraphSAGE model for node classification
 on large graphs using GraphBolt dataloader.
-
 Paper: [Inductive Representation Learning on Large Graphs]
 (https://arxiv.org/abs/1706.02216)
 
@@ -37,7 +36,6 @@ main
 │
 └───> All nodes set inference & Test set evaluation
 """
-
 import argparse
 import time
 
