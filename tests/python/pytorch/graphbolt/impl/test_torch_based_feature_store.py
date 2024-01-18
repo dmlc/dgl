@@ -136,6 +136,59 @@ def test_torch_based_feature(in_memory):
         feature_a = feature_b = None
 
 
+def is_feature_store_pinned(store):
+    for feature in store._features.values():
+        assert feature._tensor.is_pinned()
+
+
+def is_feature_store_on_cuda(store):
+    for feature in store._features.values():
+        assert feature._tensor.is_cuda
+
+
+def is_feature_store_on_cpu(store):
+    for feature in store._features.values():
+        assert not feature._tensor.is_cuda
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
+@pytest.mark.parametrize("device", ["pinned", "cuda"])
+def test_feature_store_to_device(device):
+    with tempfile.TemporaryDirectory() as test_dir:
+        a = torch.tensor([[1, 2, 4], [2, 5, 3]])
+        b = torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]])
+        write_tensor_to_disk(test_dir, "a", a, fmt="torch")
+        write_tensor_to_disk(test_dir, "b", b, fmt="numpy")
+        feature_data = [
+            gb.OnDiskFeatureData(
+                domain="node",
+                type="paper",
+                name="a",
+                format="torch",
+                path=os.path.join(test_dir, "a.pt"),
+            ),
+            gb.OnDiskFeatureData(
+                domain="edge",
+                type="paper:cites:paper",
+                name="b",
+                format="numpy",
+                path=os.path.join(test_dir, "b.npy"),
+            ),
+        ]
+        feature_store = gb.TorchBasedFeatureStore(feature_data)
+        feature_store2 = feature_store.to(device)
+        if device == "pinned":
+            is_feature_store_pinned(feature_store2)
+        elif device == "cuda":
+            is_feature_store_on_cuda(feature_store2)
+
+        # The original variable should be untouched.
+        is_feature_store_on_cpu(feature_store)
+
+
 @unittest.skipIf(
     F._default_context_str == "cpu",
     reason="Tests for pinned memory are only meaningful on GPU.",
@@ -167,6 +220,9 @@ def test_torch_based_pinned_feature(dtype, idtype, shape):
 
     feature = gb.TorchBasedFeature(tensor)
     feature.pin_memory_()
+
+    # Check if pinning is truly in-place.
+    assert feature._tensor.data_ptr() == tensor.data_ptr()
 
     # Test read entire pinned feature, the result should be on cuda.
     assert torch.equal(feature.read(), test_tensor_cuda)

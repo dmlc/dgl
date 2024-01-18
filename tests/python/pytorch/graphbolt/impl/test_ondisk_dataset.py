@@ -1175,9 +1175,9 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
-        # Test do not generate original_edge_id.
+        # Test generating original_edge_id.
         output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, include_original_edge_id=False
+            test_dir, include_original_edge_id=True
         )
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
@@ -1186,8 +1186,7 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         )
         assert (
             fused_csc_sampling_graph.edge_attributes is not None
-            and gb.ORIGINAL_EDGE_ID
-            not in fused_csc_sampling_graph.edge_attributes
+            and gb.ORIGINAL_EDGE_ID in fused_csc_sampling_graph.edge_attributes
         )
         fused_csc_sampling_graph = None
 

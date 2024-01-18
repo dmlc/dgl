@@ -1,5 +1,6 @@
 """Torch-based feature store for GraphBolt."""
 
+import copy
 import textwrap
 from typing import Dict, List
 
@@ -82,6 +83,17 @@ class TorchBasedFeature(Feature):
         # Make sure the tensor is contiguous.
         self._tensor = torch_feature.contiguous()
         self._metadata = metadata
+        self._is_inplace_pinned = set()
+
+    def __del__(self):
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        for tensor in self._is_inplace_pinned:
+            assert (
+                torch.cuda.cudart().cudaHostUnregister(tensor.data_ptr()) == 0
+            )
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -168,7 +180,33 @@ class TorchBasedFeature(Feature):
 
     def pin_memory_(self):
         """In-place operation to copy the feature to pinned memory."""
-        self._tensor = self._tensor.pin_memory()
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        x = self._tensor
+        if not x.is_pinned() and x.device.type == "cpu":
+            assert (
+                x.is_contiguous()
+            ), "Tensor pinning is only supported for contiguous tensors."
+            assert (
+                torch.cuda.cudart().cudaHostRegister(
+                    x.data_ptr(), x.numel() * x.element_size(), 0
+                )
+                == 0
+            )
+
+            self._is_inplace_pinned.add(x)
+
+    def to(self, device):  # pylint: disable=invalid-name
+        """Copy `TorchBasedFeature` to the specified device."""
+        # copy.copy is a shallow copy so it does not copy tensor memory.
+        self2 = copy.copy(self)
+        if device == "pinned":
+            self2._tensor = self2._tensor.pin_memory()
+        else:
+            self2._tensor = self2._tensor.to(device)
+        return self2
 
     def __repr__(self) -> str:
         ret = (
@@ -254,6 +292,13 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         """In-place operation to copy the feature store to pinned memory."""
         for feature in self._features.values():
             feature.pin_memory_()
+
+    def to(self, device):  # pylint: disable=invalid-name
+        """Copy `TorchBasedFeatureStore` to the specified device."""
+        # copy.copy is a shallow copy so it does not copy tensor memory.
+        self2 = copy.copy(self)
+        self2._features = {k: v.to(device) for k, v in self2._features.items()}
+        return self2
 
     def __repr__(self) -> str:
         ret = "{Classname}(\n" + "    {features}\n" + ")"
