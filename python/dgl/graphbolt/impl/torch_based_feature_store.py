@@ -210,7 +210,8 @@ class TorchBasedFeature(Feature):
 
     def record_stream(self, stream):
         """Record the given stream in the Feature."""
-        self._tensor.record_stream(stream)
+        if self._tensor.is_cuda:
+            self._tensor.record_stream(stream)
 
     def __repr__(self) -> str:
         ret = (
