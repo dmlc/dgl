@@ -39,7 +39,7 @@ def _find_and_wrap_parent(
 
 
 class EndMarker(dp.iter.IterDataPipe):
-    """Used to mark the end of a datapipe."""
+    """Used to mark the end of a datapipe and is a no-op."""
 
     def __init__(self, datapipe):
         self.datapipe = datapipe
@@ -50,7 +50,17 @@ class EndMarker(dp.iter.IterDataPipe):
 
 
 class Bufferer(dp.iter.IterDataPipe):
-    """Buffers items before yielding them."""
+    """Buffers items before yielding them.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The data pipeline.
+    buffer_size : int, optional
+        The size of the buffer which stores the fetched samples. If data coming
+        from datapipe has latency spikes, consider increasing passing a high
+        value. Default is 2.
+    """
 
     def __init__(self, datapipe, buffer_size=2):
         self.datapipe = datapipe
