@@ -83,16 +83,17 @@ class TorchBasedFeature(Feature):
         # Make sure the tensor is contiguous.
         self._tensor = torch_feature.contiguous()
         self._metadata = metadata
+        self._is_inplace_pinned = set()
 
     def __del__(self):
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
         # truly in-place, we need to use cudaHostRegister. Then, we need to use
         # cudaHostUnregister to unpin the tensor in the destructor.
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
-        if hasattr(self, "_is_inplace_pinned"):
-            cudart = torch.cuda.cudart()
-            for tensor in self._is_inplace_pinned:
-                assert cudart.cudaHostUnregister(tensor.data_ptr()) == 0
+        for tensor in self._is_inplace_pinned:
+            assert (
+                torch.cuda.cudart().cudaHostUnregister(tensor.data_ptr()) == 0
+            )
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -179,7 +180,6 @@ class TorchBasedFeature(Feature):
 
     def pin_memory_(self):
         """In-place operation to copy the feature to pinned memory."""
-        self._is_inplace_pinned = set()
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
         # truly in-place, we need to use cudaHostRegister. Then, we need to use
         # cudaHostUnregister to unpin the tensor in the destructor.
