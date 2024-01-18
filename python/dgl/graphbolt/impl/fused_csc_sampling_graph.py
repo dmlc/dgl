@@ -34,7 +34,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ):
         super().__init__()
         self._c_csc_graph = c_csc_graph
-        self._is_inplace_pinned = set()
 
     def __del__(self):
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
@@ -992,6 +991,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         # cudaHostUnregister to unpin the tensor in the destructor.
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
         cudart = torch.cuda.cudart()
+        if not hasattr(self, "_is_inplace_pinned"):
+            self._is_inplace_pinned = set()
 
         def _pin(x):
             if hasattr(x, "pin_memory_"):
