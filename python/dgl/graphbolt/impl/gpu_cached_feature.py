@@ -1,9 +1,9 @@
 """GPU cached feature for GraphBolt."""
 import torch
 
-from dgl.cuda import GPUCache
-
 from ..feature_store import Feature
+
+from .gpu_cache import GPUCache
 
 __all__ = ["GPUCachedFeature"]
 
@@ -52,10 +52,7 @@ class GPUCachedFeature(Feature):
         self.cache_size = cache_size
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
-        self.item_shape = (-1,) + feat0.shape[1:]
-        feat0 = torch.reshape(feat0, (1, -1))
-        self.flat_shape = (-1, feat0.shape[1])
-        self._feature = GPUCache(cache_size, feat0.shape[1])
+        self._feature = GPUCache((cache_size,) + feat0.shape[1:], feat0.dtype)
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -75,15 +72,12 @@ class GPUCachedFeature(Feature):
             The read feature.
         """
         if ids is None:
-            return self._fallback_feature.read().to("cuda")
-        keys = ids.to("cuda")
-        values, missing_index, missing_keys = self._feature.query(keys)
+            return self._fallback_feature.read()
+        values, missing_index, missing_keys = self._feature.query(ids)
         missing_values = self._fallback_feature.read(missing_keys).to("cuda")
-        missing_values = missing_values.reshape(self.flat_shape)
-        values = values.to(missing_values.dtype)
         values[missing_index] = missing_values
         self._feature.replace(missing_keys, missing_values)
-        return torch.reshape(values, self.item_shape)
+        return values
 
     def size(self):
         """Get the size of the feature.
@@ -114,10 +108,8 @@ class GPUCachedFeature(Feature):
             size = min(self.cache_size, value.shape[0])
             self._feature.replace(
                 torch.arange(0, size, device="cuda"),
-                value[:size].to("cuda").reshape(self.flat_shape),
+                value[:size].to("cuda"),
             )
         else:
             self._fallback_feature.update(value, ids)
-            self._feature.replace(
-                ids.to("cuda"), value.to("cuda").reshape(self.flat_shape)
-            )
+            self._feature.replace(ids, value)

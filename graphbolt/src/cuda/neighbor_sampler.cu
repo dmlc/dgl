@@ -157,6 +157,15 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
+  auto max_in_degree = torch::empty(
+      1,
+      c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
+  AT_DISPATCH_INDEX_TYPES(
+      indptr.scalar_type(), "SampleNeighborsMaxInDegree", ([&] {
+        CUB_CALL(
+            DeviceReduce::Max, in_degree.data_ptr<index_t>(),
+            max_in_degree.data_ptr<index_t>(), num_rows);
+      }));
   torch::optional<int64_t> num_edges_;
   torch::Tensor sub_indptr;
   torch::optional<torch::Tensor> sliced_probs_or_mask;
@@ -182,16 +191,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   if (!probs_or_mask.has_value() && fanouts.size() <= 1) {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
-  auto max_in_degree = torch::empty(
-      1,
-      c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
-  AT_DISPATCH_INDEX_TYPES(
-      indptr.scalar_type(), "SampleNeighborsInDegree", ([&] {
-        CUB_CALL(
-            DeviceReduce::Max, in_degree.data_ptr<index_t>(),
-            max_in_degree.data_ptr<index_t>(), num_rows);
-      }));
-  auto coo_rows = CSRToCOO(sub_indptr, indices.scalar_type());
+  auto coo_rows = ExpandIndptrImpl(
+      sub_indptr, indices.scalar_type(), torch::nullopt, num_edges_);
   const auto num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
@@ -233,7 +234,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
 
         // Find the smallest integer type to store the edge id offsets.
-        // CSRToCOO had synch inside, so it is safe to read max_in_degree now.
+        // ExpandIndptr or IndexSelectCSCImpl had synch inside, so it is safe to
+        // read max_in_degree now.
         const int num_bits =
             cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         std::array<int, 4> type_bits = {8, 16, 32, 64};
