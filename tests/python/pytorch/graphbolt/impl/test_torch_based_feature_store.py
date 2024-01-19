@@ -221,6 +221,9 @@ def test_torch_based_pinned_feature(dtype, idtype, shape):
     feature = gb.TorchBasedFeature(tensor)
     feature.pin_memory_()
 
+    # Check if pinning is truly in-place.
+    assert feature._tensor.data_ptr() == tensor.data_ptr()
+
     # Test read entire pinned feature, the result should be on cuda.
     assert torch.equal(feature.read(), test_tensor_cuda)
     assert feature.read().is_cuda
