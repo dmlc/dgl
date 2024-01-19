@@ -869,7 +869,7 @@ def test_to_pyg_adapter():
         node_features={"feat": expected_node_features},
         labels=expected_labels,
     )
-    pyg_data = test_minibatch.to_pyg_adapter(device=torch.device("cpu"))
+    pyg_data = test_minibatch.to_pyg_adapter()
     assert torch.equal(pyg_data.edge_index, expected_edge_index), "Edge index is not correctly constructed."
     assert torch.equal(pyg_data.x, expected_node_features), "Node features are not correctly set."
     assert torch.equal(pyg_data.y, expected_labels), "Labels are not correctly set."
@@ -880,7 +880,7 @@ def test_to_pyg_adapter():
         node_features={"feat": expected_node_features},
         labels=expected_labels,
     )
-    pyg_data = test_minibatch.to_pyg_adapter(device=torch.device("cpu"))
+    pyg_data = test_minibatch.to_pyg_adapter()
     assert pyg_data.edge_index.numel() == 0, "Edge index should be empty."
 
     # Test with node_features as None
@@ -889,7 +889,7 @@ def test_to_pyg_adapter():
         node_features=None,
         labels=expected_labels,
     )
-    pyg_data = test_minibatch.to_pyg_adapter(device=torch.device("cpu"))
+    pyg_data = test_minibatch.to_pyg_adapter()
     assert pyg_data.x is None, "Node features should be None."
 
     # Test with labels as None
@@ -898,7 +898,7 @@ def test_to_pyg_adapter():
         node_features={"feat": expected_node_features},
         labels=None,
     )
-    pyg_data = test_minibatch.to_pyg_adapter(device=torch.device("cpu"))
+    pyg_data = test_minibatch.to_pyg_adapter()
     assert pyg_data.y is None, "Labels should be None."
 
 test_to_pyg_adapter()

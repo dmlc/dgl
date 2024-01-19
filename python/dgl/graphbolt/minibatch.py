@@ -500,7 +500,7 @@ class MiniBatch:
         return self
 
 
-    def to_pyg_adapter(self, device):
+    def to_pyg_adapter(self):
         """
         Converts the MiniBatch instance to a PyTorch Geometric (PyG) Data object.
          This function is responsible for transforming the graph data contained in 
@@ -518,10 +518,10 @@ class MiniBatch:
         pyg_data = minibatch.to_pyg_adapter(device=torch.device('cpu'))
         """
         from torch_geometric.data import Data
-        def construct_edge_index(subgraph, device):
+        def construct_edge_index(subgraph):
             csc_matrix = subgraph.sampled_csc
-            indices = csc_matrix.indices.to(device)
-            indptr = csc_matrix.indptr.to(device)
+            indices = csc_matrix.indices
+            indptr = csc_matrix.indptr
             row_indices = expand_indptr(indptr, dtype=indices.dtype, output_size=len(indices))
             col_indices = indices
             return torch.stack([row_indices, col_indices], dim=0)
@@ -529,12 +529,12 @@ class MiniBatch:
         all_edge_indices = []
         for subgraph in self.sampled_subgraphs:
             if subgraph is not None:
-                edge_index = construct_edge_index(subgraph, device)
+                edge_index = construct_edge_index(subgraph)
                 all_edge_indices.append(edge_index)
 
         combined_edge_index = (
             torch.cat(all_edge_indices, dim=1) if all_edge_indices 
-            else torch.empty((2, 0), dtype=torch.long, device=device)
+            else torch.empty((2, 0), dtype=torch.long)
         )
 
         node_features = self.node_features["feat"] if self.node_features else None
