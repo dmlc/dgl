@@ -60,7 +60,8 @@ def test_integration_link_prediction():
     )
     expected = [
         str(
-            """MiniBatch(seed_nodes=None,
+            """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 1, 1, 1, 1, 2]),
                                                                          indices=tensor([0, 4]),
                                                            ),
@@ -116,7 +117,8 @@ def test_integration_link_prediction():
        )"""
         ),
         str(
-            """MiniBatch(seed_nodes=None,
+            """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 0, 0, 0, 1, 2, 3]),
                                                                          indices=tensor([4, 1, 0]),
                                                            ),
@@ -172,7 +174,8 @@ def test_integration_link_prediction():
        )"""
         ),
         str(
-            """MiniBatch(seed_nodes=None,
+            """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 0, 1, 1, 2]),
                                                                          indices=tensor([1, 0]),
                                                            ),
@@ -276,7 +279,8 @@ def test_integration_node_classification():
     )
     expected = [
         str(
-            """MiniBatch(seed_nodes=None,
+            """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 2, 3, 4]),
                                                                          indices=tensor([4, 1, 0, 1]),
                                                            ),
@@ -317,7 +321,8 @@ def test_integration_node_classification():
        )"""
         ),
         str(
-            """MiniBatch(seed_nodes=None,
+            """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 2, 2]),
                                                                          indices=tensor([0, 2]),
                                                            ),
@@ -356,7 +361,8 @@ def test_integration_node_classification():
        )"""
         ),
         str(
-            """MiniBatch(seed_nodes=None,
+            """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 2]),
                                                                          indices=tensor([0, 2]),
                                                            ),

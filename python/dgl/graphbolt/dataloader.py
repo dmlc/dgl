@@ -1,5 +1,8 @@
 """Graph Bolt DataLoaders"""
 
+from queue import Queue
+
+import torch
 import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
@@ -35,6 +38,62 @@ def _find_and_wrap_parent(
             )
 
 
+class EndMarker(dp.iter.IterDataPipe):
+    """Used to mark the end of a datapipe and is a no-op."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        for data in self.datapipe:
+            yield data
+
+
+class Bufferer(dp.iter.IterDataPipe):
+    """Buffers items before yielding them.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The data pipeline.
+    buffer_size : int, optional
+        The size of the buffer which stores the fetched samples. If data coming
+        from datapipe has latency spikes, consider increasing passing a high
+        value. Default is 2.
+    """
+
+    def __init__(self, datapipe, buffer_size=2):
+        self.datapipe = datapipe
+        if buffer_size <= 0:
+            raise ValueError(
+                "'buffer_size' is required to be a positive integer."
+            )
+        self.buffer = Queue(buffer_size)
+
+    def __iter__(self):
+        for data in self.datapipe:
+            if not self.buffer.full():
+                self.buffer.put(data)
+            else:
+                return_data = self.buffer.get()
+                self.buffer.put(data)
+                yield return_data
+        while not self.buffer.empty():
+            yield self.buffer.get()
+
+
+class Awaiter(dp.iter.IterDataPipe):
+    """Calls the wait function of all items."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        for data in self.datapipe:
+            data.wait()
+            yield data
+
+
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
 
@@ -64,6 +123,14 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
         yield from self.dataloader
 
 
+# There needs to be a single instance of the uva_stream, if it is created
+# multiple times, it leads to multiple CUDA memory pools and memory leaks.
+def _get_uva_stream():
+    if not hasattr(_get_uva_stream, "stream"):
+        _get_uva_stream.stream = torch.cuda.Stream(priority=-1)
+    return _get_uva_stream.stream
+
+
 class DataLoader(torch.utils.data.DataLoader):
     """Multiprocessing DataLoader.
 
@@ -84,9 +151,26 @@ class DataLoader(torch.utils.data.DataLoader):
         If True, the data loader will not shut down the worker processes after a
         dataset has been consumed once. This allows to maintain the workers
         instances alive.
+    overlap_feature_fetch : bool, optional
+        If True, the data loader will overlap the UVA feature fetcher operations
+        with the rest of operations by using an alternative CUDA stream. Default
+        is True.
+    max_uva_threads : int, optional
+        Limits the number of CUDA threads used for UVA copies so that the rest
+        of the computations can run simultaneously with it. Setting it to a too
+        high value will limit the amount of overlap while setting it too low may
+        cause the PCI-e bandwidth to not get fully utilized. Manually tuned
+        default is 6144, meaning around 3-4 Streaming Multiprocessors.
     """
 
-    def __init__(self, datapipe, num_workers=0, persistent_workers=True):
+    def __init__(
+        self,
+        datapipe,
+        num_workers=0,
+        persistent_workers=True,
+        overlap_feature_fetch=True,
+        max_uva_threads=6144,
+    ):
         # Multiprocessing requires two modifications to the datapipe:
         #
         # 1. Insert a stage after ItemSampler to distribute the
@@ -94,6 +178,7 @@ class DataLoader(torch.utils.data.DataLoader):
         # 2. Cut the datapipe at FeatureFetcher, and wrap the inner datapipe
         #    of the FeatureFetcher with a multiprocessing PyTorch DataLoader.
 
+        datapipe = EndMarker(datapipe)
         datapipe_graph = dp_utils.traverse_dps(datapipe)
         datapipe_adjlist = datapipe_graph_to_adjlist(datapipe_graph)
 
@@ -122,7 +207,35 @@ class DataLoader(torch.utils.data.DataLoader):
             persistent_workers=persistent_workers,
         )
 
-        # (3) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
+        # (3) Overlap UVA feature fetching by buffering and using an alternative
+        # stream.
+        if (
+            overlap_feature_fetch
+            and num_workers == 0
+            and torch.cuda.is_available()
+        ):
+            torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
+            feature_fetchers = dp_utils.find_dps(
+                datapipe_graph,
+                FeatureFetcher,
+            )
+            for feature_fetcher in feature_fetchers:
+                feature_fetcher.stream = _get_uva_stream()
+            _find_and_wrap_parent(
+                datapipe_graph,
+                datapipe_adjlist,
+                EndMarker,
+                Bufferer,
+                buffer_size=2,
+            )
+            _find_and_wrap_parent(
+                datapipe_graph,
+                datapipe_adjlist,
+                EndMarker,
+                Awaiter,
+            )
+
+        # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
         # data pipeline up to the CopyTo operation to run in a separate thread.
         _find_and_wrap_parent(
             datapipe_graph,
