@@ -117,7 +117,7 @@ def create_dataloader(
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(
+    datapipe = datapipe.sample_neighbor2(
         graph, fanout if job != "infer" else [-1]
     )
 
