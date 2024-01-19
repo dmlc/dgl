@@ -501,22 +501,35 @@ class MiniBatch:
 
 
     def to_pyg_adapter(self):
-        """
-        Converts the MiniBatch instance to a PyTorch Geometric (PyG) Data object.
-         This function is responsible for transforming the graph data contained in 
-        the MiniBatch instance into the format required by PyG. It constructs edge 
-        indices for each subgraph in the minibatch and combines them. It also 
-        prepares node features and labels to be compatible with the PyG Data object.
-        - Args: 
-        device (torch.device): The device (CPU or GPU) where the tensors will 
-        be allocated.
-        -  Returns:
-        Data: A PyTorch Geometric Data object containing graph information such as 
-        node features, edge indices, and labels.
-        Example Usage:
-        # Assuming `minibatch` is an instance of `MiniBatch`
-        pyg_data = minibatch.to_pyg_adapter(device=torch.device('cpu'))
-        """
+        """Converts the MiniBatch instance to a PyTorch Geometric (PyG) Data object.
+
+        This function transforms the graph data contained in the MiniBatch instance 
+        into a format compatible with PyG. It constructs edge indices for each 
+        subgraph in the minibatch and combines them into a single edge index tensor. 
+        It also prepares node features and labels to be included in the PyG Data object.
+
+        The function assumes that the `MiniBatch` instance has been properly initialized 
+        and contains the necessary graph data.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Data
+            A PyTorch Geometric Data object containing the graph data, including node 
+            features, edge indices, and labels.
+
+        Examples
+        --------
+        Assuming `minibatch` is an instance of `MiniBatch`:
+
+        >>> pyg_data = minibatch.to_pyg_adapter()
+        """     
+        
+
+
         from torch_geometric.data import Data
         def construct_edge_index(subgraph):
             csc_matrix = subgraph.sampled_csc
@@ -527,10 +540,11 @@ class MiniBatch:
             return torch.stack([row_indices, col_indices], dim=0)
 
         all_edge_indices = []
-        for subgraph in self.sampled_subgraphs:
-            if subgraph is not None:
-                edge_index = construct_edge_index(subgraph)
-                all_edge_indices.append(edge_index)
+        if self.sampled_subgraphs is not None:
+            for subgraph in self.sampled_subgraphs:
+                if subgraph is not None:
+                    edge_index = construct_edge_index(subgraph)
+                    all_edge_indices.append(edge_index)
 
         combined_edge_index = (
             torch.cat(all_edge_indices, dim=1) if all_edge_indices 

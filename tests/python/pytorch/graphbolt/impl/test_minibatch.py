@@ -876,7 +876,7 @@ def test_to_pyg_adapter():
 
     # Test with sampled_csc as None
     test_minibatch = gb.MiniBatch(
-        sampled_subgraphs=[None],
+        sampled_subgraphs=None,
         node_features={"feat": expected_node_features},
         labels=expected_labels,
     )
@@ -901,4 +901,3 @@ def test_to_pyg_adapter():
     pyg_data = test_minibatch.to_pyg_adapter()
     assert pyg_data.y is None, "Labels should be None."
 
-test_to_pyg_adapter()
