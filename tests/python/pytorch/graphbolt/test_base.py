@@ -248,6 +248,25 @@ def test_isin_non_1D_dim():
         gb.isin(elements, test_elements)
 
 
+def torch_expand_indptr(indptr, dtype, nodes=None):
+    if nodes is None:
+        nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
+    return nodes.to(dtype).repeat_interleave(indptr.diff())
+
+
+@pytest.mark.parametrize("nodes", [None, True])
+@pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
+def test_expand_indptr(nodes, dtype):
+    if nodes:
+        nodes = torch.tensor([1, 7, 3, 4, 5, 8], dtype=dtype, device=F.ctx())
+    indptr = torch.tensor([0, 2, 2, 7, 10, 12, 20], device=F.ctx())
+    torch_result = torch_expand_indptr(indptr, dtype, nodes)
+    gb_result = gb.expand_indptr(indptr, dtype, nodes)
+    assert torch.equal(torch_result, gb_result)
+    gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
+    assert torch.equal(torch_result, gb_result)
+
+
 def test_csc_format_base_representation():
     csc_format_base = gb.CSCFormatBase(
         indptr=torch.tensor([0, 2, 4]),

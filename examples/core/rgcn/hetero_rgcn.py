@@ -116,7 +116,7 @@ def prepare_data(args, device):
     # Initialize a train sampler that samples neighbors for multi-layer graph
     # convolution. It samples 25 and 10 neighbors for the first and second
     # layers respectively.
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([25, 10])
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([25, 10], fused=False)
     num_workers = args.num_workers
     train_loader = dgl.dataloading.DataLoader(
         g,
@@ -488,7 +488,7 @@ def evaluate(
     else:
         evaluator = MAG240MEvaluator()
 
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([25, 10])
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([25, 10], fused=False)
     dataloader = dgl.dataloading.DataLoader(
         g,
         idx,

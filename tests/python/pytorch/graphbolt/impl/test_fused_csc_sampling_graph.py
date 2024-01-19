@@ -1601,9 +1601,13 @@ def test_csc_sampling_graph_to_device(device):
 def test_csc_sampling_graph_to_pinned_memory():
     # Construct FusedCSCSamplingGraph.
     graph = create_fused_csc_sampling_graph()
+    ptr = graph.csc_indptr.data_ptr()
 
     # Copy to pinned_memory in-place.
     graph.pin_memory_()
+
+    # Check if pinning is truly in-place.
+    assert graph.csc_indptr.data_ptr() == ptr
 
     is_graph_on_device_type(graph, "cpu")
     is_graph_pinned(graph)
