@@ -58,8 +58,7 @@ def test_minibatch_representation_homo():
     labels = torch.tensor([0.0, 1.0, 2.0])
     # Test minibatch without data.
     minibatch = gb.MiniBatch()
-    expect_result = str(
-        """MiniBatch(seeds=None,
+    expect_result = str("""MiniBatch(seeds=None,
           seed_nodes=None,
           sampled_subgraphs=None,
           positive_node_pairs=None,
@@ -93,8 +92,7 @@ def test_minibatch_representation_homo():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    expect_result = str(
-        """MiniBatch(seeds=None,
+    expect_result = str("""MiniBatch(seeds=None,
           seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6]),
                                                                          indices=tensor([0, 1, 2, 2, 1, 2]),
@@ -242,8 +240,7 @@ def test_minibatch_representation_hetero():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    expect_result = str(
-        """MiniBatch(seeds=None,
+    expect_result = str("""MiniBatch(seeds=None,
           seed_nodes={'B': tensor([10, 15])},
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
                                                                          indices=tensor([0, 1, 1]),
@@ -854,8 +851,7 @@ def test_dgl_link_predication_hetero(mode):
 def test_to_pyg_adapter():
     test_subgraph = gb.SampledSubgraphImpl(
         sampled_csc=gb.CSCFormatBase(
-            indptr=torch.tensor([0, 2, 3]), 
-            indices=torch.tensor([0, 1, 1])
+            indptr=torch.tensor([0, 2, 3]), indices=torch.tensor([0, 1, 1])
         ),
         original_column_node_ids=torch.tensor([0, 1]),
         original_row_node_ids=torch.tensor([0, 1]),
@@ -870,9 +866,15 @@ def test_to_pyg_adapter():
         labels=expected_labels,
     )
     pyg_data = test_minibatch.to_pyg_adapter()
-    assert torch.equal(pyg_data.edge_index, expected_edge_index), "Edge index is not correctly constructed."
-    assert torch.equal(pyg_data.x, expected_node_features), "Node features are not correctly set."
-    assert torch.equal(pyg_data.y, expected_labels), "Labels are not correctly set."
+    assert torch.equal(
+        pyg_data.edge_index, expected_edge_index
+    ), "Edge index is not correctly constructed."
+    assert torch.equal(
+        pyg_data.x, expected_node_features
+    ), "Node features are not correctly set."
+    assert torch.equal(
+        pyg_data.y, expected_labels
+    ), "Labels are not correctly set."
 
     # Test with sampled_csc as None
     test_minibatch = gb.MiniBatch(
@@ -900,4 +902,3 @@ def test_to_pyg_adapter():
     )
     pyg_data = test_minibatch.to_pyg_adapter()
     assert pyg_data.y is None, "Labels should be None."
-
