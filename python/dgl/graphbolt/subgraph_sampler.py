@@ -11,8 +11,10 @@ from .internal import compact_temporal_nodes, unique_and_compact
 from .minibatch_transformer import MiniBatchTransformer
 
 __all__ = [
-    "SubgraphSampler", "SubgraphSamplerPreprocess",
+    "SubgraphSampler",
+    "SubgraphSamplerPreprocess",
 ]
+
 
 @functional_datapipe("sample_subgraph_preprocess")
 class SubgraphSamplerPreprocess(Mapper):
@@ -187,6 +189,7 @@ class SubgraphSamplerPreprocess(Mapper):
             compacted_negative_srcs if has_neg_src else None,
             compacted_negative_dsts if has_neg_dst else None,
         )
+
 
 @functional_datapipe("sample_subgraph")
 class SubgraphSampler(MiniBatchTransformer):

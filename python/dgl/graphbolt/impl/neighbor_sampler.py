@@ -2,19 +2,19 @@
 
 import torch
 from torch.utils.data import functional_datapipe
+from torchdata.datapipes.iter import IterDataPipe, Mapper
 
 from ..internal import compact_csc_format, unique_and_compact_csc_formats
 
 from ..subgraph_sampler import SubgraphSampler
 from .sampled_subgraph_impl import SampledSubgraphImpl
-from torchdata.datapipes.iter import IterDataPipe, Mapper
 
 
 __all__ = ["NeighborSampler", "LayerNeighborSampler", "NeighborSampler2"]
 
+
 @functional_datapipe("sample_per_layer")
 class SamplePerLayer(Mapper):
-
     def __init__(self, datapipe, sampler, fanout, replace, prob_name):
         super().__init__(datapipe, self._sample_per_layer)
         self.sampler = sampler
@@ -23,12 +23,16 @@ class SamplePerLayer(Mapper):
         self.prob_name = prob_name
 
     def _sample_per_layer(self, minibatch):
-        print("sample_per_layer", minibatch)
-        return self.sampler(minibatch.input_nodes, self.fanout, self.replace, self.prob_name), minibatch
+        return (
+            self.sampler(
+                minibatch.input_nodes, self.fanout, self.replace, self.prob_name
+            ),
+            minibatch,
+        )
+
 
 @functional_datapipe("compact_per_layer")
 class CompactPerLayer(Mapper):
-
     def __init__(self, datapipe, deduplicate):
         super().__init__(datapipe, self._compact_per_layer)
         self.deduplicate = deduplicate
@@ -60,9 +64,8 @@ class CompactPerLayer(Mapper):
             )
         minibatch.input_nodes = original_row_node_ids
         minibatch.sampled_subgraphs.insert(0, subgraph)
-        print("compact_per_layer", minibatch)
         return minibatch
-        
+
 
 @functional_datapipe("sample_neighbor2")
 class NeighborSampler2(IterDataPipe):
@@ -159,6 +162,7 @@ class NeighborSampler2(IterDataPipe):
     ):
         self.graph = graph
         datapipe = datapipe.sample_subgraph_preprocess()
+
         def helper(minibatch):
             seeds = minibatch.input_nodes
             # Enrich seeds with all node types.
@@ -177,20 +181,23 @@ class NeighborSampler2(IterDataPipe):
                 }
             minibatch.input_nodes = seeds
             minibatch.sampled_subgraphs = []
-            print("helper_end", minibatch)
             return minibatch
+
         datapipe = datapipe.map(helper)
         sampler = getattr(graph, sampler)
         for fanout in reversed(fanouts):
             # Convert fanout to tensor.
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
-            datapipe = datapipe.sample_per_layer(sampler, fanout, replace, prob_name)
+            datapipe = datapipe.sample_per_layer(
+                sampler, fanout, replace, prob_name
+            )
             datapipe = datapipe.compact_per_layer(deduplicate)
         self.datapipe = datapipe
 
     def __iter__(self):
         yield from self.datapipe
+
 
 @functional_datapipe("sample_neighbor")
 class NeighborSampler(SubgraphSampler):
