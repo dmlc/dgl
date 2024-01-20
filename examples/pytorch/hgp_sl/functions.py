@@ -12,7 +12,7 @@ import torch
 from dgl.backend import astype
 from dgl.base import ALL, is_all
 from dgl.heterograph_index import HeteroGraphIndex
-from dgl.sparse import _gsddmm, _gspmm
+from dgl._sparse_ops import _gsddmm, _gspmm
 from torch import Tensor
 from torch.autograd import Function
 
