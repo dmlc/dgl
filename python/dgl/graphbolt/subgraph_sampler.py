@@ -37,27 +37,26 @@ class SubgraphSamplerPreprocess(Mapper):
         super().__init__(datapipe, self._preprocess)
 
     def _preprocess(self, minibatch):
-        for minibatch in self.datapipe:
-            if minibatch.node_pairs is not None:
-                (
-                    seeds,
-                    seeds_timestamp,
-                    minibatch.compacted_node_pairs,
-                    minibatch.compacted_negative_srcs,
-                    minibatch.compacted_negative_dsts,
-                ) = self._node_pairs_preprocess(minibatch)
-            elif minibatch.seed_nodes is not None:
-                seeds = minibatch.seed_nodes
-                seeds_timestamp = (
-                    minibatch.timestamp if hasattr(minibatch, "timestamp") else None
-                )
-            else:
-                raise ValueError(
-                    f"Invalid minibatch {minibatch}: Either `node_pairs` or "
-                    "`seed_nodes` should have a value."
-                )
-            minibatch.input_nodes = seeds
-            return minibatch
+        if minibatch.node_pairs is not None:
+            (
+                seeds,
+                seeds_timestamp,
+                minibatch.compacted_node_pairs,
+                minibatch.compacted_negative_srcs,
+                minibatch.compacted_negative_dsts,
+            ) = self._node_pairs_preprocess(minibatch)
+        elif minibatch.seed_nodes is not None:
+            seeds = minibatch.seed_nodes
+            seeds_timestamp = (
+                minibatch.timestamp if hasattr(minibatch, "timestamp") else None
+            )
+        else:
+            raise ValueError(
+                f"Invalid minibatch {minibatch}: Either `node_pairs` or "
+                "`seed_nodes` should have a value."
+            )
+        minibatch.input_nodes = seeds
+        return minibatch
 
     def _node_pairs_preprocess(self, minibatch):
         use_timestamp = hasattr(minibatch, "timestamp")
