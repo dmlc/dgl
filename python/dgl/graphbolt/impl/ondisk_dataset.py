@@ -124,10 +124,11 @@ def preprocess_ondisk_dataset(
     is_homogeneous = "type" not in input_config["graph"]["nodes"][0]
     if is_homogeneous:
         # Homogeneous graph.
-        num_nodes = input_config["graph"]["nodes"][0]["num"]
         edge_fmt = input_config["graph"]["edges"][0]["format"]
         edge_path = input_config["graph"]["edges"][0]["path"]
         src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
+        num_nodes = input_config["graph"]["nodes"][0]["num"]
+        num_edges = len(src)
         coo_tensor = torch.tensor([src, dst])
         sparse_matrix = dglsp.spmatrix(coo_tensor)
         indptr, indices, value_indices = sparse_matrix.csc()
@@ -200,6 +201,7 @@ def preprocess_ondisk_dataset(
                         graph_feature["format"],
                         in_memory=in_memory,
                     )
+                    assert node_data.shape[0] == num_nodes
                     node_attributes[graph_feature["name"]] = node_data
                 elif graph_feature["domain"] == "edge":
                     edge_data = read_data(
@@ -207,6 +209,7 @@ def preprocess_ondisk_dataset(
                         graph_feature["format"],
                         in_memory=in_memory,
                     )
+                    assert edge_data.shape[0] == num_edges
                     edge_attributes[graph_feature["name"]] = edge_data
         else:
             # Heterogeneous graph.
