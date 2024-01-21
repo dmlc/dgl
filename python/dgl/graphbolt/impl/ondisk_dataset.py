@@ -10,7 +10,6 @@ from typing import Dict, List, Union
 import torch
 import yaml
 
-# import dgl
 import dgl.sparse as dglsp
 
 from ...base import dgl_warning
