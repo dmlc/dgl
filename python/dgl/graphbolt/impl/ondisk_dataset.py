@@ -10,11 +10,12 @@ from typing import Dict, List, Union
 import torch
 import yaml
 
-import dgl
+# import dgl
+import dgl.sparse as dglsp
 
 from ...base import dgl_warning
 from ...data.utils import download, extract_archive
-from ..base import etype_str_to_tuple
+from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
 from ..dataset import Dataset, Task
 from ..internal import (
     calculate_dir_hash,
@@ -26,7 +27,7 @@ from ..internal import (
 )
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
+from .fused_csc_sampling_graph import fused_csc_sampling_graph, FusedCSCSamplingGraph
 from .ondisk_metadata import (
     OnDiskGraphTopology,
     OnDiskMetaData,
@@ -125,77 +126,267 @@ def preprocess_ondisk_dataset(
         edge_fmt = input_config["graph"]["edges"][0]["format"]
         edge_path = input_config["graph"]["edges"][0]["path"]
         src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
-        g = dgl.graph((src, dst), num_nodes=num_nodes)
+        # g = dgl.graph((src, dst), num_nodes=num_nodes)
+        # assert 0, type(src)
+        coo_tensor = torch.tensor([src, dst])
+        # assert 0, coo_tensor.shape
+        sparse_matrix = dglsp.spmatrix(coo_tensor)
+        indptr, indices, value_indices = sparse_matrix.csc()
+        node_type_offset = None
+        type_per_edge = None
+        node_type_to_id = None
+        edge_type_to_id = None
+        node_attributes = {}
+        edge_attributes = {}
+        if include_original_edge_id:
+            edge_attributes[ORIGINAL_EDGE_ID] = value_indices
+        # assert 0, [indptr, indices, edge_attributes[ORIGINAL_EDGE_ID]]
     else:
         # Heterogeneous graph.
-        # Construct the num nodes dict.
-        num_nodes_dict = {}
-        for node_info in input_config["graph"]["nodes"]:
-            num_nodes_dict[node_info["type"]] = node_info["num"]
-        # Construct the data dict.
-        data_dict = {}
-        for edge_info in input_config["graph"]["edges"]:
+        # Construct node_type_offset and node_type_to_id.
+        node_type_offset = [0]
+        node_type_to_id = {}
+        for node_type_id, node_info in enumerate(
+            input_config["graph"]["nodes"]
+        ):
+            node_type_to_id[node_info["type"]] = node_type_id
+            node_type_offset.append(node_type_offset[-1] + node_info["num"])
+        # Construct edge_type_to_id and coo_tensor.
+        edge_type_offset = [0]
+        edge_type_to_id = {}
+        coo_src_list = []
+        coo_dst_list = []
+        coo_etype_list = []
+
+        for edge_type_id, edge_info in enumerate(
+            input_config["graph"]["edges"]
+        ):
+            edge_type_to_id[edge_info["type"]] = edge_type_id
             edge_fmt = edge_info["format"]
             edge_path = edge_info["path"]
             src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
-            data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
+            edge_type_offset.append(edge_type_offset[-1] + len(src))
+            # data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
+            src_type, _, dst_type = etype_str_to_tuple(edge_info["type"])
+            # print([src, dst])
+            src += node_type_offset[node_type_to_id[src_type]]
+            dst += node_type_offset[node_type_to_id[dst_type]]
+            # assert 0, [src, dst]
+            coo_src_list.append(torch.tensor(src))
+            coo_dst_list.append(torch.tensor(dst))
+            coo_etype_list.append(torch.full((len(src),), edge_type_id))
+
+        coo_src = torch.cat(coo_src_list)
+        coo_dst = torch.cat(coo_dst_list)
+        coo_etype = torch.cat(coo_etype_list)
+
+        sparse_matrix = dglsp.spmatrix(
+            indices=torch.stack((coo_src, coo_dst), dim=0), val=coo_etype
+        )
+        indptr, indices, value_indices = sparse_matrix.csc()
+        node_type_offset = torch.tensor(node_type_offset)
+        type_per_edge = torch.index_select(
+            coo_etype, dim=0, index=value_indices
+        )
+        node_attributes = {}
+        edge_attributes = {}
+        if include_original_edge_id:
+            edge_attributes[ORIGINAL_EDGE_ID] = value_indices
+
         # Construct the heterograph.
-        g = dgl.heterograph(data_dict, num_nodes_dict)
+        # g = dgl.heterograph(data_dict, num_nodes_dict)
 
     # 3. Load the sampling related node/edge features and add them to
     # the sampling-graph.
     if input_config["graph"].get("feature_data", None):
-        for graph_feature in input_config["graph"]["feature_data"]:
-            in_memory = (
-                True
-                if "in_memory" not in graph_feature
-                else graph_feature["in_memory"]
-            )
-            if graph_feature["domain"] == "node":
-                node_data = read_data(
-                    os.path.join(dataset_dir, graph_feature["path"]),
-                    graph_feature["format"],
-                    in_memory=in_memory,
+        if is_homogeneous:
+            # homogeneous graph.
+            for graph_feature in input_config["graph"]["feature_data"]:
+                in_memory = (
+                    True
+                    if "in_memory" not in graph_feature
+                    else graph_feature["in_memory"]
                 )
-                if is_homogeneous:
-                    g.ndata[graph_feature["name"]] = node_data
-                else:
-                    g.nodes[graph_feature["type"]].data[
-                        graph_feature["name"]
+                if graph_feature["domain"] == "node":
+                    node_data = read_data(
+                        os.path.join(dataset_dir, graph_feature["path"]),
+                        graph_feature["format"],
+                        in_memory=in_memory,
+                    )
+                    node_attributes[graph_feature["name"]] = node_data
+                elif graph_feature["domain"] == "edge":
+                    edge_data = read_data(
+                        os.path.join(dataset_dir, graph_feature["path"]),
+                        graph_feature["format"],
+                        in_memory=in_memory,
+                    )
+                    edge_attributes[graph_feature["name"]] = edge_data
+        # for graph_feature in input_config["graph"]["feature_data"]:
+        #     in_memory = (
+        #         True
+        #         if "in_memory" not in graph_feature
+        #         else graph_feature["in_memory"]
+        #     )
+        # if graph_feature["domain"] == "node":
+        #     node_data = read_data(
+        #         os.path.join(dataset_dir, graph_feature["path"]),
+        #         graph_feature["format"],
+        #         in_memory=in_memory,
+        #     )
+        #     if is_homogeneous:
+        #         # g.ndata[graph_feature["name"]] = node_data
+        #         node_attributes[graph_feature["name"]] = node_data
+        #     else:
+        #         g.nodes[graph_feature["type"]].data[
+        #             graph_feature["name"]
+        #         ] = node_data
+        # if graph_feature["domain"] == "edge":
+        #     edge_data = read_data(
+        #         os.path.join(dataset_dir, graph_feature["path"]),
+        #         graph_feature["format"],
+        #         in_memory=in_memory,
+        #     )
+        #     if is_homogeneous:
+        #         # g.edata[graph_feature["name"]] = edge_data
+        #         edge_attributes[graph_feature["name"]] = edge_data
+        #     else:
+        #         g.edges[etype_str_to_tuple(graph_feature["type"])].data[
+        #             graph_feature["name"]
+        #         ] = edge_data
+        else:
+            # heterogeneous graph.
+            node_feature_collector = {}
+            edge_feature_collector = {}
+            for graph_feature in input_config["graph"]["feature_data"]:
+                in_memory = (
+                    True
+                    if "in_memory" not in graph_feature
+                    else graph_feature["in_memory"]
+                )
+                if graph_feature["domain"] == "node":
+                    node_data = read_data(
+                        os.path.join(dataset_dir, graph_feature["path"]),
+                        graph_feature["format"],
+                        in_memory=in_memory,
+                    )
+                    # assert 0, node_data.shape
+                    # if graph_feature["name"] not in node_feature_collector:
+                    #     node_feature_collector[graph_feature["name"]] = torch.empty(
+                    #         ([node_type_offset[-1]] + list(node_data.shape[1:]))
+                    #     )
+                    # node_feature_collector[graph_feature["name"]][
+                    #     node_type_offset[
+                    #         node_type_to_id[graph_feature["type"]]
+                    #     ] : node_type_offset[
+                    #         node_type_to_id[graph_feature["type"]] + 1
+                    #     ]
+                    # ] = node_data
+                    if graph_feature["name"] not in node_feature_collector:
+                        node_feature_collector[graph_feature["name"]] = {}
+                    node_feature_collector[graph_feature["name"]][
+                        graph_feature["type"]
                     ] = node_data
-            if graph_feature["domain"] == "edge":
-                edge_data = read_data(
-                    os.path.join(dataset_dir, graph_feature["path"]),
-                    graph_feature["format"],
-                    in_memory=in_memory,
-                )
-                if is_homogeneous:
-                    g.edata[graph_feature["name"]] = edge_data
-                else:
-                    g.edges[etype_str_to_tuple(graph_feature["type"])].data[
-                        graph_feature["name"]
+                elif graph_feature["domain"] == "edge":
+                    edge_data = read_data(
+                        os.path.join(dataset_dir, graph_feature["path"]),
+                        graph_feature["format"],
+                        in_memory=in_memory,
+                    )
+                    # assert 0, edge_data.shape
+                    # if graph_feature["name"] not in edge_feature_collector:
+                    #     edge_feature_collector[graph_feature["name"]] = torch.empty(
+                    #         ([edge_type_offset[-1]] + list(edge_data.shape[1:]))
+                    #     )
+                    # edge_feature_collector[graph_feature["name"]][
+                    #     edge_type_offset[
+                    #         edge_type_to_id[graph_feature["type"]]
+                    #     ] : edge_type_offset[
+                    #         edge_type_to_id[graph_feature["type"]] + 1
+                    #     ]
+                    # ] = edge_data
+                    if graph_feature["name"] not in edge_feature_collector:
+                        edge_feature_collector[graph_feature["name"]] = {}
+                    edge_feature_collector[graph_feature["name"]][
+                        graph_feature["type"]
                     ] = edge_data
-        if not is_homogeneous:
+
             # For heterogenous graph, a node/edge feature must cover all
             # node/edge types.
-            for feat_name, feat_data in g.ndata.items():
-                existing_types = set(feat_data.keys())
-                assert existing_types == set(g.ntypes), (
-                    f"Node feature {feat_name} does not cover all node types."
-                    + f"Existing types: {existing_types}."
-                    + f"Expected types: {g.ntypes}."
+            # for feat_name, feat_data in g.ndata.items():
+            #     existing_types = set(feat_data.keys())
+            #     assert existing_types == set(g.ntypes), (
+            #         f"Node feature {feat_name} does not cover all node types."
+            #         + f"Existing types: {existing_types}."
+            #         + f"Expected types: {g.ntypes}."
+            #     )
+            # for feat_name, feat_data in g.edata.items():
+            #     existing_types = set(feat_data.keys())
+            #     assert existing_types == set(g.canonical_etypes), (
+            #         f"Edge feature {feat_name} does not cover all edge types."
+            #         + f"Existing types: {existing_types}."
+            #         + f"Expected types: {g.etypes}."
+            #     )
+        # For heterogenous, a node/edge feature must cover all node/edge types.
+        all_node_types = set(node_type_to_id.keys())
+        for feat_name, feat_data in node_feature_collector.items():
+            existing_node_type = set(feat_data.keys())
+            assert all_node_types == existing_node_type, (
+                f"Node feature {feat_name} does not cover all node types. "
+                f"Existing types: {existing_node_type}. "
+                f"Expected types: {all_node_types}."
+            )
+        all_edge_types = set(edge_type_to_id.keys())
+        for feat_name, feat_data in edge_feature_collector.items():
+            existing_edge_type = set(feat_data.keys())
+            assert all_edge_types == existing_edge_type, (
+                f"Edge feature {feat_name} does not cover all edge types. "
+                f"Existing types: {existing_edge_type}. "
+                f"Expected types: {all_edge_types}."
+            )
+
+        for feat_name, feat_data in node_feature_collector.items():
+            feat_tensor = torch.empty(
+                (
+                    [node_type_offset[-1]]
+                    + list(next(iter(feat_data.values())).shape[1:])
                 )
-            for feat_name, feat_data in g.edata.items():
-                existing_types = set(feat_data.keys())
-                assert existing_types == set(g.canonical_etypes), (
-                    f"Edge feature {feat_name} does not cover all edge types."
-                    + f"Existing types: {existing_types}."
-                    + f"Expected types: {g.etypes}."
+            )
+            for ntype, feat in feat_data.items():
+                feat_tensor[
+                    node_type_offset[node_type_to_id[ntype]] : node_type_offset[
+                        node_type_to_id[ntype] + 1
+                    ]
+                ] = feat
+            node_attributes[feat_name] = feat_tensor
+        
+        for feat_name, feat_data in edge_feature_collector.items():
+            feat_tensor = torch.empty(
+                (
+                    [edge_type_offset[-1]]
+                    + list(next(iter(feat_data.values())).shape[1:])
                 )
+            )
+            for etype, feat in feat_data.items():
+                feat_tensor[
+                    edge_type_offset[edge_type_to_id[etype]] : edge_type_offset[
+                        edge_type_to_id[etype] + 1
+                    ]
+                ] = feat
+            edge_attributes[feat_name] = feat_tensor
 
     # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
-    fused_csc_sampling_graph = from_dglgraph(
-        g, is_homogeneous, include_original_edge_id
+    # fused_csc_sampling_graph = from_dglgraph(
+    #     g, is_homogeneous, include_original_edge_id
+    # )
+    graph = fused_csc_sampling_graph(
+        csc_indptr=indptr,
+        indices=indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
     )
 
     # 5. Record value of include_original_edge_id.
@@ -209,7 +400,7 @@ def preprocess_ondisk_dataset(
     )
 
     torch.save(
-        fused_csc_sampling_graph,
+        graph,
         os.path.join(
             dataset_dir,
             output_config["graph_topology"]["path"],
