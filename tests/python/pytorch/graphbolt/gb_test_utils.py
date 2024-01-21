@@ -95,15 +95,16 @@ def random_homo_graphbolt_graph(
     nodes = np.repeat(np.arange(num_nodes), 5)
     neighbors = np.random.randint(0, num_nodes, size=(num_edges))
     edges = np.stack([nodes, neighbors], axis=1)
+    # assert 0, (edges, type(edges), edges.dtype)
     os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
     assert edge_fmt in ["numpy", "csv"], print(
         "only numpy and csv are supported for edges."
     )
     if edge_fmt == "csv":
         # Wrtie into edges/edge.csv
-        edges = pd.DataFrame(edges, columns=["src", "dst"])
+        edges_DataFrame = pd.DataFrame(edges, columns=["src", "dst"])
         edge_path = os.path.join("edges", "edge.csv")
-        edges.to_csv(
+        edges_DataFrame.to_csv(
             os.path.join(test_dir, edge_path),
             index=False,
             header=False,
@@ -136,7 +137,7 @@ def random_homo_graphbolt_graph(
         np.arange(each_set_size),
         np.arange(each_set_size, 2 * each_set_size),
     )
-    train_data = np.vstack(train_pairs).T.astype(np.int64)
+    train_data = np.vstack(train_pairs).T.astype(edges.dtype)
     train_path = os.path.join("set", "train.npy")
     np.save(os.path.join(test_dir, train_path), train_data)
 
@@ -144,7 +145,7 @@ def random_homo_graphbolt_graph(
         np.arange(each_set_size, 2 * each_set_size),
         np.arange(2 * each_set_size, 3 * each_set_size),
     )
-    validation_data = np.vstack(validation_pairs).T.astype(np.int64)
+    validation_data = np.vstack(validation_pairs).T.astype(edges.dtype)
     validation_path = os.path.join("set", "validation.npy")
     np.save(os.path.join(test_dir, validation_path), validation_data)
 
@@ -152,7 +153,7 @@ def random_homo_graphbolt_graph(
         np.arange(2 * each_set_size, 3 * each_set_size),
         np.arange(3 * each_set_size, 4 * each_set_size),
     )
-    test_data = np.vstack(test_pairs).T.astype(np.int64)
+    test_data = np.vstack(test_pairs).T.astype(edges.dtype)
     test_path = os.path.join("set", "test.npy")
     np.save(os.path.join(test_dir, test_path), test_data)
 
