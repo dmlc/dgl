@@ -82,7 +82,7 @@ class MiniBatch:
 
     query_index: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Group ids associated with seed nodes / node pairs in the graph, which
+    Indexes associated with seed nodes / node pairs in the graph, which
     indicates to which query a seed node / node pair belongs.
     - If `query_index` is a tensor: It indicates the graph is homogeneous. The
       value should be corresponding query to given 'seed_nodes' or
