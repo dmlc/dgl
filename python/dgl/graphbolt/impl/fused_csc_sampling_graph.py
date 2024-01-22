@@ -978,12 +978,16 @@ class FusedCSCSamplingGraph(SamplingGraph):
             max_node_id = self.total_num_nodes
         pos_src = node_pairs[:, 0]
         num_negative = node_pairs.shape[0] * negative_ratio
-        negative_seeds = torch.cat(
-            (
-                pos_src.repeat_interleave(negative_ratio),
-                torch.randint(0, max_node_id, (num_negative,)),
-            ),
-        ).view(2, num_negative).T
+        negative_seeds = (
+            torch.cat(
+                (
+                    pos_src.repeat_interleave(negative_ratio),
+                    torch.randint(0, max_node_id, (num_negative,)),
+                ),
+            )
+            .view(2, num_negative)
+            .T
+        )
         return negative_seeds
 
     def copy_to_shared_memory(self, shared_memory_name: str):
