@@ -97,7 +97,6 @@ def random_homo_graphbolt_graph(
         0, num_nodes, size=(num_edges), dtype=np.int64
     )
     edges = np.stack([nodes, neighbors], axis=1)
-    # assert 0, (edges, type(edges), edges.dtype)
     os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
     assert edge_fmt in ["numpy", "csv"], print(
         "only numpy and csv are supported for edges."
