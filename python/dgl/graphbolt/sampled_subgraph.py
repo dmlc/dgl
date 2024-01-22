@@ -128,8 +128,8 @@ class SampledSubgraph:
         ----------
         self : SampledSubgraph
             The sampled subgraph.
-        edges : Union(Tuple[torch.Tensor, torch.Tensor],
-          Dict[str, Tuple[torch.Tensor, torch.Tensor]])
+        edges : Union[Tuple[torch.Tensor, torch.Tensor],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]]]
             Edges to exclude. If sampled subgraph is homogeneous, then `edges`
             should be a pair of tensors representing the edges to exclude. If
             sampled subgraph is heterogeneous, then `edges` should be a
