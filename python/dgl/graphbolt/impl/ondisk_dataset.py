@@ -132,7 +132,6 @@ def preprocess_ondisk_dataset(
         coo_tensor = torch.tensor([src, dst])
         sparse_matrix = dglsp.spmatrix(coo_tensor)
         indptr, indices, value_indices = sparse_matrix.csc()
-        assert indices.dtype == torch.int64
         node_type_offset = None
         type_per_edge = None
         node_type_to_id = None
@@ -176,7 +175,6 @@ def preprocess_ondisk_dataset(
             indices=torch.stack((coo_src, coo_dst), dim=0)
         )
         indptr, indices, value_indices = sparse_matrix.csc()
-        assert indices.dtype == torch.int64
         node_type_offset = torch.tensor(node_type_offset)
         type_per_edge = torch.index_select(
             coo_etype, dim=0, index=value_indices
