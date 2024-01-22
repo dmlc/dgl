@@ -43,16 +43,16 @@ struct AlignmentFunc {
 
 template <typename indptr_t, typename indices_t>
 __global__ void _CopyIndicesAlignedKernel(
-    const indptr_t edge_count, const int64_t num_nodes,
+    const int64_t edge_count, const int64_t num_nodes,
     const indptr_t* const indptr, const indptr_t* const output_indptr,
     const indptr_t* const output_indptr_aligned, const indices_t* const indices,
-    indices_t* const output_indices, const int64_t* const perm) {
+    const int64_t* const coo_aligned_rows, indices_t* const output_indices,
+    const int64_t* const perm) {
   indptr_t idx = static_cast<indptr_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
 
   while (idx < edge_count) {
-    const auto permuted_row_pos =
-        cuda::UpperBound(output_indptr_aligned, num_nodes, idx) - 1;
+    const auto permuted_row_pos = coo_aligned_rows[idx];
     const auto row_pos = perm ? perm[permuted_row_pos] : permuted_row_pos;
     const auto out_row = output_indptr[row_pos];
     const auto d = output_indptr[row_pos + 1] - out_row;
@@ -97,7 +97,8 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
       torch::empty(num_nodes + 1, options.dtype(indptr_scalar_type));
 
   auto output_indptr_aligned =
-      allocator.AllocateStorage<indptr_t>(num_nodes + 1);
+      torch::empty(num_nodes + 1, options.dtype(indptr_scalar_type));
+  auto output_indptr_aligned_ptr = output_indptr_aligned.data_ptr<indptr_t>();
 
   {
     // Returns the actual and modified_indegree as a pair, the
@@ -106,7 +107,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
     auto modified_in_degree = thrust::make_transform_iterator(
         iota, AlignmentFunc<indptr_t, indices_t>{in_degree, perm, num_nodes});
     auto output_indptr_pair = thrust::make_zip_iterator(
-        output_indptr.data_ptr<indptr_t>(), output_indptr_aligned.get());
+        output_indptr.data_ptr<indptr_t>(), output_indptr_aligned_ptr);
     thrust::tuple<indptr_t, indptr_t> zero_value{};
     // Compute the prefix sum over actual and modified indegrees.
     CUB_CALL(
@@ -121,24 +122,27 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
     output_size = static_cast<indptr_t>(edge_count);
   }
   // Copy the modified number of edges.
-  auto edge_count_aligned =
-      cuda::CopyScalar{output_indptr_aligned.get() + num_nodes};
+  auto edge_count_aligned_ =
+      cuda::CopyScalar{output_indptr_aligned_ptr + num_nodes};
+  const int64_t edge_count_aligned = static_cast<intptr_t>(edge_count_aligned_);
 
   // Allocate output array with actual number of edges.
   torch::Tensor output_indices =
       torch::empty(output_size.value(), options.dtype(indices.scalar_type()));
   const dim3 block(BLOCK_SIZE);
-  const dim3 grid(
-      (static_cast<indptr_t>(edge_count_aligned) + BLOCK_SIZE - 1) /
-      BLOCK_SIZE);
+  const dim3 grid((edge_count_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
+
+  auto coo_aligned_rows = ExpandIndptrImpl(
+      output_indptr_aligned, torch::kLong, torch::nullopt, edge_count_aligned);
 
   // Perform the actual copying, of the indices array into
   // output_indices in an aligned manner.
   CUDA_KERNEL_CALL(
-      _CopyIndicesAlignedKernel, grid, block, 0,
-      static_cast<indptr_t>(edge_count_aligned), num_nodes, sliced_indptr,
-      output_indptr.data_ptr<indptr_t>(), output_indptr_aligned.get(),
+      _CopyIndicesAlignedKernel, grid, block, 0, edge_count_aligned, num_nodes,
+      sliced_indptr, output_indptr.data_ptr<indptr_t>(),
+      output_indptr_aligned_ptr,
       reinterpret_cast<indices_t*>(indices.data_ptr()),
+      coo_aligned_rows.data_ptr<int64_t>(),
       reinterpret_cast<indices_t*>(output_indices.data_ptr()), perm);
   return {output_indptr, output_indices};
 }
