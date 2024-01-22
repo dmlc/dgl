@@ -502,7 +502,8 @@ class MiniBatch:
     def to_pyg_data(self):
         """Converts the MiniBatch instance to a PyTorch Geometric (PyG) Data object.
 
-        PyG Data only support homo case, with one node feature type
+        PyG Data only support homo case, with one node feature type. It would demonstrate
+        Error if it is hetero or has more than one node feature.
 
         This function transforms the graph data contained in the MiniBatch instance
         into a format compatible with PyG. It constructs edge indices for each
