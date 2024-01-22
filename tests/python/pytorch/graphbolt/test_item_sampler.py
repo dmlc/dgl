@@ -825,7 +825,7 @@ def test_ItemSetDict_seeds(batch_size, shuffle, drop_last):
         assert isinstance(minibatch, gb.MiniBatch)
         assert minibatch.seeds is not None
         assert minibatch.labels is None
-        assert minibatch.group_ids is None
+        assert minibatch.query_index is None
         is_last = (i + 1) * batch_size >= total_pairs
         if not is_last or total_pairs % batch_size == 0:
             expected_batch_size = batch_size
@@ -878,7 +878,7 @@ def test_ItemSetDict_seeds_labels(batch_size, shuffle, drop_last):
         assert isinstance(minibatch, gb.MiniBatch)
         assert minibatch.seeds is not None
         assert minibatch.labels is not None
-        assert minibatch.group_ids is None
+        assert minibatch.query_index is None
         is_last = (i + 1) * batch_size >= total_ids
         if not is_last or total_ids % batch_size == 0:
             expected_batch_size = batch_size
