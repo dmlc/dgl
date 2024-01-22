@@ -536,7 +536,9 @@ class MiniBatch:
             indices = csc_matrix.indices
             indptr = csc_matrix.indptr
             row_indices = expand_indptr(
-                indptr, dtype=indices.dtype, output_size=len(indices)
+                indptr, 
+                dtype=indices.dtype, 
+                output_size=len(indices)
             )
             col_indices = indices
             return torch.stack([row_indices, col_indices], dim=0)
