@@ -130,16 +130,18 @@ struct SegmentEndFunc {
 };
 
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
-    const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids, torch::optional<torch::Tensor> type_per_edge,
+    torch::Tensor indptr, torch::Tensor indices,
+    torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
+    bool replace, bool layer, bool return_eids,
+    torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask) {
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
   // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
   auto allocator = cuda::GetAllocator();
-  auto num_rows = nodes.size(0);
+  auto num_rows =
+      nodes.has_value() ? nodes.value().size(0) : indptr.size(0) - 1;
   auto fanouts_pinned = torch::empty(
       fanouts.size(),
       c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
@@ -166,29 +168,44 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             DeviceReduce::Max, in_degree.data_ptr<index_t>(),
             max_in_degree.data_ptr<index_t>(), num_rows);
       }));
+  // Protect access to max_in_degree with a CUDAEvent
+  at::cuda::CUDAEvent max_in_degree_event;
+  max_in_degree_event.record();
   torch::optional<int64_t> num_edges_;
   torch::Tensor sub_indptr;
+  if (!nodes.has_value()) {
+    num_edges_ = indices.size(0);
+    sub_indptr = indptr;
+  }
   torch::optional<torch::Tensor> sliced_probs_or_mask;
   if (probs_or_mask.has_value()) {
-    torch::Tensor sliced_probs_or_mask_tensor;
-    std::tie(sub_indptr, sliced_probs_or_mask_tensor) = IndexSelectCSCImpl(
-        in_degree, sliced_indptr, probs_or_mask.value(), nodes,
-        indptr.size(0) - 2, num_edges_);
-    sliced_probs_or_mask = sliced_probs_or_mask_tensor;
-    num_edges_ = sliced_probs_or_mask_tensor.size(0);
+    if (nodes.has_value()) {
+      torch::Tensor sliced_probs_or_mask_tensor;
+      std::tie(sub_indptr, sliced_probs_or_mask_tensor) = IndexSelectCSCImpl(
+          in_degree, sliced_indptr, probs_or_mask.value(), nodes.value(),
+          indptr.size(0) - 2, num_edges_);
+      sliced_probs_or_mask = sliced_probs_or_mask_tensor;
+      num_edges_ = sliced_probs_or_mask_tensor.size(0);
+    } else {
+      sliced_probs_or_mask = probs_or_mask;
+    }
   }
   if (fanouts.size() > 1) {
     torch::Tensor sliced_type_per_edge;
-    std::tie(sub_indptr, sliced_type_per_edge) = IndexSelectCSCImpl(
-        in_degree, sliced_indptr, type_per_edge.value(), nodes,
-        indptr.size(0) - 2, num_edges_);
+    if (nodes.has_value()) {
+      std::tie(sub_indptr, sliced_type_per_edge) = IndexSelectCSCImpl(
+          in_degree, sliced_indptr, type_per_edge.value(), nodes.value(),
+          indptr.size(0) - 2, num_edges_);
+    } else {
+      sliced_type_per_edge = type_per_edge.value();
+    }
     std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
         sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
     num_rows = sliced_indptr.size(0);
     num_edges_ = sliced_type_per_edge.size(0);
   }
   // If sub_indptr was not computed in the two code blocks above:
-  if (!probs_or_mask.has_value() && fanouts.size() <= 1) {
+  if (nodes.has_value() && !probs_or_mask.has_value() && fanouts.size() <= 1) {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
   auto coo_rows = ExpandIndptrImpl(
@@ -233,9 +250,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         auto num_sampled_edges =
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
 
-        // Find the smallest integer type to store the edge id offsets.
-        // ExpandIndptr or IndexSelectCSCImpl had synch inside, so it is safe to
-        // read max_in_degree now.
+        // Find the smallest integer type to store the edge id offsets. We synch
+        // the CUDAEvent so that the access is safe.
+        max_in_degree_event.synchronize();
         const int num_bits =
             cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         std::array<int, 4> type_bits = {8, 16, 32, 64};
@@ -306,7 +323,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
               picked_eids = torch::empty(
                   static_cast<indptr_t>(num_sampled_edges),
-                  nodes.options().dtype(indptr.scalar_type()));
+                  sub_indptr.options());
 
               // Need to sort the sampled edges only when fanouts.size() == 1
               // since multiple fanout sampling case is automatically going to
@@ -385,9 +402,12 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
+  if (!nodes.has_value()) {
+    nodes = torch::arange(indptr.size(0) - 1, indices.options());
+  }
 
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-      output_indptr, output_indices, nodes, torch::nullopt,
+      output_indptr, output_indices, nodes.value(), torch::nullopt,
       subgraph_reverse_edge_ids, output_type_per_edge);
 }
 

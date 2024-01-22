@@ -207,7 +207,8 @@ def test_feature_store_to_device(device):
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("shape", [(2, 1), (2, 3), (2, 2, 2), (137, 13, 3)])
-def test_torch_based_pinned_feature(dtype, idtype, shape):
+@pytest.mark.parametrize("in_place", [torch.int32, torch.int64])
+def test_torch_based_pinned_feature(dtype, idtype, shape, in_place):
     if dtype == torch.complex128:
         tensor = torch.complex(
             torch.randint(0, 13, shape, dtype=torch.float64),
@@ -219,10 +220,13 @@ def test_torch_based_pinned_feature(dtype, idtype, shape):
     test_tensor_cuda = test_tensor.cuda()
 
     feature = gb.TorchBasedFeature(tensor)
-    feature.pin_memory_()
+    if in_place:
+        feature.pin_memory_()
 
-    # Check if pinning is truly in-place.
-    assert feature._tensor.data_ptr() == tensor.data_ptr()
+        # Check if pinning is truly in-place.
+        assert feature._tensor.data_ptr() == tensor.data_ptr()
+    else:
+        feature = feature.to("pinned")
 
     # Test read entire pinned feature, the result should be on cuda.
     assert torch.equal(feature.read(), test_tensor_cuda)

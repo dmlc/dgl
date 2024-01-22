@@ -121,7 +121,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  * on it gives the output indptr.
  */
 std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
-    torch::Tensor indptr, torch::Tensor nodes);
+    torch::Tensor indptr, torch::optional<torch::Tensor> nodes);
 
 /**
  * @brief Given the compacted sub_indptr tensor, edge type tensor and
