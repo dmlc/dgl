@@ -31,11 +31,34 @@ class SampledSubgraph:
     ) -> Union[CSCFormatBase, Dict[str, CSCFormatBase],]:
         """Returns the node pairs representing edges in csc format.
         - If `sampled_csc` is a CSCFormatBase: It should be in the csc format.
-            `indptr` stores the index in the data array where each column
-            starts. `indices` stores the row indices of the non-zero elements.
+          `indptr` stores the index in the data array where each column
+          starts. `indices` stores the row indices of the non-zero elements.
         - If `sampled_csc` is a dictionary: The keys should be edge type and
-            the values should be corresponding node pairs. The ids inside
-            is heterogeneous ids."""
+          the values should be corresponding node pairs. The ids inside is
+          heterogeneous ids.
+
+        Examples
+        --------
+        1. Homogeneous graph.
+        >>> import dgl.graphbolt as gb
+        >>> import torch
+        >>> sampled_csc = gb.CSCFormatBase(
+        ...     indptr=torch.tensor([0, 1, 2, 3]),
+        ...     indices=torch.tensor([0, 1, 2]))
+        >>> print(sampled_csc)
+        CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
+                    indices=tensor([0, 1, 2]),
+        )
+
+        2. Heterogeneous graph.
+        sampled_csc = {"A:relation:B": gb.CSCFormatBase(
+        ...     indptr=torch.tensor([0, 1, 2, 3]),
+        ...     indices=torch.tensor([0, 1, 2]))}
+        >>> print(sampled_csc)
+        {'A:relation:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
+                    indices=tensor([0, 1, 2]),
+        )}
+        """
         raise NotImplementedError
 
     @property
@@ -46,11 +69,11 @@ class SampledSubgraph:
         Column's reverse node ids in the original graph. A graph structure
         can be treated as a coordinated row and column pair, and this is
         the mapped ids of the column.
-        - If `original_column_node_ids` is a tensor: It represents the
-            original node ids.
+        - If `original_column_node_ids` is a tensor: It represents the original
+          node ids.
         - If `original_column_node_ids` is a dictionary: The keys should be
-            node type and the values should be corresponding original
-            heterogeneous node ids.
+          node type and the values should be corresponding original
+          heterogeneous node ids.
         If present, it means column IDs are compacted, and `sampled_csc`
         column IDs match these compacted ones.
         """
@@ -64,11 +87,11 @@ class SampledSubgraph:
         Row's reverse node ids in the original graph. A graph structure
         can be treated as a coordinated row and column pair, and this is
         the mapped ids of the row.
-        - If `original_row_node_ids` is a tensor: It represents the
-            original node ids.
-        - If `original_row_node_ids` is a dictionary: The keys should be
-            node type and the values should be corresponding original
-            heterogeneous node ids.
+        - If `original_row_node_ids` is a tensor: It represents the original
+          node ids.
+        - If `original_row_node_ids` is a dictionary: The keys should be node
+          type and the values should be corresponding original heterogeneous
+          node ids.
         If present, it means row IDs are compacted, and `sampled_csc`
         row IDs match these compacted ones."""
         return None
@@ -77,12 +100,12 @@ class SampledSubgraph:
     def original_edge_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         """Returns corresponding reverse edge ids the original graph.
         Reverse edge ids in the original graph. This is useful when edge
-            features are needed.
-            - If `original_edge_ids` is a tensor: It represents the
-                original edge ids.
-            - If `original_edge_ids` is a dictionary: The keys should be
-                edge type and the values should be corresponding original
-                heterogeneous edge ids.
+        features are needed.
+        - If `original_edge_ids` is a tensor: It represents the original edge
+          ids.
+        - If `original_edge_ids` is a dictionary: The keys should be edge type
+          and the values should be corresponding original heterogeneous edge
+          ids.
         """
         return None
 
@@ -105,12 +128,12 @@ class SampledSubgraph:
         ----------
         self : SampledSubgraph
             The sampled subgraph.
-        edges : Union[Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-                    Tuple[torch.Tensor, torch.Tensor]]
+        edges : Union[Tuple[torch.Tensor, torch.Tensor],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]]]
             Edges to exclude. If sampled subgraph is homogeneous, then `edges`
             should be a pair of tensors representing the edges to exclude. If
-            sampled subgraph is heterogeneous, then `edges` should be a dictionary
-            of edge types and the corresponding edges to exclude.
+            sampled subgraph is heterogeneous, then `edges` should be a
+            dictionary of edge types and the corresponding edges to exclude.
         assume_num_node_within_int32: bool
             If True, assumes the value of node IDs in the provided `edges` fall
             within the int32 range, which can significantly enhance computation
@@ -119,7 +142,7 @@ class SampledSubgraph:
         Returns
         -------
         SampledSubgraph
-           An instance of a class that inherits from `SampledSubgraph`.
+            An instance of a class that inherits from `SampledSubgraph`.
 
         Examples
         --------
