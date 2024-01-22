@@ -80,18 +80,17 @@ class MiniBatch:
           or other graph components depending on the specific context.
     """
 
-    query_index: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    indexes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Indexes associated with seed nodes / node pairs in the graph, which
     indicates to which query a seed node / node pair belongs.
-    - If `query_index` is a tensor: It indicates the graph is homogeneous. The
+    - If `indexes` is a tensor: It indicates the graph is homogeneous. The
       value should be corresponding query to given 'seed_nodes' or
       'node_pairs'.
-    - If `query_index` is a dictionary: It indicates the graph is
+    - If `indexes` is a dictionary: It indicates the graph is
       heterogeneous. The keys should be node or edge type and the value should
-      be corresponding query to given 'seed_nodes' or 'node_pairs'. The
-      starting value of each query ids is 0, and the query ids between
-      different keys do not affect each other.
+      be corresponding query to given 'seed_nodes' or 'node_pairs'. For each
+      key, indexes are consecutive integers starting from zero.
     """
 
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
