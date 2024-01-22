@@ -41,6 +41,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         # truly in-place, we need to use cudaHostRegister. Then, we need to use
         # cudaHostUnregister to unpin the tensor in the destructor.
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        
         for tensor in self._is_inplace_pinned:
             assert (
                 torch.cuda.cudart().cudaHostUnregister(tensor.data_ptr()) == 0

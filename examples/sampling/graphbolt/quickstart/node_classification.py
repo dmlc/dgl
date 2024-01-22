@@ -2,7 +2,6 @@
 This example shows how to create a GraphBolt dataloader to sample and train a
 node classification model with the Cora dataset.
 """
-
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch

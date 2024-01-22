@@ -848,7 +848,7 @@ def test_dgl_link_predication_hetero(mode):
             )
 
 
-def test_to_pyg_adapter():
+def test_to_pyg():
     test_subgraph = gb.SampledSubgraphImpl(
         sampled_csc=gb.CSCFormatBase(
             indptr=torch.tensor([0, 2, 3]), indices=torch.tensor([0, 1, 1])
@@ -865,7 +865,7 @@ def test_to_pyg_adapter():
         node_features={"feat": expected_node_features},
         labels=expected_labels,
     )
-    pyg_data = test_minibatch.to_pyg_adapter()
+    pyg_data = test_minibatch.to_pyg_data()
     assert torch.equal(
         pyg_data.edge_index, expected_edge_index
     ), "Edge index is not correctly constructed."
@@ -882,7 +882,7 @@ def test_to_pyg_adapter():
         node_features={"feat": expected_node_features},
         labels=expected_labels,
     )
-    pyg_data = test_minibatch.to_pyg_adapter()
+    pyg_data = test_minibatch.to_pyg_data()
     assert pyg_data.edge_index.numel() == 0, "Edge index should be empty."
 
     # Test with node_features as None
@@ -891,7 +891,7 @@ def test_to_pyg_adapter():
         node_features=None,
         labels=expected_labels,
     )
-    pyg_data = test_minibatch.to_pyg_adapter()
+    pyg_data = test_minibatch.to_pyg_data()
     assert pyg_data.x is None, "Node features should be None."
 
     # Test with labels as None
@@ -900,5 +900,5 @@ def test_to_pyg_adapter():
         node_features={"feat": expected_node_features},
         labels=None,
     )
-    pyg_data = test_minibatch.to_pyg_adapter()
+    pyg_data = test_minibatch.to_pyg_data()
     assert pyg_data.y is None, "Labels should be None."

@@ -499,8 +499,10 @@ class MiniBatch:
 
         return self
 
-    def to_pyg_adapter(self):
+    def to_pyg_data(self):
         """Converts the MiniBatch instance to a PyTorch Geometric (PyG) Data object.
+
+        PyG Data only support homo case, with one node feature type
 
         This function transforms the graph data contained in the MiniBatch instance
         into a format compatible with PyG. It constructs edge indices for each
@@ -516,7 +518,7 @@ class MiniBatch:
 
         Returns
         -------
-        Data
+        torch_geometric.data.Data
             A PyTorch Geometric Data object containing the graph data, including node
             features, edge indices, and labels.
 
@@ -539,6 +541,15 @@ class MiniBatch:
             col_indices = indices
             return torch.stack([row_indices, col_indices], dim=0)
 
+        def check_graph_type_and_features(node_features):
+            if node_features:
+                feature_keys = list(node_features.keys())
+                if len(feature_keys) > 1:
+                    raise ValueError("Graph has multiple node feature types, which is not allowed.")
+                return feature_keys[0]
+            else:
+                return None
+
         all_edge_indices = []
         if self.sampled_subgraphs is not None:
             for subgraph in self.sampled_subgraphs:
@@ -552,9 +563,9 @@ class MiniBatch:
             else torch.empty((2, 0), dtype=torch.long)
         )
 
-        node_features = (
-            self.node_features["feat"] if self.node_features else None
-        )
+        feature_key = check_graph_type_and_features(self.node_features)
+        node_features = self.node_features[feature_key] if feature_key else None
+
         graph_labels = self.labels
         pyg_data = Data(
             x=node_features, edge_index=combined_edge_index, y=graph_labels
