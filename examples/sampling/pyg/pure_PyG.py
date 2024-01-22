@@ -1,41 +1,42 @@
 # Reaches around 0.7870 ± 0.0036 test accuracy.
 
-import os.path as osp
 import argparse
+import os.path as osp
+import time
+
 import torch
 import torch.nn.functional as F
 from ogb.nodeproppred import Evaluator, PygNodePropPredDataset
-from tqdm import tqdm
 
 from torch_geometric.loader import NeighborLoader
 from torch_geometric.nn import SAGEConv
-import time
+from tqdm import tqdm
 
 
 parser = argparse.ArgumentParser(
-        description="Which dataset are you going to use?"
-    )
+    description="Which dataset are you going to use?"
+)
 
 parser.add_argument(
-        "--dataset",
-        type=str,
-        default="ogbn-arxiv",
-        help='Name of the dataset to use (e.g., "ogbn-products", "ogbn-arxiv")',
+    "--dataset",
+    type=str,
+    default="ogbn-arxiv",
+    help='Name of the dataset to use (e.g., "ogbn-products", "ogbn-arxiv")',
 )
 
 
 args = parser.parse_args()
 dataset_name = args.dataset
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dataset = PygNodePropPredDataset(name=args.dataset)
 split_idx = dataset.get_idx_split()
 evaluator = Evaluator(name=dataset_name)
-data = dataset[0].to(device, 'x', 'y')
+data = dataset[0].to(device, "x", "y")
 
 
 train_loader = NeighborLoader(
     data,
-    input_nodes=split_idx['train'],
+    input_nodes=split_idx["train"],
     num_neighbors=[15, 10, 5],
     batch_size=1024,
     shuffle=True,
@@ -78,7 +79,7 @@ class SAGE(torch.nn.Module):
 
     def inference(self, x_all):
         pbar = tqdm(total=x_all.size(0) * self.num_layers)
-        pbar.set_description('Evaluating')
+        pbar.set_description("Evaluating")
 
         # Compute representations of nodes layer by layer, using *all*
         # available edges. This leads to faster computation in contrast to
@@ -89,7 +90,7 @@ class SAGE(torch.nn.Module):
                 x = x_all[batch.n_id].to(device)
                 edge_index = batch.edge_index.to(device)
                 x = self.convs[i](x, edge_index)
-                x = x[:batch.batch_size]
+                x = x[: batch.batch_size]
                 if i != self.num_layers - 1:
                     x = x.relu()
                 xs.append(x.cpu())
@@ -110,14 +111,14 @@ model = model.to(device)
 def train(epoch):
     model.train()
 
-    pbar = tqdm(total=split_idx['train'].size(0))
-    pbar.set_description(f'Epoch {epoch:02d}')
+    pbar = tqdm(total=split_idx["train"].size(0))
+    pbar.set_description(f"Epoch {epoch:02d}")
 
     total_loss = total_correct = 0
     for batch in train_loader:
         optimizer.zero_grad()
-        out = model(batch.x, batch.edge_index.to(device))[:batch.batch_size]
-        y = batch.y[:batch.batch_size].squeeze()
+        out = model(batch.x, batch.edge_index.to(device))[: batch.batch_size]
+        y = batch.y[: batch.batch_size].squeeze()
         loss = F.cross_entropy(out, y)
         loss.backward()
         optimizer.step()
@@ -129,7 +130,7 @@ def train(epoch):
     pbar.close()
 
     loss = total_loss / len(train_loader)
-    approx_acc = total_correct / split_idx['train'].size(0)
+    approx_acc = total_correct / split_idx["train"].size(0)
 
     return loss, approx_acc
 
@@ -143,37 +144,45 @@ def test():
     y_true = data.y.cpu()
     y_pred = out.argmax(dim=-1, keepdim=True)
 
-    train_acc = evaluator.eval({
-        'y_true': y_true[split_idx['train']],
-        'y_pred': y_pred[split_idx['train']],
-    })['acc']
-    val_acc = evaluator.eval({
-        'y_true': y_true[split_idx['valid']],
-        'y_pred': y_pred[split_idx['valid']],
-    })['acc']
-    test_acc = evaluator.eval({
-        'y_true': y_true[split_idx['test']],
-        'y_pred': y_pred[split_idx['test']],
-    })['acc']
+    train_acc = evaluator.eval(
+        {
+            "y_true": y_true[split_idx["train"]],
+            "y_pred": y_pred[split_idx["train"]],
+        }
+    )["acc"]
+    val_acc = evaluator.eval(
+        {
+            "y_true": y_true[split_idx["valid"]],
+            "y_pred": y_pred[split_idx["valid"]],
+        }
+    )["acc"]
+    test_acc = evaluator.eval(
+        {
+            "y_true": y_true[split_idx["test"]],
+            "y_pred": y_pred[split_idx["test"]],
+        }
+    )["acc"]
 
     return train_acc, val_acc, test_acc
+
 
 start_time = time.time()
 
 test_accs = []
 for epoch in range(10):
-  
 
     model.reset_parameters()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
 
     best_val_acc = final_test_acc = 0.0
-  
+
     loss, acc = train(epoch)
-    print(f'Epoch {epoch:02d}, Loss: {loss:.4f}, Approx. Train: {acc:.4f}')
+    print(f"Epoch {epoch:02d}, Loss: {loss:.4f}, Approx. Train: {acc:.4f}")
 
     train_acc, val_acc, test_acc = test()
-    print(f'Train: {train_acc:.4f}, Val: {val_acc:.4f}, 'f'Test: {test_acc:.4f}')
+    print(
+        f"Train: {train_acc:.4f}, Val: {val_acc:.4f}, " f"Test: {test_acc:.4f}"
+    )
 
     if val_acc > best_val_acc:
         best_val_acc = val_acc
@@ -181,8 +190,8 @@ for epoch in range(10):
     test_accs.append(final_test_acc)
 
 test_acc = torch.tensor(test_accs)
-print('================================')
-print(f'Final Test: {test_acc.mean():.4f} ± {test_acc.std():.4f}')
-end_time = time.time()  
-total_training_time = end_time - start_time  
+print("================================")
+print(f"Final Test: {test_acc.mean():.4f} ± {test_acc.std():.4f}")
+end_time = time.time()
+total_training_time = end_time - start_time
 print(f"Total training time: {total_training_time:.2f} seconds")
