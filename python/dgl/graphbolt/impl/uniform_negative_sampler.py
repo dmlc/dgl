@@ -68,4 +68,8 @@ class UniformNegativeSampler(NegativeSampler):
                 self.negative_ratio,
             )
         else:
-            raise NotImplementedError("Not implemented yet.")
+            return self.graph.sample_negative_seeds_uniform(
+                etype,
+                node_pairs,
+                self.negative_ratio,
+            )

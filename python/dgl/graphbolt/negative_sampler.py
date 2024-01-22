@@ -1,5 +1,6 @@
 """Negative samplers."""
 
+import torch
 from _collections_abc import Mapping
 
 from torch.utils.data import functional_datapipe
@@ -69,7 +70,16 @@ class NegativeSampler(MiniBatchTransformer):
             else:
                 self._collate(minibatch, self._sample_with_etype(node_pairs))
         else:
-            raise NotImplementedError("Not implemented yet.")
+            seeds = minibatch.seeds
+            if isinstance(seeds, Mapping):
+                for etype, pos_pairs in seeds.items():
+                    self._collate(
+                        minibatch,
+                        self._sample_with_etype(pos_pairs, etype, use_seeds=True),
+                        etype,
+                    )
+            else:
+                self._collate(minibatch, self._sample_with_etype(seeds, use_seeds=True))
         return minibatch
 
     def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
@@ -120,4 +130,7 @@ class NegativeSampler(MiniBatchTransformer):
                 minibatch.negative_srcs = neg_src
                 minibatch.negative_dsts = neg_dst
         else:
-            raise NotImplementedError("Not implemented yet.")
+            minibatch.labels = torch.ones(minibatch.seeds.shape[0])
+            neg_labels = torch.zeros(neg_pairs.shape[0])
+            minibatch.labels = torch.cat((minibatch.labels, neg_labels))
+            minibatch.seeds = torch.cat((minibatch.seeds, neg_pairs))
