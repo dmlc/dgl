@@ -408,8 +408,7 @@ if __name__ == "__main__":
     if not torch.cuda.is_available():
         print(f"Multi-gpu training needs to be in gpu mode.")
         exit(0)
-    args.storage_device, args.device = args.mode.split("-")
-    args.device = torch.device(args.device)
+    args.storage_device, _ = args.mode.split("-")
 
     devices = list(map(int, args.gpu.split(",")))
     world_size = len(devices)
