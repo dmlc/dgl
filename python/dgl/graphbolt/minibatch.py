@@ -89,7 +89,9 @@ class MiniBatch:
       'node_pairs'.
     - If `query_index` is a dictionary: It indicates the graph is
       heterogeneous. The keys should be node or edge type and the value should
-      be corresponding query to given 'seed_nodes' or 'node_pairs'.
+      be corresponding query to given 'seed_nodes' or 'node_pairs'. The
+      starting value of each query ids is 0, and the query ids between
+      different keys do not affect each other.
     """
 
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
