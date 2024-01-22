@@ -94,7 +94,7 @@ def random_homo_graphbolt_graph(
     # Generate random edges.
     nodes = np.repeat(np.arange(num_nodes), 5)
     neighbors = np.random.randint(0, num_nodes, size=(num_edges))
-    edges = np.stack([nodes, neighbors], axis=1)
+    edges = np.stack([nodes, neighbors], axis=1, dtype=np.int64)
     # assert 0, (edges, type(edges), edges.dtype)
     os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
     assert edge_fmt in ["numpy", "csv"], print(
