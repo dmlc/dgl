@@ -554,8 +554,7 @@ class MiniBatch:
             )
             col_indices = indices
             return torch.stack([row_indices, col_indices], dim=0)
-            
-            
+
         def get_only_element_or_none(dict_obj):
             if not dict_obj or len(dict_obj) != 1:
                 return None
@@ -573,7 +572,6 @@ class MiniBatch:
             if all_edge_indices
             else torch.empty((2, 0), dtype=torch.long)
         )
-
 
         node_features = get_only_element_or_none(self.node_features)
         graph_labels = self.labels
