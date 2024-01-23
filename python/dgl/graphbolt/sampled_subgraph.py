@@ -31,7 +31,7 @@ class SampledSubgraph:
     ) -> Union[CSCFormatBase, Dict[str, CSCFormatBase],]:
         """Returns the node pairs representing edges in csc format.
           - If `sampled_csc` is a CSCFormatBase: It should be in the csc
-            format.`indptr` stores the index in the data array where each
+            format. `indptr` stores the index in the data array where each
             column starts. `indices` stores the row indices of the non-zero
             elements.
           - If `sampled_csc` is a dictionary: The keys should be edge type and
