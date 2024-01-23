@@ -537,9 +537,7 @@ class MiniBatch:
             indices = csc_matrix.indices
             indptr = csc_matrix.indptr
             row_indices = expand_indptr(
-                indptr, 
-                dtype=indices.dtype, 
-                output_size=len(indices)
+                indptr, dtype=indices.dtype, output_size=len(indices)
             )
             col_indices = indices
             return torch.stack([row_indices, col_indices], dim=0)
@@ -548,7 +546,9 @@ class MiniBatch:
             if node_features:
                 feature_keys = list(node_features.keys())
                 if len(feature_keys) > 1:
-                    raise ValueError("Graph has multiple node feature types, which is not allowed.")
+                    raise ValueError(
+                        "Graph has multiple node feature types, which is not allowed."
+                    )
                 return feature_keys[0]
             else:
                 return None
