@@ -170,6 +170,7 @@ start_time = time.time()
 
 test_accs = []
 for epoch in range(10):
+    epoch_start_time = time.time()
 
     model.reset_parameters()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
@@ -188,6 +189,9 @@ for epoch in range(10):
         best_val_acc = val_acc
         final_test_acc = test_acc
     test_accs.append(final_test_acc)
+    epoch_end_time = time.time()
+    each_training_time = epoch_end_time - epoch_start_time
+    print(f"This epoch training time: {each_training_time:.2f} seconds")
 
 test_acc = torch.tensor(test_accs)
 print("================================")
