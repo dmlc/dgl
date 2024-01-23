@@ -166,8 +166,6 @@ def test():
     return train_acc, val_acc, test_acc
 
 
-start_time = time.time()
-
 test_accs = []
 for epoch in range(10):
     epoch_start_time = time.time()
@@ -180,6 +178,10 @@ for epoch in range(10):
     loss, acc = train(epoch)
     print(f"Epoch {epoch:02d}, Loss: {loss:.4f}, Approx. Train: {acc:.4f}")
 
+    epoch_end_time = time.time()
+    each_training_time = epoch_end_time - epoch_start_time
+    print(f"This epoch training time: {each_training_time:.2f} seconds")
+
     train_acc, val_acc, test_acc = test()
     print(
         f"Train: {train_acc:.4f}, Val: {val_acc:.4f}, " f"Test: {test_acc:.4f}"
@@ -189,13 +191,8 @@ for epoch in range(10):
         best_val_acc = val_acc
         final_test_acc = test_acc
     test_accs.append(final_test_acc)
-    epoch_end_time = time.time()
-    each_training_time = epoch_end_time - epoch_start_time
-    print(f"This epoch training time: {each_training_time:.2f} seconds")
+
 
 test_acc = torch.tensor(test_accs)
 print("================================")
 print(f"Test accuracy {test_acc.mean():.4f}")
-end_time = time.time()
-total_training_time = end_time - start_time
-print(f"Total training time: {total_training_time:.2f} seconds")
