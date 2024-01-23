@@ -207,7 +207,7 @@ def test_feature_store_to_device(device):
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("shape", [(2, 1), (2, 3), (2, 2, 2), (137, 13, 3)])
-@pytest.mark.parametrize("in_place", [torch.int32, torch.int64])
+@pytest.mark.parametrize("in_place", [False, True])
 def test_torch_based_pinned_feature(dtype, idtype, shape, in_place):
     if dtype == torch.complex128:
         tensor = torch.complex(
