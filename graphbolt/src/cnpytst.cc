@@ -22,6 +22,10 @@ int main(int argc, char *argv[]) {
   auto idx = torch::tensor({10, 1003, 1004, 10000});
   // auto aaaaa = torch::from_blob(idx, {3}, torch::kInt);
 
+  // auto ret = arr.index_select(idx);
+
+  // std::cout << ret;
+
   auto ret = arr.index_select(idx);
 
   std::cout << ret;

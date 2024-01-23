@@ -78,6 +78,80 @@ void cnpy::NpyArray::load_all() {
 }
 
 torch::Tensor cnpy::NpyArray::index_select(torch::Tensor idx) {
+  // open file
+  int feature_fd = open(filename.c_str(), O_RDONLY | O_DIRECT);
+
+  int64_t feature_size = feature_dim * word_size;
+
+  int64_t num_idx = idx.numel();
+
+  omp_set_num_threads(32);
+  // printf("max thread:%d\n", omp_get_max_threads());
+  int numthd = omp_get_max_threads();
+
+  char *read_buffer = (char *)aligned_alloc(ALIGNMENT, ALIGNMENT * 2 * numthd);
+  char *result_buffer =
+      (char *)aligned_alloc(ALIGNMENT, feature_size * num_idx);
+
+  auto idx_data = idx.data_ptr<int64_t>();
+  // auto cache_data = cache.data_ptr<float>();
+  // auto cache_table_data = cache_table.data_ptr<int32_t>();
+
+#pragma omp parallel for num_threads(numthd)
+  for (int64_t n = 0; n < num_idx; n++) {
+    int64_t i;
+    int64_t offset;
+    int64_t aligned_offset;
+    int64_t residual;
+    // int64_t cache_entry;
+    int64_t read_size;
+
+    i = idx_data[n];
+    // cache_entry = cache_table_data[i];
+    // if (cache_entry >= 0) {
+    //   memcpy(
+    //       result_buffer + feature_dim * n,
+    //       cache_data + cache_entry * feature_dim, feature_size);
+    // } else {
+    offset = i * feature_size + prefix_len;
+    aligned_offset = offset & (long)~(ALIGNMENT - 1);
+    residual = offset - aligned_offset;
+
+    if (residual + feature_size > ALIGNMENT) {
+      read_size = ALIGNMENT * 2;
+    } else {
+      read_size = ALIGNMENT;
+    }
+
+    // printf("in thread: %d\n ", omp_get_thread_num());
+
+    if (pread(
+            feature_fd, read_buffer + (ALIGNMENT * 2 * omp_get_thread_num()),
+            read_size, aligned_offset) == -1) {
+      fprintf(stderr, "ERROR: %s\n", strerror(errno));
+    }
+    memcpy(
+        result_buffer + feature_size * n,
+        read_buffer + (ALIGNMENT * 2 * omp_get_thread_num() + residual),
+        feature_size);
+    // }
+  }
+
+  auto options = torch::TensorOptions()
+                     .dtype(torch::kFloat16)
+                     .layout(torch::kStrided)
+                     .device(torch::kCPU)
+                     .requires_grad(false);
+  auto result =
+      torch::from_blob(result_buffer, {num_idx, feature_dim}, options);
+
+  free(read_buffer);
+  close(feature_fd);
+
+  return result;
+}
+
+torch::Tensor cnpy::NpyArray::index_select_all(torch::Tensor idx) {
   int fd = open(filename.c_str(), O_RDONLY | O_DIRECT);
 
   int64_t feature_size = feature_dim * word_size;

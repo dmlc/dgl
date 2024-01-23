@@ -49,6 +49,7 @@ struct NpyArray {
   void print_npy_header();
   void load_all();
   torch::Tensor feature_size() { return feature_shape; }
+  torch::Tensor index_select_all(torch::Tensor idx);
   torch::Tensor index_select(torch::Tensor idx);
 
   size_t num_bytes() const { return num_vals * word_size; }
