@@ -8,7 +8,46 @@ from ..feature_store import Feature
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
 
-__all__ = ["TorchBasedFeature", "TorchBasedFeatureStore"]
+__all__ = ["TorchBasedFeature", "DiskBasedFeature", "TorchBasedFeatureStore"]
+
+
+class DiskBasedFeature(Feature):
+    r""" """
+
+    def __init__(self, path: str, metadata: Dict = None):
+        super().__init__()
+        # assert isinstance(torch_feature, torch.Tensor), (
+        #     f"torch_feature in TorchBasedFeature must be torch.Tensor, "
+        #     f"but got {type(torch_feature)}."
+        # )
+        # assert torch_feature.dim() > 1, (
+        #     f"dimension of torch_feature in TorchBasedFeature must be greater "
+        #     f"than 1, but got {torch_feature.dim()} dimension."
+        # )
+        # Make sure the tensor is contiguous.
+        # self._tensor = torch_feature.contiguous()
+        # print("device", self._tensor.device)
+
+        # Disk dataset path.
+        self.path = path
+        self._metadata = metadata
+
+    def read(self, ids: torch.Tensor = None):
+        # if ids is None:
+        #     if self._tensor.is_pinned():
+        #         return self._tensor.cuda()
+        #     return self._tensor
+        return torch.ops.graphbolt.disk_index_select(self.path, ids)
+
+    def size(self):
+        """Get the size of the feature.
+
+        Returns
+        -------
+        torch.Size
+            The size of the feature.
+        """
+        return torch.ops.graphbolt.disk_feature_size(self.path)
 
 
 class TorchBasedFeature(Feature):
@@ -221,9 +260,8 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                mmap_mode = "r+" if not spec.in_memory else None
-                features[key] = TorchBasedFeature(
-                    torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
+                features[key] = DiskBasedFeature(
+                    spec.path,
                     metadata=metadata,
                 )
             else:

@@ -88,3 +88,9 @@ if(DEFINED MKL_LIBRARIES)
                           ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
 
+add_library(cnpy SHARED "src/cnpy.cc")
+target_link_libraries(cnpy "${TORCH_LIBRARIES}")
+
+add_executable(cnpytest src/cnpytst.cc)
+target_link_libraries(cnpytest cnpy)
+

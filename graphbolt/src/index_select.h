@@ -47,6 +47,38 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
  */
 torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index);
 
+/**
+ * @brief Select rows from input tensor according to index tensor.
+ *
+ * NOTE:
+ * 1. The shape of input tensor can be multi-dimensional, but the index tensor
+ * must be 1-D.
+ * 2. If input is on pinned memory and index is on pinned memory or GPU memory,
+ * then UVAIndexSelectImpl will be called. Otherwise, torch::index_select will
+ * be called.
+ *
+ * @param input Input tensor with shape (N, ...).
+ * @param index Index tensor with shape (M,).
+ * @return torch::Tensor Output tensor with shape (M, ...).
+ */
+torch::Tensor DiskIndexSelect(std::string path, torch::Tensor index);
+
+/**
+ * @brief Select rows from input tensor according to index tensor.
+ *
+ * NOTE:
+ * 1. The shape of input tensor can be multi-dimensional, but the index tensor
+ * must be 1-D.
+ * 2. If input is on pinned memory and index is on pinned memory or GPU memory,
+ * then UVAIndexSelectImpl will be called. Otherwise, torch::index_select will
+ * be called.
+ *
+ * @param input Input tensor with shape (N, ...).
+ * @param index Index tensor with shape (M,).
+ * @return torch::Tensor Output tensor with shape (M, ...).
+ */
+torch::Tensor DiskFeatureSize(std::string path);
+
 }  // namespace ops
 }  // namespace graphbolt
 
