@@ -148,6 +148,8 @@ class DeepwalkDataset:
         fast_neg=True,
         ogbl_name="",
         load_from_ogbl=False,
+        ogbn_name="",
+        load_from_ogbn=False,
     ):
         """This class has the following functions:
         1. Transform the txt network file into DGL graph;
@@ -180,6 +182,14 @@ class DeepwalkDataset:
             from load_dataset import load_from_ogbl_with_name
 
             self.G = load_from_ogbl_with_name(ogbl_name)
+            self.G = make_undirected(self.G)
+        elif load_from_ogbn:
+            assert (
+                len(gpus) == 1
+            ), "ogb.linkproppred is not compatible with multi-gpu training."
+            from load_dataset import load_from_ogbn_with_name
+
+            self.G = load_from_ogbn_with_name(ogbn_name)
             self.G = make_undirected(self.G)
         else:
             self.net, self.node2id, self.id2node, self.sm = ReadTxtNet(net_file)
