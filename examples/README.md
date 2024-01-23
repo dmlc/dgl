@@ -6,6 +6,13 @@ The folder contains example implementations of selected research papers related 
 
 To quickly locate the examples of your interest, search for the tagged keywords or use the search tool on [dgl.ai](https://www.dgl.ai/).
 
+## 2024
+
+- <a name="labor"></a> Lin et al. ARGO: An Auto-Tuning Runtime System for Scalable GNN Training on Multi-Core Processor. [Paper link](https://arxiv.org/abs/2210.13339)
+  - Example code: [PyTorch](https://github.com/jasonlin316/dgl/tree/argo/examples/pytorch/ARGO)
+
+  - Tags: semi-supervised node classification
+
 ## 2023
 
 - <a name="labor"></a> Zheng Wang et al. From Cluster Assumption to Graph Convolution: Graph-based Semi-Supervised Learning Revisited. [Paper link](https://arxiv.org/abs/2210.13339)
