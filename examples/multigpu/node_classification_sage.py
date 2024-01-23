@@ -171,12 +171,14 @@ def train(
     use_uva,
 ):
     # Instantiate a neighbor sampler
-    sampler = NeighborSampler(
-        [10, 10, 10],
-        prefetch_node_feats=["feat"],
-        prefetch_labels=["label"],
-        fused=(args.mode != "benchmark"),
-    )
+    if args.mode == "benchmark":
+        sampler = NeighborSampler([10, 10, 10], fused=False)
+    else:
+        sampler = NeighborSampler(
+            [10, 10, 10],
+            prefetch_node_feats=["feat"],
+            prefetch_labels=["label"],
+        )
     train_dataloader = DataLoader(
         g,
         train_idx,
