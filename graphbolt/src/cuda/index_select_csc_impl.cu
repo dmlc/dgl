@@ -43,8 +43,8 @@ struct AlignmentFunc {
 
 template <typename indptr_t, typename indices_t>
 __global__ void _CopyIndicesAlignedKernel(
-    const int64_t edge_count, const int64_t num_nodes,
-    const indptr_t* const indptr, const indptr_t* const output_indptr,
+    const indptr_t edge_count, const indptr_t* const indptr,
+    const indptr_t* const output_indptr,
     const indptr_t* const output_indptr_aligned, const indices_t* const indices,
     const int64_t* const coo_aligned_rows, indices_t* const output_indices,
     const int64_t* const perm) {
@@ -124,7 +124,7 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   // Copy the modified number of edges.
   auto edge_count_aligned_ =
       cuda::CopyScalar{output_indptr_aligned_ptr + num_nodes};
-  const int64_t edge_count_aligned = static_cast<intptr_t>(edge_count_aligned_);
+  const int64_t edge_count_aligned = static_cast<indptr_t>(edge_count_aligned_);
 
   // Allocate output array with actual number of edges.
   torch::Tensor output_indices =
@@ -138,9 +138,9 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   // Perform the actual copying, of the indices array into
   // output_indices in an aligned manner.
   CUDA_KERNEL_CALL(
-      _CopyIndicesAlignedKernel, grid, block, 0, edge_count_aligned, num_nodes,
-      sliced_indptr, output_indptr.data_ptr<indptr_t>(),
-      output_indptr_aligned_ptr,
+      _CopyIndicesAlignedKernel, grid, block, 0,
+      static_cast<indptr_t>(edge_count_aligned_), sliced_indptr,
+      output_indptr.data_ptr<indptr_t>(), output_indptr_aligned_ptr,
       reinterpret_cast<indices_t*>(indices.data_ptr()),
       coo_aligned_rows.data_ptr<int64_t>(),
       reinterpret_cast<indices_t*>(output_indices.data_ptr()), perm);
