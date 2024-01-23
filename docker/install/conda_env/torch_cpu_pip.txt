@@ -21,4 +21,5 @@ torch==1.13.0+cpu
 torchdata
 torcheval
 torchmetrics
+torch_geometric
 tqdm
