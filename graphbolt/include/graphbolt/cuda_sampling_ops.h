@@ -19,7 +19,8 @@ namespace ops {
  *
  * @param indptr Index pointer array of the CSC.
  * @param indices Indices array of the CSC.
- * @param nodes The nodes from which to sample neighbors.
+ * @param nodes The nodes from which to sample neighbors. If not provided,
+ * assumed to be equal to torch.arange(indptr.size(0) - 1).
  * @param fanouts The number of edges to be sampled for each node with or
  * without considering edge types.
  *   - When the length is 1, it indicates that the fanout applies to all

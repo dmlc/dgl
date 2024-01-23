@@ -286,7 +286,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Sample neighboring edges of the given nodes and return the induced
    * subgraph.
    *
-   * @param nodes The nodes from which to sample neighbors.
+   * @param nodes The nodes from which to sample neighbors. If not provided,
+   * assumed to be equal to torch.arange(NumNodes()).
    * @param fanouts The number of edges to be sampled for each node with or
    * without considering edge types.
    *   - When the length is 1, it indicates that the fanout applies to all
