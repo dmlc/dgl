@@ -1,5 +1,6 @@
 """Uniform negative sampler for GraphBolt."""
 
+import torch
 from torch.utils.data import functional_datapipe
 
 from ..negative_sampler import NegativeSampler
@@ -73,3 +74,10 @@ class UniformNegativeSampler(NegativeSampler):
                 node_pairs,
                 self.negative_ratio,
             )
+
+    def _construct_indexes(self, node_pairs):
+        num_pos_node_pairs = node_pairs.shape[0]
+        negative_ratio = self.negative_ratio
+        pos_indexes = torch.arange(0, num_pos_node_pairs)
+        neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
+        return torch.cat((pos_indexes, neg_indexes))

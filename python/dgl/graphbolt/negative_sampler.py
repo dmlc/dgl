@@ -84,10 +84,14 @@ class NegativeSampler(MiniBatchTransformer):
                         ),
                         etype,
                     )
+                    minibatch.indexes[etype] = self._construct_indexes(
+                        pos_pairs
+                    )
             else:
                 self._collate(
                     minibatch, self._sample_with_etype(seeds, use_seeds=True)
                 )
+                minibatch.indexes = self._construct_indexes(seeds)
         return minibatch
 
     def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
@@ -107,6 +111,22 @@ class NegativeSampler(MiniBatchTransformer):
         -------
         Tuple[Tensor, Tensor]
             A collection of negative node pairs.
+        """
+        raise NotImplementedError
+
+    def _construct_indexes(self, node_pairs):
+        """Generate indexes for postive and negative edges. Positve edge and
+        the negative edges sampled from it will have same query.
+
+        Parameters
+        ----------
+        node_pairs: torch.Tensor
+            A N*2 tensor representing N positive edges.
+
+        Returns
+        -------
+        torch.Tensor
+            The indexes indicate to which query the edge belongs.
         """
         raise NotImplementedError
 
