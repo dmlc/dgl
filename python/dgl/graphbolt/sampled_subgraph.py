@@ -30,9 +30,10 @@ class SampledSubgraph:
         self,
     ) -> Union[CSCFormatBase, Dict[str, CSCFormatBase],]:
         """Returns the node pairs representing edges in csc format.
-          - If `sampled_csc` is a CSCFormatBase: It should be in the csc format.
-            `indptr` stores the index in the data array where each column
-            starts. `indices` stores the row indices of the non-zero elements.
+          - If `sampled_csc` is a CSCFormatBase: It should be in the csc
+            format.`indptr` stores the index in the data array where each
+            column starts. `indices` stores the row indices of the non-zero
+            elements.
           - If `sampled_csc` is a dictionary: The keys should be edge type and
             the values should be corresponding node pairs. The ids inside is
             heterogeneous ids.
@@ -71,8 +72,8 @@ class SampledSubgraph:
         Column's reverse node ids in the original graph. A graph structure
         can be treated as a coordinated row and column pair, and this is
         the mapped ids of the column.
-          - If `original_column_node_ids` is a tensor: It represents the original
-            node ids.
+          - If `original_column_node_ids` is a tensor: It represents the
+            original node ids.
           - If `original_column_node_ids` is a dictionary: The keys should be
             node type and the values should be corresponding original
             heterogeneous node ids.
@@ -105,9 +106,9 @@ class SampledSubgraph:
         features are needed.
           - If `original_edge_ids` is a tensor: It represents the original edge
             ids.
-          - If `original_edge_ids` is a dictionary: The keys should be edge type
-            and the values should be corresponding original heterogeneous edge
-            ids.
+          - If `original_edge_ids` is a dictionary: The keys should be edge
+            type and the values should be corresponding original heterogeneous
+            edge ids.
         """
         return None
 
@@ -121,10 +122,10 @@ class SampledSubgraph:
     ):
         r"""Exclude edges from the sampled subgraph.
 
-        This function can be used with sampled subgraphs, regardless of whether they
-        have compacted row/column nodes or not. If the original subgraph has
-        compacted row or column nodes, the corresponding row or column nodes in the
-        returned subgraph will also be compacted.
+        This function can be used with sampled subgraphs, regardless of
+        whether they have compacted row/column nodes or not. If the original
+        subgraph has compacted row or column nodes, the corresponding row or
+        column nodes in the returned subgraph will also be compacted.
 
         Parameters
         ----------
