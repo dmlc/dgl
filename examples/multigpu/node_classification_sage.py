@@ -171,12 +171,16 @@ def train(
     use_uva,
 ):
     # Instantiate a neighbor sampler
-    sampler = NeighborSampler(
-        [10, 10, 10],
-        prefetch_node_feats=["feat"],
-        prefetch_labels=["label"],
-        fused=(args.mode != "benchmark"),
-    )
+    if args.mode == "benchmark":
+        # A work-around to prevent CUDA running error. For more details, please
+        # see https://github.com/dmlc/dgl/issues/6697.
+        sampler = NeighborSampler([10, 10, 10], fused=False)
+    else:
+        sampler = NeighborSampler(
+            [10, 10, 10],
+            prefetch_node_feats=["feat"],
+            prefetch_labels=["label"],
+        )
     train_dataloader = DataLoader(
         g,
         train_idx,
