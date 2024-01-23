@@ -195,7 +195,7 @@ for epoch in range(10):
 
 test_acc = torch.tensor(test_accs)
 print("================================")
-print(f"Final Test: {test_acc.mean():.4f} ± {test_acc.std():.4f}")
+print(f"Test accuracy: {test_acc.mean():.4f}")
 end_time = time.time()
 total_training_time = end_time - start_time
 print(f"Total training time: {total_training_time:.2f} seconds")
