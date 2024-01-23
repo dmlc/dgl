@@ -494,7 +494,7 @@ def test_get_dgl_blocks_hetero():
     )
     dgl_blocks = minibatch.blocks
     expect_result = str(
-       """[Block(num_src_nodes={'A': 4, 'B': 3},
+    """[Block(num_src_nodes={'A': 4, 'B': 3},
       num_dst_nodes={'A': 4, 'B': 3},
       num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
       metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]), Block(num_src_nodes={'A': 2, 'B': 2},
