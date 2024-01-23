@@ -41,12 +41,12 @@ struct AlignmentFunc {
   }
 };
 
-template <typename indptr_t, typename indices_t>
+template <typename indptr_t, typename indices_t, typename coo_rows_t>
 __global__ void _CopyIndicesAlignedKernel(
     const indptr_t edge_count, const indptr_t* const indptr,
     const indptr_t* const output_indptr,
     const indptr_t* const output_indptr_aligned, const indices_t* const indices,
-    const int64_t* const coo_aligned_rows, indices_t* const output_indices,
+    const coo_rows_t* const coo_aligned_rows, indices_t* const output_indices,
     const int64_t* const perm) {
   indptr_t idx = static_cast<indptr_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
@@ -132,18 +132,32 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   const dim3 block(BLOCK_SIZE);
   const dim3 grid((edge_count_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
-  auto coo_aligned_rows = ExpandIndptrImpl(
-      output_indptr_aligned, torch::kLong, torch::nullopt, edge_count_aligned);
+  // Find the smallest integer type to store the coo_aligned_rows tensor.
+  const int num_bits = cuda::NumberOfBits(num_nodes);
+  std::array<int, 4> type_bits = {8, 15, 31, 63};
+  const auto type_index =
+      std::lower_bound(type_bits.begin(), type_bits.end(), num_bits) -
+      type_bits.begin();
+  std::array<torch::ScalarType, 5> types = {
+      torch::kByte, torch::kInt16, torch::kInt32, torch::kLong, torch::kLong};
+  auto coo_dtype = types[type_index];
 
-  // Perform the actual copying, of the indices array into
-  // output_indices in an aligned manner.
-  CUDA_KERNEL_CALL(
-      _CopyIndicesAlignedKernel, grid, block, 0,
-      static_cast<indptr_t>(edge_count_aligned_), sliced_indptr,
-      output_indptr.data_ptr<indptr_t>(), output_indptr_aligned_ptr,
-      reinterpret_cast<indices_t*>(indices.data_ptr()),
-      coo_aligned_rows.data_ptr<int64_t>(),
-      reinterpret_cast<indices_t*>(output_indices.data_ptr()), perm);
+  auto coo_aligned_rows = ExpandIndptrImpl(
+      output_indptr_aligned, coo_dtype, torch::nullopt, edge_count_aligned);
+
+  AT_DISPATCH_INTEGRAL_TYPES(
+      coo_dtype, "UVAIndexSelectCSCCopyIndicesCOO", ([&] {
+        using coo_rows_t = scalar_t;
+        // Perform the actual copying, of the indices array into
+        // output_indices in an aligned manner.
+        CUDA_KERNEL_CALL(
+            _CopyIndicesAlignedKernel, grid, block, 0,
+            static_cast<indptr_t>(edge_count_aligned_), sliced_indptr,
+            output_indptr.data_ptr<indptr_t>(), output_indptr_aligned_ptr,
+            reinterpret_cast<indices_t*>(indices.data_ptr()),
+            coo_aligned_rows.data_ptr<coo_rows_t>(),
+            reinterpret_cast<indices_t*>(output_indices.data_ptr()), perm);
+      }));
   return {output_indptr, output_indices};
 }
 
