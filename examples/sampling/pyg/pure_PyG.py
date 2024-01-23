@@ -180,7 +180,7 @@ for epoch in range(10):
 
     epoch_end_time = time.time()
     each_training_time = epoch_end_time - epoch_start_time
-    print(f"This epoch training time: {each_training_time:.2f} seconds")
+    print(f"Time {each_training_time:.2f}")
 
     train_acc, val_acc, test_acc = test()
     print(
