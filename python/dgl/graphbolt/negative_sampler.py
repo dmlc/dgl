@@ -72,11 +72,17 @@ class NegativeSampler(MiniBatchTransformer):
                 self._collate(minibatch, self._sample_with_etype(node_pairs))
         else:
             seeds = minibatch.seeds
-            assert (
-                len(seeds.shape) == 2 and seeds.shape[1] == 2
-            ), "Only 2-D tensor representing node paris is supported for negative sampling."
+
             if isinstance(seeds, Mapping):
+                if minibatch.indexes is None:
+                    minibatch.indexes = {}
                 for etype, pos_pairs in seeds.items():
+                    assert (
+                        len(pos_pairs.shape) == 2 and pos_pairs.shape[1] == 2
+                    ), (
+                        "Only tensor with shape N*2 is supported for negative"
+                        + f" sampling, but got {pos_pairs.shape}."
+                    )
                     self._collate(
                         minibatch,
                         self._sample_with_etype(
@@ -88,6 +94,10 @@ class NegativeSampler(MiniBatchTransformer):
                         pos_pairs
                     )
             else:
+                assert len(seeds.shape) == 2 and seeds.shape[1] == 2, (
+                    "Only tensor with shape N*2 is supported for negative"
+                    + f" sampling, but got {seeds.shape}."
+                )
                 self._collate(
                     minibatch, self._sample_with_etype(seeds, use_seeds=True)
                 )
@@ -158,14 +168,16 @@ class NegativeSampler(MiniBatchTransformer):
                 minibatch.negative_srcs = neg_src
                 minibatch.negative_dsts = neg_dst
         else:
-            neg_labels = torch.zeros(neg_pairs.shape[0])
+            neg_labels = torch.zeros(neg_pairs.shape[0]).bool()
             if etype is None:
                 if minibatch.labels is None:
                     minibatch.labels = torch.ones(minibatch.seeds.shape[0])
                 minibatch.labels = torch.cat((minibatch.labels, neg_labels))
                 minibatch.seeds = torch.cat((minibatch.seeds, neg_pairs))
             else:
-                if minibatch.labels[etype] is None:
+                if minibatch.labels is None:
+                    minibatch.labels = {}
+                if minibatch.labels.get(etype, None) is None:
                     minibatch.labels[etype] = torch.ones(
                         minibatch.seeds[etype].shape[0]
                     )
