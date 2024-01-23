@@ -913,3 +913,18 @@ def test_to_pyg():
     )
     pyg_data = test_minibatch.to_pyg_data()
     assert pyg_data.y is None, "Labels should be None."
+
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph],
+        node_features={
+            "feat": expected_node_features,
+            "extra_feat": torch.tensor([[3], [4]])
+        },
+        labels=expected_labels,
+    )
+    try:
+        pyg_data = test_minibatch.to_pyg_data()
+        assert pyg_data.x is None, "Multiple features case should return None or raise an error."
+    except ValueError as e:
+        assert str(e) == "Graph has multiple node feature types, which is not allowed."
+

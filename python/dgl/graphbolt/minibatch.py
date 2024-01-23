@@ -554,17 +554,11 @@ class MiniBatch:
             )
             col_indices = indices
             return torch.stack([row_indices, col_indices], dim=0)
-
-        def check_graph_type_and_features(node_features):
-            if node_features:
-                feature_keys = list(node_features.keys())
-                if len(feature_keys) > 1:
-                    raise ValueError(
-                        "Graph has multiple node feature types, which is not allowed."
-                    )
-                return feature_keys[0]
-            else:
+            
+        def get_only_element_or_none(dict_obj):
+            if not dict_obj or len(dict_obj) != 1:
                 return None
+            return next(iter(dict_obj.values()))
 
         all_edge_indices = []
         if self.sampled_subgraphs is not None:
@@ -579,9 +573,8 @@ class MiniBatch:
             else torch.empty((2, 0), dtype=torch.long)
         )
 
-        feature_key = check_graph_type_and_features(self.node_features)
-        node_features = self.node_features[feature_key] if feature_key else None
 
+        node_features = get_only_element_or_none(self.node_features)
         graph_labels = self.labels
         pyg_data = Data(
             x=node_features, edge_index=combined_edge_index, y=graph_labels
