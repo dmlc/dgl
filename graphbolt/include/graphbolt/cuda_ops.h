@@ -113,7 +113,8 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  * given nodes and their indptr values.
  *
  * @param indptr The indptr tensor.
- * @param nodes  The nodes to read from indptr
+ * @param nodes  The nodes to read from indptr. If not provided, assumed to be
+ * equal to torch.arange(indptr.size(0) - 1).
  *
  * @return Tuple of tensors with values:
  * (indptr[nodes + 1] - indptr[nodes], indptr[nodes]), the returned indegrees
@@ -121,7 +122,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  * on it gives the output indptr.
  */
 std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
-    torch::Tensor indptr, torch::Tensor nodes);
+    torch::Tensor indptr, torch::optional<torch::Tensor> nodes);
 
 /**
  * @brief Given the compacted sub_indptr tensor, edge type tensor and

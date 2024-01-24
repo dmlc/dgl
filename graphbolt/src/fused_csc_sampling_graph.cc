@@ -607,21 +607,28 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 }
 
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
-    const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
+    torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
-  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
-  if (probs_name.has_value() && !probs_name.value().empty()) {
-    probs_or_mask = this->EdgeAttribute(probs_name);
-  }
+  auto probs_or_mask = this->EdgeAttribute(probs_name);
 
-  if (!replace && utils::is_on_gpu(nodes) &&
-      utils::is_accessible_from_gpu(indptr_) &&
-      utils::is_accessible_from_gpu(indices_) &&
-      (!probs_or_mask.has_value() ||
-       utils::is_accessible_from_gpu(probs_or_mask.value())) &&
-      (!type_per_edge_.has_value() ||
-       utils::is_accessible_from_gpu(type_per_edge_.value()))) {
+  // If nodes does not have a value, then we expect all arguments to be resident
+  // on the GPU. If nodes has a value, then we expect them to be accessible from
+  // GPU. This is required for the dispatch to work when CUDA is not available.
+  if (((!nodes.has_value() && utils::is_on_gpu(indptr_) &&
+        utils::is_on_gpu(indices_) &&
+        (!probs_or_mask.has_value() ||
+         utils::is_on_gpu(probs_or_mask.value())) &&
+        (!type_per_edge_.has_value() ||
+         utils::is_on_gpu(type_per_edge_.value()))) ||
+       (nodes.has_value() && utils::is_on_gpu(nodes.value()) &&
+        utils::is_accessible_from_gpu(indptr_) &&
+        utils::is_accessible_from_gpu(indices_) &&
+        (!probs_or_mask.has_value() ||
+         utils::is_accessible_from_gpu(probs_or_mask.value())) &&
+        (!type_per_edge_.has_value() ||
+         utils::is_accessible_from_gpu(type_per_edge_.value())))) &&
+      !replace) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "SampleNeighbors", {
           return ops::SampleNeighbors(
@@ -629,6 +636,7 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
               type_per_edge_, probs_or_mask);
         });
   }
+  TORCH_CHECK(nodes.has_value(), "Nodes can not be None on the CPU.");
 
   if (probs_or_mask.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
@@ -645,7 +653,7 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
     SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
     return SampleNeighborsImpl(
-        nodes, return_eids,
+        nodes.value(), return_eids,
         GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
         GetPickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
@@ -653,7 +661,7 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl(
-        nodes, return_eids,
+        nodes.value(), return_eids,
         GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
         GetPickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
