@@ -60,7 +60,7 @@ def graph_data_to_fused_csc_sampling_graph(
 
     Returns
     -------
-    graph : FusedCSCSamplingGraph
+    sampling_graph : FusedCSCSamplingGraph
         The FusedCSCSamplingGraph constructed from the raw data.
     """
     is_homogeneous = "type" not in graph_data["nodes"][0]
