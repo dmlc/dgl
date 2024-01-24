@@ -1243,7 +1243,9 @@ def dgl_parition_to_graphbolt(part_config, *, store_eids=False):
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
         dgl_warning(
-            "Running in debug mode which means all attributes of DGL partitions will be saved to the new format. What's more, more sanity checks will be performed during convertion."
+            "Running in debug mode which means all attributes of DGL partitions"
+            " will be saved to the new format. What's more, more sanity checks"
+            " will be performed during convertion."
         )
     part_meta = _load_part_config(part_config)
     num_parts = part_meta["num_parts"]
