@@ -22,7 +22,7 @@ class SamplePerLayer(Mapper):
         self.replace = replace
         self.prob_name = prob_name
 
-    def _sample_per_layer(self, minibatch):
+    def _sample_per_layer(self, minibatch, seeds_timestamp):
         return (
             self.sampler(
                 minibatch.input_nodes, self.fanout, self.replace, self.prob_name

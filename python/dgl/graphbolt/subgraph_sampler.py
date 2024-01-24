@@ -58,7 +58,7 @@ class SubgraphSamplerPreprocess(Mapper):
                 "`seed_nodes` should have a value."
             )
         minibatch.input_nodes = seeds
-        return minibatch
+        return minibatch, seeds_timestamp
 
     def _node_pairs_preprocess(self, minibatch):
         use_timestamp = hasattr(minibatch, "timestamp")
