@@ -72,14 +72,11 @@ class NegativeSampler(MiniBatchTransformer):
                 self._collate(minibatch, self._sample_with_etype(node_pairs))
         else:
             seeds = minibatch.seeds
-
             if isinstance(seeds, Mapping):
                 if minibatch.indexes is None:
                     minibatch.indexes = {}
                 for etype, pos_pairs in seeds.items():
-                    assert (
-                        len(pos_pairs.shape) == 2 and pos_pairs.shape[1] == 2
-                    ), (
+                    assert pos_pairs.ndim == 2 and pos_pairs.shape[1] == 2, (
                         "Only tensor with shape N*2 is supported for negative"
                         + f" sampling, but got {pos_pairs.shape}."
                     )
@@ -94,7 +91,7 @@ class NegativeSampler(MiniBatchTransformer):
                         pos_pairs
                     )
             else:
-                assert len(seeds.shape) == 2 and seeds.shape[1] == 2, (
+                assert seeds.ndim == 2 and seeds.shape[1] == 2, (
                     "Only tensor with shape N*2 is supported for negative"
                     + f" sampling, but got {seeds.shape}."
                 )
