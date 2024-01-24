@@ -41,8 +41,7 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 
-# TODO: Discuss about the naming and location of this function.
-def graph_data_to_fused_csc_sampling_graph(
+def _graph_data_to_fused_csc_sampling_graph(
     dataset_dir: str,
     graph_data: Dict,
     include_original_edge_id: bool,
@@ -331,7 +330,7 @@ def preprocess_ondisk_dataset(
     # 2. Load the data and create a FusedCSCSamplingGraph.
     if "graph" not in input_config:
         raise RuntimeError("Invalid config: does not contain graph field.")
-    sampling_graph = graph_data_to_fused_csc_sampling_graph(
+    sampling_graph = _graph_data_to_fused_csc_sampling_graph(
         dataset_dir,
         input_config["graph"],
         include_original_edge_id,
