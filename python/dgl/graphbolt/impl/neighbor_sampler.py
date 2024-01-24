@@ -24,8 +24,7 @@ class SamplePerLayer(Mapper):
         self.replace = replace
         self.prob_name = prob_name
 
-    def _sample_per_layer(self, minibatch_and_seeds_timestamp):
-        minibatch, _ = minibatch_and_seeds_timestamp
+    def _sample_per_layer(self, minibatch):
         return (
             self.sampler(
                 minibatch.input_nodes, self.fanout, self.replace, self.prob_name
@@ -168,7 +167,8 @@ class NeighborSampler2(IterDataPipe):
         self.graph = graph
         datapipe = datapipe.sample_subgraph_preprocess()
 
-        def helper(minibatch):
+        def helper(minibatch_and_seeds_timestamp):
+            minibatch, _ = minibatch_and_seeds_timestamp
             seeds = minibatch.input_nodes
             # Enrich seeds with all node types.
             if isinstance(seeds, dict):
