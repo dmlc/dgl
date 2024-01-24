@@ -54,7 +54,7 @@ class SampledSubgraph:
 
         2. Heterogeneous graph.
 
-        sampled_csc = {"A:relation:B": gb.CSCFormatBase(
+        >>> sampled_csc = {"A:relation:B": gb.CSCFormatBase(
         ...     indptr=torch.tensor([0, 1, 2, 3]),
         ...     indices=torch.tensor([0, 1, 2]))}
         >>> print(sampled_csc)
