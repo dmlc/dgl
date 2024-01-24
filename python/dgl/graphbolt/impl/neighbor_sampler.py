@@ -15,6 +15,8 @@ __all__ = ["NeighborSampler", "LayerNeighborSampler", "NeighborSampler2"]
 
 @functional_datapipe("sample_per_layer")
 class SamplePerLayer(Mapper):
+    """Sample neighbor edges from a graph for a single layer."""
+
     def __init__(self, datapipe, sampler, fanout, replace, prob_name):
         super().__init__(datapipe, self._sample_per_layer)
         self.sampler = sampler
@@ -33,6 +35,8 @@ class SamplePerLayer(Mapper):
 
 @functional_datapipe("compact_per_layer")
 class CompactPerLayer(Mapper):
+    """Compact the sampled edges for a single layer."""
+
     def __init__(self, datapipe, deduplicate):
         super().__init__(datapipe, self._compact_per_layer)
         self.deduplicate = deduplicate
