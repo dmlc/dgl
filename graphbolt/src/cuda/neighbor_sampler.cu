@@ -171,10 +171,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   // Protect access to max_in_degree with a CUDAEvent
   at::cuda::CUDAEvent max_in_degree_event;
   max_in_degree_event.record();
-  torch::optional<int64_t> num_edges_;
+  torch::optional<int64_t> num_edges;
   torch::Tensor sub_indptr;
   if (!nodes.has_value()) {
-    num_edges_ = indices.size(0);
+    num_edges = indices.size(0);
     sub_indptr = indptr;
   }
   torch::optional<torch::Tensor> sliced_probs_or_mask;
@@ -183,9 +183,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       torch::Tensor sliced_probs_or_mask_tensor;
       std::tie(sub_indptr, sliced_probs_or_mask_tensor) = IndexSelectCSCImpl(
           in_degree, sliced_indptr, probs_or_mask.value(), nodes.value(),
-          indptr.size(0) - 2, num_edges_);
+          indptr.size(0) - 2, num_edges);
       sliced_probs_or_mask = sliced_probs_or_mask_tensor;
-      num_edges_ = sliced_probs_or_mask_tensor.size(0);
+      num_edges = sliced_probs_or_mask_tensor.size(0);
     } else {
       sliced_probs_or_mask = probs_or_mask;
     }
@@ -195,22 +195,22 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     if (nodes.has_value()) {
       std::tie(sub_indptr, sliced_type_per_edge) = IndexSelectCSCImpl(
           in_degree, sliced_indptr, type_per_edge.value(), nodes.value(),
-          indptr.size(0) - 2, num_edges_);
+          indptr.size(0) - 2, num_edges);
     } else {
       sliced_type_per_edge = type_per_edge.value();
     }
     std::tie(sub_indptr, in_degree, sliced_indptr) = SliceCSCIndptrHetero(
         sub_indptr, sliced_type_per_edge, sliced_indptr, fanouts.size());
     num_rows = sliced_indptr.size(0);
-    num_edges_ = sliced_type_per_edge.size(0);
+    num_edges = sliced_type_per_edge.size(0);
   }
   // If sub_indptr was not computed in the two code blocks above:
   if (nodes.has_value() && !probs_or_mask.has_value() && fanouts.size() <= 1) {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
   auto coo_rows = ExpandIndptrImpl(
-      sub_indptr, indices.scalar_type(), torch::nullopt, num_edges_);
-  const auto num_edges = coo_rows.size(0);
+      sub_indptr, indices.scalar_type(), torch::nullopt, num_edges);
+  num_edges = coo_rows.size(0);
   const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
       static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
   auto output_indptr = torch::empty_like(sub_indptr);
@@ -272,12 +272,14 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               // Using bfloat16 for random numbers works just as reliably as
               // float32 and provides around %30 percent speedup.
               using rnd_t = nv_bfloat16;
-              auto randoms = allocator.AllocateStorage<rnd_t>(num_edges);
-              auto randoms_sorted = allocator.AllocateStorage<rnd_t>(num_edges);
+              auto randoms =
+                  allocator.AllocateStorage<rnd_t>(num_edges.value());
+              auto randoms_sorted =
+                  allocator.AllocateStorage<rnd_t>(num_edges.value());
               auto edge_id_segments =
-                  allocator.AllocateStorage<edge_id_t>(num_edges);
+                  allocator.AllocateStorage<edge_id_t>(num_edges.value());
               auto sorted_edge_id_segments =
-                  allocator.AllocateStorage<edge_id_t>(num_edges);
+                  allocator.AllocateStorage<edge_id_t>(num_edges.value());
               AT_DISPATCH_INDEX_TYPES(
                   indices.scalar_type(), "SampleNeighborsIndices", ([&] {
                     using indices_t = index_t;
@@ -299,10 +301,12 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                               layer ? indices.data_ptr<indices_t>() : nullptr;
                           const dim3 block(BLOCK_SIZE);
                           const dim3 grid(
-                              (num_edges + BLOCK_SIZE - 1) / BLOCK_SIZE);
+                              (num_edges.value() + BLOCK_SIZE - 1) /
+                              BLOCK_SIZE);
                           // Compute row and random number pairs.
                           CUDA_KERNEL_CALL(
-                              _ComputeRandoms, grid, block, 0, num_edges,
+                              _ComputeRandoms, grid, block, 0,
+                              num_edges.value(),
                               sliced_indptr.data_ptr<indptr_t>(),
                               sub_indptr.data_ptr<indptr_t>(),
                               coo_rows.data_ptr<indices_t>(), sliced_probs_ptr,
@@ -317,7 +321,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               CUB_CALL(
                   DeviceSegmentedSort::SortPairs, randoms.get(),
                   randoms_sorted.get(), edge_id_segments.get(),
-                  sorted_edge_id_segments.get(), num_edges, num_rows,
+                  sorted_edge_id_segments.get(), num_edges.value(), num_rows,
                   sub_indptr.data_ptr<indptr_t>(),
                   sub_indptr.data_ptr<indptr_t>() + 1);
 
