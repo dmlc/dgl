@@ -1643,6 +1643,8 @@ def test_sample_neighbors_homo(labor, is_pinned, nodes):
     # Generate subgraph via sample neighbors.
     if nodes:
         nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
+    elif F._default_context_str != "gpu":
+        pytest.skip("Optional nodes is supported only for the GPU.")
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts=torch.LongTensor([2]))
 

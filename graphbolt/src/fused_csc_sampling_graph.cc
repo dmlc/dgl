@@ -635,10 +635,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
               indptr_, indices_, nodes, fanouts, replace, layer, return_eids,
               type_per_edge_, probs_or_mask);
         });
-  } else if (!nodes.has_value()) {
-    // Initialize the nodes tensor for the CPU execution.
-    nodes = torch::arange(NumNodes(), indices_.options());
   }
+  TORCH_CHECK(nodes.has_value(), "Nodes can not be None on the CPU.");
 
   if (probs_or_mask.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
