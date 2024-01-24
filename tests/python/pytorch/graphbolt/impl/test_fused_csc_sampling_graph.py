@@ -1615,7 +1615,10 @@ def test_csc_sampling_graph_to_pinned_memory():
 
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize("is_pinned", [False, True])
-def test_sample_neighbors_homo(labor, is_pinned):
+@pytest.mark.parametrize("nodes", [None, True])
+def test_sample_neighbors_homo(labor, is_pinned, nodes):
+    if is_pinned and nodes is None:
+        pytest.skip("Optional nodes and is_pinned is not supported together.")
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -1638,15 +1641,22 @@ def test_sample_neighbors_homo(labor, is_pinned):
     )
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
+    if nodes:
+        nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
+    elif F._default_context_str != "gpu":
+        pytest.skip("Optional nodes is supported only for the GPU.")
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts=torch.LongTensor([2]))
 
     # Verify in subgraph.
     sampled_indptr_num = subgraph.sampled_csc.indptr.size(0)
     sampled_num = subgraph.sampled_csc.indices.size(0)
-    assert sampled_indptr_num == 4
-    assert sampled_num == 6
+    if nodes is None:
+        assert sampled_indptr_num == indptr.shape[0]
+        assert sampled_num == 10
+    else:
+        assert sampled_indptr_num == 4
+        assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
