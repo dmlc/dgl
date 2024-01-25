@@ -189,23 +189,23 @@ def preprocess_ondisk_dataset(
         if not is_homogeneous:
             # For heterogenous graph, a node/edge feature must cover all
             # node/edge types.
+            ntypes = g.ntypes
             assert all(
-                set(g.nodes[g.ntypes[0]].data.keys())
+                set(g.nodes[ntypes[0]].data.keys())
                 == set(g.nodes[ntype].data.keys())
-                for ntype in g.ntypes
+                for ntype in ntypes
             ), (
-                "Node feature does not cover all node types."
-                + f"Existing types: {set(g.nodes[g.ntypes[0]].data.keys())}."
-                + f"Expected types: {set(g.nodes[ntype].data.keys() for ntype in g.ntypes)}."
+                "Node feature does not cover all node types: "
+                + f"{set(g.nodes[ntype].data.keys() for ntype in ntypes)}."
             )
+            etypes = g.canonical_etypes
             assert all(
-                set(g.edges[g.canonical_etypes[0]].data.keys())
+                set(g.edges[etypes[0]].data.keys())
                 == set(g.edges[etype].data.keys())
-                for etype in g.canonical_etypes
+                for etype in etypes
             ), (
-                "Edge feature does not cover all edge types."
-                + f"Existing types: {set(g.edges[g.canonical_etypes[0]].data.keys())}."
-                + f"Expected types: {set(g.edges[etype].data.keys() for etype in g.canonical_etypes)}."
+                "Edge feature does not cover all edge types: "
+                + f"{set(g.edges[etype].data.keys() for etype in etypes)}."
             )
 
     # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
