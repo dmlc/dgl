@@ -1,5 +1,6 @@
 """Functions for partitions. """
 
+import copy
 import json
 import logging
 import os
@@ -9,8 +10,8 @@ import numpy as np
 
 import torch
 
-from .. import backend as F
-from ..base import DGLError, EID, ETYPE, NID, NTYPE
+from .. import backend as F, graphbolt as gb
+from ..base import dgl_warning, DGLError, EID, ETYPE, NID, NTYPE
 from ..convert import to_homogeneous
 from ..data.utils import load_graphs, load_tensors, save_graphs, save_tensors
 from ..partition import (
@@ -1223,12 +1224,18 @@ def partition_graph(
         return orig_nids, orig_eids
 
 
-def convert_dgl_partition_to_csc_sampling_graph(part_config):
+def dgl_partition_to_graphbolt(
+    part_config,
+    *,
+    store_eids=False,
+    store_inner_node=False,
+    store_inner_edge=False,
+):
     """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
 
     This API converts `DGLGraph` partitions to `FusedCSCSamplingGraph` which is
     dedicated for sampling in `GraphBolt`. New graphs will be stored alongside
-    original graph as `fused_csc_sampling_graph.tar`.
+    original graph as `fused_csc_sampling_graph.pt`.
 
     In the near future, partitions are supposed to be saved as
     `FusedCSCSamplingGraph` directly. At that time, this API should be deprecated.
@@ -1237,18 +1244,39 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
     ----------
     part_config : str
         The partition configuration JSON file.
+    store_eids : bool, optional
+        Whether to store edge IDs in the new graph. Default: False.
+    store_inner_node : bool, optional
+        Whether to store inner node mask in the new graph. Default: False.
+    store_inner_edge : bool, optional
+        Whether to store inner edge mask in the new graph. Default: False.
     """
-
-    # As only this function requires GraphBolt for now, let's import here.
-    from .. import graphbolt
-
+    debug_mode = "DGL_DIST_DEBUG" in os.environ
+    if debug_mode:
+        dgl_warning(
+            "Running in debug mode which means all attributes of DGL partitions"
+            " will be saved to the new format."
+        )
     part_meta = _load_part_config(part_config)
+    new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
 
     # Utility functions.
+    def is_homogeneous(ntypes, etypes):
+        return len(ntypes) == 1 and len(etypes) == 1
+
     def init_type_per_edge(graph, gpb):
         etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
         return etype_ids
+
+    # [Rui] DGL partitions are always saved as homogeneous graphs even though
+    # the original graph is heterogeneous. But heterogeneous information like
+    # node/edge types are saved as node/edge data alongside with partitions.
+    # What needs more attention is that due to the existence of HALO nodes in
+    # each partition, the local node IDs are not sorted according to the node
+    # types. So we fail to assign ``node_type_offset`` as required by GraphBolt.
+    # But this is not a problem since such information is not used in sampling.
+    # We can simply pass None to it.
 
     # Iterate over partitions.
     for part_id in range(num_parts):
@@ -1256,23 +1284,66 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
             part_config, part_id, load_feats=False
         )
         _, _, ntypes, etypes = load_partition_book(part_config, part_id)
-        node_type_to_id = {ntype: ntid for ntid, ntype in enumerate(ntypes)}
-        edge_type_to_id = {
-            _etype_tuple_to_str(etype): etid
-            for etid, etype in enumerate(etypes)
-        }
+        is_homo = is_homogeneous(ntypes, etypes)
+        node_type_to_id = (
+            None
+            if is_homo
+            else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
+        )
+        edge_type_to_id = (
+            None
+            if is_homo
+            else {
+                gb.etype_tuple_to_str(etype): etid
+                for etype, etid in etypes.items()
+            }
+        )
         # Obtain CSC indtpr and indices.
-        indptr, indices, _ = graph.adj().csc()
-        # Initalize type per edge.
-        type_per_edge = init_type_per_edge(graph, gpb)
-        type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
-        # Sanity check.
-        assert len(type_per_edge) == graph.num_edges()
-        csc_graph = graphbolt.fused_csc_sampling_graph(
+        indptr, indices, edge_ids = graph.adj_tensors("csc")
+
+        # Save node attributes. Detailed attributes are shown below.
+        #  DGL_GB\Attributes  dgl.NID("_ID")  dgl.NTYPE("_TYPE")  "inner_node"  "part_id"
+        #  DGL_Homograph           ✅                🚫                  ✅          ✅
+        #  GB_Homograph            ✅                🚫               optional       🚫
+        #  DGL_Heterograph         ✅                ✅                  ✅          ✅
+        #  GB_Heterograph          ✅                🚫               optional       🚫
+        required_node_attrs = [NID]
+        if store_inner_node:
+            required_node_attrs.append("inner_node")
+        if debug_mode:
+            required_node_attrs = list(graph.ndata.keys())
+        node_attributes = {
+            attr: graph.ndata[attr] for attr in required_node_attrs
+        }
+
+        # Save edge attributes. Detailed attributes are shown below.
+        #  DGL_GB\Attributes  dgl.EID("_ID")  dgl.ETYPE("_TYPE")  "inner_edge"
+        #  DGL_Homograph           ✅               🚫                  ✅
+        #  GB_Homograph         optional            🚫               optional
+        #  DGL_Heterograph         ✅               ✅                  ✅
+        #  GB_Heterograph       optional            ✅               optional
+        type_per_edge = None
+        if not is_homo:
+            type_per_edge = init_type_per_edge(graph, gpb)[edge_ids]
+            type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
+        required_edge_attrs = []
+        if store_eids:
+            required_edge_attrs.append(EID)
+        if store_inner_edge:
+            required_edge_attrs.append("inner_edge")
+        if debug_mode:
+            required_edge_attrs = list(graph.edata.keys())
+        edge_attributes = {
+            attr: graph.edata[attr][edge_ids] for attr in required_edge_attrs
+        }
+
+        csc_graph = gb.fused_csc_sampling_graph(
             indptr,
             indices,
             node_type_offset=None,
             type_per_edge=type_per_edge,
+            node_attributes=node_attributes,
+            edge_attributes=edge_attributes,
             node_type_to_id=node_type_to_id,
             edge_type_to_id=edge_type_to_id,
         )
@@ -1284,3 +1355,12 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
             os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.pt"
         )
         torch.save(csc_graph, csc_graph_path)
+
+        # Update graph path.
+        new_part_meta[f"part-{part_id}"]["gb_part_graph"] = os.path.relpath(
+            csc_graph_path, os.path.dirname(part_config)
+        )
+
+    # Update partition config.
+    _dump_part_config(part_config, new_part_meta)
+    print(f"Converted partitions to GraphBolt format into {part_config}")
