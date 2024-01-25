@@ -1301,9 +1301,12 @@ def dgl_partition_to_graphbolt(
         # Obtain CSC indtpr and indices.
         indptr, indices, edge_ids = graph.adj_tensors("csc")
 
-        # Save node attributes.
-        #   NID: required.
-        #   inner_node: optional.
+        # Save node attributes. Detailed attributes are shown below.
+        #  DGL_GB\Attributes  dgl.NID("_ID")  dgl.NTYPE("_TYPE")  "inner_node"  "part_id"
+        #  DGL_Homograph           ✔️                ❌                  ✔️            ✔️
+        #  GB_Homograph            ✔️                ❌               optional        ❌
+        #  DGL_Heterograph         ✔️                ✔️                   ✔️            ✔️
+        #  GB_Heterograph          ✔️                ❌               optional        ❌
         required_node_attrs = [NID]
         if store_inner_node:
             required_node_attrs.append("inner_node")
@@ -1313,10 +1316,12 @@ def dgl_partition_to_graphbolt(
             attr: graph.ndata[attr] for attr in required_node_attrs
         }
 
-        # Save edge attributes.
-        #   EID: optional.
-        #   ETYPE: required for heterograph. saved into `type_per_edge`.
-        #   inner_edge: optional.
+        # Save node attributes. Detailed attributes are shown below.
+        #  DGL_GB\Attributes  dgl.EID("_ID")  dgl.ETYPE("_TYPE")  "inner_edge"
+        #  DGL_Homograph           ✔️                ❌                  ✔️
+        #  GB_Homograph         optional            ❌               optional
+        #  DGL_Heterograph         ✔️                ✔️                   ✔️
+        #  GB_Heterograph       optional            ✔️                optional
         type_per_edge = None
         if not is_homo:
             type_per_edge = init_type_per_edge(graph, gpb)[edge_ids]
