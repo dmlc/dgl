@@ -935,7 +935,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             ),
         )
 
-    def sample_negative_seeds_uniform(
+    def sample_negative_edges_uniform_2(
         self, edge_type, node_pairs, negative_ratio
     ):
         """
@@ -943,8 +943,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         edges according to a uniform distribution. For each edge ``(u, v)``,
         it is supposed to generate `negative_ratio` pairs of negative edges
         ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
-        the graph. As ``u`` is exactly same as the corresponding positive edges,
-        it returns None for negative sources.
+        the graph. ``u`` is exactly same as the corresponding positive edges.
+        It returns negative sources constructed from the corresponding positive
+        edges.
 
         Parameters
         ----------
@@ -952,12 +953,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
             The type of edges in the provided node_pairs. Any negative edges
             sampled will also have the same type. If set to None, it will be
             considered as a homogeneous graph.
-        node_pairs : Tuple[Tensor, Tensor]
-            A tuple of two 1D tensors that represent the source and destination
-            of positive edges, with 'positive' indicating that these edges are
-            present in the graph. It's important to note that within the
-            context of a heterogeneous graph, the ids in these tensors signify
-            heterogeneous ids.
+        node_pairs : torch.Tensor
+            A 2D tensors that represent the N pairs of positive edges in
+            source-destination format, with 'positive' indicating that these
+            edges are present in the graph. It's important to note that within
+            the context of a heterogeneous graph, the ids in these tensors
+            signify heterogeneous ids.
         negative_ratio: int
             The ratio of the number of negative samples to positive samples.
 

@@ -76,29 +76,20 @@ class NegativeSampler(MiniBatchTransformer):
                 if minibatch.indexes is None:
                     minibatch.indexes = {}
                 for etype, pos_pairs in seeds.items():
-                    assert pos_pairs.ndim == 2 and pos_pairs.shape[1] == 2, (
-                        "Only tensor with shape N*2 is supported for negative"
-                        + f" sampling, but got {pos_pairs.shape}."
-                    )
+                    (
+                        neg_node_pairs,
+                        minibatch.indexes[etype],
+                    ) = self._sample_with_etype(pos_pairs, use_seeds=True)
                     self._collate(
                         minibatch,
-                        self._sample_with_etype(
-                            pos_pairs, etype, use_seeds=True
-                        ),
+                        neg_node_pairs,
                         etype,
                     )
-                    minibatch.indexes[etype] = self._construct_indexes(
-                        pos_pairs
-                    )
             else:
-                assert seeds.ndim == 2 and seeds.shape[1] == 2, (
-                    "Only tensor with shape N*2 is supported for negative"
-                    + f" sampling, but got {seeds.shape}."
+                neg_node_pairs, minibatch.indexes = self._sample_with_etype(
+                    seeds, use_seeds=True
                 )
-                self._collate(
-                    minibatch, self._sample_with_etype(seeds, use_seeds=True)
-                )
-                minibatch.indexes = self._construct_indexes(seeds)
+                self._collate(minibatch, neg_node_pairs)
         return minibatch
 
     def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
@@ -121,34 +112,23 @@ class NegativeSampler(MiniBatchTransformer):
         """
         raise NotImplementedError
 
-    def _construct_indexes(self, node_pairs):
-        """Generate indexes for postive and negative edges. Positve edge and
-        the negative edges sampled from it will have same query.
-
-        Parameters
-        ----------
-        node_pairs: torch.Tensor
-            A N*2 tensor representing N positive edges.
-
-        Returns
-        -------
-        torch.Tensor
-            The indexes indicate to which query the edge belongs.
-        """
-        raise NotImplementedError
-
     def _collate(self, minibatch, neg_pairs, etype=None):
-        """Collates positive and negative samples into minibatch.
+        """Collate negative samples into minibatch.
+          - If `node_pairs` in minibatch is not None: collate negative samples
+            to `negative_srcs` and `negative_dsts` in minibatch.
+          - If `seeds` in minibatch is not None: concatenate positive edges
+            with negative edges. Also, construct labels corresponding to seeds.
 
         Parameters
         ----------
         minibatch : MiniBatch
-            The input minibatch, which contains positive node pairs, will be filled
-            with negative information in this function.
-        neg_pairs : Tuple[Tensor, Tensor]
-            A tuple of tensors represents source-destination node pairs of
-            negative edges, where negative means the edge may not exist in
-            the graph.
+            The input minibatch, which contains positive node pairs, will be
+            filled with negative information in this function.
+        neg_pairs : Union[Tuple[Tensor, Tensor], Tensor]
+            It represents source-destination node pairs of negative edges,
+            where negative means the edge may not exist in the graph.
+              - If `node_pairs` is not None: `neg_pairs` is a Tuple of tensor.
+              - If `seeds` is not None: `neg_pairs` is a tensor.
         etype : str
             Canonical edge type.
         """

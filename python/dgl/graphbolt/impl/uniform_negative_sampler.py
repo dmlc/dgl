@@ -69,15 +69,20 @@ class UniformNegativeSampler(NegativeSampler):
                 self.negative_ratio,
             )
         else:
-            return self.graph.sample_negative_seeds_uniform(
+            assert node_pairs.ndim == 2 and node_pairs.shape[1] == 2, (
+                "Only tensor with shape N*2 is supported for negative"
+                + f" sampling, but got {node_pairs.shape}."
+            )
+            # Construct negative node pairs.
+            neg_node_pairs = self.graph.sample_negative_edges_uniform_2(
                 etype,
                 node_pairs,
                 self.negative_ratio,
             )
-
-    def _construct_indexes(self, node_pairs):
-        num_pos_node_pairs = node_pairs.shape[0]
-        negative_ratio = self.negative_ratio
-        pos_indexes = torch.arange(0, num_pos_node_pairs)
-        neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
-        return torch.cat((pos_indexes, neg_indexes))
+            # Construct indexes for all node pairs.
+            num_pos_node_pairs = node_pairs.shape[0]
+            negative_ratio = self.negative_ratio
+            pos_indexes = torch.arange(0, num_pos_node_pairs)
+            neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
+            indexes = torch.cat((pos_indexes, neg_indexes))
+            return neg_node_pairs, indexes
