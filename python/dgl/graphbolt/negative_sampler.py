@@ -40,7 +40,9 @@ class NegativeSampler(MiniBatchTransformer):
 
     def _sample(self, minibatch):
         """
-        Generate a mix of positive and negative samples.
+        Generate a mix of positive and negative samples. If `seeds` in
+        minibatch is not None, `labels` and `indexes` will be constructed
+        after negative sampling, based on corresponding seeds.
 
         Parameters
         ----------
@@ -75,26 +77,27 @@ class NegativeSampler(MiniBatchTransformer):
             if isinstance(seeds, Mapping):
                 if minibatch.indexes is None:
                     minibatch.indexes = {}
+                if minibatch.labels is None:
+                    minibatch.labels = {}
                 for etype, pos_pairs in seeds.items():
                     (
-                        neg_node_pairs,
+                        minibatch.seeds[etype],
+                        minibatch.labels[etype],
                         minibatch.indexes[etype],
                     ) = self._sample_with_etype(pos_pairs, use_seeds=True)
-                    self._collate(
-                        minibatch,
-                        neg_node_pairs,
-                        etype,
-                    )
             else:
-                neg_node_pairs, minibatch.indexes = self._sample_with_etype(
-                    seeds, use_seeds=True
-                )
-                self._collate(minibatch, neg_node_pairs)
+                (
+                    minibatch.seeds,
+                    minibatch.labels,
+                    minibatch.indexes,
+                ) = self._sample_with_etype(seeds, use_seeds=True)
         return minibatch
 
     def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
         """Generate negative pairs for a given etype form positive pairs
-        for a given etype.
+        for a given etype. If `node_pairs` is a 2D tensor, which represents
+        `seeds` is used in minibatch, corresponding labels and indexes will be
+        constructed.
 
         Parameters
         ----------
@@ -113,54 +116,28 @@ class NegativeSampler(MiniBatchTransformer):
         raise NotImplementedError
 
     def _collate(self, minibatch, neg_pairs, etype=None):
-        """Collate negative samples into minibatch.
-          - If `node_pairs` in minibatch is not None: collate negative samples
-            to `negative_srcs` and `negative_dsts` in minibatch.
-          - If `seeds` in minibatch is not None: concatenate positive edges
-            with negative edges. Also, construct labels corresponding to seeds.
+        """Collates positive and negative samples into minibatch.
 
         Parameters
         ----------
         minibatch : MiniBatch
             The input minibatch, which contains positive node pairs, will be
             filled with negative information in this function.
-        neg_pairs : Union[Tuple[Tensor, Tensor], Tensor]
-            It represents source-destination node pairs of negative edges,
-            where negative means the edge may not exist in the graph.
-              - If `node_pairs` is not None: `neg_pairs` is a Tuple of tensor.
-              - If `seeds` is not None: `neg_pairs` is a tensor.
+        neg_pairs : Tuple[Tensor, Tensor]
+            A tuple of tensors represents source-destination node pairs of
+            negative edges, where negative means the edge may not exist in
+            the graph.
         etype : str
             Canonical edge type.
         """
-        if minibatch.seeds is None:
-            neg_src, neg_dst = neg_pairs
-            if neg_src is not None:
-                neg_src = neg_src.view(-1, self.negative_ratio)
-            if neg_dst is not None:
-                neg_dst = neg_dst.view(-1, self.negative_ratio)
-            if etype is not None:
-                minibatch.negative_srcs[etype] = neg_src
-                minibatch.negative_dsts[etype] = neg_dst
-            else:
-                minibatch.negative_srcs = neg_src
-                minibatch.negative_dsts = neg_dst
+        neg_src, neg_dst = neg_pairs
+        if neg_src is not None:
+            neg_src = neg_src.view(-1, self.negative_ratio)
+        if neg_dst is not None:
+            neg_dst = neg_dst.view(-1, self.negative_ratio)
+        if etype is not None:
+            minibatch.negative_srcs[etype] = neg_src
+            minibatch.negative_dsts[etype] = neg_dst
         else:
-            neg_labels = torch.zeros(neg_pairs.shape[0]).bool()
-            if etype is None:
-                if minibatch.labels is None:
-                    minibatch.labels = torch.ones(minibatch.seeds.shape[0])
-                minibatch.labels = torch.cat((minibatch.labels, neg_labels))
-                minibatch.seeds = torch.cat((minibatch.seeds, neg_pairs))
-            else:
-                if minibatch.labels is None:
-                    minibatch.labels = {}
-                if minibatch.labels.get(etype, None) is None:
-                    minibatch.labels[etype] = torch.ones(
-                        minibatch.seeds[etype].shape[0]
-                    )
-                minibatch.labels[etype] = torch.cat(
-                    (minibatch.labels[etype], neg_labels)
-                )
-                minibatch.seeds[etype] = torch.cat(
-                    (minibatch.seeds[etype], neg_pairs)
-                )
+            minibatch.negative_srcs = neg_src
+            minibatch.negative_dsts = neg_dst

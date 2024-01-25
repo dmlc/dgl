@@ -944,8 +944,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         it is supposed to generate `negative_ratio` pairs of negative edges
         ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
         the graph. ``u`` is exactly same as the corresponding positive edges.
-        It returns negative sources constructed from the corresponding positive
-        edges.
+        It returns positive edges concatenated with negative edges. In
+        negative edges, negative sources are constructed from the
+        corresponding positive edges.
 
         Parameters
         ----------
@@ -989,7 +990,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             .view(2, num_negative)
             .T
         )
-        return negative_seeds
+        seeds = torch.cat((node_pairs, negative_seeds))
+        return seeds
 
     def copy_to_shared_memory(self, shared_memory_name: str):
         """Copy the graph to shared memory.

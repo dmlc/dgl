@@ -62,19 +62,13 @@ class UniformNegativeSampler(NegativeSampler):
         self.graph = graph
 
     def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
-        if not use_seeds:
-            return self.graph.sample_negative_edges_uniform(
-                etype,
-                node_pairs,
-                self.negative_ratio,
-            )
-        else:
+        if use_seeds:
             assert node_pairs.ndim == 2 and node_pairs.shape[1] == 2, (
                 "Only tensor with shape N*2 is supported for negative"
                 + f" sampling, but got {node_pairs.shape}."
             )
-            # Construct negative node pairs.
-            neg_node_pairs = self.graph.sample_negative_edges_uniform_2(
+            # Sample negative edges, and concatenate positive edges with them.
+            seeds = self.graph.sample_negative_edges_uniform_2(
                 etype,
                 node_pairs,
                 self.negative_ratio,
@@ -85,4 +79,16 @@ class UniformNegativeSampler(NegativeSampler):
             pos_indexes = torch.arange(0, num_pos_node_pairs)
             neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
             indexes = torch.cat((pos_indexes, neg_indexes))
-            return neg_node_pairs, indexes
+            # Construct labels for all node pairs.
+            pos_num = node_pairs.shape[0]
+            neg_num = seeds.shape[0] - pos_num
+            labels = torch.cat(
+                (torch.ones(pos_num), torch.zeros(neg_num))
+            ).bool()
+            return seeds, labels, indexes
+        else:
+            return self.graph.sample_negative_edges_uniform(
+                etype,
+                node_pairs,
+                self.negative_ratio,
+            )
