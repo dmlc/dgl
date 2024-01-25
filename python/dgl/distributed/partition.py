@@ -1270,7 +1270,7 @@ def dgl_partition_to_graphbolt(
         return etype_ids
 
     # [Rui] DGL partitions are always saved as homogeneous graphs even though
-    # the original graph is heterogeneous. But heterogeneous infomation like
+    # the original graph is heterogeneous. But heterogeneous information like
     # node/edge types are saved as node/edge data alongside with partitions.
     # What needs more attention is that due to the existence of HALO nodes in
     # each partition, the local node IDs are not sorted according to the node
