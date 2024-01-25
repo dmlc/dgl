@@ -1316,7 +1316,7 @@ def dgl_partition_to_graphbolt(
             attr: graph.ndata[attr] for attr in required_node_attrs
         }
 
-        # Save node attributes. Detailed attributes are shown below.
+        # Save edge attributes. Detailed attributes are shown below.
         #  DGL_GB\Attributes  dgl.EID("_ID")  dgl.ETYPE("_TYPE")  "inner_edge"
         #  DGL_Homograph           ✅               🚫                  ✅
         #  GB_Homograph         optional            🚫               optional
