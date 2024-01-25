@@ -2745,7 +2745,7 @@ def test_OnDiskDataset_load_tasks_selectively():
 
 
 def test_OnDiskDataset_preprocess_graph_with_single_type():
-    """ Test for graph with single node/edge type. """
+    """Test for graph with single node/edge type."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
         dataset_name = "graphbolt_test"
