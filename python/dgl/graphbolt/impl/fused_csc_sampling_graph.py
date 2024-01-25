@@ -966,12 +966,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
         Returns
         -------
         torch.Tensor
-            A 2D tensors represents the N pairs of negative source-destination
-            node pairs. In the context of a heterogeneous graph, both the
-            input nodes and the selected nodes are represented by heterogeneous
-            IDs, and the formed edges are of the input type `edge_type`. Note
-            that negative refers to false negatives, which means the edge
-            could be present or not present in the graph.
+            A 2D tensors represents the N pairs of positive and negative
+            source-destination node pairs. In the context of a heterogeneous
+            graph, both the input nodes and the selected nodes are represented
+            by heterogeneous IDs, and the formed edges are of the input type
+            `edge_type`. Note that negative refers to false negatives, which
+            means the edge could be present or not present in the graph.
         """
         if edge_type:
             _, _, dst_ntype = etype_str_to_tuple(edge_type)

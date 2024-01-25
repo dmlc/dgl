@@ -2,8 +2,6 @@
 
 from _collections_abc import Mapping
 
-import torch
-
 from torch.utils.data import functional_datapipe
 
 from .minibatch_transformer import MiniBatchTransformer
