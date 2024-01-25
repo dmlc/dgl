@@ -118,9 +118,17 @@ def preprocess_ondisk_dataset(
     # 2. Load the edge data and create a DGLGraph.
     if "graph" not in input_config:
         raise RuntimeError("Invalid config: does not contain graph field.")
+    # For any graph that node/edge types are specified, we construct DGLGraph
+    # with `dgl.heterograph()` even there's only one node/edge type. This is
+    # because we want to save the node/edge types in the graph. So the logic of
+    # checking whether the graph is homogeneous is different from the logic in
+    # `DGLGraph.is_homogeneous()`. Otherwise, we construct DGLGraph with
+    # `dgl.graph()`.
     is_homogeneous = (
         len(input_config["graph"]["nodes"]) == 1
         and len(input_config["graph"]["edges"]) == 1
+        and "type" not in input_config["graph"]["nodes"][0]
+        and "type" not in input_config["graph"]["edges"][0]
     )
     if is_homogeneous:
         # Homogeneous graph.
@@ -181,20 +189,24 @@ def preprocess_ondisk_dataset(
         if not is_homogeneous:
             # For heterogenous graph, a node/edge feature must cover all
             # node/edge types.
-            for feat_name, feat_data in g.ndata.items():
-                existing_types = set(feat_data.keys())
-                assert existing_types == set(g.ntypes), (
-                    f"Node feature {feat_name} does not cover all node types."
-                    + f"Existing types: {existing_types}."
-                    + f"Expected types: {g.ntypes}."
-                )
-            for feat_name, feat_data in g.edata.items():
-                existing_types = set(feat_data.keys())
-                assert existing_types == set(g.canonical_etypes), (
-                    f"Edge feature {feat_name} does not cover all edge types."
-                    + f"Existing types: {existing_types}."
-                    + f"Expected types: {g.etypes}."
-                )
+            assert all(
+                set(g.nodes[g.ntypes[0]].data.keys())
+                == set(g.nodes[ntype].data.keys())
+                for ntype in g.ntypes
+            ), (
+                "Node feature does not cover all node types."
+                + f"Existing types: {set(g.nodes[g.ntypes[0]].data.keys())}."
+                + f"Expected types: {set(g.nodes[ntype].data.keys() for ntype in g.ntypes)}."
+            )
+            assert all(
+                set(g.edges[g.canonical_etypes[0]].data.keys())
+                == set(g.edges[etype].data.keys())
+                for etype in g.canonical_etypes
+            ), (
+                "Edge feature does not cover all edge types."
+                + f"Existing types: {set(g.edges[g.canonical_etypes[0]].data.keys())}."
+                + f"Expected types: {set(g.edges[etype].data.keys() for etype in g.canonical_etypes)}."
+            )
 
     # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
     fused_csc_sampling_graph = from_dglgraph(

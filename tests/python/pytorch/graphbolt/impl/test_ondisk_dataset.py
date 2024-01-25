@@ -2744,14 +2744,13 @@ def test_OnDiskDataset_load_tasks_selectively():
         dataset = None
 
 
-def test_OnDiskDataset_preprocess_homograph_with_type():
-    """Test if the preprocessed works well for homograph with node/edge type."""
+def test_OnDiskDataset_preprocess_graph_with_single_type():
+    """ Test for graph with single node/edge type. """
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
         dataset_name = "graphbolt_test"
         num_nodes = 4000
         num_edges = 20000
-        num_classes = 10
 
         # Generate random edges.
         nodes = np.repeat(np.arange(num_nodes), 5)
@@ -2816,3 +2815,10 @@ def test_OnDiskDataset_preprocess_homograph_with_type():
             graph.edge_attributes is not None
             and "feat" in graph.edge_attributes
         )
+        assert torch.equal(graph.node_type_offset, torch.tensor([0, num_nodes]))
+        assert torch.equal(
+            graph.type_per_edge,
+            torch.zeros(num_edges),
+        )
+        assert graph.edge_type_to_id == {"author:collab:author": 0}
+        assert graph.node_type_to_id == {"author": 0}
