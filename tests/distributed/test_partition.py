@@ -9,7 +9,7 @@ import pytest
 import torch as th
 from dgl import function as fn
 from dgl.distributed import (
-    dgl_parition_to_graphbolt,
+    dgl_partition_to_graphbolt,
     load_partition,
     load_partition_book,
     load_partition_feats,
@@ -682,7 +682,7 @@ def test_UnknownPartitionBook():
 @pytest.mark.parametrize("num_parts", [1, 4])
 @pytest.mark.parametrize("store_eids", [True, False])
 @pytest.mark.parametrize("debug_mode", [True, False])
-def test_dgl_parition_to_graphbolt_homo(
+def test_dgl_partition_to_graphbolt_homo(
     part_method, num_parts, store_eids, debug_mode
 ):
     reset_envs()
@@ -695,7 +695,7 @@ def test_dgl_parition_to_graphbolt_homo(
             g, graph_name, num_parts, test_dir, part_method=part_method
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
-        dgl_parition_to_graphbolt(part_config, store_eids=store_eids)
+        dgl_partition_to_graphbolt(part_config, store_eids=store_eids)
         for part_id in range(num_parts):
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
@@ -729,7 +729,7 @@ def test_dgl_parition_to_graphbolt_homo(
 @pytest.mark.parametrize("num_parts", [1, 4])
 @pytest.mark.parametrize("store_eids", [True, False])
 @pytest.mark.parametrize("debug_mode", [True, False])
-def test_dgl_parition_to_graphbolt_hetero(
+def test_dgl_partition_to_graphbolt_hetero(
     part_method, num_parts, store_eids, debug_mode
 ):
     reset_envs()
@@ -742,7 +742,7 @@ def test_dgl_parition_to_graphbolt_hetero(
             g, graph_name, num_parts, test_dir, part_method=part_method
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
-        dgl_parition_to_graphbolt(part_config, store_eids=store_eids)
+        dgl_partition_to_graphbolt(part_config, store_eids=store_eids)
         for part_id in range(num_parts):
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")

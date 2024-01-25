@@ -1,5 +1,6 @@
 """Functions for partitions. """
 
+import copy
 import json
 import logging
 import os
@@ -1223,7 +1224,7 @@ def partition_graph(
         return orig_nids, orig_eids
 
 
-def dgl_parition_to_graphbolt(part_config, *, store_eids=False):
+def dgl_partition_to_graphbolt(part_config, *, store_eids=False):
     """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
 
     This API converts `DGLGraph` partitions to `FusedCSCSamplingGraph` which is
@@ -1248,6 +1249,7 @@ def dgl_parition_to_graphbolt(part_config, *, store_eids=False):
             " will be performed during convertion."
         )
     part_meta = _load_part_config(part_config)
+    new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
 
     # Utility functions.
@@ -1322,3 +1324,12 @@ def dgl_parition_to_graphbolt(part_config, *, store_eids=False):
             os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.pt"
         )
         torch.save(csc_graph, csc_graph_path)
+
+        # Update graph path.
+        new_part_meta[f"part-{part_id}"]["gb_part_graph"] = os.path.relpath(
+            csc_graph_path, os.path.dirname(part_config)
+        )
+
+    # Update partition config.
+    _dump_part_config(part_config, new_part_meta)
+    print(f"Converted partitions to GraphBolt format into {part_config}")
