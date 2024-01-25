@@ -1224,7 +1224,13 @@ def partition_graph(
         return orig_nids, orig_eids
 
 
-def dgl_partition_to_graphbolt(part_config, *, store_eids=False):
+def dgl_partition_to_graphbolt(
+    part_config,
+    *,
+    store_eids=False,
+    store_inner_node=False,
+    store_inner_edge=False,
+):
     """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
 
     This API converts `DGLGraph` partitions to `FusedCSCSamplingGraph` which is
@@ -1240,13 +1246,16 @@ def dgl_partition_to_graphbolt(part_config, *, store_eids=False):
         The partition configuration JSON file.
     store_eids : bool, optional
         Whether to store edge IDs in the new graph. Default: False.
+    store_inner_node : bool, optional
+        Whether to store inner node mask in the new graph. Default: False.
+    store_inner_edge : bool, optional
+        Whether to store inner edge mask in the new graph. Default: False.
     """
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
         dgl_warning(
             "Running in debug mode which means all attributes of DGL partitions"
-            " will be saved to the new format. What's more, more sanity checks"
-            " will be performed during convertion."
+            " will be saved to the new format."
         )
     part_meta = _load_part_config(part_config)
     new_part_meta = copy.deepcopy(part_meta)
@@ -1291,20 +1300,37 @@ def dgl_partition_to_graphbolt(part_config, *, store_eids=False):
         )
         # Obtain CSC indtpr and indices.
         indptr, indices, edge_ids = graph.adj_tensors("csc")
-        # Initalize type per edge.
+
+        # Save node attributes.
+        #   NID: required.
+        #   inner_node: optional.
+        required_node_attrs = [NID]
+        if store_inner_node:
+            required_node_attrs.append("inner_node")
+        if debug_mode:
+            required_node_attrs = list(graph.ndata.keys())
+        node_attributes = {
+            attr: graph.ndata[attr] for attr in required_node_attrs
+        }
+
+        # Save edge attributes.
+        #   EID: optional.
+        #   ETYPE: required for heterograph. saved into `type_per_edge`.
+        #   inner_edge: optional.
         type_per_edge = None
         if not is_homo:
             type_per_edge = init_type_per_edge(graph, gpb)[edge_ids]
             type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
-        # Store original global node IDs. [Required].
-        node_attributes = {NID: graph.ndata[NID]}
-        # Store original global edge IDs. [Optional].
-        edge_attributes = None
-        if store_eids or debug_mode:
-            edge_attributes = {EID: graph.edata[EID][edge_ids]}
-        # Store NTYPE for debug mode only.
-        if debug_mode and (not is_homo):
-            node_attributes[NTYPE] = graph.ndata[NTYPE]
+        required_edge_attrs = []
+        if store_eids:
+            required_edge_attrs.append(EID)
+        if store_inner_edge:
+            required_edge_attrs.append("inner_edge")
+        if debug_mode:
+            required_edge_attrs = list(graph.edata.keys())
+        edge_attributes = {
+            attr: graph.edata[attr][edge_ids] for attr in required_edge_attrs
+        }
 
         csc_graph = gb.fused_csc_sampling_graph(
             indptr,
