@@ -2742,3 +2742,77 @@ def test_OnDiskDataset_load_tasks_selectively():
             dataset = gb.OnDiskDataset(test_dir).load(tasks=2)
 
         dataset = None
+
+
+def test_OnDiskDataset_preprocess_homograph_with_type():
+    """Test if the preprocessed works well for homograph with node/edge type."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random edges.
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors], axis=1)
+        # Wrtie into edges/edge.csv
+        os.makedirs(os.path.join(test_dir, "edges/"), exist_ok=True)
+        edges = pd.DataFrame(edges, columns=["src", "dst"])
+        edges.to_csv(
+            os.path.join(test_dir, "edges/edge.csv"),
+            index=False,
+            header=False,
+        )
+
+        # Generate random graph edge-feats.
+        edge_feats = np.random.rand(num_edges, 5)
+        os.makedirs(os.path.join(test_dir, "data/"), exist_ok=True)
+        np.save(os.path.join(test_dir, "data/edge-feat.npy"), edge_feats)
+
+        # Generate random node-feats.
+        node_feats = np.random.rand(num_nodes, 10)
+        np.save(os.path.join(test_dir, "data/node-feat.npy"), node_feats)
+
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+            graph: # graph structure and required attributes.
+                nodes:
+                    - num: {num_nodes}
+                      type: author
+                edges:
+                    - type: author:collab:author
+                      format: csv
+                      path: edges/edge.csv
+                feature_data:
+                    - domain: edge
+                      type: author:collab:author
+                      name: feat
+                      format: numpy
+                      path: data/edge-feat.npy
+                    - domain: node
+                      type: author
+                      name: feat
+                      format: numpy
+                      path: data/node-feat.npy
+        """
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+        assert dataset.dataset_name == dataset_name
+
+        graph = dataset.graph
+        assert isinstance(graph, gb.FusedCSCSamplingGraph)
+        assert graph.total_num_nodes == num_nodes
+        assert graph.total_num_edges == num_edges
+        assert (
+            graph.node_attributes is not None
+            and "feat" in graph.node_attributes
+        )
+        assert (
+            graph.edge_attributes is not None
+            and "feat" in graph.edge_attributes
+        )

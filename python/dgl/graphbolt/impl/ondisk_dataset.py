@@ -118,7 +118,10 @@ def preprocess_ondisk_dataset(
     # 2. Load the edge data and create a DGLGraph.
     if "graph" not in input_config:
         raise RuntimeError("Invalid config: does not contain graph field.")
-    is_homogeneous = "type" not in input_config["graph"]["nodes"][0]
+    is_homogeneous = (
+        len(input_config["graph"]["nodes"]) == 1
+        and len(input_config["graph"]["edges"]) == 1
+    )
     if is_homogeneous:
         # Homogeneous graph.
         num_nodes = input_config["graph"]["nodes"][0]["num"]
