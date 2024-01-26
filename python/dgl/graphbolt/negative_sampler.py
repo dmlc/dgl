@@ -108,8 +108,14 @@ class NegativeSampler(MiniBatchTransformer):
 
         Returns
         -------
-        Tuple[Tensor, Tensor]
+        Tuple[Tensor, Tensor] or Tensor
             A collection of negative node pairs.
+        Tensor or None
+            Corresponding labels. If label is True, corresponding edge is
+            positive. If label is False, corresponding edge is negative.
+        Tensor or None
+            Corresponding indexes, indicates to which query an edge belongs.
+
         """
         raise NotImplementedError
 
