@@ -59,10 +59,10 @@ class Bufferer(dp.iter.IterDataPipe):
     buffer_size : int, optional
         The size of the buffer which stores the fetched samples. If data coming
         from datapipe has latency spikes, consider increasing passing a high
-        value. Default is 2.
+        value. Default is 1.
     """
 
-    def __init__(self, datapipe, buffer_size):
+    def __init__(self, datapipe, buffer_size=1):
         self.datapipe = datapipe
         if buffer_size <= 0:
             raise ValueError(
