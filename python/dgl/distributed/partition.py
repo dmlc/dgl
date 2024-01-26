@@ -143,7 +143,58 @@ def _get_part_ranges(id_ranges):
     return res
 
 
-def load_partition(part_config, part_id, load_feats=True):
+def _verify_dgl_partition(graph, part_id, gpb, ntypes, etypes):
+    """Verify the partition of a DGL graph."""
+    assert (
+        NID in graph.ndata
+    ), "the partition graph should contain node mapping to global node ID"
+    assert (
+        EID in graph.edata
+    ), "the partition graph should contain edge mapping to global edge ID"
+
+    for ntype in ntypes:
+        ntype_id = ntypes[ntype]
+        # graph.ndata[NID] are global homogeneous node IDs.
+        nids = F.boolean_mask(
+            graph.ndata[NID], _get_inner_node_mask(graph, ntype_id)
+        )
+        partids1 = gpb.nid2partid(nids)
+        _, per_type_nids = gpb.map_to_per_ntype(nids)
+        partids2 = gpb.nid2partid(per_type_nids, ntype)
+        assert np.all(F.asnumpy(partids1 == part_id)), (
+            "Unexpected partition IDs are found in the loaded partition "
+            "while querying via global homogeneous node IDs."
+        )
+        assert np.all(F.asnumpy(partids2 == part_id)), (
+            "Unexpected partition IDs are found in the loaded partition "
+            "while querying via type-wise node IDs."
+        )
+    for etype in etypes:
+        etype_id = etypes[etype]
+        # graph.edata[EID] are global homogeneous edge IDs.
+        eids = F.boolean_mask(
+            graph.edata[EID], _get_inner_edge_mask(graph, etype_id)
+        )
+        partids1 = gpb.eid2partid(eids)
+        _, per_type_eids = gpb.map_to_per_etype(eids)
+        partids2 = gpb.eid2partid(per_type_eids, etype)
+        assert np.all(F.asnumpy(partids1 == part_id)), (
+            "Unexpected partition IDs are found in the loaded partition "
+            "while querying via global homogeneous edge IDs."
+        )
+        assert np.all(F.asnumpy(partids2 == part_id)), (
+            "Unexpected partition IDs are found in the loaded partition "
+            "while querying via type-wise edge IDs."
+        )
+
+
+def _verify_graphbolt_partition(graph, part_id, gpb, ntypes, etypes):
+    """Verify the partition of a GraphBolt graph."""
+    # [Rui][TODO]
+    _, _, _, _, _ = graph, part_id, gpb, ntypes, etypes
+
+
+def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
     """Load data of a partition from the data path.
 
     A partition data includes a graph structure of the partition, a dict of node tensors,
@@ -165,6 +216,8 @@ def load_partition(part_config, part_id, load_feats=True):
     load_feats : bool, optional
         Whether to load node/edge feats. If False, the returned node/edge feature
         dictionaries will be empty. Default: True.
+    use_graphbolt : bool, optional
+        Whether to load GraphBolt partition. Default: False.
 
     Returns
     -------
@@ -192,10 +245,13 @@ def load_partition(part_config, part_id, load_feats=True):
         "part-{}".format(part_id) in part_metadata
     ), "part-{} does not exist".format(part_id)
     part_files = part_metadata["part-{}".format(part_id)]
+    part_graph_field = "part_graph"
+    if use_graphbolt:
+        part_graph_field = "part_graph_graphbolt"
     assert (
-        "part_graph" in part_files
-    ), "the partition does not contain graph structure."
-    partition_path = relative_to_config(part_files["part_graph"])
+        part_graph_field in part_files
+    ), f"the partition does not contain graph structure: {part_graph_field}"
+    partition_path = relative_to_config(part_files[part_graph_field])
     logging.info(
         "Start to load partition from %s which is "
         "%d bytes. It may take non-trivial "
@@ -203,54 +259,24 @@ def load_partition(part_config, part_id, load_feats=True):
         partition_path,
         os.path.getsize(partition_path),
     )
-    graph = load_graphs(partition_path)[0][0]
-    logging.info("Finished loading partition.")
-
-    assert (
-        NID in graph.ndata
-    ), "the partition graph should contain node mapping to global node ID"
-    assert (
-        EID in graph.edata
-    ), "the partition graph should contain edge mapping to global edge ID"
+    graph = (
+        torch.load(partition_path)
+        if use_graphbolt
+        else load_graphs(partition_path)[0][0]
+    )
+    logging.info("Finished loading partition from %s.", partition_path)
 
     gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id)
     ntypes_list = list(ntypes.keys())
     etypes_list = list(etypes.keys())
+
     if "DGL_DIST_DEBUG" in os.environ:
-        for ntype in ntypes:
-            ntype_id = ntypes[ntype]
-            # graph.ndata[NID] are global homogeneous node IDs.
-            nids = F.boolean_mask(
-                graph.ndata[NID], _get_inner_node_mask(graph, ntype_id)
-            )
-            partids1 = gpb.nid2partid(nids)
-            _, per_type_nids = gpb.map_to_per_ntype(nids)
-            partids2 = gpb.nid2partid(per_type_nids, ntype)
-            assert np.all(F.asnumpy(partids1 == part_id)), (
-                "Unexpected partition IDs are found in the loaded partition "
-                "while querying via global homogeneous node IDs."
-            )
-            assert np.all(F.asnumpy(partids2 == part_id)), (
-                "Unexpected partition IDs are found in the loaded partition "
-                "while querying via type-wise node IDs."
-            )
-        for etype in etypes:
-            etype_id = etypes[etype]
-            # graph.edata[EID] are global homogeneous edge IDs.
-            eids = F.boolean_mask(
-                graph.edata[EID], _get_inner_edge_mask(graph, etype_id)
-            )
-            partids1 = gpb.eid2partid(eids)
-            _, per_type_eids = gpb.map_to_per_etype(eids)
-            partids2 = gpb.eid2partid(per_type_eids, etype)
-            assert np.all(F.asnumpy(partids1 == part_id)), (
-                "Unexpected partition IDs are found in the loaded partition "
-                "while querying via global homogeneous edge IDs."
-            )
-            assert np.all(F.asnumpy(partids2 == part_id)), (
-                "Unexpected partition IDs are found in the loaded partition "
-                "while querying via type-wise edge IDs."
-            )
+        _verify_func = (
+            _verify_graphbolt_partition
+            if use_graphbolt
+            else _verify_dgl_partition
+        )
+        _verify_func(graph, part_id, gpb, ntypes, etypes)
 
     node_feats = {}
     edge_feats = {}
@@ -1357,9 +1383,9 @@ def dgl_partition_to_graphbolt(
         torch.save(csc_graph, csc_graph_path)
 
         # Update graph path.
-        new_part_meta[f"part-{part_id}"]["gb_part_graph"] = os.path.relpath(
-            csc_graph_path, os.path.dirname(part_config)
-        )
+        new_part_meta[f"part-{part_id}"][
+            "part_graph_graphbolt"
+        ] = os.path.relpath(csc_graph_path, os.path.dirname(part_config))
 
     # Update partition config.
     _dump_part_config(part_config, new_part_meta)

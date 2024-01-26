@@ -712,11 +712,9 @@ def test_dgl_partition_to_graphbolt_homo(
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
-            new_g = th.load(
-                os.path.join(
-                    test_dir, f"part{part_id}/fused_csc_sampling_graph.pt"
-                )
-            )
+            new_g = load_partition(
+                part_config, part_id, load_feats=False, use_graphbolt=True
+            )[0]
             orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
@@ -784,11 +782,9 @@ def test_dgl_partition_to_graphbolt_hetero(
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
-            new_g = th.load(
-                os.path.join(
-                    test_dir, f"part{part_id}/fused_csc_sampling_graph.pt"
-                )
-            )
+            new_g = load_partition(
+                part_config, part_id, load_feats=False, use_graphbolt=True
+            )[0]
             orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
