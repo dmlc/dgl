@@ -935,6 +935,64 @@ class FusedCSCSamplingGraph(SamplingGraph):
             ),
         )
 
+    def sample_negative_edges_uniform_2(
+        self, edge_type, node_pairs, negative_ratio
+    ):
+        """
+        Sample negative edges by randomly choosing negative source-destination
+        edges according to a uniform distribution. For each edge ``(u, v)``,
+        it is supposed to generate `negative_ratio` pairs of negative edges
+        ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
+        the graph. ``u`` is exactly same as the corresponding positive edges.
+        It returns positive edges concatenated with negative edges. In
+        negative edges, negative sources are constructed from the
+        corresponding positive edges.
+
+        Parameters
+        ----------
+        edge_type: str
+            The type of edges in the provided node_pairs. Any negative edges
+            sampled will also have the same type. If set to None, it will be
+            considered as a homogeneous graph.
+        node_pairs : torch.Tensor
+            A 2D tensors that represent the N pairs of positive edges in
+            source-destination format, with 'positive' indicating that these
+            edges are present in the graph. It's important to note that within
+            the context of a heterogeneous graph, the ids in these tensors
+            signify heterogeneous ids.
+        negative_ratio: int
+            The ratio of the number of negative samples to positive samples.
+
+        Returns
+        -------
+        torch.Tensor
+            A 2D tensors represents the N pairs of positive and negative
+            source-destination node pairs. In the context of a heterogeneous
+            graph, both the input nodes and the selected nodes are represented
+            by heterogeneous IDs, and the formed edges are of the input type
+            `edge_type`. Note that negative refers to false negatives, which
+            means the edge could be present or not present in the graph.
+        """
+        if edge_type:
+            _, _, dst_ntype = etype_str_to_tuple(edge_type)
+            max_node_id = self.num_nodes[dst_ntype]
+        else:
+            max_node_id = self.total_num_nodes
+        pos_src = node_pairs[:, 0]
+        num_negative = node_pairs.shape[0] * negative_ratio
+        negative_seeds = (
+            torch.cat(
+                (
+                    pos_src.repeat_interleave(negative_ratio),
+                    torch.randint(0, max_node_id, (num_negative,)),
+                ),
+            )
+            .view(2, num_negative)
+            .T
+        )
+        seeds = torch.cat((node_pairs, negative_seeds))
+        return seeds
+
     def copy_to_shared_memory(self, shared_memory_name: str):
         """Copy the graph to shared memory.
 
