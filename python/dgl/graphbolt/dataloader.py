@@ -62,7 +62,7 @@ class Bufferer(dp.iter.IterDataPipe):
         value. Default is 2.
     """
 
-    def __init__(self, datapipe, buffer_size=2):
+    def __init__(self, datapipe, buffer_size):
         self.datapipe = datapipe
         if buffer_size <= 0:
             raise ValueError(
@@ -92,6 +92,17 @@ class Awaiter(dp.iter.IterDataPipe):
         for data in self.datapipe:
             data.wait()
             yield data
+
+
+class BuffererAndAwaiter(dp.iter.IterDataPipe):
+    """Bufferer and Awaiter back to back."""
+
+    def __init__(self, datapipe, buffer_size):
+        datapipe = Bufferer(datapipe, buffer_size)
+        self.datapipe = Awaiter(datapipe)
+
+    def __iter__(self):
+        yield from self.datapipe
 
 
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
@@ -221,18 +232,15 @@ class DataLoader(torch.utils.data.DataLoader):
             )
             for feature_fetcher in feature_fetchers:
                 feature_fetcher.stream = _get_uva_stream()
+            # _find_and_wrap_parent does not work if we wrap the same datapipe
+            # more than once. So, we wrap it once by a single datapipe called
+            # BuffererAndAwaiter instead of Bufferer and Awaiter separately.
             _find_and_wrap_parent(
                 datapipe_graph,
                 datapipe_adjlist,
                 EndMarker,
-                Bufferer,
-                buffer_size=2,
-            )
-            _find_and_wrap_parent(
-                datapipe_graph,
-                datapipe_adjlist,
-                EndMarker,
-                Awaiter,
+                BuffererAndAwaiter,
+                buffer_size=1,
             )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
