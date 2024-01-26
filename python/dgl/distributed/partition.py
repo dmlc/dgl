@@ -191,7 +191,7 @@ def _verify_dgl_partition(graph, part_id, gpb, ntypes, etypes):
 def _verify_graphbolt_partition(graph, part_id, gpb, ntypes, etypes):
     """Verify the partition of a GraphBolt graph."""
     # [Rui][TODO]
-    pass
+    _, _, _, _, _ = graph, part_id, gpb, ntypes, etypes
 
 
 def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
@@ -264,7 +264,7 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
         if use_graphbolt
         else load_graphs(partition_path)[0][0]
     )
-    logging.info(f"Finished loading partition from {partition_path}")
+    logging.info("Finished loading partition from %s.", partition_path)
 
     gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id)
     ntypes_list = list(ntypes.keys())
