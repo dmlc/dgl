@@ -30,7 +30,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def __repr__(self):
         final_str = (
-            "{Classname}(csc_indptr={csc_indptr},\n"
+            "{classname}(csc_indptr={csc_indptr},\n"
             "indices={indices},\n"
             "{metadata})"
         )
@@ -53,7 +53,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             meta_str += f"\nedge_attributes={self.edge_attributes},"
 
         final_str = final_str.format(
-            Classname=classname_str,
+            classname=classname_str,
             csc_indptr=csc_indptr_str,
             indices=indices_str,
             metadata=meta_str,
