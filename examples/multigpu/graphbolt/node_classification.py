@@ -139,7 +139,10 @@ def create_dataloader(
     if args.storage_device == "cpu":
         datapipe = datapipe.copy_to(device)
 
-    dataloader = gb.DataLoader(datapipe, args.num_workers)
+    # Until https://github.com/dmlc/dgl/issues/7008, overlap should be False.
+    dataloader = gb.DataLoader(
+        datapipe, args.num_workers, overlap_feature_fetch=False
+    )
 
     # Return the fully-initialized DataLoader object.
     return dataloader

@@ -31,6 +31,8 @@ dependencies:
     - torcheval
     - torchmetrics
     - torch_geometric
+    - torch-scatter
+    - torch-sparse
     - tqdm
     - boto3 # AWS SDK for python
     - sphinx==4.2.0
