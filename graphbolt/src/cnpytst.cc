@@ -26,16 +26,9 @@ int main(int argc, char *argv[]) {
 
   // std::cout << ret;
 
-  auto ret = arr.index_select(idx);
+  // auto ret = arr.index_select_pread(idx);
+  // auto ret = arr.index_select_aio(idx);  // some bugs
+  auto ret = arr.index_select_iouring(idx);  // some bugs
 
-  std::cout << ret;
-
-  // std::complex<double> *loaded_data = arr.data<std::complex<double>>();
-  // int i, j;
-  // i = 0, j = 0;
-  // std::cout << loaded_data[i * Ny + j] << std::endl;
-  // j = 1;
-  // std::cout << loaded_data[i * Ny + j] << std::endl;
-  // i = 1;
-  // std::cout << loaded_data[i * Ny + j] << std::endl;
+  std::cout << ret << std::endl;
 }

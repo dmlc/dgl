@@ -1,6 +1,9 @@
 #include "cnpy.h"
 
+#include <aio.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
+#include <liburing.h>
 #include <omp.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -77,25 +80,22 @@ void cnpy::NpyArray::load_all() {
   close(fd);
 }
 
-torch::Tensor cnpy::NpyArray::index_select(torch::Tensor idx) {
-  // open file
+torch::Tensor cnpy::NpyArray::index_select_pread(torch::Tensor idx) {
   int feature_fd = open(filename.c_str(), O_RDONLY | O_DIRECT);
 
   int64_t feature_size = feature_dim * word_size;
-
   int64_t num_idx = idx.numel();
 
-  omp_set_num_threads(32);
-  // printf("max thread:%d\n", omp_get_max_threads());
-  int numthd = omp_get_max_threads();
+  // int numthd = omp_get_num_procs();
+  int numthd = 1;
+
+  omp_set_num_threads(numthd);
 
   char *read_buffer = (char *)aligned_alloc(ALIGNMENT, ALIGNMENT * 2 * numthd);
   char *result_buffer =
       (char *)aligned_alloc(ALIGNMENT, feature_size * num_idx);
 
   auto idx_data = idx.data_ptr<int64_t>();
-  // auto cache_data = cache.data_ptr<float>();
-  // auto cache_table_data = cache_table.data_ptr<int32_t>();
 
 #pragma omp parallel for num_threads(numthd)
   for (int64_t n = 0; n < num_idx; n++) {
@@ -103,16 +103,9 @@ torch::Tensor cnpy::NpyArray::index_select(torch::Tensor idx) {
     int64_t offset;
     int64_t aligned_offset;
     int64_t residual;
-    // int64_t cache_entry;
     int64_t read_size;
 
     i = idx_data[n];
-    // cache_entry = cache_table_data[i];
-    // if (cache_entry >= 0) {
-    //   memcpy(
-    //       result_buffer + feature_dim * n,
-    //       cache_data + cache_entry * feature_dim, feature_size);
-    // } else {
     offset = i * feature_size + prefix_len;
     aligned_offset = offset & (long)~(ALIGNMENT - 1);
     residual = offset - aligned_offset;
@@ -123,8 +116,6 @@ torch::Tensor cnpy::NpyArray::index_select(torch::Tensor idx) {
       read_size = ALIGNMENT;
     }
 
-    // printf("in thread: %d\n ", omp_get_thread_num());
-
     if (pread(
             feature_fd, read_buffer + (ALIGNMENT * 2 * omp_get_thread_num()),
             read_size, aligned_offset) == -1) {
@@ -134,7 +125,6 @@ torch::Tensor cnpy::NpyArray::index_select(torch::Tensor idx) {
         result_buffer + feature_size * n,
         read_buffer + (ALIGNMENT * 2 * omp_get_thread_num() + residual),
         feature_size);
-    // }
   }
 
   auto options = torch::TensorOptions()
@@ -143,9 +133,174 @@ torch::Tensor cnpy::NpyArray::index_select(torch::Tensor idx) {
                      .device(torch::kCPU)
                      .requires_grad(false);
   auto result =
-      torch::from_blob(result_buffer, {num_idx, feature_dim}, options);
+      torch::from_blob(result_buffer, {num_idx, feature_dim}, options).clone();
 
   free(read_buffer);
+  free(result_buffer);
+  close(feature_fd);
+
+  return result;
+}
+
+torch::Tensor cnpy::NpyArray::index_select_aio(torch::Tensor idx) {
+  int feature_fd = open(filename.c_str(), O_RDONLY | O_DIRECT);
+
+  int64_t feature_size = feature_dim * word_size;
+  int64_t num_idx = idx.numel();
+
+  int64_t group_size = 23;
+
+  char *read_buffer =
+      (char *)aligned_alloc(ALIGNMENT, ALIGNMENT * 2 * group_size);
+  char *result_buffer =
+      (char *)aligned_alloc(ALIGNMENT, feature_size * num_idx);
+
+  auto idx_data = idx.data_ptr<int64_t>();
+
+  aiocb *rd = (aiocb *)aligned_alloc(ALIGNMENT, sizeof(aiocb) * group_size);
+
+  uint64_t residual[group_size];
+  for (int64_t n = 0; n < num_idx; n += group_size) {
+    for (int64_t m = 0; n + m < std::min(num_idx, n + group_size); m++) {
+      int64_t i;
+      uint64_t offset;
+      uint64_t aligned_offset;
+      uint64_t read_size;
+
+      i = idx_data[n + m];
+      offset = i * feature_size + prefix_len;
+      aligned_offset = offset & (long)~(ALIGNMENT - 1);
+      residual[m] = offset - aligned_offset;
+
+      if (residual[m] + feature_size > ALIGNMENT) {
+        read_size = ALIGNMENT * 2;
+      } else {
+        read_size = ALIGNMENT;
+      }
+
+      rd[m].aio_buf = read_buffer + (ALIGNMENT * 2 * m);
+      rd[m].aio_fildes = feature_fd;
+      rd[m].aio_nbytes = read_size;
+      rd[m].aio_offset = aligned_offset;
+      printf(
+          "aio_buf %u %u\n", rd[m].aio_buf,
+          uint64_t(rd[m].aio_buf) % ALIGNMENT);
+
+      if (aio_read(&rd[m]) == -1) {
+        perror("aio_read");
+        exit(1);
+      }
+    }
+    for (int64_t m = 0; n + m < std::min(num_idx, n + group_size); m++) {
+      float *tt = (float *)(read_buffer + (ALIGNMENT * 2 * m + residual[m]));
+      printf("read_buffer[0]: %u\n", tt[0]);
+      while (aio_error(&rd[m]) == EINPROGRESS) {
+      }
+      memcpy(
+          result_buffer + feature_size * (n + m),
+          read_buffer + (ALIGNMENT * 2 * m + residual[m]), feature_size);
+    }
+  }
+
+  auto options = torch::TensorOptions()
+                     .dtype(torch::kFloat16)
+                     .layout(torch::kStrided)
+                     .device(torch::kCPU)
+                     .requires_grad(false);
+  auto result =
+      torch::from_blob(result_buffer, {num_idx, feature_dim}, options).clone();
+
+  free(read_buffer);
+  free(result_buffer);
+  close(feature_fd);
+  free(rd);
+
+  return result;
+}
+torch::Tensor cnpy::NpyArray::index_select_iouring(torch::Tensor idx) {
+  int feature_fd = open(filename.c_str(), O_RDONLY | O_DIRECT);
+
+  int64_t feature_size = feature_dim * word_size;
+  int64_t num_idx = idx.numel();
+
+  int64_t group_size = 512;
+
+  char *read_buffer =
+      (char *)aligned_alloc(ALIGNMENT, ALIGNMENT * 2 * group_size);
+  char *result_buffer =
+      (char *)aligned_alloc(ALIGNMENT, feature_size * num_idx);
+
+  auto idx_data = idx.data_ptr<int64_t>();
+
+  struct io_uring ring;
+  io_uring_queue_init(512, &ring, 0);
+
+  int64_t residual[group_size];
+
+  for (int64_t n = 0; n < num_idx; n += group_size) {
+    int64_t m;
+    for (m = 0; n + m < std::min(num_idx, n + group_size); m++) {
+      int64_t i = idx_data[n + m];
+      uint64_t offset = i * feature_size + prefix_len;
+      uint64_t aligned_offset = offset & (long)~(ALIGNMENT - 1);
+      uint64_t read_size;
+
+      residual[m] = offset - aligned_offset;
+
+      if (residual[m] + feature_size > ALIGNMENT) {
+        read_size = ALIGNMENT * 2;
+      } else {
+        read_size = ALIGNMENT;
+      }
+
+      struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+      if (!sqe) {
+        perror("io_uring_get_sqe");
+        break;
+      }
+
+      io_uring_prep_read(
+          sqe, feature_fd, read_buffer + (ALIGNMENT * 2 * m), read_size,
+          aligned_offset);
+    }
+    io_uring_submit(&ring);
+
+    int64_t finish_sum = 0;
+    while (finish_sum < m) {
+      struct io_uring_cqe *cqe;
+      if (io_uring_wait_cqe(&ring, &cqe) < 0) {
+        perror("io_uring_wait_cqe");
+        break;
+      }
+      struct io_uring_cqe *cqes[group_size];
+      int cqecount = io_uring_peek_batch_cqe(&ring, cqes, group_size);
+      if (cqecount == -1) {
+        perror("cqec -1\n");
+        abort();
+      }
+      io_uring_cq_advance(&ring, cqecount);
+      finish_sum += cqecount;
+      // printf("finish_sum %ld\n", finish_sum);
+    }
+
+    for (m = 0; n + m < std::min(num_idx, n + group_size); m++) {
+      memcpy(
+          result_buffer + feature_size * (n + m),
+          read_buffer + (ALIGNMENT * 2 * m + residual[m]), feature_size);
+    }
+  }
+  io_uring_queue_exit(&ring);
+
+  auto options = torch::TensorOptions()
+                     .dtype(torch::kFloat16)
+                     .layout(torch::kStrided)
+                     .device(torch::kCPU)
+                     .requires_grad(false);
+  auto result =
+      torch::from_blob(result_buffer, {num_idx, feature_dim}, options).clone();
+
+  free(read_buffer);
+  free(result_buffer);
   close(feature_fd);
 
   return result;
