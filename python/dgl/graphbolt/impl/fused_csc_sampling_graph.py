@@ -1103,12 +1103,12 @@ def fused_csc_sampling_graph(
     ...         node_attributes=None, edge_attributes=None,)
     >>> print(graph)
     FusedCSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7, 8]),
-                      indices=tensor([1, 3, 0, 1, 2, 0, 3, 2]),
-                      total_num_nodes=4, num_edges={'n1:e1:n2': 5, 'n1:e2:n3': 3},
-                      node_type_offset=tensor([0, 1, 2, 4]),
-                      type_per_edge=tensor([0, 1, 0, 1, 1, 0, 0, 0]),
-                      node_type_to_id={'n1': 0, 'n2': 1, 'n3': 2},
-                      edge_type_to_id={'n1:e1:n2': 0, 'n1:e2:n3': 1},)
+                          indices=tensor([1, 3, 0, 1, 2, 0, 3, 2]),
+                          total_num_nodes=4, num_edges={'n1:e1:n2': 5, 'n1:e2:n3': 3},
+                          node_type_offset=tensor([0, 1, 2, 4]),
+                          type_per_edge=tensor([0, 1, 0, 1, 1, 0, 0, 0]),
+                          node_type_to_id={'n1': 0, 'n2': 1, 'n3': 2},
+                          edge_type_to_id={'n1:e1:n2': 0, 'n1:e2:n3': 1},)
     """
     if node_type_to_id is not None and edge_type_to_id is not None:
         node_types = list(node_type_to_id.keys())
