@@ -235,13 +235,14 @@ class DataLoader(torch.utils.data.DataLoader):
             # _find_and_wrap_parent does not work if we wrap the same datapipe
             # more than once. So, we wrap it once by a single datapipe called
             # BuffererAndAwaiter instead of Bufferer and Awaiter separately.
-            _find_and_wrap_parent(
-                datapipe_graph,
-                datapipe_adjlist,
-                EndMarker,
-                BuffererAndAwaiter,
-                buffer_size=1,
-            )
+            if len(feature_fetchers) > 0:
+                _find_and_wrap_parent(
+                    datapipe_graph,
+                    datapipe_adjlist,
+                    EndMarker,
+                    BuffererAndAwaiter,
+                    buffer_size=1,
+                )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
         # data pipeline up to the CopyTo operation to run in a separate thread.
