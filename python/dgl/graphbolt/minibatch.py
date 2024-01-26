@@ -156,6 +156,15 @@ class MiniBatch:
     all node ids inside are compacted.
     """
 
+    compacted_seeds: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None
+    """
+    Representation of compacted seeds corresponding to 'seeds', where
+    all node ids inside are compacted.
+    """
+
     compacted_negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of compacted nodes corresponding to 'negative_srcs', where
