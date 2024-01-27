@@ -9,6 +9,7 @@ import torchdata.datapipes as dp
 
 from .base import CopyTo
 from .feature_fetcher import FeatureFetcher
+from .impl.neighbor_sampler import SamplePerLayer
 
 from .internal import datapipe_graph_to_adjlist
 from .item_sampler import ItemSampler
@@ -95,6 +96,15 @@ class Awaiter(dp.iter.IterDataPipe):
             yield data
 
 
+class FetcherAndSampler(dp.iter.IterDataPipe):
+    def __init__(self, datapipe, sampler):
+        datapipe = datapipe.fetch_insubgraph_data(sampler)
+        self.datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
+
+    def __iter__(self):
+        yield from self.datapipe
+
+
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
 
@@ -170,6 +180,7 @@ class DataLoader(torch.utils.data.DataLoader):
         num_workers=0,
         persistent_workers=True,
         overlap_feature_fetch=True,
+        overlap_graph_fetch=True,
         max_uva_threads=6144,
     ):
         # Multiprocessing requires two modifications to the datapipe:
@@ -224,6 +235,23 @@ class DataLoader(torch.utils.data.DataLoader):
                     datapipe_graph,
                     feature_fetcher,
                     Awaiter(Bufferer(feature_fetcher, buffer_size=1)),
+                )
+
+        if (
+            overlap_graph_fetch
+            and num_workers == 0
+            and torch.cuda.is_available()
+        ):
+            torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
+            samplers = dp_utils.find_dps(
+                datapipe_graph,
+                SamplePerLayer,
+            )
+            for sampler in samplers:
+                datapipe_graph = dp_utils.replace_dp(
+                    datapipe_graph,
+                    sampler,
+                    FetcherAndSampler(sampler.datapipe, sampler),
                 )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
