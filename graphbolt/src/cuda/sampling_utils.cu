@@ -35,30 +35,48 @@ struct SliceFunc {
 
 // Returns (indptr[nodes + 1] - indptr[nodes], indptr[nodes])
 std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
-    torch::Tensor indptr, torch::Tensor nodes) {
-  const int64_t num_nodes = nodes.size(0);
-  // Read indptr only once in case it is pinned and access is slow.
-  auto sliced_indptr =
-      torch::empty(num_nodes, nodes.options().dtype(indptr.scalar_type()));
-  // compute in-degrees
-  auto in_degree =
-      torch::empty(num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
-  thrust::counting_iterator<int64_t> iota(0);
-  AT_DISPATCH_INTEGRAL_TYPES(
-      indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
-        using indptr_t = scalar_t;
-        AT_DISPATCH_INDEX_TYPES(
-            nodes.scalar_type(), "IndexSelectCSCNodes", ([&] {
-              using nodes_t = index_t;
-              THRUST_CALL(
-                  for_each, iota, iota + num_nodes,
-                  SliceFunc<indptr_t, nodes_t>{
-                      nodes.data_ptr<nodes_t>(), indptr.data_ptr<indptr_t>(),
-                      in_degree.data_ptr<indptr_t>(),
-                      sliced_indptr.data_ptr<indptr_t>()});
-            }));
-      }));
-  return {in_degree, sliced_indptr};
+    torch::Tensor indptr, torch::optional<torch::Tensor> nodes_optional) {
+  if (nodes_optional.has_value()) {
+    auto nodes = nodes_optional.value();
+    const int64_t num_nodes = nodes.size(0);
+    // Read indptr only once in case it is pinned and access is slow.
+    auto sliced_indptr =
+        torch::empty(num_nodes, nodes.options().dtype(indptr.scalar_type()));
+    // compute in-degrees
+    auto in_degree = torch::empty(
+        num_nodes + 1, nodes.options().dtype(indptr.scalar_type()));
+    thrust::counting_iterator<int64_t> iota(0);
+    AT_DISPATCH_INTEGRAL_TYPES(
+        indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
+          using indptr_t = scalar_t;
+          AT_DISPATCH_INDEX_TYPES(
+              nodes.scalar_type(), "IndexSelectCSCNodes", ([&] {
+                using nodes_t = index_t;
+                THRUST_CALL(
+                    for_each, iota, iota + num_nodes,
+                    SliceFunc<indptr_t, nodes_t>{
+                        nodes.data_ptr<nodes_t>(), indptr.data_ptr<indptr_t>(),
+                        in_degree.data_ptr<indptr_t>(),
+                        sliced_indptr.data_ptr<indptr_t>()});
+              }));
+        }));
+    return {in_degree, sliced_indptr};
+  } else {
+    const int64_t num_nodes = indptr.size(0) - 1;
+    auto sliced_indptr = indptr.slice(0, 0, num_nodes);
+    auto in_degree = torch::empty(
+        num_nodes + 2, indptr.options().dtype(indptr.scalar_type()));
+    AT_DISPATCH_INTEGRAL_TYPES(
+        indptr.scalar_type(), "IndexSelectCSCIndptr", ([&] {
+          using indptr_t = scalar_t;
+          CUB_CALL(
+              DeviceAdjacentDifference::SubtractLeftCopy,
+              indptr.data_ptr<indptr_t>(), in_degree.data_ptr<indptr_t>(),
+              num_nodes + 1, cub::Difference{});
+        }));
+    in_degree = in_degree.slice(0, 1);
+    return {in_degree, sliced_indptr};
+  }
 }
 
 template <typename indptr_t, typename etype_t>
