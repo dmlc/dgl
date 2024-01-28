@@ -683,10 +683,6 @@ def test_multiprocessing():
     p.join()
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 def test_in_subgraph_homo():
     """Original graph in COO:
     1   0   1   0   1
@@ -704,30 +700,29 @@ def test_in_subgraph_homo():
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.fused_csc_sampling_graph(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices).to(F.ctx())
 
     # Extract in subgraph.
-    nodes = torch.LongTensor([4, 1, 3])
+    nodes = torch.tensor([4, 1, 3], device=F.ctx())
     in_subgraph = graph.in_subgraph(nodes)
 
     # Verify in subgraph.
     assert torch.equal(
-        in_subgraph.sampled_csc.indices, torch.LongTensor([0, 3, 4, 2, 3, 1, 2])
+        in_subgraph.sampled_csc.indices,
+        torch.tensor([0, 3, 4, 2, 3, 1, 2], device=F.ctx()),
     )
     assert torch.equal(
-        in_subgraph.sampled_csc.indptr, torch.LongTensor([0, 3, 5, 7])
+        in_subgraph.sampled_csc.indptr,
+        torch.tensor([0, 3, 5, 7], device=F.ctx()),
     )
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
     assert torch.equal(
-        in_subgraph.original_edge_ids, torch.LongTensor([9, 10, 11, 3, 4, 7, 8])
+        in_subgraph.original_edge_ids,
+        torch.tensor([9, 10, 11, 3, 4, 7, 8], device=F.ctx()),
     )
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 def test_in_subgraph_hetero():
     """Original graph in COO:
     1   0   1   0   1
@@ -773,44 +768,53 @@ def test_in_subgraph_hetero():
         type_per_edge=type_per_edge,
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
-    )
+    ).to(F.ctx())
 
     # Extract in subgraph.
     nodes = {
-        "N0": torch.LongTensor([1]),
-        "N1": torch.LongTensor([2, 1]),
+        "N0": torch.tensor([1], device=F.ctx()),
+        "N1": torch.tensor([2, 1], device=F.ctx()),
     }
     in_subgraph = graph.in_subgraph(nodes)
 
     # Verify in subgraph.
     assert torch.equal(
-        in_subgraph.sampled_csc["N0:R0:N0"].indices, torch.LongTensor([])
+        in_subgraph.sampled_csc["N0:R0:N0"].indices,
+        torch.tensor([], device=F.ctx()),
     )
     assert torch.equal(
-        in_subgraph.sampled_csc["N0:R0:N0"].indptr, torch.LongTensor([0, 0])
+        in_subgraph.sampled_csc["N0:R0:N0"].indptr,
+        torch.tensor([0, 0], device=F.ctx()),
     )
     assert torch.equal(
-        in_subgraph.sampled_csc["N0:R1:N1"].indices, torch.LongTensor([0, 1])
+        in_subgraph.sampled_csc["N0:R1:N1"].indices,
+        torch.tensor([0, 1], device=F.ctx()),
     )
     assert torch.equal(
-        in_subgraph.sampled_csc["N0:R1:N1"].indptr, torch.LongTensor([0, 1, 2])
+        in_subgraph.sampled_csc["N0:R1:N1"].indptr,
+        torch.tensor([0, 1, 2], device=F.ctx()),
     )
     assert torch.equal(
-        in_subgraph.sampled_csc["N1:R2:N0"].indices, torch.LongTensor([0, 1])
+        in_subgraph.sampled_csc["N1:R2:N0"].indices,
+        torch.tensor([0, 1], device=F.ctx()),
     )
     assert torch.equal(
-        in_subgraph.sampled_csc["N1:R2:N0"].indptr, torch.LongTensor([0, 2])
+        in_subgraph.sampled_csc["N1:R2:N0"].indptr,
+        torch.tensor([0, 2], device=F.ctx()),
     )
     assert torch.equal(
-        in_subgraph.sampled_csc["N1:R3:N1"].indices, torch.LongTensor([1, 2, 0])
+        in_subgraph.sampled_csc["N1:R3:N1"].indices,
+        torch.tensor([1, 2, 0], device=F.ctx()),
     )
     assert torch.equal(
-        in_subgraph.sampled_csc["N1:R3:N1"].indptr, torch.LongTensor([0, 2, 3])
+        in_subgraph.sampled_csc["N1:R3:N1"].indptr,
+        torch.tensor([0, 2, 3], device=F.ctx()),
     )
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
     assert torch.equal(
-        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 9, 10, 11, 7, 8])
+        in_subgraph.original_edge_ids,
+        torch.tensor([3, 4, 9, 10, 11, 7, 8], device=F.ctx()),
     )
 
 
@@ -898,12 +902,12 @@ def test_temporal_sample_neighbors_homo(
                 neighbor = indices[j].item()
                 if (
                     use_node_timestamp
-                    and (node_timestamp[neighbor] > seed_timestamp[i]).item()
+                    and (node_timestamp[neighbor] >= seed_timestamp[i]).item()
                 ):
                     continue
                 if (
                     use_edge_timestamp
-                    and (edge_timestamp[j] > seed_timestamp[i]).item()
+                    and (edge_timestamp[j] >= seed_timestamp[i]).item()
                 ):
                     continue
                 neighbors.append(neighbor)
@@ -911,7 +915,7 @@ def test_temporal_sample_neighbors_homo(
         return available_neighbors
 
     nodes = torch.tensor(seed_list, dtype=indices_dtype)
-    subgraph, neighbors_timestamp = sampler(
+    subgraph = sampler(
         nodes,
         seed_timestamp,
         fanouts,
@@ -1004,7 +1008,7 @@ def test_temporal_sample_neighbors_hetero(
         )
         graph.edge_attributes = {"timestamp": edge_timestamp}
 
-    subgraph, neighbors_timestamp = sampler(
+    subgraph = sampler(
         seeds,
         seed_timestamp,
         fanouts,
@@ -1035,13 +1039,13 @@ def test_temporal_sample_neighbors_hetero(
                 if (
                     use_node_timestamp
                     and (
-                        node_timestamp[neighbor] > homo_seed_timestamp[i]
+                        node_timestamp[neighbor] >= homo_seed_timestamp[i]
                     ).item()
                 ):
                     continue
                 if (
                     use_edge_timestamp
-                    and (edge_timestamp[j] > homo_seed_timestamp[i]).item()
+                    and (edge_timestamp[j] >= homo_seed_timestamp[i]).item()
                 ):
                     continue
                 neighbors.append(neighbor)
@@ -1402,7 +1406,7 @@ def test_from_dglgraph_homogeneous():
         dgl_g, is_homogeneous=True, include_original_edge_id=True
     )
     # Get the COO representation of the FusedCSCSamplingGraph.
-    num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
+    num_columns = gb_g.csc_indptr.diff()
     rows = gb_g.indices
     columns = torch.arange(gb_g.total_num_nodes).repeat_interleave(num_columns)
 
@@ -1456,11 +1460,11 @@ def test_from_dglgraph_heterogeneous():
 
     # `reverse_node_id` is used to map the node id in FusedCSCSamplingGraph to the
     # node id in Hetero-DGLGraph.
-    num_ntypes = gb_g.node_type_offset[1:] - gb_g.node_type_offset[:-1]
+    num_ntypes = gb_g.node_type_offset.diff()
     reverse_node_id = torch.cat([torch.arange(num) for num in num_ntypes])
 
     # Get the COO representation of the FusedCSCSamplingGraph.
-    num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
+    num_columns = gb_g.csc_indptr.diff()
     rows = reverse_node_id[gb_g.indices]
     columns = reverse_node_id[
         torch.arange(gb_g.total_num_nodes).repeat_interleave(num_columns)
@@ -1511,11 +1515,7 @@ def test_from_dglgraph_heterogeneous():
     }
 
 
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="`to` function needs GPU to test.",
-)
-def test_csc_sampling_graph_to_device():
+def create_fused_csc_sampling_graph():
     # Initialize data.
     total_num_nodes = 10
     total_num_edges = 9
@@ -1541,7 +1541,7 @@ def test_csc_sampling_graph_to_device():
     }
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.fused_csc_sampling_graph(
+    return gb.fused_csc_sampling_graph(
         indptr,
         indices,
         edge_attributes=edge_attributes,
@@ -1551,24 +1551,74 @@ def test_csc_sampling_graph_to_device():
         edge_type_to_id=etypes,
     )
 
-    # Copy to device.
-    graph = graph.to("cuda")
 
-    # Check.
-    assert graph.csc_indptr.device.type == "cuda"
-    assert graph.indices.device.type == "cuda"
-    assert graph.node_type_offset.device.type == "cuda"
-    assert graph.type_per_edge.device.type == "cuda"
-    assert graph.csc_indptr.device.type == "cuda"
+def is_graph_on_device_type(graph, device_type):
+    assert graph.csc_indptr.device.type == device_type
+    assert graph.indices.device.type == device_type
+    assert graph.node_type_offset.device.type == device_type
+    assert graph.type_per_edge.device.type == device_type
+    assert graph.csc_indptr.device.type == device_type
     for key in graph.edge_attributes:
-        assert graph.edge_attributes[key].device.type == "cuda"
+        assert graph.edge_attributes[key].device.type == device_type
+
+
+def is_graph_pinned(graph):
+    assert graph.csc_indptr.is_pinned()
+    assert graph.indices.is_pinned()
+    assert graph.node_type_offset.is_pinned()
+    assert graph.type_per_edge.is_pinned()
+    assert graph.csc_indptr.is_pinned()
+    for key in graph.edge_attributes:
+        assert graph.edge_attributes[key].is_pinned()
 
 
 @unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
+    F._default_context_str == "cpu",
+    reason="`to` function needs GPU to test.",
 )
-def test_sample_neighbors_homo():
+@pytest.mark.parametrize("device", ["pinned", "cuda"])
+def test_csc_sampling_graph_to_device(device):
+    # Construct FusedCSCSamplingGraph.
+    graph = create_fused_csc_sampling_graph()
+
+    # Copy to device.
+    graph2 = graph.to(device)
+
+    if device == "cuda":
+        is_graph_on_device_type(graph2, "cuda")
+    elif device == "pinned":
+        is_graph_on_device_type(graph2, "cpu")
+        is_graph_pinned(graph2)
+
+    # The original variable should be untouched.
+    is_graph_on_device_type(graph, "cpu")
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
+def test_csc_sampling_graph_to_pinned_memory():
+    # Construct FusedCSCSamplingGraph.
+    graph = create_fused_csc_sampling_graph()
+    ptr = graph.csc_indptr.data_ptr()
+
+    # Copy to pinned_memory in-place.
+    graph.pin_memory_()
+
+    # Check if pinning is truly in-place.
+    assert graph.csc_indptr.data_ptr() == ptr
+
+    is_graph_on_device_type(graph, "cpu")
+    is_graph_pinned(graph)
+
+
+@pytest.mark.parametrize("labor", [False, True])
+@pytest.mark.parametrize("is_pinned", [False, True])
+@pytest.mark.parametrize("nodes", [None, True])
+def test_sample_neighbors_homo(labor, is_pinned, nodes):
+    if is_pinned and nodes is None:
+        pytest.skip("Optional nodes and is_pinned is not supported together.")
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -1576,6 +1626,8 @@ def test_sample_neighbors_homo():
     0   1   0   0   1
     1   0   0   0   1
     """
+    if F._default_context_str == "cpu" and is_pinned:
+        pytest.skip("Pinning is not meaningful without a GPU.")
     # Initialize data.
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
@@ -1584,26 +1636,32 @@ def test_sample_neighbors_homo():
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.fused_csc_sampling_graph(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices).to(
+        "pinned" if is_pinned else F.ctx()
+    )
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.LongTensor([1, 3, 4])
-    subgraph = graph.sample_neighbors(nodes, fanouts=torch.LongTensor([2]))
+    if nodes:
+        nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
+    elif F._default_context_str != "gpu":
+        pytest.skip("Optional nodes is supported only for the GPU.")
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(nodes, fanouts=torch.LongTensor([2]))
 
     # Verify in subgraph.
     sampled_indptr_num = subgraph.sampled_csc.indptr.size(0)
     sampled_num = subgraph.sampled_csc.indices.size(0)
-    assert sampled_indptr_num == 4
-    assert sampled_num == 6
+    if nodes is None:
+        assert sampled_indptr_num == indptr.shape[0]
+        assert sampled_num == 10
+    else:
+        assert sampled_indptr_num == 4
+        assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_sample_neighbors_hetero(labor):
     """Original graph in COO:
@@ -1634,10 +1692,13 @@ def test_sample_neighbors_hetero(labor):
         type_per_edge=type_per_edge,
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
-    )
+    ).to(F.ctx())
 
     # Sample on both node types.
-    nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
+    nodes = {
+        "n1": torch.tensor([0], device=F.ctx()),
+        "n2": torch.tensor([0], device=F.ctx()),
+    }
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts)
@@ -1645,24 +1706,26 @@ def test_sample_neighbors_hetero(labor):
     # Verify in subgraph.
     expected_sampled_csc = {
         "n1:e1:n2": gb.CSCFormatBase(
-            indptr=torch.LongTensor([0, 2]),
-            indices=torch.LongTensor([0, 1]),
+            indptr=torch.tensor([0, 2], device=F.ctx()),
+            indices=torch.tensor([0, 1], device=F.ctx()),
         ),
         "n2:e2:n1": gb.CSCFormatBase(
-            indptr=torch.LongTensor([0, 2]),
-            indices=torch.LongTensor([0, 2]),
+            indptr=torch.tensor([0, 2], device=F.ctx()),
+            indices=torch.tensor([0, 2], device=F.ctx()),
         ),
     }
     assert len(subgraph.sampled_csc) == 2
     for etype, pairs in expected_sampled_csc.items():
         assert torch.equal(subgraph.sampled_csc[etype].indptr, pairs.indptr)
-        assert torch.equal(subgraph.sampled_csc[etype].indices, pairs.indices)
+        assert torch.equal(
+            subgraph.sampled_csc[etype].indices.sort()[0], pairs.indices
+        )
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
 
     # Sample on single node type.
-    nodes = {"n1": torch.LongTensor([0])}
+    nodes = {"n1": torch.tensor([0], device=F.ctx())}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts)
@@ -1670,27 +1733,25 @@ def test_sample_neighbors_hetero(labor):
     # Verify in subgraph.
     expected_sampled_csc = {
         "n1:e1:n2": gb.CSCFormatBase(
-            indptr=torch.LongTensor([0]),
-            indices=torch.LongTensor([]),
+            indptr=torch.tensor([0], device=F.ctx()),
+            indices=torch.tensor([], device=F.ctx()),
         ),
         "n2:e2:n1": gb.CSCFormatBase(
-            indptr=torch.LongTensor([0, 2]),
-            indices=torch.LongTensor([0, 2]),
+            indptr=torch.tensor([0, 2], device=F.ctx()),
+            indices=torch.tensor([0, 2], device=F.ctx()),
         ),
     }
     assert len(subgraph.sampled_csc) == 2
     for etype, pairs in expected_sampled_csc.items():
         assert torch.equal(subgraph.sampled_csc[etype].indptr, pairs.indptr)
-        assert torch.equal(subgraph.sampled_csc[etype].indices, pairs.indices)
+        assert torch.equal(
+            subgraph.sampled_csc[etype].indices.sort()[0], pairs.indices
+        )
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "fanouts, expected_sampled_num1, expected_sampled_num2",
     [
@@ -1739,9 +1800,12 @@ def test_sample_neighbors_fanouts(
         type_per_edge=type_per_edge,
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
-    )
+    ).to(F.ctx())
 
-    nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
+    nodes = {
+        "n1": torch.tensor([0], device=F.ctx()),
+        "n2": torch.tensor([0], device=F.ctx()),
+    }
     fanouts = torch.LongTensor(fanouts)
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts)
@@ -1761,10 +1825,6 @@ def test_sample_neighbors_fanouts(
     assert subgraph.sampled_csc["n2:e2:n1"].indptr.size(0) == 2
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "replace, expected_sampled_num1, expected_sampled_num2",
     [(False, 2, 2), (True, 4, 4)],
@@ -1772,6 +1832,8 @@ def test_sample_neighbors_fanouts(
 def test_sample_neighbors_replace(
     replace, expected_sampled_num1, expected_sampled_num2
 ):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     """Original graph in COO:
     "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
     "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
@@ -1820,12 +1882,9 @@ def test_sample_neighbors_replace(
     assert subgraph.sampled_csc["n2:e2:n1"].indptr.size(0) == 2
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("labor", [False, True])
-def test_sample_neighbors_return_eids_homo(labor):
+@pytest.mark.parametrize("is_pinned", [False, True])
+def test_sample_neighbors_return_eids_homo(labor, is_pinned):
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -1833,6 +1892,8 @@ def test_sample_neighbors_return_eids_homo(labor):
     0   1   0   0   1
     1   0   0   0   1
     """
+    if F._default_context_str == "cpu" and is_pinned:
+        pytest.skip("Pinning is not meaningful without a GPU.")
     # Initialize data.
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
@@ -1846,26 +1907,25 @@ def test_sample_neighbors_return_eids_homo(labor):
     # Construct FusedCSCSamplingGraph.
     graph = gb.fused_csc_sampling_graph(
         indptr, indices, edge_attributes=edge_attributes
-    )
+    ).to("pinned" if is_pinned else F.ctx())
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.LongTensor([1, 3, 4])
+    nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts=torch.LongTensor([-1]))
 
     # Verify in subgraph.
     expected_reverse_edge_ids = edge_attributes[gb.ORIGINAL_EDGE_ID][
         torch.tensor([3, 4, 7, 8, 9, 10, 11])
-    ]
-    assert torch.equal(expected_reverse_edge_ids, subgraph.original_edge_ids)
+    ].to(F.ctx())
+    assert torch.equal(
+        torch.sort(expected_reverse_edge_ids)[0],
+        torch.sort(subgraph.original_edge_ids)[0],
+    )
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("labor", [False, True])
 def test_sample_neighbors_return_eids_hetero(labor):
     """
@@ -1901,35 +1961,40 @@ def test_sample_neighbors_return_eids_hetero(labor):
         edge_attributes=edge_attributes,
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
-    )
+    ).to(F.ctx())
 
     # Sample on both node types.
-    nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
+    nodes = {
+        "n1": torch.LongTensor([0]).to(F.ctx()),
+        "n2": torch.LongTensor([0]).to(F.ctx()),
+    }
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts)
 
-    # Verify in subgraph.
     expected_reverse_edge_ids = {
-        "n2:e2:n1": edge_attributes[gb.ORIGINAL_EDGE_ID][torch.tensor([0, 1])],
-        "n1:e1:n2": edge_attributes[gb.ORIGINAL_EDGE_ID][torch.tensor([4, 5])],
+        "n2:e2:n1": graph.edge_attributes[gb.ORIGINAL_EDGE_ID][
+            torch.tensor([0, 1], device=F.ctx())
+        ],
+        "n1:e1:n2": graph.edge_attributes[gb.ORIGINAL_EDGE_ID][
+            torch.tensor([4, 5], device=F.ctx())
+        ],
     }
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     for etype in etypes.keys():
         assert torch.equal(
-            subgraph.original_edge_ids[etype], expected_reverse_edge_ids[etype]
+            subgraph.original_edge_ids[etype].sort()[0],
+            expected_reverse_edge_ids[etype].sort()[0],
         )
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("replace", [True, False])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize("probs_name", ["weight", "mask"])
 def test_sample_neighbors_probs(replace, labor, probs_name):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -1976,10 +2041,6 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
         assert sampled_num == 4
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("replace", [True, False])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize(
@@ -1990,6 +2051,8 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
     ],
 )
 def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     # Initialize data.
     total_num_nodes = 5
     total_num_edges = 12
@@ -2021,10 +2084,6 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
     assert sampled_num == 0
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("replace", [False, True])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize(
@@ -2045,6 +2104,8 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
     ],
 )
 def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     """Original graph in COO:
     1   1   1   1   1   1
     0   0   0   0   0   0
@@ -2106,10 +2167,6 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
                 assert sampled_num == min(fanouts[0], 6)
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("replace", [False, True])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize(
@@ -2127,6 +2184,8 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
 def test_sample_neighbors_hetero_pick_number(
     fanouts, replace, labor, probs_name
 ):
+    if F._default_context_str == "gpu" and replace == True:
+        pytest.skip("Sampling with replacement not yet supported on GPU.")
     # Initialize data.
     total_num_nodes = 10
     total_num_edges = 9

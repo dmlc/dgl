@@ -89,9 +89,7 @@ def create_dataloader(
     features,
     itemset,
     device,
-    drop_last=False,
-    shuffle=True,
-    drop_uneven_inputs=False,
+    is_train,
 ):
     ############################################################################
     # [HIGHLIGHT]
@@ -122,13 +120,10 @@ def create_dataloader(
     datapipe = gb.DistributedItemSampler(
         item_set=itemset,
         batch_size=args.batch_size,
-        drop_last=drop_last,
-        shuffle=shuffle,
-        drop_uneven_inputs=drop_uneven_inputs,
+        drop_last=is_train,
+        shuffle=is_train,
+        drop_uneven_inputs=is_train,
     )
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
-    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
-
     ############################################################################
     # [Note]:
     # datapipe.copy_to() / gb.CopyTo()
@@ -137,8 +132,17 @@ def create_dataloader(
     # [Output]:
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
-    datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=args.num_workers)
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device)
+
+    # Until https://github.com/dmlc/dgl/issues/7008, overlap should be False.
+    dataloader = gb.DataLoader(
+        datapipe, args.num_workers, overlap_feature_fetch=False
+    )
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -184,7 +188,7 @@ def train(
         epoch_start = time.time()
 
         model.train()
-        total_loss = torch.tensor(0, dtype=torch.float).to(device)
+        total_loss = torch.tensor(0, dtype=torch.float, device=device)
         ########################################################################
         # (HIGHLIGHT) Use Join Context Manager to solve uneven input problem.
         #
@@ -224,20 +228,17 @@ def train(
                 loss.backward()
                 optimizer.step()
 
-                total_loss += loss
+                total_loss += loss.detach()
 
         # Evaluate the model.
         if rank == 0:
             print("Validating...")
-        acc = (
-            evaluate(
-                rank,
-                model,
-                valid_dataloader,
-                num_classes,
-                device,
-            )
-            / world_size
+        acc = evaluate(
+            rank,
+            model,
+            valid_dataloader,
+            num_classes,
+            device,
         )
         ########################################################################
         # (HIGHLIGHT) Collect accuracy and loss values from sub-processes and
@@ -249,14 +250,13 @@ def train(
         dist.reduce(tensor=acc, dst=0)
         total_loss /= step + 1
         dist.reduce(tensor=total_loss, dst=0)
-        dist.barrier()
 
         epoch_end = time.time()
         if rank == 0:
             print(
                 f"Epoch {epoch:05d} | "
                 f"Average Loss {total_loss.item() / world_size:.4f} | "
-                f"Accuracy {acc.item():.4f} | "
+                f"Accuracy {acc.item() / world_size:.4f} | "
                 f"Time {epoch_end - epoch_start:.4f}"
             )
 
@@ -272,15 +272,18 @@ def run(rank, world_size, args, devices, dataset):
         rank=rank,
     )
 
-    graph = dataset.graph
-    features = dataset.feature
+    # Pin the graph and features to enable GPU access.
+    if args.storage_device == "pinned":
+        dataset.graph.pin_memory_()
+        dataset.feature.pin_memory_()
+
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
     args.fanout = list(map(int, args.fanout.split(",")))
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    in_size = features.size("node", None, "feat")[0]
+    in_size = dataset.feature.size("node", None, "feat")[0]
     hidden_size = 256
     out_size = num_classes
 
@@ -291,33 +294,27 @@ def run(rank, world_size, args, devices, dataset):
     # Create data loaders.
     train_dataloader = create_dataloader(
         args,
-        graph,
-        features,
+        dataset.graph,
+        dataset.feature,
         train_set,
         device,
-        drop_last=False,
-        shuffle=True,
-        drop_uneven_inputs=False,
+        is_train=True,
     )
     valid_dataloader = create_dataloader(
         args,
-        graph,
-        features,
+        dataset.graph,
+        dataset.feature,
         valid_set,
         device,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
+        is_train=False,
     )
     test_dataloader = create_dataloader(
         args,
-        graph,
-        features,
+        dataset.graph,
+        dataset.feature,
         test_set,
         device,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
+        is_train=False,
     )
 
     # Model training.
@@ -348,7 +345,7 @@ def run(rank, world_size, args, devices, dataset):
         / world_size
     )
     dist.reduce(tensor=test_acc, dst=0)
-    dist.barrier()
+    torch.cuda.synchronize()
     if rank == 0:
         print(f"Test Accuracy {test_acc.item():.4f}")
 
@@ -382,10 +379,17 @@ def parse_args():
         type=str,
         default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
-        " identical with the number of layers in your model. Default: 15,10,5",
+        " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
         "--num-workers", type=int, default=0, help="The number of processes."
+    )
+    parser.add_argument(
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cuda", "pinned-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
@@ -395,6 +399,7 @@ if __name__ == "__main__":
     if not torch.cuda.is_available():
         print(f"Multi-gpu training needs to be in gpu mode.")
         exit(0)
+    args.storage_device, _ = args.mode.split("-")
 
     devices = list(map(int, args.gpu.split(",")))
     world_size = len(devices)

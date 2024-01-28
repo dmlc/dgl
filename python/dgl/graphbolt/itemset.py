@@ -1,5 +1,6 @@
 """GraphBolt Itemset."""
 
+import textwrap
 from typing import Dict, Iterable, Iterator, Sized, Tuple, Union
 
 import torch
@@ -24,7 +25,10 @@ class ItemSet:
         items.
     names: Union[str, Tuple[str]], optional
         The names of the items. If it is a tuple, each name corresponds to an
-        item in the tuple.
+        item in the tuple. The naming is arbitrary, but in general practice,
+        the names should be chosen from ['seed_nodes', 'node_pairs', 'labels',
+        'seeds', 'negative_srcs', 'negative_dsts'] to align with the attributes
+        of class `dgl.graphbolt.MiniBatch`.
 
     Examples
     --------
@@ -175,7 +179,14 @@ class ItemSet:
         return self._names
 
     def __repr__(self) -> str:
-        return _itemset_str(self, "ItemSet")
+        ret = (
+            f"{self.__class__.__name__}(\n"
+            f"    items={self._items},\n"
+            f"    names={self._names},\n"
+            f")"
+        )
+
+        return ret
 
 
 class ItemSetDict:
@@ -330,31 +341,19 @@ class ItemSetDict:
         return self._names
 
     def __repr__(self) -> str:
-        return _itemset_str(self, "ItemSetDict")
+        ret = (
+            "{Classname}(\n"
+            "    itemsets={itemsets},\n"
+            "    names={names},\n"
+            ")"
+        )
 
+        itemsets_str = textwrap.indent(
+            repr(self._itemsets), " " * len("    itemsets=")
+        ).strip()
 
-def _itemset_str(itemset: Union[ItemSet, ItemSetDict], name) -> str:
-    final_str = f"{name}("
-    indent_len = len(final_str)
-
-    def _add_indent(_str, indent):
-        lines = _str.split("\n")
-        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
-        return "\n".join(lines)
-
-    items = (
-        itemset._items if isinstance(itemset, ItemSet) else itemset._itemsets
-    )
-    item_str = (
-        "items="
-        + _add_indent(str(items), indent_len + len("items="))
-        + ",\n"
-        + " " * indent_len
-    )
-    name_str = (
-        "names="
-        + _add_indent(str(itemset._names), indent_len + len("items="))
-        + ",\n)"
-    )
-    final_str += item_str + name_str
-    return final_str
+        return ret.format(
+            Classname=self.__class__.__name__,
+            itemsets=itemsets_str,
+            names=self._names,
+        )

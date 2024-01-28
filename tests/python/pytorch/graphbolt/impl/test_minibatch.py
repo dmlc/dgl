@@ -58,7 +58,8 @@ def test_minibatch_representation_homo():
     # Test minibatch without data.
     minibatch = gb.MiniBatch()
     expect_result = str(
-        """MiniBatch(seed_nodes=None,
+        """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=None,
           positive_node_pairs=None,
           node_pairs_with_labels=None,
@@ -69,6 +70,7 @@ def test_minibatch_representation_homo():
           negative_dsts=None,
           labels=None,
           input_nodes=None,
+          indexes=None,
           edge_features=None,
           compacted_node_pairs=None,
           compacted_negative_srcs=None,
@@ -77,7 +79,7 @@ def test_minibatch_representation_homo():
        )"""
     )
     result = str(minibatch)
-    assert result == expect_result, print(len(expect_result), len(result))
+    assert result == expect_result, print(expect_result, result)
     # Test minibatch with all attributes.
     minibatch = gb.MiniBatch(
         node_pairs=csc_formats,
@@ -93,7 +95,8 @@ def test_minibatch_representation_homo():
         compacted_negative_dsts=compacted_negative_dsts,
     )
     expect_result = str(
-        """MiniBatch(seed_nodes=None,
+        """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6]),
                                                                          indices=tensor([0, 1, 2, 2, 1, 2]),
                                                            ),
@@ -125,13 +128,18 @@ def test_minibatch_representation_homo():
           negative_srcs=tensor([[8],
                                 [1],
                                 [6]]),
-          negative_node_pairs=(tensor([0, 1, 2]),
-                              tensor([6, 0, 0])),
+          negative_node_pairs=(tensor([[0],
+                                      [1],
+                                      [2]]),
+                              tensor([[6],
+                                      [0],
+                                      [0]])),
           negative_dsts=tensor([[2],
                                 [8],
                                 [8]]),
           labels=tensor([0., 1., 2.]),
           input_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
+          indexes=None,
           edge_features=[{'x': tensor([9, 0, 1, 1, 7, 4])},
                         {'x': tensor([0, 2, 2])}],
           compacted_node_pairs=CSCFormatBase(indptr=tensor([0, 2, 3]),
@@ -238,7 +246,8 @@ def test_minibatch_representation_hetero():
         compacted_negative_dsts=compacted_negative_dsts,
     )
     expect_result = str(
-        """MiniBatch(seed_nodes={'B': tensor([10, 15])},
+        """MiniBatch(seeds=None,
+          seed_nodes={'B': tensor([10, 15])},
           sampled_subgraphs=[SampledSubgraphImpl(sampled_csc={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
                                                                          indices=tensor([0, 1, 1]),
                                                            ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2]),
@@ -278,12 +287,17 @@ def test_minibatch_representation_hetero():
           negative_srcs={'B': tensor([[8],
                                 [1],
                                 [6]])},
-          negative_node_pairs={'A:r:B': (tensor([0, 1, 2]), tensor([6, 0, 0]))},
+          negative_node_pairs={'A:r:B': (tensor([[0],
+                                      [1],
+                                      [2]]), tensor([[6],
+                                      [0],
+                                      [0]]))},
           negative_dsts={'B': tensor([[2],
                                 [8],
                                 [8]])},
           labels={'B': tensor([2, 5])},
           input_nodes={'A': tensor([ 5,  7,  9, 11]), 'B': tensor([10, 11, 12])},
+          indexes=None,
           edge_features=[{('A:r:B', 'x'): tensor([4, 2, 4])},
                         {('A:r:B', 'x'): tensor([0, 6])}],
           compacted_node_pairs={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
@@ -664,10 +678,7 @@ def check_dgl_blocks_hetero(minibatch, blocks):
         edges = block.edges(etype=etype)
         dst_ndoes = torch.arange(
             0, len(sampled_csc[i][relation].indptr) - 1
-        ).repeat_interleave(
-            sampled_csc[i][relation].indptr[1:]
-            - sampled_csc[i][relation].indptr[:-1]
-        )
+        ).repeat_interleave(sampled_csc[i][relation].indptr.diff())
         assert torch.equal(edges[0], sampled_csc[i][relation].indices)
         assert torch.equal(edges[1], dst_ndoes)
         assert torch.equal(
@@ -676,10 +687,7 @@ def check_dgl_blocks_hetero(minibatch, blocks):
     edges = blocks[0].edges(etype=gb.etype_str_to_tuple(reverse_relation))
     dst_ndoes = torch.arange(
         0, len(sampled_csc[0][reverse_relation].indptr) - 1
-    ).repeat_interleave(
-        sampled_csc[0][reverse_relation].indptr[1:]
-        - sampled_csc[0][reverse_relation].indptr[:-1]
-    )
+    ).repeat_interleave(sampled_csc[0][reverse_relation].indptr.diff())
     assert torch.equal(edges[0], sampled_csc[0][reverse_relation].indices)
     assert torch.equal(edges[1], dst_ndoes)
     assert torch.equal(
@@ -704,9 +712,7 @@ def check_dgl_blocks_homo(minibatch, blocks):
     for i, block in enumerate(blocks):
         dst_ndoes = torch.arange(
             0, len(sampled_csc[i].indptr) - 1
-        ).repeat_interleave(
-            sampled_csc[i].indptr[1:] - sampled_csc[i].indptr[:-1]
-        )
+        ).repeat_interleave(sampled_csc[i].indptr.diff())
         assert torch.equal(block.edges()[0], sampled_csc[i].indices), print(
             block.edges()
         )
@@ -781,12 +787,12 @@ def test_dgl_link_predication_homo(mode):
     if mode == "neg_graph" or mode == "neg_src":
         assert torch.equal(
             minibatch.negative_node_pairs[0],
-            minibatch.compacted_negative_srcs.view(-1),
+            minibatch.compacted_negative_srcs,
         )
     if mode == "neg_graph" or mode == "neg_dst":
         assert torch.equal(
             minibatch.negative_node_pairs[1],
-            minibatch.compacted_negative_dsts.view(-1),
+            minibatch.compacted_negative_dsts,
         )
     (
         node_pairs,
@@ -842,11 +848,11 @@ def test_dgl_link_predication_hetero(mode):
         for etype, src in minibatch.compacted_negative_srcs.items():
             assert torch.equal(
                 minibatch.negative_node_pairs[etype][0],
-                src.view(-1),
+                src,
             )
     if mode == "neg_graph" or mode == "neg_dst":
         for etype, dst in minibatch.compacted_negative_dsts.items():
             assert torch.equal(
                 minibatch.negative_node_pairs[etype][1],
-                minibatch.compacted_negative_dsts[etype].view(-1),
+                minibatch.compacted_negative_dsts[etype],
             )

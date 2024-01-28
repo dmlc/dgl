@@ -10,6 +10,7 @@
 
 #include <dmlc/thread_local.h>
 
+#include <mutex>
 #include <optional>
 #include <pcg_random.hpp>
 #include <random>
@@ -35,6 +36,9 @@ class RandomEngine {
   /** @brief Set the seed. */
   void SetSeed(uint64_t seed);
   void SetSeed(uint64_t seed, uint64_t stream);
+
+  /** @brief Protect manual seed accesses. */
+  static std::mutex manual_seed_mutex;
 
   /** @brief Manually fix the seed. */
   static std::optional<uint64_t> manual_seed;

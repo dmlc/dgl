@@ -8,6 +8,11 @@ if(USE_CUDA)
   add_definitions(-DGRAPHBOLT_USE_CUDA)
 endif()
 
+# For windows, define NOMINMAX to avoid conflict with std::min/max
+if(MSVC)
+  add_definitions(-DNOMINMAX)
+endif()
+
 # Find PyTorch cmake files and PyTorch versions with the python interpreter
 # $PYTHON_INTERP ("python3" or "python" if empty)
 if(NOT PYTHON_INTERP)
@@ -47,6 +52,7 @@ file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
 if(USE_CUDA)
   file(GLOB BOLT_CUDA_SRC
     ${BOLT_DIR}/cuda/*.cu
+    ${BOLT_DIR}/cuda/*.cc
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
   if(DEFINED ENV{CUDAARCHS})
@@ -70,6 +76,11 @@ if(USE_CUDA)
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
                              "../third_party/cccl/libcudacxx/include")
+
+  message(STATUS "Use HugeCTR gpu_cache for graphbolt with INCLUDE_DIRS $ENV{GPU_CACHE_INCLUDE_DIRS}.")
+  target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE $ENV{GPU_CACHE_INCLUDE_DIRS})
+  target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${GPU_CACHE_BUILD_DIR})
+  target_link_libraries(${LIB_GRAPHBOLT_NAME} gpu_cache)
   
   get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
   message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")

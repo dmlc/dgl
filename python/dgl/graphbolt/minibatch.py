@@ -54,6 +54,45 @@ class MiniBatch:
       value should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
     """
 
+    seeds: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None
+    """
+    Representation of seed items utilized in node classification tasks, link
+    prediction tasks and hyperlinks tasks.
+    - If `seeds` is a tensor: it indicates that the seeds originate from a
+      homogeneous graph. It can be either a 1-dimensional or 2-dimensional
+      tensor:
+        - 1-dimensional tensor: Each element directly represents a seed node
+          within the graph.
+        - 2-dimensional tensor: Each row designates a seed item, which can
+          encompass various entities such as edges, hyperlinks, or other graph
+          components depending on the specific context.
+    - If `seeds` is a dictionary: it indicates that the seeds originate from a
+      heterogeneous graph. The keys should be edge or node type, and the value
+      should be a tensor, which can be either a 1-dimensional or 2-dimensional
+      tensor:
+        - 1-dimensional tensor: Each element directly represents a seed node
+        of the given type within the graph.
+        - 2-dimensional tensor: Each row designates a seed item of the given
+          type, which can encompass various entities such as edges, hyperlinks,
+          or other graph components depending on the specific context.
+    """
+
+    indexes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    """
+    Indexes associated with seed nodes / node pairs in the graph, which
+    indicates to which query a seed node / node pair belongs.
+    - If `indexes` is a tensor: It indicates the graph is homogeneous. The
+      value should be corresponding query to given 'seed_nodes' or
+      'node_pairs'.
+    - If `indexes` is a dictionary: It indicates the graph is
+      heterogeneous. The keys should be node or edge type and the value should
+      be corresponding query to given 'seed_nodes' or 'node_pairs'. For each
+      key, indexes are consecutive integers starting from zero.
+    """
+
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the head nodes in the link
@@ -202,7 +241,7 @@ class MiniBatch:
                             v.indices,
                             torch.arange(
                                 0,
-                                v.indptr[-1],
+                                len(v.indices),
                                 device=v.indptr.device,
                                 dtype=v.indptr.dtype,
                             ),
@@ -227,7 +266,7 @@ class MiniBatch:
                         sampled_csc.indices,
                         torch.arange(
                             0,
-                            sampled_csc.indptr[-1],
+                            len(sampled_csc.indices),
                             device=sampled_csc.indptr.device,
                             dtype=sampled_csc.indptr.dtype,
                         ),
@@ -299,15 +338,15 @@ class MiniBatch:
             # For homogeneous graph.
             if isinstance(self.compacted_negative_srcs, torch.Tensor):
                 negative_node_pairs = (
-                    self.compacted_negative_srcs.view(-1),
-                    self.compacted_negative_dsts.view(-1),
+                    self.compacted_negative_srcs,
+                    self.compacted_negative_dsts,
                 )
             # For heterogeneous graph.
             else:
                 negative_node_pairs = {
                     etype: (
-                        neg_src.view(-1),
-                        self.compacted_negative_dsts[etype].view(-1),
+                        neg_src,
+                        self.compacted_negative_dsts[etype],
                     )
                     for etype, neg_src in self.compacted_negative_srcs.items()
                 }
@@ -319,10 +358,10 @@ class MiniBatch:
             if isinstance(self.compacted_negative_srcs, torch.Tensor):
                 negative_ratio = self.compacted_negative_srcs.size(1)
                 negative_node_pairs = (
-                    self.compacted_negative_srcs.view(-1),
-                    self.compacted_node_pairs[1].repeat_interleave(
-                        negative_ratio
-                    ),
+                    self.compacted_negative_srcs,
+                    self.compacted_node_pairs[1]
+                    .repeat_interleave(negative_ratio)
+                    .view(-1, negative_ratio),
                 )
             # For heterogeneous graph.
             else:
@@ -331,10 +370,10 @@ class MiniBatch:
                 ].size(1)
                 negative_node_pairs = {
                     etype: (
-                        neg_src.view(-1),
-                        self.compacted_node_pairs[etype][1].repeat_interleave(
-                            negative_ratio
-                        ),
+                        neg_src,
+                        self.compacted_node_pairs[etype][1]
+                        .repeat_interleave(negative_ratio)
+                        .view(-1, negative_ratio),
                     )
                     for etype, neg_src in self.compacted_negative_srcs.items()
                 }
@@ -346,10 +385,10 @@ class MiniBatch:
             if isinstance(self.compacted_negative_dsts, torch.Tensor):
                 negative_ratio = self.compacted_negative_dsts.size(1)
                 negative_node_pairs = (
-                    self.compacted_node_pairs[0].repeat_interleave(
-                        negative_ratio
-                    ),
-                    self.compacted_negative_dsts.view(-1),
+                    self.compacted_node_pairs[0]
+                    .repeat_interleave(negative_ratio)
+                    .view(-1, negative_ratio),
+                    self.compacted_negative_dsts,
                 )
             # For heterogeneous graph.
             else:
@@ -358,10 +397,10 @@ class MiniBatch:
                 ].size(1)
                 negative_node_pairs = {
                     etype: (
-                        self.compacted_node_pairs[etype][0].repeat_interleave(
-                            negative_ratio
-                        ),
-                        neg_dst.view(-1),
+                        self.compacted_node_pairs[etype][0]
+                        .repeat_interleave(negative_ratio)
+                        .view(-1, negative_ratio),
+                        neg_dst,
                     )
                     for etype, neg_dst in self.compacted_negative_dsts.items()
                 }
@@ -396,6 +435,7 @@ class MiniBatch:
                 for etype in positive_node_pairs:
                     pos_src, pos_dst = positive_node_pairs[etype]
                     neg_src, neg_dst = negative_node_pairs[etype]
+                    neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
                     node_pairs_by_etype[etype] = (
                         torch.cat((pos_src, neg_src), dim=0),
                         torch.cat((pos_dst, neg_dst), dim=0),
@@ -410,6 +450,7 @@ class MiniBatch:
                 # Homogeneous graph.
                 pos_src, pos_dst = positive_node_pairs
                 neg_src, neg_dst = negative_node_pairs
+                neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
                 node_pairs = (
                     torch.cat((pos_src, neg_src), dim=0),
                     torch.cat((pos_dst, neg_dst), dim=0),

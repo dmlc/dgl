@@ -4,6 +4,8 @@
  * @file graphbolt/cuda_sampling_ops.h
  * @brief Available CUDA sampling operations in Graphbolt.
  */
+#ifndef GRAPHBOLT_CUDA_SAMPLING_OPS_H_
+#define GRAPHBOLT_CUDA_SAMPLING_OPS_H_
 
 #include <graphbolt/fused_sampled_subgraph.h>
 #include <torch/script.h>
@@ -17,7 +19,8 @@ namespace ops {
  *
  * @param indptr Index pointer array of the CSC.
  * @param indices Indices array of the CSC.
- * @param nodes The nodes from which to sample neighbors.
+ * @param nodes The nodes from which to sample neighbors. If not provided,
+ * assumed to be equal to torch.arange(indptr.size(0) - 1).
  * @param fanouts The number of edges to be sampled for each node with or
  * without considering edge types.
  *   - When the length is 1, it indicates that the fanout applies to all
@@ -47,9 +50,9 @@ namespace ops {
  * the sampled graph's information.
  */
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
-    const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids,
+    torch::Tensor indptr, torch::Tensor indices,
+    torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
+    bool replace, bool layer, bool return_eids,
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
     torch::optional<torch::Tensor> probs_or_mask = torch::nullopt);
 
@@ -65,3 +68,5 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> InSubgraph(
 
 }  //  namespace ops
 }  //  namespace graphbolt
+
+#endif  // GRAPHBOLT_CUDA_SAMPLING_OPS_H_

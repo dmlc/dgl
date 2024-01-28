@@ -5,16 +5,12 @@
  * @brief Index select operator implementation on CUDA.
  */
 #include <c10/core/ScalarType.h>
-#include <c10/cuda/CUDAStream.h>
 #include <graphbolt/cuda_ops.h>
-#include <thrust/execution_policy.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/transform_iterator.h>
 
-#include <cub/cub.cuh>
 #include <numeric>
 
 #include "./common.h"
+#include "./max_uva_threads.h"
 #include "./utils.h"
 
 namespace graphbolt {
@@ -124,35 +120,39 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   const IdType* index_sorted_ptr = sorted_index.data_ptr<IdType>();
   const int64_t* permutation_ptr = permutation.data_ptr<int64_t>();
 
-  auto stream = cuda::GetCurrentStream();
-
   if (aligned_feature_size == 1) {
     // Use a single thread to process each output row to avoid wasting threads.
     const int num_threads = cuda::FindNumThreads(return_len);
-    const int num_blocks = (return_len + num_threads - 1) / num_threads;
+    const int num_blocks =
+        (std::min(return_len, cuda::max_uva_threads.value_or(1 << 20)) +
+         num_threads - 1) /
+        num_threads;
     CUDA_KERNEL_CALL(
-        IndexSelectSingleKernel, num_blocks, num_threads, 0, stream, input_ptr,
+        IndexSelectSingleKernel, num_blocks, num_threads, 0, input_ptr,
         input_len, index_sorted_ptr, return_len, ret_ptr, permutation_ptr);
   } else {
-    dim3 block(512, 1);
+    constexpr int BLOCK_SIZE = 512;
+    dim3 block(BLOCK_SIZE, 1);
     while (static_cast<int64_t>(block.x) >= 2 * aligned_feature_size) {
       block.x >>= 1;
       block.y <<= 1;
     }
-    const dim3 grid((return_len + block.y - 1) / block.y);
+    const dim3 grid(std::min(
+        (return_len + block.y - 1) / block.y,
+        cuda::max_uva_threads.value_or(1 << 20) / BLOCK_SIZE));
     if (aligned_feature_size * sizeof(DType) <= GPU_CACHE_LINE_SIZE) {
       // When feature size is smaller than GPU cache line size, use unaligned
       // version for less SM usage, which is more resource efficient.
       CUDA_KERNEL_CALL(
-          IndexSelectMultiKernel, grid, block, 0, stream, input_ptr, input_len,
+          IndexSelectMultiKernel, grid, block, 0, input_ptr, input_len,
           aligned_feature_size, index_sorted_ptr, return_len, ret_ptr,
           permutation_ptr);
     } else {
       // Use aligned version to improve the memory access pattern.
       CUDA_KERNEL_CALL(
-          IndexSelectMultiKernelAligned, grid, block, 0, stream, input_ptr,
-          input_len, aligned_feature_size, index_sorted_ptr, return_len,
-          ret_ptr, permutation_ptr);
+          IndexSelectMultiKernelAligned, grid, block, 0, input_ptr, input_len,
+          aligned_feature_size, index_sorted_ptr, return_len, ret_ptr,
+          permutation_ptr);
     }
   }
 

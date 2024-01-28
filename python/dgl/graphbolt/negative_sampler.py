@@ -38,7 +38,9 @@ class NegativeSampler(MiniBatchTransformer):
 
     def _sample(self, minibatch):
         """
-        Generate a mix of positive and negative samples.
+        Generate a mix of positive and negative samples. If `seeds` in
+        minibatch is not None, `labels` and `indexes` will be constructed
+        after negative sampling, based on corresponding seeds.
 
         Parameters
         ----------
@@ -55,21 +57,45 @@ class NegativeSampler(MiniBatchTransformer):
             An instance of 'MiniBatch' encompasses both positive and negative
             samples.
         """
-        node_pairs = minibatch.node_pairs
-        assert node_pairs is not None
-        if isinstance(node_pairs, Mapping):
-            minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
-            for etype, pos_pairs in node_pairs.items():
-                self._collate(
-                    minibatch, self._sample_with_etype(pos_pairs, etype), etype
-                )
+        if minibatch.seeds is None:
+            node_pairs = minibatch.node_pairs
+            assert node_pairs is not None
+            if isinstance(node_pairs, Mapping):
+                minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
+                for etype, pos_pairs in node_pairs.items():
+                    self._collate(
+                        minibatch,
+                        self._sample_with_etype(pos_pairs, etype),
+                        etype,
+                    )
+            else:
+                self._collate(minibatch, self._sample_with_etype(node_pairs))
         else:
-            self._collate(minibatch, self._sample_with_etype(node_pairs))
+            seeds = minibatch.seeds
+            if isinstance(seeds, Mapping):
+                if minibatch.indexes is None:
+                    minibatch.indexes = {}
+                if minibatch.labels is None:
+                    minibatch.labels = {}
+                for etype, pos_pairs in seeds.items():
+                    (
+                        minibatch.seeds[etype],
+                        minibatch.labels[etype],
+                        minibatch.indexes[etype],
+                    ) = self._sample_with_etype(pos_pairs, use_seeds=True)
+            else:
+                (
+                    minibatch.seeds,
+                    minibatch.labels,
+                    minibatch.indexes,
+                ) = self._sample_with_etype(seeds, use_seeds=True)
         return minibatch
 
-    def _sample_with_etype(self, node_pairs, etype=None):
+    def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
         """Generate negative pairs for a given etype form positive pairs
-        for a given etype.
+        for a given etype. If `node_pairs` is a 2D tensor, which represents
+        `seeds` is used in minibatch, corresponding labels and indexes will be
+        constructed.
 
         Parameters
         ----------
@@ -82,8 +108,14 @@ class NegativeSampler(MiniBatchTransformer):
 
         Returns
         -------
-        Tuple[Tensor, Tensor]
+        Tuple[Tensor, Tensor] or Tensor
             A collection of negative node pairs.
+        Tensor or None
+            Corresponding labels. If label is True, corresponding edge is
+            positive. If label is False, corresponding edge is negative.
+        Tensor or None
+            Corresponding indexes, indicates to which query an edge belongs.
+
         """
         raise NotImplementedError
 
@@ -93,8 +125,8 @@ class NegativeSampler(MiniBatchTransformer):
         Parameters
         ----------
         minibatch : MiniBatch
-            The input minibatch, which contains positive node pairs, will be filled
-            with negative information in this function.
+            The input minibatch, which contains positive node pairs, will be
+            filled with negative information in this function.
         neg_pairs : Tuple[Tensor, Tensor]
             A tuple of tensors represents source-destination node pairs of
             negative edges, where negative means the edge may not exist in

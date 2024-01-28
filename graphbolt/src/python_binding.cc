@@ -9,8 +9,16 @@
 #include <graphbolt/serialize.h>
 #include <graphbolt/unique_and_compact.h>
 
+#ifdef GRAPHBOLT_USE_CUDA
+#include "./cuda/max_uva_threads.h"
+#endif
+#include "./expand_indptr.h"
 #include "./index_select.h"
 #include "./random.h"
+
+#ifdef GRAPHBOLT_USE_CUDA
+#include "./cuda/gpu_cache.h"
+#endif
 
 namespace graphbolt {
 namespace sampling {
@@ -52,9 +60,6 @@ TORCH_LIBRARY(graphbolt, m) {
       .def(
           "temporal_sample_neighbors",
           &FusedCSCSamplingGraph::TemporalSampleNeighbors)
-      .def(
-          "sample_negative_edges_uniform",
-          &FusedCSCSamplingGraph::SampleNegativeEdgesUniform)
       .def("copy_to_shared_memory", &FusedCSCSamplingGraph::CopyToSharedMemory)
       .def_pickle(
           // __getstate__
@@ -70,6 +75,12 @@ TORCH_LIBRARY(graphbolt, m) {
             g->SetState(state);
             return g;
           });
+#ifdef GRAPHBOLT_USE_CUDA
+  m.class_<cuda::GpuCache>("GpuCache")
+      .def("query", &cuda::GpuCache::Query)
+      .def("replace", &cuda::GpuCache::Replace);
+  m.def("gpu_cache", &cuda::GpuCache::Create);
+#endif
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
@@ -77,7 +88,11 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
+  m.def("expand_indptr", &ops::ExpandIndptr);
   m.def("set_seed", &RandomEngine::SetManualSeed);
+#ifdef GRAPHBOLT_USE_CUDA
+  m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
+#endif
 }
 
 }  // namespace sampling

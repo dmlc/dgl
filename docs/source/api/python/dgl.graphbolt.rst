@@ -185,10 +185,12 @@ Utilities
     from_dglgraph
     etype_str_to_tuple
     etype_tuple_to_str
+    isin
+    seed
+    expand_indptr
     add_reverse_edges
     exclude_seed_edges
     compact_csc_format
     unique_and_compact
     unique_and_compact_csc_formats
-    unique_and_compact_node_pairs
 

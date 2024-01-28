@@ -33,6 +33,7 @@ def test_CopyTo():
         "node_inference",
         "link_prediction",
         "edge_classification",
+        "extra_attrs",
         "other",
     ],
 )
@@ -40,7 +41,7 @@ def test_CopyTo():
 def test_CopyToWithMiniBatches(task):
     N = 16
     B = 2
-    if task == "node_classification":
+    if task == "node_classification" or task == "extra_attrs":
         itemset = gb.ItemSet(
             (torch.arange(N), torch.arange(N)), names=("seed_nodes", "labels")
         )
@@ -125,6 +126,15 @@ def test_CopyToWithMiniBatches(task):
             "negative_node_pairs",
             "node_pairs_with_labels",
         ]
+    elif task == "extra_attrs":
+        copied_attrs = [
+            "node_features",
+            "edge_features",
+            "sampled_subgraphs",
+            "labels",
+            "blocks",
+            "seed_nodes",
+        ]
 
     def test_data_device(datapipe):
         for data in datapipe:
@@ -148,11 +158,16 @@ def test_CopyToWithMiniBatches(task):
                         else:
                             assert var.device.type == "cpu"
 
+    if task == "extra_attrs":
+        extra_attrs = ["seed_nodes"]
+    else:
+        extra_attrs = None
+
     # Invoke CopyTo via class constructor.
-    test_data_device(gb.CopyTo(datapipe, "cuda"))
+    test_data_device(gb.CopyTo(datapipe, "cuda", extra_attrs))
 
     # Invoke CopyTo via functional form.
-    test_data_device(datapipe.copy_to("cuda"))
+    test_data_device(datapipe.copy_to("cuda", extra_attrs))
 
 
 def test_etype_tuple_to_str():
@@ -233,6 +248,25 @@ def test_isin_non_1D_dim():
         gb.isin(elements, test_elements)
 
 
+def torch_expand_indptr(indptr, dtype, nodes=None):
+    if nodes is None:
+        nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
+    return nodes.to(dtype).repeat_interleave(indptr.diff())
+
+
+@pytest.mark.parametrize("nodes", [None, True])
+@pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
+def test_expand_indptr(nodes, dtype):
+    if nodes:
+        nodes = torch.tensor([1, 7, 3, 4, 5, 8], dtype=dtype, device=F.ctx())
+    indptr = torch.tensor([0, 2, 2, 7, 10, 12, 20], device=F.ctx())
+    torch_result = torch_expand_indptr(indptr, dtype, nodes)
+    gb_result = gb.expand_indptr(indptr, dtype, nodes)
+    assert torch.equal(torch_result, gb_result)
+    gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
+    assert torch.equal(torch_result, gb_result)
+
+
 def test_csc_format_base_representation():
     csc_format_base = gb.CSCFormatBase(
         indptr=torch.tensor([0, 2, 4]),
@@ -244,3 +278,11 @@ def test_csc_format_base_representation():
 )"""
     )
     assert str(csc_format_base) == expected_result, print(csc_format_base)
+
+
+def test_csc_format_base_incorrect_indptr():
+    indptr = torch.tensor([0, 2, 4, 6, 7, 11])
+    indices = torch.tensor([2, 3, 1, 4, 5, 2, 5, 1, 4, 4])
+    with pytest.raises(AssertionError):
+        # The value of last element in indptr is not corresponding to indices.
+        csc_formats = gb.CSCFormatBase(indptr=indptr, indices=indices)
