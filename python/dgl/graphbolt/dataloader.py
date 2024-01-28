@@ -185,7 +185,7 @@ class DataLoader(torch.utils.data.DataLoader):
         of the computations can run simultaneously with it. Setting it to a too
         high value will limit the amount of overlap while setting it too low may
         cause the PCI-e bandwidth to not get fully utilized. Manually tuned
-        default is 12288, meaning around 6-8 Streaming Multiprocessors.
+        default is 6144, meaning around 3-4 Streaming Multiprocessors.
     """
 
     def __init__(
@@ -195,7 +195,7 @@ class DataLoader(torch.utils.data.DataLoader):
         persistent_workers=True,
         overlap_feature_fetch=True,
         overlap_graph_fetch=True,
-        max_uva_threads=12288,
+        max_uva_threads=6144,
     ):
         # Multiprocessing requires two modifications to the datapipe:
         #
