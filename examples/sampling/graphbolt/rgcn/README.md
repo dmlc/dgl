@@ -19,15 +19,15 @@ Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 9
 
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) |
 | ------------ | ------------- | ----------- | ------------- | ------------------------ |
-| ~1.1GB       | ~4.5GB        | 0           |  0GB          | ~235s                    |
-| ~1.1GB       | ~2GB          | 1           |  4.4GB        | ~60s                     |
+| ~1.1GB       | ~5.3GB        | 0           |  0GB          | ~230s                    |
+| ~1.1GB       | ~3GB          | 1           |  3.87GB       | ~64.6s                   |
 
 ### Accuracies
 ```
-Epoch: 01, Loss: 2.6736, Valid accuracy: 42.21%
-Epoch: 02, Loss: 2.0809, Valid accuracy: 42.51%
-Epoch: 03, Loss: 1.8143, Valid accuracy: 42.76%
-Test accuracy 41.4817
+Epoch: 01, Loss: 2.3434, Valid accuracy: 48.23%
+Epoch: 02, Loss: 1.5646, Valid accuracy: 48.49%
+Epoch: 03, Loss: 1.1633, Valid accuracy: 45.79%
+Test accuracy 44.6792
 ```
 
 ## Run on `ogb-lsc-mag240m` dataset
@@ -47,17 +47,17 @@ Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 9
 
 > **note:**
 `buffer/cache` are highly used during train, it's about 300GB. If more RAM is available, more `buffer/cache` will be consumed as graph size is about 55GB and feature data is about 350GB.
-One more thing, first epoch is quite slow as `buffer/cache` is not ready yet. For GPU train, first epoch takes **34:56min, 1.93s/it**.
+One more thing, first epoch is quite slow as `buffer/cache` is not ready yet. For GPU train, first epoch takes **1030s**.
 Even in following epochs, time consumption varies.
 
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) |
 | ------------ | ------------- | ----------- | ------------- | ------------------------ |
-| ~404GB       | ~55GB       | 0           |  0GB            | ~197s                    |
-| ~404GB       | ~55GB       | 1           |  7GB            | ~119s                    |
+| ~404GB       | ~67GB         | 0           |  0GB          | ~248s                    |
+| ~404GB       | ~60GB         | 1           |  15GB         | ~166s                    |
 
 ### Accuracies
 ```
-Epoch: 01, Loss: 2.3038, Valid accuracy: 46.33%
-Epoch: 02, Loss: 2.1160, Valid accuracy: 46.47%
-Epoch: 03, Loss: 2.0847, Valid accuracy: 48.38%
+Epoch: 01, Loss: 2.1432, Valid accuracy: 50.21%
+Epoch: 02, Loss: 1.9267, Valid accuracy: 50.77%
+Epoch: 03, Loss: 1.8797, Valid accuracy: 53.38%
 ```
