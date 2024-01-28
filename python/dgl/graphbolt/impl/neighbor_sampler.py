@@ -1,5 +1,6 @@
 """Neighbor subgraph samplers for GraphBolt."""
 
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import torch
@@ -20,22 +21,34 @@ __all__ = ["NeighborSampler", "LayerNeighborSampler", "SamplePerLayer"]
 class FetchInsubgraphData(Mapper):
     """"""
 
-    def __init__(self, datapipe, sample_per_layer_obj):
+    def __init__(self, datapipe, sample_per_layer_obj, stream=None):
         super().__init__(datapipe, self._fetch_per_layer)
         self.graph = sample_per_layer_obj.sampler.__self__
         self.prob_name = sample_per_layer_obj.prob_name
+        self.stream = stream
+        self.executor = ThreadPoolExecutor(max_workers=1)
 
-    def _fetch_per_layer(self, minibatch):
+    def _fetch_per_layer_helper(self, minibatch, stream):
         index = minibatch.input_nodes
+        if index.is_cuda:
+            index.record_stream(torch.cuda.current_stream())
         index_select = partial(
             torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
         )
+
+        def record_stream(tensor):
+            if stream is not None and tensor.is_cuda:
+                tensor.record_stream(stream)
+
         indptr, indices = index_select(self.graph.indices, index, None)
+        record_stream(indptr)
+        record_stream(indices)
         output_size = len(indices)
         if self.graph.type_per_edge is not None:
             _, type_per_edge = index_select(
                 self.graph.type_per_edge, index, output_size
             )
+            record_stream(type_per_edge)
         else:
             type_per_edge = None
         if self.graph.edge_attributes is not None:
@@ -44,6 +57,7 @@ class FetchInsubgraphData(Mapper):
                 _, probs_or_mask = index_select(
                     probs_or_mask, index, output_size
                 )
+                record_stream(probs_or_mask)
         else:
             probs_or_mask = None
         subgraph = fused_csc_sampling_graph(
@@ -54,7 +68,26 @@ class FetchInsubgraphData(Mapper):
         if self.prob_name is not None and probs_or_mask is not None:
             subgraph.edge_attributes = {self.prob_name: probs_or_mask}
 
-        return subgraph, minibatch
+        if self.stream is not None:
+            event = torch.cuda.current_stream().record_event()
+
+            class WaitableTuple(tuple):
+                def wait(self):
+                    event.wait()
+
+            return WaitableTuple((subgraph, minibatch))
+        else:
+            return subgraph, minibatch
+
+    def _fetch_per_layer(self, minibatch):
+        current_stream = None
+        if self.stream is not None:
+            current_stream = torch.cuda.current_stream()
+            self.stream.wait_stream(current_stream)
+        with torch.cuda.stream(self.stream):
+            return self.executor.submit(
+                self._fetch_per_layer_helper, minibatch, current_stream
+            )
 
 
 @functional_datapipe("sample_per_layer_from_fetched_subgraph")

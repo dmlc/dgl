@@ -96,9 +96,23 @@ class Awaiter(dp.iter.IterDataPipe):
             yield data
 
 
+class FutureWaiter(dp.iter.IterDataPipe):
+    """Calls the result function of all items and returns their results."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        for data in self.datapipe:
+            yield data.result()
+
+
 class FetcherAndSampler(dp.iter.IterDataPipe):
-    def __init__(self, datapipe, sampler):
-        datapipe = datapipe.fetch_insubgraph_data(sampler)
+    def __init__(self, datapipe, sampler, stream):
+        datapipe = datapipe.fetch_insubgraph_data(sampler, stream)
+        datapipe = Bufferer(datapipe, 1)
+        datapipe = FutureWaiter(datapipe)
+        datapipe = Awaiter(datapipe)
         self.datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
 
     def __iter__(self):
@@ -251,7 +265,9 @@ class DataLoader(torch.utils.data.DataLoader):
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     sampler,
-                    FetcherAndSampler(sampler.datapipe, sampler),
+                    FetcherAndSampler(
+                        sampler.datapipe, sampler, _get_uva_stream()
+                    ),
                 )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
