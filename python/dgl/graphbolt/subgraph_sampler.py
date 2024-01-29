@@ -3,6 +3,7 @@
 from collections import defaultdict
 from typing import Dict
 
+import torch
 from torch.utils.data import functional_datapipe
 
 from .base import etype_str_to_tuple
@@ -69,10 +70,27 @@ class SubgraphSampler(MiniBatchTransformer):
             seeds_timestamp = (
                 minibatch.timestamp if hasattr(minibatch, "timestamp") else None
             )
+        elif minibatch.seeds is not None:
+            seeds = minibatch.seeds
+            if seeds.ndim == 1:
+                seeds = minibatch.seed_nodes
+                seeds_timestamp = (
+                    minibatch.timestamp
+                    if hasattr(minibatch, "timestamp")
+                    else None
+                )
+            elif seeds.ndim == 2 and seeds.shape[1] == 2:
+                (
+                    seeds,
+                    seeds_timestamp,
+                    minibatch.compacted_seeds,
+                ) = self._node_pairs_preprocess_2(minibatch)
+            else:
+                raise NotImplementedError("Not implemented yet.")
         else:
             raise ValueError(
-                f"Invalid minibatch {minibatch}: Either `node_pairs` or "
-                "`seed_nodes` should have a value."
+                f"Invalid minibatch {minibatch}: One and only one of "
+                "`node_pairs`, `seed_nodes` and `seeds` should have a value."
             )
         minibatch._seed_nodes = seeds
         minibatch._seeds_timestamp = seeds_timestamp
