@@ -71,6 +71,8 @@ class CompactPerLayer(Mapper):
 
 
 class MinibatchTransformer(Mapper):
+    """Prepare the minibatch for the sampling and compaction steps."""
+
     def __init__(
         self,
         datapipe,
