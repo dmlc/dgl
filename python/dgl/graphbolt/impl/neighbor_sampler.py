@@ -18,7 +18,7 @@ __all__ = ["NeighborSampler", "LayerNeighborSampler", "SamplePerLayer"]
 
 
 @functional_datapipe("fetch_insubgraph_data")
-class FetchInsubgraphData(Mapper):
+class FetchInsubgraphData(MiniBatchTransformer):
     """"""
 
     def __init__(
@@ -76,16 +76,17 @@ class FetchInsubgraphData(Mapper):
             if self.prob_name is not None and probs_or_mask is not None:
                 subgraph.edge_attributes = {self.prob_name: probs_or_mask}
 
+            minibatch.sampled_subgraphs.insert(0, subgraph)
+
             if self.stream is not None:
                 event = torch.cuda.current_stream().record_event()
 
-                class WaitableTuple(tuple):
-                    def wait(self):
-                        event.wait()
+                def _wait():
+                    event.wait()
 
-                return WaitableTuple((subgraph, minibatch))
-            else:
-                return subgraph, minibatch
+                minibatch.wait = _wait
+
+            return minibatch
 
     def _fetch_per_layer(self, minibatch):
         current_stream = None
@@ -98,7 +99,7 @@ class FetchInsubgraphData(Mapper):
 
 
 @functional_datapipe("sample_per_layer_from_fetched_subgraph")
-class SamplePerLayerFromFetchedSubgraph(Mapper):
+class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
     """Sample neighbor edges from a graph for a single layer."""
 
     def __init__(self, datapipe, sample_per_layer_obj):
@@ -108,15 +109,16 @@ class SamplePerLayerFromFetchedSubgraph(Mapper):
         self.replace = sample_per_layer_obj.replace
         self.prob_name = sample_per_layer_obj.prob_name
 
-    def _sample_per_layer_from_fetched_subgraph(self, subgraph_minibatch):
-        subgraph, minibatch = subgraph_minibatch
+    def _sample_per_layer_from_fetched_subgraph(self, minibatch):
+        subgraph = minibatch.sampled_subgraphs[0]
 
         sampled_subgraph = getattr(subgraph, self.sampler_name)(
             None, self.fanout, self.replace, self.prob_name
         )
         sampled_subgraph.original_column_node_ids = minibatch.input_nodes
+        minibatch.sampled_subgraphs[0] = sampled_subgraph
 
-        return sampled_subgraph, minibatch
+        return minibatch
 
 
 @functional_datapipe("sample_per_layer")
