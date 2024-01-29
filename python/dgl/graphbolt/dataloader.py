@@ -181,6 +181,10 @@ class DataLoader(torch.utils.data.DataLoader):
         If True, the data loader will overlap the UVA feature fetcher operations
         with the rest of operations by using an alternative CUDA stream. Default
         is True.
+    overlap_graph_fetch : bool, optional
+        If True, the data loader will overlap the UVA graph fetching operations
+        with the rest of operations by using an alternative CUDA stream. Default
+        is False.
     max_uva_threads : int, optional
         Limits the number of CUDA threads used for UVA copies so that the rest
         of the computations can run simultaneously with it. Setting it to a too
@@ -195,7 +199,7 @@ class DataLoader(torch.utils.data.DataLoader):
         num_workers=0,
         persistent_workers=True,
         overlap_feature_fetch=True,
-        overlap_graph_fetch=True,
+        overlap_graph_fetch=False,
         max_uva_threads=6144,
     ):
         # Multiprocessing requires two modifications to the datapipe:
