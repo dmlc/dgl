@@ -19,14 +19,13 @@ __all__ = [
 ]
 
 
-def _find_and_wrap_parent(
-    datapipe_graph, datapipe_adjlist, target_datapipe, wrapper, **kwargs
-):
+def _find_and_wrap_parent(datapipe_graph, target_datapipe, wrapper, **kwargs):
     """Find parent of target_datapipe and wrap it with ."""
     datapipes = dp_utils.find_dps(
         datapipe_graph,
         target_datapipe,
     )
+    datapipe_adjlist = datapipe_graph_to_adjlist(datapipe_graph)
     for datapipe in datapipes:
         datapipe_id = id(datapipe)
         for parent_datapipe_id in datapipe_adjlist[datapipe_id][1]:
@@ -36,6 +35,7 @@ def _find_and_wrap_parent(
                 parent_datapipe,
                 wrapper(parent_datapipe, **kwargs),
             )
+    return datapipe_graph
 
 
 class EndMarker(dp.iter.IterDataPipe):
@@ -92,17 +92,6 @@ class Awaiter(dp.iter.IterDataPipe):
         for data in self.datapipe:
             data.wait()
             yield data
-
-
-class BuffererAndAwaiter(dp.iter.IterDataPipe):
-    """Bufferer and Awaiter back to back."""
-
-    def __init__(self, datapipe, buffer_size):
-        datapipe = Bufferer(datapipe, buffer_size)
-        self.datapipe = Awaiter(datapipe)
-
-    def __iter__(self):
-        yield from self.datapipe
 
 
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
@@ -191,7 +180,6 @@ class DataLoader(torch.utils.data.DataLoader):
 
         datapipe = EndMarker(datapipe)
         datapipe_graph = dp_utils.traverse_dps(datapipe)
-        datapipe_adjlist = datapipe_graph_to_adjlist(datapipe_graph)
 
         # (1) Insert minibatch distribution.
         # TODO(BarclayII): Currently I'm using sharding_filter() as a
@@ -209,9 +197,8 @@ class DataLoader(torch.utils.data.DataLoader):
             )
 
         # (2) Cut datapipe at FeatureFetcher and wrap.
-        _find_and_wrap_parent(
+        datapipe_graph = _find_and_wrap_parent(
             datapipe_graph,
-            datapipe_adjlist,
             FeatureFetcher,
             MultiprocessingWrapper,
             num_workers=num_workers,
@@ -236,19 +223,22 @@ class DataLoader(torch.utils.data.DataLoader):
             # more than once. So, we wrap it once by a single datapipe called
             # BuffererAndAwaiter instead of Bufferer and Awaiter separately.
             if len(feature_fetchers) > 0:
-                _find_and_wrap_parent(
+                datapipe_graph = _find_and_wrap_parent(
                     datapipe_graph,
-                    datapipe_adjlist,
                     EndMarker,
-                    BuffererAndAwaiter,
+                    Bufferer,
                     buffer_size=1,
+                )
+                datapipe_graph = _find_and_wrap_parent(
+                    datapipe_graph,
+                    EndMarker,
+                    Awaiter,
                 )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
         # data pipeline up to the CopyTo operation to run in a separate thread.
-        _find_and_wrap_parent(
+        datapipe_graph = _find_and_wrap_parent(
             datapipe_graph,
-            datapipe_adjlist,
             CopyTo,
             dp.iter.Prefetcher,
             buffer_size=2,
