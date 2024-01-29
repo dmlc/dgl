@@ -20,15 +20,15 @@ Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 9
 
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) |
 | ------------ | ------------- | ----------- | ------------- | ------------------------ |
-| ~1.1GB       | ~5GB          | 0           |  0GB          | ~243s                    |
-| ~1.1GB       | ~3GB          | 1           |  4.4GB        | ~81s                     |
+| ~1.1GB       | ~7GB          | 0           |  0GB          | ~233s                    |
+| ~1.1GB       | ~5GB          | 1           |  4.5GB        | ~73.6s                   |
 
 ### Accuracies
 ```
-Epoch: 01, Loss: 2.3302, Valid: 47.76%, Test: 46.58%
-Epoch: 02, Loss: 1.5486, Valid: 48.31%, Test: 47.12%
-Epoch: 03, Loss: 1.1469, Valid: 46.43%, Test: 45.18%
-Test accuracy 45.1227
+Epoch: 01, Loss: 2.3386, Valid: 47.67%, Test: 46.96%
+Epoch: 02, Loss: 1.5563, Valid: 47.66%, Test: 47.02%
+Epoch: 03, Loss: 1.1557, Valid: 46.58%, Test: 45.42%
+Test accuracy 45.3850
 ```
 
 ## Run on `ogb-lsc-mag240m` dataset
@@ -54,8 +54,8 @@ Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 9
 
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) |
 | ------------ | ------------- | ----------- | ------------- | ------------------------ |
-| ~404GB       | ~60GB         | 0           |  0GB          | ~216s                    |
-| ~404GB       | ~60GB         | 1           |  7GB          | ~157s                    |
+| ~404GB       | ~72GB         | 0           |  0GB          | ~325s                    |
+| ~404GB       | ~61GB         | 1           |  14GB         | ~178s                    |
 
 ### Accuracies
 ```

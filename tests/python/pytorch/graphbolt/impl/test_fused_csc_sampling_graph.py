@@ -1615,7 +1615,10 @@ def test_csc_sampling_graph_to_pinned_memory():
 
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize("is_pinned", [False, True])
-def test_sample_neighbors_homo(labor, is_pinned):
+@pytest.mark.parametrize("nodes", [None, True])
+def test_sample_neighbors_homo(labor, is_pinned, nodes):
+    if is_pinned and nodes is None:
+        pytest.skip("Optional nodes and is_pinned is not supported together.")
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -1623,6 +1626,8 @@ def test_sample_neighbors_homo(labor, is_pinned):
     0   1   0   0   1
     1   0   0   0   1
     """
+    if F._default_context_str == "cpu" and is_pinned:
+        pytest.skip("Pinning is not meaningful without a GPU.")
     # Initialize data.
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
@@ -1631,23 +1636,27 @@ def test_sample_neighbors_homo(labor, is_pinned):
     assert indptr[-1] == len(indices)
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.fused_csc_sampling_graph(indptr, indices)
-    if F._default_context_str == "gpu":
-        if is_pinned:
-            graph.pin_memory_()
-        else:
-            graph = graph.to(F.ctx())
+    graph = gb.fused_csc_sampling_graph(indptr, indices).to(
+        "pinned" if is_pinned else F.ctx()
+    )
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
+    if nodes:
+        nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
+    elif F._default_context_str != "gpu":
+        pytest.skip("Optional nodes is supported only for the GPU.")
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts=torch.LongTensor([2]))
 
     # Verify in subgraph.
     sampled_indptr_num = subgraph.sampled_csc.indptr.size(0)
     sampled_num = subgraph.sampled_csc.indices.size(0)
-    assert sampled_indptr_num == 4
-    assert sampled_num == 6
+    if nodes is None:
+        assert sampled_indptr_num == indptr.shape[0]
+        assert sampled_num == 10
+    else:
+        assert sampled_indptr_num == 4
+        assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -1883,6 +1892,8 @@ def test_sample_neighbors_return_eids_homo(labor, is_pinned):
     0   1   0   0   1
     1   0   0   0   1
     """
+    if F._default_context_str == "cpu" and is_pinned:
+        pytest.skip("Pinning is not meaningful without a GPU.")
     # Initialize data.
     total_num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
@@ -1896,12 +1907,7 @@ def test_sample_neighbors_return_eids_homo(labor, is_pinned):
     # Construct FusedCSCSamplingGraph.
     graph = gb.fused_csc_sampling_graph(
         indptr, indices, edge_attributes=edge_attributes
-    )
-    if F._default_context_str == "gpu":
-        if is_pinned:
-            graph.pin_memory_()
-        else:
-            graph = graph.to(F.ctx())
+    ).to("pinned" if is_pinned else F.ctx())
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())

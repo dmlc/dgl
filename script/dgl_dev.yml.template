@@ -30,6 +30,7 @@ dependencies:
     - torchdata>=0.5.0
     - torcheval
     - torchmetrics
+    - torch_geometric
     - tqdm
     - boto3 # AWS SDK for python
     - sphinx==4.2.0
