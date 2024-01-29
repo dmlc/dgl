@@ -25,12 +25,11 @@ class SamplePerLayer(Mapper):
         self.prob_name = prob_name
 
     def _sample_per_layer(self, minibatch):
-        return (
-            self.sampler(
-                minibatch.input_nodes, self.fanout, self.replace, self.prob_name
-            ),
-            minibatch,
+        subgraph = self.sampler(
+            minibatch.input_nodes, self.fanout, self.replace, self.prob_name
         )
+        minibatch.sampled_subgraphs.insert(0, subgraph)
+        return minibatch
 
 
 @functional_datapipe("compact_per_layer")
@@ -41,8 +40,8 @@ class CompactPerLayer(Mapper):
         super().__init__(datapipe, self._compact_per_layer)
         self.deduplicate = deduplicate
 
-    def _compact_per_layer(self, subgraph_minibatch):
-        subgraph, minibatch = subgraph_minibatch
+    def _compact_per_layer(self, minibatch):
+        subgraph = minibatch.sampled_subgraphs[0]
         seeds = minibatch.input_nodes
         if self.deduplicate:
             (
@@ -67,7 +66,38 @@ class CompactPerLayer(Mapper):
                 original_edge_ids=subgraph.original_edge_ids,
             )
         minibatch.input_nodes = original_row_node_ids
-        minibatch.sampled_subgraphs.insert(0, subgraph)
+        minibatch.sampled_subgraphs[0] = subgraph
+        return minibatch
+
+
+class MinibatchTransformer(Mapper):
+    def __init__(
+        self,
+        datapipe,
+        graph,
+    ):
+        super().__init__(datapipe, self._transform)
+        self.graph = graph
+
+    def _transform(self, minibatch_and_seeds_timestamp):
+        minibatch, _ = minibatch_and_seeds_timestamp
+        seeds = minibatch.input_nodes
+        # Enrich seeds with all node types.
+        if isinstance(seeds, dict):
+            ntypes = list(self.graph.node_type_to_id.keys())
+            # Loop over different seeds to extract the device they are on.
+            device = None
+            dtype = None
+            for _, seed in seeds.items():
+                device = seed.device
+                dtype = seed.dtype
+                break
+            default_tensor = torch.tensor([], dtype=dtype, device=device)
+            seeds = {
+                ntype: seeds.get(ntype, default_tensor) for ntype in ntypes
+            }
+        minibatch.input_nodes = seeds
+        minibatch.sampled_subgraphs = []
         return minibatch
 
 
@@ -166,29 +196,7 @@ class NeighborSampler2(IterDataPipe):
     ):
         self.graph = graph
         datapipe = datapipe.sample_subgraph_preprocess()
-
-        def helper(minibatch_and_seeds_timestamp):
-            minibatch, _ = minibatch_and_seeds_timestamp
-            seeds = minibatch.input_nodes
-            # Enrich seeds with all node types.
-            if isinstance(seeds, dict):
-                ntypes = list(self.graph.node_type_to_id.keys())
-                # Loop over different seeds to extract the device they are on.
-                device = None
-                dtype = None
-                for _, seed in seeds.items():
-                    device = seed.device
-                    dtype = seed.dtype
-                    break
-                default_tensor = torch.tensor([], dtype=dtype, device=device)
-                seeds = {
-                    ntype: seeds.get(ntype, default_tensor) for ntype in ntypes
-                }
-            minibatch.input_nodes = seeds
-            minibatch.sampled_subgraphs = []
-            return minibatch
-
-        datapipe = datapipe.map(helper)
+        datapipe = MinibatchTransformer(datapipe, graph)
         sampler = getattr(graph, sampler)
         for fanout in reversed(fanouts):
             # Convert fanout to tensor.
