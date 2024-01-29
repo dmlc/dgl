@@ -1,5 +1,6 @@
 """Graph Bolt DataLoaders"""
 
+from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 
 import torch
@@ -108,8 +109,8 @@ class FutureWaiter(dp.iter.IterDataPipe):
 
 
 class FetcherAndSampler(dp.iter.IterDataPipe):
-    def __init__(self, datapipe, sampler, stream):
-        datapipe = datapipe.fetch_insubgraph_data(sampler, stream)
+    def __init__(self, datapipe, sampler, stream, executor):
+        datapipe = datapipe.fetch_insubgraph_data(sampler, stream, executor)
         datapipe = Bufferer(datapipe, 1)
         datapipe = FutureWaiter(datapipe)
         datapipe = Awaiter(datapipe)
@@ -261,12 +262,13 @@ class DataLoader(torch.utils.data.DataLoader):
                 datapipe_graph,
                 SamplePerLayer,
             )
+            executor = ThreadPoolExecutor(max_workers=1)
             for sampler in samplers:
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     sampler,
                     FetcherAndSampler(
-                        sampler.datapipe, sampler, _get_uva_stream()
+                        sampler.datapipe, sampler, _get_uva_stream(), executor
                     ),
                 )
 

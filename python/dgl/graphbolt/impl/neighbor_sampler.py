@@ -21,12 +21,17 @@ __all__ = ["NeighborSampler", "LayerNeighborSampler", "SamplePerLayer"]
 class FetchInsubgraphData(Mapper):
     """"""
 
-    def __init__(self, datapipe, sample_per_layer_obj, stream=None):
+    def __init__(
+        self, datapipe, sample_per_layer_obj, stream=None, executor=None
+    ):
         super().__init__(datapipe, self._fetch_per_layer)
         self.graph = sample_per_layer_obj.sampler.__self__
         self.prob_name = sample_per_layer_obj.prob_name
         self.stream = stream
-        self.executor = ThreadPoolExecutor(max_workers=1)
+        if executor is None:
+            self.executor = ThreadPoolExecutor(max_workers=1)
+        else:
+            self.executor = executor
 
     def _fetch_per_layer_helper(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
