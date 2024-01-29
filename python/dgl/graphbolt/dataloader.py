@@ -219,9 +219,6 @@ class DataLoader(torch.utils.data.DataLoader):
             )
             for feature_fetcher in feature_fetchers:
                 feature_fetcher.stream = _get_uva_stream()
-            # _find_and_wrap_parent does not work if we wrap the same datapipe
-            # more than once. So, we wrap it once by a single datapipe called
-            # BuffererAndAwaiter instead of Bufferer and Awaiter separately.
             if len(feature_fetchers) > 0:
                 datapipe_graph = _find_and_wrap_parent(
                     datapipe_graph,
