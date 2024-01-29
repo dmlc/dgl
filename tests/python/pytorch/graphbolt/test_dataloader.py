@@ -46,7 +46,8 @@ def test_DataLoader():
     reason="This test requires the GPU.",
 )
 @pytest.mark.parametrize("overlap_feature_fetch", [True, False])
-def test_gpu_sampling_DataLoader(overlap_feature_fetch):
+@pytest.mark.parametrize("enable_feature_fetch", [True, False])
+def test_gpu_sampling_DataLoader(overlap_feature_fetch, enable_feature_fetch):
     N = 40
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
@@ -70,11 +71,12 @@ def test_gpu_sampling_DataLoader(overlap_feature_fetch):
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )
-    datapipe = dgl.graphbolt.FeatureFetcher(
-        datapipe,
-        feature_store,
-        ["a", "b"],
-    )
+    if enable_feature_fetch:
+        datapipe = dgl.graphbolt.FeatureFetcher(
+            datapipe,
+            feature_store,
+            ["a", "b"],
+        )
 
     dataloader = dgl.graphbolt.DataLoader(
         datapipe, overlap_feature_fetch=overlap_feature_fetch
