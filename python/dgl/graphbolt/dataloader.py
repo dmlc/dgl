@@ -16,6 +16,7 @@ from .item_sampler import ItemSampler
 
 __all__ = [
     "DataLoader",
+    "Awaiter",
 ]
 
 

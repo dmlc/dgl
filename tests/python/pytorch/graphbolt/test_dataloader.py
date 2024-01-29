@@ -7,6 +7,8 @@ import dgl.graphbolt
 import pytest
 import torch
 
+import torchdata.dataloader2.graph as dp_utils
+
 from . import gb_test_utils
 
 
@@ -81,4 +83,12 @@ def test_gpu_sampling_DataLoader(overlap_feature_fetch, enable_feature_fetch):
     dataloader = dgl.graphbolt.DataLoader(
         datapipe, overlap_feature_fetch=overlap_feature_fetch
     )
+    if enable_feature_fetch and overlap_feature_fetch:
+        datapipe = dataloader.dataset
+        datapipe_graph = dp_utils.traverse_dps(datapipe)
+        awaiters = dp_utils.find_dps(
+            datapipe_graph,
+            dgl.graphbolt.Awaiter,
+        )
+        assert len(awaiters) == 1
     assert len(list(dataloader)) == N // B
