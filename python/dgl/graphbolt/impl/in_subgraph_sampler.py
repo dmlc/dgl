@@ -3,6 +3,7 @@
 from torch.utils.data import functional_datapipe
 
 from ..internal import unique_and_compact_csc_formats
+from ..minibatch_transformer import MiniBatchTransformer
 
 from ..subgraph_sampler import SubgraphSampler
 from .sampled_subgraph_impl import SampledSubgraphImpl
@@ -66,8 +67,10 @@ class InSubgraphSampler(SubgraphSampler):
         super().__init__(datapipe)
         self.graph = graph
         self.sampler = graph.in_subgraph
+        self.append_sampling_step(MiniBatchTransformer, self._sample_subgraphs)
 
-    def sample_subgraphs(self, seeds, seeds_timestamp):
+    def _sample_subgraphs(self, minibatch):
+        seeds = minibatch.input_nodes
         subgraph = self.sampler(seeds)
         (
             original_row_node_ids,
@@ -79,5 +82,6 @@ class InSubgraphSampler(SubgraphSampler):
             original_row_node_ids=original_row_node_ids,
             original_edge_ids=subgraph.original_edge_ids,
         )
-        seeds = original_row_node_ids
-        return (seeds, [subgraph])
+        minibatch.input_nodes = original_row_node_ids
+        minibatch.sampled_subgraphs = [subgraph]
+        return minibatch
