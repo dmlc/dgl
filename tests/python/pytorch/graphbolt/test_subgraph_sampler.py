@@ -104,11 +104,7 @@ def test_NeighborSampler_fanouts(labor):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Node(sampler_type):
     _check_sampler_type(sampler_type)
@@ -140,11 +136,7 @@ def to_link_batch(data):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Link(sampler_type):
     _check_sampler_type(sampler_type)
@@ -172,11 +164,7 @@ def test_SubgraphSampler_Link(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Link_With_Negative(sampler_type):
     _check_sampler_type(sampler_type)
@@ -227,11 +215,7 @@ def get_hetero_graph():
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Node_Hetero(sampler_type):
     _check_sampler_type(sampler_type)
@@ -260,11 +244,7 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Link_Hetero(sampler_type):
     _check_sampler_type(sampler_type)
@@ -308,11 +288,7 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
     _check_sampler_type(sampler_type)
@@ -357,11 +333,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     _check_sampler_type(sampler_type)
@@ -406,11 +378,7 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     _check_sampler_type(sampler_type)
@@ -456,11 +424,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 @pytest.mark.parametrize(
     "replace",
@@ -555,11 +519,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
     _check_sampler_type(sampler_type)
@@ -623,11 +583,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
     _check_sampler_type(sampler_type)
@@ -918,11 +874,7 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [
-        SamplerType.Normal,
-        SamplerType.Layer,
-        SamplerType.Temporal,
-    ],
+    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
 def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     _check_sampler_type(sampler_type)
