@@ -199,6 +199,7 @@ class SubgraphSampler(MiniBatchTransformer):
         )
 
     def append_sampling_step(self, datapipe_type, *args, **kwargs):
+        """Append a step to the sampling datapipe pipeline."""
         parent_datapipe = self.datapipe.datapipe
         dp_utils.replace_dp(
             dp_utils.traverse_dps(self.datapipe),
