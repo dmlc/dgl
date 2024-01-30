@@ -72,14 +72,18 @@ class SubgraphSampler(MiniBatchTransformer):
             )
         elif minibatch.seeds is not None:
             seeds = minibatch.seeds
-            if seeds.ndim == 1:
-                seeds = minibatch.seed_nodes
+            if isinstance(seeds, Dict):
+                seeds_ndim = next(iter(seeds.values())).ndim
+            else:
+                seeds_ndim = seeds.ndim
+            if seeds_ndim == 1:
+                seeds = minibatch.seeds
                 seeds_timestamp = (
                     minibatch.timestamp
                     if hasattr(minibatch, "timestamp")
                     else None
                 )
-            elif seeds.ndim == 2 and seeds.shape[1] == 2:
+            elif seeds_ndim == 2:
                 (
                     seeds,
                     seeds_timestamp,
@@ -89,8 +93,8 @@ class SubgraphSampler(MiniBatchTransformer):
                 raise NotImplementedError("Not implemented yet.")
         else:
             raise ValueError(
-                f"Invalid minibatch {minibatch}: One and only one of "
-                "`node_pairs`, `seed_nodes` and `seeds` should have a value."
+                f"Invalid minibatch {minibatch}: One of `node_pairs`, "
+                "`seed_nodes` and `seeds` should have a value."
             )
         minibatch._seed_nodes = seeds
         minibatch._seeds_timestamp = seeds_timestamp
@@ -151,6 +155,8 @@ class SubgraphSampler(MiniBatchTransformer):
             else:
                 seeds, compacted = unique_and_compact(nodes)
                 nodes_timestamp = None
+            print(nodes)
+            print(compacted)
             (
                 compacted_node_pairs,
                 compacted_negative_srcs,
