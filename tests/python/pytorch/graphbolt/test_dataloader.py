@@ -83,12 +83,17 @@ def test_gpu_sampling_DataLoader(overlap_feature_fetch, enable_feature_fetch):
     dataloader = dgl.graphbolt.DataLoader(
         datapipe, overlap_feature_fetch=overlap_feature_fetch
     )
-    if enable_feature_fetch and overlap_feature_fetch:
-        datapipe = dataloader.dataset
-        datapipe_graph = dp_utils.traverse_dps(datapipe)
-        awaiters = dp_utils.find_dps(
-            datapipe_graph,
-            dgl.graphbolt.Awaiter,
-        )
-        assert len(awaiters) == 1
+    bufferer_awaiter_cnt = int(enable_feature_fetch and overlap_feature_fetch)
+    datapipe = dataloader.dataset
+    datapipe_graph = dp_utils.traverse_dps(datapipe)
+    awaiters = dp_utils.find_dps(
+        datapipe_graph,
+        dgl.graphbolt.Awaiter,
+    )
+    assert len(awaiters) == bufferer_awaiter_cnt
+    bufferers = dp_utils.find_dps(
+        datapipe_graph,
+        dgl.graphbolt.Bufferer,
+    )
+    assert len(bufferers) == bufferer_awaiter_cnt
     assert len(list(dataloader)) == N // B
