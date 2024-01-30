@@ -222,15 +222,8 @@ class DataLoader(torch.utils.data.DataLoader):
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     feature_fetcher,
-                    Awaiter(feature_fetcher),
+                    Awaiter(Bufferer(feature_fetcher, buffer_size=1)),
                 )
-                # Now, we have FeatureFetcher -> Awaiter
-                datapipe_graph = dp_utils.replace_dp(
-                    datapipe_graph,
-                    feature_fetcher,
-                    Bufferer(feature_fetcher, buffer_size=1),
-                )
-                # Now, we have FeatureFetcher -> Bufferer -> Awaiter
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
         # data pipeline up to the CopyTo operation to run in a separate thread.
