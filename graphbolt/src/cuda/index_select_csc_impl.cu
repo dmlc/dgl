@@ -20,7 +20,7 @@
 namespace graphbolt {
 namespace ops {
 
-constexpr int BLOCK_SIZE = 128;
+constexpr int BLOCK_SIZE = CUDA_MAX_NUM_THREADS;
 
 // Given the in_degree array and a permutation, returns in_degree of the output
 // and the permuted and modified in_degree of the input. The modified in_degree
