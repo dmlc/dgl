@@ -510,7 +510,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
                         )
                 node_ids = [
                     sampledsubgraph.original_column_node_ids,
-                    sampledsubgraph.original_row_node_ids
+                    sampledsubgraph.original_row_node_ids,
                 ]
                 for ids in node_ids:
                     for _, value in ids.items():
@@ -580,7 +580,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
                 )
                 assert torch.equal(
                     sampled_subgraph.sampled_csc.indices,
-                    compacted_indices[step]
+                    compacted_indices[step],
                 )
                 assert torch.equal(
                     sampled_subgraph.sampled_csc.indptr, indptr[step]
@@ -592,7 +592,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
 
 
 def _datapipe_test_A(
-        datapipe, original_row_node_ids, original_column_node_ids, csc_formats
+    datapipe, original_row_node_ids, original_column_node_ids, csc_formats
 ):
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
@@ -617,7 +617,7 @@ def _datapipe_test_A(
 
 
 def _datapipe_test_B(
-        datapipe, original_row_node_ids, compacted_indices, indptr, seeds
+    datapipe, original_row_node_ids, compacted_indices, indptr, seeds
 ):
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
@@ -923,7 +923,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
         warnings.simplefilter("ignore", category=UserWarning)
         for minibatch in sampler_dp:
             for step, sampled_subgraph in enumerate(
-                    minibatch.sampled_subgraphs
+                minibatch.sampled_subgraphs
             ):
                 assert (
                     len(sampled_subgraph.sampled_csc["n1:e1:n2"].indices)
