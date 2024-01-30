@@ -109,9 +109,9 @@ class FutureWaiter(dp.iter.IterDataPipe):
 
 
 class FetcherAndSampler(dp.iter.IterDataPipe):
-    def __init__(self, datapipe, sampler, stream, executor):
+    def __init__(self, datapipe, sampler, stream, executor, buffer_size):
         datapipe = datapipe.fetch_insubgraph_data(sampler, stream, executor)
-        datapipe = Bufferer(datapipe, 1)
+        datapipe = Bufferer(datapipe, buffer_size)
         datapipe = FutureWaiter(datapipe)
         datapipe = Awaiter(datapipe)
         self.datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
@@ -272,7 +272,11 @@ class DataLoader(torch.utils.data.DataLoader):
                     datapipe_graph,
                     sampler,
                     FetcherAndSampler(
-                        sampler.datapipe, sampler, _get_uva_stream(), executor
+                        sampler.datapipe,
+                        sampler,
+                        _get_uva_stream(),
+                        executor,
+                        buffer_size=1,
                     ),
                 )
 
