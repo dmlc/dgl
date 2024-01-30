@@ -1191,11 +1191,19 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         fused_csc_sampling_graph = None
 
 
-@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
-def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt):
+def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt="numpy"):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
-        # All metadata fields are specified.
+        """Original graph in COO:
+        0   1   1   0   0
+        0   0   1   1   0
+        0   0   0   1   1
+        1   0   0   0   1
+        1   1   0   0   0
+
+        node_feats: [0.0, 1.9, 2.8, 3.7, 4.6]
+        edge_feats: [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9]
+        """
         dataset_name = "graphbolt_test"
         num_nodes = 5
         num_edges = 10
@@ -1206,23 +1214,9 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt):
             [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [1, 2, 2, 3, 3, 4, 4, 0, 0, 1]]
         ).T
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
-        assert edge_fmt in ["numpy", "csv"], print(
-            "only numpy and csv are supported for edges."
-        )
-        if edge_fmt == "csv":
-            # Wrtie into edges/edge.csv
-            edges = pd.DataFrame(edges, columns=["src", "dst"])
-            edge_path = os.path.join("edges", "edge.csv")
-            edges.to_csv(
-                os.path.join(test_dir, edge_path),
-                index=False,
-                header=False,
-            )
-        else:
-            # Wrtie into edges/edge.npy
-            edges = edges.T
-            edge_path = os.path.join("edges", "edge.npy")
-            np.save(os.path.join(test_dir, edge_path), edges)
+        edges = edges.T
+        edge_path = os.path.join("edges", "edge.npy")
+        np.save(os.path.join(test_dir, edge_path), edges)
 
         # Generate graph edge-feats.
         edge_feats = np.array(
@@ -1364,7 +1358,23 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt):
 def test_OnDiskDataset_preprocess_heterogeneous_hardcode(edge_fmt="numpy"):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
-        # All metadata fields are specified.
+        """Original graph in COO:
+        0   1   1   0   0
+        0   0   1   1   0
+        0   0   0   1   1
+        1   0   0   0   1
+        1   1   0   0   0
+
+        node_type_0: [0, 1]
+        node_type_1: [2, 3, 4]
+        edge_type_0: node_type_0 -> node_type_0
+        edge_type_1: node_type_0 -> node_type_1
+        edge_type_2: node_type_1 -> node_type_1
+        edge_type_3: node_type_1 -> node_type_0
+
+        node_feats: [0.0, 1.9, 2.8, 3.7, 4.6]
+        edge_feats: [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9]
+        """
         dataset_name = "graphbolt_test"
         num_nodes = {
             "A": 2,
@@ -1583,7 +1593,7 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
         nodes = np.repeat(np.arange(num_nodes), 5)
         neighbors = np.random.randint(0, num_nodes, size=(num_edges))
         edges = np.stack([nodes, neighbors], axis=1)
-        # Wrtie into edges/edge.csv
+        # Write into edges/edge.csv
         os.makedirs(os.path.join(test_dir, "edges/"), exist_ok=True)
         edges = pd.DataFrame(edges, columns=["src", "dst"])
         edges.to_csv(
@@ -1737,7 +1747,7 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
         nodes = np.repeat(np.arange(num_nodes), 5)
         neighbors = np.random.randint(0, num_nodes, size=(num_edges))
         edges = np.stack([nodes, neighbors], axis=1)
-        # Wrtie into edges/edge.csv
+        # Write into edges/edge.csv
         os.makedirs(os.path.join(test_dir, "edges\\"), exist_ok=True)
         edges = pd.DataFrame(edges, columns=["src", "dst"])
         edges.to_csv(
@@ -2482,7 +2492,7 @@ def test_OnDiskDataset_load_1D_feature(fmt):
         nodes = np.repeat(np.arange(num_nodes), 5)
         neighbors = np.random.randint(0, num_nodes, size=(num_edges))
         edges = np.stack([nodes, neighbors], axis=1)
-        # Wrtie into edges/edge.csv
+        # Write into edges/edge.csv
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
         edges = pd.DataFrame(edges, columns=["src", "dst"])
         edge_path = os.path.join("edges", "edge.csv")
@@ -3095,7 +3105,7 @@ def test_OnDiskDataset_preprocess_graph_with_single_type():
         nodes = np.repeat(np.arange(num_nodes), 5)
         neighbors = np.random.randint(0, num_nodes, size=(num_edges))
         edges = np.stack([nodes, neighbors], axis=1)
-        # Wrtie into edges/edge.csv
+        # Write into edges/edge.csv
         os.makedirs(os.path.join(test_dir, "edges/"), exist_ok=True)
         edges = pd.DataFrame(edges, columns=["src", "dst"])
         edges.to_csv(
