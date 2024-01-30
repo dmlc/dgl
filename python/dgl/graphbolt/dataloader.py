@@ -109,6 +109,8 @@ class FutureWaiter(dp.iter.IterDataPipe):
 
 
 class FetcherAndSampler(dp.iter.IterDataPipe):
+    """Overlapped graph sampling operation replacement."""
+
     def __init__(self, datapipe, sampler, stream, executor, buffer_size):
         datapipe = datapipe.fetch_insubgraph_data(sampler, stream, executor)
         datapipe = Bufferer(datapipe, buffer_size)

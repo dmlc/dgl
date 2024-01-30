@@ -20,7 +20,7 @@ __all__ = ["NeighborSampler", "LayerNeighborSampler", "SamplePerLayer"]
 
 @functional_datapipe("fetch_insubgraph_data")
 class FetchInsubgraphData(Mapper):
-    """"""
+    """Fetches the insubgraph and wraps it in a FusedCSCSamplingGraph object."""
 
     def __init__(
         self, datapipe, sample_per_layer_obj, stream=None, executor=None
