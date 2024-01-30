@@ -155,8 +155,6 @@ class SubgraphSampler(MiniBatchTransformer):
             else:
                 seeds, compacted = unique_and_compact(nodes)
                 nodes_timestamp = None
-            print(nodes)
-            print(compacted)
             (
                 compacted_node_pairs,
                 compacted_negative_srcs,

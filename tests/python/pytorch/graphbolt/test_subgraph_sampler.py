@@ -337,7 +337,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_node_pairs(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
+def test_SubgraphSampler_Link_Hetero_Unknown_Etype_node_pairs(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
@@ -382,7 +382,9 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
+def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype_node_pairs(
+    sampler_type,
+):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
@@ -432,7 +434,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     "replace",
     [False, True],
 )
-def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
+def test_SubgraphSampler_Random_Hetero_Graph_seed_ndoes(sampler_type, replace):
     _check_sampler_type(sampler_type)
     if F._default_context_str == "gpu" and replace == True:
         pytest.skip("Sampling with replacement not yet supported on GPU.")
@@ -523,7 +525,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
+def test_SubgraphSampler_without_dedpulication_Homo_seed_nodes(sampler_type):
     _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
@@ -587,7 +589,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
+def test_SubgraphSampler_without_dedpulication_Hetero_seed_nodes(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2)
@@ -680,7 +682,7 @@ def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
     reason="Fails due to different result on the GPU.",
 )
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_unique_csc_format_Homo_cpu(labor):
+def test_SubgraphSampler_unique_csc_format_Homo_cpu_seed_nodes(labor):
     torch.manual_seed(1205)
     graph = dgl.graph(([5, 0, 6, 7, 2, 2, 4], [0, 1, 2, 2, 3, 4, 4]))
     graph = gb.from_dglgraph(graph, True).to(F.ctx())
@@ -739,7 +741,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_cpu(labor):
     reason="Fails due to different result on the CPU.",
 )
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_unique_csc_format_Homo_gpu(labor):
+def test_SubgraphSampler_unique_csc_format_Homo_gpu_seed_nodes(labor):
     torch.manual_seed(1205)
     graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
     graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
@@ -794,7 +796,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_gpu(labor):
 
 
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_unique_csc_format_Hetero(labor):
+def test_SubgraphSampler_unique_csc_format_Hetero_seed_nodes(labor):
     graph = get_hetero_graph().to(F.ctx())
     itemset = gb.ItemSetDict(
         {"n2": gb.ItemSet(torch.arange(2), names="seed_nodes")}
@@ -878,7 +880,7 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
+def test_SubgraphSampler_Hetero_multifanout_per_layer_seed_nodes(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items_n1 = torch.tensor([0])
@@ -1219,9 +1221,9 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
-    first_names = "node_pairs"
+    first_names = "seeds"
     second_items = torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T
-    second_names = "node_pairs"
+    second_names = "seeds"
     if sampler_type == SamplerType.Temporal:
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
@@ -1252,7 +1254,8 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
-    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    # TODO: `exclude_seed_edges` doesn't support `seeds` now.
+    # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
 
@@ -1264,9 +1267,9 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
-    first_names = "node_pairs"
+    first_names = "seeds"
     second_items = torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T
-    second_names = "node_pairs"
+    second_names = "seeds"
     if sampler_type == SamplerType.Temporal:
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
@@ -1298,7 +1301,8 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
-    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    # TODO: `exclude_seed_edges` doesn't support `seeds` now.
+    # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
 
@@ -1347,9 +1351,9 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
         edge_attributes=edge_attributes,
     ).to(F.ctx())
     first_items = torch.tensor([0])
-    first_names = "seed_nodes"
+    first_names = "seeds"
     second_items = torch.tensor([0])
-    second_names = "seed_nodes"
+    second_names = "seeds"
     if sampler_type == SamplerType.Temporal:
         first_items = (first_items, torch.randint(0, 10, (1,)))
         first_names = (first_names, "timestamp")
@@ -1409,7 +1413,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
     graph = gb.from_dglgraph(graph, True).to(F.ctx())
     seed_nodes = torch.LongTensor([0, 3, 4])
     items = seed_nodes
-    names = "seed_nodes"
+    names = "seeds"
     if sampler_type == SamplerType.Temporal:
         graph.node_attributes = {
             "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
@@ -1469,7 +1473,7 @@ def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2)
-    names = "seed_nodes"
+    names = "seeds"
     if sampler_type == SamplerType.Temporal:
         graph.node_attributes = {
             "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
@@ -1564,7 +1568,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_cpu(labor):
     graph = gb.from_dglgraph(graph, True).to(F.ctx())
     seed_nodes = torch.LongTensor([0, 3, 4])
 
-    itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
+    itemset = gb.ItemSet(seed_nodes, names="seeds")
     item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(
         F.ctx()
     )
@@ -1623,7 +1627,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_gpu(labor):
     graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
     seed_nodes = torch.LongTensor([0, 3, 4])
 
-    itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
+    itemset = gb.ItemSet(seed_nodes, names="seeds")
     item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes)).copy_to(
         F.ctx()
     )
@@ -1674,9 +1678,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_gpu(labor):
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_unique_csc_format_Hetero(labor):
     graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict(
-        {"n2": gb.ItemSet(torch.arange(2), names="seed_nodes")}
-    )
+    itemset = gb.ItemSetDict({"n2": gb.ItemSet(torch.arange(2), names="seeds")})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -1761,7 +1763,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     graph = get_hetero_graph().to(F.ctx())
     items_n1 = torch.tensor([0])
     items_n2 = torch.tensor([1])
-    names = "seed_nodes"
+    names = "seeds"
     if sampler_type == SamplerType.Temporal:
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
