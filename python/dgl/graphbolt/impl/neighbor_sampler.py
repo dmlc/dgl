@@ -5,7 +5,7 @@ from functools import partial
 
 import torch
 from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import IterDataPipe, Mapper
+from torchdata.datapipes.iter import Mapper
 
 from ..internal import compact_csc_format, unique_and_compact_csc_formats
 from ..minibatch_transformer import MiniBatchTransformer
