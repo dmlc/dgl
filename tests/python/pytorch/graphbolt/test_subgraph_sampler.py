@@ -21,6 +21,7 @@ def _check_sampler_type(sampler_type):
             "TemporalNeighborSampler sampling tests are only supported on CPU."
         )
 
+
 def _check_sampler_len(sampler, lenExp):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
