@@ -1,4 +1,5 @@
 import unittest
+import warnings
 
 from enum import Enum
 from functools import partial
@@ -9,7 +10,6 @@ import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
-from torchdata.datapipes.iter import Mapper
 
 from . import gb_test_utils
 
@@ -20,6 +20,11 @@ def _check_sampler_type(sampler_type):
         pytest.skip(
             "TemporalNeighborSampler sampling tests are only supported on CPU."
         )
+
+def _check_sampler_len(sampler, lenExp):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        assert len(list(sampler)) == lenExp
 
 
 class SamplerType(Enum):
@@ -128,7 +133,7 @@ def test_SubgraphSampler_Node(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
     sampler_dp = sampler(item_sampler, graph, fanouts)
-    assert len(list(sampler_dp)) == 5
+    _check_sampler_len(sampler_dp, 5)
 
 
 def to_link_batch(data):
@@ -161,7 +166,7 @@ def test_SubgraphSampler_Link(sampler_type):
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    assert len(list(datapipe)) == 5
+    _check_sampler_len(datapipe, 5)
 
 
 @pytest.mark.parametrize(
@@ -190,7 +195,7 @@ def test_SubgraphSampler_Link_With_Negative(sampler_type):
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    assert len(list(datapipe)) == 5
+    _check_sampler_len(datapipe, 5)
 
 
 def get_hetero_graph():
@@ -239,9 +244,11 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
     sampler_dp = sampler(item_sampler, graph, fanouts)
-    assert len(list(sampler_dp)) == 2
-    for minibatch in sampler_dp:
-        assert len(minibatch.sampled_subgraphs) == num_layer
+    _check_sampler_len(sampler_dp, 2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        for minibatch in sampler_dp:
+            assert len(minibatch.sampled_subgraphs) == num_layer
 
 
 @pytest.mark.parametrize(
@@ -285,7 +292,7 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    assert len(list(datapipe)) == 5
+    _check_sampler_len(datapipe, 5)
 
 
 @pytest.mark.parametrize(
@@ -330,7 +337,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    assert len(list(datapipe)) == 5
+    _check_sampler_len(datapipe, 5)
 
 
 @pytest.mark.parametrize(
@@ -375,7 +382,7 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    assert len(list(datapipe)) == 5
+    _check_sampler_len(datapipe, 5)
 
 
 @pytest.mark.parametrize(
@@ -421,7 +428,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    assert len(list(datapipe)) == 5
+    _check_sampler_len(datapipe, 5)
 
 
 @pytest.mark.parametrize(
@@ -491,32 +498,24 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
 
     sampler_dp = sampler(item_sampler, graph, fanouts, replace=replace)
 
-    for data in sampler_dp:
-        for sampledsubgraph in data.sampled_subgraphs:
-            for _, value in sampledsubgraph.sampled_csc.items():
-                assert torch.equal(
-                    torch.ge(
-                        value.indices,
-                        torch.zeros(len(value.indices)).to(F.ctx()),
-                    ),
-                    torch.ones(len(value.indices)).to(F.ctx()),
-                )
-                assert torch.equal(
-                    torch.ge(
-                        value.indptr, torch.zeros(len(value.indptr)).to(F.ctx())
-                    ),
-                    torch.ones(len(value.indptr)).to(F.ctx()),
-                )
-            for _, value in sampledsubgraph.original_column_node_ids.items():
-                assert torch.equal(
-                    torch.ge(value, torch.zeros(len(value)).to(F.ctx())),
-                    torch.ones(len(value)).to(F.ctx()),
-                )
-            for _, value in sampledsubgraph.original_row_node_ids.items():
-                assert torch.equal(
-                    torch.ge(value, torch.zeros(len(value)).to(F.ctx())),
-                    torch.ones(len(value)).to(F.ctx()),
-                )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        for data in sampler_dp:
+            for sampledsubgraph in data.sampled_subgraphs:
+                for _, value in sampledsubgraph.sampled_csc.items():
+                    for idx in [value.indices, value.indptr]:
+                        assert torch.equal(
+                            torch.ge(idx, torch.zeros(len(idx)).to(F.ctx())),
+                            torch.ones(len(idx)).to(F.ctx()),
+                        )
+                node_ids = [sampledsubgraph.original_column_node_ids,
+                            sampledsubgraph.original_row_node_ids]
+                for ids in node_ids:
+                    for _, value in ids.items():
+                        assert torch.equal(
+                            torch.ge(value, torch.zeros(len(value)).to(F.ctx())),
+                            torch.ones(len(value)).to(F.ctx()),
+                        )
 
 
 @pytest.mark.parametrize(
@@ -568,9 +567,53 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
         torch.tensor([0, 2, 2, 3, 4, 4, 5]).to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        for data in datapipe:
+            for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
+                assert len(sampled_subgraph.original_row_node_ids) == length[step]
+                assert torch.equal(
+                    sampled_subgraph.sampled_csc.indices, compacted_indices[step]
+                )
+                assert torch.equal(
+                    sampled_subgraph.sampled_csc.indptr, indptr[step]
+                )
+                assert torch.equal(
+                    torch.sort(sampled_subgraph.original_column_node_ids)[0],
+                    seeds[step],
+                )
+
+
+def _datapipe_test_A(datapipe, original_row_node_ids, original_column_node_ids, csc_formats):
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            assert len(sampled_subgraph.original_row_node_ids) == length[step]
+            for ntype in ["n1", "n2"]:
+                assert torch.equal(
+                    sampled_subgraph.original_row_node_ids[ntype],
+                    original_row_node_ids[step][ntype].to(F.ctx()),
+                )
+                assert torch.equal(
+                    sampled_subgraph.original_column_node_ids[ntype],
+                    original_column_node_ids[step][ntype].to(F.ctx()),
+                )
+            for etype in ["n1:e1:n2", "n2:e2:n1"]:
+                assert torch.equal(
+                    sampled_subgraph.sampled_csc[etype].indices,
+                    csc_formats[step][etype].indices.to(F.ctx()),
+                )
+                assert torch.equal(
+                    sampled_subgraph.sampled_csc[etype].indptr,
+                    csc_formats[step][etype].indptr.to(F.ctx()),
+                )
+
+
+def _datapipe_test_B(datapipe, original_row_node_ids, compacted_indices, indptr, seeds):
+    for data in datapipe:
+        for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
+            assert torch.equal(
+                sampled_subgraph.original_row_node_ids,
+                original_row_node_ids[step],
+            )
             assert torch.equal(
                 sampled_subgraph.sampled_csc.indices, compacted_indices[step]
             )
@@ -578,8 +621,7 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
                 sampled_subgraph.sampled_csc.indptr, indptr[step]
             )
             assert torch.equal(
-                torch.sort(sampled_subgraph.original_column_node_ids)[0],
-                seeds[step],
+                sampled_subgraph.original_column_node_ids, seeds[step]
             )
 
 
@@ -653,26 +695,9 @@ def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
         },
     ]
 
-    for data in datapipe:
-        for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            for ntype in ["n1", "n2"]:
-                assert torch.equal(
-                    sampled_subgraph.original_row_node_ids[ntype],
-                    original_row_node_ids[step][ntype].to(F.ctx()),
-                )
-                assert torch.equal(
-                    sampled_subgraph.original_column_node_ids[ntype],
-                    original_column_node_ids[step][ntype].to(F.ctx()),
-                )
-            for etype in ["n1:e1:n2", "n2:e2:n1"]:
-                assert torch.equal(
-                    sampled_subgraph.sampled_csc[etype].indices,
-                    csc_formats[step][etype].indices.to(F.ctx()),
-                )
-                assert torch.equal(
-                    sampled_subgraph.sampled_csc[etype].indptr,
-                    csc_formats[step][etype].indptr.to(F.ctx()),
-                )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        _datapipe_test_A(datapipe, original_row_node_ids, original_column_node_ids, csc_formats)
 
 
 @unittest.skipIf(
@@ -717,21 +742,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_cpu(labor):
         torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
-    for data in datapipe:
-        for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            assert torch.equal(
-                sampled_subgraph.original_row_node_ids,
-                original_row_node_ids[step],
-            )
-            assert torch.equal(
-                sampled_subgraph.sampled_csc.indices, compacted_indices[step]
-            )
-            assert torch.equal(
-                sampled_subgraph.sampled_csc.indptr, indptr[step]
-            )
-            assert torch.equal(
-                sampled_subgraph.original_column_node_ids, seeds[step]
-            )
+    _datapipe_test_B(datapipe, original_row_node_ids, compacted_indices, indptr, seeds)
 
 
 @unittest.skipIf(
@@ -776,21 +787,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_gpu(labor):
         torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
-    for data in datapipe:
-        for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            assert torch.equal(
-                sampled_subgraph.original_row_node_ids,
-                original_row_node_ids[step],
-            )
-            assert torch.equal(
-                sampled_subgraph.sampled_csc.indices, compacted_indices[step]
-            )
-            assert torch.equal(
-                sampled_subgraph.sampled_csc.indptr, indptr[step]
-            )
-            assert torch.equal(
-                sampled_subgraph.original_column_node_ids, seeds[step]
-            )
+    _datapipe_test_B(datapipe, original_row_node_ids, compacted_indices, indptr, seeds)
 
 
 @pytest.mark.parametrize("labor", [False, True])
@@ -851,27 +848,7 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
             "n2": torch.tensor([0, 1]),
         },
     ]
-
-    for data in datapipe:
-        for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            for ntype in ["n1", "n2"]:
-                assert torch.equal(
-                    sampled_subgraph.original_row_node_ids[ntype],
-                    original_row_node_ids[step][ntype].to(F.ctx()),
-                )
-                assert torch.equal(
-                    sampled_subgraph.original_column_node_ids[ntype],
-                    original_column_node_ids[step][ntype].to(F.ctx()),
-                )
-            for etype in ["n1:e1:n2", "n2:e2:n1"]:
-                assert torch.equal(
-                    sampled_subgraph.sampled_csc[etype].indices,
-                    csc_formats[step][etype].indices.to(F.ctx()),
-                )
-                assert torch.equal(
-                    sampled_subgraph.sampled_csc[etype].indptr,
-                    csc_formats[step][etype].indptr.to(F.ctx()),
-                )
+    _datapipe_test_A(datapipe, original_row_node_ids, original_column_node_ids, csc_formats)
 
 
 @pytest.mark.parametrize(
@@ -884,7 +861,9 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     items_n1 = torch.tensor([0])
     items_n2 = torch.tensor([1])
     names = "seed_nodes"
+    i_len = 2
     if sampler_type == SamplerType.Temporal:
+        i_len = 3
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -907,35 +886,26 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     fanouts = [torch.LongTensor([2, 1]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
     sampler_dp = sampler(item_sampler, graph, fanouts)
-    if sampler_type == SamplerType.Temporal:
-        indices_len = [
-            {
-                "n1:e1:n2": 4,
-                "n2:e2:n1": 3,
-            },
-            {
-                "n1:e1:n2": 2,
-                "n2:e2:n1": 1,
-            },
-        ]
-    else:
-        indices_len = [
-            {
-                "n1:e1:n2": 4,
-                "n2:e2:n1": 2,
-            },
-            {
-                "n1:e1:n2": 2,
-                "n2:e2:n1": 1,
-            },
-        ]
-    for minibatch in sampler_dp:
-        for step, sampled_subgraph in enumerate(minibatch.sampled_subgraphs):
-            assert (
-                len(sampled_subgraph.sampled_csc["n1:e1:n2"].indices)
-                == indices_len[step]["n1:e1:n2"]
-            )
-            assert (
-                len(sampled_subgraph.sampled_csc["n2:e2:n1"].indices)
-                == indices_len[step]["n2:e2:n1"]
-            )
+    indices_len = [
+        {
+            "n1:e1:n2": 4,
+            "n2:e2:n1": i_len,
+        },
+        {
+            "n1:e1:n2": 2,
+            "n2:e2:n1": 1,
+        },
+    ]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        for minibatch in sampler_dp:
+            for step, sampled_subgraph in enumerate(minibatch.sampled_subgraphs):
+                assert (
+                    len(sampled_subgraph.sampled_csc["n1:e1:n2"].indices)
+                    == indices_len[step]["n1:e1:n2"]
+                )
+                assert (
+                    len(sampled_subgraph.sampled_csc["n2:e2:n1"].indices)
+                    == indices_len[step]["n2:e2:n1"]
+                )
