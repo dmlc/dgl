@@ -7,6 +7,8 @@ import dgl.graphbolt
 import pytest
 import torch
 
+import torchdata.dataloader2.graph as dp_utils
+
 from . import gb_test_utils
 
 
@@ -46,7 +48,8 @@ def test_DataLoader():
     reason="This test requires the GPU.",
 )
 @pytest.mark.parametrize("overlap_feature_fetch", [True, False])
-def test_gpu_sampling_DataLoader(overlap_feature_fetch):
+@pytest.mark.parametrize("enable_feature_fetch", [True, False])
+def test_gpu_sampling_DataLoader(overlap_feature_fetch, enable_feature_fetch):
     N = 40
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
@@ -70,13 +73,27 @@ def test_gpu_sampling_DataLoader(overlap_feature_fetch):
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )
-    datapipe = dgl.graphbolt.FeatureFetcher(
-        datapipe,
-        feature_store,
-        ["a", "b"],
-    )
+    if enable_feature_fetch:
+        datapipe = dgl.graphbolt.FeatureFetcher(
+            datapipe,
+            feature_store,
+            ["a", "b"],
+        )
 
     dataloader = dgl.graphbolt.DataLoader(
         datapipe, overlap_feature_fetch=overlap_feature_fetch
     )
+    bufferer_awaiter_cnt = int(enable_feature_fetch and overlap_feature_fetch)
+    datapipe = dataloader.dataset
+    datapipe_graph = dp_utils.traverse_dps(datapipe)
+    awaiters = dp_utils.find_dps(
+        datapipe_graph,
+        dgl.graphbolt.Awaiter,
+    )
+    assert len(awaiters) == bufferer_awaiter_cnt
+    bufferers = dp_utils.find_dps(
+        datapipe_graph,
+        dgl.graphbolt.Bufferer,
+    )
+    assert len(bufferers) == bufferer_awaiter_cnt
     assert len(list(dataloader)) == N // B
