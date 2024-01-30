@@ -48,7 +48,7 @@ def test_DataLoader():
     reason="This test requires the GPU.",
 )
 @pytest.mark.parametrize(
-    "sampler_name", ["NeighborSampler", "NeighborSampler2"]
+    "sampler_name", ["NeighborSampler", "LayerNeighborSampler"]
 )
 @pytest.mark.parametrize("enable_feature_fetch", [True, False])
 @pytest.mark.parametrize("overlap_feature_fetch", [True, False])
@@ -96,7 +96,7 @@ def test_gpu_sampling_DataLoader(
         overlap_graph_fetch=overlap_graph_fetch,
     )
     bufferer_awaiter_cnt = int(enable_feature_fetch and overlap_feature_fetch)
-    if overlap_graph_fetch and sampler_name == "NeighborSampler2":
+    if overlap_graph_fetch:
         bufferer_awaiter_cnt += num_layers
     datapipe = dataloader.dataset
     datapipe_graph = dp_utils.traverse_dps(datapipe)
