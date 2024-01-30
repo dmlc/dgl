@@ -2,7 +2,6 @@
 
 import torch
 from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import IterDataPipe
 
 from ..internal import compact_csc_format, unique_and_compact_csc_formats
 from ..minibatch_transformer import MiniBatchTransformer
@@ -72,7 +71,7 @@ class CompactPerLayer(MiniBatchTransformer):
 
 
 @functional_datapipe("sample_neighbor2")
-class NeighborSampler2(IterDataPipe):
+class NeighborSampler2(MiniBatchTransformer):
     """Sample neighbor edges from a graph and return a subgraph.
 
     Functional name: :obj:`sample_neighbor`.
@@ -198,10 +197,7 @@ class NeighborSampler2(IterDataPipe):
                 sampler, fanout, replace, prob_name
             )
             datapipe = datapipe.compact_per_layer(deduplicate)
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        yield from self.datapipe
+        super().__init__(datapipe, lambda minibatch: minibatch)
 
 
 @functional_datapipe("sample_neighbor")
