@@ -508,12 +508,16 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
                             torch.ge(idx, torch.zeros(len(idx)).to(F.ctx())),
                             torch.ones(len(idx)).to(F.ctx()),
                         )
-                node_ids = [sampledsubgraph.original_column_node_ids,
-                            sampledsubgraph.original_row_node_ids]
+                node_ids = [
+                    sampledsubgraph.original_column_node_ids,
+                    sampledsubgraph.original_row_node_ids
+                ]
                 for ids in node_ids:
                     for _, value in ids.items():
                         assert torch.equal(
-                            torch.ge(value, torch.zeros(len(value)).to(F.ctx())),
+                            torch.ge(
+                                value, torch.zeros(len(value)).to(F.ctx())
+                            ),
                             torch.ones(len(value)).to(F.ctx()),
                         )
 
@@ -571,9 +575,12 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
         warnings.simplefilter("ignore", category=UserWarning)
         for data in datapipe:
             for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-                assert len(sampled_subgraph.original_row_node_ids) == length[step]
+                assert (
+                    len(sampled_subgraph.original_row_node_ids) == length[step]
+                )
                 assert torch.equal(
-                    sampled_subgraph.sampled_csc.indices, compacted_indices[step]
+                    sampled_subgraph.sampled_csc.indices,
+                    compacted_indices[step]
                 )
                 assert torch.equal(
                     sampled_subgraph.sampled_csc.indptr, indptr[step]
@@ -584,7 +591,9 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
                 )
 
 
-def _datapipe_test_A(datapipe, original_row_node_ids, original_column_node_ids, csc_formats):
+def _datapipe_test_A(
+        datapipe, original_row_node_ids, original_column_node_ids, csc_formats
+):
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             for ntype in ["n1", "n2"]:
@@ -607,7 +616,9 @@ def _datapipe_test_A(datapipe, original_row_node_ids, original_column_node_ids, 
                 )
 
 
-def _datapipe_test_B(datapipe, original_row_node_ids, compacted_indices, indptr, seeds):
+def _datapipe_test_B(
+        datapipe, original_row_node_ids, compacted_indices, indptr, seeds
+):
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert torch.equal(
@@ -697,7 +708,12 @@ def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
-        _datapipe_test_A(datapipe, original_row_node_ids, original_column_node_ids, csc_formats)
+        _datapipe_test_A(
+            datapipe,
+            original_row_node_ids,
+            original_column_node_ids,
+            csc_formats,
+        )
 
 
 @unittest.skipIf(
@@ -742,7 +758,9 @@ def test_SubgraphSampler_unique_csc_format_Homo_cpu(labor):
         torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
-    _datapipe_test_B(datapipe, original_row_node_ids, compacted_indices, indptr, seeds)
+    _datapipe_test_B(
+        datapipe, original_row_node_ids, compacted_indices, indptr, seeds
+    )
 
 
 @unittest.skipIf(
@@ -787,7 +805,9 @@ def test_SubgraphSampler_unique_csc_format_Homo_gpu(labor):
         torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
-    _datapipe_test_B(datapipe, original_row_node_ids, compacted_indices, indptr, seeds)
+    _datapipe_test_B(
+        datapipe, original_row_node_ids, compacted_indices, indptr, seeds
+    )
 
 
 @pytest.mark.parametrize("labor", [False, True])
@@ -848,7 +868,9 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
             "n2": torch.tensor([0, 1]),
         },
     ]
-    _datapipe_test_A(datapipe, original_row_node_ids, original_column_node_ids, csc_formats)
+    _datapipe_test_A(
+        datapipe, original_row_node_ids, original_column_node_ids, csc_formats
+    )
 
 
 @pytest.mark.parametrize(
@@ -900,7 +922,9 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         for minibatch in sampler_dp:
-            for step, sampled_subgraph in enumerate(minibatch.sampled_subgraphs):
+            for step, sampled_subgraph in enumerate(
+                    minibatch.sampled_subgraphs
+            ):
                 assert (
                     len(sampled_subgraph.sampled_csc["n1:e1:n2"].indices)
                     == indices_len[step]["n1:e1:n2"]
