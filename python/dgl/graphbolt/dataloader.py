@@ -46,8 +46,7 @@ class EndMarker(dp.iter.IterDataPipe):
         self.datapipe = datapipe
 
     def __iter__(self):
-        for data in self.datapipe:
-            yield data
+        yield from self.datapipe
 
 
 class Bufferer(dp.iter.IterDataPipe):
@@ -220,18 +219,18 @@ class DataLoader(torch.utils.data.DataLoader):
             )
             for feature_fetcher in feature_fetchers:
                 feature_fetcher.stream = _get_uva_stream()
-            if len(feature_fetchers) > 0:
-                datapipe_graph = _find_and_wrap_parent(
+                datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
-                    EndMarker,
-                    Bufferer,
-                    buffer_size=1,
+                    feature_fetcher,
+                    Awaiter(feature_fetcher),
                 )
-                datapipe_graph = _find_and_wrap_parent(
+                # Now, we have FeatureFetcher -> Awaiter
+                datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
-                    EndMarker,
-                    Awaiter,
+                    feature_fetcher,
+                    Bufferer(feature_fetcher, buffer_size=1),
                 )
+                # Now, we have FeatureFetcher -> Bufferer -> Awaiter
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
         # data pipeline up to the CopyTo operation to run in a separate thread.
