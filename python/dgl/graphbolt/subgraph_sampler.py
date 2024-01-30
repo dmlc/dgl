@@ -3,8 +3,9 @@
 from collections import defaultdict
 from typing import Dict
 
+import torchdata.dataloader2.graph as dp_utils
+
 from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import Mapper
 
 from .base import etype_str_to_tuple
 from .internal import compact_temporal_nodes, unique_and_compact
@@ -36,6 +37,12 @@ class SubgraphSampler(MiniBatchTransformer):
         datapipe,
     ):
         super().__init__(datapipe, lambda x: x)
+
+        def _postprocess(minibatch):
+            delattr(minibatch, "seeds_timestamp")
+            return minibatch
+
+        self.datapipe = self.datapipe.transform(_postprocess)
         self.append_sampling_step(MiniBatchTransformer, self._preprocess)
 
     def _preprocess(self, minibatch):
@@ -192,4 +199,9 @@ class SubgraphSampler(MiniBatchTransformer):
         )
 
     def append_sampling_step(self, datapipe_type, *args, **kwargs):
-        self.datapipe = datapipe_type(self.datapipe, *args, **kwargs)
+        parent_datapipe = self.datapipe.datapipe
+        dp_utils.replace_dp(
+            dp_utils.traverse_dps(self.datapipe),
+            parent_datapipe,
+            datapipe_type(parent_datapipe, *args, **kwargs),
+        )
