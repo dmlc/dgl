@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import functional_datapipe
 
 from ..internal import compact_csc_format
+from ..minibatch_transformer import MiniBatchTransformer
 
 from ..subgraph_sampler import SubgraphSampler
 from .sampled_subgraph_impl import SampledSubgraphImpl
@@ -88,8 +89,11 @@ class TemporalNeighborSampler(SubgraphSampler):
         self.node_timestamp_attr_name = node_timestamp_attr_name
         self.edge_timestamp_attr_name = edge_timestamp_attr_name
         self.sampler = graph.temporal_sample_neighbors
+        self.append_sampling_step(MiniBatchTransformer, self._sample_subgraphs)
 
-    def sample_subgraphs(self, seeds, seeds_timestamp):
+    def _sample_subgraphs(self, minibatch):
+        seeds = minibatch.input_nodes
+        seeds_timestamp = minibatch.seeds_timestamp
         assert (
             seeds_timestamp is not None
         ), "seeds_timestamp must be provided for temporal neighbor sampling."
@@ -132,4 +136,6 @@ class TemporalNeighborSampler(SubgraphSampler):
             subgraphs.insert(0, subgraph)
             seeds = original_row_node_ids
             seeds_timestamp = row_timestamps
-        return seeds, subgraphs
+        minibatch.input_nodes = seeds
+        minibatch.sampled_subgraphs = subgraphs
+        return minibatch

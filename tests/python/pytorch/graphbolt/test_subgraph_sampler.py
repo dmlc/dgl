@@ -26,14 +26,11 @@ class SamplerType(Enum):
     Normal = 0
     Layer = 1
     Temporal = 2
-    PipelinedNeighbor = 3
 
 
 def _get_sampler(sampler_type):
     if sampler_type == SamplerType.Normal:
         return gb.NeighborSampler
-    if sampler_type == SamplerType.PipelinedNeighbor:
-        return gb.NeighborSampler2
     if sampler_type == SamplerType.Layer:
         return gb.LayerNeighborSampler
     return partial(
@@ -49,13 +46,11 @@ def test_SubgraphSampler_invoke():
 
     # Invoke via class constructor.
     datapipe = gb.SubgraphSampler(item_sampler)
-    with pytest.raises(NotImplementedError):
-        next(iter(datapipe))
+    assert len(list(datapipe)) == 5
 
     # Invokde via functional form.
     datapipe = item_sampler.sample_subgraph()
-    with pytest.raises(NotImplementedError):
-        next(iter(datapipe))
+    assert len(list(datapipe)) == 5
 
 
 @pytest.mark.parametrize("labor", [False, True])
@@ -113,7 +108,6 @@ def test_NeighborSampler_fanouts(labor):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Node(sampler_type):
@@ -150,7 +144,6 @@ def to_link_batch(data):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Link(sampler_type):
@@ -183,7 +176,6 @@ def test_SubgraphSampler_Link(sampler_type):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Link_With_Negative(sampler_type):
@@ -239,7 +231,6 @@ def get_hetero_graph():
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Node_Hetero(sampler_type):
@@ -273,7 +264,6 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Link_Hetero(sampler_type):
@@ -322,7 +312,6 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
@@ -372,7 +361,6 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
@@ -422,7 +410,6 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
@@ -473,7 +460,6 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 @pytest.mark.parametrize(
@@ -573,7 +559,6 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
@@ -642,7 +627,6 @@ def test_SubgraphSampler_without_dedpulication_Homo(sampler_type):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_without_dedpulication_Hetero(sampler_type):
@@ -938,7 +922,6 @@ def test_SubgraphSampler_unique_csc_format_Hetero(labor):
         SamplerType.Normal,
         SamplerType.Layer,
         SamplerType.Temporal,
-        SamplerType.PipelinedNeighbor,
     ],
 )
 def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
