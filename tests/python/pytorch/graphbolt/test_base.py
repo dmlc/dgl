@@ -248,6 +248,34 @@ def test_isin_non_1D_dim():
         gb.isin(elements, test_elements)
 
 
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+@pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("pinned", [False, True])
+def test_index_select(dtype, idtype, pinned):
+    if F._default_context_str != "gpu" and pinned:
+        pytest.skip("Pinned tests are available only on GPU.")
+    tensor = torch.tensor([[2, 3], [5, 5], [20, 13]], dtype=dtype)
+    tensor = tensor.pin_memory() if pinned else tensor.to(F.ctx())
+    index = torch.tensor([0, 2], dtype=idtype, device=F.ctx())
+    gb_result = gb.index_select(tensor, index)
+    torch_result = tensor.to(F.ctx())[index.long()]
+    assert torch.equal(torch_result, gb_result)
+
+
 def torch_expand_indptr(indptr, dtype, nodes=None):
     if nodes is None:
         nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)

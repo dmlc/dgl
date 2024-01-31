@@ -194,29 +194,34 @@ class SAGE(nn.Module):
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
-    def inference(self, graph, features, dataloader, device):
+    @torch.no_grad()
+    def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
         feature = features.read("node", None, "feat")
 
-        buffer_device = torch.device("cpu")
-        # Enable pin_memory for faster CPU to GPU data transfer if the
-        # model is running on a GPU.
-        pin_memory = buffer_device != device
+        pin_memory = storage_device == "pinned"
+        buffer_device = torch.device("cpu" if pin_memory else storage_device)
+
+        def move_to_storage_device(tensor):
+            if pin_memory:
+                return tensor.pin_memory()
+            else:
+                return feature.to(buffer_device)
 
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
 
+            feature = move_to_storage_device(feature)
+
             y = torch.empty(
                 graph.total_num_nodes,
                 self.out_size if is_last_layer else self.hidden_size,
-                dtype=torch.float32,
+                dtype=feature.dtype,
                 device=buffer_device,
-                pin_memory=pin_memory,
             )
-            feature = feature.to(device)
 
-            for step, data in tqdm(enumerate(dataloader)):
-                x = feature[data.input_nodes]
+            for data in tqdm(dataloader):
+                x = gb.index_select(feature, data.input_nodes)
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
@@ -245,7 +250,7 @@ def layerwise_infer(
         num_workers=args.num_workers,
         job="infer",
     )
-    pred = model.inference(graph, features, dataloader, args.device)
+    pred = model.inference(graph, features, dataloader, args.storage_device)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
 
