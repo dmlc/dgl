@@ -7,6 +7,7 @@ from typing import Dict, List
 import numpy as np
 import torch
 
+from ..base import index_select
 from ..feature_store import Feature
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
@@ -117,7 +118,7 @@ class TorchBasedFeature(Feature):
             if self._tensor.is_pinned():
                 return self._tensor.cuda()
             return self._tensor
-        return torch.ops.graphbolt.index_select(self._tensor, ids)
+        return index_select(self._tensor, ids)
 
     def size(self):
         """Get the size of the feature.
