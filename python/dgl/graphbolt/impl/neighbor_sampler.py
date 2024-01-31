@@ -191,6 +191,11 @@ class NeighborSampler(SubgraphSampler):
         minibatch.sampled_subgraphs = []
         return minibatch
 
+    @staticmethod
+    def set_input_nodes(minibatch):
+        minibatch.input_nodes = minibatch._seed_nodes
+        return minibatch
+
     def sampling_stages(self, datapipe):
         datapipe = datapipe.transform(self.prepare)
         sampler = getattr(self.graph, self.sampler)
@@ -203,11 +208,7 @@ class NeighborSampler(SubgraphSampler):
             )
             datapipe = datapipe.compact_per_layer(self.deduplicate)
 
-        def set_input_nodes(minibatch):
-            minibatch.input_nodes = minibatch._seed_nodes
-            return minibatch
-
-        return datapipe.transform(set_input_nodes)
+        return datapipe.transform(self.set_input_nodes)
 
 
 @functional_datapipe("sample_layer_neighbor")
