@@ -3,7 +3,6 @@ import torch
 from torch.utils.data import functional_datapipe
 
 from ..internal import compact_csc_format
-from ..minibatch_transformer import MiniBatchTransformer
 
 from ..subgraph_sampler import SubgraphSampler
 from .sampled_subgraph_impl import SampledSubgraphImpl

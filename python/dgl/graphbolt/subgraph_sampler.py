@@ -3,8 +3,6 @@
 from collections import defaultdict
 from typing import Dict
 
-import torchdata.dataloader2.graph as dp_utils
-
 from torch.utils.data import functional_datapipe
 
 from .base import etype_str_to_tuple
@@ -217,21 +215,26 @@ class SubgraphSampler(MiniBatchTransformer):
 
     def sample_subgraphs(self, seeds, seeds_timestamp):
         """Sample subgraphs from the given seeds, possibly with temporal constraints.
+
         Any subclass of SubgraphSampler should implement this method.
+
         Parameters
         ----------
         seeds : Union[torch.Tensor, Dict[str, torch.Tensor]]
             The seed nodes.
+
         seeds_timestamp : Union[torch.Tensor, Dict[str, torch.Tensor]]
             The timestamps of the seed nodes. If given, the sampled subgraphs
             should not contain any nodes or edges that are newer than the
             timestamps of the seed nodes. Default: None.
+
         Returns
         -------
         Union[torch.Tensor, Dict[str, torch.Tensor]]
             The input nodes.
         List[SampledSubgraph]
             The sampled subgraphs.
+
         Examples
         --------
         >>> @functional_datapipe("my_sample_subgraph")
