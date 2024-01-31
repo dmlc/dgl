@@ -299,13 +299,17 @@ def test_NegativeSampler_Hetero_Data():
     negative_dp = gb.UniformNegativeSampler(item_sampler, graph, negative_ratio)
     assert len(list(negative_dp)) == 5
     # Perform Negative sampling.
-    for data in negative_dp:
+    expected_neg_src = [
+        {"n1:e1:n2": torch.tensor([0, 0])},
+        {"n1:e1:n2": torch.tensor([1, 1])},
+        {"n2:e2:n1": torch.tensor([0, 0])},
+        {"n2:e2:n1": torch.tensor([1, 1])},
+        {"n2:e2:n1": torch.tensor([2, 2])},
+    ]
+    for i, data in enumerate(negative_dp):
         # Check negative seeds value.
-        for seeds_data in data.seeds.values():
-            pos_src = seeds_data[:batch_size, 0]
+        for etype, seeds_data in data.seeds.items():
             neg_src = seeds_data[batch_size:, 0]
             neg_dst = seeds_data[batch_size:, 1]
-            assert torch.equal(
-                pos_src.repeat_interleave(negative_ratio), neg_src
-            )
+            assert torch.equal(expected_neg_src[i][etype], neg_src)
             assert (neg_dst < 3).all(), neg_dst
