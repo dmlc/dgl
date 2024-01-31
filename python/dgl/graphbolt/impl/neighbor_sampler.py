@@ -214,6 +214,7 @@ class NeighborSampler(SubgraphSampler):
 
 @functional_datapipe("sample_layer_neighbor")
 class LayerNeighborSampler(NeighborSampler):
+    # pylint: disable=abstract-method
     """Sample layer neighbor edges from a graph and return a subgraph.
 
     Functional name: :obj:`sample_layer_neighbor`.
