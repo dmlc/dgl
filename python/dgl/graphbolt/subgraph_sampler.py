@@ -28,14 +28,20 @@ class SubgraphSampler(MiniBatchTransformer):
     ----------
     datapipe : DataPipe
         The datapipe.
+    args : Non-Keyword Arguments
+        Arguments to be passed into sampling_stages.
+    kwargs : Keyword Arguments
+        Arguments to be passed into sampling_stages.
     """
 
     def __init__(
         self,
         datapipe,
+        *args,
+        **kwargs,
     ):
         datapipe = datapipe.transform(self._preprocess)
-        datapipe = self.sampling_stages(datapipe)
+        datapipe = self.sampling_stages(datapipe, *args, **kwargs)
         datapipe = datapipe.transform(self._postprocess)
         super().__init__(datapipe, self._identity)
 

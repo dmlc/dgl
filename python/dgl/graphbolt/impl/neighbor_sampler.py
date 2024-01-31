@@ -1,5 +1,7 @@
 """Neighbor subgraph samplers for GraphBolt."""
 
+from functools import partial
+
 import torch
 from torch.utils.data import functional_datapipe
 
@@ -164,19 +166,15 @@ class NeighborSampler(SubgraphSampler):
         deduplicate=True,
         sampler="sample_neighbors",
     ):
-        self.graph = graph
-        self.fanouts = fanouts
-        self.replace = replace
-        self.prob_name = prob_name
-        self.deduplicate = deduplicate
-        self.sampler = sampler
-        super().__init__(datapipe)
+        super().__init__(
+            datapipe, graph, fanouts, replace, prob_name, deduplicate, sampler
+        )
 
-    def _prepare(self, minibatch):
+    def _prepare(self, node_type_to_id, minibatch):
         seeds = minibatch._seed_nodes
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
-            ntypes = list(self.graph.node_type_to_id.keys())
+            ntypes = list(node_type_to_id.keys())
             # Loop over different seeds to extract the device they are on.
             device = None
             dtype = None
@@ -197,17 +195,21 @@ class NeighborSampler(SubgraphSampler):
         minibatch.input_nodes = minibatch._seed_nodes
         return minibatch
 
-    def sampling_stages(self, datapipe):
-        datapipe = datapipe.transform(self._prepare)
-        sampler = getattr(self.graph, self.sampler)
-        for fanout in reversed(self.fanouts):
+    def sampling_stages(
+        self, datapipe, graph, fanouts, replace, prob_name, deduplicate, sampler
+    ):
+        datapipe = datapipe.transform(
+            partial(self._prepare, graph.node_type_to_id)
+        )
+        sampler = getattr(graph, sampler)
+        for fanout in reversed(fanouts):
             # Convert fanout to tensor.
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
             datapipe = datapipe.sample_per_layer(
-                sampler, fanout, self.replace, self.prob_name
+                sampler, fanout, replace, prob_name
             )
-            datapipe = datapipe.compact_per_layer(self.deduplicate)
+            datapipe = datapipe.compact_per_layer(deduplicate)
 
         return datapipe.transform(self._set_input_nodes)
 
