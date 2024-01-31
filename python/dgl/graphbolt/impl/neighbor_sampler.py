@@ -323,5 +323,5 @@ class LayerNeighborSampler(NeighborSampler):
             replace,
             prob_name,
             deduplicate,
-            sampler=sampler,
+            sampler,
         )
