@@ -192,7 +192,6 @@ class SAGE(nn.Module):
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
-    @torch.no_grad()
     def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
         pin_memory = storage_device == "pinned"
