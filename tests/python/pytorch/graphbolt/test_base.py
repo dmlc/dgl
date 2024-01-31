@@ -1,6 +1,5 @@
 import re
 import unittest
-from torchdata.datapipes.iter import IterableWrapper
 from collections.abc import Iterable, Mapping
 
 import backend as F
@@ -8,6 +7,7 @@ import backend as F
 import dgl.graphbolt as gb
 import pytest
 import torch
+from torchdata.datapipes.iter import IterableWrapper
 
 from . import gb_test_utils
 
@@ -16,7 +16,7 @@ from . import gb_test_utils
 def test_CopyTo():
     dp = IterableWrapper(range(10))
     dp = dp.batch(batch_size=5)
-    dp = dp.map(lambda x : torch.tensor(x))
+    dp = dp.map(lambda x: torch.tensor(x))
 
     # Invoke CopyTo via class constructor.
     dp1 = gb.CopyTo(dp, "cuda")
