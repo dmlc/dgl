@@ -16,6 +16,6 @@ export TF_FORCE_GPU_ALLOW_GROWTH=true
 
 export CUDA_VISIBLE_DEVICES=0
 
-python3 -m pip install pytest psutil pyyaml pydantic pandas rdflib ogb || fail "pip install"
+python3 -m pip install pytest psutil pyyaml pydantic pandas rdflib ogb torchdata || fail "pip install"
 
 python3 -m pytest -v --junitxml=pytest_cugraph.xml --durations=20 tests/cugraph || fail "cugraph"

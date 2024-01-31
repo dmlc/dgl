@@ -451,6 +451,8 @@ pipeline {
                   steps {
                     unit_test_linux('tensorflow', 'cpu')
                   }
+                  // Tensorflow is deprecated.
+                  when { expression { false } }
                 }
               }
               post {
