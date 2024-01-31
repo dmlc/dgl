@@ -37,7 +37,11 @@ class SubgraphSampler(MiniBatchTransformer):
         datapipe = datapipe.transform(self._preprocess)
         datapipe = self.sampling_stages(datapipe)
         datapipe = datapipe.transform(self._postprocess)
-        super().__init__(datapipe, lambda x: x)
+        super().__init__(datapipe, self._identity)
+
+    @staticmethod
+    def _identity(minibatch):
+        return minibatch
 
     @staticmethod
     def _postprocess(minibatch):
