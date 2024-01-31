@@ -72,6 +72,7 @@ class CompactPerLayer(MiniBatchTransformer):
 
 @functional_datapipe("sample_neighbor")
 class NeighborSampler(SubgraphSampler):
+    # pylint: disable=abstract-method
     """Sample neighbor edges from a graph and return a subgraph.
 
     Functional name: :obj:`sample_neighbor`.
@@ -171,7 +172,7 @@ class NeighborSampler(SubgraphSampler):
         self.sampler = sampler
         super().__init__(datapipe)
 
-    def prepare(self, minibatch):
+    def _prepare(self, minibatch):
         seeds = minibatch._seed_nodes
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
@@ -192,12 +193,12 @@ class NeighborSampler(SubgraphSampler):
         return minibatch
 
     @staticmethod
-    def set_input_nodes(minibatch):
+    def _set_input_nodes(minibatch):
         minibatch.input_nodes = minibatch._seed_nodes
         return minibatch
 
     def sampling_stages(self, datapipe):
-        datapipe = datapipe.transform(self.prepare)
+        datapipe = datapipe.transform(self._prepare)
         sampler = getattr(self.graph, self.sampler)
         for fanout in reversed(self.fanouts):
             # Convert fanout to tensor.
@@ -208,7 +209,7 @@ class NeighborSampler(SubgraphSampler):
             )
             datapipe = datapipe.compact_per_layer(self.deduplicate)
 
-        return datapipe.transform(self.set_input_nodes)
+        return datapipe.transform(self._set_input_nodes)
 
 
 @functional_datapipe("sample_layer_neighbor")
