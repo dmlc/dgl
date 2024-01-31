@@ -298,7 +298,7 @@ def test_NegativeSampler_Hetero_Data():
     item_sampler = gb.ItemSampler(itemset, batch_size=batch_size)
     negative_dp = gb.UniformNegativeSampler(item_sampler, graph, negative_ratio)
     assert len(list(negative_dp)) == 5
-    # Perform Negative sampling.
+    # Perform negative sampling.
     expected_neg_src = [
         {"n1:e1:n2": torch.tensor([0, 0])},
         {"n1:e1:n2": torch.tensor([1, 1])},
