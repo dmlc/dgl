@@ -79,14 +79,16 @@ class SAGE(nn.Module):
                 hidden_x = F.relu(hidden_x)
         return hidden_x
 
-    def inference(self, graph, features, dataloader, device):
+    def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
-        feature = features.read("node", None, "feat")
+        pin_memory = storage_device == "pinned"
+        buffer_device = torch.device("cpu" if pin_memory else storage_device)
 
-        buffer_device = torch.device("cpu")
-        # Enable pin_memory for faster CPU to GPU data transfer if the
-        # model is running on a GPU.
-        pin_memory = buffer_device != device
+        def move_to_storage_device(tensor):
+            if pin_memory:
+                return tensor.pin_memory()
+            else:
+                return tensor.to(buffer_device)
 
         print("Start node embedding inference.")
         for layer_idx, layer in enumerate(self.layers):
@@ -97,19 +99,18 @@ class SAGE(nn.Module):
                 self.hidden_size,
                 dtype=torch.float32,
                 device=buffer_device,
-                pin_memory=pin_memory,
             )
-            feature = feature.to(device)
-            for step, data in tqdm.tqdm(enumerate(dataloader)):
-                x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+            for data in tqdm.tqdm(dataloader):
+                # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], data.node_features["feat"])
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                 # By design, our seed nodes are contiguous.
                 y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
                     buffer_device, non_blocking=True
                 )
-            feature = y
+            if not is_last_layer:
+                features.update("node", None, "feat", move_to_storage_device(y))
 
         return y
 
@@ -213,12 +214,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs. This step is skipped in evaluation/inference because features
-    # are updated as a whole during it, thus storing features in minibatch is
-    # unnecessary.
+    # subgraphs.
     ############################################################################
-    if is_train:
-        datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
     # [Input]:
@@ -294,7 +292,7 @@ def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
     )
 
     # Compute node embeddings for the entire graph.
-    node_emb = model.inference(graph, features, dataloader, args.device)
+    node_emb = model.inference(graph, features, dataloader, args.storage_device)
     results = []
 
     # Loop over both validation and test sets.

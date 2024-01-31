@@ -98,9 +98,9 @@ class TorchBasedFeature(Feature):
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
 
-        If the feature is on pinned CPU memory and `ids` is on GPU, it will be
-        read by the GPU and the returned tensor will be on GPU. Otherwise, the
-        returned tensor will be on the same device as the feature.
+        If the feature is on pinned CPU memory and `ids` is on GPU or pinned CPU
+        memory, it will be read by GPU and the returned tensor will be on GPU.
+        Otherwise, the returned tensor will be on CPU.
 
         Parameters
         ----------
@@ -114,6 +114,8 @@ class TorchBasedFeature(Feature):
             The read feature.
         """
         if ids is None:
+            if self._tensor.is_pinned():
+                return self._tensor.cuda()
             return self._tensor
         return torch.ops.graphbolt.index_select(self._tensor, ids)
 
@@ -142,11 +144,6 @@ class TorchBasedFeature(Feature):
             updated.
         """
         if ids is None:
-            assert self.size() == value.size()[1:], (
-                f"ids is None, so the entire feature will be updated. "
-                f"But the size of the feature is {self.size()}, "
-                f"while the size of the value is {value.size()[1:]}."
-            )
             self._tensor = value
         else:
             assert ids.shape[0] == value.shape[0], (

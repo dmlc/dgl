@@ -131,11 +131,9 @@ def create_dataloader(
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs. This step is skipped in inference because features are updated
-    # as a whole during it, thus storing features in minibatch is unnecessary.
+    # subgraphs.
     ############################################################################
-    if job != "infer":
-        datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
     # [Step-5]:
@@ -197,8 +195,6 @@ class SAGE(nn.Module):
     @torch.no_grad()
     def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
-        feature = features.read("node", None, "feat")
-
         pin_memory = storage_device == "pinned"
         buffer_device = torch.device("cpu" if pin_memory else storage_device)
 
@@ -206,23 +202,20 @@ class SAGE(nn.Module):
             if pin_memory:
                 return tensor.pin_memory()
             else:
-                return feature.to(buffer_device)
+                return tensor.to(buffer_device)
 
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
 
-            feature = move_to_storage_device(feature)
-
             y = torch.empty(
                 graph.total_num_nodes,
                 self.out_size if is_last_layer else self.hidden_size,
-                dtype=feature.dtype,
+                dtype=torch.float32,
                 device=buffer_device,
             )
-
             for data in tqdm(dataloader):
-                x = gb.index_select(feature, data.input_nodes)
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+                # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], data.node_features["feat"])
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
@@ -230,7 +223,8 @@ class SAGE(nn.Module):
                 y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
                     buffer_device
                 )
-            feature = y
+            if not is_last_layer:
+                features.update("node", None, "feat", move_to_storage_device(y))
 
         return y
 
