@@ -1061,6 +1061,8 @@ def test_SubgraphSampler_Link(sampler_type):
     # TODO: `exclude_seed_edges` doesn't support `seeds` now.
     # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
+    for data in datapipe:
+        assert torch.equal(data.compacted_seeds, torch.tensor([[0, 2], [1, 3]]))
 
 
 @pytest.mark.parametrize(
@@ -1165,6 +1167,16 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
     # TODO: `exclude_seed_edges` doesn't support `seeds` now.
     # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
+    for data in datapipe:
+        for compacted_seeds in data.compacted_seeds.values():
+            if sampler_type == SamplerType.Temporal:
+                assert torch.equal(
+                    compacted_seeds, torch.tensor([[0, 0], [1, 1]])
+                )
+            else:
+                assert torch.equal(
+                    compacted_seeds, torch.tensor([[0, 0], [0, 1]])
+                )
 
 
 @pytest.mark.parametrize(
