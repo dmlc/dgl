@@ -36,16 +36,19 @@ class SubgraphSampler(MiniBatchTransformer):
         self,
         datapipe,
     ):
+        datapipe = datapipe.transform(self._preprocess)
+        datapipe = self.sampling_stages(datapipe)
+        datapipe = datapipe.transform(self._postprocess)
         super().__init__(datapipe, lambda x: x)
 
-        def _postprocess(minibatch):
-            delattr(minibatch, "seeds_timestamp")
-            return minibatch
+    @staticmethod
+    def _postprocess(minibatch):
+        delattr(minibatch, "_seed_nodes")
+        delattr(minibatch, "_seeds_timestamp")
+        return minibatch
 
-        self.datapipe = self.datapipe.transform(_postprocess)
-        self.append_sampling_step(MiniBatchTransformer, self._preprocess)
-
-    def _preprocess(self, minibatch):
+    @staticmethod
+    def _preprocess(minibatch):
         if minibatch.node_pairs is not None:
             (
                 seeds,
@@ -53,7 +56,7 @@ class SubgraphSampler(MiniBatchTransformer):
                 minibatch.compacted_node_pairs,
                 minibatch.compacted_negative_srcs,
                 minibatch.compacted_negative_dsts,
-            ) = self._node_pairs_preprocess(minibatch)
+            ) = SubgraphSampler._node_pairs_preprocess(minibatch)
         elif minibatch.seed_nodes is not None:
             seeds = minibatch.seed_nodes
             seeds_timestamp = (
@@ -64,11 +67,12 @@ class SubgraphSampler(MiniBatchTransformer):
                 f"Invalid minibatch {minibatch}: Either `node_pairs` or "
                 "`seed_nodes` should have a value."
             )
-        minibatch.input_nodes = seeds
-        minibatch.seeds_timestamp = seeds_timestamp
+        minibatch._seed_nodes = seeds
+        minibatch._seeds_timestamp = seeds_timestamp
         return minibatch
 
-    def _node_pairs_preprocess(self, minibatch):
+    @staticmethod
+    def _node_pairs_preprocess(minibatch):
         use_timestamp = hasattr(minibatch, "timestamp")
         node_pairs = minibatch.node_pairs
         neg_src, neg_dst = minibatch.negative_srcs, minibatch.negative_dsts
@@ -198,11 +202,54 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted_negative_dsts if has_neg_dst else None,
         )
 
-    def append_sampling_step(self, datapipe_type, *args, **kwargs):
-        """Append a step to the sampling datapipe pipeline."""
-        parent_datapipe = self.datapipe.datapipe
-        dp_utils.replace_dp(
-            dp_utils.traverse_dps(self.datapipe),
-            parent_datapipe,
-            datapipe_type(parent_datapipe, *args, **kwargs),
+    def _sample(self, minibatch):
+        (
+            minibatch.input_nodes,
+            minibatch.sampled_subgraphs,
+        ) = self.sample_subgraphs(
+            minibatch._seed_nodes, minibatch._seeds_timestamp
         )
+        return minibatch
+
+    def sampling_stages(self, datapipe):
+        """The sampling stages are defined here by chaining to the datapipe."""
+        return datapipe.transform(self._sample)
+
+    def sample_subgraphs(self, seeds, seeds_timestamp):
+        """Sample subgraphs from the given seeds, possibly with temporal constraints.
+        Any subclass of SubgraphSampler should implement this method.
+        Parameters
+        ----------
+        seeds : Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The seed nodes.
+        seeds_timestamp : Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The timestamps of the seed nodes. If given, the sampled subgraphs
+            should not contain any nodes or edges that are newer than the
+            timestamps of the seed nodes. Default: None.
+        Returns
+        -------
+        Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The input nodes.
+        List[SampledSubgraph]
+            The sampled subgraphs.
+        Examples
+        --------
+        >>> @functional_datapipe("my_sample_subgraph")
+        >>> class MySubgraphSampler(SubgraphSampler):
+        >>>     def __init__(self, datapipe, graph, fanouts):
+        >>>         super().__init__(datapipe)
+        >>>         self.graph = graph
+        >>>         self.fanouts = fanouts
+        >>>     def sample_subgraphs(self, seeds):
+        >>>         # Sample subgraphs from the given seeds.
+        >>>         subgraphs = []
+        >>>         subgraphs_nodes = []
+        >>>         for fanout in reversed(self.fanouts):
+        >>>             subgraph = self.graph.sample_neighbors(seeds, fanout)
+        >>>             subgraphs.insert(0, subgraph)
+        >>>             subgraphs_nodes.append(subgraph.nodes)
+        >>>             seeds = subgraph.nodes
+        >>>         subgraphs_nodes = torch.unique(torch.cat(subgraphs_nodes))
+        >>>         return subgraphs_nodes, subgraphs
+        """
+        raise NotImplementedError

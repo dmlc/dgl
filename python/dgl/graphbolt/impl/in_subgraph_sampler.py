@@ -67,10 +67,8 @@ class InSubgraphSampler(SubgraphSampler):
         super().__init__(datapipe)
         self.graph = graph
         self.sampler = graph.in_subgraph
-        self.append_sampling_step(MiniBatchTransformer, self._sample_subgraphs)
 
-    def _sample_subgraphs(self, minibatch):
-        seeds = minibatch.input_nodes
+    def sample_subgraphs(self, seeds, seeds_timestamp):
         subgraph = self.sampler(seeds)
         (
             original_row_node_ids,
@@ -82,6 +80,5 @@ class InSubgraphSampler(SubgraphSampler):
             original_row_node_ids=original_row_node_ids,
             original_edge_ids=subgraph.original_edge_ids,
         )
-        minibatch.input_nodes = original_row_node_ids
-        minibatch.sampled_subgraphs = [subgraph]
-        return minibatch
+        seeds = original_row_node_ids
+        return (seeds, [subgraph])

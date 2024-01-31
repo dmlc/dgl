@@ -26,7 +26,7 @@ class SamplePerLayer(MiniBatchTransformer):
 
     def _sample_per_layer(self, minibatch):
         subgraph = self.sampler(
-            minibatch.input_nodes, self.fanout, self.replace, self.prob_name
+            minibatch._seed_nodes, self.fanout, self.replace, self.prob_name
         )
         minibatch.sampled_subgraphs.insert(0, subgraph)
         return minibatch
@@ -42,7 +42,7 @@ class CompactPerLayer(MiniBatchTransformer):
 
     def _compact_per_layer(self, minibatch):
         subgraph = minibatch.sampled_subgraphs[0]
-        seeds = minibatch.input_nodes
+        seeds = minibatch._seed_nodes
         if self.deduplicate:
             (
                 original_row_node_ids,
@@ -65,7 +65,7 @@ class CompactPerLayer(MiniBatchTransformer):
                 original_row_node_ids=original_row_node_ids,
                 original_edge_ids=subgraph.original_edge_ids,
             )
-        minibatch.input_nodes = original_row_node_ids
+        minibatch._seed_nodes = original_row_node_ids
         minibatch.sampled_subgraphs[0] = subgraph
         return minibatch
 
@@ -163,39 +163,51 @@ class NeighborSampler(SubgraphSampler):
         deduplicate=True,
         sampler="sample_neighbors",
     ):
-        super().__init__(datapipe)
         self.graph = graph
+        self.fanouts = fanouts
+        self.replace = replace
+        self.prob_name = prob_name
+        self.deduplicate = deduplicate
+        self.sampler = sampler
+        super().__init__(datapipe)
 
-        def prepare(minibatch):
-            seeds = minibatch.input_nodes
-            # Enrich seeds with all node types.
-            if isinstance(seeds, dict):
-                ntypes = list(self.graph.node_type_to_id.keys())
-                # Loop over different seeds to extract the device they are on.
-                device = None
-                dtype = None
-                for _, seed in seeds.items():
-                    device = seed.device
-                    dtype = seed.dtype
-                    break
-                default_tensor = torch.tensor([], dtype=dtype, device=device)
-                seeds = {
-                    ntype: seeds.get(ntype, default_tensor) for ntype in ntypes
-                }
-            minibatch.input_nodes = seeds
-            minibatch.sampled_subgraphs = []
-            return minibatch
+    def prepare(self, minibatch):
+        seeds = minibatch._seed_nodes
+        # Enrich seeds with all node types.
+        if isinstance(seeds, dict):
+            ntypes = list(self.graph.node_type_to_id.keys())
+            # Loop over different seeds to extract the device they are on.
+            device = None
+            dtype = None
+            for _, seed in seeds.items():
+                device = seed.device
+                dtype = seed.dtype
+                break
+            default_tensor = torch.tensor([], dtype=dtype, device=device)
+            seeds = {
+                ntype: seeds.get(ntype, default_tensor) for ntype in ntypes
+            }
+        minibatch._seed_nodes = seeds
+        minibatch.sampled_subgraphs = []
+        return minibatch
 
-        self.append_sampling_step(MiniBatchTransformer, prepare)
-        sampler = getattr(graph, sampler)
-        for fanout in reversed(fanouts):
+    def sampling_stages(self, datapipe):
+        datapipe = datapipe.transform(self.prepare)
+        sampler = getattr(self.graph, self.sampler)
+        for fanout in reversed(self.fanouts):
             # Convert fanout to tensor.
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
-            self.append_sampling_step(
-                SamplePerLayer, sampler, fanout, replace, prob_name
+            datapipe = datapipe.sample_per_layer(
+                sampler, fanout, self.replace, self.prob_name
             )
-            self.append_sampling_step(CompactPerLayer, deduplicate)
+            datapipe = datapipe.compact_per_layer(self.deduplicate)
+
+        def set_input_nodes(minibatch):
+            minibatch.input_nodes = minibatch._seed_nodes
+            return minibatch
+
+        return datapipe.transform(set_input_nodes)
 
 
 @functional_datapipe("sample_layer_neighbor")
@@ -302,6 +314,7 @@ class LayerNeighborSampler(NeighborSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
+        sampler="sample_layer_neighbors",
     ):
         super().__init__(
             datapipe,
@@ -310,5 +323,5 @@ class LayerNeighborSampler(NeighborSampler):
             replace,
             prob_name,
             deduplicate,
-            sampler="sample_layer_neighbors",
+            sampler=sampler,
         )

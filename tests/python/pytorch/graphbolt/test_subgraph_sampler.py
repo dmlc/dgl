@@ -46,11 +46,13 @@ def test_SubgraphSampler_invoke():
 
     # Invoke via class constructor.
     datapipe = gb.SubgraphSampler(item_sampler)
-    assert len(list(datapipe)) == 5
+    with pytest.raises(NotImplementedError):
+        next(iter(datapipe))
 
     # Invokde via functional form.
     datapipe = item_sampler.sample_subgraph()
-    assert len(list(datapipe)) == 5
+    with pytest.raises(NotImplementedError):
+        next(iter(datapipe))
 
 
 @pytest.mark.parametrize("labor", [False, True])
