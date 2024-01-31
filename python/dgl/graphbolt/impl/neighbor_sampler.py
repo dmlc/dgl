@@ -36,7 +36,7 @@ class FetchInsubgraphData(Mapper):
 
     def _fetch_per_layer_helper(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
-            index = minibatch.input_nodes
+            index = minibatch._seed_nodes
             if index.is_cuda:
                 index.record_stream(torch.cuda.current_stream())
             index_select = partial(
@@ -116,7 +116,7 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
         sampled_subgraph = getattr(subgraph, self.sampler_name)(
             None, self.fanout, self.replace, self.prob_name
         )
-        sampled_subgraph.original_column_node_ids = minibatch.input_nodes
+        sampled_subgraph.original_column_node_ids = minibatch._seed_nodes
         minibatch.sampled_subgraphs[0] = sampled_subgraph
 
         return minibatch
