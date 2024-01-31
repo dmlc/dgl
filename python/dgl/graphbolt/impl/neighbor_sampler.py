@@ -156,6 +156,7 @@ class NeighborSampler(SubgraphSampler):
     )]
     """
 
+    # pylint: disable=useless-super-delegation
     def __init__(
         self,
         datapipe,
@@ -195,6 +196,7 @@ class NeighborSampler(SubgraphSampler):
         minibatch.input_nodes = minibatch._seed_nodes
         return minibatch
 
+    # pylint: disable=arguments-differ
     def sampling_stages(
         self, datapipe, graph, fanouts, replace, prob_name, deduplicate, sampler
     ):
