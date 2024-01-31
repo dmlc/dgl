@@ -1,6 +1,6 @@
 import re
 import unittest
-import warnings
+from torchdata.datapipes.iter import IterableWrapper
 from collections.abc import Iterable, Mapping
 
 import backend as F
@@ -14,20 +14,19 @@ from . import gb_test_utils
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
-    def checkData(dp):
-        # Filtering DGLWarning:
-        #    Failed to map item list to `MiniBatch`
-        #    as the names of items are not provided.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=UserWarning)
-            for data in dp:
-                assert data.device.type == "cuda"
+    dp = IterableWrapper(range(10))
+    dp = dp.batch(batch_size=5)
+    dp = dp.map(lambda x : torch.tensor(x))
 
-    item_sampler = gb.ItemSampler(gb.ItemSet(torch.randn(20)), 4)
     # Invoke CopyTo via class constructor.
-    checkData(gb.CopyTo(item_sampler, "cuda"))
+    dp1 = gb.CopyTo(dp, "cuda")
+    for data in dp1:
+        assert data.device.type == "cuda"
+
     # Invoke CopyTo via functional form.
-    checkData(item_sampler.copy_to("cuda"))
+    dp2 = dp.copy_to("cuda")
+    for data in dp2:
+        assert data.device.type == "cuda"
 
 
 @pytest.mark.parametrize(
