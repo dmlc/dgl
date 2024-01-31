@@ -186,7 +186,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph, args.fanout if is_train else [-1]
+    )
 
     ############################################################################
     # [Input]:
@@ -284,9 +286,6 @@ def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
     model.eval()
     evaluator = Evaluator(name="ogbl-citation2")
 
-    # Since we need to use all neghborhoods for evaluation, we set the fanout
-    # to -1.
-    args.fanout = [-1]
     dataloader = create_dataloader(
         args, graph, features, all_nodes_set, is_train=False
     )
