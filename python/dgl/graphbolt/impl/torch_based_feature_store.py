@@ -72,6 +72,7 @@ class TorchBasedFeature(Feature):
 
     def __init__(self, torch_feature: torch.Tensor, metadata: Dict = None):
         super().__init__()
+        self._is_inplace_pinned = set()
         assert isinstance(torch_feature, torch.Tensor), (
             f"torch_feature in TorchBasedFeature must be torch.Tensor, "
             f"but got {type(torch_feature)}."
@@ -83,7 +84,6 @@ class TorchBasedFeature(Feature):
         # Make sure the tensor is contiguous.
         self._tensor = torch_feature.contiguous()
         self._metadata = metadata
-        self._is_inplace_pinned = set()
 
     def __del__(self):
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
@@ -198,6 +198,10 @@ class TorchBasedFeature(Feature):
 
             self._is_inplace_pinned.add(x)
 
+    def is_pinned(self):
+        """Returns True if the stored feature is pinned."""
+        return self._tensor.is_pinned()
+
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `TorchBasedFeature` to the specified device."""
         # copy.copy is a shallow copy so it does not copy tensor memory.
@@ -292,6 +296,10 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         """In-place operation to copy the feature store to pinned memory."""
         for feature in self._features.values():
             feature.pin_memory_()
+
+    def is_pinned(self):
+        """Returns True if all the stored features are pinned."""
+        return all(feature.is_pinned() for feature in self._features.values())
 
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `TorchBasedFeatureStore` to the specified device."""

@@ -22,21 +22,44 @@ class SubgraphSampler(MiniBatchTransformer):
     Functional name: :obj:`sample_subgraph`.
 
     This class is the base class of all subgraph samplers. Any subclass of
-    SubgraphSampler should implement the :meth:`sample_subgraphs` method.
+    SubgraphSampler should implement either the :meth:`sample_subgraphs` method
+    or the :meth:`sampling_stages` method to define the fine-grained sampling
+    stages to take advantage of optimizations provided by the GraphBolt
+    DataLoader.
 
     Parameters
     ----------
     datapipe : DataPipe
         The datapipe.
+    args : Non-Keyword Arguments
+        Arguments to be passed into sampling_stages.
+    kwargs : Keyword Arguments
+        Arguments to be passed into sampling_stages.
     """
 
     def __init__(
         self,
         datapipe,
+        *args,
+        **kwargs,
     ):
-        super().__init__(datapipe, self._sample)
+        datapipe = datapipe.transform(self._preprocess)
+        datapipe = self.sampling_stages(datapipe, *args, **kwargs)
+        datapipe = datapipe.transform(self._postprocess)
+        super().__init__(datapipe, self._identity)
 
-    def _sample(self, minibatch):
+    @staticmethod
+    def _identity(minibatch):
+        return minibatch
+
+    @staticmethod
+    def _postprocess(minibatch):
+        delattr(minibatch, "_seed_nodes")
+        delattr(minibatch, "_seeds_timestamp")
+        return minibatch
+
+    @staticmethod
+    def _preprocess(minibatch):
         if minibatch.node_pairs is not None:
             (
                 seeds,
@@ -44,7 +67,7 @@ class SubgraphSampler(MiniBatchTransformer):
                 minibatch.compacted_node_pairs,
                 minibatch.compacted_negative_srcs,
                 minibatch.compacted_negative_dsts,
-            ) = self._node_pairs_preprocess(minibatch)
+            ) = SubgraphSampler._node_pairs_preprocess(minibatch)
         elif minibatch.seed_nodes is not None:
             seeds = minibatch.seed_nodes
             seeds_timestamp = (
@@ -55,13 +78,12 @@ class SubgraphSampler(MiniBatchTransformer):
                 f"Invalid minibatch {minibatch}: Either `node_pairs` or "
                 "`seed_nodes` should have a value."
             )
-        (
-            minibatch.input_nodes,
-            minibatch.sampled_subgraphs,
-        ) = self.sample_subgraphs(seeds, seeds_timestamp)
+        minibatch._seed_nodes = seeds
+        minibatch._seeds_timestamp = seeds_timestamp
         return minibatch
 
-    def _node_pairs_preprocess(self, minibatch):
+    @staticmethod
+    def _node_pairs_preprocess(minibatch):
         use_timestamp = hasattr(minibatch, "timestamp")
         node_pairs = minibatch.node_pairs
         neg_src, neg_dst = minibatch.negative_srcs, minibatch.negative_dsts
@@ -190,6 +212,23 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted_negative_srcs if has_neg_src else None,
             compacted_negative_dsts if has_neg_dst else None,
         )
+
+    def _sample(self, minibatch):
+        (
+            minibatch.input_nodes,
+            minibatch.sampled_subgraphs,
+        ) = self.sample_subgraphs(
+            minibatch._seed_nodes, minibatch._seeds_timestamp
+        )
+        return minibatch
+
+    def sampling_stages(self, datapipe):
+        """The sampling stages are defined here by chaining to the datapipe. The
+        default implementation expects :meth:`sample_subgraphs` to be
+        implemented. To define fine-grained stages, this method should be
+        overridden.
+        """
+        return datapipe.transform(self._sample)
 
     def sample_subgraphs(self, seeds, seeds_timestamp):
         """Sample subgraphs from the given seeds, possibly with temporal constraints.
