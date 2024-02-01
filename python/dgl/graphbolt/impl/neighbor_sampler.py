@@ -179,63 +179,6 @@ class CompactPerLayer(MiniBatchTransformer):
         return minibatch
 
 
-@functional_datapipe("sample_per_layer")
-class SamplePerLayer(MiniBatchTransformer):
-    """Sample neighbor edges from a graph for a single layer."""
-
-    def __init__(self, datapipe, sampler, fanout, replace, prob_name):
-        super().__init__(datapipe, self._sample_per_layer)
-        self.sampler = sampler
-        self.fanout = fanout
-        self.replace = replace
-        self.prob_name = prob_name
-
-    def _sample_per_layer(self, minibatch):
-        subgraph = self.sampler(
-            minibatch._seed_nodes, self.fanout, self.replace, self.prob_name
-        )
-        minibatch.sampled_subgraphs.insert(0, subgraph)
-        return minibatch
-
-
-@functional_datapipe("compact_per_layer")
-class CompactPerLayer(MiniBatchTransformer):
-    """Compact the sampled edges for a single layer."""
-
-    def __init__(self, datapipe, deduplicate):
-        super().__init__(datapipe, self._compact_per_layer)
-        self.deduplicate = deduplicate
-
-    def _compact_per_layer(self, minibatch):
-        subgraph = minibatch.sampled_subgraphs[0]
-        seeds = minibatch._seed_nodes
-        if self.deduplicate:
-            (
-                original_row_node_ids,
-                compacted_csc_format,
-            ) = unique_and_compact_csc_formats(subgraph.sampled_csc, seeds)
-            subgraph = SampledSubgraphImpl(
-                sampled_csc=compacted_csc_format,
-                original_column_node_ids=seeds,
-                original_row_node_ids=original_row_node_ids,
-                original_edge_ids=subgraph.original_edge_ids,
-            )
-        else:
-            (
-                original_row_node_ids,
-                compacted_csc_format,
-            ) = compact_csc_format(subgraph.sampled_csc, seeds)
-            subgraph = SampledSubgraphImpl(
-                sampled_csc=compacted_csc_format,
-                original_column_node_ids=seeds,
-                original_row_node_ids=original_row_node_ids,
-                original_edge_ids=subgraph.original_edge_ids,
-            )
-        minibatch._seed_nodes = original_row_node_ids
-        minibatch.sampled_subgraphs[0] = subgraph
-        return minibatch
-
-
 @functional_datapipe("sample_neighbor")
 class NeighborSampler(SubgraphSampler):
     # pylint: disable=abstract-method
