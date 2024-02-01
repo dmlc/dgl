@@ -1220,14 +1220,18 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt="numpy"):
 
         # Generate graph edge-feats.
         edge_feats = np.array(
-            [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9]
+            [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9],
+            dtype=np.float64,
         )
         os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
         edge_feat_path = os.path.join("data", "edge-feat.npy")
         np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
 
         # Generate node-feats.
-        node_feats = np.array([0.0, 1.9, 2.8, 3.7, 4.6])
+        node_feats = np.array(
+            [0.0, 1.9, 2.8, 3.7, 4.6],
+            dtype=np.float64,
+        )
         node_feat_path = os.path.join("data", "node-feat.npy")
         np.save(os.path.join(test_dir, node_feat_path), node_feats)
 
@@ -1409,27 +1413,31 @@ def test_OnDiskDataset_preprocess_heterogeneous_hardcode(edge_fmt="numpy"):
         # Generate node features.
         os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
         np.save(
-            os.path.join(test_dir, "data", "A-feat.npy"), np.array([0.0, 1.9])
+            os.path.join(test_dir, "data", "A-feat.npy"),
+            np.array([0.0, 1.9], dtype=np.float64),
         )
         np.save(
             os.path.join(test_dir, "data", "B-feat.npy"),
-            np.array([2.8, 3.7, 4.6]),
+            np.array([2.8, 3.7, 4.6], dtype=np.float64),
         )
 
         # Generate edge features.
         os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
-        np.save(os.path.join(test_dir, "data", "a_a-feat.npy"), np.array([0.0]))
+        np.save(
+            os.path.join(test_dir, "data", "a_a-feat.npy"),
+            np.array([0.0], dtype=np.float64),
+        )
         np.save(
             os.path.join(test_dir, "data", "a_b-feat.npy"),
-            np.array([1.1, 2.2, 3.3]),
+            np.array([1.1, 2.2, 3.3], dtype=np.float64),
         )
         np.save(
             os.path.join(test_dir, "data", "b_b-feat.npy"),
-            np.array([4.4, 5.5, 6.6]),
+            np.array([4.4, 5.5, 6.6], dtype=np.float64),
         )
         np.save(
             os.path.join(test_dir, "data", "b_a-feat.npy"),
-            np.array([7.7, 8.8, 9.9]),
+            np.array([7.7, 8.8, 9.9], dtype=np.float64),
         )
 
         yaml_content = (
@@ -1509,6 +1517,7 @@ def test_OnDiskDataset_preprocess_heterogeneous_hardcode(edge_fmt="numpy"):
         fused_csc_sampling_graph = torch.load(
             os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
         )
+        print(fused_csc_sampling_graph)
         assert fused_csc_sampling_graph.total_num_nodes == 5
         assert fused_csc_sampling_graph.total_num_edges == 10
         assert torch.equal(

@@ -63,10 +63,10 @@ def _graph_data_to_fused_csc_sampling_graph(
         The FusedCSCSamplingGraph constructed from the raw data.
     """
     is_homogeneous = (
-        len(input_config["graph"]["nodes"]) == 1
-        and len(input_config["graph"]["edges"]) == 1
-        and "type" not in input_config["graph"]["nodes"][0]
-        and "type" not in input_config["graph"]["edges"][0]
+        len(graph_data["nodes"]) == 1
+        and len(graph_data["edges"]) == 1
+        and "type" not in graph_data["nodes"][0]
+        and "type" not in graph_data["edges"][0]
     )
 
     if is_homogeneous:
@@ -89,6 +89,9 @@ def _graph_data_to_fused_csc_sampling_graph(
             edge_attributes[ORIGINAL_EDGE_ID] = value_indices
     else:
         # Heterogeneous graph.
+        # Sort graph_data by ntype/etype lexicographically to ensure ordering.
+        graph_data["nodes"].sort(key=lambda x: x["type"])
+        graph_data["edges"].sort(key=lambda x: x["type"])
         # Construct node_type_offset and node_type_to_id.
         node_type_offset = [0]
         node_type_to_id = {}
@@ -129,7 +132,11 @@ def _graph_data_to_fused_csc_sampling_graph(
         node_attributes = {}
         edge_attributes = {}
         if include_original_edge_id:
-            edge_attributes[ORIGINAL_EDGE_ID] = value_indices
+            original_edge_id = [
+                value_indices[i] - edge_type_offset[type_per_edge[i]]
+                for i in range(len(value_indices))
+            ]
+            edge_attributes[ORIGINAL_EDGE_ID] = torch.tensor(original_edge_id)
 
     # Load the sampling related node/edge features and add them to
     # the sampling-graph.
@@ -210,11 +217,10 @@ def _graph_data_to_fused_csc_sampling_graph(
                 )
 
             for feat_name, feat_data in node_feature_collector.items():
+                _feat = next(iter(feat_data.values()))
                 feat_tensor = torch.empty(
-                    (
-                        [node_type_offset[-1]]
-                        + list(next(iter(feat_data.values())).shape[1:])
-                    )
+                    ([node_type_offset[-1]] + list(_feat.shape[1:])),
+                    dtype=_feat.dtype,
                 )
                 for ntype, feat in feat_data.items():
                     feat_tensor[
@@ -224,11 +230,10 @@ def _graph_data_to_fused_csc_sampling_graph(
                     ] = feat
                 node_attributes[feat_name] = feat_tensor
             for feat_name, feat_data in edge_feature_collector.items():
+                _feat = next(iter(feat_data.values()))
                 feat_tensor = torch.empty(
-                    (
-                        [edge_type_offset[-1]]
-                        + list(next(iter(feat_data.values())).shape[1:])
-                    )
+                    ([edge_type_offset[-1]] + list(_feat.shape[1:])),
+                    dtype=_feat.dtype,
                 )
                 for etype, feat in feat_data.items():
                     feat_tensor[
@@ -236,9 +241,7 @@ def _graph_data_to_fused_csc_sampling_graph(
                             edge_type_to_id[etype]
                         ] : edge_type_offset[edge_type_to_id[etype] + 1]
                     ] = feat
-                edge_attributes[feat_name] = torch.index_select(
-                    feat_tensor, dim=0, index=value_indices
-                )
+                edge_attributes[feat_name] = feat_tensor
 
     # Construct the FusedCSCSamplingGraph.
     sampling_graph = fused_csc_sampling_graph(
