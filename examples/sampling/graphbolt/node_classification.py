@@ -287,7 +287,9 @@ def evaluate(args, model, graph, features, itemset, num_classes):
 
 
 def train(args, graph, features, train_set, valid_set, num_classes, model):
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=args.lr, weight_decay=5e-4
+    )
     dataloader = create_dataloader(
         graph=graph,
         features=features,
@@ -343,7 +345,7 @@ def parse_args():
     parser.add_argument(
         "--lr",
         type=float,
-        default=0.0005,
+        default=1e-3,
         help="Learning rate for optimization.",
     )
     parser.add_argument(

@@ -62,7 +62,12 @@ def _graph_data_to_fused_csc_sampling_graph(
     sampling_graph : FusedCSCSamplingGraph
         The FusedCSCSamplingGraph constructed from the raw data.
     """
-    is_homogeneous = "type" not in graph_data["nodes"][0]
+    is_homogeneous = (
+        len(input_config["graph"]["nodes"]) == 1
+        and len(input_config["graph"]["edges"]) == 1
+        and "type" not in input_config["graph"]["nodes"][0]
+        and "type" not in input_config["graph"]["edges"][0]
+    )
 
     if is_homogeneous:
         # Homogeneous graph.
@@ -330,6 +335,7 @@ def preprocess_ondisk_dataset(
     # 2. Load the data and create a FusedCSCSamplingGraph.
     if "graph" not in input_config:
         raise RuntimeError("Invalid config: does not contain graph field.")
+
     sampling_graph = _graph_data_to_fused_csc_sampling_graph(
         dataset_dir,
         input_config["graph"],

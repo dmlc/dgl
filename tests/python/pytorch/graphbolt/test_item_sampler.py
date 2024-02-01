@@ -204,9 +204,16 @@ def test_ItemSet_graphs(batch_size, shuffle, drop_last):
         dgl.rand_graph(num_nodes * (i + 1), num_edges * (i + 1))
         for i in range(num_graphs)
     ]
-    item_set = gb.ItemSet(graphs)
+    item_set = gb.ItemSet(graphs, names="graphs")
+    # DGLGraph is not supported in gb.MiniBatch yet. Let's use a customized
+    # minibatcher to return the original graphs.
+    customized_minibatcher = lambda batch, names: batch
     item_sampler = gb.ItemSampler(
-        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+        item_set,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        drop_last=drop_last,
+        minibatcher=customized_minibatcher,
     )
     minibatch_num_nodes = []
     minibatch_num_edges = []
@@ -459,13 +466,13 @@ def test_ItemSet_seeds_labels(batch_size, shuffle, drop_last):
 def test_append_with_other_datapipes():
     num_ids = 100
     batch_size = 4
-    item_set = gb.ItemSet(torch.arange(0, num_ids))
+    item_set = gb.ItemSet(torch.arange(0, num_ids), names="seed_nodes")
     data_pipe = gb.ItemSampler(item_set, batch_size)
     # torchdata.datapipes.iter.Enumerator
     data_pipe = data_pipe.enumerate()
     for i, (idx, data) in enumerate(data_pipe):
         assert i == idx
-        assert len(data) == batch_size
+        assert len(data.seed_nodes) == batch_size
 
 
 @pytest.mark.parametrize("batch_size", [1, 4])
@@ -825,6 +832,7 @@ def test_ItemSetDict_seeds(batch_size, shuffle, drop_last):
         assert isinstance(minibatch, gb.MiniBatch)
         assert minibatch.seeds is not None
         assert minibatch.labels is None
+        assert minibatch.indexes is None
         is_last = (i + 1) * batch_size >= total_pairs
         if not is_last or total_pairs % batch_size == 0:
             expected_batch_size = batch_size
@@ -877,6 +885,7 @@ def test_ItemSetDict_seeds_labels(batch_size, shuffle, drop_last):
         assert isinstance(minibatch, gb.MiniBatch)
         assert minibatch.seeds is not None
         assert minibatch.labels is not None
+        assert minibatch.indexes is None
         is_last = (i + 1) * batch_size >= total_ids
         if not is_last or total_ids % batch_size == 0:
             expected_batch_size = batch_size

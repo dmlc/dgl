@@ -80,6 +80,19 @@ class MiniBatch:
           or other graph components depending on the specific context.
     """
 
+    indexes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    """
+    Indexes associated with seed nodes / node pairs in the graph, which
+    indicates to which query a seed node / node pair belongs.
+    - If `indexes` is a tensor: It indicates the graph is homogeneous. The
+      value should be corresponding query to given 'seed_nodes' or
+      'node_pairs'.
+    - If `indexes` is a dictionary: It indicates the graph is
+      heterogeneous. The keys should be node or edge type and the value should
+      be corresponding query to given 'seed_nodes' or 'node_pairs'. For each
+      key, indexes are consecutive integers starting from zero.
+    """
+
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the head nodes in the link
@@ -140,6 +153,15 @@ class MiniBatch:
     ] = None
     """
     Representation of compacted node pairs corresponding to 'node_pairs', where
+    all node ids inside are compacted.
+    """
+
+    compacted_seeds: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None
+    """
+    Representation of compacted seeds corresponding to 'seeds', where
     all node ids inside are compacted.
     """
 
