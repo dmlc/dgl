@@ -223,7 +223,11 @@ class SubgraphSampler(MiniBatchTransformer):
         return minibatch
 
     def sampling_stages(self, datapipe):
-        """The sampling stages are defined here by chaining to the datapipe."""
+        """The sampling stages are defined here by chaining to the datapipe. The
+        default implementation expects :meth:`sample_subgraphs` to be
+        implemented. To define fine-grained stages, this method should be
+        overridden.
+        """
         return datapipe.transform(self._sample)
 
     def sample_subgraphs(self, seeds, seeds_timestamp):
