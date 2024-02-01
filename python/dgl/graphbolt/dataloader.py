@@ -1,7 +1,7 @@
 """Graph Bolt DataLoaders"""
 
-from concurrent.futures import ThreadPoolExecutor
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
 import torch
 import torch.utils.data
