@@ -90,6 +90,7 @@ def test_basic_feature_store_hetero():
         ("edge", "paper:cites", "b"),
     ]
 
+
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 def test_basic_feature_store_errors():
     a = torch.tensor([3, 2, 1])
