@@ -165,8 +165,10 @@ class NeighborSampler(SubgraphSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
-        sampler="sample_neighbors",
+        sampler=None,
     ):
+        if sampler is None:
+            sampler = graph.sample_neighbors
         super().__init__(
             datapipe, graph, fanouts, replace, prob_name, deduplicate, sampler
         )
@@ -203,7 +205,6 @@ class NeighborSampler(SubgraphSampler):
         datapipe = datapipe.transform(
             partial(self._prepare, graph.node_type_to_id)
         )
-        sampler = getattr(graph, sampler)
         for fanout in reversed(fanouts):
             # Convert fanout to tensor.
             if not isinstance(fanout, torch.Tensor):
@@ -321,7 +322,6 @@ class LayerNeighborSampler(NeighborSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
-        sampler="sample_layer_neighbors",
     ):
         super().__init__(
             datapipe,
@@ -330,5 +330,5 @@ class LayerNeighborSampler(NeighborSampler):
             replace,
             prob_name,
             deduplicate,
-            sampler,
+            graph.sample_layer_neighbors,
         )
