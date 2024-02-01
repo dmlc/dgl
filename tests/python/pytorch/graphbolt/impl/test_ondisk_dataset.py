@@ -1517,7 +1517,6 @@ def test_OnDiskDataset_preprocess_heterogeneous_hardcode(edge_fmt="numpy"):
         fused_csc_sampling_graph = torch.load(
             os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
         )
-        print(fused_csc_sampling_graph)
         assert fused_csc_sampling_graph.total_num_nodes == 5
         assert fused_csc_sampling_graph.total_num_edges == 10
         assert torch.equal(
