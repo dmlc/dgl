@@ -191,9 +191,6 @@ class FetcherAndSampler(MiniBatchTransformer):
         datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
         super().__init__(datapipe)
 
-    def __iter__(self):
-        yield from self.datapipe
-
 
 @functional_datapipe("sample_neighbor")
 class NeighborSampler(SubgraphSampler):
