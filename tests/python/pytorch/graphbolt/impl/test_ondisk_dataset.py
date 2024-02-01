@@ -20,15 +20,19 @@ from .. import gb_test_utils as gbt
 
 
 def _on_disk_dataset(
-        test_dir,
-        func=gb.ondisk_dataset.preprocess_ondisk_dataset,
-        force_preprocess=None
+    test_dir,
+    func=gb.ondisk_dataset.preprocess_ondisk_dataset,
+    force_preprocess=None,
 ):
     with pytest.warns(
         DGLWarning,
         match="Edge feature is stored, but edge IDs are not saved.",
     ):
-        return func(test_dir, include_original_edge_id=False, force_preprocess=force_preprocess)
+        return func(
+            test_dir,
+            include_original_edge_id=False,
+            force_preprocess=force_preprocess
+        )
 
 
 def write_yaml_file(yaml_content, dir):
@@ -1921,7 +1925,9 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
             f.write(yaml_content)
 
         # First preprocess on-disk dataset.
-        preprocessed_metadata_path = _on_disk_dataset(test_dir, force_preprocess=False)
+        preprocessed_metadata_path = _on_disk_dataset(
+            test_dir, force_preprocess=False
+        )
 
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
@@ -1951,7 +1957,9 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
         assert target_yaml_data["tasks"][0]["name"] == "link_prediction"
 
         # Force preprocess on-disk dataset.
-        preprocessed_metadata_path = _on_disk_dataset(test_dir, force_preprocess=True)
+        preprocessed_metadata_path = _on_disk_dataset(
+            test_dir, force_preprocess=True
+        )
 
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
@@ -2806,7 +2814,9 @@ def test_OnDiskDataset_force_preprocess(capsys):
         assert tasks[0].metadata["name"] == "link_prediction"
 
         # Force preprocess on-disk dataset.
-        dataset = _on_disk_dataset(test_dir, gb.OnDiskDataset, force_preprocess=True).load()
+        dataset = _on_disk_dataset(
+            test_dir, gb.OnDiskDataset, force_preprocess=True
+        ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "The on-disk dataset is re-preprocessing, so the existing "
