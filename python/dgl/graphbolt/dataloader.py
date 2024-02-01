@@ -1,13 +1,11 @@
 """Graph Bolt DataLoaders"""
 
-from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 import torch
 import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
-from torch.utils.data import functional_datapipe
 
 from .base import CopyTo
 from .feature_fetcher import FeatureFetcher
@@ -19,8 +17,6 @@ from .item_sampler import ItemSampler
 
 __all__ = [
     "DataLoader",
-    "Waiter",
-    "Bufferer",
 ]
 
 
@@ -41,75 +37,6 @@ def _find_and_wrap_parent(datapipe_graph, target_datapipe, wrapper, **kwargs):
                 wrapper(parent_datapipe, **kwargs),
             )
     return datapipe_graph
-
-
-class EndMarker(dp.iter.IterDataPipe):
-    """Used to mark the end of a datapipe and is a no-op."""
-
-    def __init__(self, datapipe):
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        yield from self.datapipe
-
-
-@functional_datapipe("buffer")
-class Bufferer(dp.iter.IterDataPipe):
-    """Buffers items before yielding them.
-
-    Parameters
-    ----------
-    datapipe : DataPipe
-        The data pipeline.
-    buffer_size : int, optional
-        The size of the buffer which stores the fetched samples. If data coming
-        from datapipe has latency spikes, consider setting to a higher value.
-        Default is 1.
-    """
-
-    def __init__(self, datapipe, buffer_size=1):
-        self.datapipe = datapipe
-        if buffer_size <= 0:
-            raise ValueError(
-                "'buffer_size' is required to be a positive integer."
-            )
-        self.buffer = deque(maxlen=buffer_size)
-
-    def __iter__(self):
-        for data in self.datapipe:
-            if len(self.buffer) < self.buffer.maxlen:
-                self.buffer.append(data)
-            else:
-                return_data = self.buffer.popleft()
-                self.buffer.append(data)
-                yield return_data
-        while len(self.buffer) > 0:
-            yield self.buffer.popleft()
-
-
-@functional_datapipe("wait")
-class Waiter(dp.iter.IterDataPipe):
-    """Calls the wait function of all items."""
-
-    def __init__(self, datapipe):
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        for data in self.datapipe:
-            data.wait()
-            yield data
-
-
-@functional_datapipe("wait_future")
-class FutureWaiter(dp.iter.IterDataPipe):
-    """Calls the result function of all items and returns their results."""
-
-    def __init__(self, datapipe):
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        for data in self.datapipe:
-            yield data.result()
 
 
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
@@ -201,7 +128,7 @@ class DataLoader(torch.utils.data.DataLoader):
         # 2. Cut the datapipe at FeatureFetcher, and wrap the inner datapipe
         #    of the FeatureFetcher with a multiprocessing PyTorch DataLoader.
 
-        datapipe = EndMarker(datapipe)
+        datapipe = datapipe.mark_end()
         datapipe_graph = dp_utils.traverse_dps(datapipe)
 
         # (1) Insert minibatch distribution.
@@ -260,17 +187,10 @@ class DataLoader(torch.utils.data.DataLoader):
             )
             executor = ThreadPoolExecutor(max_workers=1)
             for sampler in samplers:
-                datapipe = sampler.datapipe.fetch_insubgraph_data(
-                    sampler, _get_uva_stream(), executor
-                )
-                datapipe = datapipe.buffer(1).wait_future().wait()
-                datapipe = datapipe.sample_per_layer_from_fetched_subgraph(
-                    sampler
-                )
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     sampler,
-                    datapipe,
+                    sampler.fetch_and_sample(_get_uva_stream(), executor, 1),
                 )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the

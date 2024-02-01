@@ -179,6 +179,21 @@ class CompactPerLayer(MiniBatchTransformer):
         return minibatch
 
 
+@functional_datapipe("fetch_and_sample")
+class FetcherAndSampler(MiniBatchTransformer):
+    """Overlapped graph sampling operation replacement."""
+
+    def __init__(self, sampler, stream, executor, buffer_size):
+        datapipe = sampler.datapipe.fetch_insubgraph_data(
+            sampler, stream, executor
+        )
+        datapipe = datapipe.buffer(buffer_size).wait_future().wait()
+        self.datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
+
+    def __iter__(self):
+        yield from self.datapipe
+
+
 @functional_datapipe("sample_neighbor")
 class NeighborSampler(SubgraphSampler):
     # pylint: disable=abstract-method
