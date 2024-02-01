@@ -7,6 +7,7 @@ import torch
 import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
+from torch.utils.data import functional_datapipe
 
 from .base import CopyTo
 from .feature_fetcher import FeatureFetcher
@@ -52,6 +53,7 @@ class EndMarker(dp.iter.IterDataPipe):
         yield from self.datapipe
 
 
+@functional_datapipe("buffer")
 class Bufferer(dp.iter.IterDataPipe):
     """Buffers items before yielding them.
 
@@ -85,7 +87,8 @@ class Bufferer(dp.iter.IterDataPipe):
             yield self.buffer.popleft()
 
 
-class Awaiter(dp.iter.IterDataPipe):
+@functional_datapipe("wait")
+class Waiter(dp.iter.IterDataPipe):
     """Calls the wait function of all items."""
 
     def __init__(self, datapipe):
@@ -97,6 +100,7 @@ class Awaiter(dp.iter.IterDataPipe):
             yield data
 
 
+@functional_datapipe("wait_future")
 class FutureWaiter(dp.iter.IterDataPipe):
     """Calls the result function of all items and returns their results."""
 
@@ -106,20 +110,6 @@ class FutureWaiter(dp.iter.IterDataPipe):
     def __iter__(self):
         for data in self.datapipe:
             yield data.result()
-
-
-class FetcherAndSampler(dp.iter.IterDataPipe):
-    """Overlapped graph sampling operation replacement."""
-
-    def __init__(self, datapipe, sampler, stream, executor, buffer_size):
-        datapipe = datapipe.fetch_insubgraph_data(sampler, stream, executor)
-        datapipe = Bufferer(datapipe, buffer_size)
-        datapipe = FutureWaiter(datapipe)
-        datapipe = Awaiter(datapipe)
-        self.datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
-
-    def __iter__(self):
-        yield from self.datapipe
 
 
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
@@ -255,7 +245,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     feature_fetcher,
-                    Awaiter(Bufferer(feature_fetcher, buffer_size=1)),
+                    feature_fetcher.buffer(1).wait(),
                 )
 
         if (
@@ -270,16 +260,17 @@ class DataLoader(torch.utils.data.DataLoader):
             )
             executor = ThreadPoolExecutor(max_workers=1)
             for sampler in samplers:
+                datapipe = sampler.datapipe.fetch_insubgraph_data(
+                    sampler, _get_uva_stream(), executor
+                )
+                datapipe = datapipe.buffer(1).wait_future().wait()
+                datapipe = datapipe.sample_per_layer_from_fetched_subgraph(
+                    sampler
+                )
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     sampler,
-                    FetcherAndSampler(
-                        sampler.datapipe,
-                        sampler,
-                        _get_uva_stream(),
-                        executor,
-                        buffer_size=1,
-                    ),
+                    datapipe,
                 )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
