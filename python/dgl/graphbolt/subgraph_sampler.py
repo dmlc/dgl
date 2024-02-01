@@ -75,7 +75,7 @@ class SubgraphSampler(MiniBatchTransformer):
                 seeds,
                 seeds_timestamp,
                 minibatch.compacted_seeds,
-            ) = self._seeds_preprocess(minibatch)
+            ) = SubgraphSampler._seeds_preprocess(minibatch)
         else:
             raise ValueError(
                 f"Invalid minibatch {minibatch}: One of `node_pairs`, "
@@ -233,7 +233,8 @@ class SubgraphSampler(MiniBatchTransformer):
         """
         return datapipe.transform(self._sample)
 
-    def _seeds_preprocess(self, minibatch):
+    @staticmethod
+    def _seeds_preprocess(minibatch):
         use_timestamp = hasattr(minibatch, "timestamp")
         seeds = minibatch.seeds
         is_heterogeneous = isinstance(seeds, Dict)
