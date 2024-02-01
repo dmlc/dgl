@@ -22,7 +22,10 @@ class SubgraphSampler(MiniBatchTransformer):
     Functional name: :obj:`sample_subgraph`.
 
     This class is the base class of all subgraph samplers. Any subclass of
-    SubgraphSampler should implement the :meth:`sample_subgraphs` method.
+    SubgraphSampler should implement either the :meth:`sample_subgraphs` method
+    or the :meth:`sampling_stages` method to define the fine-grained sampling
+    stages to take advantage of optimizations provided by the GraphBolt
+    DataLoader.
 
     Parameters
     ----------
