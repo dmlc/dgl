@@ -188,10 +188,15 @@ class FetcherAndSampler(MiniBatchTransformer):
             sampler, stream, executor
         )
         datapipe = datapipe.buffer(buffer_size).wait_future().wait()
-        self.datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
+        datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
+        super().__init__(datapipe, self._identity)
 
     def __iter__(self):
         yield from self.datapipe
+
+    @staticmethod
+    def _identity(minibatch):
+        return minibatch
 
 
 @functional_datapipe("sample_neighbor")
