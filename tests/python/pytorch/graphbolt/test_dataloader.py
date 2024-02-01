@@ -102,7 +102,7 @@ def test_gpu_sampling_DataLoader(
     datapipe_graph = dp_utils.traverse_dps(datapipe)
     awaiters = dp_utils.find_dps(
         datapipe_graph,
-        dgl.graphbolt.Awaiter,
+        dgl.graphbolt.Waiter,
     )
     assert len(awaiters) == bufferer_awaiter_cnt
     bufferers = dp_utils.find_dps(
