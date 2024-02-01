@@ -82,7 +82,9 @@ class NegativeSampler(MiniBatchTransformer):
                         minibatch.seeds[etype],
                         minibatch.labels[etype],
                         minibatch.indexes[etype],
-                    ) = self._sample_with_etype(pos_pairs, use_seeds=True)
+                    ) = self._sample_with_etype(
+                        pos_pairs, etype, use_seeds=True
+                    )
             else:
                 (
                     minibatch.seeds,
