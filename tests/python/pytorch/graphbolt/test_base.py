@@ -13,17 +13,19 @@ from . import gb_test_utils
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
-    item_sampler = gb.ItemSampler(gb.ItemSet(torch.randn(20)), 4)
+    item_sampler = gb.ItemSampler(
+        gb.ItemSet(torch.arange(20), names="seed_nodes"), 4
+    )
 
     # Invoke CopyTo via class constructor.
     dp = gb.CopyTo(item_sampler, "cuda")
     for data in dp:
-        assert data.device.type == "cuda"
+        assert data.seed_nodes.device.type == "cuda"
 
     # Invoke CopyTo via functional form.
     dp = item_sampler.copy_to("cuda")
     for data in dp:
-        assert data.device.type == "cuda"
+        assert data.seed_nodes.device.type == "cuda"
 
 
 @pytest.mark.parametrize(
