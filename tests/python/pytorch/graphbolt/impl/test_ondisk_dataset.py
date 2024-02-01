@@ -31,7 +31,7 @@ def _on_disk_dataset(
         return func(
             test_dir,
             include_original_edge_id=False,
-            force_preprocess=force_preprocess
+            force_preprocess=force_preprocess,
         )
 
 
