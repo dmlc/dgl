@@ -638,6 +638,8 @@ def partition_graph(
     num_trainers_per_machine=1,
     objtype="cut",
     graph_formats=None,
+    use_graphbolt=False,
+    **kwargs,
 ):
     """Partition a graph for distributed training and store the partitions on files.
 
@@ -811,6 +813,10 @@ def partition_graph(
         ``csc`` and ``csr``. If not specified, save one format only according to what
         format is available. If multiple formats are available, selection priority
         from high to low is ``coo``, ``csc``, ``csr``.
+    use_graphbolt : bool, optional
+        Whether to save partitions in GraphBolt format. Default: False.
+    kwargs : dict
+        Other keyword arguments for converting DGL partitions to GraphBolt.
 
     Returns
     -------
@@ -1298,7 +1304,8 @@ def partition_graph(
         )
     )
 
-    _dump_part_config(f"{out_path}/{graph_name}.json", part_metadata)
+    part_config = os.path.join(out_path, graph_name + ".json")
+    _dump_part_config(part_config, part_metadata)
 
     num_cuts = sim_g.num_edges() - tot_num_inner_edges
     if num_parts == 1:
@@ -1308,6 +1315,12 @@ def partition_graph(
             g.num_edges(), num_cuts, num_parts
         )
     )
+
+    if use_graphbolt:
+        dgl_partition_to_graphbolt(
+            part_config,
+            **kwargs,
+        )
 
     if return_mapping:
         return orig_nids, orig_eids

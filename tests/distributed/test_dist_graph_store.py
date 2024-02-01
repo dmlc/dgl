@@ -19,7 +19,6 @@ import pytest
 import torch as th
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import (
-    dgl_partition_to_graphbolt,
     DistEmbedding,
     DistGraph,
     DistGraphServer,
@@ -155,10 +154,9 @@ def check_server_client_empty(
     # Partition the graph
     num_parts = 1
     graph_name = "dist_graph_test_1"
-    partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
-    if use_graphbolt:
-        part_config = os.path.join("/tmp/dist_graph", f"{graph_name}.json")
-        dgl_partition_to_graphbolt(part_config)
+    partition_graph(
+        g, graph_name, num_parts, "/tmp/dist_graph", use_graphbolt=use_graphbolt
+    )
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
@@ -586,10 +584,9 @@ def check_server_client(
     graph_name = f"check_server_client_{shared_mem}_{num_servers}_{num_clients}_{num_groups}"
     g.ndata["features"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
     g.edata["features"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
-    partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
-    if use_graphbolt:
-        part_config = os.path.join("/tmp/dist_graph", f"{graph_name}.json")
-        dgl_partition_to_graphbolt(part_config)
+    partition_graph(
+        g, graph_name, num_parts, "/tmp/dist_graph", use_graphbolt=use_graphbolt
+    )
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
@@ -662,10 +659,8 @@ def check_server_client_hierarchy(
         num_parts,
         "/tmp/dist_graph",
         num_trainers_per_machine=num_clients,
+        use_graphbolt=use_graphbolt,
     )
-    if use_graphbolt:
-        part_config = os.path.join("/tmp/dist_graph", f"{graph_name}.json")
-        dgl_partition_to_graphbolt(part_config)
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
@@ -928,10 +923,9 @@ def check_server_client_hetero(
     # Partition the graph
     num_parts = 1
     graph_name = "dist_graph_test_3"
-    partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
-    if use_graphbolt:
-        part_config = os.path.join("/tmp/dist_graph", f"{graph_name}.json")
-        dgl_partition_to_graphbolt(part_config)
+    partition_graph(
+        g, graph_name, num_parts, "/tmp/dist_graph", use_graphbolt=use_graphbolt
+    )
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
