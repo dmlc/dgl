@@ -1211,7 +1211,8 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt="numpy"):
 
         # Generate edges.
         edges = np.array(
-            [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [1, 2, 2, 3, 3, 4, 4, 0, 0, 1]]
+            [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [1, 2, 2, 3, 3, 4, 4, 0, 0, 1]],
+            dtype=np.int64,
         ).T
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
         edges = edges.T
@@ -1395,19 +1396,20 @@ def test_OnDiskDataset_preprocess_heterogeneous_hardcode(edge_fmt="numpy"):
         # Generate edges.
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
         np.save(
-            os.path.join(test_dir, "edges", "a_a.npy"), np.array([[0], [1]])
+            os.path.join(test_dir, "edges", "a_a.npy"),
+            np.array([[0], [1]], dtype=np.int64),
         )
         np.save(
             os.path.join(test_dir, "edges", "a_b.npy"),
-            np.array([[0, 1, 1], [0, 0, 1]]),
+            np.array([[0, 1, 1], [0, 0, 1]], dtype=np.int64),
         )
         np.save(
             os.path.join(test_dir, "edges", "b_b.npy"),
-            np.array([[0, 0, 1], [1, 2, 2]]),
+            np.array([[0, 0, 1], [1, 2, 2]], dtype=np.int64),
         )
         np.save(
             os.path.join(test_dir, "edges", "b_a.npy"),
-            np.array([[1, 2, 2], [0, 0, 1]]),
+            np.array([[1, 2, 2], [0, 0, 1]], dtype=np.int64),
         )
 
         # Generate node features.
