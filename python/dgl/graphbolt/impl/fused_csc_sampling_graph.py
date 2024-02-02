@@ -1018,7 +1018,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
             torch.cat(
                 (
                     pos_src.repeat_interleave(negative_ratio),
-                    torch.randint(0, max_node_id, (num_negative,)),
+                    torch.randint(
+                        0,
+                        max_node_id,
+                        (num_negative,),
+                        dtype=node_pairs.dtype,
+                        device=node_pairs.device,
+                    ),
                 ),
             )
             .view(2, num_negative)
