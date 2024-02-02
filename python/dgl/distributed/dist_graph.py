@@ -8,7 +8,7 @@ from collections.abc import MutableMapping
 
 import numpy as np
 
-from .. import backend as F, graphbolt as gb, heterograph_index
+from .. import backend as F, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..base import ALL, DGLError, EID, ETYPE, is_all, NID
 from ..convert import graph as dgl_graph, heterograph as dgl_heterograph
@@ -164,6 +164,8 @@ def _get_graph_from_shared_mem(graph_name, use_graphbolt):
     through shared memory to reduce the overhead of data access.
     """
     if use_graphbolt:
+        from .. import graphbolt as gb
+
         return gb.load_from_shared_memory(graph_name)
     g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(
         graph_name
@@ -307,6 +309,8 @@ class EdgeDataView(MutableMapping):
 
 def _format_partition(graph, graph_format):
     """Format the partition to the specified format."""
+    from .. import graphbolt as gb
+
     if isinstance(graph, gb.FusedCSCSamplingGraph):
         return graph
     # formatting dtype
