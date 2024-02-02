@@ -79,7 +79,6 @@ class UniformNegativeSampler(NegativeSampler):
             pos_indexes = torch.arange(
                 0,
                 num_pos_node_pairs,
-                dtype=seeds.dtype,
                 device=seeds.device,
             )
             neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
@@ -91,12 +90,10 @@ class UniformNegativeSampler(NegativeSampler):
                 (
                     torch.ones(
                         pos_num,
-                        dtype=seeds.dtype,
                         device=seeds.device,
                     ),
                     torch.zeros(
                         neg_num,
-                        dtype=seeds.dtype,
                         device=seeds.device,
                     ),
                 ),
