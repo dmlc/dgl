@@ -2,9 +2,10 @@
 from collections import OrderedDict
 from itertools import product
 
-import dgl
 import pytest
 import torch
+
+from dgl import ETYPE, graph, to_block as dgl_to_block
 from dgl.nn import CuGraphRelGraphConv, RelGraphConv
 
 # TODO(tingyu66): Re-enable the following tests after updating cuGraph CI image.
@@ -23,7 +24,7 @@ options = OrderedDict(
 def generate_graph():
     u = torch.tensor([0, 1, 0, 2, 3, 0, 4, 0, 5, 0, 6, 7, 0, 8, 9])
     v = torch.tensor([1, 9, 2, 9, 9, 4, 9, 5, 9, 6, 9, 9, 8, 9, 0])
-    g = dgl.graph((u, v))
+    g = graph((u, v))
     return g
 
 
@@ -41,11 +42,11 @@ def test_relgraphconv_equality(
         "self_loop": self_loop,
     }
     g = generate_graph().to(device)
-    g.edata[dgl.ETYPE] = torch.randint(num_rels, (g.num_edges(),)).to(device)
+    g.edata[ETYPE] = torch.randint(num_rels, (g.num_edges(),)).to(device)
     if idtype_int:
         g = g.int()
     if to_block:
-        g = dgl.to_block(g)
+        g = dgl_to_block(g)
     feat = torch.rand(g.num_src_nodes(), in_feat).to(device)
 
     torch.manual_seed(0)
@@ -55,8 +56,8 @@ def test_relgraphconv_equality(
     kwargs["apply_norm"] = False
     conv2 = CuGraphRelGraphConv(*args, **kwargs).to(device)
 
-    out1 = conv1(g, feat, g.edata[dgl.ETYPE])
-    out2 = conv2(g, feat, g.edata[dgl.ETYPE], max_in_degree=max_in_degree)
+    out1 = conv1(g, feat, g.edata[ETYPE])
+    out2 = conv2(g, feat, g.edata[ETYPE], max_in_degree=max_in_degree)
     assert torch.allclose(out1, out2, atol=1e-06)
 
     grad_out = torch.rand_like(out1)

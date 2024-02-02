@@ -3,7 +3,7 @@
 import cugraph  # usort: skip
 import backend as F
 
-import dgl
+from dgl import from_cugraph, graph
 
 
 def test_dummy():
@@ -12,7 +12,7 @@ def test_dummy():
 
 
 def test_to_cugraph_conversion():
-    g = dgl.graph((F.tensor([0, 1, 2, 3]), F.tensor([1, 0, 3, 2]))).to("cuda")
+    g = graph((F.tensor([0, 1, 2, 3]), F.tensor([1, 0, 3, 2]))).to("cuda")
     cugraph_g = g.to_cugraph()
 
     assert cugraph_g.number_of_nodes() == g.num_nodes()
@@ -33,7 +33,7 @@ def test_from_cugraph_conversion():
 
     cugraph_g.from_cudf_edgelist(df)
 
-    g = dgl.from_cugraph(cugraph_g)
+    g = from_cugraph(cugraph_g)
 
     assert g.device.type == "cuda"
     assert g.num_nodes() == cugraph_g.number_of_nodes()
@@ -52,7 +52,7 @@ def test_from_cugraph_conversion():
 
     cugraph_g.from_cudf_edgelist(df)
 
-    g = dgl.from_cugraph(cugraph_g)
+    g = from_cugraph(cugraph_g)
 
     assert g.device.type == "cuda"
     assert g.num_nodes() == cugraph_g.number_of_nodes()

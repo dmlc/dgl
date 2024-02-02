@@ -2,9 +2,10 @@
 from collections import OrderedDict
 from itertools import product
 
-import dgl
 import pytest
 import torch
+
+from dgl import graph, to_block as dgl_to_block
 from dgl.nn import CuGraphSAGEConv, SAGEConv
 
 options = OrderedDict(
@@ -19,7 +20,7 @@ options = OrderedDict(
 def generate_graph():
     u = torch.tensor([0, 1, 0, 2, 3, 0, 4, 0, 5, 0, 6, 7, 0, 8, 9])
     v = torch.tensor([1, 9, 2, 9, 9, 4, 9, 5, 9, 6, 9, 9, 8, 9, 0])
-    g = dgl.graph((u, v))
+    g = graph((u, v))
     return g
 
 
@@ -32,7 +33,7 @@ def test_SAGEConv_equality(idtype_int, max_in_degree, to_block):
     if idtype_int:
         g = g.int()
     if to_block:
-        g = dgl.to_block(g)
+        g = dgl_to_block(g)
     feat = torch.rand(g.num_src_nodes(), in_feat).to(device)
 
     torch.manual_seed(0)
