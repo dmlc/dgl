@@ -90,14 +90,16 @@ class UniformNegativeSampler(NegativeSampler):
                 (
                     torch.ones(
                         pos_num,
+                        dtype=torch.bool,
                         device=seeds.device,
                     ),
                     torch.zeros(
                         neg_num,
+                        dtype=torch.bool,
                         device=seeds.device,
                     ),
                 ),
-            ).bool()
+            )
             return seeds, labels, indexes
         else:
             return self.graph.sample_negative_edges_uniform(
