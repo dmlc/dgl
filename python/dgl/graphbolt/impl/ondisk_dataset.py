@@ -121,9 +121,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         coo_dst = torch.cat(coo_dst_list)
         coo_etype = torch.cat(coo_etype_list)
 
-        sparse_matrix = spmatrix(
-            indices=torch.stack((coo_src, coo_dst), dim=0)
-        )
+        sparse_matrix = spmatrix(indices=torch.stack((coo_src, coo_dst), dim=0))
         indptr, indices, value_indices = sparse_matrix.csc()
         node_type_offset = torch.tensor(node_type_offset)
         type_per_edge = torch.index_select(
