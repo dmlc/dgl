@@ -1033,7 +1033,9 @@ def test_SubgraphSampler_Node(sampler_type):
     sampler_dp = sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 5
     for data in sampler_dp:
-        assert torch.equal(data.compacted_seeds, torch.tensor([0, 1]))
+        assert torch.equal(
+            data.compacted_seeds, torch.tensor([0, 1]).to(F.ctx())
+        )
 
 
 @pytest.mark.parametrize(
@@ -1064,7 +1066,9 @@ def test_SubgraphSampler_Link(sampler_type):
     # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
     for data in datapipe:
-        assert torch.equal(data.compacted_seeds, torch.tensor([[0, 1], [2, 3]]))
+        assert torch.equal(
+            data.compacted_seeds, torch.tensor([[0, 1], [2, 3]]).to(F.ctx())
+        )
 
 
 @pytest.mark.parametrize(
@@ -1128,7 +1132,8 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
         for etype, compacted_seeds in minibatch.compacted_seeds.items():
             print(minibatch.compacted_seeds)
             assert torch.equal(
-                compacted_seeds, expected_compacted_seeds[etype][step]
+                compacted_seeds,
+                expected_compacted_seeds[etype][step].to(F.ctx()),
             )
 
 
@@ -1179,11 +1184,12 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
         for compacted_seeds in data.compacted_seeds.values():
             if sampler_type == SamplerType.Temporal:
                 assert torch.equal(
-                    compacted_seeds, torch.tensor([[0, 0], [1, 1]])
+                    compacted_seeds, torch.tensor([[0, 0], [1, 1]]).to(F.ctx())
                 )
             else:
                 assert torch.equal(
-                    compacted_seeds, torch.tensor([[0, 0], [0, 1]])
+                    torch.sort(compacted_seeds.T, dim=1)[0].T,
+                    torch.tensor([[0, 0], [0, 1]]).to(F.ctx()),
                 )
 
 

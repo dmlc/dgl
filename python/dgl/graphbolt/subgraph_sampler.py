@@ -252,7 +252,7 @@ class SubgraphSampler(MiniBatchTransformer):
                             minibatch.timestamp[etype]
                         )
                 else:
-                    assert pair.shape[1] == 2, (
+                    assert pair.ndim == 2 and pair.shape[1] == 2, (
                         "Only tensor with shape N*2 is "
                         + f"supported now, but got {pair.shape}."
                     )
