@@ -10,8 +10,6 @@ from typing import Dict, List, Union
 import torch
 import yaml
 
-import dgl.sparse as dglsp
-
 from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
@@ -62,6 +60,8 @@ def _graph_data_to_fused_csc_sampling_graph(
     sampling_graph : FusedCSCSamplingGraph
         The FusedCSCSamplingGraph constructed from the raw data.
     """
+    from ...sparse import spmatrix
+
     is_homogeneous = (
         len(graph_data["nodes"]) == 1
         and len(graph_data["edges"]) == 1
@@ -77,7 +77,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         num_nodes = graph_data["nodes"][0]["num"]
         num_edges = len(src)
         coo_tensor = torch.tensor([src, dst])
-        sparse_matrix = dglsp.spmatrix(coo_tensor)
+        sparse_matrix = spmatrix(coo_tensor)
         indptr, indices, value_indices = sparse_matrix.csc()
         node_type_offset = None
         type_per_edge = None
@@ -121,7 +121,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         coo_dst = torch.cat(coo_dst_list)
         coo_etype = torch.cat(coo_etype_list)
 
-        sparse_matrix = dglsp.spmatrix(
+        sparse_matrix = spmatrix(
             indices=torch.stack((coo_src, coo_dst), dim=0)
         )
         indptr, indices, value_indices = sparse_matrix.csc()
@@ -242,6 +242,11 @@ def _graph_data_to_fused_csc_sampling_graph(
                         ] : edge_type_offset[edge_type_to_id[etype] + 1]
                     ] = feat
                 edge_attributes[feat_name] = feat_tensor
+
+    if not bool(node_attributes):
+        node_attributes = None
+    if not bool(edge_attributes):
+        edge_attributes = None
 
     # Construct the FusedCSCSamplingGraph.
     sampling_graph = fused_csc_sampling_graph(
