@@ -91,7 +91,6 @@ def test_basic_feature_store_hetero():
     ]
 
 
-@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 def test_basic_feature_store_errors():
     a = torch.tensor([3, 2, 1])
     b = torch.tensor([[1, 2, 4], [2, 5, 3]])
