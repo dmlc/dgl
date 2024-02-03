@@ -824,6 +824,7 @@ std::pair<bool, std::vector<int64_t>> FastTemporalPick(
   constexpr int64_t kTriedThreshold = 1000;
   auto timestamp = utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset);
   std::vector<int64_t> sampled_edges;
+  sampled_edges.reserve(fanout);
   std::set<int64_t> sampled_edge_set;
   int64_t sample_count = 0;
   int64_t tried = 0;
@@ -866,6 +867,9 @@ int64_t TemporalNumPick(
     int64_t offset, int64_t num_neighbors) {
   constexpr int64_t kFastPathThreshold = 1000;
   if (num_neighbors > kFastPathThreshold && !probs_or_mask.has_value()) {
+    // TODO: Currently we use the fast path both in TemporalNumPick and
+    // TemporalPick. We may only sample once in TemporalNumPick and use the
+    // sampled edges in TemporalPick to avoid sampling twice.
     auto [success, sampled_edges] = FastTemporalPick(
         seed_timestamp, csc_indics, fanout, replace, node_timestamp,
         edge_timestamp, seed_offset, offset, num_neighbors);
