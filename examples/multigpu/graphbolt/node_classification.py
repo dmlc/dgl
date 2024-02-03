@@ -391,7 +391,7 @@ def parse_args():
         "--gpu-cache-size",
         type=int,
         default=0,
-        help="The GPU cache size for input features.",
+        help="The capacity of the GPU cache, the number of features to store.",
     )
     parser.add_argument(
         "--mode",
