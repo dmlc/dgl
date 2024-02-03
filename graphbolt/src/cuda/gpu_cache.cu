@@ -78,6 +78,7 @@ void GpuCache::Replace(torch::Tensor keys, torch::Tensor values) {
       "Values should have the correct dimensions.");
   TORCH_CHECK(
       values.scalar_type() == dtype_, "Values should have the correct dtype.");
+  if (keys.size(0) == 0) return;
   keys = keys.to(torch::kLong);
   torch::Tensor float_values;
   if (num_bytes_ % sizeof(float) != 0) {
