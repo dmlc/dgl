@@ -99,7 +99,7 @@ c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::Create(
     for (const auto& pair : node_attributes.value()) {
       TORCH_CHECK(
           pair.value().size(0) == indptr.size(0) - 1,
-          "Expected node_attribute.size(0) and num_nodes to be euqal, "
+          "Expected node_attribute.size(0) and num_nodes to be equal, "
           "but node_attribute.size(0) was ",
           pair.value().size(0), ", and num_nodes was ", indptr.size(0) - 1,
           ".");
