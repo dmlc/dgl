@@ -197,12 +197,6 @@ class SAGE(nn.Module):
         pin_memory = storage_device == "pinned"
         buffer_device = torch.device("cpu" if pin_memory else storage_device)
 
-        def move_to_storage_device(tensor):
-            if pin_memory:
-                return tensor.pin_memory()
-            else:
-                return tensor.to(buffer_device)
-
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
 
@@ -211,6 +205,7 @@ class SAGE(nn.Module):
                 self.out_size if is_last_layer else self.hidden_size,
                 dtype=torch.float32,
                 device=buffer_device,
+                pin_memory=pin_memory,
             )
             for data in tqdm(dataloader):
                 # len(blocks) = 1
@@ -223,7 +218,7 @@ class SAGE(nn.Module):
                     buffer_device
                 )
             if not is_last_layer:
-                features.update("node", None, "feat", move_to_storage_device(y))
+                features.update("node", None, "feat", y)
 
         return y
 
