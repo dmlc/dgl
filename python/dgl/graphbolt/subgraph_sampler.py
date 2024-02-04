@@ -245,37 +245,28 @@ class SubgraphSampler(MiniBatchTransformer):
             if use_timestamp:
                 nodes_timestamp = defaultdict(list)
             for etype, pair in seeds.items():
-                if pair.ndim == 1:
-                    nodes[etype].append(pair)
-                    if use_timestamp:
-                        nodes_timestamp[etype].append(
-                            minibatch.timestamp[etype]
-                        )
-                else:
-                    assert pair.ndim == 2 and pair.shape[1] == 2, (
-                        "Only tensor with shape N*2 is "
-                        + f"supported now, but got {pair.shape}."
+                assert pair.ndim == 1 or (
+                    pair.ndim == 2 and pair.shape[1] == 2
+                ), (
+                    "Only tensor with shape 1*N and N*2 is "
+                    + f"supported now, but got {pair.shape}."
+                )
+                ntypes = etype[:].split(":")[::2]
+                pair = pair.view(pair.shape[0], -1)
+                if use_timestamp:
+                    negative_ratio = (
+                        pair.shape[0] // minibatch.timestamp[etype].shape[0] - 1
                     )
-                    src_type, _, dst_type = etype_str_to_tuple(etype)
-                    src, dst = pair.T
-                    nodes[src_type].append(src)
-                    nodes[dst_type].append(dst)
+                    neg_timestamp = minibatch.timestamp[
+                        etype
+                    ].repeat_interleave(negative_ratio)
+                for i, ntype in enumerate(ntypes):
+                    nodes[ntype].append(pair[:, i])
                     if use_timestamp:
-                        negative_ratio = int(
-                            pair.shape[0] / minibatch.timestamp[etype].shape[0]
-                            - 1
-                        )
-                        neg_timestamp = minibatch.timestamp[
-                            etype
-                        ].repeat_interleave(negative_ratio)
-                        nodes_timestamp[src_type].append(
+                        nodes_timestamp[ntype].append(
                             minibatch.timestamp[etype]
                         )
-                        nodes_timestamp[src_type].append(neg_timestamp)
-                        nodes_timestamp[dst_type].append(
-                            minibatch.timestamp[etype]
-                        )
-                        nodes_timestamp[dst_type].append(neg_timestamp)
+                        nodes_timestamp[ntype].append(neg_timestamp)
             # Unique and compact the collected nodes.
             if use_timestamp:
                 (
@@ -302,8 +293,8 @@ class SubgraphSampler(MiniBatchTransformer):
             nodes_timestamp = None
             if use_timestamp:
                 # Timestamp for source and destination nodes are the same.
-                negative_ratio = int(
-                    seeds.shape[0] / minibatch.timestamp.shape[0] - 1
+                negative_ratio = (
+                    seeds.shape[0] // minibatch.timestamp.shape[0] - 1
                 )
                 neg_timestamp = minibatch.timestamp.repeat_interleave(
                     negative_ratio
@@ -311,11 +302,7 @@ class SubgraphSampler(MiniBatchTransformer):
                 seeds_timestamp = torch.cat(
                     (minibatch.timestamp, neg_timestamp)
                 )
-                nodes_timestamp = [
-                    torch.cat(
-                        [seeds_timestamp for _ in range(seeds.ndim)]
-                    ).view(-1)
-                ]
+                nodes_timestamp = [seeds_timestamp for _ in range(seeds.ndim)]
             # Unique and compact the collected nodes.
             if use_timestamp:
                 (
