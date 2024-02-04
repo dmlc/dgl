@@ -15,12 +15,22 @@ from .fused_csc_sampling_graph import fused_csc_sampling_graph
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
-__all__ = ["NeighborSampler", "LayerNeighborSampler", "SamplePerLayer"]
+__all__ = [
+    "NeighborSampler",
+    "LayerNeighborSampler",
+    "SamplePerLayer",
+    "SamplePerLayerFromFetchedSubgraph",
+    "FetchInsubgraphData",
+]
 
 
 @functional_datapipe("fetch_insubgraph_data")
 class FetchInsubgraphData(Mapper):
-    """Fetches the insubgraph and wraps it in a FusedCSCSamplingGraph object."""
+    """Fetches the insubgraph and wraps it in a FusedCSCSamplingGraph object. If
+    the provided sample_per_layer_obj has a valid prob_name, then it reads the
+    probabilies of all the fetched edges. Furthermore, if type_per_array tensor
+    exists in the underlying graph, then the types of all the fetched edges are
+    read as well."""
 
     def __init__(
         self, datapipe, sample_per_layer_obj, stream=None, executor=None
@@ -34,11 +44,18 @@ class FetchInsubgraphData(Mapper):
         else:
             self.executor = executor
 
-    def _fetch_per_layer_helper(self, minibatch, stream):
+    def _fetch_per_layer_impl(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
             index = minibatch._seed_nodes
-            if index.is_cuda:
-                index.record_stream(torch.cuda.current_stream())
+            if isinstance(index, dict):
+                index = self.graph._convert_to_homogeneous_nodes(index)
+
+            index, original_positions = index.sort()
+            if (original_positions.diff() == 1).all().item():  # is_sorted
+                minibatch._subgraph_seed_nodes = None
+            else:
+                minibatch._subgraph_seed_nodes = original_positions
+            index.record_stream(torch.cuda.current_stream())
             index_select = partial(
                 torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
             )
@@ -69,10 +86,19 @@ class FetchInsubgraphData(Mapper):
                     record_stream(probs_or_mask)
             else:
                 probs_or_mask = None
+            if self.graph.node_type_offset is not None:
+                node_type_offset = torch.searchsorted(
+                    index, self.graph.node_type_offset
+                )
+            else:
+                node_type_offset = None
             subgraph = fused_csc_sampling_graph(
                 indptr,
                 indices,
+                node_type_offset=node_type_offset,
                 type_per_edge=type_per_edge,
+                node_type_to_id=self.graph.node_type_to_id,
+                edge_type_to_id=self.graph.edge_type_to_id,
             )
             if self.prob_name is not None and probs_or_mask is not None:
                 subgraph.edge_attributes = {self.prob_name: probs_or_mask}
@@ -80,12 +106,7 @@ class FetchInsubgraphData(Mapper):
             minibatch.sampled_subgraphs.insert(0, subgraph)
 
             if self.stream is not None:
-                event = torch.cuda.current_stream().record_event()
-
-                def _wait():
-                    event.wait()
-
-                minibatch.wait = _wait
+                minibatch.wait = torch.cuda.current_stream().record_event().wait
 
             return minibatch
 
@@ -95,7 +116,7 @@ class FetchInsubgraphData(Mapper):
             current_stream = torch.cuda.current_stream()
             self.stream.wait_stream(current_stream)
         return self.executor.submit(
-            self._fetch_per_layer_helper, minibatch, current_stream
+            self._fetch_per_layer_impl, minibatch, current_stream
         )
 
 
@@ -114,8 +135,12 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
         subgraph = minibatch.sampled_subgraphs[0]
 
         sampled_subgraph = getattr(subgraph, self.sampler_name)(
-            None, self.fanout, self.replace, self.prob_name
+            minibatch._subgraph_seed_nodes,
+            self.fanout,
+            self.replace,
+            self.prob_name,
         )
+        delattr(minibatch, "_subgraph_seed_nodes")
         sampled_subgraph.original_column_node_ids = minibatch._seed_nodes
         minibatch.sampled_subgraphs[0] = sampled_subgraph
 
@@ -293,7 +318,8 @@ class NeighborSampler(SubgraphSampler):
             datapipe, graph, fanouts, replace, prob_name, deduplicate, sampler
         )
 
-    def _prepare(self, node_type_to_id, minibatch):
+    @staticmethod
+    def _prepare(node_type_to_id, minibatch):
         seeds = minibatch._seed_nodes
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
