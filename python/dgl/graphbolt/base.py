@@ -20,6 +20,7 @@ __all__ = [
     "FutureWaiter",
     "EndMarker",
     "isin",
+    "index_select",
     "expand_indptr",
     "CSCFormatBase",
     "seed",
@@ -105,6 +106,33 @@ def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
     return torch.ops.graphbolt.expand_indptr(
         indptr, dtype, node_ids, output_size
     )
+
+
+def index_select(tensor, index):
+    """Returns a new tensor which indexes the input tensor along dimension dim
+    using the entries in index.
+
+    The returned tensor has the same number of dimensions as the original tensor
+    (tensor). The first dimension has the same size as the length of index;
+    other dimensions have the same size as in the original tensor.
+
+    When tensor is a pinned tensor and index.is_cuda is True, the operation runs
+    on the CUDA device and the returned tensor will also be on CUDA.
+
+    Parameters
+    ----------
+    tensor : torch.Tensor
+        The input tensor.
+    index : torch.Tensor
+        The 1-D tensor containing the indices to index.
+
+    Returns
+        -------
+        torch.Tensor
+            The indexed input tensor, equivalent to tensor[index].
+    """
+    assert index.dim() == 1, "Index should be 1D tensor."
+    return torch.ops.graphbolt.index_select(tensor, index)
 
 
 def etype_tuple_to_str(c_etype):

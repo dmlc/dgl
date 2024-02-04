@@ -79,14 +79,10 @@ class SAGE(nn.Module):
                 hidden_x = F.relu(hidden_x)
         return hidden_x
 
-    def inference(self, graph, features, dataloader, device):
+    def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
-        feature = features.read("node", None, "feat")
-
-        buffer_device = torch.device("cpu")
-        # Enable pin_memory for faster CPU to GPU data transfer if the
-        # model is running on a GPU.
-        pin_memory = buffer_device != device
+        pin_memory = storage_device == "pinned"
+        buffer_device = torch.device("cpu" if pin_memory else storage_device)
 
         print("Start node embedding inference.")
         for layer_idx, layer in enumerate(self.layers):
@@ -99,17 +95,17 @@ class SAGE(nn.Module):
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
-            feature = feature.to(device)
-            for step, data in tqdm.tqdm(enumerate(dataloader)):
-                x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+            for data in tqdm.tqdm(dataloader):
+                # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], data.node_features["feat"])
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                 # By design, our seed nodes are contiguous.
                 y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
                     buffer_device, non_blocking=True
                 )
-            feature = y
+            if not is_last_layer:
+                features.update("node", None, "feat", y)
 
         return y
 
@@ -185,7 +181,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph, args.fanout if is_train else [-1]
+    )
 
     ############################################################################
     # [Input]:
@@ -213,12 +211,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs. This step is skipped in evaluation/inference because features
-    # are updated as a whole during it, thus storing features in minibatch is
-    # unnecessary.
+    # subgraphs.
     ############################################################################
-    if is_train:
-        datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
     # [Input]:
@@ -286,15 +281,12 @@ def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
     model.eval()
     evaluator = Evaluator(name="ogbl-citation2")
 
-    # Since we need to use all neghborhoods for evaluation, we set the fanout
-    # to -1.
-    args.fanout = [-1]
     dataloader = create_dataloader(
         args, graph, features, all_nodes_set, is_train=False
     )
 
     # Compute node embeddings for the entire graph.
-    node_emb = model.inference(graph, features, dataloader, args.device)
+    node_emb = model.inference(graph, features, dataloader, args.storage_device)
     results = []
 
     # Loop over both validation and test sets.
