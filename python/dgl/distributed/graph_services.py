@@ -41,7 +41,7 @@ class SubgraphResponse(Response):
     """The response for sampling and in_subgraph"""
 
     def __init__(
-        self, global_src, global_dst, global_eids=None, etype_ids=None
+        self, global_src, global_dst, *, global_eids=None, etype_ids=None
     ):
         self.global_src = global_src
         self.global_dst = global_dst
@@ -155,7 +155,9 @@ def _sample_neighbors_graphbolt(
     global_dst = global_nid_mapping[local_dst]
 
     # [Rui][TODO] edge IDs are not supported yet.
-    return global_src, global_dst, None, subgraph.type_per_edge
+    return LocalSampledGraph(
+        global_src, global_dst, None, subgraph.type_per_edge
+    )
 
 
 def _sample_neighbors_dgl(
@@ -192,7 +194,7 @@ def _sample_neighbors_dgl(
         global_nid_mapping, src
     ), F.gather_row(global_nid_mapping, dst)
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
-    return global_src, global_dst, global_eids
+    return LocalSampledGraph(global_src, global_dst, global_eids)
 
 
 def _sample_neighbors(use_graphbolt, *args, **kwargs):
@@ -220,19 +222,10 @@ def _sample_neighbors(use_graphbolt, *args, **kwargs):
     tensor
         The edge type ID array.
     """
-    global_src, global_dst, global_eids, etype_ids = None, None, None, None
-    if use_graphbolt:
-        (
-            global_src,
-            global_dst,
-            global_eids,
-            etype_ids,
-        ) = _sample_neighbors_graphbolt(*args, **kwargs)
-    else:
-        global_src, global_dst, global_eids = _sample_neighbors_dgl(
-            *args, **kwargs
-        )
-    return global_src, global_dst, global_eids, etype_ids
+    func = (
+        _sample_neighbors_graphbolt if use_graphbolt else _sample_neighbors_dgl
+    )
+    return func(*args, **kwargs)
 
 
 def _sample_etype_neighbors(
@@ -273,8 +266,7 @@ def _sample_etype_neighbors(
         global_nid_mapping, src
     ), F.gather_row(global_nid_mapping, dst)
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
-    # `etype_ids` is always None as it's required by GraphBolt sampling only.
-    return global_src, global_dst, global_eids, None
+    return LocalSampledGraph(global_src, global_dst, global_eids)
 
 
 def _find_edges(local_g, partition_book, seed_edges):
@@ -320,8 +312,7 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
     src, dst = sampled_graph.edges()
     global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
-    # `etype_ids` is always None as it's required by GraphBolt sampling only.
-    return global_src, global_dst, global_eids, None
+    return LocalSampledGraph(global_src, global_dst, global_eids)
 
 
 # --- NOTE 1 ---
@@ -397,7 +388,7 @@ class SamplingRequest(Request):
             prob = [kv_store.data_store[self.prob]]
         else:
             prob = None
-        global_src, global_dst, global_eids, etype_ids = _sample_neighbors(
+        res = _sample_neighbors(
             self.use_graphbolt,
             local_g,
             partition_book,
@@ -408,7 +399,10 @@ class SamplingRequest(Request):
             replace=self.replace,
         )
         return SubgraphResponse(
-            global_src, global_dst, global_eids=global_eids, etype_ids=etype_ids
+            res.global_src,
+            res.global_dst,
+            global_eids=res.global_eids,
+            etype_ids=res.etype_ids,
         )
 
 
@@ -464,12 +458,7 @@ class SamplingRequestEtype(Request):
             ]
         else:
             probs = None
-        (
-            global_src,
-            global_dst,
-            global_eids,
-            etype_ids,
-        ) = _sample_etype_neighbors(
+        res = _sample_etype_neighbors(
             local_g,
             partition_book,
             self.seed_nodes,
@@ -481,7 +470,10 @@ class SamplingRequestEtype(Request):
             self.etype_sorted,
         )
         return SubgraphResponse(
-            global_src, global_dst, global_eids=global_eids, etype_ids=etype_ids
+            res.global_src,
+            res.global_dst,
+            global_eids=res.global_eids,
+            etype_ids=res.etype_ids,
         )
 
 
@@ -629,7 +621,9 @@ def merge_graphs(res_list, num_nodes):
 
 
 LocalSampledGraph = namedtuple(
-    "LocalSampledGraph", "global_src global_dst global_eids etype_ids"
+    "LocalSampledGraph",
+    "global_src global_dst global_eids etype_ids",
+    defaults=(None, None, None, None),
 )
 
 
@@ -685,10 +679,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     # sample neighbors for the nodes in the local partition.
     res_list = []
     if local_nids is not None:
-        src, dst, eids, etype_ids = local_access(
-            g.local_partition, partition_book, local_nids
-        )
-        res_list.append(LocalSampledGraph(src, dst, eids, etype_ids))
+        res = local_access(g.local_partition, partition_book, local_nids)
+        res_list.append(res)
 
     # receive responses from remote machines.
     if msgseq2pos is not None:
