@@ -97,12 +97,21 @@ c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::Create(
   }
   if (node_attributes.has_value()) {
     for (const auto& pair : node_attributes.value()) {
-      TORCH_CHECK(pair.value().size(0) == indptr.size(0) - 1);
+      TORCH_CHECK(
+          pair.value().size(0) == indptr.size(0) - 1,
+          "Expected node_attribute.size(0) and num_nodes to be equal, "
+          "but node_attribute.size(0) was ",
+          pair.value().size(0), ", and num_nodes was ", indptr.size(0) - 1,
+          ".");
     }
   }
   if (edge_attributes.has_value()) {
     for (const auto& pair : edge_attributes.value()) {
-      TORCH_CHECK(pair.value().size(0) == indices.size(0));
+      TORCH_CHECK(
+          pair.value().size(0) == indices.size(0),
+          "Expected edge_attribute.size(0) and num_edges to be equal, "
+          "but edge_attribute.size(0) was ",
+          pair.value().size(0), ", and num_edges was ", indices.size(0), ".");
     }
   }
   return c10::make_intrusive<FusedCSCSamplingGraph>(
