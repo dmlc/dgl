@@ -622,7 +622,7 @@ def merge_graphs(res_list, num_nodes):
     return g
 
 
-LocalSampledGraph = namedtuple( # pylint: disable=unexpected-keyword-arg
+LocalSampledGraph = namedtuple(  # pylint: disable=unexpected-keyword-arg
     "LocalSampledGraph",
     "global_src global_dst global_eids etype_ids",
     defaults=(None, None, None, None),
