@@ -31,6 +31,7 @@ def start_server(
     disable_shared_mem,
     graph_name,
     graph_format=["csc", "coo"],
+    use_graphbolt=False,
 ):
     g = DistGraphServer(
         rank,
@@ -40,6 +41,7 @@ def start_server(
         tmpdir / (graph_name + ".json"),
         disable_shared_mem=disable_shared_mem,
         graph_format=graph_format,
+        use_graphbolt=use_graphbolt,
     )
     g.start()
 
@@ -72,6 +74,7 @@ def start_sample_client_shuffle(
     group_id,
     orig_nid,
     orig_eid,
+    use_graphbolt=False,
 ):
     os.environ["DGL_GROUP_ID"] = str(group_id)
     gpb = None
@@ -80,17 +83,26 @@ def start_sample_client_shuffle(
             tmpdir / "test_sampling.json", rank
         )
     dgl.distributed.initialize("rpc_ip_config.txt")
-    dist_graph = DistGraph("test_sampling", gpb=gpb)
-    sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+    dist_graph = DistGraph(
+        "test_sampling", gpb=gpb, use_graphbolt=use_graphbolt
+    )
+    sampled_graph = sample_neighbors(
+        dist_graph, [0, 10, 99, 66, 1024, 2008], 3, use_graphbolt=use_graphbolt
+    )
 
     src, dst = sampled_graph.edges()
     src = orig_nid[src]
     dst = orig_nid[dst]
     assert sampled_graph.num_nodes() == g.num_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
-    eids = g.edge_ids(src, dst)
-    eids1 = orig_eid[sampled_graph.edata[dgl.EID]]
-    assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
+    if use_graphbolt:
+        assert (
+            dgl.EID not in sampled_graph.edata
+        ), "EID should not be in sampled graph if use_graphbolt=True."
+    else:
+        eids = g.edge_ids(src, dst)
+        eids1 = orig_eid[sampled_graph.edata[dgl.EID]]
+        assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
 
 
 def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids, etype=None):
@@ -378,7 +390,9 @@ def test_rpc_sampling():
         check_rpc_sampling(Path(tmpdirname), 1)
 
 
-def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
+def check_rpc_sampling_shuffle(
+    tmpdir, num_server, num_groups=1, use_graphbolt=False
+):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
@@ -393,6 +407,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
     )
 
     pserver_list = []
@@ -406,6 +421,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
                 num_server > 1,
                 "test_sampling",
                 ["csc", "coo"],
+                use_graphbolt,
             ),
         )
         p.start()
@@ -427,6 +443,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
                     group_id,
                     orig_nids,
                     orig_eids,
+                    use_graphbolt,
                 ),
             )
             p.start()
@@ -1012,6 +1029,9 @@ def test_rpc_sampling_shuffle(num_server):
 
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_sampling_shuffle(
+            Path(tmpdirname), num_server, use_graphbolt=True
+        )
         check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
         # [TODO][Rhett] Tests for multiple groups may fail sometimes and
         # root cause is unknown. Let's disable them for now.
