@@ -100,6 +100,8 @@ def _sample_neighbors_graphbolt(
         The nodes to sample neighbors from.
     fanout : tensor or int
         The number of edges to be sampled for each node.
+    edge_dir : str, optional
+        Determines whether to sample inbound or outbound edges.
     prob : tensor, optional
         The probability associated with each neighboring edge of a node.
     replace : bool, optional
