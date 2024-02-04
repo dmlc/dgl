@@ -28,14 +28,16 @@ from dgl import graphbolt as gb
         torch.float64,
     ],
 )
-def test_gpu_cached_feature(dtype):
+@pytest.mark.parametrize("cache_size_a", [1, 1024])
+@pytest.mark.parametrize("cache_size_b", [1, 1024])
+def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
     a = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype, pin_memory=True)
     b = torch.tensor(
         [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype, pin_memory=True
     )
 
-    feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), 2)
-    feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), 1)
+    feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), cache_size_a)
+    feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), cache_size_b)
 
     # Test read the entire feature.
     assert torch.equal(feat_store_a.read(), a.to("cuda"))
@@ -52,6 +54,23 @@ def test_gpu_cached_feature(dtype):
             "cuda"
         ),
     )
+    assert torch.equal(
+        feat_store_a.read(torch.tensor([1, 1]).to("cuda")),
+        torch.tensor([[4, 5, 6], [4, 5, 6]], dtype=dtype).to("cuda"),
+    )
+    assert torch.equal(
+        feat_store_b.read(torch.tensor([0]).to("cuda")),
+        torch.tensor([[[1, 2], [3, 4]]], dtype=dtype).to("cuda"),
+    )
+    # The cache should be full now for the large cache sizes, %100 hit expected.
+    if cache_size_a >= 1024:
+        total_miss = feat_store_a._feature.total_miss
+        feat_store_a.read(torch.tensor([0, 1]).to("cuda"))
+        assert total_miss == feat_store_a._feature.total_miss
+    if cache_size_b >= 1024:
+        total_miss = feat_store_b._feature.total_miss
+        feat_store_b.read(torch.tensor([0, 1]).to("cuda"))
+        assert total_miss == feat_store_b._feature.total_miss
 
     # Test get the size of the entire feature with ids.
     assert feat_store_a.size() == torch.Size([3])
