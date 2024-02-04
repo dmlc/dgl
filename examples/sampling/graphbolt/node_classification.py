@@ -131,11 +131,9 @@ def create_dataloader(
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs. This step is skipped in inference because features are updated
-    # as a whole during it, thus storing features in minibatch is unnecessary.
+    # subgraphs.
     ############################################################################
-    if job != "infer":
-        datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
     # [Step-5]:
@@ -194,14 +192,10 @@ class SAGE(nn.Module):
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
-    def inference(self, graph, features, dataloader, device):
+    def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
-        feature = features.read("node", None, "feat")
-
-        buffer_device = torch.device("cpu")
-        # Enable pin_memory for faster CPU to GPU data transfer if the
-        # model is running on a GPU.
-        pin_memory = buffer_device != device
+        pin_memory = storage_device == "pinned"
+        buffer_device = torch.device("cpu" if pin_memory else storage_device)
 
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
@@ -213,11 +207,9 @@ class SAGE(nn.Module):
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
-            feature = feature.to(device)
-
-            for step, data in tqdm(enumerate(dataloader)):
-                x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+            for data in tqdm(dataloader):
+                # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], data.node_features["feat"])
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
@@ -225,7 +217,8 @@ class SAGE(nn.Module):
                 y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
                     buffer_device
                 )
-            feature = y
+            if not is_last_layer:
+                features.update("node", None, "feat", y)
 
         return y
 
@@ -245,7 +238,7 @@ def layerwise_infer(
         num_workers=args.num_workers,
         job="infer",
     )
-    pred = model.inference(graph, features, dataloader, args.device)
+    pred = model.inference(graph, features, dataloader, args.storage_device)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
 
