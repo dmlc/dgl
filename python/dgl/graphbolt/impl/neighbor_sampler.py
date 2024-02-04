@@ -56,7 +56,7 @@ class FetchInsubgraphData(Mapper):
             else:
                 minibatch._subgraph_seed_nodes = original_positions
             index.record_stream(torch.cuda.current_stream())
-            index_select = partial(
+            index_select_csc_with_indptr = partial(
                 torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
             )
 
@@ -64,12 +64,14 @@ class FetchInsubgraphData(Mapper):
                 if stream is not None and tensor.is_cuda:
                     tensor.record_stream(stream)
 
-            indptr, indices = index_select(self.graph.indices, index, None)
+            indptr, indices = index_select_csc_with_indptr(
+                self.graph.indices, index, None
+            )
             record_stream(indptr)
             record_stream(indices)
             output_size = len(indices)
             if self.graph.type_per_edge is not None:
-                _, type_per_edge = index_select(
+                _, type_per_edge = index_select_csc_with_indptr(
                     self.graph.type_per_edge, index, output_size
                 )
                 record_stream(type_per_edge)
@@ -80,7 +82,7 @@ class FetchInsubgraphData(Mapper):
                     self.prob_name, None
                 )
                 if probs_or_mask is not None:
-                    _, probs_or_mask = index_select(
+                    _, probs_or_mask = index_select_csc_with_indptr(
                         probs_or_mask, index, output_size
                     )
                     record_stream(probs_or_mask)
