@@ -59,13 +59,18 @@ class FetchInsubgraphData(Mapper):
                     tensor.record_stream(stream)
                 return tensor
 
-            index, original_positions = index.sort()
-            if (original_positions.diff() == 1).all().item():  # is_sorted
+            if self.graph.node_type_offset is None:
+                # sorting not needed.
                 minibatch._subgraph_seed_nodes = None
             else:
-                minibatch._subgraph_seed_nodes = record_stream(
-                    original_positions.sort()[1]
-                )
+                index, original_positions = index.sort()
+                if (original_positions.diff() == 1).all().item():
+                    # already sorted.
+                    minibatch._subgraph_seed_nodes = None
+                else:
+                    minibatch._subgraph_seed_nodes = record_stream(
+                        original_positions.sort()[1]
+                    )
             index_select_csc_with_indptr = partial(
                 torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
             )
