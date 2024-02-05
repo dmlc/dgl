@@ -1,5 +1,6 @@
 """Base types and utilities for Graph Bolt."""
 
+from collections import deque
 from dataclasses import dataclass
 
 import torch
@@ -14,6 +15,10 @@ __all__ = [
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
+    "FutureWaiter",
+    "Waiter",
+    "Bufferer",
+    "EndMarker",
     "isin",
     "index_select",
     "expand_indptr",
@@ -245,6 +250,76 @@ class CopyTo(IterDataPipe):
                         ),
                     )
             yield data
+
+
+@functional_datapipe("mark_end")
+class EndMarker(IterDataPipe):
+    """Used to mark the end of a datapipe and is a no-op."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        yield from self.datapipe
+
+
+@functional_datapipe("buffer")
+class Bufferer(IterDataPipe):
+    """Buffers items before yielding them.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The data pipeline.
+    buffer_size : int, optional
+        The size of the buffer which stores the fetched samples. If data coming
+        from datapipe has latency spikes, consider setting to a higher value.
+        Default is 1.
+    """
+
+    def __init__(self, datapipe, buffer_size=1):
+        self.datapipe = datapipe
+        if buffer_size <= 0:
+            raise ValueError(
+                "'buffer_size' is required to be a positive integer."
+            )
+        self.buffer = deque(maxlen=buffer_size)
+
+    def __iter__(self):
+        for data in self.datapipe:
+            if len(self.buffer) < self.buffer.maxlen:
+                self.buffer.append(data)
+            else:
+                return_data = self.buffer.popleft()
+                self.buffer.append(data)
+                yield return_data
+        while len(self.buffer) > 0:
+            yield self.buffer.popleft()
+
+
+@functional_datapipe("wait")
+class Waiter(IterDataPipe):
+    """Calls the wait function of all items."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        for data in self.datapipe:
+            data.wait()
+            yield data
+
+
+@functional_datapipe("wait_future")
+class FutureWaiter(IterDataPipe):
+    """Calls the result function of all items and returns their results."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        for data in self.datapipe:
+            yield data.result()
 
 
 @dataclass

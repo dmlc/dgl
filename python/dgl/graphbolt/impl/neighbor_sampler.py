@@ -1,18 +1,152 @@
 """Neighbor subgraph samplers for GraphBolt."""
 
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import torch
 from torch.utils.data import functional_datapipe
+from torchdata.datapipes.iter import Mapper
 
 from ..internal import compact_csc_format, unique_and_compact_csc_formats
 from ..minibatch_transformer import MiniBatchTransformer
 
 from ..subgraph_sampler import SubgraphSampler
+from .fused_csc_sampling_graph import fused_csc_sampling_graph
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
-__all__ = ["NeighborSampler", "LayerNeighborSampler"]
+__all__ = [
+    "NeighborSampler",
+    "LayerNeighborSampler",
+    "SamplePerLayer",
+    "SamplePerLayerFromFetchedSubgraph",
+    "FetchInsubgraphData",
+]
+
+
+@functional_datapipe("fetch_insubgraph_data")
+class FetchInsubgraphData(Mapper):
+    """Fetches the insubgraph and wraps it in a FusedCSCSamplingGraph object. If
+    the provided sample_per_layer_obj has a valid prob_name, then it reads the
+    probabilies of all the fetched edges. Furthermore, if type_per_array tensor
+    exists in the underlying graph, then the types of all the fetched edges are
+    read as well."""
+
+    def __init__(
+        self, datapipe, sample_per_layer_obj, stream=None, executor=None
+    ):
+        super().__init__(datapipe, self._fetch_per_layer)
+        self.graph = sample_per_layer_obj.sampler.__self__
+        self.prob_name = sample_per_layer_obj.prob_name
+        self.stream = stream
+        if executor is None:
+            self.executor = ThreadPoolExecutor(max_workers=1)
+        else:
+            self.executor = executor
+
+    def _fetch_per_layer_impl(self, minibatch, stream):
+        with torch.cuda.stream(self.stream):
+            index = minibatch._seed_nodes
+            if isinstance(index, dict):
+                index = self.graph._convert_to_homogeneous_nodes(index)
+
+            index, original_positions = index.sort()
+            if (original_positions.diff() == 1).all().item():  # is_sorted
+                minibatch._subgraph_seed_nodes = None
+            else:
+                minibatch._subgraph_seed_nodes = original_positions
+            index.record_stream(torch.cuda.current_stream())
+            index_select_csc_with_indptr = partial(
+                torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
+            )
+
+            def record_stream(tensor):
+                if stream is not None and tensor.is_cuda:
+                    tensor.record_stream(stream)
+
+            indptr, indices = index_select_csc_with_indptr(
+                self.graph.indices, index, None
+            )
+            record_stream(indptr)
+            record_stream(indices)
+            output_size = len(indices)
+            if self.graph.type_per_edge is not None:
+                _, type_per_edge = index_select_csc_with_indptr(
+                    self.graph.type_per_edge, index, output_size
+                )
+                record_stream(type_per_edge)
+            else:
+                type_per_edge = None
+            if self.graph.edge_attributes is not None:
+                probs_or_mask = self.graph.edge_attributes.get(
+                    self.prob_name, None
+                )
+                if probs_or_mask is not None:
+                    _, probs_or_mask = index_select_csc_with_indptr(
+                        probs_or_mask, index, output_size
+                    )
+                    record_stream(probs_or_mask)
+            else:
+                probs_or_mask = None
+            if self.graph.node_type_offset is not None:
+                node_type_offset = torch.searchsorted(
+                    index, self.graph.node_type_offset
+                )
+            else:
+                node_type_offset = None
+            subgraph = fused_csc_sampling_graph(
+                indptr,
+                indices,
+                node_type_offset=node_type_offset,
+                type_per_edge=type_per_edge,
+                node_type_to_id=self.graph.node_type_to_id,
+                edge_type_to_id=self.graph.edge_type_to_id,
+            )
+            if self.prob_name is not None and probs_or_mask is not None:
+                subgraph.edge_attributes = {self.prob_name: probs_or_mask}
+
+            minibatch.sampled_subgraphs.insert(0, subgraph)
+
+            if self.stream is not None:
+                minibatch.wait = torch.cuda.current_stream().record_event().wait
+
+            return minibatch
+
+    def _fetch_per_layer(self, minibatch):
+        current_stream = None
+        if self.stream is not None:
+            current_stream = torch.cuda.current_stream()
+            self.stream.wait_stream(current_stream)
+        return self.executor.submit(
+            self._fetch_per_layer_impl, minibatch, current_stream
+        )
+
+
+@functional_datapipe("sample_per_layer_from_fetched_subgraph")
+class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
+    """Sample neighbor edges from a graph for a single layer."""
+
+    def __init__(self, datapipe, sample_per_layer_obj):
+        super().__init__(datapipe, self._sample_per_layer_from_fetched_subgraph)
+        self.sampler_name = sample_per_layer_obj.sampler.__name__
+        self.fanout = sample_per_layer_obj.fanout
+        self.replace = sample_per_layer_obj.replace
+        self.prob_name = sample_per_layer_obj.prob_name
+
+    def _sample_per_layer_from_fetched_subgraph(self, minibatch):
+        subgraph = minibatch.sampled_subgraphs[0]
+
+        sampled_subgraph = getattr(subgraph, self.sampler_name)(
+            minibatch._subgraph_seed_nodes,
+            self.fanout,
+            self.replace,
+            self.prob_name,
+        )
+        delattr(minibatch, "_subgraph_seed_nodes")
+        sampled_subgraph.original_column_node_ids = minibatch._seed_nodes
+        minibatch.sampled_subgraphs[0] = sampled_subgraph
+
+        return minibatch
 
 
 @functional_datapipe("sample_per_layer")
@@ -70,6 +204,19 @@ class CompactPerLayer(MiniBatchTransformer):
         minibatch._seed_nodes = original_row_node_ids
         minibatch.sampled_subgraphs[0] = subgraph
         return minibatch
+
+
+@functional_datapipe("fetch_and_sample")
+class FetcherAndSampler(MiniBatchTransformer):
+    """Overlapped graph sampling operation replacement."""
+
+    def __init__(self, sampler, stream, executor, buffer_size):
+        datapipe = sampler.datapipe.fetch_insubgraph_data(
+            sampler, stream, executor
+        )
+        datapipe = datapipe.buffer(buffer_size).wait_future().wait()
+        datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
+        super().__init__(datapipe)
 
 
 @functional_datapipe("sample_neighbor")
@@ -173,7 +320,8 @@ class NeighborSampler(SubgraphSampler):
             datapipe, graph, fanouts, replace, prob_name, deduplicate, sampler
         )
 
-    def _prepare(self, node_type_to_id, minibatch):
+    @staticmethod
+    def _prepare(node_type_to_id, minibatch):
         seeds = minibatch._seed_nodes
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
