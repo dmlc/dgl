@@ -145,7 +145,8 @@ def _sample_neighbors_graphbolt(
     # [Rui][TODO] Support multiple fanouts.
     assert fanout.numel() == 1, "Expect a single fanout."
 
-    subgraph = g._sample_neighbors(nodes, fanout)
+    return_eids = g.edge_attributes is not None and EID in g.edge_attributes
+    subgraph = g._sample_neighbors(nodes, fanout, return_eids=return_eids)
 
     # 3. Map local node IDs to global node IDs.
     local_src = subgraph.indices
@@ -156,9 +157,11 @@ def _sample_neighbors_graphbolt(
     global_src = global_nid_mapping[local_src]
     global_dst = global_nid_mapping[local_dst]
 
-    # [Rui][TODO] edge IDs are not supported yet.
+    global_eids = None
+    if return_eids:
+        global_eids = g.edge_attributes[EID][subgraph.original_edge_ids]
     return LocalSampledGraph(
-        global_src, global_dst, None, subgraph.type_per_edge
+        global_src, global_dst, global_eids, subgraph.type_per_edge
     )
 
 
