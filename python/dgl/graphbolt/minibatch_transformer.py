@@ -29,14 +29,18 @@ class MiniBatchTransformer(Mapper):
     def __init__(
         self,
         datapipe,
-        transformer,
+        transformer=None,
     ):
         super().__init__(datapipe, self._transformer)
-        self.transformer = transformer
+        self.transformer = transformer or self._identity
 
     def _transformer(self, minibatch):
         minibatch = self.transformer(minibatch)
         assert isinstance(
             minibatch, (MiniBatch,)
         ), "The transformer output should be an instance of MiniBatch"
+        return minibatch
+
+    @staticmethod
+    def _identity(minibatch):
         return minibatch
