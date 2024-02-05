@@ -131,7 +131,7 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
         IndexSelectSingleKernel, num_blocks, num_threads, 0, input_ptr,
         input_len, index_sorted_ptr, return_len, ret_ptr, permutation_ptr);
   } else {
-    constexpr int BLOCK_SIZE = 512;
+    constexpr int BLOCK_SIZE = CUDA_MAX_NUM_THREADS;
     dim3 block(BLOCK_SIZE, 1);
     while (static_cast<int64_t>(block.x) >= 2 * aligned_feature_size) {
       block.x >>= 1;

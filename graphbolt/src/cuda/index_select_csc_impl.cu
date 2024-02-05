@@ -14,12 +14,13 @@
 #include <numeric>
 
 #include "./common.h"
+#include "./max_uva_threads.h"
 #include "./utils.h"
 
 namespace graphbolt {
 namespace ops {
 
-constexpr int BLOCK_SIZE = 128;
+constexpr int BLOCK_SIZE = CUDA_MAX_NUM_THREADS;
 
 // Given the in_degree array and a permutation, returns in_degree of the output
 // and the permuted and modified in_degree of the input. The modified in_degree
@@ -130,7 +131,10 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   torch::Tensor output_indices =
       torch::empty(output_size.value(), options.dtype(indices.scalar_type()));
   const dim3 block(BLOCK_SIZE);
-  const dim3 grid((edge_count_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
+  const dim3 grid(
+      (std::min(edge_count_aligned, cuda::max_uva_threads.value_or(1 << 20)) +
+       BLOCK_SIZE - 1) /
+      BLOCK_SIZE);
 
   // Find the smallest integer type to store the coo_aligned_rows tensor.
   const int num_bits = cuda::NumberOfBits(num_nodes);
