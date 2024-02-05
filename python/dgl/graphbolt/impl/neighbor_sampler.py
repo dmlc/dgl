@@ -48,21 +48,27 @@ class FetchInsubgraphData(Mapper):
         with torch.cuda.stream(self.stream):
             index = minibatch._seed_nodes
             if isinstance(index, dict):
+                for idx in index.values():
+                    idx.record_stream(torch.cuda.current_stream())
                 index = self.graph._convert_to_homogeneous_nodes(index)
+            else:
+                index.record_stream(torch.cuda.current_stream())
+
+            def record_stream(tensor):
+                if stream is not None and tensor.is_cuda:
+                    tensor.record_stream(stream)
+                return tensor
 
             index, original_positions = index.sort()
             if (original_positions.diff() == 1).all().item():  # is_sorted
                 minibatch._subgraph_seed_nodes = None
             else:
-                minibatch._subgraph_seed_nodes = original_positions
-            index.record_stream(torch.cuda.current_stream())
+                minibatch._subgraph_seed_nodes = record_stream(
+                    original_positions.sort()[1]
+                )
             index_select_csc_with_indptr = partial(
                 torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
             )
-
-            def record_stream(tensor):
-                if stream is not None and tensor.is_cuda:
-                    tensor.record_stream(stream)
 
             indptr, indices = index_select_csc_with_indptr(
                 self.graph.indices, index, None
