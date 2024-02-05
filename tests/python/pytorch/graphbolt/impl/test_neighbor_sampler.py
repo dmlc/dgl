@@ -41,8 +41,12 @@ def get_hetero_graph():
 @unittest.skipIf(F._default_context_str != "gpu", reason="Enabled only on GPU.")
 @pytest.mark.parametrize("hetero", [False, True])
 @pytest.mark.parametrize("prob_name", [None, "weight", "mask"])
-def test_NeighborSampler_GraphFetch(hetero, prob_name):
-    items = torch.arange(3)
+@pytest.mark.parametrize("sorted", [False, True])
+def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
+    if sorted:
+        items = torch.arange(3)
+    else:
+        items = torch.tensor([2, 0, 1])
     names = "seed_nodes"
     itemset = gb.ItemSet(items, names=names)
     graph = get_hetero_graph().to(F.ctx())
