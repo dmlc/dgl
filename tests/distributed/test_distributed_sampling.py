@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import os
 import random
-import sys
+import tempfile
 import time
 import traceback
 import unittest
@@ -1013,47 +1013,85 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
         assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 
-# Wait non shared memory graph store
-@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-@unittest.skipIf(
-    dgl.backend.backend_name == "tensorflow",
-    reason="Not support tensorflow for now",
-)
-@unittest.skipIf(
-    dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support"
-)
 @pytest.mark.parametrize("num_server", [1])
-def test_rpc_sampling_shuffle(num_server):
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+def test_rpc_sampling_shuffle(num_server, use_graphbolt):
     reset_envs()
-    import tempfile
-
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling_shuffle(
-            Path(tmpdirname), num_server, use_graphbolt=True
+            Path(tmpdirname), num_server, use_graphbolt=use_graphbolt
         )
-        check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
-        # [TODO][Rhett] Tests for multiple groups may fail sometimes and
-        # root cause is unknown. Let's disable them for now.
-        # check_rpc_sampling_shuffle(Path(tmpdirname), num_server, num_groups=2)
+
+
+@pytest.mark.parametrize("num_server", [1])
+def test_rpc_hetero_sampling_shuffle(num_server):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
+
+
+@pytest.mark.parametrize("num_server", [1])
+def test_rpc_hetero_sampling_empty_shuffle(num_server):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server)
-        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server)
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize(
+    "graph_formats", [None, ["csc"], ["csr"], ["csc", "coo"]]
+)
+def test_rpc_hetero_etype_sampling_shuffle(num_server, graph_formats):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_hetero_etype_sampling_shuffle(
-            Path(tmpdirname), num_server, ["csc"]
+            Path(tmpdirname), num_server, graph_formats=graph_formats
         )
-        check_rpc_hetero_etype_sampling_shuffle(
-            Path(tmpdirname), num_server, ["csr"]
-        )
-        check_rpc_hetero_etype_sampling_shuffle(
-            Path(tmpdirname), num_server, ["csc", "coo"]
-        )
+
+
+@pytest.mark.parametrize("num_server", [1])
+def test_rpc_hetero_etype_sampling_empty_shuffle(num_server):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_hetero_etype_sampling_empty_shuffle(
             Path(tmpdirname), num_server
         )
+
+
+@pytest.mark.parametrize("num_server", [1])
+def test_rpc_bipartite_sampling_empty_shuffle(num_server):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_bipartite_sampling_empty(Path(tmpdirname), num_server)
+
+
+@pytest.mark.parametrize("num_server", [1])
+def test_rpc_bipartite_sampling_shuffle(num_server):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_bipartite_sampling_shuffle(Path(tmpdirname), num_server)
+
+
+@pytest.mark.parametrize("num_server", [1])
+def test_rpc_bipartite_etype_sampling_empty_shuffle(num_server):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_bipartite_etype_sampling_empty(Path(tmpdirname), num_server)
+
+
+@pytest.mark.parametrize("num_server", [1])
+def test_rpc_bipartite_etype_sampling_shuffle(num_server):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_bipartite_etype_sampling_shuffle(Path(tmpdirname), num_server)
 
 
