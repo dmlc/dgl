@@ -151,7 +151,7 @@ def evaluate(rank, model, dataloader, num_classes, device):
     y = []
     y_hats = []
 
-    for data in (tqdm.tqdm(dataloader) if rank == 0 else dataloader):
+    for data in tqdm.tqdm(dataloader) if rank == 0 else dataloader:
         blocks = data.blocks
         x = data.node_features["feat"]
         y.append(data.labels)
