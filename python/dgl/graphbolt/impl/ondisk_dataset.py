@@ -122,7 +122,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         coo_etype = torch.cat(coo_etype_list)
 
         total_num_nodes = node_type_offset[-1]
-        total_num_edges = len(coo_src)
+        total_num_edges = edge_type_offset[-1]
 
         sparse_matrix = spmatrix(
             indices=torch.stack((coo_src, coo_dst), dim=0),
@@ -136,11 +136,9 @@ def _graph_data_to_fused_csc_sampling_graph(
         node_attributes = {}
         edge_attributes = {}
         if include_original_edge_id:
-            original_edge_id = [
-                value_indices[i] - edge_type_offset[type_per_edge[i]]
-                for i in range(total_num_edges)
-            ]
-            edge_attributes[ORIGINAL_EDGE_ID] = torch.tensor(original_edge_id)
+            edge_attributes[ORIGINAL_EDGE_ID] = value_indices - torch.gather(
+                input=torch.tensor(edge_type_offset), dim=0, index=type_per_edge
+            )
 
     # Load the sampling related node/edge features and add them to
     # the sampling-graph.
@@ -223,7 +221,7 @@ def _graph_data_to_fused_csc_sampling_graph(
             for feat_name, feat_data in node_feature_collector.items():
                 _feat = next(iter(feat_data.values()))
                 feat_tensor = torch.empty(
-                    ([node_type_offset[-1]] + list(_feat.shape[1:])),
+                    ([total_num_nodes] + list(_feat.shape[1:])),
                     dtype=_feat.dtype,
                 )
                 for ntype, feat in feat_data.items():
@@ -236,7 +234,7 @@ def _graph_data_to_fused_csc_sampling_graph(
             for feat_name, feat_data in edge_feature_collector.items():
                 _feat = next(iter(feat_data.values()))
                 feat_tensor = torch.empty(
-                    ([edge_type_offset[-1]] + list(_feat.shape[1:])),
+                    ([total_num_edges] + list(_feat.shape[1:])),
                     dtype=_feat.dtype,
                 )
                 for etype, feat in feat_data.items():
