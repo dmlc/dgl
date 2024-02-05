@@ -75,6 +75,7 @@ def start_sample_client_shuffle(
     orig_nid,
     orig_eid,
     use_graphbolt=False,
+    return_eids=False,
 ):
     os.environ["DGL_GROUP_ID"] = str(group_id)
     gpb = None
@@ -95,7 +96,7 @@ def start_sample_client_shuffle(
     dst = orig_nid[dst]
     assert sampled_graph.num_nodes() == g.num_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
-    if use_graphbolt:
+    if use_graphbolt and not return_eids:
         assert (
             dgl.EID not in sampled_graph.edata
         ), "EID should not be in sampled graph if use_graphbolt=True."
@@ -391,7 +392,7 @@ def test_rpc_sampling():
 
 
 def check_rpc_sampling_shuffle(
-    tmpdir, num_server, num_groups=1, use_graphbolt=False
+    tmpdir, num_server, num_groups=1, use_graphbolt=False, return_eids=False
 ):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
@@ -408,6 +409,7 @@ def check_rpc_sampling_shuffle(
         part_method="metis",
         return_mapping=True,
         use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -444,6 +446,7 @@ def check_rpc_sampling_shuffle(
                     orig_nids,
                     orig_eids,
                     use_graphbolt,
+                    return_eids,
                 ),
             )
             p.start()
@@ -1015,12 +1018,16 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
 
 @pytest.mark.parametrize("num_server", [1])
 @pytest.mark.parametrize("use_graphbolt", [False, True])
-def test_rpc_sampling_shuffle(num_server, use_graphbolt):
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_sampling_shuffle(num_server, use_graphbolt, return_eids):
     reset_envs()
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling_shuffle(
-            Path(tmpdirname), num_server, use_graphbolt=use_graphbolt
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
         )
 
 
