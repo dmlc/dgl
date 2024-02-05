@@ -235,6 +235,28 @@ class SubgraphSampler(MiniBatchTransformer):
 
     @staticmethod
     def _seeds_preprocess(minibatch):
+        """Preprocess `seeds` in a minibatch to construct `unique_seeds`,
+        `node_timestamp` and `compacted_seeds` for further sampling. It
+        optionally incorporates timestamps for temporal graphs, organizing and
+        compacting seeds based on their types and timestamps.
+
+        Parameters
+        ----------
+        minibatch: MiniBatch
+            The minibatch.
+
+        Returns
+        -------
+        unique_seeds: torch.Tensor or Dict[str, torch.Tensor]
+            A tensor or a dictionary of tensors representing the unique seeds.
+            In heterogeneous graphs, seeds are returned for each node type.
+        nodes_timestamp: None or a torch.Tensor or Dict[str, torch.Tensor]
+            Containing timestamps for each seed. This is only returned if
+            `minibatch` includes timestamps and the graph is temporal.
+        compacted_seeds: torch.tensor or a Dict[str, torch.Tensor]
+            Representation of compacted seeds corresponding to 'seeds', where
+            all node ids inside are compacted.
+        """
         use_timestamp = hasattr(minibatch, "timestamp")
         seeds = minibatch.seeds
         is_heterogeneous = isinstance(seeds, Dict)
