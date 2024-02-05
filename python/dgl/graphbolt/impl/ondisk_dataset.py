@@ -7,6 +7,8 @@ import textwrap
 from copy import deepcopy
 from typing import Dict, List, Union
 
+import numpy as np
+
 import torch
 import yaml
 
@@ -76,7 +78,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         num_nodes = graph_data["nodes"][0]["num"]
         num_edges = len(src)
-        coo_tensor = torch.tensor([src, dst])
+        coo_tensor = torch.tensor(np.array([src, dst]))
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
         indptr, indices, value_indices = sparse_matrix.csc()
         node_type_offset = None
