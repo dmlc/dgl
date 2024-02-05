@@ -1928,7 +1928,7 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
                 gb.ondisk_dataset.preprocess_ondisk_dataset(
                     test_dir,
                     include_original_edge_id=False,
-                    force_preprocess=False
+                    force_preprocess=False,
                 )
             )
         captured = capsys.readouterr().out.split("\n")
@@ -1967,7 +1967,7 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
                 gb.ondisk_dataset.preprocess_ondisk_dataset(
                     test_dir,
                     include_original_edge_id=False,
-                    force_preprocess=True
+                    force_preprocess=True,
                 )
             )
         captured = capsys.readouterr().out.split("\n")
@@ -2974,7 +2974,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         with pytest.warns(
             DGLWarning,
             match="Edge feature is stored, but edge IDs are not saved.",
-         ):
+        ):
             dataset = gb.OnDiskDataset(
                 test_dir, include_original_edge_id=False
             ).load()
