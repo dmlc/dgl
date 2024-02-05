@@ -1,6 +1,7 @@
 """A set of graph services of getting subgraphs from DistGraph"""
-from collections import namedtuple
 import os
+from collections import namedtuple
+
 import numpy as np
 
 import torch
@@ -711,7 +712,11 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
     # For DGL partitions and GraphBolt partitions that are partitioned with
     # `store_eids=True`, the edge IDs are stored in the edata. Otherwise, the
     # edge types are stored in the edata.
-    etype_ids, type_wise_eids = gpb.map_to_per_etype(frontier.edata[EID]) if EID in frontier.edata else (frontier.edata[ETYPE], None)
+    etype_ids, type_wise_eids = (
+        gpb.map_to_per_etype(frontier.edata[EID])
+        if EID in frontier.edata
+        else (frontier.edata[ETYPE], None)
+    )
     etype_ids, idx = F.sort_1d(etype_ids)
     if type_wise_eids is not None:
         type_wise_eids = F.gather_row(type_wise_eids, idx)
@@ -735,12 +740,12 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
                 F.boolean_mask(dst, type_idx),
             )
             if "DGL_DIST_DEBUG" in os.environ:
-                assert torch.all(src_ntype_id == src_ntype_ids[type_idx]), (
-                    "source ntype is is not expected."
-                )
-                assert torch.all(dst_ntype_id == dst_ntype_ids[type_idx]), (
-                    "destination ntype is is not expected."
-                )
+                assert torch.all(
+                    src_ntype_id == src_ntype_ids[type_idx]
+                ), "source ntype is is not expected."
+                assert torch.all(
+                    dst_ntype_id == dst_ntype_ids[type_idx]
+                ), "destination ntype is is not expected."
             if type_wise_eids is not None:
                 edge_ids[etype] = F.boolean_mask(type_wise_eids, type_idx)
     hg = heterograph(
