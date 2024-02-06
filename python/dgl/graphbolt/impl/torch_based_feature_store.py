@@ -175,7 +175,8 @@ class TorchBasedFeature(Feature):
         )
 
     def pin_memory_(self):
-        """In-place operation to copy the feature to pinned memory."""
+        """In-place operation to copy the feature to pinned memory. Returns the
+        same object modified in-place."""
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
         # truly in-place, we need to use cudaHostRegister. Then, we need to use
         # cudaHostUnregister to unpin the tensor in the destructor.
@@ -193,6 +194,8 @@ class TorchBasedFeature(Feature):
             )
 
             self._is_inplace_pinned.add(x)
+
+        return self
 
     def is_pinned(self):
         """Returns True if the stored feature is pinned."""
@@ -289,9 +292,12 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         super().__init__(features)
 
     def pin_memory_(self):
-        """In-place operation to copy the feature store to pinned memory."""
+        """In-place operation to copy the feature store to pinned memory.
+        Returns the same object modified in-place."""
         for feature in self._features.values():
             feature.pin_memory_()
+
+        return self
 
     def is_pinned(self):
         """Returns True if all the stored features are pinned."""
