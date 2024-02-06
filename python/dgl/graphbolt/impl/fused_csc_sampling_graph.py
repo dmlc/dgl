@@ -1092,7 +1092,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return self2._apply_to_members(_pin if device == "pinned" else _to)
 
     def pin_memory_(self):
-        """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""
+        """Copy `FusedCSCSamplingGraph` to the pinned memory in-place. Returns
+        the same object modified in-place."""
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
         # truly in-place, we need to use cudaHostRegister. Then, we need to use
         # cudaHostUnregister to unpin the tensor in the destructor.
@@ -1123,7 +1124,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
             return x
 
-        self._apply_to_members(_pin)
+        return self._apply_to_members(_pin)
 
 
 def fused_csc_sampling_graph(
