@@ -12,57 +12,26 @@ However, with ARGO enabled, we are able to scale over 64 cores, allowing ARGO to
 
 
 This README includes how to:
-1. [Set up the environment](#1-setting-up-the-environment)
+1. [Installation](#1-installation)
 2. [Run the example code](#2-running-the-example-GNN-program)
 3. [Modify your own GNN program to enable ARGO.](#3-enabling-ARGO-on-your-own-GNN-program)
 
-## 1. Setting up the environment
+## 1. Installation
 
-1. Clone the repository:
-
-   ```shell
-   git clone https://github.com/jasonlin316/ARGO.git
-   ```
-
-2. Download Anaconda and install
-   ```shell
-   wget https://repo.anaconda.com/archive/Anaconda3-2023.03-Linux-x86_64.sh
-   bash Anaconda3-2023.03-Linux-x86_64.sh
-   ```
-
-3. Create a virtual environment:
+1. ARGO utilizes the scikit-optimize library for auto-tuning. Please install scikit-optimize to run ARGO:
 
    ```shell
-   conda create -n py38 python=3.8.1
-   ```
-
-4. Active the virtual environment:
-
-   ```shell
-   conda activate py38
-   ```
-
-5. Install required packages:
-
-   ```shell
-   conda install pytorch torchvision torchaudio cpuonly -c pytorch
-   conda install -c dglteam dgl
-   conda install -c conda-forge ogb
    conda install -c conda-forge scikit-optimize
    ```
->  Note: there exist a bug in the older version (before v0.9.0) of the Scikit-Optimization library.  
-To fix the bug, find the "transformer.py" which should be located in  
-   ```~/anaconda3/envs/py38/lib/python3.8/site-packages/skopt/space/transformers.py```  
-Once open the file, replace all ```np.int_``` with ```int```.
-
-6. Download the OGB datasets (optional if you are not running any)
+   or
    ```shell
-   python ogb_example.py --dataset <ogb_dataset>
+   pip install scikit-optimize
    ```
-- Available choices [ogbn-products, ogbn-papers100M]  
+   >  Note: there exist a bug in the older version (before v0.9.0) of the Scikit-Optimization library.  
+   To fix the bug, find the "transformer.py" which should be located in  
+      ```~/anaconda3/envs/py38/lib/python3.8/site-packages/skopt/space/transformers.py```  
+   Once open the file, replace all ```np.int_``` with ```int```.
 
-   The program will ask if you want to download the dataset; please enter "y" for the program to proceed. You may terminate the program after the dataset is downloaded.
-   This extra step is not required for other datasets (e.g., reddit) because they will download automatically. 
 
 ## 2. Running the example GNN program
 ### Usage
