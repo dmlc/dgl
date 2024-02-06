@@ -91,7 +91,9 @@ def start_sample_client_shuffle(
         dist_graph, [0, 10, 99, 66, 1024, 2008], 3, use_graphbolt=use_graphbolt
     )
 
-    assert dgl.ETYPE not in sampled_graph.edata, "Etype should not be in homogeneous sampled graph."
+    assert (
+        dgl.ETYPE not in sampled_graph.edata
+    ), "Etype should not be in homogeneous sampled graph."
     src, dst = sampled_graph.edges()
     src = orig_nid[src]
     dst = orig_nid[dst]
@@ -461,14 +463,23 @@ def check_rpc_sampling_shuffle(
         assert p.exitcode == 0
 
 
-def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes, use_graphbolt=False, return_eids=False):
+def start_hetero_sample_client(
+    rank,
+    tmpdir,
+    disable_shared_mem,
+    nodes,
+    use_graphbolt=False,
+    return_eids=False,
+):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(
             tmpdir / "test_sampling.json", rank
         )
     dgl.distributed.initialize("rpc_ip_config.txt")
-    dist_graph = DistGraph("test_sampling", gpb=gpb, use_graphbolt=use_graphbolt)
+    dist_graph = DistGraph(
+        "test_sampling", gpb=gpb, use_graphbolt=use_graphbolt
+    )
     assert "feat" in dist_graph.nodes["n1"].data
     assert "feat" not in dist_graph.nodes["n2"].data
     assert "feat" not in dist_graph.nodes["n3"].data
@@ -477,7 +488,9 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes, use_grap
     try:
         # Enable santity check in distributed sampling.
         os.environ["DGL_DIST_DEBUG"] = "1"
-        sampled_graph = sample_neighbors(dist_graph, nodes, 3, use_graphbolt=use_graphbolt)
+        sampled_graph = sample_neighbors(
+            dist_graph, nodes, 3, use_graphbolt=use_graphbolt
+        )
         block = dgl.to_block(sampled_graph, nodes)
         if not use_graphbolt or return_eids:
             block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
@@ -532,7 +545,9 @@ def start_hetero_etype_sample_client(
     return block, gpb
 
 
-def check_rpc_hetero_sampling_shuffle(tmpdir, num_server, use_graphbolt=False, return_eids=False):
+def check_rpc_hetero_sampling_shuffle(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero()
@@ -556,15 +571,26 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server, use_graphbolt=False, r
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling", ["csc", "coo"], use_graphbolt),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     block, gpb = start_hetero_sample_client(
-        0, tmpdir, num_server > 1, nodes={"n3": [0, 10, 99, 66, 124, 208]},
-        use_graphbolt=use_graphbolt, return_eids=return_eids,
+        0,
+        tmpdir,
+        num_server > 1,
+        nodes={"n3": [0, 10, 99, 66, 124, 208]},
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
     for p in pserver_list:
         p.join()
@@ -579,7 +605,9 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server, use_graphbolt=False, r
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
 
-        assert np.all(F.asnumpy(g.has_edges_between(orig_src, orig_dst, etype=etype)))
+        assert np.all(
+            F.asnumpy(g.has_edges_between(orig_src, orig_dst, etype=etype))
+        )
 
         if use_graphbolt and not return_eids:
             continue
@@ -603,7 +631,9 @@ def get_degrees(g, nids, ntype):
     return deg
 
 
-def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server, use_graphbolt=False, return_eids=False):
+def check_rpc_hetero_sampling_empty_shuffle(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(empty=True)
@@ -627,7 +657,14 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server, use_graphbolt=Fa
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling", ["csc", "coo"], use_graphbolt),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
@@ -636,8 +673,12 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server, use_graphbolt=Fa
     deg = get_degrees(g, orig_nids["n3"], "n3")
     empty_nids = F.nonzero_1d(deg == 0)
     block, gpb = start_hetero_sample_client(
-        0, tmpdir, num_server > 1, nodes={"n3": empty_nids},
-        use_graphbolt=use_graphbolt, return_eids=return_eids,
+        0,
+        tmpdir,
+        num_server > 1,
+        nodes={"n3": empty_nids},
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
     for p in pserver_list:
         p.join()
@@ -1051,17 +1092,29 @@ def test_rpc_hetero_sampling_shuffle(num_server, use_graphbolt, return_eids):
     reset_envs()
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server, use_graphbolt=use_graphbolt, return_eids=return_eids)
+        check_rpc_hetero_sampling_shuffle(
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
+        )
 
 
 @pytest.mark.parametrize("num_server", [1])
 @pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("return_eids", [False, True])
-def test_rpc_hetero_sampling_empty_shuffle(num_server, use_graphbolt, return_eids):
+def test_rpc_hetero_sampling_empty_shuffle(
+    num_server, use_graphbolt, return_eids
+):
     reset_envs()
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server, use_graphbolt=use_graphbolt, return_eids=return_eids)
+        check_rpc_hetero_sampling_empty_shuffle(
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
+        )
 
 
 @pytest.mark.parametrize("num_server", [1])
