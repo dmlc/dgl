@@ -116,7 +116,9 @@ class SampledSubgraph:
         self,
         edges: Union[
             Dict[str, Tuple[torch.Tensor, torch.Tensor]],
+            Dict[str, torch.Tensor],
             Tuple[torch.Tensor, torch.Tensor],
+            torch.Tensor,
         ],
         assume_num_node_within_int32: bool = True,
     ):
@@ -183,7 +185,7 @@ class SampledSubgraph:
         ), "Values > int32 are not supported yet."
         assert (
             isinstance(self.sampled_csc, (CSCFormatBase, tuple))
-        ) == isinstance(edges, tuple), (
+        ) == isinstance(edges, (tuple, torch.Tensor)), (
             "The sampled subgraph and the edges to exclude should be both "
             "homogeneous or both heterogeneous."
         )
@@ -200,6 +202,8 @@ class SampledSubgraph:
                 self.original_row_node_ids,
                 self.original_column_node_ids,
             )
+            if isinstance(edges, torch.Tensor):
+                edges = edges.T
             index = _exclude_homo_edges(
                 reverse_edges, edges, assume_num_node_within_int32
             )
@@ -227,6 +231,8 @@ class SampledSubgraph:
                     original_row_node_ids,
                     original_column_node_ids,
                 )
+                if isinstance(edges[etype], torch.Tensor):
+                    edges[etype] = edges[etype].T
                 index[etype] = _exclude_homo_edges(
                     reverse_edges,
                     edges[etype],
