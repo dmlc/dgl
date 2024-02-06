@@ -709,9 +709,11 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
             idtype=g.idtype,
         )
 
-    # For DGL partitions and GraphBolt partitions that are partitioned with
-    # `store_eids=True`, the edge IDs are stored in the edata. Otherwise, the
-    # edge types are stored in the edata.
+    # For DGL partitions, the global edge IDs are always stored in the edata.
+    # For GraphBolt partitions, the edge type IDs are always stored in the
+    # edata. As for the edge IDs, they are stored in the edata if the graph is
+    # partitioned with `store_eids=True`. Otherwise, the edge IDs are not
+    # stored.
     etype_ids, type_wise_eids = (
         gpb.map_to_per_etype(frontier.edata[EID])
         if EID in frontier.edata
