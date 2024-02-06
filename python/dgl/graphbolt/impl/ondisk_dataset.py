@@ -136,9 +136,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         indptr, indices, edge_ids = sparse_matrix.csc()
         del sparse_matrix
         node_type_offset = torch.tensor(node_type_offset)
-        type_per_edge = torch.index_select(
-            coo_etype, dim=0, index=edge_ids
-        )
+        type_per_edge = torch.index_select(coo_etype, dim=0, index=edge_ids)
         del coo_etype
         node_attributes = {}
         edge_attributes = {}
