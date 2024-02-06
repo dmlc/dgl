@@ -487,15 +487,16 @@ class MiniBatch:
             col_nodes = []
             row_nodes = []
             for subgraph in self.sampled_subgraphs:
-                if subgraph is not None:
-                    sampled_csc = subgraph.sampled_csc
-                    indptr = sampled_csc.indptr
-                    indices = sampled_csc.indices
-                    expanded_indptr = expand_indptr(
-                        indptr, dtype=indices.dtype, output_size=len(indices)
-                    )
-                    col_nodes.append(expanded_indptr)
-                    row_nodes.append(indices)
+                if subgraph is None:
+                    continue
+                sampled_csc = subgraph.sampled_csc
+                indptr = sampled_csc.indptr
+                indices = sampled_csc.indices
+                expanded_indptr = expand_indptr(
+                    indptr, dtype=indices.dtype, output_size=len(indices)
+                )
+                col_nodes.append(expanded_indptr)
+                row_nodes.append(indices)
             col_nodes = torch.cat(col_nodes)
             row_nodes = torch.cat(row_nodes)
             edge_index = torch.unique(
