@@ -199,7 +199,6 @@ def _verify_graphbolt_partition(graph, part_id, gpb, ntypes, etypes):
         field in graph.edge_attributes for field in required_edata_fields
     ), "the partition graph should contain edge mapping to global edge ID."
 
-    num_nodes = graph.total_num_nodes
     num_edges = graph.total_num_edges
     local_src_ids = graph.indices
     local_dst_ids = gb.expand_indptr(
