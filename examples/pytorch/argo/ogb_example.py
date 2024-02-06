@@ -1,6 +1,6 @@
 '''
-Disclaimer: we did not write or own this code. 
-This file is an official example from DGL: https://github.com/dmlc/dgl/blob/master/examples/pytorch/ogb/ogbn-products/graphsage/main.py
+This is modified version of: https://github.com/dmlc/dgl/blob/master/examples/pytorch/ogb/ogbn-products/graphsage/main.py
+This example shows how to enable ARGO to automatically instantiate multi-processing and adjust CPU core assignment to achieve better performance.
 '''
 
 import argparse

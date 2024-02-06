@@ -1,6 +1,5 @@
 '''
-Disclaimer: we do not write or own this code. 
-This file is an official example from DGL: https://github.com/dmlc/dgl/blob/master/examples/pytorch/ogb/ogbn-products/graphsage/main.py
+This is modified version of: https://github.com/dmlc/dgl/blob/master/examples/pytorch/ogb/ogbn-products/graphsage/main.py
 '''
 
 import argparse
