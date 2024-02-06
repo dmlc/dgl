@@ -1,4 +1,5 @@
 """Module for converting graph from/to other object."""
+
 from collections import defaultdict
 from collections.abc import Mapping
 
@@ -296,9 +297,9 @@ def heterograph(data_dict, num_nodes_dict=None, idtype=None, device=None):
     >>> g = dgl.heterograph(data_dict)
     >>> g
     Graph(num_nodes={'game': 5, 'topic': 3, 'user': 4},
-          num_edges={('user', 'follows', 'user'): 2, ('user', 'follows', 'topic'): 2,
+          num_edges={('user', 'follows', 'topic'): 2, ('user', 'follows', 'user'): 2,
                      ('user', 'plays', 'game'): 2},
-          metagraph=[('user', 'user', 'follows'), ('user', 'topic', 'follows'),
+          metagraph=[('user', 'topic', 'follows'), ('user', 'user', 'follows'),
                      ('user', 'game', 'plays')])
 
     Explicitly specify the number of nodes for each node type in the graph.
@@ -1810,11 +1811,11 @@ def to_networkx(
     ...     ('user', 'follows', 'topic'): (torch.tensor([1, 1]), torch.tensor([1, 2])),
     ...     ('user', 'plays', 'game'): (torch.tensor([0, 3]), torch.tensor([3, 4]))
     ... })
-    ... g.ndata['n'] = {
+    >>> g.ndata['n'] = {
     ...     'game': torch.zeros(5, 1),
     ...     'user': torch.ones(4, 1)
     ... }
-    ... g.edata['e'] = {
+    >>> g.edata['e'] = {
     ...     ('user', 'follows', 'user'): torch.zeros(2, 1),
     ...     'plays': torch.ones(2, 1)
     ... }
