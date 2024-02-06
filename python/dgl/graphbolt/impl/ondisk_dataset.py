@@ -80,7 +80,9 @@ def _graph_data_to_fused_csc_sampling_graph(
         num_edges = len(src)
         coo_tensor = torch.tensor(np.array([src, dst]))
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
+        del coo_tensor
         indptr, indices, value_indices = sparse_matrix.csc()
+        del sparse_matrix
         node_type_offset = None
         type_per_edge = None
         node_type_to_id = None
@@ -100,6 +102,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         for ntype_id, node_info in enumerate(graph_data["nodes"]):
             node_type_to_id[node_info["type"]] = ntype_id
             node_type_offset.append(node_type_offset[-1] + node_info["num"])
+        total_num_nodes = node_type_offset[-1]
         # Construct edge_type_offset, edge_type_to_id and coo_tensor.
         edge_type_offset = [0]
         edge_type_to_id = {}
@@ -118,29 +121,36 @@ def _graph_data_to_fused_csc_sampling_graph(
             coo_src_list.append(torch.tensor(src))
             coo_dst_list.append(torch.tensor(dst))
             coo_etype_list.append(torch.full((len(src),), etype_id))
+        total_num_edges = edge_type_offset[-1]
 
         coo_src = torch.cat(coo_src_list)
+        del coo_src_list
         coo_dst = torch.cat(coo_dst_list)
+        del coo_dst_list
         coo_etype = torch.cat(coo_etype_list)
-
-        total_num_nodes = node_type_offset[-1]
-        total_num_edges = edge_type_offset[-1]
+        del coo_etype_list
 
         sparse_matrix = spmatrix(
             indices=torch.stack((coo_src, coo_dst), dim=0),
             shape=(total_num_nodes, total_num_nodes),
         )
+        del coo_src, coo_dst
         indptr, indices, value_indices = sparse_matrix.csc()
+        del sparse_matrix
         node_type_offset = torch.tensor(node_type_offset)
         type_per_edge = torch.index_select(
             coo_etype, dim=0, index=value_indices
         )
+        del coo_etype
         node_attributes = {}
         edge_attributes = {}
         if include_original_edge_id:
-            edge_attributes[ORIGINAL_EDGE_ID] = value_indices - torch.gather(
-                input=torch.tensor(edge_type_offset), dim=0, index=type_per_edge
+            value_indices -= torch.gather(
+                input=torch.tensor(edge_type_offset),
+                dim=0,
+                index=type_per_edge,
             )
+            edge_attributes[ORIGINAL_EDGE_ID] = value_indices
 
     # Load the sampling related node/edge features and add them to
     # the sampling-graph.
