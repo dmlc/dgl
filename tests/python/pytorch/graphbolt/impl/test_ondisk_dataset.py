@@ -1835,12 +1835,9 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            preprocessed_metadata_path = gb.preprocess_ondisk_dataset(test_dir)
-
+        preprocessed_metadata_path = gb.preprocess_ondisk_dataset(
+            test_dir, include_original_edge_id=True
+        )
         with open(preprocessed_metadata_path, "r") as f:
             yaml_data = yaml.safe_load(f)
 
@@ -1920,17 +1917,11 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
             f.write(yaml_content)
 
         # First preprocess on-disk dataset.
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            preprocessed_metadata_path = (
-                gb.ondisk_dataset.preprocess_ondisk_dataset(
-                    test_dir,
-                    include_original_edge_id=False,
-                    force_preprocess=False,
-                )
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=True, force_preprocess=False
             )
+        )
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "Start to preprocess the on-disk dataset.",
@@ -1959,17 +1950,11 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
         assert target_yaml_data["tasks"][0]["name"] == "link_prediction"
 
         # Force preprocess on-disk dataset.
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            preprocessed_metadata_path = (
-                gb.ondisk_dataset.preprocess_ondisk_dataset(
-                    test_dir,
-                    include_original_edge_id=False,
-                    force_preprocess=True,
-                )
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=True, force_preprocess=True
             )
+        )
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "The on-disk dataset is re-preprocessing, so the existing "
@@ -2005,15 +1990,11 @@ def test_OnDiskDataset_preprocess_auto_force_preprocess(capsys):
             f.write(yaml_content)
 
         # First preprocess on-disk dataset.
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            preprocessed_metadata_path = (
-                gb.ondisk_dataset.preprocess_ondisk_dataset(
-                    test_dir, include_original_edge_id=False
-                )
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=True
             )
+        )
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "Start to preprocess the on-disk dataset.",
@@ -2030,15 +2011,11 @@ def test_OnDiskDataset_preprocess_auto_force_preprocess(capsys):
         yaml_data["tasks"][0]["name"] = "fake_name"
         with open(yaml_file, "w") as f:
             yaml.dump(yaml_data, f)
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            preprocessed_metadata_path = (
-                gb.ondisk_dataset.preprocess_ondisk_dataset(
-                    test_dir, include_original_edge_id=False
-                )
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=True
             )
+        )
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "The on-disk dataset is re-preprocessing, so the existing "
@@ -2161,11 +2138,7 @@ def test_OnDiskDataset_load_name(edge_fmt):
             f.write(yaml_content)
 
         # Check modify `dataset_name` field.
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         dataset.yaml_data["dataset_name"] = "fake_name"
         dataset.load()
         assert dataset.dataset_name == "fake_name"
@@ -2691,9 +2664,7 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id, edge_fmt):
             f.write(yaml_content)
 
         if include_original_edge_id:
-            dataset = gb.OnDiskDataset(
-                test_dir, include_original_edge_id=include_original_edge_id
-            )
+            dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         else:
             with pytest.warns(
                 DGLWarning,
@@ -2852,13 +2823,9 @@ def test_OnDiskDataset_force_preprocess(capsys):
             f.write(yaml_content)
 
         # First preprocess on-disk dataset.
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            dataset = gb.OnDiskDataset(
-                test_dir, include_original_edge_id=False, force_preprocess=False
-            ).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True, force_preprocess=False
+        ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "Start to preprocess the on-disk dataset.",
@@ -2883,13 +2850,9 @@ def test_OnDiskDataset_force_preprocess(capsys):
         assert tasks[0].metadata["name"] == "link_prediction"
 
         # Force preprocess on-disk dataset.
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            dataset = gb.OnDiskDataset(
-                test_dir, include_original_edge_id=False, force_preprocess=True
-            ).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True, force_preprocess=True
+        ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "The on-disk dataset is re-preprocessing, so the existing "
@@ -2927,13 +2890,9 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
             f.write(yaml_content)
 
         # First preprocess on-disk dataset.
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            dataset = gb.OnDiskDataset(
-                test_dir, include_original_edge_id=False
-            ).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "Start to preprocess the on-disk dataset.",
@@ -2949,13 +2908,9 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         yaml_data["tasks"][0]["name"] = "fake_name"
         with open(yaml_file, "w") as f:
             yaml.dump(yaml_data, f)
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            dataset = gb.OnDiskDataset(
-                test_dir, include_original_edge_id=False
-            ).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "The on-disk dataset is re-preprocessing, so the existing "
