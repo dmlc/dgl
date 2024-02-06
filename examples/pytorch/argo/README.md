@@ -21,7 +21,7 @@ This README includes how to:
 1. ARGO utilizes the scikit-optimize library for auto-tuning. Please install scikit-optimize to run ARGO:
 
    ```shell
-   conda install -c conda-forge scikit-optimize
+   conda install -c conda-forge "scikit-optimize>=0.9.0" 
    ```
    or
    ```shell
