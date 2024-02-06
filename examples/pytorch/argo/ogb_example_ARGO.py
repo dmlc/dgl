@@ -1,5 +1,6 @@
 '''
-This is modified version of: https://github.com/dmlc/dgl/blob/master/examples/pytorch/ogb/ogbn-products/graphsage/main.py
+This is a modified version of: https://github.com/dmlc/dgl/blob/master/examples/pytorch/ogb/ogbn-products/graphsage/main.py
+This example shows how to enable ARGO to automatically instantiate multi-processing and adjust CPU core assignment to achieve better performance.
 '''
 
 import argparse
@@ -171,7 +172,9 @@ def train(args, device, data, rank, world_size, comp_core, load_core, counter, b
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
     # Training loop
+    avg = 0
     iter_tput = []
+    best_eval_acc = 0
     best_test_acc = 0
     PATH = "model.pt"
     if counter[0] != 0:
@@ -180,6 +183,7 @@ def train(args, device, data, rank, world_size, comp_core, load_core, counter, b
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
         loss = checkpoint['loss']
+    
     with dataloader.enable_cpu_affinity(loader_cores=load_core, compute_cores=comp_core): 
         for epoch in range(ep):
             tic = time.time()
@@ -207,23 +211,39 @@ def train(args, device, data, rank, world_size, comp_core, load_core, counter, b
                 iter_tput.append(len(seeds) / (time.time() - tic_step))
                 if step % args.log_every == 0:
                     acc = compute_acc(batch_pred, batch_labels)
-                    gpu_mem_alloc = (
-                        th.cuda.max_memory_allocated() / 1000000
-                        if th.cuda.is_available()
-                        else 0
-                    )
                     print(
-                        "Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB".format(
+                        "Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}".format(
                             step,
                             loss.item(),
                             acc.item(),
                             np.mean(iter_tput[3:]),
-                            gpu_mem_alloc,
                         )
                     )
 
             toc = time.time()
             print("Epoch Time(s): {:.4f}".format(toc - tic))
+            if epoch >= 5 and rank == 0:
+                avg += toc - tic
+            if epoch % args.eval_every == 0 and epoch != 0:
+                eval_acc, test_acc, pred = evaluate(
+                    model, g, nfeat, labels, val_nid, test_nid, device
+                )
+                if args.save_pred:
+                    np.savetxt(
+                        args.save_pred + "%02d" % epoch,
+                        pred.argmax(1).cpu().numpy(),
+                        "%d",
+                    )
+                print("Eval Acc {:.4f}".format(eval_acc))
+                if eval_acc > best_eval_acc:
+                    best_eval_acc = eval_acc
+                    best_test_acc = test_acc
+                print(
+                    "Best Eval Acc {:.4f} Test Acc {:.4f}".format(
+                        best_eval_acc, best_test_acc
+                    )
+                )
+            
     dist.barrier()
     if rank == 0:
         th.save({'epoch': counter[0],
@@ -231,6 +251,8 @@ def train(args, device, data, rank, world_size, comp_core, load_core, counter, b
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                     }, PATH)
+    if rank == 0:
+        print("Avg epoch time: {}".format(avg / (epoch - 4)))
     return best_test_acc
 
 
@@ -297,6 +319,5 @@ if __name__ == "__main__":
     os.environ['MASTER_ADDR'] = '127.0.0.1'
     os.environ['MASTER_PORT'] = '29501'
     mp.set_start_method('fork', force=True)
-    runtime = ARGO(n_search = 15, epoch = args.num_epochs, batch_size = args.batch_size) #initialization
+    runtime = ARGO(n_search = 15, epoch = args.num_epochs, batch_size = args.batch_size) # initialization
     runtime.run(train, args=(args, device, data)) # wrap the training function
-        
