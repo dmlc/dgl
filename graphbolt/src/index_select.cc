@@ -34,6 +34,7 @@ torch::Tensor DiskIndexSelect(std::string path, torch::Tensor index) {
   // arr.print_npy_header();
   // return arr.index_select_all({index.to(torch::kLong)});
   // return arr.index_select_pread({index.to(torch::kLong)});
+  // return arr.index_select_pread_single({index.to(torch::kLong)});
   // return arr.index_select_aio({index.to(torch::kLong)});
   return arr.index_select_iouring({index.to(torch::kLong)});
 }

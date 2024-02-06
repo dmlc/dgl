@@ -28,7 +28,8 @@ int main(int argc, char *argv[]) {
 
   // auto ret = arr.index_select_pread(idx);
   // auto ret = arr.index_select_aio(idx);  // some bugs
-  auto ret = arr.index_select_iouring(idx);  // some bugs
+  auto ret = arr.index_select_iouring(idx);
+  // auto ret = arr.index_select_pread_single(idx);
 
   std::cout << ret << std::endl;
 }

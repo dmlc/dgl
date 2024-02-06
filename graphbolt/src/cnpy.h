@@ -51,6 +51,8 @@ struct NpyArray {
   torch::Tensor feature_size() { return feature_shape; }
   torch::Tensor index_select_all(torch::Tensor idx);
   torch::Tensor index_select_pread(torch::Tensor idx);
+  torch::Tensor index_select_pread_single(torch::Tensor idx);
+
   torch::Tensor index_select_aio(torch::Tensor idx);
   torch::Tensor index_select_iouring(torch::Tensor idx);
 
