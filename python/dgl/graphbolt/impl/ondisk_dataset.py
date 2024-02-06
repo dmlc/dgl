@@ -80,9 +80,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         num_edges = len(src)
         coo_tensor = torch.tensor(np.array([src, dst]))
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
-        del coo_tensor
-        indptr, indices, value_indices = sparse_matrix.csc()
-        del sparse_matrix
+        indptr, indices, edge_ids = sparse_matrix.csc()
         node_type_offset = None
         type_per_edge = None
         node_type_to_id = None
@@ -90,7 +88,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         node_attributes = {}
         edge_attributes = {}
         if include_original_edge_id:
-            edge_attributes[ORIGINAL_EDGE_ID] = value_indices
+            edge_attributes[ORIGINAL_EDGE_ID] = edge_ids
     else:
         # Heterogeneous graph.
         # Sort graph_data by ntype/etype lexicographically to ensure ordering.
@@ -135,22 +133,22 @@ def _graph_data_to_fused_csc_sampling_graph(
             shape=(total_num_nodes, total_num_nodes),
         )
         del coo_src, coo_dst
-        indptr, indices, value_indices = sparse_matrix.csc()
+        indptr, indices, edge_ids = sparse_matrix.csc()
         del sparse_matrix
         node_type_offset = torch.tensor(node_type_offset)
         type_per_edge = torch.index_select(
-            coo_etype, dim=0, index=value_indices
+            coo_etype, dim=0, index=edge_ids
         )
         del coo_etype
         node_attributes = {}
         edge_attributes = {}
         if include_original_edge_id:
-            value_indices -= torch.gather(
+            edge_ids -= torch.gather(
                 input=torch.tensor(edge_type_offset),
                 dim=0,
                 index=type_per_edge,
             )
-            edge_attributes[ORIGINAL_EDGE_ID] = value_indices
+            edge_attributes[ORIGINAL_EDGE_ID] = edge_ids
 
     # Load the sampling related node/edge features and add them to
     # the sampling-graph.
