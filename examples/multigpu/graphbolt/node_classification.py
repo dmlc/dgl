@@ -284,6 +284,12 @@ def run(rank, world_size, args, devices, dataset):
     hidden_size = 256
     out_size = num_classes
 
+    if args.gpu_cache_size > 0:
+        dataset.feature._features[("node", None, "feat")] = gb.GPUCachedFeature(
+            dataset.feature._features[("node", None, "feat")],
+            args.gpu_cache_size,
+        )
+
     # Create GraphSAGE model. It should be copied onto a GPU as a replica.
     model = SAGE(in_size, hidden_size, out_size).to(device)
     model = DDP(model)
@@ -380,6 +386,12 @@ def parse_args():
     )
     parser.add_argument(
         "--num-workers", type=int, default=0, help="The number of processes."
+    )
+    parser.add_argument(
+        "--gpu-cache-size",
+        type=int,
+        default=0,
+        help="The capacity of the GPU cache, the number of features to store.",
     )
     parser.add_argument(
         "--mode",
