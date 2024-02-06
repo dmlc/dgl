@@ -202,8 +202,8 @@ def _verify_graphbolt_partition(graph, part_id, gpb, ntypes, etypes):
     num_nodes = graph.total_num_nodes
     num_edges = graph.total_num_edges
     local_src_ids = graph.indices
-    local_dst_ids = torch.repeat_interleave(
-        torch.arange(num_nodes), torch.diff(graph.csc_indptr)
+    local_dst_ids = gb.expand_indptr(
+        graph.csc_indptr, dtype=local_src_ids.dtype, output_size=num_edges
     )
     global_src_ids = graph.node_attributes[NID][local_src_ids]
     global_dst_ids = graph.node_attributes[NID][local_dst_ids]

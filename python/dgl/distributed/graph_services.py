@@ -151,8 +151,8 @@ def _sample_neighbors_graphbolt(
 
     # 3. Map local node IDs to global node IDs.
     local_src = subgraph.indices
-    local_dst = torch.repeat_interleave(
-        subgraph.original_column_node_ids, torch.diff(subgraph.indptr)
+    local_dst = gb.expand_indptr(
+        subgraph.indptr, dtype=local_src.dtype, output_size=local_src.shape[0]
     )
     global_nid_mapping = g.node_attributes[NID]
     global_src = global_nid_mapping[local_src]
