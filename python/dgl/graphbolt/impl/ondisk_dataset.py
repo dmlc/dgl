@@ -727,6 +727,16 @@ class BuiltinDataset(OnDiskDataset):
         .. note::
             Reverse edges are added to the original graph and duplicated
             edges are removed.
+    
+    **ogbn-papers100M**
+        The ogbn-papers100M dataset is a directed graph, representing the citation
+        network between all Computer Science (CS) arXiv papers indexed by MAG.
+        See more details in `ogbn-papers100M
+        <https://ogb.stanford.edu/docs/nodeprop/#ogbn-papers100M>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
 
     **ogbn-products**
         The ogbn-products dataset is an undirected and unweighted graph,
@@ -766,6 +776,7 @@ class BuiltinDataset(OnDiskDataset):
         "ogbl-citation2",
         "ogbn-products",
         "ogbn-arxiv",
+        "ogbn-papers100M",
     ]
     _large_datasets = ["ogb-lsc-mag240m"]
     _all_datasets = _datasets + _large_datasets
