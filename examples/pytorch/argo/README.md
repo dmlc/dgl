@@ -41,10 +41,9 @@ This README includes how to:
   - `--sampler`: the mini-batch sampling algorithm. Available choices [shadow, neighbor]
   - `--model`: GNN model. Available choices [gcn, sage]
   - `--layer`: number of GNN layers.
+  - `--fan_out`: number of fanout neighbors for each layer.
   - `--hidden`: hidden feature dimension.
   - `--batch_size`: the size of the mini-batch.
-
->  Note: the default number of layer is 3. If you want to change the number of layers for the Neighbor Sampler, please update the sample size in ```line 114```.
 
 
 

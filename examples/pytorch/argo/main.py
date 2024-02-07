@@ -137,7 +137,7 @@ def train(
     drop_last, shuffle = True, True
     if args.sampler.lower() == "neighbor":
         sampler = NeighborSampler(
-            [15, 10, 5],
+            [int(fanout) for fanout in args.fan_out.split(",")],
             prefetch_node_feats=["feat"],
             prefetch_labels=["label"],
         )
@@ -226,6 +226,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--batch_size", type=int, default=1024 * 4)
     parser.add_argument("--layer", type=int, default=3)
+    parser.add_argument("--fan_out", type=str, default="15,10,5")
     parser.add_argument(
         "--sampler",
         type=str,
