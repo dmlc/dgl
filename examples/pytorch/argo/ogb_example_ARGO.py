@@ -1,9 +1,10 @@
-'''
+"""
 This is a modified version of: https://github.com/dmlc/dgl/blob/master/examples/pytorch/ogb/ogbn-products/graphsage/main.py
 This example shows how to enable ARGO to automatically instantiate multi-processing and adjust CPU core assignment to achieve better performance.
-'''
+"""
 
 import argparse
+import os
 import time
 
 import dgl
@@ -11,16 +12,16 @@ import dgl.nn.pytorch as dglnn
 
 import numpy as np
 import torch as th
+import torch.distributed as dist
+import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
-from ogb.nodeproppred import DglNodePropPredDataset
-import os
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel
-import torch.multiprocessing as mp
 from argo import ARGO
+from ogb.nodeproppred import DglNodePropPredDataset
+from torch.nn.parallel import DistributedDataParallel
+
 
 class SAGE(nn.Module):
     def __init__(
@@ -137,8 +138,19 @@ def load_subtensor(nfeat, labels, seeds, input_nodes):
 
 
 #### Entry point
-def train(args, device, data, rank, world_size, comp_core, load_core, counter, b_size, ep):
-    dist.init_process_group('gloo', rank=rank, world_size=world_size) 
+def train(
+    args,
+    device,
+    data,
+    rank,
+    world_size,
+    comp_core,
+    load_core,
+    counter,
+    b_size,
+    ep,
+):
+    dist.init_process_group("gloo", rank=rank, world_size=world_size)
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, labels, n_classes, nfeat, g = data
 
@@ -154,7 +166,7 @@ def train(args, device, data, rank, world_size, comp_core, load_core, counter, b
         shuffle=True,
         drop_last=False,
         num_workers=len(load_core),
-        use_ddp = True
+        use_ddp=True,
     )
 
     # Define model and optimizer
@@ -179,12 +191,14 @@ def train(args, device, data, rank, world_size, comp_core, load_core, counter, b
     PATH = "model.pt"
     if counter[0] != 0:
         checkpoint = th.load(PATH)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        epoch = checkpoint['epoch']
-        loss = checkpoint['loss']
-    
-    with dataloader.enable_cpu_affinity(loader_cores=load_core, compute_cores=comp_core): 
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        epoch = checkpoint["epoch"]
+        loss = checkpoint["loss"]
+
+    with dataloader.enable_cpu_affinity(
+        loader_cores=load_core, compute_cores=comp_core
+    ):
         for epoch in range(ep):
             tic = time.time()
 
@@ -243,18 +257,21 @@ def train(args, device, data, rank, world_size, comp_core, load_core, counter, b
                         best_eval_acc, best_test_acc
                     )
                 )
-            
+
     dist.barrier()
     if rank == 0:
-        th.save({'epoch': counter[0],
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'loss': loss,
-                    }, PATH)
+        th.save(
+            {
+                "epoch": counter[0],
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss": loss,
+            },
+            PATH,
+        )
     if rank == 0:
         print("Avg epoch time: {}".format(avg / (epoch - 4)))
     return best_test_acc
-
 
 
 if __name__ == "__main__":
@@ -275,7 +292,12 @@ if __name__ == "__main__":
     argparser.add_argument("--eval-every", type=int, default=1)
     argparser.add_argument("--lr", type=float, default=0.003)
     argparser.add_argument("--dropout", type=float, default=0.5)
-    argparser.add_argument("--dataset", type=str, default="ogbn-products", choices= ["ogbn-papers100M", "ogbn-products"])
+    argparser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-products",
+        choices=["ogbn-papers100M", "ogbn-products"],
+    )
     argparser.add_argument(
         "--num-workers",
         type=int,
@@ -316,8 +338,10 @@ if __name__ == "__main__":
         nfeat,
         graph,
     )
-    os.environ['MASTER_ADDR'] = '127.0.0.1'
-    os.environ['MASTER_PORT'] = '29501'
-    mp.set_start_method('fork', force=True)
-    runtime = ARGO(n_search = 15, epoch = args.num_epochs, batch_size = args.batch_size) # initialization
-    runtime.run(train, args=(args, device, data)) # wrap the training function
+    os.environ["MASTER_ADDR"] = "127.0.0.1"
+    os.environ["MASTER_PORT"] = "29501"
+    mp.set_start_method("fork", force=True)
+    runtime = ARGO(
+        n_search=15, epoch=args.num_epochs, batch_size=args.batch_size
+    )  # initialization
+    runtime.run(train, args=(args, device, data))  # wrap the training function

@@ -1,6 +1,6 @@
-'''
+"""
 This is modified version of: https://github.com/dmlc/dgl/blob/master/examples/pytorch/ogb/ogbn-products/graphsage/main.py
-'''
+"""
 
 import argparse
 import time
@@ -249,7 +249,12 @@ if __name__ == "__main__":
     argparser.add_argument("--eval-every", type=int, default=1)
     argparser.add_argument("--lr", type=float, default=0.003)
     argparser.add_argument("--dropout", type=float, default=0.5)
-    argparser.add_argument("--dataset", type=str, default="ogbn-products", choices= ["ogbn-papers100M", "ogbn-products"])
+    argparser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-products",
+        choices=["ogbn-papers100M", "ogbn-products"],
+    )
     argparser.add_argument(
         "--num-workers",
         type=int,
@@ -298,4 +303,3 @@ if __name__ == "__main__":
         print(
             "Average test accuracy:", np.mean(test_accs), "±", np.std(test_accs)
         )
-        
