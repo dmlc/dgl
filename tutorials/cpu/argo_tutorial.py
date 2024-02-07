@@ -65,7 +65,7 @@ Enable ARGO by initializing the runtime system, and wrapping the training functi
     runtime.run(train, args=(args, device, data)) # wrap the training function
 
 .. note::
-    ARGO takes three input paramters: number of searches *n_search*, number of epochs, and the mini-batch size. 
+    ARGO takes three input parameters: number of searches *n_search*, number of epochs, and the mini-batch size. 
     Increasing *n_search* potentially leads to a better configuration with less epoch time; 
     however, searching itself also causes extra overhead. We recommend setting *n_search* from 15 to 45 for an optimal overall performance. 
 
