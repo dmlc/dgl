@@ -727,7 +727,7 @@ class BuiltinDataset(OnDiskDataset):
         .. note::
             Reverse edges are added to the original graph and duplicated
             edges are removed.
-    
+
     **ogbn-papers100M**
         The ogbn-papers100M dataset is a directed graph, representing the citation
         network between all Computer Science (CS) arXiv papers indexed by MAG.
