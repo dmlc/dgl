@@ -79,7 +79,7 @@ class SAGE(nn.Module):
                 num_workers=args.num_workers,
             )
 
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader, disable=None):
                 block = blocks[0].int().to(device)
 
                 h = x[input_nodes]
