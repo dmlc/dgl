@@ -296,10 +296,5 @@ if __name__ == "__main__":
         graph,
     )
 
-    # Run 10 times
-    test_accs = []
-    for i in range(10):
-        test_accs.append(train(args, device, data).cpu().numpy())
-        print(
-            "Average test accuracy:", np.mean(test_accs), "±", np.std(test_accs)
-        )
+    test_acc = train(args, device, data).cpu().numpy()
+    print("Test accuracy:", test_acc)
