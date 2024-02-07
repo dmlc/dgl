@@ -259,13 +259,13 @@ torch::Tensor cnpy::NpyArray::index_select_iouring(torch::Tensor idx) {
   int64_t feature_size = feature_dim * word_size;
   int64_t num_idx = idx.numel();
 
-  int numthd = 32;
+  int numthd = 8;
   omp_set_num_threads(numthd);
 
-  int64_t group_size = 1024;
+  int64_t group_size = 512;
 
   char *read_buffer =
-      (char *)aligned_alloc(ALIGNMENT, ALIGNMENT * 2 * group_size);
+      (char *)aligned_alloc(ALIGNMENT, ALIGNMENT * 4 * group_size);
   char *result_buffer =
       (char *)aligned_alloc(ALIGNMENT, feature_size * num_idx);
 
@@ -274,19 +274,22 @@ torch::Tensor cnpy::NpyArray::index_select_iouring(torch::Tensor idx) {
   struct io_uring ring;
   io_uring_queue_init(1024, &ring, 0);
 
-  int64_t residual[group_size];
+  int64_t residual[group_size * 2];
 
-  for (int64_t n = 0; n < num_idx; n += group_size) {
-    int64_t r = std::min(num_idx, n + group_size);
+  int64_t l[2] = {0, 0}, r[2] = {0, 0}, group = 0;
+  r[group] = std::min(num_idx, l[group] + group_size);
+
+  auto prepare_func = [&] {
+  // printf("prepare group: %u\n", group);
 #pragma omp parallel for num_threads(numthd)
-    for (int64_t m = 0; m < r - n; m++) {
-      int64_t i = idx_data[n + m];
+    for (int64_t m = 0; m < r[group] - l[group]; m++) {
+      int64_t i = idx_data[l[group] + m];
       int64_t offset = i * feature_size + prefix_len;
       int64_t aligned_offset = offset & (long)~(ALIGNMENT - 1);
       int64_t read_size;
-      residual[m] = offset - aligned_offset;
+      residual[m + group * group_size] = offset - aligned_offset;
 
-      if (residual[m] + feature_size > ALIGNMENT) {
+      if (residual[m + group * group_size] + feature_size > ALIGNMENT) {
         read_size = ALIGNMENT * 2;
       } else {
         read_size = ALIGNMENT;
@@ -296,16 +299,20 @@ torch::Tensor cnpy::NpyArray::index_select_iouring(torch::Tensor idx) {
       {
         struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
         io_uring_prep_read(
-            sqe, feature_fd, read_buffer + (ALIGNMENT * 2 * m), read_size,
-            aligned_offset);
+            sqe, feature_fd,
+            read_buffer + (ALIGNMENT * 2 * m) +
+                group * ALIGNMENT * 2 * group_size,
+            read_size, aligned_offset);
       }
-
-      // printf("from thread %d\n", omp_get_thread_num());
     }
-    io_uring_submit(&ring);
+    group ^= 1;
+  };
 
+  auto wait_func = [&] {
+    // printf("wait group: %u\n", group);
     int64_t finish_num = 0;
-    while (finish_num < r - n) {
+    // printf("wait %lu %lu\n", r[group], l[group]);
+    while (finish_num < r[group] - l[group]) {
       struct io_uring_cqe *cqe;
       if (io_uring_wait_cqe(&ring, &cqe) < 0) {
         perror("io_uring_wait_cqe");
@@ -319,17 +326,41 @@ torch::Tensor cnpy::NpyArray::index_select_iouring(torch::Tensor idx) {
       }
       io_uring_cq_advance(&ring, cqecount);
       finish_num += cqecount;
-      // printf("finish num: %d\n", finish_num);
+      // printf("finsh num: %lu\n", finish_num);
     }
-    // printf("end thread %d\n", omp_get_thread_num());
+  };
 
+  auto copy_func = [&] {
+  // printf("copy group: %u\n", group);
 #pragma omp parallel for num_threads(numthd)
-    for (int64_t m = 0; m < r - n; m++) {
+    for (int64_t m = 0; m < r[group] - l[group]; m++) {
       memcpy(
-          result_buffer + feature_size * (n + m),
-          read_buffer + (ALIGNMENT * 2 * m + residual[m]), feature_size);
+          result_buffer + feature_size * (l[group] + m),
+          read_buffer + group * ALIGNMENT * 2 * group_size +
+              (ALIGNMENT * 2 * m + residual[m + group * group_size]),
+          feature_size);
     }
+  };
+  // g=0 l=0 r=2
+  prepare_func();  // pre g 0 g=1 l=2 r=4
+  l[group] = l[group ^ 1] + group_size;
+  r[group] = std::min(num_idx, l[group] + group_size);
+  io_uring_submit(&ring);  // sub g 0
+  // printf("submit group: %u\n", group ^ 1);
+
+  for (; l[group] < num_idx;) {  //
+    prepare_func();              // pre g 1  g=0
+    wait_func();                 // wait g 0
+    io_uring_submit(&ring);      // sub g 1
+    // printf("submit group: %u\n", group ^ 1);
+    copy_func();  // copy g 0
+    l[group] = l[group ^ 1] + group_size;
+    r[group] = std::min(num_idx, l[group] + group_size);  // l=4 r=4
   }
+  group ^= 1;
+  wait_func();
+  copy_func();
+
   io_uring_queue_exit(&ring);
 
   auto options = torch::TensorOptions()
