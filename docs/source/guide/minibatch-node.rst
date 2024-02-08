@@ -44,6 +44,7 @@ putting the list of generated MFGs onto GPU.
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dataset = gb.BuiltinDataset("ogbn-arxiv").load()
+    g = dataset.graph
     train_set = dataset.tasks[0].train_set
     datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
@@ -205,6 +206,7 @@ of node types to node IDs.
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dataset = gb.BuiltinDataset("ogbn-mag").load()
+    g = dataset.graph
     train_set = dataset.tasks[0].train_set
     datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
