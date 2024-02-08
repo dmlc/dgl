@@ -886,9 +886,9 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer_seed_nodes(sampler_type):
     items_n1 = torch.tensor([0])
     items_n2 = torch.tensor([1])
     names = "seed_nodes"
-    i_len = 2
+    item_length = 2
     if sampler_type == SamplerType.Temporal:
-        i_len = 3
+        item_length = 3
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -914,7 +914,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer_seed_nodes(sampler_type):
     indices_len = [
         {
             "n1:e1:n2": 4,
-            "n2:e2:n1": i_len,
+            "n2:e2:n1": item_length,
         },
         {
             "n1:e1:n2": 2,
@@ -935,7 +935,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer_seed_nodes(sampler_type):
                 assert (
                     len(sampled_subgraph.sampled_csc["n2:e2:n1"].indices)
                     == indices_len[step]["n2:e2:n1"]
-
+                )
 
 def test_SubgraphSampler_invoke():
     itemset = gb.ItemSet(torch.arange(10), names="seeds")
