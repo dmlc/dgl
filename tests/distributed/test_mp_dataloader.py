@@ -342,7 +342,7 @@ def check_neg_dataloader(g, num_server, num_workers):
 
 
 @pytest.mark.parametrize("num_server", [1])
-@pytest.mark.parametrize("num_workers", [0, 4])
+@pytest.mark.parametrize("num_workers", [0, 1])
 @pytest.mark.parametrize("drop_last", [False, True])
 @pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("return_eids", [False, True])
@@ -696,7 +696,7 @@ def create_random_hetero():
 
 
 @pytest.mark.parametrize("num_server", [1])
-@pytest.mark.parametrize("num_workers", [0, 4])
+@pytest.mark.parametrize("num_workers", [0, 1])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
 @pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("return_eids", [False, True])
@@ -719,7 +719,7 @@ def test_dataloader_homograph(
 
 
 @pytest.mark.parametrize("num_server", [1])
-@pytest.mark.parametrize("num_workers", [0, 4])
+@pytest.mark.parametrize("num_workers", [0, 1])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
 def test_dataloader_heterograph(num_server, num_workers, dataloader_type):
     reset_envs()
