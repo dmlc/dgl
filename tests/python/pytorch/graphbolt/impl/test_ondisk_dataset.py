@@ -2169,7 +2169,9 @@ def test_OnDiskDataset_load_feature(edge_fmt):
             f.write(yaml_content)
 
         # Case1. Test modify the `in_memory` field.
-        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         original_feature_data = dataset.feature
         dataset.yaml_data["feature_data"][0]["in_memory"] = True
         load_dataset(dataset)
@@ -2215,7 +2217,9 @@ def test_OnDiskDataset_load_feature(edge_fmt):
         # on Windows requires both a drive and a root), then all
         # previous segments are ignored and joining continues from
         # the absolute path segment.
-        dataset = load_dataset(gb.OnDiskDataset(test_dir, include_original_edge_id=True))
+        dataset = load_dataset(
+            gb.OnDiskDataset(test_dir, include_original_edge_id=True)
+        )
         original_feature_data = dataset.feature
         dataset.yaml_data["feature_data"][0]["path"] = os.path.join(
             test_dir, dataset.yaml_data["feature_data"][0]["path"]
@@ -2287,7 +2291,9 @@ def test_OnDiskDataset_load_graph(edge_fmt):
         # on Windows requires both a drive and a root), then all
         # previous segments are ignored and joining continues from
         # the absolute path segment.
-        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         original_graph = dataset.graph
         dataset.yaml_data["graph_topology"]["path"] = os.path.join(
             test_dir, dataset.yaml_data["graph_topology"]["path"]
@@ -2410,7 +2416,9 @@ def test_OnDiskDataset_load_tasks(edge_fmt):
         # on Windows requires both a drive and a root), then all
         # previous segments are ignored and joining continues from
         # the absolute path segment.
-        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         original_train_set = dataset.tasks[0].train_set._items
         dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
             "path"
@@ -2583,7 +2591,9 @@ def test_OnDiskDataset_load_1D_feature(fmt):
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         feature = dataset.feature.read("node", None, "feat")
         # Test whether feature has changed.
         assert torch.equal(torch.from_numpy(node_feats.reshape(-1, 1)), feature)
@@ -3080,14 +3090,20 @@ def test_OnDiskDataset_load_tasks_selectively():
             f.write(yaml_content)
 
         # Case1. Test load all tasks.
-        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         assert len(dataset.tasks) == 2
 
         # Case2. Test load tasks selectively.
-        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load(tasks="link_prediction")
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load(tasks="link_prediction")
         assert len(dataset.tasks) == 1
         assert dataset.tasks[0].metadata["name"] == "link_prediction"
-        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load(tasks=["link_prediction"])
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load(tasks=["link_prediction"])
         assert len(dataset.tasks) == 1
         assert dataset.tasks[0].metadata["name"] == "link_prediction"
 
@@ -3096,12 +3112,16 @@ def test_OnDiskDataset_load_tasks_selectively():
             DGLWarning,
             match="Below tasks are not found in YAML: {'fake-name'}. Skipped.",
         ):
-            dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load(tasks=["fake-name"])
+            dataset = gb.OnDiskDataset(
+                test_dir, include_original_edge_id=True
+            ).load(tasks=["fake-name"])
             assert len(dataset.tasks) == 0
 
         # Case4. Test load tasks selectively with incorrect task type.
         with pytest.raises(TypeError):
-            dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load(tasks=2)
+            dataset = gb.OnDiskDataset(
+                test_dir, include_original_edge_id=True
+            ).load(tasks=2)
 
         dataset = None
 
@@ -3162,7 +3182,9 @@ def test_OnDiskDataset_preprocess_graph_with_single_type():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         assert dataset.dataset_name == dataset_name
 
         graph = dataset.graph
