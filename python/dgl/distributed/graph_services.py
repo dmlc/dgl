@@ -1,4 +1,5 @@
 """A set of graph services of getting subgraphs from DistGraph"""
+import os
 from collections import namedtuple
 
 import numpy as np
@@ -150,8 +151,11 @@ def _sample_neighbors_graphbolt(
 
     # 3. Map local node IDs to global node IDs.
     local_src = subgraph.indices
-    local_dst = torch.repeat_interleave(
-        subgraph.original_column_node_ids, torch.diff(subgraph.indptr)
+    local_dst = gb.expand_indptr(
+        subgraph.indptr,
+        dtype=local_src.dtype,
+        node_ids=subgraph.original_column_node_ids,
+        output_size=local_src.shape[0],
     )
     global_nid_mapping = g.node_attributes[NID]
     global_src = global_nid_mapping[local_src]
@@ -708,24 +712,47 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
             idtype=g.idtype,
         )
 
-    etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
-    src, dst = frontier.edges()
+    # For DGL partitions, the global edge IDs are always stored in the edata.
+    # For GraphBolt partitions, the edge type IDs are always stored in the
+    # edata. As for the edge IDs, they are stored in the edata if the graph is
+    # partitioned with `store_eids=True`. Otherwise, the edge IDs are not
+    # stored.
+    etype_ids, type_wise_eids = (
+        gpb.map_to_per_etype(frontier.edata[EID])
+        if EID in frontier.edata
+        else (frontier.edata[ETYPE], None)
+    )
     etype_ids, idx = F.sort_1d(etype_ids)
+    if type_wise_eids is not None:
+        type_wise_eids = F.gather_row(type_wise_eids, idx)
+
+    # Sort the edges by their edge types.
+    src, dst = frontier.edges()
     src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
-    eid = F.gather_row(frontier.edata[EID], idx)
-    _, src = gpb.map_to_per_ntype(src)
-    _, dst = gpb.map_to_per_ntype(dst)
+    src_ntype_ids, src = gpb.map_to_per_ntype(src)
+    dst_ntype_ids, dst = gpb.map_to_per_ntype(dst)
 
     data_dict = dict()
     edge_ids = {}
     for etid, etype in enumerate(g.canonical_etypes):
+        src_ntype, _, dst_ntype = etype
+        src_ntype_id = g.get_ntype_id(src_ntype)
+        dst_ntype_id = g.get_ntype_id(dst_ntype)
         type_idx = etype_ids == etid
         if F.sum(type_idx, 0) > 0:
             data_dict[etype] = (
                 F.boolean_mask(src, type_idx),
                 F.boolean_mask(dst, type_idx),
             )
-            edge_ids[etype] = F.boolean_mask(eid, type_idx)
+            if "DGL_DIST_DEBUG" in os.environ:
+                assert torch.all(
+                    src_ntype_id == src_ntype_ids[type_idx]
+                ), "source ntype is is not expected."
+                assert torch.all(
+                    dst_ntype_id == dst_ntype_ids[type_idx]
+                ), "destination ntype is is not expected."
+            if type_wise_eids is not None:
+                edge_ids[etype] = F.boolean_mask(type_wise_eids, type_idx)
     hg = heterograph(
         data_dict,
         {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
