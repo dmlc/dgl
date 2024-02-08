@@ -43,20 +43,19 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> GpuCache::Query(
       torch::empty(keys.size(0), keys.options().dtype(torch::kLong));
   auto missing_keys =
       torch::empty(keys.size(0), keys.options().dtype(torch::kLong));
-  cuda::CopyScalar<size_t> missing_len;
-  auto stream = cuda::GetCurrentStream();
+  auto allocator = cuda::GetAllocator();
+  auto missing_len_device = allocator.AllocateStorage<size_t>(1);
   cache_->Query(
       reinterpret_cast<const key_t *>(keys.data_ptr()), keys.size(0),
       values.data_ptr<float>(),
       reinterpret_cast<uint64_t *>(missing_index.data_ptr()),
-      reinterpret_cast<key_t *>(missing_keys.data_ptr()), missing_len.get(),
-      stream);
+      reinterpret_cast<key_t *>(missing_keys.data_ptr()),
+      missing_len_device.get(), cuda::GetCurrentStream());
   values = values.view(torch::kByte)
                .slice(1, 0, num_bytes_)
                .view(dtype_)
                .view(shape_);
-  // To safely read missing_len, we synchronize
-  stream.synchronize();
+  cuda::CopyScalar<size_t> missing_len(missing_len_device.get());
   missing_index = missing_index.slice(0, 0, static_cast<size_t>(missing_len));
   missing_keys = missing_keys.slice(0, 0, static_cast<size_t>(missing_len));
   return std::make_tuple(values, missing_index, missing_keys);
@@ -79,6 +78,7 @@ void GpuCache::Replace(torch::Tensor keys, torch::Tensor values) {
       "Values should have the correct dimensions.");
   TORCH_CHECK(
       values.scalar_type() == dtype_, "Values should have the correct dtype.");
+  if (keys.numel() == 0) return;
   keys = keys.to(torch::kLong);
   torch::Tensor float_values;
   if (num_bytes_ % sizeof(float) != 0) {

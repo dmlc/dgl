@@ -1,10 +1,13 @@
 """A set of graph services of getting subgraphs from DistGraph"""
+import os
 from collections import namedtuple
 
 import numpy as np
 
-from .. import backend as F
-from ..base import EID, NID
+import torch
+
+from .. import backend as F, graphbolt as gb
+from ..base import EID, ETYPE, NID
 from ..convert import graph, heterograph
 from ..sampling import (
     sample_etype_neighbors as local_sample_etype_neighbors,
@@ -38,16 +41,29 @@ ETYPE_SAMPLING_SERVICE_ID = 6662
 class SubgraphResponse(Response):
     """The response for sampling and in_subgraph"""
 
-    def __init__(self, global_src, global_dst, global_eids):
+    def __init__(
+        self, global_src, global_dst, *, global_eids=None, etype_ids=None
+    ):
         self.global_src = global_src
         self.global_dst = global_dst
         self.global_eids = global_eids
+        self.etype_ids = etype_ids
 
     def __setstate__(self, state):
-        self.global_src, self.global_dst, self.global_eids = state
+        (
+            self.global_src,
+            self.global_dst,
+            self.global_eids,
+            self.etype_ids,
+        ) = state
 
     def __getstate__(self):
-        return self.global_src, self.global_dst, self.global_eids
+        return (
+            self.global_src,
+            self.global_dst,
+            self.global_eids,
+            self.etype_ids,
+        )
 
 
 class FindEdgeResponse(Response):
@@ -65,8 +81,102 @@ class FindEdgeResponse(Response):
         return self.global_src, self.global_dst, self.order_id
 
 
-def _sample_neighbors(
-    local_g, partition_book, seed_nodes, fan_out, edge_dir, prob, replace
+def _sample_neighbors_graphbolt(
+    g, gpb, nodes, fanout, edge_dir="in", prob=None, replace=False
+):
+    """Sample from local partition via graphbolt.
+
+    The input nodes use global IDs. We need to map the global node IDs to local
+    node IDs, perform sampling and map the sampled results to the global IDs
+    space again. The sampled results are stored in three vectors that store
+    source nodes, destination nodes, etype IDs and edge IDs.
+
+    Parameters
+    ----------
+    g : FusedCSCSamplingGraph
+        The local partition.
+    gpb : GraphPartitionBook
+        The graph partition book.
+    nodes : tensor
+        The nodes to sample neighbors from.
+    fanout : tensor or int
+        The number of edges to be sampled for each node.
+    edge_dir : str, optional
+        Determines whether to sample inbound or outbound edges.
+    prob : tensor, optional
+        The probability associated with each neighboring edge of a node.
+    replace : bool, optional
+        If True, sample with replacement.
+
+    Returns
+    -------
+    tensor
+        The source node ID array.
+    tensor
+        The destination node ID array.
+    tensor
+        The edge ID array.
+    tensor
+        The edge type ID array.
+    """
+    assert (
+        edge_dir == "in"
+    ), f"GraphBolt only supports inbound edge sampling but got {edge_dir}."
+
+    # 1. Map global node IDs to local node IDs.
+    nodes = gpb.nid2localnid(nodes, gpb.partid)
+
+    # 2. Perform sampling.
+    # [Rui][TODO] `prob` and `replace` are not tested yet. Skip for now.
+    assert (
+        prob is None
+    ), "DistGraphBolt does not support sampling with probability."
+    assert (
+        not replace
+    ), "DistGraphBolt does not support sampling with replacement."
+
+    # Sanity checks.
+    assert isinstance(
+        g, gb.FusedCSCSamplingGraph
+    ), "Expect a FusedCSCSamplingGraph."
+    assert isinstance(nodes, torch.Tensor), "Expect a tensor of nodes."
+    if isinstance(fanout, int):
+        fanout = torch.LongTensor([fanout])
+    assert isinstance(fanout, torch.Tensor), "Expect a tensor of fanout."
+    # [Rui][TODO] Support multiple fanouts.
+    assert fanout.numel() == 1, "Expect a single fanout."
+
+    return_eids = g.edge_attributes is not None and EID in g.edge_attributes
+    subgraph = g._sample_neighbors(nodes, fanout, return_eids=return_eids)
+
+    # 3. Map local node IDs to global node IDs.
+    local_src = subgraph.indices
+    local_dst = gb.expand_indptr(
+        subgraph.indptr,
+        dtype=local_src.dtype,
+        node_ids=subgraph.original_column_node_ids,
+        output_size=local_src.shape[0],
+    )
+    global_nid_mapping = g.node_attributes[NID]
+    global_src = global_nid_mapping[local_src]
+    global_dst = global_nid_mapping[local_dst]
+
+    global_eids = None
+    if return_eids:
+        global_eids = g.edge_attributes[EID][subgraph.original_edge_ids]
+    return LocalSampledGraph(
+        global_src, global_dst, global_eids, subgraph.type_per_edge
+    )
+
+
+def _sample_neighbors_dgl(
+    local_g,
+    partition_book,
+    seed_nodes,
+    fan_out,
+    edge_dir="in",
+    prob=None,
+    replace=False,
 ):
     """Sample from local partition.
 
@@ -93,7 +203,38 @@ def _sample_neighbors(
         global_nid_mapping, src
     ), F.gather_row(global_nid_mapping, dst)
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
-    return global_src, global_dst, global_eids
+    return LocalSampledGraph(global_src, global_dst, global_eids)
+
+
+def _sample_neighbors(use_graphbolt, *args, **kwargs):
+    """Wrapper for sampling neighbors.
+
+    The actual sampling function depends on whether to use GraphBolt.
+
+    Parameters
+    ----------
+    use_graphbolt : bool
+        Whether to use GraphBolt for sampling.
+    args : list
+        The arguments for the sampling function.
+    kwargs : dict
+        The keyword arguments for the sampling function.
+
+    Returns
+    -------
+    tensor
+        The source node ID array.
+    tensor
+        The destination node ID array.
+    tensor
+        The edge ID array.
+    tensor
+        The edge type ID array.
+    """
+    func = (
+        _sample_neighbors_graphbolt if use_graphbolt else _sample_neighbors_dgl
+    )
+    return func(*args, **kwargs)
 
 
 def _sample_etype_neighbors(
@@ -134,7 +275,7 @@ def _sample_etype_neighbors(
         global_nid_mapping, src
     ), F.gather_row(global_nid_mapping, dst)
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
-    return global_src, global_dst, global_eids
+    return LocalSampledGraph(global_src, global_dst, global_eids)
 
 
 def _find_edges(local_g, partition_book, seed_edges):
@@ -180,7 +321,7 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
     src, dst = sampled_graph.edges()
     global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
-    return global_src, global_dst, global_eids
+    return LocalSampledGraph(global_src, global_dst, global_eids)
 
 
 # --- NOTE 1 ---
@@ -212,12 +353,21 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
 class SamplingRequest(Request):
     """Sampling Request"""
 
-    def __init__(self, nodes, fan_out, edge_dir="in", prob=None, replace=False):
+    def __init__(
+        self,
+        nodes,
+        fan_out,
+        edge_dir="in",
+        prob=None,
+        replace=False,
+        use_graphbolt=False,
+    ):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
         self.replace = replace
         self.fan_out = fan_out
+        self.use_graphbolt = use_graphbolt
 
     def __setstate__(self, state):
         (
@@ -226,6 +376,7 @@ class SamplingRequest(Request):
             self.prob,
             self.replace,
             self.fan_out,
+            self.use_graphbolt,
         ) = state
 
     def __getstate__(self):
@@ -235,6 +386,7 @@ class SamplingRequest(Request):
             self.prob,
             self.replace,
             self.fan_out,
+            self.use_graphbolt,
         )
 
     def process_request(self, server_state):
@@ -245,16 +397,22 @@ class SamplingRequest(Request):
             prob = [kv_store.data_store[self.prob]]
         else:
             prob = None
-        global_src, global_dst, global_eids = _sample_neighbors(
+        res = _sample_neighbors(
+            self.use_graphbolt,
             local_g,
             partition_book,
             self.seed_nodes,
             self.fan_out,
-            self.edge_dir,
-            prob,
-            self.replace,
+            edge_dir=self.edge_dir,
+            prob=prob,
+            replace=self.replace,
         )
-        return SubgraphResponse(global_src, global_dst, global_eids)
+        return SubgraphResponse(
+            res.global_src,
+            res.global_dst,
+            global_eids=res.global_eids,
+            etype_ids=res.etype_ids,
+        )
 
 
 class SamplingRequestEtype(Request):
@@ -309,7 +467,7 @@ class SamplingRequestEtype(Request):
             ]
         else:
             probs = None
-        global_src, global_dst, global_eids = _sample_etype_neighbors(
+        res = _sample_etype_neighbors(
             local_g,
             partition_book,
             self.seed_nodes,
@@ -320,7 +478,12 @@ class SamplingRequestEtype(Request):
             self.replace,
             self.etype_sorted,
         )
-        return SubgraphResponse(global_src, global_dst, global_eids)
+        return SubgraphResponse(
+            res.global_src,
+            res.global_dst,
+            global_eids=res.global_eids,
+            etype_ids=res.etype_ids,
+        )
 
 
 class EdgesRequest(Request):
@@ -434,7 +597,7 @@ class InSubgraphRequest(Request):
         global_src, global_dst, global_eids = _in_subgraph(
             local_g, partition_book, self.seed_nodes
         )
-        return SubgraphResponse(global_src, global_dst, global_eids)
+        return SubgraphResponse(global_src, global_dst, global_eids=global_eids)
 
 
 def merge_graphs(res_list, num_nodes):
@@ -443,24 +606,33 @@ def merge_graphs(res_list, num_nodes):
         srcs = []
         dsts = []
         eids = []
+        etype_ids = []
         for res in res_list:
             srcs.append(res.global_src)
             dsts.append(res.global_dst)
             eids.append(res.global_eids)
+            etype_ids.append(res.etype_ids)
         src_tensor = F.cat(srcs, 0)
         dst_tensor = F.cat(dsts, 0)
-        eid_tensor = F.cat(eids, 0)
+        eid_tensor = None if eids[0] is None else F.cat(eids, 0)
+        etype_id_tensor = None if etype_ids[0] is None else F.cat(etype_ids, 0)
     else:
         src_tensor = res_list[0].global_src
         dst_tensor = res_list[0].global_dst
         eid_tensor = res_list[0].global_eids
+        etype_id_tensor = res_list[0].etype_ids
     g = graph((src_tensor, dst_tensor), num_nodes=num_nodes)
-    g.edata[EID] = eid_tensor
+    if eid_tensor is not None:
+        g.edata[EID] = eid_tensor
+    if etype_id_tensor is not None:
+        g.edata[ETYPE] = etype_id_tensor
     return g
 
 
-LocalSampledGraph = namedtuple(
-    "LocalSampledGraph", "global_src global_dst global_eids"
+LocalSampledGraph = namedtuple(  # pylint: disable=unexpected-keyword-arg
+    "LocalSampledGraph",
+    "global_src global_dst global_eids etype_ids",
+    defaults=(None, None, None, None),
 )
 
 
@@ -491,7 +663,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     """
     req_list = []
     partition_book = g.get_partition_book()
-    nodes = toindex(nodes).tousertensor()
+    if not isinstance(nodes, torch.Tensor):
+        nodes = toindex(nodes).tousertensor()
     partition_id = partition_book.nid2partid(nodes)
     local_nids = None
     for pid in range(partition_book.num_partitions()):
@@ -515,10 +688,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     # sample neighbors for the nodes in the local partition.
     res_list = []
     if local_nids is not None:
-        src, dst, eids = local_access(
-            g.local_partition, partition_book, local_nids
-        )
-        res_list.append(LocalSampledGraph(src, dst, eids))
+        res = local_access(g.local_partition, partition_book, local_nids)
+        res_list.append(res)
 
     # receive responses from remote machines.
     if msgseq2pos is not None:
@@ -541,24 +712,47 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
             idtype=g.idtype,
         )
 
-    etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
-    src, dst = frontier.edges()
+    # For DGL partitions, the global edge IDs are always stored in the edata.
+    # For GraphBolt partitions, the edge type IDs are always stored in the
+    # edata. As for the edge IDs, they are stored in the edata if the graph is
+    # partitioned with `store_eids=True`. Otherwise, the edge IDs are not
+    # stored.
+    etype_ids, type_wise_eids = (
+        gpb.map_to_per_etype(frontier.edata[EID])
+        if EID in frontier.edata
+        else (frontier.edata[ETYPE], None)
+    )
     etype_ids, idx = F.sort_1d(etype_ids)
+    if type_wise_eids is not None:
+        type_wise_eids = F.gather_row(type_wise_eids, idx)
+
+    # Sort the edges by their edge types.
+    src, dst = frontier.edges()
     src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
-    eid = F.gather_row(frontier.edata[EID], idx)
-    _, src = gpb.map_to_per_ntype(src)
-    _, dst = gpb.map_to_per_ntype(dst)
+    src_ntype_ids, src = gpb.map_to_per_ntype(src)
+    dst_ntype_ids, dst = gpb.map_to_per_ntype(dst)
 
     data_dict = dict()
     edge_ids = {}
     for etid, etype in enumerate(g.canonical_etypes):
+        src_ntype, _, dst_ntype = etype
+        src_ntype_id = g.get_ntype_id(src_ntype)
+        dst_ntype_id = g.get_ntype_id(dst_ntype)
         type_idx = etype_ids == etid
         if F.sum(type_idx, 0) > 0:
             data_dict[etype] = (
                 F.boolean_mask(src, type_idx),
                 F.boolean_mask(dst, type_idx),
             )
-            edge_ids[etype] = F.boolean_mask(eid, type_idx)
+            if "DGL_DIST_DEBUG" in os.environ:
+                assert torch.all(
+                    src_ntype_id == src_ntype_ids[type_idx]
+                ), "source ntype is is not expected."
+                assert torch.all(
+                    dst_ntype_id == dst_ntype_ids[type_idx]
+                ), "destination ntype is is not expected."
+            if type_wise_eids is not None:
+                edge_ids[etype] = F.boolean_mask(type_wise_eids, type_idx)
     hg = heterograph(
         data_dict,
         {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
@@ -721,7 +915,15 @@ def sample_etype_neighbors(
         return frontier
 
 
-def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
+def sample_neighbors(
+    g,
+    nodes,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    replace=False,
+    use_graphbolt=False,
+):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -764,6 +966,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
 
         For sampling without replacement, if fanout > the number of neighbors, all the
         neighbors are sampled. If fanout == -1, all neighbors are collected.
+    use_graphbolt : bool, optional
+        Whether to use GraphBolt for sampling.
 
     Returns
     -------
@@ -795,20 +999,26 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
         else:
             _prob = None
         return SamplingRequest(
-            node_ids, fanout, edge_dir=edge_dir, prob=_prob, replace=replace
+            node_ids,
+            fanout,
+            edge_dir=edge_dir,
+            prob=_prob,
+            replace=replace,
+            use_graphbolt=use_graphbolt,
         )
 
     def local_access(local_g, partition_book, local_nids):
         # See NOTE 1
         _prob = [g.edata[prob].local_partition] if prob is not None else None
         return _sample_neighbors(
+            use_graphbolt,
             local_g,
             partition_book,
             local_nids,
             fanout,
-            edge_dir,
-            _prob,
-            replace,
+            edge_dir=edge_dir,
+            prob=_prob,
+            replace=replace,
         )
 
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
