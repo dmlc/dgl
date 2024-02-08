@@ -776,9 +776,8 @@ class BuiltinDataset(OnDiskDataset):
         "ogbl-citation2",
         "ogbn-products",
         "ogbn-arxiv",
-        "ogbn-papers100M",
     ]
-    _large_datasets = ["ogb-lsc-mag240m"]
+    _large_datasets = ["ogb-lsc-mag240m", "ogbn-papers100M"]
     _all_datasets = _datasets + _large_datasets
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
