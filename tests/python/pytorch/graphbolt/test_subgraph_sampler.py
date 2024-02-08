@@ -937,6 +937,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer_seed_nodes(sampler_type):
                     == indices_len[step]["n2:e2:n1"]
                 )
 
+
 def test_SubgraphSampler_invoke():
     itemset = gb.ItemSet(torch.arange(10), names="seeds")
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
