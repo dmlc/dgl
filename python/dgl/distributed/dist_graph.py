@@ -1406,7 +1406,12 @@ class DistGraph:
             )
         else:
             frontier = graph_services.sample_neighbors(
-                self, seed_nodes, fanout, replace=replace, prob=prob
+                self,
+                seed_nodes,
+                fanout,
+                replace=replace,
+                prob=prob,
+                use_graphbolt=self._use_graphbolt,
             )
         return frontier
 
