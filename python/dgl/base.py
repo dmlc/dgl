@@ -1,6 +1,7 @@
 """Module for base types and utilities."""
 from __future__ import absolute_import
 
+import sys
 import warnings
 
 from ._ffi.base import DGLError  # pylint: disable=unused-import
@@ -50,6 +51,9 @@ def dgl_warning_format(message, category, filename, lineno, line=None):
 
 def dgl_warning(message, category=DGLWarning, stacklevel=2):
     """DGL warning wrapper that defaults to ``DGLWarning`` instead of ``UserWarning`` category."""
+    # Skip warning in unit test.
+    if "unittest" in sys.modules.keys():
+        return
     return warnings.warn(message, category=category, stacklevel=stacklevel)
 
 
