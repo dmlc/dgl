@@ -203,10 +203,13 @@ class SampledSubgraph:
                 self.original_column_node_ids,
             )
             if isinstance(edges, torch.Tensor):
-                edges = edges.T
-            index = _exclude_homo_edges(
-                reverse_edges, edges, assume_num_node_within_int32
-            )
+                index = _exclude_homo_edges_2(
+                    reverse_edges, edges, assume_num_node_within_int32
+                )
+            else:
+                index = _exclude_homo_edges(
+                    reverse_edges, edges, assume_num_node_within_int32
+                )
             return calling_class(*_slice_subgraph(self, index))
         else:
             index = {}
@@ -232,12 +235,17 @@ class SampledSubgraph:
                     original_column_node_ids,
                 )
                 if isinstance(edges[etype], torch.Tensor):
-                    edges[etype] = edges[etype].T
-                index[etype] = _exclude_homo_edges(
-                    reverse_edges,
-                    edges[etype],
-                    assume_num_node_within_int32,
-                )
+                    index[etype] = _exclude_homo_edges_2(
+                        reverse_edges,
+                        edges[etype],
+                        assume_num_node_within_int32,
+                    )
+                else:
+                    index[etype] = _exclude_homo_edges(
+                        reverse_edges,
+                        edges[etype],
+                        assume_num_node_within_int32,
+                    )
             return calling_class(*_slice_subgraph(self, index))
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
@@ -286,6 +294,27 @@ def _exclude_homo_edges(
     if assume_num_node_within_int32:
         val = edges[0] << 32 | edges[1]
         val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]
+    else:
+        # TODO: Add support for value > int32.
+        raise NotImplementedError(
+            "Values out of range int32 are not supported yet"
+        )
+    mask = ~isin(val, val_to_exclude)
+    return torch.nonzero(mask, as_tuple=True)[0]
+
+
+def _exclude_homo_edges_2(
+    edges: Tuple[torch.Tensor, torch.Tensor],
+    edges_to_exclude: torch.Tensor,
+    assume_num_node_within_int32: bool,
+):
+    """Return the indices of edges to be included."""
+    if assume_num_node_within_int32:
+        val = edges[0] << 32 | edges[1]
+        edges_to_exclude_trans = edges_to_exclude.T
+        val_to_exclude = (
+            edges_to_exclude_trans[0] << 32 | edges_to_exclude_trans[1]
+        )
     else:
         # TODO: Add support for value > int32.
         raise NotImplementedError(
