@@ -1,7 +1,6 @@
 import re
 import unittest
 
-from enum import Enum
 from functools import partial
 
 import backend as F
@@ -10,9 +9,6 @@ import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
-from torchdata.datapipes.iter import Mapper
-
-from . import gb_test_utils
 
 
 def test_add_reverse_edges_homo():
