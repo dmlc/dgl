@@ -622,18 +622,7 @@ class DistGraph:
 
         self._init_ndata_store()
         self._init_edata_store()
-
-        self._num_nodes = 0
-        self._num_edges = 0
-        for part_md in self._gpb.metadata():
-            self._num_nodes += int(part_md["num_nodes"])
-            self._num_edges += int(part_md["num_edges"])
-
-        # When we store node/edge types in a list, they are stored in the order of type IDs.
-        self._ntype_map = {ntype: i for i, ntype in enumerate(self.ntypes)}
-        self._etype_map = {
-            etype: i for i, etype in enumerate(self.canonical_etypes)
-        }
+        self._init_metadata()
 
     def _init(self, gpb):
         self._client = get_kvstore()
@@ -698,6 +687,19 @@ class DistGraph:
             else:
                 self._edata_store[etype] = data
 
+    def _init_metadata(self):
+        self._num_nodes = 0
+        self._num_edges = 0
+        for part_md in self._gpb.metadata():
+            self._num_nodes += int(part_md["num_nodes"])
+            self._num_edges += int(part_md["num_edges"])
+
+        # When we store node/edge types in a list, they are stored in the order of type IDs.
+        self._ntype_map = {ntype: i for i, ntype in enumerate(self.ntypes)}
+        self._etype_map = {
+            etype: i for i, etype in enumerate(self.canonical_etypes)
+        }
+
     def __getstate__(self):
         return self.graph_name, self._gpb, self._use_graphbolt
 
@@ -707,11 +709,7 @@ class DistGraph:
 
         self._init_ndata_store()
         self._init_edata_store()
-        self._num_nodes = 0
-        self._num_edges = 0
-        for part_md in self._gpb.metadata():
-            self._num_nodes += int(part_md["num_nodes"])
-            self._num_edges += int(part_md["num_edges"])
+        self._init_metadata()
 
     @property
     def local_partition(self):
@@ -1403,10 +1401,16 @@ class DistGraph:
                 replace=replace,
                 etype_sorted=etype_sorted,
                 prob=prob,
+                use_graphbolt=self._use_graphbolt,
             )
         else:
             frontier = graph_services.sample_neighbors(
-                self, seed_nodes, fanout, replace=replace, prob=prob
+                self,
+                seed_nodes,
+                fanout,
+                replace=replace,
+                prob=prob,
+                use_graphbolt=self._use_graphbolt,
             )
         return frontier
 
