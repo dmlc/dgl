@@ -53,7 +53,7 @@ def dgl_warning(message, category=DGLWarning, stacklevel=2):
     """DGL warning wrapper that defaults to ``DGLWarning`` instead of ``UserWarning`` category."""
     # Skip warning in unit test.
     if "unittest" in sys.modules.keys():
-        return
+        return None
     return warnings.warn(message, category=category, stacklevel=stacklevel)
 
 
