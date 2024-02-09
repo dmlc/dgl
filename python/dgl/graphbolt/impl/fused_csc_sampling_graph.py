@@ -625,8 +625,16 @@ class FusedCSCSamplingGraph(SamplingGraph):
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
+        return_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
         C_sampled_subgraph = self._sample_neighbors(
-            nodes, fanouts, replace, probs_name
+            nodes,
+            fanouts,
+            replace=replace,
+            probs_name=probs_name,
+            return_eids=return_eids,
         )
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
@@ -679,6 +687,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        return_eids: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -714,6 +723,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        return_eids: bool, optional
+            Boolean indicating whether to return the original edge IDs of the
+            sampled edges.
 
         Returns
         -------
@@ -722,16 +734,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         # Ensure nodes is 1-D tensor.
         self._check_sampler_arguments(nodes, fanouts, probs_name)
-        has_original_eids = (
-            self.edge_attributes is not None
-            and ORIGINAL_EDGE_ID in self.edge_attributes
-        )
         return self._c_csc_graph.sample_neighbors(
             nodes,
             fanouts.tolist(),
             replace,
             False,
-            has_original_eids,
+            return_eids,
             probs_name,
         )
 
@@ -1018,7 +1026,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
             torch.cat(
                 (
                     pos_src.repeat_interleave(negative_ratio),
-                    torch.randint(0, max_node_id, (num_negative,)),
+                    torch.randint(
+                        0,
+                        max_node_id,
+                        (num_negative,),
+                        dtype=node_pairs.dtype,
+                        device=node_pairs.device,
+                    ),
                 ),
             )
             .view(2, num_negative)
@@ -1078,7 +1092,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return self2._apply_to_members(_pin if device == "pinned" else _to)
 
     def pin_memory_(self):
-        """Copy `FusedCSCSamplingGraph` to the pinned memory in-place."""
+        """Copy `FusedCSCSamplingGraph` to the pinned memory in-place. Returns
+        the same object modified in-place."""
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
         # truly in-place, we need to use cudaHostRegister. Then, we need to use
         # cudaHostUnregister to unpin the tensor in the destructor.
@@ -1109,7 +1124,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
             return x
 
-        self._apply_to_members(_pin)
+        return self._apply_to_members(_pin)
 
 
 def fused_csc_sampling_graph(

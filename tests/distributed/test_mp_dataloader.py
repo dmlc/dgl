@@ -22,10 +22,19 @@ from utils import generate_ip_config, reset_envs
 
 
 class NeighborSampler(object):
-    def __init__(self, g, fanouts, sample_neighbors):
+    def __init__(
+        self,
+        g,
+        fanouts,
+        sample_neighbors,
+        use_graphbolt=False,
+        return_eids=False,
+    ):
         self.g = g
         self.fanouts = fanouts
         self.sample_neighbors = sample_neighbors
+        self.use_graphbolt = use_graphbolt
+        self.return_eids = return_eids
 
     def sample_blocks(self, seeds):
         import torch as th
@@ -35,13 +44,16 @@ class NeighborSampler(object):
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
             frontier = self.sample_neighbors(
-                self.g, seeds, fanout, replace=True
+                self.g, seeds, fanout, use_graphbolt=self.use_graphbolt
             )
             # Then we compact the frontier into a bipartite graph for
             # message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
+            if frontier.num_edges() > 0:
+                if not self.use_graphbolt or self.return_eids:
+                    block.edata[dgl.EID] = frontier.edata[dgl.EID]
 
             blocks.insert(0, block)
         return blocks
@@ -53,6 +65,7 @@ def start_server(
     part_config,
     disable_shared_mem,
     num_clients,
+    use_graphbolt=False,
 ):
     print("server: #clients=" + str(num_clients))
     g = DistGraphServer(
@@ -63,6 +76,7 @@ def start_server(
         part_config,
         disable_shared_mem=disable_shared_mem,
         graph_format=["csc", "coo"],
+        use_graphbolt=use_graphbolt,
     )
     g.start()
 
@@ -75,29 +89,35 @@ def start_dist_dataloader(
     drop_last,
     orig_nid,
     orig_eid,
-    group_id=0,
+    use_graphbolt=False,
+    return_eids=False,
 ):
-    import dgl
-    import torch as th
-
-    os.environ["DGL_GROUP_ID"] = str(group_id)
     dgl.distributed.initialize(ip_config)
     gpb = None
-    disable_shared_mem = num_server > 0
+    disable_shared_mem = num_server > 1
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(part_config, rank)
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
-    dist_graph = DistGraph("test_mp", gpb=gpb, part_config=part_config)
-
-    for i in range(num_server):
-        part, _, _, _, _, _, _ = load_partition(part_config, i)
+    dist_graph = DistGraph(
+        "test_sampling",
+        gpb=gpb,
+        part_config=part_config,
+        use_graphbolt=use_graphbolt,
+    )
 
     # Create sampler
     sampler = NeighborSampler(
-        dist_graph, [5, 10], dgl.distributed.sample_neighbors
+        dist_graph,
+        [5, 10],
+        dgl.distributed.sample_neighbors,
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
+
+    # Enable santity check in distributed sampling.
+    os.environ["DGL_DIST_DEBUG"] = "1"
 
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
@@ -113,7 +133,7 @@ def start_dist_dataloader(
         groundtruth_g = CitationGraphDataset("cora")[0]
         max_nid = []
 
-        for epoch in range(2):
+        for _ in range(2):
             for idx, blocks in zip(
                 range(0, num_nodes_to_sample, batch_size), dataloader
             ):
@@ -129,6 +149,16 @@ def start_dist_dataloader(
                     src_nodes_id, dst_nodes_id
                 )
                 assert np.all(F.asnumpy(has_edges))
+
+                if use_graphbolt and not return_eids:
+                    continue
+                eids = orig_eid[block.edata[dgl.EID]]
+                expected_eids = groundtruth_g.edge_ids(
+                    src_nodes_id, dst_nodes_id
+                )
+                assert th.equal(
+                    eids, expected_eids
+                ), f"{eids} != {expected_eids}"
             if drop_last:
                 assert (
                     np.max(max_nid)
@@ -311,23 +341,22 @@ def check_neg_dataloader(g, num_server, num_workers):
             assert p.exitcode == 0
 
 
-@unittest.skip(reason="Skip due to glitch in CI")
-@pytest.mark.parametrize("num_server", [3])
-@pytest.mark.parametrize("num_workers", [0, 4])
-@pytest.mark.parametrize("drop_last", [True, False])
-@pytest.mark.parametrize("num_groups", [1])
-def test_dist_dataloader(num_server, num_workers, drop_last, num_groups):
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("num_workers", [0, 1])
+@pytest.mark.parametrize("drop_last", [False, True])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_dist_dataloader(
+    num_server, num_workers, drop_last, use_graphbolt, return_eids
+):
     reset_envs()
-    # No multiple partitions on single machine for
-    # multiple client groups in case of race condition.
-    if num_groups > 1:
-        num_server = 1
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    os.environ["DGL_NUM_SAMPLER"] = str(num_workers)
     with tempfile.TemporaryDirectory() as test_dir:
         ip_config = "ip_config.txt"
         generate_ip_config(ip_config, num_server, num_server)
 
         g = CitationGraphDataset("cora")[0]
-        print(g.idtype)
         num_parts = num_server
         num_hops = 1
 
@@ -339,6 +368,8 @@ def test_dist_dataloader(num_server, num_workers, drop_last, num_groups):
             num_hops=num_hops,
             part_method="metis",
             return_mapping=True,
+            use_graphbolt=use_graphbolt,
+            store_eids=return_eids,
         )
 
         part_config = os.path.join(test_dir, "test_sampling.json")
@@ -353,36 +384,33 @@ def test_dist_dataloader(num_server, num_workers, drop_last, num_groups):
                     part_config,
                     num_server > 1,
                     num_workers + 1,
+                    use_graphbolt,
                 ),
             )
             p.start()
             time.sleep(1)
             pserver_list.append(p)
 
-        os.environ["DGL_DIST_MODE"] = "distributed"
-        os.environ["DGL_NUM_SAMPLER"] = str(num_workers)
         ptrainer_list = []
         num_trainers = 1
         for trainer_id in range(num_trainers):
-            for group_id in range(num_groups):
-                p = ctx.Process(
-                    target=start_dist_dataloader,
-                    args=(
-                        trainer_id,
-                        ip_config,
-                        part_config,
-                        num_server,
-                        drop_last,
-                        orig_nid,
-                        orig_eid,
-                        group_id,
-                    ),
-                )
-                p.start()
-                time.sleep(
-                    1
-                )  # avoid race condition when instantiating DistGraph
-                ptrainer_list.append(p)
+            p = ctx.Process(
+                target=start_dist_dataloader,
+                args=(
+                    trainer_id,
+                    ip_config,
+                    part_config,
+                    num_server,
+                    drop_last,
+                    orig_nid,
+                    orig_eid,
+                    use_graphbolt,
+                    return_eids,
+                ),
+            )
+            p.start()
+            time.sleep(1)  # avoid race condition when instantiating DistGraph
+            ptrainer_list.append(p)
 
         for p in ptrainer_list:
             p.join()
@@ -401,6 +429,8 @@ def start_node_dataloader(
     orig_nid,
     orig_eid,
     groundtruth_g,
+    use_graphbolt=False,
+    return_eids=False,
 ):
     dgl.distributed.initialize(ip_config)
     gpb = None
@@ -409,7 +439,12 @@ def start_node_dataloader(
         _, _, _, gpb, _, _, _ = load_partition(part_config, rank)
     num_nodes_to_sample = 202
     batch_size = 32
-    dist_graph = DistGraph("test_mp", gpb=gpb, part_config=part_config)
+    dist_graph = DistGraph(
+        "test_sampling",
+        gpb=gpb,
+        part_config=part_config,
+        use_graphbolt=use_graphbolt,
+    )
     assert len(dist_graph.ntypes) == len(groundtruth_g.ntypes)
     assert len(dist_graph.etypes) == len(groundtruth_g.etypes)
     if len(dist_graph.etypes) == 1:
@@ -431,6 +466,9 @@ def start_node_dataloader(
         ]
     )  # test int for hetero
 
+    # Enable santity check in distributed sampling.
+    os.environ["DGL_DIST_DEBUG"] = "1"
+
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
@@ -444,7 +482,7 @@ def start_node_dataloader(
             num_workers=num_workers,
         )
 
-        for epoch in range(2):
+        for _ in range(2):
             for idx, (_, _, blocks) in zip(
                 range(0, num_nodes_to_sample, batch_size), dataloader
             ):
@@ -459,6 +497,16 @@ def start_node_dataloader(
                         src_nodes_id, dst_nodes_id, etype=etype
                     )
                     assert np.all(F.asnumpy(has_edges))
+
+                    if use_graphbolt and not return_eids:
+                        continue
+                    eids = orig_eid[etype][block.edata[dgl.EID]]
+                    expected_eids = groundtruth_g.edge_ids(
+                        src_nodes_id, dst_nodes_id
+                    )
+                    assert th.equal(
+                        eids, expected_eids
+                    ), f"{eids} != {expected_eids}"
     del dataloader
     # this is needed since there's two test here in one process
     dgl.distributed.exit_client()
@@ -481,7 +529,7 @@ def start_edge_dataloader(
         _, _, _, gpb, _, _, _ = load_partition(part_config, rank)
     num_edges_to_sample = 202
     batch_size = 32
-    dist_graph = DistGraph("test_mp", gpb=gpb, part_config=part_config)
+    dist_graph = DistGraph("test_sampling", gpb=gpb, part_config=part_config)
     assert len(dist_graph.ntypes) == len(groundtruth_g.ntypes)
     assert len(dist_graph.etypes) == len(groundtruth_g.etypes)
     if len(dist_graph.etypes) == 1:
@@ -533,7 +581,14 @@ def start_edge_dataloader(
     dgl.distributed.exit_client()
 
 
-def check_dataloader(g, num_server, num_workers, dataloader_type):
+def check_dataloader(
+    g,
+    num_server,
+    num_workers,
+    dataloader_type,
+    use_graphbolt=False,
+    return_eids=False,
+):
     with tempfile.TemporaryDirectory() as test_dir:
         ip_config = "ip_config.txt"
         generate_ip_config(ip_config, num_server, num_server)
@@ -548,6 +603,8 @@ def check_dataloader(g, num_server, num_workers, dataloader_type):
             num_hops=num_hops,
             part_method="metis",
             return_mapping=True,
+            use_graphbolt=use_graphbolt,
+            store_eids=return_eids,
         )
         part_config = os.path.join(test_dir, "test_sampling.json")
         if not isinstance(orig_nid, dict):
@@ -566,6 +623,7 @@ def check_dataloader(g, num_server, num_workers, dataloader_type):
                     part_config,
                     num_server > 1,
                     num_workers + 1,
+                    use_graphbolt,
                 ),
             )
             p.start()
@@ -587,6 +645,8 @@ def check_dataloader(g, num_server, num_workers, dataloader_type):
                     orig_nid,
                     orig_eid,
                     g,
+                    use_graphbolt,
+                    return_eids,
                 ),
             )
             p.start()
@@ -635,14 +695,35 @@ def create_random_hetero():
     return g
 
 
-@unittest.skip(reason="Skip due to glitch in CI")
-@pytest.mark.parametrize("num_server", [3])
-@pytest.mark.parametrize("num_workers", [0, 4])
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("num_workers", [0, 1])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
-def test_dataloader(num_server, num_workers, dataloader_type):
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_dataloader_homograph(
+    num_server, num_workers, dataloader_type, use_graphbolt, return_eids
+):
+    if dataloader_type == "edge" and use_graphbolt:
+        # GraphBolt does not support edge dataloader.
+        return
     reset_envs()
     g = CitationGraphDataset("cora")[0]
-    check_dataloader(g, num_server, num_workers, dataloader_type)
+    check_dataloader(
+        g,
+        num_server,
+        num_workers,
+        dataloader_type,
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
+    )
+
+
+@unittest.skip(reason="Skip due to glitch in CI")
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("num_workers", [0, 1])
+@pytest.mark.parametrize("dataloader_type", ["node", "edge"])
+def test_dataloader_heterograph(num_server, num_workers, dataloader_type):
+    reset_envs()
     g = create_random_hetero()
     check_dataloader(g, num_server, num_workers, dataloader_type)
 
