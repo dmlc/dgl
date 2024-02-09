@@ -70,7 +70,9 @@ def test_minibatch_representation_homo():
           negative_dsts=None,
           labels=None,
           input_nodes=None,
+          indexes=None,
           edge_features=None,
+          compacted_seeds=None,
           compacted_node_pairs=None,
           compacted_negative_srcs=None,
           compacted_negative_dsts=None,
@@ -138,8 +140,10 @@ def test_minibatch_representation_homo():
                                 [8]]),
           labels=tensor([0., 1., 2.]),
           input_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
+          indexes=None,
           edge_features=[{'x': tensor([9, 0, 1, 1, 7, 4])},
                         {'x': tensor([0, 2, 2])}],
+          compacted_seeds=None,
           compacted_node_pairs=CSCFormatBase(indptr=tensor([0, 2, 3]),
                                              indices=tensor([3, 4, 5]),
                                ),
@@ -295,8 +299,10 @@ def test_minibatch_representation_hetero():
                                 [8]])},
           labels={'B': tensor([2, 5])},
           input_nodes={'A': tensor([ 5,  7,  9, 11]), 'B': tensor([10, 11, 12])},
+          indexes=None,
           edge_features=[{('A:r:B', 'x'): tensor([4, 2, 4])},
                         {('A:r:B', 'x'): tensor([0, 6])}],
+          compacted_seeds=None,
           compacted_node_pairs={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
                                              indices=tensor([3, 4, 5]),
                                ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2]),
@@ -853,3 +859,86 @@ def test_dgl_link_predication_hetero(mode):
                 minibatch.negative_node_pairs[etype][1],
                 minibatch.compacted_negative_dsts[etype],
             )
+
+
+def test_to_pyg_data():
+    test_subgraph_a = gb.SampledSubgraphImpl(
+        sampled_csc=gb.CSCFormatBase(
+            indptr=torch.tensor([0, 1, 3, 5, 6]),
+            indices=torch.tensor([0, 1, 2, 2, 1, 2]),
+        ),
+        original_column_node_ids=torch.tensor([10, 11, 12, 13]),
+        original_row_node_ids=torch.tensor([19, 20, 21, 22, 25, 30]),
+        original_edge_ids=torch.tensor([10, 11, 12, 13]),
+    )
+    test_subgraph_b = gb.SampledSubgraphImpl(
+        sampled_csc=gb.CSCFormatBase(
+            indptr=torch.tensor([0, 1, 3]),
+            indices=torch.tensor([1, 2, 0]),
+        ),
+        original_row_node_ids=torch.tensor([10, 11, 12]),
+        original_edge_ids=torch.tensor([10, 15, 17]),
+        original_column_node_ids=torch.tensor([10, 11]),
+    )
+    expected_edge_index = torch.tensor(
+        [[0, 0, 1, 1, 1, 2, 2, 3], [0, 1, 0, 1, 2, 1, 2, 2]]
+    )
+    expected_node_features = torch.tensor([[1], [2], [3], [4]])
+    expected_labels = torch.tensor([0, 1])
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph_a, test_subgraph_b],
+        node_features={"feat": expected_node_features},
+        labels=expected_labels,
+    )
+    pyg_data = test_minibatch.to_pyg_data()
+    pyg_data.validate()
+    assert torch.equal(pyg_data.edge_index, expected_edge_index)
+    assert torch.equal(pyg_data.x, expected_node_features)
+    assert torch.equal(pyg_data.y, expected_labels)
+
+    # Test with sampled_csc as None.
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=None,
+        node_features={"feat": expected_node_features},
+        labels=expected_labels,
+    )
+    pyg_data = test_minibatch.to_pyg_data()
+    assert pyg_data.edge_index is None, "Edge index should be none."
+
+    # Test with node_features as None.
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph_a],
+        node_features=None,
+        labels=expected_labels,
+    )
+    pyg_data = test_minibatch.to_pyg_data()
+    assert pyg_data.x is None, "Node features should be None."
+
+    # Test with labels as None.
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph_a],
+        node_features={"feat": expected_node_features},
+        labels=None,
+    )
+    pyg_data = test_minibatch.to_pyg_data()
+    assert pyg_data.y is None, "Labels should be None."
+
+    # Test with multiple features.
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph_a],
+        node_features={
+            "feat": expected_node_features,
+            "extra_feat": torch.tensor([[3], [4]]),
+        },
+        labels=expected_labels,
+    )
+    try:
+        pyg_data = test_minibatch.to_pyg_data()
+        assert (
+            pyg_data.x is None,
+        ), "Multiple features case should raise an error."
+    except AssertionError as e:
+        assert (
+            str(e)
+            == "`to_pyg_data` only supports single feature homogeneous graph."
+        )
