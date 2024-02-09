@@ -8,7 +8,7 @@ import torch
 import dgl
 from dgl.utils import recursive_apply
 
-from .base import etype_str_to_tuple
+from .base import etype_str_to_tuple, expand_indptr
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
@@ -473,6 +473,50 @@ class MiniBatch:
             return (self.compacted_node_pairs, self.labels)
         else:
             return None
+
+    def to_pyg_data(self):
+        """Construct a PyG Data from `MiniBatch`. This function only supports
+        node classification task on a homogeneous graph and the number of
+        features cannot be more than one.
+        """
+        from torch_geometric.data import Data
+
+        if self.sampled_subgraphs is None:
+            edge_index = None
+        else:
+            col_nodes = []
+            row_nodes = []
+            for subgraph in self.sampled_subgraphs:
+                if subgraph is None:
+                    continue
+                sampled_csc = subgraph.sampled_csc
+                indptr = sampled_csc.indptr
+                indices = sampled_csc.indices
+                expanded_indptr = expand_indptr(
+                    indptr, dtype=indices.dtype, output_size=len(indices)
+                )
+                col_nodes.append(expanded_indptr)
+                row_nodes.append(indices)
+            col_nodes = torch.cat(col_nodes)
+            row_nodes = torch.cat(row_nodes)
+            edge_index = torch.unique(
+                torch.stack((col_nodes, row_nodes)), dim=1
+            )
+
+        if self.node_features is None:
+            node_features = None
+        else:
+            assert (
+                len(self.node_features) == 1
+            ), "`to_pyg_data` only supports single feature homogeneous graph."
+            node_features = next(iter(self.node_features.values()))
+
+        pyg_data = Data(
+            x=node_features,
+            edge_index=edge_index,
+            y=self.labels,
+        )
+        return pyg_data
 
     def to(self, device: torch.device):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""

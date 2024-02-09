@@ -151,9 +151,7 @@ def evaluate(rank, model, dataloader, num_classes, device):
     y = []
     y_hats = []
 
-    for step, data in (
-        tqdm.tqdm(enumerate(dataloader)) if rank == 0 else enumerate(dataloader)
-    ):
+    for data in tqdm.tqdm(dataloader) if rank == 0 else dataloader:
         blocks = data.blocks
         x = data.node_features["feat"]
         y.append(data.labels)
@@ -271,8 +269,11 @@ def run(rank, world_size, args, devices, dataset):
 
     # Pin the graph and features to enable GPU access.
     if args.storage_device == "pinned":
-        dataset.graph.pin_memory_()
-        dataset.feature.pin_memory_()
+        graph = dataset.graph.pin_memory_()
+        feature = dataset.feature.pin_memory_()
+    else:
+        graph = dataset.graph.to(args.storage_device)
+        feature = dataset.feature.to(args.storage_device)
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
@@ -280,9 +281,15 @@ def run(rank, world_size, args, devices, dataset):
     args.fanout = list(map(int, args.fanout.split(",")))
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    in_size = dataset.feature.size("node", None, "feat")[0]
+    in_size = feature.size("node", None, "feat")[0]
     hidden_size = 256
     out_size = num_classes
+
+    if args.gpu_cache_size > 0 and args.storage_device != "cuda":
+        feature._features[("node", None, "feat")] = gb.GPUCachedFeature(
+            feature._features[("node", None, "feat")],
+            args.gpu_cache_size,
+        )
 
     # Create GraphSAGE model. It should be copied onto a GPU as a replica.
     model = SAGE(in_size, hidden_size, out_size).to(device)
@@ -291,24 +298,24 @@ def run(rank, world_size, args, devices, dataset):
     # Create data loaders.
     train_dataloader = create_dataloader(
         args,
-        dataset.graph,
-        dataset.feature,
+        graph,
+        feature,
         train_set,
         device,
         is_train=True,
     )
     valid_dataloader = create_dataloader(
         args,
-        dataset.graph,
-        dataset.feature,
+        graph,
+        feature,
         valid_set,
         device,
         is_train=False,
     )
     test_dataloader = create_dataloader(
         args,
-        dataset.graph,
-        dataset.feature,
+        graph,
+        feature,
         test_set,
         device,
         is_train=False,
@@ -382,11 +389,17 @@ def parse_args():
         "--num-workers", type=int, default=0, help="The number of processes."
     )
     parser.add_argument(
+        "--gpu-cache-size",
+        type=int,
+        default=0,
+        help="The capacity of the GPU cache, the number of features to store.",
+    )
+    parser.add_argument(
         "--mode",
         default="pinned-cuda",
-        choices=["cpu-cuda", "pinned-cuda"],
-        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
-        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
+        choices=["cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM"
+        ", 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
