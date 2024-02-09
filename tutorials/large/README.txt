@@ -1,2 +1,0 @@
-Stochastic Training of GNNs
-===========================

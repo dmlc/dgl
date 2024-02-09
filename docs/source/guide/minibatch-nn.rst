@@ -1,6 +1,6 @@
 .. _guide-minibatch-custom-gnn-module:
 
-6.5 Implementing Custom GNN Module for Mini-batch Training
+6.6 Implementing Custom GNN Module for Mini-batch Training
 -------------------------------------------------------------
 
 :ref:`(中文版) <guide_cn-minibatch-custom-gnn-module>`

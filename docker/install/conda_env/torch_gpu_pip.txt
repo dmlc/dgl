@@ -17,5 +17,7 @@ scikit-learn
 scipy
 torch==1.13.0+cu116
 torchdata
+torcheval
 torchmetrics
+torch_geometric
 tqdm

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.18)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
@@ -75,7 +75,7 @@ dgl_feature_option(
 dgl_feature_option(
     BUILD_GRAPHBOLT
     "Build Graphbolt library"
-    "dev" "dogfood"
+    "all"
 )
 
 dgl_feature_option(
@@ -142,10 +142,10 @@ if(USE_CUDA)
   # see https://github.com/NVIDIA/thrust/issues/1401
   add_definitions(-DTHRUST_CUB_WRAPPED_NAMESPACE=dgl)
   include(cmake/modules/CUDA.cmake)
-  message(STATUS "Use external CUB/Thrust library for a consistent API and performance.")
-  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
-  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/cub")
-  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/libcudacxx/include")
+  message(STATUS "Use external CCCL library for a consistent API and performance.")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/thrust")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/cub")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/libcudacxx/include")
 endif(USE_CUDA)
 
 # initial variables
@@ -527,8 +527,13 @@ endif(BUILD_SPARSE)
 
 if(BUILD_GRAPHBOLT)
   message(STATUS "Configuring graphbolt library")
+  string(REPLACE ";" "\\;" CUDA_ARCHITECTURES_ESCAPED "${CUDA_ARCHITECTURES}")
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
   file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  if(USE_CUDA)
+    get_target_property(GPU_CACHE_INCLUDE_DIRS gpu_cache INCLUDE_DIRECTORIES)
+  endif(USE_CUDA)
+  string(REPLACE ";" "\\;" GPU_CACHE_INCLUDE_DIRS_ESCAPED "${GPU_CACHE_INCLUDE_DIRS}")
   if(MSVC)
     file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.bat BUILD_SCRIPT)
     add_custom_target(
@@ -536,9 +541,13 @@ if(BUILD_GRAPHBOLT)
       ALL
       ${CMAKE_COMMAND} -E env
       CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
       BINDIR=${BINDIR}
+      GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
+      CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
       LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
       cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
@@ -550,12 +559,19 @@ if(BUILD_GRAPHBOLT)
       ALL
       ${CMAKE_COMMAND} -E env
       CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
+      CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
       LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
       bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
   endif(MSVC)
+  if(USE_CUDA)
+    add_dependencies(graphbolt gpu_cache)
+  endif(USE_CUDA)
 endif(BUILD_GRAPHBOLT)

@@ -677,6 +677,19 @@ def test_local_scope(idtype):
 
     foo(g)
 
+    # test exception handling
+    def foo(g):
+        try:
+            with g.local_scope():
+                g.ndata["hh"] = F.ones((g.num_nodes(), 1))
+                # throw TypeError
+                1 + "1"
+        except TypeError:
+            pass
+        assert "hh" not in g.ndata
+
+    foo(g)
+
 
 @parametrize_idtype
 def test_isolated_nodes(idtype):

@@ -18,24 +18,24 @@ from .minibatch_transformer import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
-from .utils import (
-    add_reverse_edges,
-    exclude_seed_edges,
+from .internal import (
+    compact_csc_format,
     unique_and_compact,
-    unique_and_compact_node_pairs,
+    unique_and_compact_csc_formats,
 )
+from .utils import add_reverse_edges, exclude_seed_edges
 
 
 def load_graphbolt():
     """Load Graphbolt C++ library"""
-    version = torch.__version__.split("+", maxsplit=1)[0]
+    vers = torch.__version__.split("+", maxsplit=1)[0]
 
     if sys.platform.startswith("linux"):
-        basename = f"libgraphbolt_pytorch_{version}.so"
+        basename = f"libgraphbolt_pytorch_{vers}.so"
     elif sys.platform.startswith("darwin"):
-        basename = f"libgraphbolt_pytorch_{version}.dylib"
+        basename = f"libgraphbolt_pytorch_{vers}.dylib"
     elif sys.platform.startswith("win"):
-        basename = f"graphbolt_pytorch_{version}.dll"
+        basename = f"graphbolt_pytorch_{vers}.dll"
     else:
         raise NotImplementedError("Unsupported system: %s" % sys.platform)
 

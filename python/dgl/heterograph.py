@@ -750,7 +750,7 @@ class DGLGraph(object):
                 c_etype_batch_num_edges, one_hot_removed_edges, reducer="sum"
             )
             self._batch_num_edges[c_etype] = c_etype_batch_num_edges - F.astype(
-                batch_num_removed_edges, F.int64
+                batch_num_removed_edges, self.idtype
             )
 
         sub_g = self.edge_subgraph(
@@ -890,7 +890,7 @@ class DGLGraph(object):
             self._batch_num_nodes[
                 target_ntype
             ] = c_ntype_batch_num_nodes - F.astype(
-                batch_num_removed_nodes, F.int64
+                batch_num_removed_nodes, self.idtype
             )
             # Record old num_edges to check later whether some edges were removed
             old_num_edges = {
@@ -917,7 +917,7 @@ class DGLGraph(object):
             for c_etype in canonical_etypes:
                 if self._graph.num_edges(self.get_etype_id(c_etype)) == 0:
                     self._batch_num_edges[c_etype] = F.zeros(
-                        (self.batch_size,), F.int64, self.device
+                        (self.batch_size,), self.idtype, self.device
                     )
                     continue
 
@@ -936,7 +936,7 @@ class DGLGraph(object):
                     reducer="sum",
                 )
                 self._batch_num_edges[c_etype] = F.astype(
-                    batch_num_left_edges, F.int64
+                    batch_num_left_edges, self.idtype
                 )
 
         if batched and not store_ids:
@@ -1511,7 +1511,7 @@ class DGLGraph(object):
             self._batch_num_nodes = {}
             for ty in self.ntypes:
                 bnn = F.copy_to(
-                    F.tensor([self.num_nodes(ty)], F.int64), self.device
+                    F.tensor([self.num_nodes(ty)], self.idtype), self.device
                 )
                 self._batch_num_nodes[ty] = bnn
         if ntype is None:
@@ -1601,6 +1601,7 @@ class DGLGraph(object):
         batch
         unbatch
         """
+        val = utils.prepare_tensor_or_dict(self, val, "batch_num_nodes")
         if not isinstance(val, Mapping):
             if len(self.ntypes) != 1:
                 raise DGLError(
@@ -1660,7 +1661,7 @@ class DGLGraph(object):
             self._batch_num_edges = {}
             for ty in self.canonical_etypes:
                 bne = F.copy_to(
-                    F.tensor([self.num_edges(ty)], F.int64), self.device
+                    F.tensor([self.num_edges(ty)], self.idtype), self.device
                 )
                 self._batch_num_edges[ty] = bne
         if etype is None:
@@ -1752,6 +1753,7 @@ class DGLGraph(object):
         batch
         unbatch
         """
+        val = utils.prepare_tensor_or_dict(self, val, "batch_num_edges")
         if not isinstance(val, Mapping):
             if len(self.etypes) != 1:
                 raise DGLError(
@@ -5659,6 +5661,9 @@ class DGLGraph(object):
         If the graph is already on the specified device, the function directly returns it.
         Otherwise, it returns a cloned graph on the specified device.
 
+        Note that data of node and edge features are not moved to the specified
+        device before being accessed or `materialize_data()` is called.
+
         Parameters
         ----------
         device : Framework-specific device context object
@@ -5749,6 +5754,21 @@ class DGLGraph(object):
         to
         """
         return self.to(F.cpu())
+
+    def materialize_data(self):
+        """Materialize the graph data on the current device.
+
+        This method is a no-op if the graph data is already materialized.
+
+        Returns
+        -------
+        DGLGraph
+            The graph on the current device.
+        """
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.data  # pylint: disable=pointless-statement
+        return self
 
     def pin_memory_(self):
         """Pin the graph structure and node/edge data to the page-locked memory for
@@ -6061,9 +6081,11 @@ class DGLGraph(object):
         old_eframes = self._edge_frames
         self._node_frames = [fr.clone() for fr in self._node_frames]
         self._edge_frames = [fr.clone() for fr in self._edge_frames]
-        yield
-        self._node_frames = old_nframes
-        self._edge_frames = old_eframes
+        try:
+            yield
+        finally:
+            self._node_frames = old_nframes
+            self._edge_frames = old_eframes
 
     def formats(self, formats=None):
         r"""Get a cloned graph with the specified allowed sparse format(s) or

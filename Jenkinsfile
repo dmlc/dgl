@@ -158,6 +158,7 @@ def is_authorized(name) {
     'frozenbugs', 'peizhou001', 'zheng-da', 'czkkkkkk', 'thvasilo',
     // Intern:
     'keli-wen', 'caojy1998', 'RamonZhou', 'xiangyuzhi', 'Skeleton003', 'yxy235',
+    'hutiechuan',
     // Friends:
     'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
     'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
@@ -317,7 +318,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240123_1000"
                   args "-u root"
                   alwaysPull true
                 }
@@ -336,7 +337,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-gpu:cu116_v230711"
+                  image "dgllib/dgl-ci-gpu:cu116_v240123_1000"
                   args "-u root"
                   alwaysPull true
                 }
@@ -391,7 +392,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240123_1000"
                   args "-u root"
                   alwaysPull true
                 }
@@ -410,7 +411,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu116_v230711"
+                  image "dgllib/dgl-ci-gpu:cu116_v240123_1000"
                   args "-u root --runtime nvidia"
                   alwaysPull true
                 }
@@ -450,6 +451,8 @@ pipeline {
                   steps {
                     unit_test_linux('tensorflow', 'cpu')
                   }
+                  // Tensorflow is deprecated.
+                  when { expression { false } }
                 }
               }
               post {
@@ -463,7 +466,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu116_v230711"
+                  image "dgllib/dgl-ci-gpu:cu116_v240123_1000"
                   args "-u root --runtime nvidia"
                   alwaysPull true
                 }
@@ -488,7 +491,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240123_1000"
                   args "-u root --shm-size=4gb"
                   alwaysPull true
                 }
@@ -541,7 +544,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu116_v230711"
+                  image "dgllib/dgl-ci-gpu:cu116_v240123_1000"
                   args "-u root --runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -570,7 +573,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240123_1000"
                   args "-u root --shm-size=4gb"
                   alwaysPull true
                 }
@@ -580,7 +583,6 @@ pipeline {
                   steps {
                     unit_distributed_linux('pytorch', 'cpu')
                   }
-                  when { expression { false } }
                 }
               }
               post {
@@ -618,7 +620,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240123_1000"
                   args "-u root"
                   alwaysPull true
                 }

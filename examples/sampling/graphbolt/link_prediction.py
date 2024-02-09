@@ -42,8 +42,9 @@ main
 └───> Test set evaluation
 """
 import argparse
+import time
+from functools import partial
 
-import dgl
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
@@ -78,12 +79,43 @@ class SAGE(nn.Module):
                 hidden_x = F.relu(hidden_x)
         return hidden_x
 
+    def inference(self, graph, features, dataloader, storage_device):
+        """Conduct layer-wise inference to get all the node embeddings."""
+        pin_memory = storage_device == "pinned"
+        buffer_device = torch.device("cpu" if pin_memory else storage_device)
+
+        print("Start node embedding inference.")
+        for layer_idx, layer in enumerate(self.layers):
+            is_last_layer = layer_idx == len(self.layers) - 1
+
+            y = torch.empty(
+                graph.total_num_nodes,
+                self.hidden_size,
+                dtype=torch.float32,
+                device=buffer_device,
+                pin_memory=pin_memory,
+            )
+            for data in tqdm.tqdm(dataloader):
+                # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], data.node_features["feat"])
+                if not is_last_layer:
+                    hidden_x = F.relu(hidden_x)
+                # By design, our seed nodes are contiguous.
+                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device, non_blocking=True
+                )
+            if not is_last_layer:
+                features.update("node", None, "feat", y)
+
+        return y
+
 
 def create_dataloader(args, graph, features, itemset, is_train=True):
     """Get a GraphBolt version of a dataloader for link prediction tasks. This
     function demonstrates how to utilize functional forms of datapipes in
     GraphBolt. Alternatively, you can create a datapipe using its class
-    constructor.
+    constructor. For a more detailed tutorial, please read the examples in
+    `dgl/notebooks/graphbolt/walkthrough.ipynb`.
     """
 
     ############################################################################
@@ -103,8 +135,20 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
     datapipe = gb.ItemSampler(
-        itemset, batch_size=args.batch_size, shuffle=is_train
+        itemset,
+        batch_size=args.train_batch_size if is_train else args.eval_batch_size,
+        shuffle=is_train,
     )
+
+    ############################################################################
+    # [Input]:
+    # 'device': The device to copy the data to.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device. Copying here
+    # ensures that the rest of the operations run on the GPU.
+    ############################################################################
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
 
     ############################################################################
     # [Input]:
@@ -137,7 +181,27 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph, args.fanout if is_train else [-1]
+    )
+
+    ############################################################################
+    # [Input]:
+    # 'gb.exclude_seed_edges': Function to exclude seed edges, optionally
+    # including their reverse edges, from the sampled subgraphs in the
+    # minibatch.
+    # [Output]:
+    # A MiniBatchTransformer object with excluded seed edges.
+    # [Role]:
+    # During the training phase of link prediction, negative edges are
+    # sampled. It's essential to exclude the seed edges from the process
+    # to ensure that positive samples are not inadvertently included within
+    # the negative samples.
+    ############################################################################
+    if is_train and args.exclude_edges:
+        datapipe = datapipe.transform(
+            partial(gb.exclude_seed_edges, include_reverse_edges=True)
+        )
 
     ############################################################################
     # [Input]:
@@ -157,18 +221,19 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=args.device)
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
 
     ############################################################################
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
     # 'args.num_workers': The number of processes to be used for data loading.
     # [Output]:
-    # A MultiProcessDataLoader object to handle data loading.
+    # A DataLoader object to handle data loading.
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(
+    dataloader = gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
     )
@@ -177,100 +242,81 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     return dataloader
 
 
-# TODO[Keli]: Remove this helper function later.
-def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
-    """Convert the minibatch to a training pair and a label tensor."""
-    batch_size = data.compacted_node_pairs[0].shape[0]
-    neg_ratio = data.compacted_negative_dsts.shape[0] // batch_size
+@torch.no_grad()
+def compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst):
+    """Compute the Mean Reciprocal Rank (MRR) for given source and destination
+    nodes.
 
-    pos_src, pos_dst = data.compacted_node_pairs
-    if data.compacted_negative_srcs is None:
-        neg_src = pos_src.repeat_interleave(neg_ratio, dim=0)
-    else:
-        neg_src = data.compacted_negative_srcs
-    neg_dst = data.compacted_negative_dsts
+    This function computes the MRR for a set of node pairs, dividing the task
+    into batches to handle potentially large graphs.
+    """
+    rr = torch.zeros(src.shape[0])
+    # Loop over node pairs in batches.
+    for start in tqdm.trange(
+        0, src.shape[0], args.eval_batch_size, desc="Evaluate"
+    ):
+        end = min(start + args.eval_batch_size, src.shape[0])
 
-    node_pairs = (
-        torch.cat((pos_src, neg_src), dim=0),
-        torch.cat((pos_dst, neg_dst), dim=0),
-    )
-    pos_label = torch.ones_like(pos_src)
-    neg_label = torch.zeros_like(neg_src)
-    labels = torch.cat([pos_label, neg_label], dim=0)
-    return (node_pairs, labels.float())
+        # Concatenate positive and negative destination nodes.
+        all_dst = torch.cat([dst[start:end, None], neg_dst[start:end]], 1)
 
-
-# TODO[Keli]: Remove this helper function later.
-def to_dgl_blocks(sampled_subgraphs: gb.SampledSubgraphImpl):
-    """Convert sampled subgraphs to DGL blocks."""
-    blocks = [
-        dgl.create_block(
-            sampled_subgraph.node_pairs,
-            num_src_nodes=sampled_subgraph.reverse_row_node_ids.shape[0],
-            num_dst_nodes=sampled_subgraph.reverse_column_node_ids.shape[0],
+        # Fetch embeddings for current batch of source and destination nodes.
+        h_src = node_emb[src[start:end]][:, None, :].to(args.device)
+        h_dst = (
+            node_emb[all_dst.view(-1)].view(*all_dst.shape, -1).to(args.device)
         )
-        for sampled_subgraph in sampled_subgraphs
-    ]
-    return blocks
+
+        # Compute prediction scores using the model.
+        pred = model.predictor(h_src * h_dst).squeeze(-1)
+
+        # Evaluate the predictions to obtain MRR values.
+        input_dict = {"y_pred_pos": pred[:, 0], "y_pred_neg": pred[:, 1:]}
+        rr[start:end] = evaluator.eval(input_dict)["mrr_list"]
+    return rr.mean()
 
 
 @torch.no_grad()
-def evaluate(args, graph, features, itemset, model):
+def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
+    """Evaluate the model on validation and test sets."""
+    model.eval()
     evaluator = Evaluator(name="ogbl-citation2")
 
-    # Since we need to evaluate the model, we need to set the number
-    # of layers to 1 and the fanout to -1.
-    args.fanout = [torch.LongTensor([-1])]
     dataloader = create_dataloader(
-        args, graph, features, itemset, is_train=False
+        args, graph, features, all_nodes_set, is_train=False
     )
-    pos_pred = []
-    neg_pred = []
 
-    model.eval()
-    for step, data in tqdm.tqdm(enumerate(dataloader)):
-        # Unpack MiniBatch.
-        compacted_pairs, _ = to_binary_link_dgl_computing_pack(data)
-        node_feature = data.node_features["feat"].float()
-        blocks = to_dgl_blocks(data.sampled_subgraphs)
+    # Compute node embeddings for the entire graph.
+    node_emb = model.inference(graph, features, dataloader, args.storage_device)
+    results = []
 
-        # Get the embeddings of the input nodes.
-        y = model(blocks, node_feature)
-        # Calculate the score for positive and negative edges.
-        score = (
-            model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
-            .squeeze()
-            .detach()
+    # Loop over both validation and test sets.
+    for split in [valid_set, test_set]:
+        # Unpack the item set.
+        src = split._items[0][:, 0].to(node_emb.device)
+        dst = split._items[0][:, 1].to(node_emb.device)
+        neg_dst = split._items[1].to(node_emb.device)
+
+        # Compute MRR values for the current split.
+        results.append(
+            compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst)
         )
-
-        # Split the score into positive and negative parts.
-        pos_score = score[: data.compacted_node_pairs[0].shape[0]]
-        neg_score = score[data.compacted_node_pairs[0].shape[0] :]
-
-        # Append the score to the list.
-        pos_pred.append(pos_score)
-        neg_pred.append(neg_score)
-    pos_pred = torch.cat(pos_pred, dim=0)
-    neg_pred = torch.cat(neg_pred, dim=0).view(pos_pred.shape[0], -1)
-
-    input_dict = {"y_pred_pos": pos_pred, "y_pred_neg": neg_pred}
-    mrr = evaluator.eval(input_dict)["mrr_list"]
-    return mrr.mean()
+    return results
 
 
-def train(args, graph, features, train_set, valid_set, model):
+def train(args, model, graph, features, train_set):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(args, graph, features, train_set)
 
-    for epoch in tqdm.trange(args.epochs):
+    for epoch in range(args.epochs):
         model.train()
         total_loss = 0
-        for step, data in enumerate(dataloader):
-            # Unpack MiniBatch.
-            compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
-            node_feature = data.node_features["feat"].float()
-            # Convert sampled subgraphs to DGL blocks.
-            blocks = to_dgl_blocks(data.sampled_subgraphs)
+        start_epoch_time = time.time()
+        for step, data in tqdm.tqdm(enumerate(dataloader)):
+            # Get node pairs with labels for loss calculation.
+            compacted_pairs, labels = data.node_pairs_with_labels
+
+            node_feature = data.node_features["feat"]
+            blocks = data.blocks
 
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)
@@ -285,18 +331,17 @@ def train(args, graph, features, train_set, valid_set, model):
             optimizer.step()
 
             total_loss += loss.item()
-            if (step % 100 == 0) and (step != 0):
-                print(
-                    f"Epoch {epoch:05d} | "
-                    f"Step {step:05d} | "
-                    f"Loss {(total_loss) / (step + 1):.4f}",
-                    end="\n",
-                )
+            if step + 1 == args.early_stop:
+                # Early stopping requires a new dataloader to reset its state.
+                dataloader = create_dataloader(args, graph, features, train_set)
+                break
 
-    # Evaluate the model.
-    print("Validation")
-    valid_mrr = evaluate(args, graph, features, valid_set, model)
-    print(f"Valid MRR {valid_mrr.item():.4f}")
+        end_epoch_time = time.time()
+        print(
+            f"Epoch {epoch:05d} | "
+            f"Loss {(total_loss) / (step + 1):.4f} | "
+            f"Time {(end_epoch_time - start_epoch_time):.4f} s"
+        )
 
 
 def parse_args():
@@ -304,8 +349,15 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=0.0005)
     parser.add_argument("--neg-ratio", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=512)
-    parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument("--train-batch-size", type=int, default=512)
+    parser.add_argument("--eval-batch-size", type=int, default=1024)
+    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument(
+        "--early-stop",
+        type=int,
+        default=0,
+        help="0 means no early stop, otherwise stop at the input-th step",
+    )
     parser.add_argument(
         "--fanout",
         type=str,
@@ -313,41 +365,60 @@ def parse_args():
         help="Fan-out of neighbor sampling. Default: 15,10,5",
     )
     parser.add_argument(
-        "--device",
-        default="cpu",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+        "--exclude-edges",
+        type=int,
+        default=1,
+        help="Whether to exclude reverse edges during sampling. Default: 1",
+    )
+    parser.add_argument(
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.storage_device, args.device = args.mode.split("-")
+    args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data")
     dataset = gb.BuiltinDataset("ogbl-citation2").load()
-    graph = dataset.graph
-    features = dataset.feature
+
+    # Move the dataset to the selected storage.
+    graph = dataset.graph.to(args.storage_device)
+    features = dataset.feature.to(args.storage_device)
+
     train_set = dataset.tasks[0].train_set
-    valid_set = dataset.tasks[0].validation_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
-    in_size = 128
+    in_size = features.size("node", None, "feat")[0]
     hidden_channels = 256
-    model = SAGE(in_size, hidden_channels)
+    args.device = torch.device(args.device)
+    model = SAGE(in_size, hidden_channels).to(args.device)
 
     # Model training.
     print("Training...")
-    train(args, graph, features, train_set, valid_set, model)
+    train(args, model, graph, features, train_set)
 
     # Test the model.
     print("Testing...")
     test_set = dataset.tasks[0].test_set
-    test_mrr = evaluate(args, graph, features, test_set, model)
-    print(f"Test MRR {test_mrr.item():.4f}")
+    valid_set = dataset.tasks[0].validation_set
+    all_nodes_set = dataset.all_nodes_set
+    valid_mrr, test_mrr = evaluate(
+        args, model, graph, features, all_nodes_set, valid_set, test_set
+    )
+    print(
+        f"Validation MRR {valid_mrr.item():.4f}, "
+        f"Test MRR {test_mrr.item():.4f}"
+    )
 
 
 if __name__ == "__main__":

@@ -86,7 +86,7 @@ class QM9(QM9Dataset):
     Examples
     --------
     >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
-    >>> data.num_labels
+    >>> data.num_classes
     2
     >>>
     >>> # iterate over the dataset
@@ -181,7 +181,7 @@ class QM9(QM9Dataset):
             dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
             # keep all edges that don't exceed the cutoff and delete self-loops
             adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(
-                n_atoms, dtype=np.bool
+                n_atoms, dtype=np.bool_
             )
             adj = adj.tocoo()
             u, v = torch.tensor(adj.row), torch.tensor(adj.col)

@@ -15,7 +15,7 @@ How to run
 ----------
 
 ```bash
-python train.py
+python3 train.py --dataset ogbg-molhiv --num_gpus 0 --num_epochs 50
 ```
 
 ## Summary

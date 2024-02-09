@@ -10,7 +10,8 @@ main
 │           │
 │           └───> ItemSampler (Distribute data to minibatchs)
 │           │
-│           └───> sample_neighbor (Sample a subgraph for a minibatch)
+│           └───> sample_neighbor or sample_layer_neighbor
+                  (Sample a subgraph for a minibatch)
 │           │
 │           └───> fetch_feature (Fetch features for the sampled subgraph)
 │
@@ -29,7 +30,7 @@ main
       │
       └───> Trainer[HIGHLIGHT]
             │
-            ├───> SAGE.forward (RGCN model forward pass)
+            ├───> SAGE.forward (GraphSAGE model forward pass)
             │
             └───> Validate
 """
@@ -42,7 +43,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torchmetrics import Accuracy
 
 
@@ -69,10 +70,31 @@ class SAGE(LightningModule):
                 h = self.dropout(h)
         return h
 
+    def log_node_and_edge_counts(self, blocks):
+        node_counts = [block.num_src_nodes() for block in blocks] + [
+            blocks[-1].num_dst_nodes()
+        ]
+        edge_counts = [block.num_edges() for block in blocks]
+        for i, c in enumerate(node_counts):
+            self.log(
+                f"num_nodes/{i}",
+                float(c),
+                prog_bar=True,
+                on_step=True,
+                on_epoch=False,
+            )
+            if i < len(edge_counts):
+                self.log(
+                    f"num_edges/{i}",
+                    float(edge_counts[i]),
+                    prog_bar=True,
+                    on_step=True,
+                    on_epoch=False,
+                )
+
     def training_step(self, batch, batch_idx):
-        # TODO: Move this to the data pipeline as a stage.
-        blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
-        x = blocks[0].srcdata["feat"]
+        blocks = [block.to("cuda") for block in batch.blocks]
+        x = batch.node_features["feat"]
         y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
         loss = F.cross_entropy(y_hat, y)
@@ -84,11 +106,12 @@ class SAGE(LightningModule):
             on_step=True,
             on_epoch=False,
         )
+        self.log_node_and_edge_counts(blocks)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
-        x = blocks[0].srcdata["feat"]
+        blocks = [block.to("cuda") for block in batch.blocks]
+        x = batch.node_features["feat"]
         y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
         self.val_acc(torch.argmax(y_hat, 1), y)
@@ -96,10 +119,11 @@ class SAGE(LightningModule):
             "val_acc",
             self.val_acc,
             prog_bar=True,
-            on_step=True,
+            on_step=False,
             on_epoch=True,
             sync_dist=True,
         )
+        self.log_node_and_edge_counts(blocks)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -109,80 +133,69 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, fanouts, batch_size, num_workers):
+    def __init__(self, dataset, fanouts, batch_size, num_workers):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
         self.num_workers = num_workers
-        # TODO: Update with a publicly accessible URL once the dataset has been
-        # uploaded.
-        dataset = gb.OnDiskDataset(
-            "/home/ubuntu/workspace/example_ogbn_products/"
-        )
-        dataset.load()
         self.feature_store = dataset.feature
         self.graph = dataset.graph
         self.train_set = dataset.tasks[0].train_set
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
 
+    def create_dataloader(self, node_set, is_train):
+        datapipe = gb.ItemSampler(
+            node_set,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=True,
+        )
+        sampler = (
+            datapipe.sample_layer_neighbor
+            if is_train
+            else datapipe.sample_neighbor
+        )
+        datapipe = sampler(self.graph, self.fanouts)
+        datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
+        dataloader = gb.DataLoader(datapipe, num_workers=self.num_workers)
+        return dataloader
+
     ########################################################################
     # (HIGHLIGHT) The 'train_dataloader' and 'val_dataloader' hooks are
     # essential components of the Lightning framework, defining how data is
     # loaded during training and validation. In this example, we utilize a
     # specialized 'graphbolt dataloader', which are concatenated by a series
-    # of datappipes, for these purposes.
+    # of datapipes, for these purposes.
     ########################################################################
     def train_dataloader(self):
-        datapipe = gb.ItemSampler(
-            self.train_set,
-            batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=True,
-        )
-        datapipe = datapipe.sample_neighbor(self.graph, self.fanouts)
-        datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
-        dataloader = gb.MultiProcessDataLoader(
-            datapipe, num_workers=self.num_workers
-        )
-        return dataloader
+        return self.create_dataloader(self.train_set, is_train=True)
 
     def val_dataloader(self):
-        datapipe = gb.ItemSampler(
-            self.valid_set,
-            batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=True,
-        )
-        datapipe = datapipe.sample_neighbor(self.graph, self.fanouts)
-        datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
-        dataloader = gb.MultiProcessDataLoader(
-            datapipe, num_workers=self.num_workers
-        )
-        return dataloader
+        return self.create_dataloader(self.valid_set, is_train=False)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="GNN baselines on ogbgmol* data with Pytorch Geometrics"
+        description="GNN baselines on ogbn-products data with GraphBolt"
     )
     parser.add_argument(
         "--num_gpus",
         type=int,
-        default=4,
-        help="number of GPUs used for computing (default: 4)",
+        default=1,
+        help="number of GPUs used for computing (default: 1)",
     )
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=32,
-        help="input batch size for training (default: 32)",
+        default=1024,
+        help="input batch size for training (default: 1024)",
     )
     parser.add_argument(
         "--epochs",
         type=int,
-        default=10,
-        help="number of epochs to train (default: 100)",
+        default=40,
+        help="number of epochs to train (default: 40)",
     )
     parser.add_argument(
         "--num_workers",
@@ -192,11 +205,19 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    datamodule = DataModule([15, 10, 5], args.batch_size, args.num_workers)
-    model = SAGE(100, 256, datamodule.num_classes).to(torch.double)
+    dataset = gb.BuiltinDataset("ogbn-products").load()
+    datamodule = DataModule(
+        dataset,
+        [10, 10, 10],
+        args.batch_size,
+        args.num_workers,
+    )
+    in_size = dataset.feature.size("node", None, "feat")[0]
+    model = SAGE(in_size, 256, datamodule.num_classes)
 
     # Train.
-    checkpoint_callback = ModelCheckpoint(monitor="val_acc", save_top_k=1)
+    checkpoint_callback = ModelCheckpoint(monitor="val_acc", mode="max")
+    early_stopping_callback = EarlyStopping(monitor="val_acc", mode="max")
     ########################################################################
     # (HIGHLIGHT) The `Trainer` is the key Class in lightning, which automates
     # everything after defining `LightningDataModule` and
@@ -207,6 +228,6 @@ if __name__ == "__main__":
         accelerator="gpu",
         devices=args.num_gpus,
         max_epochs=args.epochs,
-        callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback, early_stopping_callback],
     )
     trainer.fit(model, datamodule=datamodule)

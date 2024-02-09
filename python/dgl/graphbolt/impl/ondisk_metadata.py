@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 
 import pydantic
 
+from ...utils import version
+
 __all__ = [
     "OnDiskFeatureDataFormat",
     "OnDiskTVTSetData",
@@ -16,6 +18,39 @@ __all__ = [
     "OnDiskGraphTopology",
     "OnDiskTaskData",
 ]
+
+
+class ExtraMetaData(pydantic.BaseModel, extra="allow"):
+    """Group extra fields into metadata. Internal use only."""
+
+    extra_fields: Optional[Dict[str, Any]] = {}
+
+    # As pydantic 2.0 has changed the API of validators, we need to use
+    # different validators for different versions to be compatible with
+    # previous versions.
+    if version.parse(pydantic.__version__) >= version.parse("2.0"):
+
+        @pydantic.model_validator(mode="before")
+        @classmethod
+        def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+            """Build extra fields."""
+            for key in list(values.keys()):
+                if key not in cls.model_fields:
+                    values["extra_fields"] = values.get("extra_fields", {})
+                    values["extra_fields"][key] = values.pop(key)
+            return values
+
+    else:
+
+        @pydantic.root_validator(pre=True)
+        @classmethod
+        def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+            """Build extra fields."""
+            for key in list(values.keys()):
+                if key not in cls.__fields__:
+                    values["extra_fields"] = values.get("extra_fields", {})
+                    values["extra_fields"][key] = values.pop(key)
+            return values
 
 
 class OnDiskFeatureDataFormat(str, Enum):
@@ -49,7 +84,7 @@ class OnDiskFeatureDataDomain(str, Enum):
     GRAPH = "graph"
 
 
-class OnDiskFeatureData(pydantic.BaseModel):
+class OnDiskFeatureData(ExtraMetaData):
     r"""The description of an on-disk feature."""
     domain: OnDiskFeatureDataDomain
     type: Optional[str] = None
@@ -62,7 +97,7 @@ class OnDiskFeatureData(pydantic.BaseModel):
 class OnDiskGraphTopologyType(str, Enum):
     """Enum of graph topology type."""
 
-    CSC_SAMPLING = "CSCSamplingGraph"
+    FUSED_CSC_SAMPLING = "FusedCSCSamplingGraph"
 
 
 class OnDiskGraphTopology(pydantic.BaseModel):
@@ -72,23 +107,12 @@ class OnDiskGraphTopology(pydantic.BaseModel):
     path: str
 
 
-class OnDiskTaskData(pydantic.BaseModel, extra="allow"):
+class OnDiskTaskData(ExtraMetaData):
     """Task specification in YAML."""
 
     train_set: Optional[List[OnDiskTVTSet]] = []
     validation_set: Optional[List[OnDiskTVTSet]] = []
     test_set: Optional[List[OnDiskTVTSet]] = []
-    extra_fields: Optional[Dict[str, Any]] = {}
-
-    @pydantic.model_validator(mode="before")
-    @classmethod
-    def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """Build extra fields."""
-        for key in list(values.keys()):
-            if key not in cls.model_fields:
-                values["extra_fields"] = values.get("extra_fields", {})
-                values["extra_fields"][key] = values.pop(key)
-        return values
 
 
 class OnDiskMetaData(pydantic.BaseModel):

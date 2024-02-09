@@ -1,6 +1,17 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.18)
 project(graphbolt C CXX)
 set (CMAKE_CXX_STANDARD 17)
+
+if(USE_CUDA)
+  message(STATUS "Build graphbolt with CUDA support")
+  enable_language(CUDA)
+  add_definitions(-DGRAPHBOLT_USE_CUDA)
+endif()
+
+# For windows, define NOMINMAX to avoid conflict with std::min/max
+if(MSVC)
+  add_definitions(-DNOMINMAX)
+endif()
 
 # Find PyTorch cmake files and PyTorch versions with the python interpreter
 # $PYTHON_INTERP ("python3" or "python" if empty)
@@ -38,6 +49,16 @@ set(BOLT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(BOLT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 file(GLOB BOLT_HEADERS ${BOLT_INCLUDE})
 file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
+if(USE_CUDA)
+  file(GLOB BOLT_CUDA_SRC
+    ${BOLT_DIR}/cuda/*.cu
+    ${BOLT_DIR}/cuda/*.cc
+  )
+  list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
+  if(DEFINED ENV{CUDAARCHS})
+    set(CMAKE_CUDA_ARCHITECTURES $ENV{CUDAARCHS})
+  endif()
+endif()
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
@@ -45,6 +66,25 @@ target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            "../third_party/dmlc-core/include"
                            "../third_party/pcg/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
+
+if(USE_CUDA)
+  set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 17)
+  message(STATUS "Use external CCCL library for a consistent API and performance for graphbolt.")
+  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE CUB_WRAPPED_NAMESPACE=graphbolt)
+  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE THRUST_NS_QUALIFIER=thrust)
+  target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
+                             "../third_party/cccl/thrust"
+                             "../third_party/cccl/cub"
+                             "../third_party/cccl/libcudacxx/include")
+
+  message(STATUS "Use HugeCTR gpu_cache for graphbolt with INCLUDE_DIRS $ENV{GPU_CACHE_INCLUDE_DIRS}.")
+  target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE $ENV{GPU_CACHE_INCLUDE_DIRS})
+  target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${GPU_CACHE_BUILD_DIR})
+  target_link_libraries(${LIB_GRAPHBOLT_NAME} gpu_cache)
+  
+  get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
+  message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")
+endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when
 # using the conda distribution. The following is a workaround to address this

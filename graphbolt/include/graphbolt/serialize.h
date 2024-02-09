@@ -7,7 +7,7 @@
 #ifndef GRAPHBOLT_SERIALIZE_H_
 #define GRAPHBOLT_SERIALIZE_H_
 
-#include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/fused_csc_sampling_graph.h>
 #include <torch/torch.h>
 
 #include <string>
@@ -15,64 +15,61 @@
 
 /**
  * @brief Overload stream operator to enable `torch::save()` and `torch.load()`
- * for CSCSamplingGraph.
+ * for FusedCSCSamplingGraph.
  */
 namespace torch {
 
 /**
- * @brief Overload input stream operator for CSCSamplingGraph deserialization.
+ * @brief Overload input stream operator for FusedCSCSamplingGraph
+ * deserialization. This enables `torch::load()` for FusedCSCSamplingGraph.
+ *
  * @param archive Input stream for deserializing.
- * @param graph CSCSamplingGraph.
+ * @param graph FusedCSCSamplingGraph.
  *
  * @return archive
+ *
+ * @code
+ * auto&& graph = c10::make_intrusive<sampling::FusedCSCSamplingGraph>();
+ * torch::load(*graph, filename);
  */
 inline serialize::InputArchive& operator>>(
     serialize::InputArchive& archive,
-    graphbolt::sampling::CSCSamplingGraph& graph);
+    graphbolt::sampling::FusedCSCSamplingGraph& graph);
 
 /**
- * @brief Overload output stream operator for CSCSamplingGraph serialization.
+ * @brief Overload output stream operator for FusedCSCSamplingGraph
+ * serialization. This enables `torch::save()` for FusedCSCSamplingGraph.
  * @param archive Output stream for serializing.
- * @param graph CSCSamplingGraph.
+ * @param graph FusedCSCSamplingGraph.
  *
  * @return archive
+ *
+ * @code
+ * auto&& graph = c10::make_intrusive<sampling::FusedCSCSamplingGraph>();
+ * torch::save(*graph, filename);
  */
 inline serialize::OutputArchive& operator<<(
     serialize::OutputArchive& archive,
-    const graphbolt::sampling::CSCSamplingGraph& graph);
+    const graphbolt::sampling::FusedCSCSamplingGraph& graph);
 
 }  // namespace torch
 
 namespace graphbolt {
 
 /**
- * @brief Load CSCSamplingGraph from file.
- * @param filename File name to read.
- *
- * @return CSCSamplingGraph.
- */
-c10::intrusive_ptr<sampling::CSCSamplingGraph> LoadCSCSamplingGraph(
-    const std::string& filename);
-
-/**
- * @brief Save CSCSamplingGraph to file.
- * @param graph CSCSamplingGraph to save.
- * @param filename File name to save.
- *
- */
-void SaveCSCSamplingGraph(
-    c10::intrusive_ptr<sampling::CSCSamplingGraph> graph,
-    const std::string& filename);
-
-/**
- * @brief Read data from archive.
+ * @brief Read data from archive and format to specified type.
  * @param archive Input archive.
  * @param key Key name of data.
  *
  * @return data.
  */
-torch::IValue read_from_archive(
-    torch::serialize::InputArchive& archive, const std::string& key);
+template <typename T>
+T read_from_archive(
+    torch::serialize::InputArchive& archive, const std::string& key) {
+  torch::IValue data;
+  archive.read(key, data);
+  return data.to<T>();
+}
 
 }  // namespace graphbolt
 

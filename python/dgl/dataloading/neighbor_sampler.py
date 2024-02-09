@@ -3,6 +3,7 @@ from .. import backend as F
 from ..base import EID, NID
 from ..heterograph import DGLGraph
 from ..transforms import to_block
+from ..utils import get_num_threads
 from .base import BlockSampler
 
 
@@ -150,8 +151,9 @@ class NeighborSampler(BlockSampler):
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes
         blocks = []
-
-        if self.fused:
+        # sample_neighbors_fused function requires multithreading to be more efficient
+        # than sample_neighbors
+        if self.fused and get_num_threads() > 1:
             cpu = F.device_type(g.device) == "cpu"
             if isinstance(seed_nodes, dict):
                 for ntype in list(seed_nodes.keys()):
@@ -190,9 +192,11 @@ class NeighborSampler(BlockSampler):
                 output_device=self.output_device,
                 exclude_edges=exclude_eids,
             )
-            eid = frontier.edata[EID]
             block = to_block(frontier, seed_nodes)
-            block.edata[EID] = eid
+            # If sampled from graphbolt-backed DistGraph, `EID` may not be in
+            # the block.
+            if EID in frontier.edata.keys():
+                block.edata[EID] = frontier.edata[EID]
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)
 

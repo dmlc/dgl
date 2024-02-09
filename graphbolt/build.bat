@@ -11,7 +11,7 @@ IF x%1x == xx GOTO single
 
 FOR %%X IN (%*) DO (
   DEL /S /Q *
-  "%CMAKE_COMMAND%" -DCMAKE_CONFIGURATION_TYPES=Release -DPYTHON_INTERP=%%X .. -G "Visual Studio 16 2019" || EXIT /B 1
+  "%CMAKE_COMMAND%" -DGPU_CACHE_BUILD_DIR=%BINDIR% -DCMAKE_CONFIGURATION_TYPES=Release -DPYTHON_INTERP=%%X .. -G "Visual Studio 16 2019" || EXIT /B 1
   msbuild graphbolt.sln /m /nr:false || EXIT /B 1
   COPY /Y Release\*.dll "%BINDIR%\graphbolt" || EXIT /B 1
 )
@@ -21,7 +21,7 @@ GOTO end
 :single
 
 DEL /S /Q *
-"%CMAKE_COMMAND%" -DCMAKE_CONFIGURATION_TYPES=Release .. -G "Visual Studio 16 2019" || EXIT /B 1
+"%CMAKE_COMMAND%" -DGPU_CACHE_BUILD_DIR=%BINDIR% -DCMAKE_CONFIGURATION_TYPES=Release .. -G "Visual Studio 16 2019" || EXIT /B 1
 msbuild graphbolt.sln /m /nr:false || EXIT /B 1
 COPY /Y Release\*.dll "%BINDIR%\graphbolt" || EXIT /B 1
 

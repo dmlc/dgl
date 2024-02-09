@@ -9,13 +9,14 @@ import pytest
 import torch as th
 from dgl import function as fn
 from dgl.distributed import (
-    convert_dgl_partition_to_csc_sampling_graph,
+    dgl_partition_to_graphbolt,
     load_partition,
     load_partition_book,
     load_partition_feats,
     partition_graph,
 )
 from dgl.distributed.graph_partition_book import (
+    _etype_str_to_tuple,
     _etype_tuple_to_str,
     DEFAULT_ETYPE,
     DEFAULT_NTYPE,
@@ -504,7 +505,7 @@ def check_partition(
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-@pytest.mark.parametrize("num_trainers_per_machine", [1, 4])
+@pytest.mark.parametrize("num_trainers_per_machine", [1])
 @pytest.mark.parametrize("load_feats", [True, False])
 @pytest.mark.parametrize(
     "graph_formats", [None, ["csc"], ["coo", "csc"], ["coo", "csc", "csr"]]
@@ -679,9 +680,21 @@ def test_UnknownPartitionBook():
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-def test_convert_dgl_partition_to_csc_sampling_graph_homo(
-    part_method, num_parts
+@pytest.mark.parametrize("store_eids", [True, False])
+@pytest.mark.parametrize("store_inner_node", [True, False])
+@pytest.mark.parametrize("store_inner_edge", [True, False])
+@pytest.mark.parametrize("debug_mode", [True, False])
+def test_dgl_partition_to_graphbolt_homo(
+    part_method,
+    num_parts,
+    store_eids,
+    store_inner_node,
+    store_inner_edge,
+    debug_mode,
 ):
+    reset_envs()
+    if debug_mode:
+        os.environ["DGL_DIST_DEBUG"] = "1"
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_graph(1000)
         graph_name = "test"
@@ -689,30 +702,69 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
             g, graph_name, num_parts, test_dir, part_method=part_method
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
-        convert_dgl_partition_to_csc_sampling_graph(part_config)
+        dgl_partition_to_graphbolt(
+            part_config,
+            store_eids=store_eids,
+            store_inner_node=store_inner_node,
+            store_inner_edge=store_inner_edge,
+        )
         for part_id in range(num_parts):
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
-            new_g = dgl.graphbolt.load_csc_sampling_graph(
-                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
-            )
-            orig_indptr, orig_indices, _ = orig_g.adj().csc()
+            new_g = load_partition(
+                part_config, part_id, load_feats=False, use_graphbolt=True
+            )[0]
+            orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
             assert new_g.node_type_offset is None
-            assert all(new_g.type_per_edge == 0)
-            for node_type, type_id in new_g.metadata.node_type_to_id.items():
-                assert g.get_ntype_id(node_type) == type_id
-            for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
-                assert g.get_etype_id(edge_type) == type_id
+            assert th.equal(
+                orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+            )
+            if store_inner_node or debug_mode:
+                assert th.equal(
+                    orig_g.ndata["inner_node"],
+                    new_g.node_attributes["inner_node"],
+                )
+            else:
+                assert "inner_node" not in new_g.node_attributes
+            if store_eids or debug_mode:
+                assert th.equal(
+                    orig_g.edata[dgl.EID][orig_eids],
+                    new_g.edge_attributes[dgl.EID],
+                )
+            else:
+                assert dgl.EID not in new_g.edge_attributes
+            if store_inner_edge or debug_mode:
+                assert th.equal(
+                    orig_g.edata["inner_edge"][orig_eids],
+                    new_g.edge_attributes["inner_edge"],
+                )
+            else:
+                assert "inner_edge" not in new_g.edge_attributes
+            assert new_g.type_per_edge is None
+            assert new_g.node_type_to_id is None
+            assert new_g.edge_type_to_id is None
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
-    part_method, num_parts
+@pytest.mark.parametrize("store_eids", [True, False])
+@pytest.mark.parametrize("store_inner_node", [True, False])
+@pytest.mark.parametrize("store_inner_edge", [True, False])
+@pytest.mark.parametrize("debug_mode", [True, False])
+def test_dgl_partition_to_graphbolt_hetero(
+    part_method,
+    num_parts,
+    store_eids,
+    store_inner_node,
+    store_inner_edge,
+    debug_mode,
 ):
+    reset_envs()
+    if debug_mode:
+        os.environ["DGL_DIST_DEBUG"] = "1"
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_hetero()
         graph_name = "test"
@@ -720,23 +772,68 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
             g, graph_name, num_parts, test_dir, part_method=part_method
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
-        convert_dgl_partition_to_csc_sampling_graph(part_config)
+        dgl_partition_to_graphbolt(
+            part_config,
+            store_eids=store_eids,
+            store_inner_node=store_inner_node,
+            store_inner_edge=store_inner_edge,
+        )
         for part_id in range(num_parts):
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
-            new_g = dgl.graphbolt.load_csc_sampling_graph(
-                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
-            )
-            orig_indptr, orig_indices, _ = orig_g.adj().csc()
+            new_g = load_partition(
+                part_config, part_id, load_feats=False, use_graphbolt=True
+            )[0]
+            orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
-            for node_type, type_id in new_g.metadata.node_type_to_id.items():
+            assert th.equal(
+                orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+            )
+            if store_inner_node or debug_mode:
+                assert th.equal(
+                    orig_g.ndata["inner_node"],
+                    new_g.node_attributes["inner_node"],
+                )
+            else:
+                assert "inner_node" not in new_g.node_attributes
+            if debug_mode:
+                assert th.equal(
+                    orig_g.ndata[dgl.NTYPE], new_g.node_attributes[dgl.NTYPE]
+                )
+            else:
+                assert dgl.NTYPE not in new_g.node_attributes
+            if store_eids or debug_mode:
+                assert th.equal(
+                    orig_g.edata[dgl.EID][orig_eids],
+                    new_g.edge_attributes[dgl.EID],
+                )
+            else:
+                assert dgl.EID not in new_g.edge_attributes
+            if store_inner_edge or debug_mode:
+                assert th.equal(
+                    orig_g.edata["inner_edge"],
+                    new_g.edge_attributes["inner_edge"],
+                )
+            else:
+                assert "inner_edge" not in new_g.edge_attributes
+            if debug_mode:
+                assert th.equal(
+                    orig_g.edata[dgl.ETYPE][orig_eids],
+                    new_g.edge_attributes[dgl.ETYPE],
+                )
+            else:
+                assert dgl.ETYPE not in new_g.edge_attributes
+            assert th.equal(
+                orig_g.edata[dgl.ETYPE][orig_eids], new_g.type_per_edge
+            )
+
+            for node_type, type_id in new_g.node_type_to_id.items():
                 assert g.get_ntype_id(node_type) == type_id
-            for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
-                assert g.get_etype_id(edge_type) == type_id
+            for edge_type, type_id in new_g.edge_type_to_id.items():
+                assert g.get_etype_id(_etype_str_to_tuple(edge_type)) == type_id
             assert new_g.node_type_offset is None
-            assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
 
 
 def test_not_sorted_node_edge_map():
@@ -847,3 +944,165 @@ def test_not_sorted_node_edge_map():
         gpb, _, _, _ = load_partition_book(part_config, 1)
         assert gpb.local_ntype_offset == [0, 300, 700]
         assert gpb.local_etype_offset == [0, 500, 1100, 1800, 2600]
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+@pytest.mark.parametrize("store_eids", [True, False])
+@pytest.mark.parametrize("store_inner_node", [True, False])
+@pytest.mark.parametrize("store_inner_edge", [True, False])
+@pytest.mark.parametrize("debug_mode", [True, False])
+def test_partition_graph_graphbolt_homo(
+    part_method,
+    num_parts,
+    store_eids,
+    store_inner_node,
+    store_inner_edge,
+    debug_mode,
+):
+    reset_envs()
+    if debug_mode:
+        os.environ["DGL_DIST_DEBUG"] = "1"
+    with tempfile.TemporaryDirectory() as test_dir:
+        g = create_random_graph(1000)
+        graph_name = "test"
+        partition_graph(
+            g,
+            graph_name,
+            num_parts,
+            test_dir,
+            part_method=part_method,
+            use_graphbolt=True,
+            store_eids=store_eids,
+            store_inner_node=store_inner_node,
+            store_inner_edge=store_inner_edge,
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        for part_id in range(num_parts):
+            orig_g = dgl.load_graphs(
+                os.path.join(test_dir, f"part{part_id}/graph.dgl")
+            )[0][0]
+            new_g = load_partition(
+                part_config, part_id, load_feats=False, use_graphbolt=True
+            )[0]
+            orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
+            assert th.equal(orig_indptr, new_g.csc_indptr)
+            assert th.equal(orig_indices, new_g.indices)
+            assert new_g.node_type_offset is None
+            assert th.equal(
+                orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+            )
+            if store_inner_node or debug_mode:
+                assert th.equal(
+                    orig_g.ndata["inner_node"],
+                    new_g.node_attributes["inner_node"],
+                )
+            else:
+                assert "inner_node" not in new_g.node_attributes
+            if store_eids or debug_mode:
+                assert th.equal(
+                    orig_g.edata[dgl.EID][orig_eids],
+                    new_g.edge_attributes[dgl.EID],
+                )
+            else:
+                assert dgl.EID not in new_g.edge_attributes
+            if store_inner_edge or debug_mode:
+                assert th.equal(
+                    orig_g.edata["inner_edge"][orig_eids],
+                    new_g.edge_attributes["inner_edge"],
+                )
+            else:
+                assert "inner_edge" not in new_g.edge_attributes
+            assert new_g.type_per_edge is None
+            assert new_g.node_type_to_id is None
+            assert new_g.edge_type_to_id is None
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+@pytest.mark.parametrize("store_eids", [True, False])
+@pytest.mark.parametrize("store_inner_node", [True, False])
+@pytest.mark.parametrize("store_inner_edge", [True, False])
+@pytest.mark.parametrize("debug_mode", [True, False])
+def test_partition_graph_graphbolt_hetero(
+    part_method,
+    num_parts,
+    store_eids,
+    store_inner_node,
+    store_inner_edge,
+    debug_mode,
+):
+    reset_envs()
+    if debug_mode:
+        os.environ["DGL_DIST_DEBUG"] = "1"
+    with tempfile.TemporaryDirectory() as test_dir:
+        g = create_random_hetero()
+        graph_name = "test"
+        partition_graph(
+            g,
+            graph_name,
+            num_parts,
+            test_dir,
+            part_method=part_method,
+            use_graphbolt=True,
+            store_eids=store_eids,
+            store_inner_node=store_inner_node,
+            store_inner_edge=store_inner_edge,
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        for part_id in range(num_parts):
+            orig_g = dgl.load_graphs(
+                os.path.join(test_dir, f"part{part_id}/graph.dgl")
+            )[0][0]
+            new_g = load_partition(
+                part_config, part_id, load_feats=False, use_graphbolt=True
+            )[0]
+            orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
+            assert th.equal(orig_indptr, new_g.csc_indptr)
+            assert th.equal(orig_indices, new_g.indices)
+            assert th.equal(
+                orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+            )
+            if store_inner_node or debug_mode:
+                assert th.equal(
+                    orig_g.ndata["inner_node"],
+                    new_g.node_attributes["inner_node"],
+                )
+            else:
+                assert "inner_node" not in new_g.node_attributes
+            if debug_mode:
+                assert th.equal(
+                    orig_g.ndata[dgl.NTYPE], new_g.node_attributes[dgl.NTYPE]
+                )
+            else:
+                assert dgl.NTYPE not in new_g.node_attributes
+            if store_eids or debug_mode:
+                assert th.equal(
+                    orig_g.edata[dgl.EID][orig_eids],
+                    new_g.edge_attributes[dgl.EID],
+                )
+            else:
+                assert dgl.EID not in new_g.edge_attributes
+            if store_inner_edge or debug_mode:
+                assert th.equal(
+                    orig_g.edata["inner_edge"],
+                    new_g.edge_attributes["inner_edge"],
+                )
+            else:
+                assert "inner_edge" not in new_g.edge_attributes
+            if debug_mode:
+                assert th.equal(
+                    orig_g.edata[dgl.ETYPE][orig_eids],
+                    new_g.edge_attributes[dgl.ETYPE],
+                )
+            else:
+                assert dgl.ETYPE not in new_g.edge_attributes
+            assert th.equal(
+                orig_g.edata[dgl.ETYPE][orig_eids], new_g.type_per_edge
+            )
+
+            for node_type, type_id in new_g.node_type_to_id.items():
+                assert g.get_ntype_id(node_type) == type_id
+            for edge_type, type_id in new_g.edge_type_to_id.items():
+                assert g.get_etype_id(_etype_str_to_tuple(edge_type)) == type_id
+            assert new_g.node_type_offset is None

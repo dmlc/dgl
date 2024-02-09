@@ -1,27 +1,32 @@
 """GraphBolt OnDiskDataset."""
 
+import json
 import os
 import shutil
+import textwrap
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Union
 
-import pandas as pd
 import torch
 import yaml
 
 import dgl
 
+from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
-from ..itemset import ItemSet, ItemSetDict
-from ..utils import read_data, save_data
-from .csc_sampling_graph import (
-    CSCSamplingGraph,
-    from_dglgraph,
-    load_csc_sampling_graph,
-    save_csc_sampling_graph,
+from ..internal import (
+    calculate_dir_hash,
+    check_dataset_change,
+    copy_or_convert_data,
+    get_attributes,
+    read_data,
+    read_edges,
 )
+from ..itemset import ItemSet, ItemSetDict
+from ..sampling_graph import SamplingGraph
+from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
 from .ondisk_metadata import (
     OnDiskGraphTopology,
     OnDiskMetaData,
@@ -33,25 +38,11 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 
-def _copy_or_convert_data(
-    input_path,
-    output_path,
-    input_format,
-    output_format="numpy",
-    in_memory=True,
-):
-    """Copy or convert the data from input_path to output_path."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    if input_format == "numpy":
-        # If the original format is numpy, just copy the file.
-        shutil.copyfile(input_path, output_path)
-    else:
-        # If the original format is not numpy, convert it to numpy.
-        data = read_data(input_path, input_format, in_memory)
-        save_data(data, output_path, output_format)
-
-
-def preprocess_ondisk_dataset(dataset_dir: str) -> str:
+def preprocess_ondisk_dataset(
+    dataset_dir: str,
+    include_original_edge_id: bool = False,
+    force_preprocess: bool = None,
+) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
 
@@ -59,6 +50,10 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     ----------
     dataset_dir : str
         The path to the dataset directory.
+    include_original_edge_id : bool, optional
+        Whether to include the original edge id in the FusedCSCSamplingGraph.
+    force_preprocess: bool, optional
+        Whether to force reload the ondisk dataset.
 
     Returns
     -------
@@ -76,13 +71,36 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         )
 
     # 0. Check if the dataset is already preprocessed.
-    preprocess_metadata_path = os.path.join("preprocessed", "metadata.yaml")
+    processed_dir_prefix = "preprocessed"
+    preprocess_metadata_path = os.path.join(
+        processed_dir_prefix, "metadata.yaml"
+    )
     if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
-        print("The dataset is already preprocessed.")
-        return os.path.join(dataset_dir, preprocess_metadata_path)
+        if force_preprocess is None:
+            with open(
+                os.path.join(dataset_dir, preprocess_metadata_path), "r"
+            ) as f:
+                preprocess_config = yaml.safe_load(f)
+            if (
+                preprocess_config.get("include_original_edge_id", None)
+                == include_original_edge_id
+            ):
+                force_preprocess = check_dataset_change(
+                    dataset_dir, processed_dir_prefix
+                )
+            else:
+                force_preprocess = True
+        if force_preprocess:
+            shutil.rmtree(os.path.join(dataset_dir, processed_dir_prefix))
+            print(
+                "The on-disk dataset is re-preprocessing, so the existing "
+                + "preprocessed dataset has been removed."
+            )
+        else:
+            print("The dataset is already preprocessed.")
+            return os.path.join(dataset_dir, preprocess_metadata_path)
 
     print("Start to preprocess the on-disk dataset.")
-    processed_dir_prefix = "preprocessed"
 
     # Check if the metadata.yaml exists.
     metadata_file_path = os.path.join(dataset_dir, "metadata.yaml")
@@ -100,18 +118,24 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     # 2. Load the edge data and create a DGLGraph.
     if "graph" not in input_config:
         raise RuntimeError("Invalid config: does not contain graph field.")
-    is_homogeneous = "type" not in input_config["graph"]["nodes"][0]
+    # For any graph that node/edge types are specified, we construct DGLGraph
+    # with `dgl.heterograph()` even there's only one node/edge type. This is
+    # because we want to save the node/edge types in the graph. So the logic of
+    # checking whether the graph is homogeneous is different from the logic in
+    # `DGLGraph.is_homogeneous()`. Otherwise, we construct DGLGraph with
+    # `dgl.graph()`.
+    is_homogeneous = (
+        len(input_config["graph"]["nodes"]) == 1
+        and len(input_config["graph"]["edges"]) == 1
+        and "type" not in input_config["graph"]["nodes"][0]
+        and "type" not in input_config["graph"]["edges"][0]
+    )
     if is_homogeneous:
         # Homogeneous graph.
         num_nodes = input_config["graph"]["nodes"][0]["num"]
-        edge_data = pd.read_csv(
-            os.path.join(
-                dataset_dir, input_config["graph"]["edges"][0]["path"]
-            ),
-            names=["src", "dst"],
-        )
-        src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
-
+        edge_fmt = input_config["graph"]["edges"][0]["format"]
+        edge_path = input_config["graph"]["edges"][0]["path"]
+        src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         g = dgl.graph((src, dst), num_nodes=num_nodes)
     else:
         # Heterogeneous graph.
@@ -122,12 +146,9 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         # Construct the data dict.
         data_dict = {}
         for edge_info in input_config["graph"]["edges"]:
-            edge_data = pd.read_csv(
-                os.path.join(dataset_dir, edge_info["path"]),
-                names=["src", "dst"],
-            )
-            src = torch.tensor(edge_data["src"])
-            dst = torch.tensor(edge_data["dst"])
+            edge_fmt = edge_info["format"]
+            edge_path = edge_info["path"]
+            src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
             data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
         # Construct the heterograph.
         g = dgl.heterograph(data_dict, num_nodes_dict)
@@ -136,33 +157,74 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     # the sampling-graph.
     if input_config["graph"].get("feature_data", None):
         for graph_feature in input_config["graph"]["feature_data"]:
+            in_memory = (
+                True
+                if "in_memory" not in graph_feature
+                else graph_feature["in_memory"]
+            )
             if graph_feature["domain"] == "node":
                 node_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
-                    in_memory=graph_feature["in_memory"],
+                    in_memory=in_memory,
                 )
-                g.ndata[graph_feature["name"]] = node_data
+                if is_homogeneous:
+                    g.ndata[graph_feature["name"]] = node_data
+                else:
+                    g.nodes[graph_feature["type"]].data[
+                        graph_feature["name"]
+                    ] = node_data
             if graph_feature["domain"] == "edge":
                 edge_data = read_data(
                     os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
-                    in_memory=graph_feature["in_memory"],
+                    in_memory=in_memory,
                 )
-                g.edata[graph_feature["name"]] = edge_data
+                if is_homogeneous:
+                    g.edata[graph_feature["name"]] = edge_data
+                else:
+                    g.edges[etype_str_to_tuple(graph_feature["type"])].data[
+                        graph_feature["name"]
+                    ] = edge_data
+        if not is_homogeneous:
+            # For heterogenous graph, a node/edge feature must cover all
+            # node/edge types.
+            ntypes = g.ntypes
+            assert all(
+                set(g.nodes[ntypes[0]].data.keys())
+                == set(g.nodes[ntype].data.keys())
+                for ntype in ntypes
+            ), (
+                "Node feature does not cover all node types: "
+                + f"{set(g.nodes[ntype].data.keys() for ntype in ntypes)}."
+            )
+            etypes = g.canonical_etypes
+            assert all(
+                set(g.edges[etypes[0]].data.keys())
+                == set(g.edges[etype].data.keys())
+                for etype in etypes
+            ), (
+                "Edge feature does not cover all edge types: "
+                + f"{set(g.edges[etype].data.keys() for etype in etypes)}."
+            )
 
-    # 4. Convert the DGLGraph to a CSCSamplingGraph.
-    csc_sampling_graph = from_dglgraph(g, is_homogeneous)
-
-    # 5. Save the CSCSamplingGraph and modify the output_config.
-    output_config["graph_topology"] = {}
-    output_config["graph_topology"]["type"] = "CSCSamplingGraph"
-    output_config["graph_topology"]["path"] = os.path.join(
-        processed_dir_prefix, "csc_sampling_graph.tar"
+    # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
+    fused_csc_sampling_graph = from_dglgraph(
+        g, is_homogeneous, include_original_edge_id
     )
 
-    save_csc_sampling_graph(
-        csc_sampling_graph,
+    # 5. Record value of include_original_edge_id.
+    output_config["include_original_edge_id"] = include_original_edge_id
+
+    # 6. Save the FusedCSCSamplingGraph and modify the output_config.
+    output_config["graph_topology"] = {}
+    output_config["graph_topology"]["type"] = "FusedCSCSamplingGraph"
+    output_config["graph_topology"]["path"] = os.path.join(
+        processed_dir_prefix, "fused_csc_sampling_graph.pt"
+    )
+
+    torch.save(
+        fused_csc_sampling_graph,
         os.path.join(
             dataset_dir,
             output_config["graph_topology"]["path"],
@@ -170,8 +232,9 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     )
     del output_config["graph"]
 
-    # 6. Load the node/edge features and do necessary conversion.
+    # 7. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
+        has_edge_feature_data = False
         for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
         ):
@@ -180,15 +243,23 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
             out_feature["path"] = os.path.join(
                 processed_dir_prefix, feature["path"].replace("pt", "npy")
             )
-            _copy_or_convert_data(
+            in_memory = (
+                True if "in_memory" not in feature else feature["in_memory"]
+            )
+            if not has_edge_feature_data and feature["domain"] == "edge":
+                has_edge_feature_data = True
+            copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
                 os.path.join(dataset_dir, out_feature["path"]),
                 feature["format"],
-                out_feature["format"],
-                feature["in_memory"],
+                output_format=out_feature["format"],
+                in_memory=in_memory,
+                is_feature=True,
             )
+        if has_edge_feature_data and not include_original_edge_id:
+            dgl_warning("Edge feature is stored, but edge IDs are not saved.")
 
-    # 7. Save tasks and train/val/test split according to the output_config.
+    # 8. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
@@ -208,20 +279,31 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                             processed_dir_prefix,
                             input_data["path"].replace("pt", "npy"),
                         )
-                        _copy_or_convert_data(
+                        copy_or_convert_data(
                             os.path.join(dataset_dir, input_data["path"]),
                             os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
                             output_data["format"],
                         )
 
-    # 8. Save the output_config.
+    # 9. Save the output_config.
     output_config_path = os.path.join(dataset_dir, preprocess_metadata_path)
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
 
-    # 9. Return the absolute path of the preprocessing yaml file.
+    # 10. Calculate and save the hash value of the dataset directory.
+    hash_value_file = "dataset_hash_value.txt"
+    hash_value_file_path = os.path.join(
+        dataset_dir, processed_dir_prefix, hash_value_file
+    )
+    if os.path.exists(hash_value_file_path):
+        os.remove(hash_value_file_path)
+    dir_hash = calculate_dir_hash(dataset_dir)
+    with open(hash_value_file_path, "w") as f:
+        f.write(json.dumps(dir_hash, indent=4))
+
+    # 11. Return the absolute path of the preprocessing yaml file.
     return output_config_path
 
 
@@ -235,9 +317,9 @@ class OnDiskTask:
     def __init__(
         self,
         metadata: Dict,
-        train_set: ItemSet or ItemSetDict,
-        validation_set: ItemSet or ItemSetDict,
-        test_set: ItemSet or ItemSetDict,
+        train_set: Union[ItemSet, ItemSetDict],
+        validation_set: Union[ItemSet, ItemSetDict],
+        test_set: Union[ItemSet, ItemSetDict],
     ):
         """Initialize a task.
 
@@ -245,11 +327,11 @@ class OnDiskTask:
         ----------
         metadata : Dict
             Metadata.
-        train_set : ItemSet or ItemSetDict
+        train_set : Union[ItemSet, ItemSetDict]
             Training set.
-        validation_set : ItemSet or ItemSetDict
+        validation_set : Union[ItemSet, ItemSetDict]
             Validation set.
-        test_set : ItemSet or ItemSetDict
+        test_set : Union[ItemSet, ItemSetDict]
             Test set.
         """
         self._metadata = metadata
@@ -263,44 +345,75 @@ class OnDiskTask:
         return self._metadata
 
     @property
-    def train_set(self) -> ItemSet or ItemSetDict:
+    def train_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the training set."""
         return self._train_set
 
     @property
-    def validation_set(self) -> ItemSet or ItemSetDict:
+    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the validation set."""
         return self._validation_set
 
     @property
-    def test_set(self) -> ItemSet or ItemSetDict:
+    def test_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the test set."""
         return self._test_set
 
+    def __repr__(self) -> str:
+        ret = "{Classname}({attributes})"
+
+        attributes_str = ""
+
+        attributes = get_attributes(self)
+        attributes.reverse()
+        for attribute in attributes:
+            if attribute[0] == "_":
+                continue
+            value = getattr(self, attribute)
+            attributes_str += f"{attribute}={value},\n"
+        attributes_str = textwrap.indent(
+            attributes_str, " " * len("OnDiskTask(")
+        ).strip()
+
+        return ret.format(
+            Classname=self.__class__.__name__, attributes=attributes_str
+        )
+
 
 class OnDiskDataset(Dataset):
-    """An on-disk dataset.
+    """An on-disk dataset which reads graph topology, feature data and
+    Train/Validation/Test set from disk.
 
-    An on-disk dataset is a dataset which reads graph topology, feature data
-    and TVT set from disk. Due to limited resources, the data which are too
-    large to fit into RAM will remain on disk while others reside in RAM once
-    ``OnDiskDataset`` is initialized. This behavior could be controled by user
-    via ``in_memory`` field in YAML file.
+    Due to limited resources, the data which are too large to fit into RAM will
+    remain on disk while others reside in RAM once ``OnDiskDataset`` is
+    initialized. This behavior could be controled by user via ``in_memory``
+    field in YAML file. All paths in YAML file are relative paths to the
+    dataset directory.
 
     A full example of YAML file is as follows:
 
     .. code-block:: yaml
 
         dataset_name: graphbolt_test
-        graph_topology:
-          type: CSCSamplingGraph
-          path: graph_topology/csc_sampling_graph.tar
+        graph:
+          nodes:
+            - type: paper # could be omitted for homogeneous graph.
+              num: 1000
+            - type: author
+              num: 1000
+          edges:
+            - type: author:writes:paper # could be omitted for homogeneous graph.
+              format: csv # Can be csv only.
+              path: edge_data/author-writes-paper.csv
+            - type: paper:cites:paper
+              format: csv
+              path: edge_data/paper-cites-paper.csv
         feature_data:
           - domain: node
-            type: paper
+            type: paper # could be omitted for homogeneous graph.
             name: feat
             format: numpy
-            in_memory: false
+            in_memory: false # If not specified, default to true.
             path: node_data/paper-feat.npy
           - domain: edge
             type: "author:writes:paper"
@@ -312,52 +425,59 @@ class OnDiskDataset(Dataset):
           - name: "edge_classification"
             num_classes: 10
             train_set:
-              - type: paper # could be null for homogeneous graph.
+              - type: paper # could be omitted for homogeneous graph.
                 data: # multiple data sources could be specified.
                   - name: node_pairs
-                    format: numpy
+                    format: numpy # Can be numpy or torch.
                     in_memory: true # If not specified, default to true.
                     path: set/paper-train-node_pairs.npy
                   - name: labels
                     format: numpy
-                    in_memory: false
                     path: set/paper-train-labels.npy
             validation_set:
               - type: paper
                 data:
                   - name: node_pairs
                     format: numpy
-                    in_memory: true
                     path: set/paper-validation-node_pairs.npy
                   - name: labels
                     format: numpy
-                    in_memory: true
                     path: set/paper-validation-labels.npy
             test_set:
               - type: paper
                 data:
                   - name: node_pairs
                     format: numpy
-                    in_memory: true
                     path: set/paper-test-node_pairs.npy
                   - name: labels
                     format: numpy
-                    in_memory: true
                     path: set/paper-test-labels.npy
 
     Parameters
     ----------
     path: str
         The YAML file path.
+    include_original_edge_id: bool, optional
+        Whether to include the original edge id in the FusedCSCSamplingGraph.
+    force_preprocess: bool, optional
+        Whether to force reload the ondisk dataset.
     """
 
-    def __init__(self, path: str) -> None:
+    def __init__(
+        self,
+        path: str,
+        include_original_edge_id: bool = False,
+        force_preprocess: bool = None,
+    ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         self._dataset_dir = path
-        yaml_path = preprocess_ondisk_dataset(path)
+        yaml_path = preprocess_ondisk_dataset(
+            path, include_original_edge_id, force_preprocess
+        )
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+        self._loaded = False
 
     def _convert_yaml_path_to_absolute_path(self):
         """Convert the path in YAML file to absolute path."""
@@ -381,14 +501,56 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self):
-        """Load the dataset."""
+    def load(self, tasks: List[str] = None):
+        """Load the dataset.
+
+        Parameters
+        ----------
+        tasks: List[str] = None
+            The name of the tasks to be loaded. For single task, the type of
+            tasks can be both string and List[str]. For multiple tasks, only
+            List[str] is acceptable.
+
+        Examples
+        --------
+        1. Loading via single task name "node_classification".
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks="node_classification")
+        >>> len(dataset.tasks)
+        1
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+
+        2. Loading via single task name ["node_classification"].
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks=["node_classification"])
+        >>> len(dataset.tasks)
+        1
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+
+        3. Loading via multiple task names ["node_classification",
+        "link_prediction"].
+
+        >>> dataset = gb.OnDiskDataset(base_dir).load(
+        ...     tasks=["node_classification","link_prediction"])
+        >>> len(dataset.tasks)
+        2
+        >>> dataset.tasks[0].metadata["name"]
+        "node_classification"
+        >>> dataset.tasks[1].metadata["name"]
+        "link_prediction"
+        """
         self._convert_yaml_path_to_absolute_path()
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
-        self._tasks = self._init_tasks(self._meta.tasks)
+        self._tasks = self._init_tasks(self._meta.tasks, tasks)
+        self._all_nodes_set = self._init_all_nodes_set(self._graph)
+        self._loaded = True
         return self
 
     @property
@@ -399,54 +561,89 @@ class OnDiskDataset(Dataset):
     @property
     def tasks(self) -> List[Task]:
         """Return the tasks."""
+        self._check_loaded()
         return self._tasks
 
     @property
-    def graph(self) -> object:
+    def graph(self) -> SamplingGraph:
         """Return the graph."""
+        self._check_loaded()
         return self._graph
 
     @property
     def feature(self) -> TorchBasedFeatureStore:
         """Return the feature."""
+        self._check_loaded()
         return self._feature
 
     @property
     def dataset_name(self) -> str:
         """Return the dataset name."""
+        self._check_loaded()
         return self._dataset_name
 
-    def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
+    @property
+    def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
+        """Return the itemset containing all nodes."""
+        self._check_loaded()
+        return self._all_nodes_set
+
+    def _init_tasks(
+        self, tasks: List[OnDiskTaskData], selected_tasks: List[str]
+    ) -> List[OnDiskTask]:
         """Initialize the tasks."""
+        if isinstance(selected_tasks, str):
+            selected_tasks = [selected_tasks]
+        if selected_tasks and not isinstance(selected_tasks, list):
+            raise TypeError(
+                f"The type of selected_task should be list, but got {type(selected_tasks)}"
+            )
         ret = []
         if tasks is None:
             return ret
+        task_names = set()
         for task in tasks:
-            ret.append(
-                OnDiskTask(
-                    task.extra_fields,
-                    self._init_tvt_set(task.train_set),
-                    self._init_tvt_set(task.validation_set),
-                    self._init_tvt_set(task.test_set),
+            task_name = task.extra_fields.get("name", None)
+            if selected_tasks is None or task_name in selected_tasks:
+                ret.append(
+                    OnDiskTask(
+                        task.extra_fields,
+                        self._init_tvt_set(task.train_set),
+                        self._init_tvt_set(task.validation_set),
+                        self._init_tvt_set(task.test_set),
+                    )
                 )
-            )
+                if selected_tasks:
+                    task_names.add(task_name)
+        if selected_tasks:
+            not_found_tasks = set(selected_tasks) - task_names
+            if len(not_found_tasks):
+                dgl_warning(
+                    f"Below tasks are not found in YAML: {not_found_tasks}. Skipped."
+                )
         return ret
+
+    def _check_loaded(self):
+        assert self._loaded, (
+            "Please ensure that you have called the OnDiskDataset.load() method"
+            + " to properly load the data."
+        )
 
     def _load_graph(
         self, graph_topology: OnDiskGraphTopology
-    ) -> CSCSamplingGraph:
+    ) -> FusedCSCSamplingGraph:
         """Load the graph topology."""
         if graph_topology is None:
             return None
-        if graph_topology.type == "CSCSamplingGraph":
-            return load_csc_sampling_graph(graph_topology.path)
+        if graph_topology.type == "FusedCSCSamplingGraph":
+            return torch.load(graph_topology.path)
         raise NotImplementedError(
             f"Graph topology type {graph_topology.type} is not supported."
         )
 
     def _init_tvt_set(
         self, tvt_set: List[OnDiskTVTSet]
-    ) -> ItemSet or ItemSetDict:
+    ) -> Union[ItemSet, ItemSetDict]:
         """Initialize the TVT set."""
         ret = None
         if (tvt_set is None) or (len(tvt_set) == 0):
@@ -475,12 +672,79 @@ class OnDiskDataset(Dataset):
             ret = ItemSetDict(data)
         return ret
 
+    def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
+        if graph is None:
+            dgl_warning(
+                "`all_node_set` is returned as None, since graph is None."
+            )
+            return None
+        num_nodes = graph.num_nodes
+        if isinstance(num_nodes, int):
+            return ItemSet(num_nodes, names="seed_nodes")
+        else:
+            data = {
+                node_type: ItemSet(num_node, names="seed_nodes")
+                for node_type, num_node in num_nodes.items()
+            }
+            return ItemSetDict(data)
+
 
 class BuiltinDataset(OnDiskDataset):
-    """GraphBolt builtin on-disk dataset.
+    """A utility class to download built-in dataset from AWS S3 and load it as
+    :class:`OnDiskDataset`.
 
-    This class is used to help download datasets from DGL S3 storage and load
-    them as ``OnDiskDataset``.
+    Available built-in datasets include:
+
+    **cora**
+        The cora dataset is a homogeneous citation network dataset, which is
+        designed for the node classification task.
+
+    **ogbn-mag**
+        The ogbn-mag dataset is a heterogeneous network composed of a subset of
+        the Microsoft Academic Graph (MAG). See more details in
+        `ogbn-mag <https://ogb.stanford.edu/docs/nodeprop/#ogbn-mag>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
+    **ogbl-citation2**
+        The ogbl-citation2 dataset is a directed graph, representing the
+        citation network between a subset of papers extracted from MAG. See
+        more details in `ogbl-citation2
+        <https://ogb.stanford.edu/docs/linkprop/#ogbl-citation2>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
+    **ogbn-arxiv**
+        The ogbn-arxiv dataset is a directed graph, representing the citation
+        network between all Computer Science (CS) arXiv papers indexed by MAG.
+        See more details in `ogbn-arxiv
+        <https://ogb.stanford.edu/docs/nodeprop/#ogbn-arxiv>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
+    **ogbn-products**
+        The ogbn-products dataset is an undirected and unweighted graph,
+        representing an Amazon product co-purchasing network. See more details
+        in `ogbn-products
+        <https://ogb.stanford.edu/docs/nodeprop/#ogbn-products>`_.
+
+        .. note::
+            Reverse edges are added to the original graph.
+            Node features are stored as float32.
+
+    **ogb-lsc-mag240m**
+        The ogb-lsc-mag240m dataset is a heterogeneous academic graph extracted
+        from the Microsoft Academic Graph (MAG). See more details in
+        `ogb-lsc-mag240m <https://ogb.stanford.edu/docs/lsc/mag240m/>`_.
+
+        .. note::
+            Reverse edges are added to the original graph.
 
     Parameters
     ----------
@@ -490,15 +754,39 @@ class BuiltinDataset(OnDiskDataset):
         The root directory of the dataset. Default ot ``datasets``.
     """
 
+    # For dataset that is smaller than 30GB, we use the base url.
+    # Otherwise, we use the accelerated url.
     _base_url = "https://data.dgl.ai/dataset/graphbolt/"
+    _accelerated_url = (
+        "https://dgl-data.s3-accelerate.amazonaws.com/dataset/graphbolt/"
+    )
+    _datasets = [
+        "cora",
+        "ogbn-mag",
+        "ogbl-citation2",
+        "ogbn-products",
+        "ogbn-arxiv",
+    ]
+    _large_datasets = ["ogb-lsc-mag240m"]
+    _all_datasets = _datasets + _large_datasets
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
         dataset_dir = os.path.join(root, name)
         if not os.path.exists(dataset_dir):
-            url = self._base_url + name + ".zip"
+            if name not in self._all_datasets:
+                raise RuntimeError(
+                    f"Dataset {name} is not available. Available datasets are "
+                    f"{self._all_datasets}."
+                )
+            url = (
+                self._accelerated_url
+                if name in self._large_datasets
+                else self._base_url
+            )
+            url += name + ".zip"
             os.makedirs(root, exist_ok=True)
             zip_file_path = os.path.join(root, name + ".zip")
             download(url, path=zip_file_path)
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
-        super().__init__(dataset_dir)
+        super().__init__(dataset_dir, force_preprocess=False)

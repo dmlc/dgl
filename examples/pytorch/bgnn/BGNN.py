@@ -374,9 +374,9 @@ class BGNNPredictor:
 
         # initialize for early stopping and metrics
         if metric_name in ["r2", "accuracy"]:
-            best_metric = [np.float("-inf")] * 3  # for train/val/test
+            best_metric = [np.cfloat("-inf")] * 3  # for train/val/test
         else:
-            best_metric = [np.float("inf")] * 3  # for train/val/test
+            best_metric = [np.cfloat("inf")] * 3  # for train/val/test
 
         best_val_epoch = 0
         epochs_since_last_best_metric = 0

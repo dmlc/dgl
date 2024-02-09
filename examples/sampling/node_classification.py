@@ -35,6 +35,7 @@ main
 """
 
 import argparse
+import time
 
 import dgl
 import dgl.nn as dglnn
@@ -74,7 +75,7 @@ class SAGE(nn.Module):
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
-    def inference(self, g, device, batch_size):
+    def inference(self, g, device, batch_size, fused_sampling: bool = True):
         """Conduct layer-wise inference to get all the node embeddings."""
         feat = g.ndata["feat"]
         #####################################################################
@@ -108,7 +109,9 @@ class SAGE(nn.Module):
         #    │          │          │
         #    └─Compute1 └─Compute2 └─Compute3
         #####################################################################
-        sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=["feat"])
+        sampler = MultiLayerFullNeighborSampler(
+            1, prefetch_node_feats=["feat"], fused=fused_sampling
+        )
 
         dataloader = DataLoader(
             g,
@@ -166,18 +169,22 @@ def evaluate(model, graph, dataloader, num_classes):
 
 
 @torch.no_grad()
-def layerwise_infer(device, graph, nid, model, num_classes, batch_size):
+def layerwise_infer(
+    device, graph, nid, model, num_classes, batch_size, fused_sampling
+):
     model.eval()
-    pred = model.inference(graph, device, batch_size)  # pred in buffer_device.
+    pred = model.inference(
+        graph, device, batch_size, fused_sampling
+    )  # pred in buffer_device.
     pred = pred[nid]
     label = graph.ndata["label"][nid].to(pred.device)
     return MF.accuracy(pred, label, task="multiclass", num_classes=num_classes)
 
 
-def train(args, device, g, dataset, model, num_classes, use_uva):
+def train(device, g, dataset, model, num_classes, use_uva, fused_sampling):
     # Create sampler & dataloader.
-    train_idx = dataset.train_idx.to(device)
-    val_idx = dataset.val_idx.to(device)
+    train_idx = dataset.train_idx.to(g.device if not use_uva else device)
+    val_idx = dataset.val_idx.to(g.device if not use_uva else device)
     #####################################################################
     # (HIGHLIGHT) Instantiate a NeighborSampler object for efficient
     # training of Graph Neural Networks (GNNs) on large-scale graphs.
@@ -196,6 +203,7 @@ def train(args, device, g, dataset, model, num_classes, use_uva):
         [10, 10, 10],  # fanout for [layer-0, layer-1, layer-2]
         prefetch_node_feats=["feat"],
         prefetch_labels=["label"],
+        fused=fused_sampling,
     )
 
     train_dataloader = DataLoader(
@@ -228,6 +236,7 @@ def train(args, device, g, dataset, model, num_classes, use_uva):
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
 
     for epoch in range(10):
+        t0 = time.time()
         model.train()
         total_loss = 0
         # A block is a graph consisting of two sets of nodes: the
@@ -252,10 +261,11 @@ def train(args, device, g, dataset, model, num_classes, use_uva):
             loss.backward()
             opt.step()
             total_loss += loss.item()
+        t1 = time.time()
         acc = evaluate(model, g, val_dataloader, num_classes)
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (it + 1):.4f} | "
-            f"Accuracy {acc.item():.4f} "
+            f"Accuracy {acc.item():.4f} | Time {t1 - t0:.4f}"
         )
 
 
@@ -268,6 +278,12 @@ if __name__ == "__main__":
         help="Training mode. 'cpu' for CPU training, 'mixed' for "
         "CPU-GPU mixed training, 'gpu' for pure-GPU training.",
     )
+    parser.add_argument(
+        "--compare-to-graphbolt",
+        default="false",
+        choices=["false", "true"],
+        help="Whether comparing to GraphBolt or not, 'false' by default.",
+    )
     args = parser.parse_args()
     if not torch.cuda.is_available():
         args.mode = "cpu"
@@ -276,12 +292,15 @@ if __name__ == "__main__":
     # Load and preprocess dataset.
     print("Loading data")
     dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
+
     g = dataset[0]
-    g = g.to("cuda" if args.mode == "gpu" else "cpu")
+    if args.compare_to_graphbolt == "false":
+        g = g.to("cuda" if args.mode == "gpu" else "cpu")
     num_classes = dataset.num_classes
     # Whether use Unified Virtual Addressing (UVA) for CUDA computation.
     use_uva = args.mode == "mixed"
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
+    fused_sampling = args.compare_to_graphbolt == "false"
 
     # Create GraphSAGE model.
     in_size = g.ndata["feat"].shape[1]
@@ -290,11 +309,17 @@ if __name__ == "__main__":
 
     # Model training.
     print("Training...")
-    train(args, device, g, dataset, model, num_classes, use_uva)
+    train(device, g, dataset, model, num_classes, use_uva, fused_sampling)
 
     # Test the model.
     print("Testing...")
     acc = layerwise_infer(
-        device, g, dataset.test_idx, model, num_classes, batch_size=4096
+        device,
+        g,
+        dataset.test_idx,
+        model,
+        num_classes,
+        batch_size=4096,
+        fused_sampling=fused_sampling,
     )
-    print(f"Test Accuracy {acc.item():.4f}")
+    print(f"Test accuracy {acc.item():.4f}")

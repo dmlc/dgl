@@ -10,7 +10,7 @@ __all__ = ["BasicFeatureStore"]
 
 
 class BasicFeatureStore(FeatureStore):
-    r"""Basic feature store."""
+    r"""A basic feature store to manage multiple features for access."""
 
     def __init__(self, features: Dict[Tuple[str, str, str], Feature]):
         r"""Initiate a basic feature store.
@@ -57,6 +57,53 @@ class BasicFeatureStore(FeatureStore):
         """
         return self._features[(domain, type_name, feature_name)].read(ids)
 
+    def size(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+    ):
+        """Get the size of the specified feature in the feature store.
+
+        Parameters
+        ----------
+        domain : str
+            The domain of the feature such as "node", "edge" or "graph".
+        type_name : str
+            The node or edge type name.
+        feature_name : str
+            The feature name.
+
+        Returns
+        -------
+        torch.Size
+            The size of the specified feature in the feature store.
+        """
+        return self._features[(domain, type_name, feature_name)].size()
+
+    def metadata(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+    ):
+        """Get the metadata of the specified feature in the feature store.
+
+        Parameters
+        ----------
+        domain : str
+            The domain of the feature such as "node", "edge" or "graph".
+        type_name : str
+            The node or edge type name.
+        feature_name : str
+            The feature name.
+        Returns
+        -------
+        Dict
+            The metadata of the feature.
+        """
+        return self._features[(domain, type_name, feature_name)].metadata()
+
     def update(
         self,
         domain: str,
@@ -89,3 +136,14 @@ class BasicFeatureStore(FeatureStore):
     def __len__(self):
         """Return the number of features."""
         return len(self._features)
+
+    def keys(self):
+        """Get the keys of the features.
+
+        Returns
+        -------
+        List[tuple]
+            The keys of the features. The tuples are in `(domain, type_name,
+            feat_name)` format.
+        """
+        return list(self._features.keys())

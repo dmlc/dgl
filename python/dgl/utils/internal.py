@@ -1127,6 +1127,8 @@ def recursive_apply(data, fn, *args, **kwargs):
         return {
             k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()
         }
+    elif isinstance(data, tuple):
+        return tuple(recursive_apply(v, fn, *args, **kwargs) for v in data)
     elif is_listlike(data):
         return [recursive_apply(v, fn, *args, **kwargs) for v in data]
     else:
@@ -1142,6 +1144,11 @@ def recursive_apply_pair(data1, data2, fn, *args, **kwargs):
             k: recursive_apply_pair(data1[k], data2[k], fn, *args, **kwargs)
             for k in data1.keys()
         }
+    elif isinstance(data1, tuple) and isinstance(data2, tuple):
+        return tuple(
+            recursive_apply_pair(x, y, fn, *args, **kwargs)
+            for x, y in zip(data1, data2)
+        )
     elif is_listlike(data1) and is_listlike(data2):
         return [
             recursive_apply_pair(x, y, fn, *args, **kwargs)
