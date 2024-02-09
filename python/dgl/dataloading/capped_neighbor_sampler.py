@@ -1,18 +1,18 @@
 """Fixed subgraph sampler."""
 from collections import defaultdict
+
 import numpy as np
 import torch
 
 from ..sampling.utils import EidExcluder
-from .base import set_node_lazy_features, set_edge_lazy_features, Sampler
+from .base import Sampler, set_edge_lazy_features, set_node_lazy_features
+
 
 class CappedNeighborSampler(Sampler):
-    """Subgraph sampler that sets an upper bound on the number of nodes included in 
-    each layer of the sampled subgraph. At each layer, the frontier is randomly 
-    subsampled. Rare node types can also be upsampled by taking the scaled square 
-    root of the sampling probabilities.
-
-    It performs node-wise neighbor sampling and returns the subgraph induced by
+    """Subgraph sampler that sets an upper bound on the number of nodes included in
+    each layer of the sampled subgraph. At each layer, the frontier is randomly
+    subsampled. Rare node types can also be upsampled by taking the scaled square
+    root of the sampling probabilities. The sampler returns the subgraph induced by
     all the sampled nodes.
 
     Parameters
@@ -35,9 +35,18 @@ class CappedNeighborSampler(Sampler):
         to the edge feature value with the given name in ``g.edata``. The feature must be
         a scalar on each edge.
     """
-    def __init__(self, fanouts, fixed_k, upsample_rare_types, replace=False,
-                 prob=None, prefetch_node_feats=None, prefetch_edge_feats=None,
-                 output_device=None):        
+
+    def __init__(
+        self,
+        fanouts,
+        fixed_k,
+        upsample_rare_types,
+        replace=False,
+        prob=None,
+        prefetch_node_feats=None,
+        prefetch_edge_feats=None,
+        output_device=None,
+    ):
         super().__init__()
         self.fanouts = fanouts
         self.replace = replace
@@ -56,7 +65,7 @@ class CappedNeighborSampler(Sampler):
         g : DGLGraph
             The graph to sample from.
         seed_nodes : Tensor or dict[str, Tensor]
-            The nodes sampled in the current minibatch.
+            Nodes which induce the subgraph.
         exclude_eids : Tensor or dict[etype, Tensor], optional
             The edges to exclude from the sampled subgraph.
 
@@ -79,27 +88,37 @@ class CappedNeighborSampler(Sampler):
 
             # Sample frontier.
             frontier = g.sample_neighbors(
-                seed_nodes, fanout,
-                output_device=self.output_device, replace=self.replace,
-                prob=self.prob, exclude_edges=exclude_eids)
+                seed_nodes,
+                fanout,
+                output_device=self.output_device,
+                replace=self.replace,
+                prob=self.prob,
+                exclude_edges=exclude_eids,
+            )
 
             # Get reached nodes.
             curr_reached = defaultdict(list)
             for c_etype in frontier.canonical_etypes:
                 (src_type, rel_type, dst_type) = c_etype
-                src, _ = frontier.edges(etype = c_etype)
+                src, _ = frontier.edges(etype=c_etype)
                 curr_reached[src_type].append(src)
 
             # De-duplication.
-            curr_reached = {ntype : torch.unique(torch.cat(srcs))
-                            for ntype, srcs in curr_reached.items()}
+            curr_reached = {
+                ntype: torch.unique(torch.cat(srcs))
+                for ntype, srcs in curr_reached.items()
+            }
 
             # Generate type sampling probabilties.
-            type_count = {node_type: indices.shape[0]
-                          for node_type, indices in curr_reached.items()}
+            type_count = {
+                node_type: indices.shape[0]
+                for node_type, indices in curr_reached.items()
+            }
             total_count = sum(type_count.values())
-            probs = {node_type: count / total_count
-                     for node_type, count in type_count.items()}
+            probs = {
+                node_type: count / total_count
+                for node_type, count in type_count.items()
+            }
 
             # Upsample rare node types.
             if self.upsample_rare_types:
@@ -110,14 +129,21 @@ class CappedNeighborSampler(Sampler):
                 prob_dist = prob_dist / prob_dist.sum()
 
                 # Update probabilities.
-                probs = {node_type: prob_dist[i] for i, node_type in enumerate(probs.keys())}
+                probs = {
+                    node_type: prob_dist[i]
+                    for i, node_type in enumerate(probs.keys())
+                }
 
             # Generate node counts per type.
-            n_per_type = {node_type: int(self.fixed_k * prob)
-                          for node_type, prob in probs.items()}
+            n_per_type = {
+                node_type: int(self.fixed_k * prob)
+                for node_type, prob in probs.items()
+            }
             remainder = self.fixed_k - sum(n_per_type.values())
             for _ in range(remainder):
-                node_type = np.random.choice(list(probs.keys()), p=list(probs.values()))
+                node_type = np.random.choice(
+                    list(probs.keys()), p=list(probs.values())
+                )
                 n_per_type[node_type] += 1
 
             # Downsample nodes.
@@ -139,8 +165,14 @@ class CappedNeighborSampler(Sampler):
         # Merge all reached nodes before sending to `DGLGraph.subgraph`.
         merged_nodes = {}
         for ntype in g.ntypes:
-            merged_nodes[ntype] = torch.unique(torch.cat([reached.get(ntype, []) for reached in all_reached_nodes]))
-        subg = g.subgraph(merged_nodes, relabel_nodes=True, output_device=self.output_device)
+            merged_nodes[ntype] = torch.unique(
+                torch.cat(
+                    [reached.get(ntype, []) for reached in all_reached_nodes]
+                )
+            )
+        subg = g.subgraph(
+            merged_nodes, relabel_nodes=True, output_device=self.output_device
+        )
 
         if exclude_eids is not None:
             subg = EidExcluder(exclude_eids)(subg)
