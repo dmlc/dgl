@@ -174,10 +174,5 @@ class FeatureFetcher(MiniBatchTransformer):
         with torch.cuda.stream(self.stream):
             data = self._read_data(data, current_stream)
             if self.stream is not None:
-                event = torch.cuda.current_stream().record_event()
-
-                def _wait():
-                    event.wait()
-
-                data.wait = _wait
+                data.wait = torch.cuda.current_stream().record_event().wait
             return data

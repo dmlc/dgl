@@ -7,6 +7,7 @@ from typing import Dict, List
 import numpy as np
 import torch
 
+from ..base import index_select
 from ..feature_store import Feature
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
@@ -117,7 +118,7 @@ class TorchBasedFeature(Feature):
             if self._tensor.is_pinned():
                 return self._tensor.cuda()
             return self._tensor
-        return torch.ops.graphbolt.index_select(self._tensor, ids)
+        return index_select(self._tensor, ids)
 
     def size(self):
         """Get the size of the feature.
@@ -144,11 +145,6 @@ class TorchBasedFeature(Feature):
             updated.
         """
         if ids is None:
-            assert self.size() == value.size()[1:], (
-                f"ids is None, so the entire feature will be updated. "
-                f"But the size of the feature is {self.size()}, "
-                f"while the size of the value is {value.size()[1:]}."
-            )
             self._tensor = value
         else:
             assert ids.shape[0] == value.shape[0], (
@@ -179,7 +175,8 @@ class TorchBasedFeature(Feature):
         )
 
     def pin_memory_(self):
-        """In-place operation to copy the feature to pinned memory."""
+        """In-place operation to copy the feature to pinned memory. Returns the
+        same object modified in-place."""
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
         # truly in-place, we need to use cudaHostRegister. Then, we need to use
         # cudaHostUnregister to unpin the tensor in the destructor.
@@ -197,6 +194,8 @@ class TorchBasedFeature(Feature):
             )
 
             self._is_inplace_pinned.add(x)
+
+        return self
 
     def is_pinned(self):
         """Returns True if the stored feature is pinned."""
@@ -293,9 +292,12 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         super().__init__(features)
 
     def pin_memory_(self):
-        """In-place operation to copy the feature store to pinned memory."""
+        """In-place operation to copy the feature store to pinned memory.
+        Returns the same object modified in-place."""
         for feature in self._features.values():
             feature.pin_memory_()
+
+        return self
 
     def is_pinned(self):
         """Returns True if all the stored features are pinned."""

@@ -1,5 +1,6 @@
 """Base types and utilities for Graph Bolt."""
 
+from collections import deque
 from dataclasses import dataclass
 
 import torch
@@ -14,7 +15,12 @@ __all__ = [
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
+    "FutureWaiter",
+    "Waiter",
+    "Bufferer",
+    "EndMarker",
     "isin",
+    "index_select",
     "expand_indptr",
     "CSCFormatBase",
     "seed",
@@ -100,6 +106,33 @@ def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
     return torch.ops.graphbolt.expand_indptr(
         indptr, dtype, node_ids, output_size
     )
+
+
+def index_select(tensor, index):
+    """Returns a new tensor which indexes the input tensor along dimension dim
+    using the entries in index.
+
+    The returned tensor has the same number of dimensions as the original tensor
+    (tensor). The first dimension has the same size as the length of index;
+    other dimensions have the same size as in the original tensor.
+
+    When tensor is a pinned tensor and index.is_cuda is True, the operation runs
+    on the CUDA device and the returned tensor will also be on CUDA.
+
+    Parameters
+    ----------
+    tensor : torch.Tensor
+        The input tensor.
+    index : torch.Tensor
+        The 1-D tensor containing the indices to index.
+
+    Returns
+        -------
+        torch.Tensor
+            The indexed input tensor, equivalent to tensor[index].
+    """
+    assert index.dim() == 1, "Index should be 1D tensor."
+    return torch.ops.graphbolt.index_select(tensor, index)
 
 
 def etype_tuple_to_str(c_etype):
@@ -217,6 +250,76 @@ class CopyTo(IterDataPipe):
                         ),
                     )
             yield data
+
+
+@functional_datapipe("mark_end")
+class EndMarker(IterDataPipe):
+    """Used to mark the end of a datapipe and is a no-op."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        yield from self.datapipe
+
+
+@functional_datapipe("buffer")
+class Bufferer(IterDataPipe):
+    """Buffers items before yielding them.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The data pipeline.
+    buffer_size : int, optional
+        The size of the buffer which stores the fetched samples. If data coming
+        from datapipe has latency spikes, consider setting to a higher value.
+        Default is 1.
+    """
+
+    def __init__(self, datapipe, buffer_size=1):
+        self.datapipe = datapipe
+        if buffer_size <= 0:
+            raise ValueError(
+                "'buffer_size' is required to be a positive integer."
+            )
+        self.buffer = deque(maxlen=buffer_size)
+
+    def __iter__(self):
+        for data in self.datapipe:
+            if len(self.buffer) < self.buffer.maxlen:
+                self.buffer.append(data)
+            else:
+                return_data = self.buffer.popleft()
+                self.buffer.append(data)
+                yield return_data
+        while len(self.buffer) > 0:
+            yield self.buffer.popleft()
+
+
+@functional_datapipe("wait")
+class Waiter(IterDataPipe):
+    """Calls the wait function of all items."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        for data in self.datapipe:
+            data.wait()
+            yield data
+
+
+@functional_datapipe("wait_future")
+class FutureWaiter(IterDataPipe):
+    """Calls the result function of all items and returns their results."""
+
+    def __init__(self, datapipe):
+        self.datapipe = datapipe
+
+    def __iter__(self):
+        for data in self.datapipe:
+            yield data.result()
 
 
 @dataclass
