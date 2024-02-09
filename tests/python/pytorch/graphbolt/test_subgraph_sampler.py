@@ -594,7 +594,7 @@ def test_SubgraphSampler_without_dedpulication_Homo_seed_nodes(sampler_type):
                 )
 
 
-def _datapipe_test_A(
+def _assert_hetero_values(
     datapipe, original_row_node_ids, original_column_node_ids, csc_formats
 ):
     for data in datapipe:
@@ -619,7 +619,7 @@ def _datapipe_test_A(
                 )
 
 
-def _datapipe_test_B(
+def _assert_homo_values(
     datapipe, original_row_node_ids, compacted_indices, indptr, seeds
 ):
     for data in datapipe:
@@ -711,7 +711,7 @@ def test_SubgraphSampler_without_dedpulication_Hetero_seed_nodes(sampler_type):
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
-        _datapipe_test_A(
+        _assert_hetero_values(
             datapipe,
             original_row_node_ids,
             original_column_node_ids,
@@ -761,7 +761,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_cpu_seed_nodes(labor):
         torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
-    _datapipe_test_B(
+    _assert_homo_values(
         datapipe, original_row_node_ids, compacted_indices, indptr, seeds
     )
 
@@ -808,7 +808,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_gpu_seed_nodes(labor):
         torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
         torch.tensor([0, 3, 4]).to(F.ctx()),
     ]
-    _datapipe_test_B(
+    _assert_homo_values(
         datapipe, original_row_node_ids, compacted_indices, indptr, seeds
     )
 
@@ -871,7 +871,7 @@ def test_SubgraphSampler_unique_csc_format_Hetero_seed_nodes(labor):
             "n2": torch.tensor([0, 1]),
         },
     ]
-    _datapipe_test_A(
+    _assert_hetero_values(
         datapipe, original_row_node_ids, original_column_node_ids, csc_formats
     )
 
