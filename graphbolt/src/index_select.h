@@ -47,6 +47,29 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
  */
 torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index);
 
+/**
+ * @brief Select rows from disk numpy file according to index tensor.
+ *
+ * NOTE:
+ * 1. The shape of input tensor can be multi-dimensional, but the index tensor
+ * must be 1-D.
+ * 2. The disk feature file should be numpy format and index should be on pinned
+ * memory.
+ *
+ * @param path Input numpy file path (string).
+ * @param index Index tensor with shape (M,).
+ * @return torch::Tensor Output tensor with shape (M, ...).
+ */
+torch::Tensor DiskIndexSelect(std::string path, torch::Tensor index);
+
+/**
+ * @brief Return the shape of disk numpy feature.
+ *
+ * @param path Input numpy file path (string).
+ * @return torch::Tensor Output tensor shape.
+ */
+torch::Tensor DiskFeatureSize(std::string path);
+
 }  // namespace ops
 }  // namespace graphbolt
 

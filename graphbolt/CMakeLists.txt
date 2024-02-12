@@ -88,3 +88,8 @@ if(DEFINED MKL_LIBRARIES)
                           ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
 
+find_library(LIBURING NAMES uring)
+if(NOT LIBURING)
+    message(FATAL_ERROR "liburing not found")
+endif()
+target_link_libraries(${LIB_GRAPHBOLT_NAME} ${LIBURING})

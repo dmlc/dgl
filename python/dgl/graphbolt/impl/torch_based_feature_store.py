@@ -8,7 +8,72 @@ from ..feature_store import Feature
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
 
-__all__ = ["TorchBasedFeature", "TorchBasedFeatureStore"]
+__all__ = ["TorchBasedFeature", "DiskBasedFeature", "TorchBasedFeatureStore"]
+
+
+class DiskBasedFeature(Feature):
+    r"""
+    A wrapper of disk based feature.
+
+    Initialize a disk based feature fetcher by a numpy file.
+
+    Parameters
+    ----------
+    path : string
+        The path to the numpy feature file.
+        Note that the dimension of the numpy should be greater than 1.
+
+    Examples
+    --------
+    >>> import torch
+    >>> from dgl import graphbolt as gb
+
+    >>> torch_feat = torch.arange(10).reshape(2, -1)
+    >>> feature = gb.DiskBasedFeature(torch_feat)
+    >>> feature.read(torch.tensor([0]))
+    tensor([[0, 1, 2, 3, 4]])
+    >>> feature.update(torch.tensor([[1 for _ in range(5)]]),
+    ...                      torch.tensor([1]))
+    >>> feature.read(torch.tensor([0, 1]))
+    tensor([[0, 1, 2, 3, 4],
+            [1, 1, 1, 1, 1]])
+    >>> feature.size()
+    torch.Size([5])
+
+    """
+
+    def __init__(self, path: str, metadata: Dict = None):
+        super().__init__()
+        # Disk feature path.
+        self._path = path
+        self._metadata = metadata
+
+    def read(self, ids: torch.Tensor = None):
+        """Read the feature by index.
+
+        The returned tensor will be on CPU.
+
+        Parameters
+        ----------
+        ids : torch.Tensor
+            The index of the feature. Only the specified indices of the
+            feature are read.
+
+        Returns
+        -------
+        torch.Tensor
+            The read feature.
+        """
+        return torch.ops.graphbolt.disk_index_select(self._path, ids)
+
+    def size(self):
+        """Get the size of the feature.
+        Returns
+        -------
+        torch.Size
+            The size of the feature.
+        """
+        return torch.ops.graphbolt.disk_feature_size(self._path)
 
 
 class TorchBasedFeature(Feature):
@@ -221,9 +286,8 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                mmap_mode = "r+" if not spec.in_memory else None
-                features[key] = TorchBasedFeature(
-                    torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
+                features[key] = DiskBasedFeature(
+                    spec.path,
                     metadata=metadata,
                 )
             else:
