@@ -413,14 +413,16 @@ def test_gather_mm_idx_b(feat_size, dtype, tol):
         and not torch.cuda.is_bf16_supported()
     ):
         pytest.skip("BF16 is not supported.")
-
     if (
         F._default_context_str == "gpu"
-        and dtype == torch.float16
-        and torch.cuda.get_device_capability() < (7, 0)
+        and (dtype == torch.float16
+            and torch.cuda.get_device_capability() < (7, 0)
+            or dtype == torch.bfloat16
+            and torch.cuda.get_device_capability() < (8, 0)
+            )
     ):
         pytest.skip(
-            f"FP16 is not supported for atomic operations on GPU with "
+            f"{dtype} is not supported for atomic operations on GPU with "
             f"cuda capability ({torch.cuda.get_device_capability()})."
         )
 
