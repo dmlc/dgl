@@ -23,7 +23,7 @@ This README includes how to:
    ```
    or
    ```shell
-   pip install scikit-optimize
+   pip install scikit-optimize>=0.9
    ```
    >  Note: there exist a bug in the older version (before v0.9.0) of the Scikit-Optimization library.  
    To fix the bug, find the "transformer.py" which should be located in  
