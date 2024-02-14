@@ -56,7 +56,8 @@ def inverse_transform(self, X):
         return np.round(X_orig).astype(int)
     return X_orig
 
-
+# This is workaround for scikit-optimize incompatibility with NumPy, which results in error::
+# AttributeError: module 'numpy' has no attribute 'int'
 Normalize.transform = transform
 Normalize.inverse_transform = inverse_transform
 
