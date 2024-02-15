@@ -175,35 +175,36 @@ def train(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
-            tic_step = time.time()
+        with dataloader.enable_cpu_affinity():
+            for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+                tic_step = time.time()
 
-            # copy block to gpu
-            blocks = [blk.int().to(device) for blk in blocks]
+                # copy block to gpu
+                blocks = [blk.int().to(device) for blk in blocks]
 
-            # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(
-                nfeat, labels, seeds, input_nodes
-            )
-
-            # Compute loss and prediction
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            iter_tput.append(len(seeds) / (time.time() - tic_step))
-            if step % args.log_every == 0:
-                acc = compute_acc(batch_pred, batch_labels)
-                print(
-                    "Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}".format(
-                        step,
-                        loss.item(),
-                        acc.item(),
-                        np.mean(iter_tput[3:]),
-                    )
+                # Load the input features as well as output labels
+                batch_inputs, batch_labels = load_subtensor(
+                    nfeat, labels, seeds, input_nodes
                 )
+
+                # Compute loss and prediction
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, batch_labels)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                iter_tput.append(len(seeds) / (time.time() - tic_step))
+                if step % args.log_every == 0 and step != 0:
+                    acc = compute_acc(batch_pred, batch_labels)
+                    print(
+                        "Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}".format(
+                            step,
+                            loss.item(),
+                            acc.item(),
+                            np.mean(iter_tput[3:]),
+                        )
+                    )
 
         toc = time.time()
         print("Epoch Time(s): {:.4f}".format(toc - tic))

@@ -10,7 +10,7 @@ Paper Link: https://arxiv.org/abs/2402.03671
 """
 
 import time
-from typing import Callable, Tuple
+from typing import Callable, List, Tuple
 
 import dgl.multiprocessing as dmp
 import numpy as np
@@ -56,7 +56,8 @@ def inverse_transform(self, X):
         return np.round(X_orig).astype(int)
     return X_orig
 
-# This is workaround for scikit-optimize incompatibility with NumPy, which results in error::
+
+# This is a workaround for scikit-optimize's incompatibility with NumPy, which results in an error::
 # AttributeError: module 'numpy' has no attribute 'int'
 Normalize.transform = transform
 Normalize.inverse_transform = inverse_transform
@@ -103,7 +104,7 @@ class ARGO:
 
     def core_binder(
         self, num_cpu_proc: int, n_samp: int, n_train: int, rank: int
-    ) -> Tuple[list[int], list[int]]:
+    ) -> Tuple[List[int], List[int]]:
         """
         Core Binder
 
@@ -151,7 +152,7 @@ class ARGO:
         )
         return load_core, comp_core
 
-    def auto_tuning(self, train: Callable, args) -> list[int]:
+    def auto_tuning(self, train: Callable, args) -> List[int]:
         """
         Auto-tuner
 
@@ -187,7 +188,7 @@ class ARGO:
         )
         return result
 
-    def mp_engine(self, x: list[int], train: Callable, args, ep: int) -> float:
+    def mp_engine(self, x: List[int], train: Callable, args, ep: int) -> float:
         """
         Multi-Process Engine (MP Engine)
 

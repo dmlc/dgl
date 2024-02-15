@@ -25,11 +25,6 @@ This README includes how to:
    ```shell
    pip install scikit-optimize>=0.9
    ```
-   >  Note: there exist a bug in the older version (before v0.9.0) of the Scikit-Optimization library.  
-   To fix the bug, find the "transformer.py" which should be located in  
-      ```~/anaconda3/envs/py38/lib/python3.8/site-packages/skopt/space/transformers.py```  
-   Once open the file, replace all ```np.int_``` with ```int```.
-
 
 ## 2. Running the example GNN program
 ### Usage

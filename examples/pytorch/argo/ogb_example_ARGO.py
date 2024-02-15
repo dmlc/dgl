@@ -85,19 +85,20 @@ class SAGE(nn.Module):
                 num_workers=args.num_workers,
             )
 
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(
-                dataloader, disable=None
-            ):
-                block = blocks[0].int().to(device)
+            with dataloader.enable_cpu_affinity():
+                for input_nodes, output_nodes, blocks in tqdm.tqdm(
+                    dataloader, disable=None
+                ):
+                    block = blocks[0].int().to(device)
 
-                h = x[input_nodes]
-                h_dst = h[: block.num_dst_nodes()]
-                h = layer(block, (h, h_dst))
-                if l != len(self.layers) - 1:
-                    h = self.activation(h)
-                    h = self.dropout(h)
+                    h = x[input_nodes]
+                    h_dst = h[: block.num_dst_nodes()]
+                    h = layer(block, (h, h_dst))
+                    if l != len(self.layers) - 1:
+                        h = self.activation(h)
+                        h = self.dropout(h)
 
-                y[output_nodes] = h
+                    y[output_nodes] = h
 
             x = y
         return y
@@ -121,7 +122,7 @@ def evaluate(model, g, nfeat, labels, val_nid, test_nid, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, nfeat, device)
+        pred = model.module.inference(g, nfeat, device)
     model.train()
     return (
         compute_acc(pred[val_nid], labels[val_nid]),
@@ -225,7 +226,7 @@ def train(
                 optimizer.step()
 
                 iter_tput.append(len(seeds) / (time.time() - tic_step))
-                if step % args.log_every == 0:
+                if step % args.log_every == 0 and step != 0:
                     acc = compute_acc(batch_pred, batch_labels)
                     print(
                         "Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}".format(
@@ -238,12 +239,23 @@ def train(
 
             toc = time.time()
             print("Epoch Time(s): {:.4f}".format(toc - tic))
-            if epoch >= 5 and rank == 0:
+
+            if rank == 0:
+                if counter[0] == 0:
+                    acc_epoch_t = 0
+                else:
+                    acc_epoch_t = np.loadtxt("epoch_t.txt")
+                acc_epoch_t += toc - tic
+                np.savetxt("epoch_t.txt", [acc_epoch_t])
+
+            if epoch >= 1 and rank == 0:
                 avg += toc - tic
-            if epoch % args.eval_every == 0 and epoch != 0:
+            if epoch % args.eval_every == 0 and epoch != 0 and rank == 0:
+                print("Start evaluation")
                 eval_acc, test_acc, pred = evaluate(
                     model, g, nfeat, labels, val_nid, test_nid, device
                 )
+                print("Finish evaluation")
                 if args.save_pred:
                     np.savetxt(
                         args.save_pred + "%02d" % epoch,
@@ -259,6 +271,14 @@ def train(
                         best_eval_acc, best_test_acc
                     )
                 )
+                print(
+                    "Avg epoch time: {}".format(
+                        acc_epoch_t / counter[0] + epoch + 1
+                    )
+                )
+                print(
+                    "Avg epoch time after auto-tuning: {}".format(avg / epoch)
+                )
 
     dist.barrier()
     if rank == 0:
@@ -271,8 +291,7 @@ def train(
             },
             PATH,
         )
-    if rank == 0:
-        print("Avg epoch time: {}".format(avg / (epoch - 4)))
+
     return best_test_acc
 
 
@@ -285,7 +304,7 @@ if __name__ == "__main__":
         help="GPU device ID. Use -1 for CPU training",
     )
     argparser.add_argument("--num-epochs", type=int, default=20)
-    argparser.add_argument("--num-hidden", type=int, default=256)
+    argparser.add_argument("--num-hidden", type=int, default=128)
     argparser.add_argument("--num-layers", type=int, default=3)
     argparser.add_argument("--fan-out", type=str, default="5,10,15")
     argparser.add_argument("--batch-size", type=int, default=1000)
