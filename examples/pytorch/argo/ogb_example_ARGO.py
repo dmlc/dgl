@@ -251,11 +251,9 @@ def train(
             if epoch >= 1 and rank == 0:
                 avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0 and rank == 0:
-                print("Start evaluation")
                 eval_acc, test_acc, pred = evaluate(
                     model, g, nfeat, labels, val_nid, test_nid, device
                 )
-                print("Finish evaluation")
                 if args.save_pred:
                     np.savetxt(
                         args.save_pred + "%02d" % epoch,
