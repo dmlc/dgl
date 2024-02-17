@@ -269,14 +269,6 @@ def train(
                         best_eval_acc, best_test_acc
                     )
                 )
-                print(
-                    "Avg epoch time: {}".format(
-                        acc_epoch_t / counter[0] + epoch + 1
-                    )
-                )
-                print(
-                    "Avg epoch time after auto-tuning: {}".format(avg / epoch)
-                )
 
     dist.barrier()
     if rank == 0:
