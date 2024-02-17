@@ -170,12 +170,12 @@ def train(args, device, data):
     iter_tput = []
     best_eval_acc = 0
     best_test_acc = 0
-    for epoch in range(args.num_epochs):
-        tic = time.time()
+    with dataloader.enable_cpu_affinity():
+        for epoch in range(args.num_epochs):
+            tic = time.time()
 
-        # Loop over the dataloader to sample the computation dependency graph as a list of
-        # blocks.
-        with dataloader.enable_cpu_affinity():
+            # Loop over the dataloader to sample the computation dependency graph as a list of
+            # blocks.
             for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
                 tic_step = time.time()
 
