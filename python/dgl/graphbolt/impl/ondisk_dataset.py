@@ -80,7 +80,9 @@ def _graph_data_to_fused_csc_sampling_graph(
         num_edges = len(src)
         coo_tensor = torch.tensor(np.array([src, dst]))
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
+        del coo_tensor
         indptr, indices, edge_ids = sparse_matrix.csc()
+        del sparse_matrix
         node_type_offset = None
         type_per_edge = None
         node_type_to_id = None
@@ -239,6 +241,7 @@ def _graph_data_to_fused_csc_sampling_graph(
                         ] : node_type_offset[node_type_to_id[ntype] + 1]
                     ] = feat
                 node_attributes[feat_name] = feat_tensor
+            del node_feature_collector
             for feat_name, feat_data in edge_feature_collector.items():
                 _feat = next(iter(feat_data.values()))
                 feat_tensor = torch.empty(
@@ -252,6 +255,7 @@ def _graph_data_to_fused_csc_sampling_graph(
                         ] : edge_type_offset[edge_type_to_id[etype] + 1]
                     ] = feat
                 edge_attributes[feat_name] = feat_tensor
+            del edge_feature_collector
 
     if not bool(node_attributes):
         node_attributes = None
@@ -259,7 +263,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         edge_attributes = None
 
     # Construct the FusedCSCSamplingGraph.
-    sampling_graph = fused_csc_sampling_graph(
+    return fused_csc_sampling_graph(
         csc_indptr=indptr,
         indices=indices,
         node_type_offset=node_type_offset,
@@ -269,8 +273,6 @@ def _graph_data_to_fused_csc_sampling_graph(
         node_attributes=node_attributes,
         edge_attributes=edge_attributes,
     )
-
-    return sampling_graph
 
 
 def preprocess_ondisk_dataset(
