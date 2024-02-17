@@ -85,20 +85,19 @@ class SAGE(nn.Module):
                 num_workers=args.num_workers,
             )
 
-            with dataloader.enable_cpu_affinity():
-                for input_nodes, output_nodes, blocks in tqdm.tqdm(
-                    dataloader, disable=None
-                ):
-                    block = blocks[0].int().to(device)
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(
+                dataloader, disable=None
+            ):
+                block = blocks[0].int().to(device)
 
-                    h = x[input_nodes]
-                    h_dst = h[: block.num_dst_nodes()]
-                    h = layer(block, (h, h_dst))
-                    if l != len(self.layers) - 1:
-                        h = self.activation(h)
-                        h = self.dropout(h)
+                h = x[input_nodes]
+                h_dst = h[: block.num_dst_nodes()]
+                h = layer(block, (h, h_dst))
+                if l != len(self.layers) - 1:
+                    h = self.activation(h)
+                    h = self.dropout(h)
 
-                    y[output_nodes] = h
+                y[output_nodes] = h
 
             x = y
         return y
