@@ -244,16 +244,11 @@ def train(
             print("Epoch Time(s): {:.4f}".format(toc - tic))
 
             if rank == 0:
-                if counter[0] == 0:
-                    acc_epoch_t = 0
-                else:
-                    acc_epoch_t = np.loadtxt("epoch_t.txt")
-                acc_epoch_t += toc - tic
-                np.savetxt("epoch_t.txt", [acc_epoch_t])
-
-            if epoch >= 1 and rank == 0:
+                global avg_total
+                avg_total.value += toc - tic
                 avg += toc - tic
-            if epoch % args.eval_every == 0 and epoch != 0 and rank == 0:
+
+                if epoch % args.eval_every == 0 and epoch != 0:
                 eval_acc, test_acc, pred = evaluate(
                     model, g, nfeat, labels, val_nid, test_nid, device
                 )
