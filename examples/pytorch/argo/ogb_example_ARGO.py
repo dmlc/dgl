@@ -284,6 +284,13 @@ def train(
             },
             PATH,
         )
+        if args.num_epochs == counter[0] + epoch + 1:
+            print(
+                "Avg epoch time: {}".format(avg_total.value / args.num_epochs)
+            )
+            print(
+                "Avg epoch time after auto-tuning: {}".format(avg / (epoch + 1))
+            )
 
     return best_test_acc
 
