@@ -249,24 +249,24 @@ def train(
                 avg += toc - tic
 
                 if epoch % args.eval_every == 0 and epoch != 0:
-                eval_acc, test_acc, pred = evaluate(
-                    model, g, nfeat, labels, val_nid, test_nid, device
-                )
-                if args.save_pred:
-                    np.savetxt(
-                        args.save_pred + "%02d" % epoch,
-                        pred.argmax(1).cpu().numpy(),
-                        "%d",
+                    eval_acc, test_acc, pred = evaluate(
+                        model, g, nfeat, labels, val_nid, test_nid, device
                     )
-                print("Eval Acc {:.4f}".format(eval_acc))
-                if eval_acc > best_eval_acc:
-                    best_eval_acc = eval_acc
-                    best_test_acc = test_acc
-                print(
-                    "Best Eval Acc {:.4f} Test Acc {:.4f}".format(
-                        best_eval_acc, best_test_acc
+                    if args.save_pred:
+                        np.savetxt(
+                            args.save_pred + "%02d" % epoch,
+                            pred.argmax(1).cpu().numpy(),
+                            "%d",
+                        )
+                    print("Eval Acc {:.4f}".format(eval_acc))
+                    if eval_acc > best_eval_acc:
+                        best_eval_acc = eval_acc
+                        best_test_acc = test_acc
+                    print(
+                        "Best Eval Acc {:.4f} Test Acc {:.4f}".format(
+                            best_eval_acc, best_test_acc
+                        )
                     )
-                )
 
     dist.barrier()
     if rank == 0:
