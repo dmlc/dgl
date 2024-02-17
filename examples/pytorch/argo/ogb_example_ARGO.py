@@ -22,6 +22,10 @@ from argo import ARGO
 from ogb.nodeproppred import DglNodePropPredDataset
 from torch.nn.parallel import DistributedDataParallel
 
+import ctypes
+from multiprocessing import RawValue
+
+avg_total = RawValue(ctypes.c_float, 0.0)
 
 class SAGE(nn.Module):
     def __init__(
