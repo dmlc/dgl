@@ -75,19 +75,51 @@ class GraphSAGE(torch.nn.Module):
         self.layers.append(SAGEConv(hidden_size, hidden_size))
         self.layers.append(SAGEConv(hidden_size, out_size))
 
-    def forward(self, blocks, x, device):
-        h = x
-        for i, (layer, block) in enumerate(zip(self.layers, blocks)):
-            src, dst = block.edges()
-            edge_index = torch.stack([src, dst], dim=0)
-            h_src, h_dst = h, h[: block.number_of_dst_nodes()]
-            h = layer((h_src, h_dst), edge_index)
-            if i != len(blocks) - 1:
-                h = F.relu(h)
-        return h
+    def forward(self, x, edge_index):
+        for i, conv in enumerate(self.layers):
+            x = conv(x, edge_index)
+            if i != len(self.layers) - 1:
+                x = x.relu()
+                x = F.dropout(x, p=0.5)
+        return x
+    
+    def inference(self, args, dataloader, features):
+        # Compute representations of nodes layer by layer, using *all*
+        # available edges. This leads to faster computation in contrast to
+        # immediately computing the final representations of each batch.
+        for layer_idx, layer in enumerate(self.layers):
+            xs = []
+            for minibatch in dataloader:
+                pyg_data = minibatch.to_pyg_data()
+                x = layer(pyg_data.x, pyg_data.edge_index)[:4 * args.batch_size]
+                if layer_idx != len(self.layers) - 1:
+                    x = x.relu()
+                xs.append(x.cpu())
+            x_all = torch.cat(xs, dim=0)
+            if layer_idx != len(self.layers) - 1:
+                features.update("node", None, "feat", x_all)
+        return x_all
 
 
-def create_dataloader(dataset_set, graph, feature, device, is_train):
+@torch.no_grad()
+def layerwise_infer(
+    model, args, infer_dataloader, test_set, features, num_classes
+):
+    model.eval()
+    pred = model.inference(args, infer_dataloader, features)
+    pred = pred[test_set._items[0]]
+    label = test_set._items[1].to(pred.device)
+    print(pred, label)
+
+    return MF.accuracy(
+        pred,
+        label,
+        task="multiclass",
+        num_classes=num_classes,
+    )
+
+
+def create_dataloader(dataset_set, graph, feature, batch_size, fanout, device, job):
     #####################################################################
     # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
     #
@@ -106,10 +138,10 @@ def create_dataloader(dataset_set, graph, feature, device, is_train):
 
     # Initialize an ItemSampler to sample mini-batches from the dataset.
     datapipe = gb.ItemSampler(
-        dataset_set, batch_size=1024, shuffle=is_train, drop_last=is_train
+        dataset_set, batch_size=batch_size, shuffle=(job == "train"), drop_last=(job == "train")
     )
     # Sample neighbors for each node in the mini-batch.
-    datapipe = datapipe.sample_neighbor(graph, [10, 10, 10])
+    datapipe = datapipe.sample_neighbor(graph, fanout if job != "infer" else [-1])
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     # Copy the data to the specified device.
@@ -144,18 +176,20 @@ def train(model, dataloader, optimizer, criterion, device, num_classes):
     num_batches = 0  # Counter for the number of mini-batches processed
 
     for minibatch in dataloader:
-        node_features = minibatch.node_features["feat"]
-        labels = minibatch.labels
+        pyg_data = minibatch.to_pyg_data()
+        
         optimizer.zero_grad()
-        out = model(minibatch.blocks, node_features, device)
-        loss = criterion(out, labels)
-        total_loss += loss.item()
-        total_correct += MF.accuracy(
-            out, labels, task="multiclass", num_classes=num_classes
-        ) * labels.size(0)
-        total_samples += labels.size(0)
+        out = model(pyg_data.x, pyg_data.edge_index)[:pyg_data.y.shape[0]]
+        y = pyg_data.y
+        loss = criterion(out, y)
         loss.backward()
         optimizer.step()
+
+        total_loss += loss.item()
+        total_correct += MF.accuracy(
+            out, y, task="multiclass", num_classes=num_classes
+        ) * y.size(0)
+        total_samples += y.size(0)
         num_batches += 1
     avg_loss = total_loss / num_batches
     avg_accuracy = total_correct / total_samples
@@ -168,11 +202,11 @@ def evaluate(model, dataloader, device, num_classes):
     y_hats = []
     ys = []
     for minibatch in dataloader:
-        node_features = minibatch.node_features["feat"]
-        labels = minibatch.labels
-        out = model(minibatch.blocks, node_features, device)
+        pyg_data = minibatch.to_pyg_data()
+        out = model(pyg_data.x, pyg_data.edge_index)[:pyg_data.y.shape[0]]
+        y = pyg_data.y
         y_hats.append(out)
-        ys.append(labels)
+        ys.append(y)
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -189,10 +223,17 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        default="ogbn-arxiv",
+        default="ogbn-products",
         help='Name of the dataset to use (e.g., "ogbn-products", "ogbn-arxiv")',
     )
+    parser.add_argument(
+        "--epochs", type=int, default=10, help="Number of training epochs."
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=1024, help="Batch size for training."
+    )
     args = parser.parse_args()
+
     dataset_name = args.dataset
     dataset = gb.BuiltinDataset(dataset_name).load()
     graph = dataset.graph
@@ -200,24 +241,25 @@ def main():
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
+    all_nodes_set = dataset.all_nodes_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_dataloader = create_dataloader(
-        train_set, graph, feature, device, is_train=True
+        train_set, graph, feature, args.batch_size, [10, 10, 10], device, job="train"
     )
     valid_dataloader = create_dataloader(
-        valid_set, graph, feature, device, is_train=False
+        valid_set, graph, feature, args.batch_size, [10, 10, 10], device, job="evaluate"
     )
-    test_dataloader = create_dataloader(
-        test_set, graph, feature, device, is_train=False
+    infer_dataloader = create_dataloader(
+        all_nodes_set, graph, feature, 4 * args.batch_size, [-1], device, job="infer"
     )
     in_channels = feature.size("node", None, "feat")[0]
     hidden_channels = 128
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
     criterion = torch.nn.CrossEntropyLoss()
-    for epoch in range(10):
+    for epoch in range(args.epochs):
         train_loss, train_accuracy = train(
             model, train_dataloader, optimizer, criterion, device, num_classes
         )
@@ -227,7 +269,7 @@ def main():
             f"Epoch {epoch}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, "
             f"Valid Accuracy: {valid_accuracy:.4f}"
         )
-    test_accuracy = evaluate(model, test_dataloader, device, num_classes)
+    test_accuracy = layerwise_infer(model, args, infer_dataloader, test_set, feature, num_classes)
     print(f"Test Accuracy: {test_accuracy:.4f}")
 
 
