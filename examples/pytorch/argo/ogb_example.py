@@ -229,7 +229,7 @@ def train(args, device, data):
                     )
                 )
 
-    print("Avg epoch time: {}".format(avg / (epoch - 4)))
+    print("Avg epoch time: {}".format(avg / args.num_epochs))
     return best_test_acc
 
 
