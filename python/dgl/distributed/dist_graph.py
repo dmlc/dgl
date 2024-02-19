@@ -95,6 +95,12 @@ class InitGraphResponse(rpc.Response):
 class QueryDataLoadingBackendRequest(rpc.Request):
     """Query the data loading backend."""
 
+    def __getstate__(self):
+        return None
+
+    def __setstate__(self, state):
+        pass
+
     def process_request(self, server_state):
         backend = (
             DATA_LOADING_BACKEND_GRAPHBOLT
