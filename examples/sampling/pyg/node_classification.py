@@ -143,7 +143,7 @@ def create_dataloader(
     return dataloader
 
 
-def train(model, dataloader, optimizer, criterion, device, num_classes):
+def train(model, dataloader, optimizer, num_classes):
     #####################################################################
     # (HIGHLIGHT) Train the model for one epoch.
     #
@@ -169,11 +169,10 @@ def train(model, dataloader, optimizer, criterion, device, num_classes):
     for minibatch in dataloader:
         pyg_data = minibatch.to_pyg_data()
 
-        # print(pyg_data.x.shape, pyg_data.edge_index.shape)
+        optimizer.zero_grad()
         out = model(pyg_data.x, pyg_data.edge_index)[: pyg_data.y.shape[0]]
         y = pyg_data.y
         loss = F.cross_entropy(out, y)
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
@@ -189,7 +188,7 @@ def train(model, dataloader, optimizer, criterion, device, num_classes):
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, device, num_classes):
+def evaluate(model, dataloader, num_classes):
     model.eval()
     y_hats = []
     ys = []
@@ -286,13 +285,12 @@ def main():
     hidden_channels = 128
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
-    criterion = torch.nn.CrossEntropyLoss()
     for epoch in range(args.epochs):
         train_loss, train_accuracy = train(
-            model, train_dataloader, optimizer, criterion, device, num_classes
+            model, train_dataloader, optimizer, num_classes
         )
 
-        valid_accuracy = evaluate(model, valid_dataloader, device, num_classes)
+        valid_accuracy = evaluate(model, valid_dataloader, num_classes)
         print(
             f"Epoch {epoch}, Train Loss: {train_loss:.4f}, "
             f"Train Accuracy: {train_accuracy:.4f}, "
