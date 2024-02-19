@@ -208,8 +208,7 @@ def train(args, device, data):
 
             toc = time.time()
             print("Epoch Time(s): {:.4f}".format(toc - tic))
-            if epoch >= 5:
-                avg += toc - tic
+            avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0:
                 eval_acc, test_acc, pred = evaluate(
                     model, g, nfeat, labels, val_nid, test_nid, device
