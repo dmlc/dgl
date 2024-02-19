@@ -38,13 +38,16 @@ class ServerState:
         Total number of edges
     partition_book : GraphPartitionBook
         Graph Partition book
+    use_graphbolt : bool
+        Whether to use graphbolt for dataloading.
     """
 
-    def __init__(self, kv_store, local_g, partition_book):
+    def __init__(self, kv_store, local_g, partition_book, use_graphbolt=False):
         self._kv_store = kv_store
         self._graph = local_g
         self.partition_book = partition_book
         self._roles = {}
+        self._use_graphbolt = use_graphbolt
 
     @property
     def roles(self):
@@ -68,6 +71,11 @@ class ServerState:
     @graph.setter
     def graph(self, graph):
         self._graph = graph
+
+    @property
+    def use_graphbolt(self):
+        """Whether to use graphbolt for dataloading."""
+        return self._use_graphbolt
 
 
 _init_api("dgl.distributed.server_state")
