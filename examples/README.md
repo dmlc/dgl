@@ -9,7 +9,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 ## 2024
 
 - <a name="labor"></a> Lin et al. ARGO: An Auto-Tuning Runtime System for Scalable GNN Training on Multi-Core Processor. [Paper link](https://arxiv.org/abs/2402.03671)
-  - Example code: [PyTorch](https://github.com/jasonlin316/dgl/tree/argo/examples/pytorch/ARGO)
+  - Example code: [PyTorch](https://github.com/dmlc/dgl/tree/master/examples/pytorch/argo)
 
   - Tags: semi-supervised node classification
 
