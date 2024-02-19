@@ -1211,7 +1211,8 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt="numpy"):
 
         # Generate edges.
         edges = np.array(
-            [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [1, 2, 2, 3, 3, 4, 4, 0, 0, 1]]
+            [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [1, 2, 2, 3, 3, 4, 4, 0, 0, 1]],
+            dtype=np.int64,
         ).T
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
         edges = edges.T
@@ -1220,14 +1221,18 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt="numpy"):
 
         # Generate graph edge-feats.
         edge_feats = np.array(
-            [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9]
+            [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9],
+            dtype=np.float64,
         )
         os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
         edge_feat_path = os.path.join("data", "edge-feat.npy")
         np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
 
         # Generate node-feats.
-        node_feats = np.array([0.0, 1.9, 2.8, 3.7, 4.6])
+        node_feats = np.array(
+            [0.0, 1.9, 2.8, 3.7, 4.6],
+            dtype=np.float64,
+        )
         node_feat_path = os.path.join("data", "node-feat.npy")
         np.save(os.path.join(test_dir, node_feat_path), node_feats)
 
@@ -1391,45 +1396,50 @@ def test_OnDiskDataset_preprocess_heterogeneous_hardcode(edge_fmt="numpy"):
         # Generate edges.
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
         np.save(
-            os.path.join(test_dir, "edges", "a_a.npy"), np.array([[0], [1]])
+            os.path.join(test_dir, "edges", "a_a.npy"),
+            np.array([[0], [1]], dtype=np.int64),
         )
         np.save(
             os.path.join(test_dir, "edges", "a_b.npy"),
-            np.array([[0, 1, 1], [0, 0, 1]]),
+            np.array([[0, 1, 1], [0, 0, 1]], dtype=np.int64),
         )
         np.save(
             os.path.join(test_dir, "edges", "b_b.npy"),
-            np.array([[0, 0, 1], [1, 2, 2]]),
+            np.array([[0, 0, 1], [1, 2, 2]], dtype=np.int64),
         )
         np.save(
             os.path.join(test_dir, "edges", "b_a.npy"),
-            np.array([[1, 2, 2], [0, 0, 1]]),
+            np.array([[1, 2, 2], [0, 0, 1]], dtype=np.int64),
         )
 
         # Generate node features.
         os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
         np.save(
-            os.path.join(test_dir, "data", "A-feat.npy"), np.array([0.0, 1.9])
+            os.path.join(test_dir, "data", "A-feat.npy"),
+            np.array([0.0, 1.9], dtype=np.float64),
         )
         np.save(
             os.path.join(test_dir, "data", "B-feat.npy"),
-            np.array([2.8, 3.7, 4.6]),
+            np.array([2.8, 3.7, 4.6], dtype=np.float64),
         )
 
         # Generate edge features.
         os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
-        np.save(os.path.join(test_dir, "data", "a_a-feat.npy"), np.array([0.0]))
+        np.save(
+            os.path.join(test_dir, "data", "a_a-feat.npy"),
+            np.array([0.0], dtype=np.float64),
+        )
         np.save(
             os.path.join(test_dir, "data", "a_b-feat.npy"),
-            np.array([1.1, 2.2, 3.3]),
+            np.array([1.1, 2.2, 3.3], dtype=np.float64),
         )
         np.save(
             os.path.join(test_dir, "data", "b_b-feat.npy"),
-            np.array([4.4, 5.5, 6.6]),
+            np.array([4.4, 5.5, 6.6], dtype=np.float64),
         )
         np.save(
             os.path.join(test_dir, "data", "b_a-feat.npy"),
-            np.array([7.7, 8.8, 9.9]),
+            np.array([7.7, 8.8, 9.9], dtype=np.float64),
         )
 
         yaml_content = (
@@ -2703,7 +2713,7 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id, edge_fmt):
             ("user", "click", "item"): 20000,
         }
         num_classes = 10
-        gbt.genereate_raw_data_for_hetero_dataset(
+        gbt.generate_raw_data_for_hetero_dataset(
             test_dir,
             dataset_name,
             num_nodes,
