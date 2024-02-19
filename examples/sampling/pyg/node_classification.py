@@ -1,16 +1,16 @@
 """
 This script demonstrates node classification with GraphSAGE on large graphs, 
-merging GraphBolt (GB) and PyTorch Geometric (PyG). GraphBolt efficiently manages 
-data loading for large datasets, crucial for mini-batch processing. Post data 
-loading, PyG's user-friendly framework takes over for training, showcasing seamless 
-integration with GraphBolt. This combination offers an efficient alternative to 
-traditional Deep Graph Library (DGL) methods, highlighting adaptability and 
-scalability in handling large-scale graph data for diverse real-world applications.
-
-
+merging GraphBolt (GB) and PyTorch Geometric (PyG). GraphBolt efficiently
+manages data loading for large datasets, crucial for mini-batch processing.
+Post data loading, PyG's user-friendly framework takes over for training,
+showcasing seamless integration with GraphBolt. This combination offers an
+efficient alternative to traditional Deep Graph Library (DGL) methods,
+highlighting adaptability and scalability in handling large-scale graph data
+for diverse real-world applications.
 
 Key Features:
-- Implements the GraphSAGE model, a scalable GNN, for node classification on large graphs.
+- Implements the GraphSAGE model, a scalable GNN, for node classification on
+  large graphs.
 - Utilizes GraphBolt, an efficient framework for large-scale graph data processing.
 - Integrates with PyTorch Geometric for building and training the GraphSAGE model.
 - The script is well-documented, providing clear explanations at each step.
@@ -76,50 +76,34 @@ class GraphSAGE(torch.nn.Module):
         self.layers.append(SAGEConv(hidden_size, out_size))
 
     def forward(self, x, edge_index):
-        for i, conv in enumerate(self.layers):
-            x = conv(x, edge_index)
+        for i, layer in enumerate(self.layers):
+            x = layer(x, edge_index)
             if i != len(self.layers) - 1:
                 x = x.relu()
-                x = F.dropout(x, p=0.5)
+                x = F.dropout(x, p=0.5, training=self.training)
         return x
-    
+
     def inference(self, args, dataloader, features):
-        # Compute representations of nodes layer by layer, using *all*
-        # available edges. This leads to faster computation in contrast to
-        # immediately computing the final representations of each batch.
-        for layer_idx, layer in enumerate(self.layers):
+        """Conduct layer-wise inference to get all the node embeddings."""
+        for i, layer in enumerate(self.layers):
             xs = []
             for minibatch in dataloader:
                 pyg_data = minibatch.to_pyg_data()
-                x = layer(pyg_data.x, pyg_data.edge_index)[:4 * args.batch_size]
-                if layer_idx != len(self.layers) - 1:
+                x = layer(pyg_data.x, pyg_data.edge_index)[
+                    : 4 * args.batch_size
+                ]
+                if i != len(self.layers) - 1:
                     x = x.relu()
                 xs.append(x.cpu())
             x_all = torch.cat(xs, dim=0)
-            if layer_idx != len(self.layers) - 1:
+            if i != len(self.layers) - 1:
                 features.update("node", None, "feat", x_all)
         return x_all
 
 
-@torch.no_grad()
-def layerwise_infer(
-    model, args, infer_dataloader, test_set, features, num_classes
+def create_dataloader(
+    dataset_set, graph, feature, batch_size, fanout, device, job
 ):
-    model.eval()
-    pred = model.inference(args, infer_dataloader, features)
-    pred = pred[test_set._items[0]]
-    label = test_set._items[1].to(pred.device)
-    print(pred, label)
-
-    return MF.accuracy(
-        pred,
-        label,
-        task="multiclass",
-        num_classes=num_classes,
-    )
-
-
-def create_dataloader(dataset_set, graph, feature, batch_size, fanout, device, job):
     #####################################################################
     # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
     #
@@ -130,18 +114,25 @@ def create_dataloader(dataset_set, graph, feature, batch_size, fanout, device, j
 
     #####################################################################
     # Create a datapipe for mini-batch sampling with a specific neighbor fanout.
-    # Here, [10, 10, 10] specifies the number of neighbors sampled for each node at each layer.
-    # We're using `sample_neighbor` for consistency with DGL's sampling API.
-    # Note: GraphBolt offers additional sampling methods, such as `sample_layer_neighbor`,
-    # which could provide further optimization and efficiency for GNN training.
-    # Users are encouraged to explore these advanced features for potentially improved performance.
+    # Here, [10, 10, 10] specifies the number of neighbors sampled for each
+    # node at each layer. We're using `sample_neighbor` for consistency with
+    # DGL's sampling API.
+    # Note: GraphBolt offers additional sampling methods, such as
+    # `sample_layer_neighbor`, which could provide further optimization and
+    # efficiency for GNN training. Users are encouraged to explore these
+    # advanced features for potentially improved performance.
 
     # Initialize an ItemSampler to sample mini-batches from the dataset.
     datapipe = gb.ItemSampler(
-        dataset_set, batch_size=batch_size, shuffle=(job == "train"), drop_last=(job == "train")
+        dataset_set,
+        batch_size=batch_size,
+        shuffle=(job == "train"),
+        drop_last=(job == "train"),
     )
     # Sample neighbors for each node in the mini-batch.
-    datapipe = datapipe.sample_neighbor(graph, fanout if job != "infer" else [-1])
+    datapipe = datapipe.sample_neighbor(
+        graph, fanout if job != "infer" else [-1]
+    )
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     # Copy the data to the specified device.
@@ -177,11 +168,12 @@ def train(model, dataloader, optimizer, criterion, device, num_classes):
 
     for minibatch in dataloader:
         pyg_data = minibatch.to_pyg_data()
-        
-        optimizer.zero_grad()
-        out = model(pyg_data.x, pyg_data.edge_index)[:pyg_data.y.shape[0]]
+
+        # print(pyg_data.x.shape, pyg_data.edge_index.shape)
+        out = model(pyg_data.x, pyg_data.edge_index)[: pyg_data.y.shape[0]]
         y = pyg_data.y
-        loss = criterion(out, y)
+        loss = F.cross_entropy(out, y)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
@@ -203,7 +195,7 @@ def evaluate(model, dataloader, device, num_classes):
     ys = []
     for minibatch in dataloader:
         pyg_data = minibatch.to_pyg_data()
-        out = model(pyg_data.x, pyg_data.edge_index)[:pyg_data.y.shape[0]]
+        out = model(pyg_data.x, pyg_data.edge_index)[: pyg_data.y.shape[0]]
         y = pyg_data.y
         y_hats.append(out)
         ys.append(y)
@@ -211,6 +203,24 @@ def evaluate(model, dataloader, device, num_classes):
     return MF.accuracy(
         torch.cat(y_hats),
         torch.cat(ys),
+        task="multiclass",
+        num_classes=num_classes,
+    )
+
+
+@torch.no_grad()
+def layerwise_infer(
+    model, args, infer_dataloader, test_set, features, num_classes
+):
+    model.eval()
+    pred = model.inference(args, infer_dataloader, features)
+    pred = pred[test_set._items[0]]
+    label = test_set._items[1].to(pred.device)
+    print(pred, label)
+
+    return MF.accuracy(
+        pred,
+        label,
         task="multiclass",
         num_classes=num_classes,
     )
@@ -246,18 +256,36 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_dataloader = create_dataloader(
-        train_set, graph, feature, args.batch_size, [10, 10, 10], device, job="train"
+        train_set,
+        graph,
+        feature,
+        args.batch_size,
+        [10, 10, 10],
+        device,
+        job="train",
     )
     valid_dataloader = create_dataloader(
-        valid_set, graph, feature, args.batch_size, [10, 10, 10], device, job="evaluate"
+        valid_set,
+        graph,
+        feature,
+        args.batch_size,
+        [10, 10, 10],
+        device,
+        job="evaluate",
     )
     infer_dataloader = create_dataloader(
-        all_nodes_set, graph, feature, 4 * args.batch_size, [-1], device, job="infer"
+        all_nodes_set,
+        graph,
+        feature,
+        4 * args.batch_size,
+        [-1],
+        device,
+        job="infer",
     )
     in_channels = feature.size("node", None, "feat")[0]
     hidden_channels = 128
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
     criterion = torch.nn.CrossEntropyLoss()
     for epoch in range(args.epochs):
         train_loss, train_accuracy = train(
@@ -266,10 +294,13 @@ def main():
 
         valid_accuracy = evaluate(model, valid_dataloader, device, num_classes)
         print(
-            f"Epoch {epoch}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, "
+            f"Epoch {epoch}, Train Loss: {train_loss:.4f}, "
+            f"Train Accuracy: {train_accuracy:.4f}, "
             f"Valid Accuracy: {valid_accuracy:.4f}"
         )
-    test_accuracy = layerwise_infer(model, args, infer_dataloader, test_set, feature, num_classes)
+    test_accuracy = layerwise_infer(
+        model, args, infer_dataloader, test_set, feature, num_classes
+    )
     print(f"Test Accuracy: {test_accuracy:.4f}")
 
 
