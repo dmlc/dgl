@@ -13,17 +13,19 @@ from . import gb_test_utils
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
-    item_sampler = gb.ItemSampler(gb.ItemSet(torch.randn(20)), 4)
+    item_sampler = gb.ItemSampler(
+        gb.ItemSet(torch.arange(20), names="seed_nodes"), 4
+    )
 
     # Invoke CopyTo via class constructor.
     dp = gb.CopyTo(item_sampler, "cuda")
     for data in dp:
-        assert data.device.type == "cuda"
+        assert data.seed_nodes.device.type == "cuda"
 
     # Invoke CopyTo via functional form.
     dp = item_sampler.copy_to("cuda")
     for data in dp:
-        assert data.device.type == "cuda"
+        assert data.seed_nodes.device.type == "cuda"
 
 
 @pytest.mark.parametrize(
@@ -246,6 +248,34 @@ def test_isin_non_1D_dim():
     test_elements = torch.tensor([[2, 5]], device=F.ctx())
     with pytest.raises(Exception):
         gb.isin(elements, test_elements)
+
+
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+@pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("pinned", [False, True])
+def test_index_select(dtype, idtype, pinned):
+    if F._default_context_str != "gpu" and pinned:
+        pytest.skip("Pinned tests are available only on GPU.")
+    tensor = torch.tensor([[2, 3], [5, 5], [20, 13]], dtype=dtype)
+    tensor = tensor.pin_memory() if pinned else tensor.to(F.ctx())
+    index = torch.tensor([0, 2], dtype=idtype, device=F.ctx())
+    gb_result = gb.index_select(tensor, index)
+    torch_result = tensor.to(F.ctx())[index.long()]
+    assert torch.equal(torch_result, gb_result)
 
 
 def torch_expand_indptr(indptr, dtype, nodes=None):

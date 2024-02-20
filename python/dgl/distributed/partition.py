@@ -199,11 +199,10 @@ def _verify_graphbolt_partition(graph, part_id, gpb, ntypes, etypes):
         field in graph.edge_attributes for field in required_edata_fields
     ), "the partition graph should contain edge mapping to global edge ID."
 
-    num_nodes = graph.total_num_nodes
     num_edges = graph.total_num_edges
     local_src_ids = graph.indices
-    local_dst_ids = torch.repeat_interleave(
-        torch.arange(num_nodes), torch.diff(graph.csc_indptr)
+    local_dst_ids = gb.expand_indptr(
+        graph.csc_indptr, dtype=local_src_ids.dtype, output_size=num_edges
     )
     global_src_ids = graph.node_attributes[NID][local_src_ids]
     global_dst_ids = graph.node_attributes[NID][local_dst_ids]
@@ -638,6 +637,8 @@ def partition_graph(
     num_trainers_per_machine=1,
     objtype="cut",
     graph_formats=None,
+    use_graphbolt=False,
+    **kwargs,
 ):
     """Partition a graph for distributed training and store the partitions on files.
 
@@ -811,6 +812,10 @@ def partition_graph(
         ``csc`` and ``csr``. If not specified, save one format only according to what
         format is available. If multiple formats are available, selection priority
         from high to low is ``coo``, ``csc``, ``csr``.
+    use_graphbolt : bool, optional
+        Whether to save partitions in GraphBolt format. Default: False.
+    kwargs : dict
+        Other keyword arguments for converting DGL partitions to GraphBolt.
 
     Returns
     -------
@@ -1298,7 +1303,8 @@ def partition_graph(
         )
     )
 
-    _dump_part_config(f"{out_path}/{graph_name}.json", part_metadata)
+    part_config = os.path.join(out_path, graph_name + ".json")
+    _dump_part_config(part_config, part_metadata)
 
     num_cuts = sim_g.num_edges() - tot_num_inner_edges
     if num_parts == 1:
@@ -1308,6 +1314,12 @@ def partition_graph(
             g.num_edges(), num_cuts, num_parts
         )
     )
+
+    if use_graphbolt:
+        dgl_partition_to_graphbolt(
+            part_config,
+            **kwargs,
+        )
 
     if return_mapping:
         return orig_nids, orig_eids
