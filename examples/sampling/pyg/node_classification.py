@@ -67,6 +67,8 @@ class GraphSAGE(torch.nn.Module):
     # - 'in_size', 'hidden_size', 'out_size' are the sizes of
     #   the input, hidden, and output features, respectively.
     # - The forward method defines the computation performed at every call.
+    # - It's adopted from the official PyG example which can be found at
+    # https://github.com/pyg-team/pytorch_geometric/blob/master/examples/ogbn_products_sage.py
     #####################################################################
     def __init__(self, in_size, hidden_size, out_size):
         super(GraphSAGE, self).__init__()
@@ -83,21 +85,21 @@ class GraphSAGE(torch.nn.Module):
                 x = F.dropout(x, p=0.5, training=self.training)
         return x
 
-    def inference(self, args, dataloader, features):
+    def inference(self, args, dataloader, x_all, device):
         """Conduct layer-wise inference to get all the node embeddings."""
         for i, layer in enumerate(self.layers):
             xs = []
             for minibatch in dataloader:
+                # Call `to_pyg_data` to convert GB Minibatch to PyG Data.
                 pyg_data = minibatch.to_pyg_data()
-                x = layer(pyg_data.x, pyg_data.edge_index)[
-                    : 4 * args.batch_size
-                ]
+                x = x_all[minibatch.node_ids()].to(device)
+                edge_index = pyg_data.edge_index
+                x = layer(x, edge_index)
+                x = x[: 4 * args.batch_size]
                 if i != len(self.layers) - 1:
                     x = x.relu()
                 xs.append(x.cpu())
             x_all = torch.cat(xs, dim=0)
-            if i != len(self.layers) - 1:
-                features.update("node", None, "feat", x_all)
         return x_all
 
 
@@ -167,6 +169,12 @@ def train(model, dataloader, optimizer, num_classes):
     num_batches = 0  # Counter for the number of mini-batches processed
 
     for minibatch in dataloader:
+        #####################################################################
+        # (HIGHLIGHT) Convert GraphBolt MiniBatch to PyG Data class.
+        #
+        # Call `MiniBatch.to_pyg_data()` and it will return a PyG Data class
+        # with necessary data and information.
+        #####################################################################
         pyg_data = minibatch.to_pyg_data()
 
         optimizer.zero_grad()
@@ -209,13 +217,13 @@ def evaluate(model, dataloader, num_classes):
 
 @torch.no_grad()
 def layerwise_infer(
-    model, args, infer_dataloader, test_set, features, num_classes
+    model, args, infer_dataloader, test_set, feature, num_classes, device
 ):
     model.eval()
-    pred = model.inference(args, infer_dataloader, features)
+    features = feature.read("node", None, "feat")
+    pred = model.inference(args, infer_dataloader, features, device)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
-    print(pred, label)
 
     return MF.accuracy(
         pred,
@@ -297,7 +305,7 @@ def main():
             f"Valid Accuracy: {valid_accuracy:.4f}"
         )
     test_accuracy = layerwise_infer(
-        model, args, infer_dataloader, test_set, feature, num_classes
+        model, args, infer_dataloader, test_set, feature, num_classes, device
     )
     print(f"Test Accuracy: {test_accuracy:.4f}")
 
