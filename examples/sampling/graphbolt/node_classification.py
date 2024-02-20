@@ -162,7 +162,11 @@ def create_dataloader(
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.DataLoader(datapipe, num_workers=num_workers, overlap_graph_fetch=args.overlap_graph_fetch)
+    dataloader = gb.DataLoader(
+        datapipe,
+        num_workers=num_workers,
+        overlap_graph_fetch=args.overlap_graph_fetch,
+    )
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -379,7 +383,7 @@ def parse_args():
         "--overlap-graph-fetch",
         type=bool,
         default=False,
-        help="An option for enabling overlap_graph_fetch in graphbolt dataloader." 
+        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
         "If True, the data loader will overlap the UVA graph fetching operations"
         "with the rest of operations by using an alternative CUDA stream. Default"
         "is False.",
