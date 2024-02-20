@@ -25,6 +25,7 @@ from ..internal import (
     read_edges,
 )
 from ..itemset import ItemSet, ItemSetDict
+from ..minibatch import MiniBatch
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
     fused_csc_sampling_graph,
@@ -39,6 +40,15 @@ from .ondisk_metadata import (
 from .torch_based_feature_store import TorchBasedFeatureStore
 
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
+
+INT32_MAX = torch.iinfo(torch.int32).max
+NAMES_INDICATING_NODE_IDS = [
+    "seed_nodes",
+    "node_pairs",
+    "seeds",
+    "negative_srcs",
+    "negative_srcs",
+]
 
 
 def _graph_data_to_fused_csc_sampling_graph(
@@ -78,7 +88,9 @@ def _graph_data_to_fused_csc_sampling_graph(
         src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         num_nodes = graph_data["nodes"][0]["num"]
         num_edges = len(src)
-        coo_tensor = torch.tensor(np.array([src, dst]))
+        node_dtype = torch.int32 if num_nodes <= INT32_MAX else torch.int64
+        edge_dtype = torch.int32 if num_edges <= INT32_MAX else torch.int64
+        coo_tensor = torch.tensor(np.array([src, dst]), dtype=node_dtype)
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
         del coo_tensor
         indptr, indices, edge_ids = sparse_matrix.csc()
@@ -103,6 +115,9 @@ def _graph_data_to_fused_csc_sampling_graph(
             node_type_to_id[node_info["type"]] = ntype_id
             node_type_offset.append(node_type_offset[-1] + node_info["num"])
         total_num_nodes = node_type_offset[-1]
+        node_dtype = (
+            torch.int32 if total_num_nodes <= INT32_MAX else torch.int64
+        )
         # Construct edge_type_offset, edge_type_to_id and coo_tensor.
         edge_type_offset = [0]
         edge_type_to_id = {}
@@ -118,10 +133,15 @@ def _graph_data_to_fused_csc_sampling_graph(
             src_type, _, dst_type = etype_str_to_tuple(edge_info["type"])
             src += node_type_offset[node_type_to_id[src_type]]
             dst += node_type_offset[node_type_to_id[dst_type]]
-            coo_src_list.append(torch.tensor(src))
-            coo_dst_list.append(torch.tensor(dst))
-            coo_etype_list.append(torch.full((len(src),), etype_id))
+            coo_src_list.append(torch.tensor(src, dtype=node_dtype))
+            coo_dst_list.append(torch.tensor(dst, dtype=node_dtype))
+            coo_etype_list.append(
+                torch.full((len(src),), etype_id, dtype=torch.int32)
+            )
         total_num_edges = edge_type_offset[-1]
+        edge_dtype = (
+            torch.int32 if total_num_edges <= INT32_MAX else torch.int64
+        )
 
         coo_src = torch.cat(coo_src_list)
         del coo_src_list
@@ -143,8 +163,8 @@ def _graph_data_to_fused_csc_sampling_graph(
         node_attributes = {}
         edge_attributes = {}
         if include_original_edge_id:
-            edge_ids -= torch.gather(
-                input=torch.tensor(edge_type_offset),
+            edge_ids -= torch.index_select(
+                torch.tensor(edge_type_offset),
                 dim=0,
                 index=type_per_edge,
             )
@@ -410,6 +430,7 @@ def preprocess_ondisk_dataset(
 
     # 6. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
+        _minibatch = MiniBatch()
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
         ):
@@ -428,11 +449,24 @@ def preprocess_ondisk_dataset(
                             processed_dir_prefix,
                             input_data["path"].replace("pt", "npy"),
                         )
+                        if "name" in input_data:
+                            name = input_data["name"]
+                            if not hasattr(_minibatch, name):
+                                dgl_warning(
+                                    f"Data name '{name}' is not a canonical "
+                                    "attribute of `Minibatch`. You probably need "
+                                    "to provide a customized `MiniBatcher`."
+                                )
+                        else:
+                            name = None
                         copy_or_convert_data(
                             os.path.join(dataset_dir, input_data["path"]),
                             os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
                             output_data["format"],
+                            within_int32=name is not None
+                            and name in NAMES_INDICATING_NODE_IDS
+                            and sampling_graph.total_num_nodes <= INT32_MAX,
                         )
 
     # 7. Save the output_config.

@@ -85,6 +85,17 @@ def get_npy_dim(npy_path):
         return len(shape)
 
 
+def _to_int32(data):
+    if isinstance(data, torch.Tensor):
+        return data.to(torch.int32)
+    elif isinstance(data, np.ndarray):
+        return data.astype(np.int32)
+    else:
+        raise TypeError(
+            "Unsupported input type. Please provide a torch tensor or numpy array."
+        )
+
+
 def copy_or_convert_data(
     input_path,
     output_path,
@@ -92,6 +103,7 @@ def copy_or_convert_data(
     output_format="numpy",
     in_memory=True,
     is_feature=False,
+    within_int32=False,
 ):
     """Copy or convert the data from input_path to output_path."""
     assert (
@@ -100,16 +112,18 @@ def copy_or_convert_data(
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     # If the original format is numpy, just copy the file.
     if input_format == "numpy":
+        data = read_data(input_path, input_format, in_memory)
+        if within_int32:
+            data = _to_int32(data)
         # If dim of the data is 1, reshape it to n * 1 and save it to output_path.
         if is_feature and get_npy_dim(input_path) == 1:
-            data = read_data(input_path, input_format, in_memory)
             data = data.reshape(-1, 1)
-            save_data(data, output_path, output_format)
-        else:
-            shutil.copyfile(input_path, output_path)
+        save_data(data, output_path, output_format)
     else:
         # If the original format is not numpy, convert it to numpy.
         data = read_data(input_path, input_format, in_memory)
+        if within_int32:
+            data = data.to(torch.int32)
         if is_feature and data.dim() == 1:
             data = data.reshape(-1, 1)
         save_data(data, output_path, output_format)
