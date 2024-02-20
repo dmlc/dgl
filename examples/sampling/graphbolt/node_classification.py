@@ -117,9 +117,14 @@ def create_dataloader(
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(
-        graph, fanout if job != "infer" else [-1]
-    )
+    if args.sample_mode == "sample-neighbors":
+        datapipe = datapipe.sample_neighbor(
+            graph, fanout if job != "infer" else [-1]
+        )
+    else:
+        datapipe = datapipe.sample_layer_neighbor(
+            graph, fanout if job != "infer" else [-1]
+        )
 
     ############################################################################
     # [Step-4]:
@@ -157,7 +162,7 @@ def create_dataloader(
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.DataLoader(datapipe, num_workers=num_workers)
+    dataloader = gb.DataLoader(datapipe, num_workers=num_workers, overlap_graph_fetch=args.overlap_graph_fetch)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -363,6 +368,21 @@ def parse_args():
         choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
         help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
+    )
+    parser.add_argument(
+        "--sample-mode",
+        default="sample-neighbors",
+        choices=["sample-neighbors", "sample-layer-neighbors"],
+        help="The sampling function when doing layerwise sampling.",
+    )
+    parser.add_argument(
+        "--overlap-graph-fetch",
+        type=bool,
+        default=False,
+        help="An option for enabling overlap_graph_fetch in graphbolt dataloader." 
+        "If True, the data loader will overlap the UVA graph fetching operations"
+        "with the rest of operations by using an alternative CUDA stream. Default"
+        "is False.",
     )
     return parser.parse_args()
 
