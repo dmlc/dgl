@@ -117,14 +117,9 @@ def create_dataloader(
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    if args.sample_mode == "sample-neighbor":
-        datapipe = datapipe.sample_neighbor(
-            graph, fanout if job != "infer" else [-1]
-        )
-    else:
-        datapipe = datapipe.sample_layer_neighbor(
-            graph, fanout if job != "infer" else [-1]
-        )
+    datapipe = getattr(datapipe, args.sample_mode)(
+        graph, fanout if job != "infer" else [-1]
+    )
 
     ############################################################################
     # [Step-4]:
@@ -370,7 +365,8 @@ def parse_args():
         "--dataset",
         type=str,
         default="ogbn-products",
-        help="The dataset we can use for node classification example.",
+        help="The dataset we can use for node classification example. Currently"
+        "dataset ogbn-products, ogbn-arxiv, ogbn-papers100M is supported.",
     )
     parser.add_argument(
         "--mode",
@@ -381,14 +377,13 @@ def parse_args():
     )
     parser.add_argument(
         "--sample-mode",
-        default="sample-neighbor",
-        choices=["sample-neighbor", "sample-layer-neighbor"],
+        default="sample_neighbor",
+        choices=["sample_neighbor", "sample_layer_neighbor"],
         help="The sampling function when doing layerwise sampling.",
     )
     parser.add_argument(
         "--overlap-graph-fetch",
-        type=bool,
-        default=False,
+        action="store_true",
         help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
         "If True, the data loader will overlap the UVA graph fetching operations"
         "with the rest of operations by using an alternative CUDA stream. Disabled"
