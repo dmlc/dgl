@@ -450,12 +450,6 @@ def preprocess_ondisk_dataset(
                         name = (
                             input_data["name"] if "name" in input_data else None
                         )
-                        if name is not None and not hasattr(_minibatch, name):
-                            dgl_warning(
-                                f"Data name '{name}' is not a canonical "
-                                "attribute of `Minibatch`. You probably need "
-                                "to provide a customized `MiniBatcher`."
-                            )
                         copy_or_convert_data(
                             os.path.join(dataset_dir, input_data["path"]),
                             os.path.join(dataset_dir, output_data["path"]),
