@@ -89,7 +89,6 @@ def _graph_data_to_fused_csc_sampling_graph(
         num_nodes = graph_data["nodes"][0]["num"]
         num_edges = len(src)
         node_dtype = torch.int32 if num_nodes <= INT32_MAX else torch.int64
-        edge_dtype = torch.int32 if num_edges <= INT32_MAX else torch.int64
         coo_tensor = torch.tensor(np.array([src, dst]), dtype=node_dtype)
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
         del coo_tensor
@@ -139,9 +138,6 @@ def _graph_data_to_fused_csc_sampling_graph(
                 torch.full((len(src),), etype_id, dtype=torch.int32)
             )
         total_num_edges = edge_type_offset[-1]
-        edge_dtype = (
-            torch.int32 if total_num_edges <= INT32_MAX else torch.int64
-        )
 
         coo_src = torch.cat(coo_src_list)
         del coo_src_list
