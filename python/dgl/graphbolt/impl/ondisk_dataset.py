@@ -388,6 +388,7 @@ def preprocess_ondisk_dataset(
         processed_dir_prefix, "fused_csc_sampling_graph.pt"
     )
 
+    num_nodes_within_int32 = sampling_graph.total_num_nodes <= INT32_MAX
     torch.save(
         sampling_graph,
         os.path.join(
@@ -395,6 +396,7 @@ def preprocess_ondisk_dataset(
             output_config["graph_topology"]["path"],
         ),
     )
+    del sampling_graph
     del output_config["graph"]
 
     # 5. Load the node/edge features and do necessary conversion.
@@ -445,24 +447,23 @@ def preprocess_ondisk_dataset(
                             processed_dir_prefix,
                             input_data["path"].replace("pt", "npy"),
                         )
-                        if "name" in input_data:
-                            name = input_data["name"]
-                            if not hasattr(_minibatch, name):
-                                dgl_warning(
-                                    f"Data name '{name}' is not a canonical "
-                                    "attribute of `Minibatch`. You probably need "
-                                    "to provide a customized `MiniBatcher`."
-                                )
-                        else:
-                            name = None
+                        name = (
+                            input_data["name"] if "name" in input_data else None
+                        )
+                        if name is not None and not hasattr(_minibatch, name):
+                            dgl_warning(
+                                f"Data name '{name}' is not a canonical "
+                                "attribute of `Minibatch`. You probably need "
+                                "to provide a customized `MiniBatcher`."
+                            )
                         copy_or_convert_data(
                             os.path.join(dataset_dir, input_data["path"]),
                             os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
                             output_data["format"],
-                            within_int32=name is not None
-                            and name in NAMES_INDICATING_NODE_IDS
-                            and sampling_graph.total_num_nodes <= INT32_MAX,
+                            within_int32=num_nodes_within_int32
+                            and name is not None
+                            and name in NAMES_INDICATING_NODE_IDS,
                         )
 
     # 7. Save the output_config.

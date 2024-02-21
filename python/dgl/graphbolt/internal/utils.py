@@ -3,7 +3,6 @@
 import hashlib
 import json
 import os
-import shutil
 from typing import List, Union
 
 import numpy as np
