@@ -367,6 +367,12 @@ def parse_args():
         " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-products",
+        help="The dataset we can use for node classification example.",
+    )
+    parser.add_argument(
         "--mode",
         default="pinned-cuda",
         choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
