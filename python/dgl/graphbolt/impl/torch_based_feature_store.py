@@ -75,6 +75,24 @@ class DiskBasedFeature(Feature):
         """
         return torch.ops.graphbolt.disk_feature_size(self._path)
 
+    def update(self, value: torch.Tensor, ids: torch.Tensor = None):
+        raise NotImplementedError
+
+    def metadata(self):
+        """Get the metadata of the feature.
+
+        Returns
+        -------
+        Dict
+            The metadata of the feature.
+        """
+        return (
+            self._metadata if self._metadata is not None else super().metadata()
+        )
+
+    def __repr__(self) -> str:
+        return _torch_based_feature_str(self)
+
 
 class TorchBasedFeature(Feature):
     r"""A wrapper of pytorch based feature.
