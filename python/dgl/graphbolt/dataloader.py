@@ -84,7 +84,9 @@ class DataLoader(torch.utils.data.DataLoader):
     everything after feature fetching in the main process. The datapipe
     is modified in-place as a result.
 
-    Only works on single GPU.
+    When the copy_to operation is placed earlier in the data pipeline, the
+    num_workers argument is required to be 0 as utilizing CUDA in multiple
+    worker processes is not supported.
 
     Parameters
     ----------
