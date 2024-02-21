@@ -1,7 +1,6 @@
 """Torch-based feature store for GraphBolt."""
 from typing import Dict, List
 
-import numpy as np
 import torch
 
 from ..feature_store import Feature
