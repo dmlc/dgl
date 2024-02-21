@@ -100,9 +100,17 @@ def test_prop_nodes_topo(idtype):
     tree.ndata["x"] = F.zeros((5, 2))
     # set all leaf nodes to be ones
     tree.nodes[[1, 3, 4]].data["x"] = F.ones((3, 2))
-    dgl.prop_nodes_topo(
-        tree, message_func=mfunc, reduce_func=rfunc, apply_node_func=None
-    )
+
+    # Filtering DGLWarning:
+    #    The input graph for the user-defined edge
+    #    function does not contain valid edges
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        dgl.prop_nodes_topo(
+            tree, message_func=mfunc, reduce_func=rfunc, apply_node_func=None
+        )
     # root node get the sum
     assert F.allclose(tree.nodes[0].data["x"], F.tensor([[3.0, 3.0]]))
 

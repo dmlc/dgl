@@ -500,7 +500,7 @@ class MiniBatch:
             col_nodes = torch.cat(col_nodes)
             row_nodes = torch.cat(row_nodes)
             edge_index = torch.unique(
-                torch.stack((col_nodes, row_nodes)), dim=1
+                torch.stack((row_nodes, col_nodes)), dim=1
             )
 
         if self.node_features is None:
