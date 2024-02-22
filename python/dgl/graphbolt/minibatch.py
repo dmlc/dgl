@@ -234,13 +234,10 @@ class MiniBatch:
         # casts to minimum dtype in-place and returns self.
         def cast_to_minimum_dtype(v: CSCFormatBase):
             # Checks if number of vertices and edges fit into an int32.
-            if (
+            dtype = {False: torch.int64, True: torch.int32}[
                 max(v.indptr.size(0) - 2, v.indices.size(0))
                 <= torch.iinfo(torch.int32).max
-            ):
-                dtype = torch.int32
-            else:
-                dtype = torch.int64
+            ]
             v.indptr = v.indptr.to(dtype)
             v.indices = v.indices.to(dtype)
             return v
