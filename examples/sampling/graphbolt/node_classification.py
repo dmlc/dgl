@@ -404,8 +404,12 @@ def main(args):
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
     # Move the dataset to the selected storage.
-    graph = dataset.graph.to(args.storage_device)
-    features = dataset.feature.to(args.storage_device)
+    if args.storage_device == "pinned":
+        graph = dataset.graph.pin_memory_()
+        features = dataset.feature.pin_memory_()
+    else:
+        graph = dataset.graph.to(args.storage_device)
+        features = dataset.feature.to(args.storage_device)
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set

@@ -32,11 +32,11 @@ def unique_and_compact(
     Returns
     -------
     Tuple[unique_nodes, compacted_node_list]
-    The Unique nodes (per type) of all nodes in the input. And the compacted
-    nodes list, where IDs inside are replaced with compacted node IDs.
-    "Compacted node list" indicates that the node IDs in the input node
-    list are replaced with mapped node IDs, where each type of node is
-    mapped to a contiguous space of IDs ranging from 0 to N.
+        The Unique nodes (per type) of all nodes in the input. And the compacted
+        nodes list, where IDs inside are replaced with compacted node IDs.
+        "Compacted node list" indicates that the node IDs in the input node
+        list are replaced with mapped node IDs, where each type of node is
+        mapped to a contiguous space of IDs ranging from 0 to N.
     """
     is_heterogeneous = isinstance(nodes, dict)
 
