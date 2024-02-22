@@ -75,7 +75,7 @@ class GraphSAGE(torch.nn.Module):
         self.layers.append(SAGEConv(hidden_size, hidden_size))
         self.layers.append(SAGEConv(hidden_size, out_size))
 
-    def forward(self, blocks, x, device):
+    def forward(self, blocks, x):
         h = x
         for i, (layer, block) in enumerate(zip(self.layers, blocks)):
             src, dst = block.edges()
@@ -92,9 +92,9 @@ def create_dataloader(dataset_set, graph, feature, device, is_train):
     # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
     #
     # - 'ItemSampler' samples mini-batches of node IDs from the dataset.
+    # - 'CopyTo' copies the fetched data to the specified device.
     # - 'sample_neighbor' performs neighbor sampling on the graph.
     # - 'FeatureFetcher' fetches node features based on the sampled subgraph.
-    # - 'CopyTo' copies the fetched data to the specified device.
 
     #####################################################################
     # Create a datapipe for mini-batch sampling with a specific neighbor fanout.
@@ -108,19 +108,19 @@ def create_dataloader(dataset_set, graph, feature, device, is_train):
     datapipe = gb.ItemSampler(
         dataset_set, batch_size=1024, shuffle=is_train, drop_last=is_train
     )
+    # Copy the data to the specified device.
+    datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
     # Sample neighbors for each node in the mini-batch.
     datapipe = datapipe.sample_neighbor(graph, [10, 10, 10])
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    # Copy the data to the specified device.
-    datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
     return dataloader
 
 
-def train(model, dataloader, optimizer, criterion, device, num_classes):
+def train(model, dataloader, optimizer, criterion, num_classes):
     #####################################################################
     # (HIGHLIGHT) Train the model for one epoch.
     #
@@ -147,7 +147,7 @@ def train(model, dataloader, optimizer, criterion, device, num_classes):
         node_features = minibatch.node_features["feat"]
         labels = minibatch.labels
         optimizer.zero_grad()
-        out = model(minibatch.blocks, node_features, device)
+        out = model(minibatch.blocks, node_features)
         loss = criterion(out, labels)
         total_loss += loss.item()
         total_correct += MF.accuracy(
@@ -163,14 +163,14 @@ def train(model, dataloader, optimizer, criterion, device, num_classes):
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, device, num_classes):
+def evaluate(model, dataloader, num_classes):
     model.eval()
     y_hats = []
     ys = []
     for minibatch in dataloader:
         node_features = minibatch.node_features["feat"]
         labels = minibatch.labels
-        out = model(minibatch.blocks, node_features, device)
+        out = model(minibatch.blocks, node_features)
         y_hats.append(out)
         ys.append(labels)
 
@@ -195,13 +195,13 @@ def main():
     args = parser.parse_args()
     dataset_name = args.dataset
     dataset = gb.BuiltinDataset(dataset_name).load()
-    graph = dataset.graph
-    feature = dataset.feature
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    graph = dataset.graph.to(device)
+    feature = dataset.feature.to(device)
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_dataloader = create_dataloader(
         train_set, graph, feature, device, is_train=True
@@ -219,15 +219,15 @@ def main():
     criterion = torch.nn.CrossEntropyLoss()
     for epoch in range(10):
         train_loss, train_accuracy = train(
-            model, train_dataloader, optimizer, criterion, device, num_classes
+            model, train_dataloader, optimizer, criterion, num_classes
         )
 
-        valid_accuracy = evaluate(model, valid_dataloader, device, num_classes)
+        valid_accuracy = evaluate(model, valid_dataloader, num_classes)
         print(
             f"Epoch {epoch}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, "
             f"Valid Accuracy: {valid_accuracy:.4f}"
         )
-    test_accuracy = evaluate(model, test_dataloader, device, num_classes)
+    test_accuracy = evaluate(model, test_dataloader, num_classes)
     print(f"Test Accuracy: {test_accuracy:.4f}")
 
 
