@@ -881,7 +881,7 @@ def test_to_pyg_data():
         original_column_node_ids=torch.tensor([10, 11]),
     )
     expected_edge_index = torch.tensor(
-        [[0, 0, 1, 1, 1, 2, 2, 3], [0, 1, 0, 1, 2, 1, 2, 2]]
+        [[0, 0, 1, 1, 1, 2, 2, 2], [0, 1, 0, 1, 2, 1, 2, 3]]
     )
     expected_node_features = torch.tensor([[1], [2], [3], [4]])
     expected_labels = torch.tensor([0, 1])

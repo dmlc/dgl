@@ -98,11 +98,12 @@ def random_homo_graphbolt_graph(
     )
     edges = np.stack([nodes, neighbors], axis=1)
     os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
-    assert edge_fmt in ["numpy", "csv"], print(
-        "only numpy and csv are supported for edges."
-    )
+    assert edge_fmt in [
+        "numpy",
+        "csv",
+    ], "Only numpy and csv are supported for edges."
     if edge_fmt == "csv":
-        # Wrtie into edges/edge.csv
+        # Write into edges/edge.csv
         edges_DataFrame = pd.DataFrame(edges, columns=["src", "dst"])
         edge_path = os.path.join("edges", "edge.csv")
         edges_DataFrame.to_csv(
@@ -111,7 +112,7 @@ def random_homo_graphbolt_graph(
             header=False,
         )
     else:
-        # Wrtie into edges/edge.npy
+        # Write into edges/edge.npy
         edges = edges.T
         edge_path = os.path.join("edges", "edge.npy")
         np.save(os.path.join(test_dir, edge_path), edges)
@@ -160,7 +161,7 @@ def random_homo_graphbolt_graph(
 
     yaml_content = f"""
         dataset_name: {dataset_name}
-        graph: # graph structure and required attributes.
+        graph: # Graph structure and required attributes.
             nodes:
                 - num: {num_nodes}
             edges:
@@ -219,7 +220,7 @@ def random_homo_graphbolt_graph(
     return yaml_content
 
 
-def genereate_raw_data_for_hetero_dataset(
+def generate_raw_data_for_hetero_dataset(
     test_dir, dataset_name, num_nodes, num_edges, num_classes, edge_fmt="csv"
 ):
     # Generate edges.
@@ -229,9 +230,10 @@ def genereate_raw_data_for_hetero_dataset(
         src = torch.randint(0, num_nodes[src_ntype], (num_edge,))
         dst = torch.randint(0, num_nodes[dst_ntype], (num_edge,))
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
-        assert edge_fmt in ["numpy", "csv"], print(
-            "only numpy and csv are supported for edges."
-        )
+        assert edge_fmt in [
+            "numpy",
+            "csv",
+        ], "Only numpy and csv are supported for edges."
         if edge_fmt == "csv":
             # Write into edges/edge.csv
             edges = pd.DataFrame(
@@ -290,7 +292,7 @@ def genereate_raw_data_for_hetero_dataset(
 
     yaml_content = f"""
         dataset_name: {dataset_name}
-        graph: # graph structure and required attributes.
+        graph: # Graph structure and required attributes.
           nodes:
             - type: user
               num: {num_nodes["user"]}

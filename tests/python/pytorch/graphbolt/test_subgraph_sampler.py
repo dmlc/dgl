@@ -1057,8 +1057,7 @@ def test_SubgraphSampler_Link(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
-    # TODO: `exclude_seed_edges` doesn't support `seeds` now.
-    # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
     for data in datapipe:
         assert torch.equal(
@@ -1091,8 +1090,7 @@ def test_SubgraphSampler_Link_With_Negative(sampler_type):
     datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
-    # TODO: `exclude_seed_edges` doesn't support `seeds` now.
-    # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
 
@@ -1171,8 +1169,7 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
-    # TODO: `exclude_seed_edges` doesn't support `seeds` now.
-    # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
     for data in datapipe:
         for compacted_seeds in data.compacted_seeds.values():
@@ -1228,8 +1225,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
     datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
-    # TODO: `exclude_seed_edges` doesn't support `seeds` now.
-    # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
 
@@ -1274,8 +1270,7 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
-    # TODO: `exclude_seed_edges` doesn't support `seeds` now.
-    # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
 
@@ -1321,8 +1316,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     datapipe = gb.UniformNegativeSampler(datapipe, graph, 1)
     sampler = _get_sampler(sampler_type)
     datapipe = sampler(datapipe, graph, fanouts)
-    # TODO: `exclude_seed_edges` doesn't support `seeds` now.
-    # datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
+    datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
     assert len(list(datapipe)) == 5
 
 
