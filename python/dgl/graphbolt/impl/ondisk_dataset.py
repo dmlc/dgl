@@ -88,7 +88,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         num_nodes = graph_data["nodes"][0]["num"]
         num_edges = len(src)
-        node_dtype = torch.int32 if num_nodes <= INT32_MAX else torch.int64
+        node_dtype = torch.int32 if num_nodes - 1 <= INT32_MAX else torch.int64
         coo_tensor = torch.tensor(np.array([src, dst]), dtype=node_dtype)
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
         del coo_tensor
@@ -115,7 +115,7 @@ def _graph_data_to_fused_csc_sampling_graph(
             node_type_offset.append(node_type_offset[-1] + node_info["num"])
         total_num_nodes = node_type_offset[-1]
         node_dtype = (
-            torch.int32 if total_num_nodes <= INT32_MAX else torch.int64
+            torch.int32 if total_num_nodes - 1 <= INT32_MAX else torch.int64
         )
         # Construct edge_type_offset, edge_type_to_id and coo_tensor.
         edge_type_offset = [0]
@@ -388,7 +388,7 @@ def preprocess_ondisk_dataset(
         processed_dir_prefix, "fused_csc_sampling_graph.pt"
     )
 
-    num_nodes_within_int32 = sampling_graph.total_num_nodes <= INT32_MAX
+    node_ids_within_int32 = sampling_graph.total_num_nodes - 1 <= INT32_MAX
     torch.save(
         sampling_graph,
         os.path.join(
@@ -455,7 +455,7 @@ def preprocess_ondisk_dataset(
                             os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
                             output_data["format"],
-                            within_int32=num_nodes_within_int32
+                            within_int32=node_ids_within_int32
                             and name is not None
                             and name in NAMES_INDICATING_NODE_IDS,
                         )
