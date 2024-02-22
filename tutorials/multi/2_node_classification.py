@@ -303,7 +303,6 @@ def run(rank, world_size, devices, dataset):
     if rank == 0:
         print("Training...")
     train(
-        world_size,
         rank,
         graph,
         features,
