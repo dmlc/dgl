@@ -251,13 +251,7 @@ def train(
             num_classes,
             device,
         )
-        ########################################################################
-        # (HIGHLIGHT) Collect accuracy and loss values from sub-processes and
-        # obtain overall average values.
-        #
-        # `torch.distributed.reduce` is used to reduce tensors from all the
-        # sub-processes to a specified process, ReduceOp.SUM is used by default.
-        ########################################################################
+
         total_loss = weighted_reduce(total_loss, num_train_items)
         acc = weighted_reduce(acc * num_val_items, num_val_items)
 
