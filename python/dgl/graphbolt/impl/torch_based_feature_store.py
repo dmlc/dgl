@@ -63,6 +63,7 @@ class TorchBasedFeature(Feature):
     tensor([[1, 2]])
 
     3. Pinned CPU feature.
+
     >>> torch_feat = torch.arange(10).reshape(2, -1).pin_memory()
     >>> feature = gb.TorchBasedFeature(torch_feat)
     >>> feature.read().device

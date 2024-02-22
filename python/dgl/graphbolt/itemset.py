@@ -36,6 +36,7 @@ class ItemSet:
     >>> from dgl import graphbolt as gb
 
     1. Integer: number of nodes.
+
     >>> num = 10
     >>> item_set = gb.ItemSet(num, names="seed_nodes")
     >>> list(item_set)
@@ -47,6 +48,7 @@ class ItemSet:
     ('seed_nodes',)
 
     2. Single iterable: seed nodes.
+
     >>> node_ids = torch.arange(0, 5)
     >>> item_set = gb.ItemSet(node_ids, names="seed_nodes")
     >>> list(item_set)
@@ -57,6 +59,7 @@ class ItemSet:
     ('seed_nodes',)
 
     3. Tuple of iterables with same shape: seed nodes and labels.
+
     >>> node_ids = torch.arange(0, 5)
     >>> labels = torch.arange(5, 10)
     >>> item_set = gb.ItemSet(
@@ -70,6 +73,7 @@ class ItemSet:
     ('seed_nodes', 'labels')
 
     4. Tuple of iterables with different shape: node pairs and negative dsts.
+
     >>> node_pairs = torch.arange(0, 10).reshape(-1, 2)
     >>> neg_dsts = torch.arange(10, 25).reshape(-1, 3)
     >>> item_set = gb.ItemSet(
