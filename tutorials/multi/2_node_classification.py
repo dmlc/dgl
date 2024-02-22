@@ -186,7 +186,6 @@ def evaluate(rank, model, graph, features, itemset, num_classes, device):
 
 
 def train(
-    world_size,
     rank,
     graph,
     features,
@@ -233,7 +232,7 @@ def train(
                 loss.backward()
                 optimizer.step()
 
-                total_loss += loss * y.size(0)
+                total_loss += loss.detach() * y.size(0)
                 num_train_items += y.size(0)
 
         # Evaluate the model.
