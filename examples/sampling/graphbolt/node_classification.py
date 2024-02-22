@@ -367,7 +367,7 @@ def parse_args():
         default="ogbn-products",
         choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
         help="The dataset we can use for node classification example. Currently"
-        "ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
+        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
     )
     parser.add_argument(
         "--mode",
