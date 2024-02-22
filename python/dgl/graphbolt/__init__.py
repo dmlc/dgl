@@ -23,7 +23,7 @@ from .internal import (
     unique_and_compact,
     unique_and_compact_csc_formats,
 )
-from .utils import add_reverse_edges, exclude_seed_edges
+from .utils import add_reverse_edges, add_reverse_edges_2, exclude_seed_edges
 
 
 def load_graphbolt():
