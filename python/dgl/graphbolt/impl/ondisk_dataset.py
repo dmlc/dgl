@@ -41,7 +41,6 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
-INT32_MAX = torch.iinfo(torch.int32).max
 NAMES_INDICATING_NODE_IDS = [
     "seed_nodes",
     "node_pairs",
@@ -88,8 +87,14 @@ def _graph_data_to_fused_csc_sampling_graph(
         src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         num_nodes = graph_data["nodes"][0]["num"]
         num_edges = len(src)
-        node_dtype = torch.int32 if num_nodes - 1 <= INT32_MAX else torch.int64
-        coo_tensor = torch.tensor(np.array([src, dst]), dtype=node_dtype)
+        coo_tensor = torch.tensor(
+            np.array([src, dst]),
+            dtype=(
+                torch.int32
+                if max(num_nodes, num_edges) - 1 <= torch.iinfo(torch.int32).max
+                else torch.int64
+            ),
+        )
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
         del coo_tensor
         indptr, indices, edge_ids = sparse_matrix.csc()
@@ -114,9 +119,6 @@ def _graph_data_to_fused_csc_sampling_graph(
             node_type_to_id[node_info["type"]] = ntype_id
             node_type_offset.append(node_type_offset[-1] + node_info["num"])
         total_num_nodes = node_type_offset[-1]
-        node_dtype = (
-            torch.int32 if total_num_nodes - 1 <= INT32_MAX else torch.int64
-        )
         # Construct edge_type_offset, edge_type_to_id and coo_tensor.
         edge_type_offset = [0]
         edge_type_to_id = {}
@@ -132,12 +134,18 @@ def _graph_data_to_fused_csc_sampling_graph(
             src_type, _, dst_type = etype_str_to_tuple(edge_info["type"])
             src += node_type_offset[node_type_to_id[src_type]]
             dst += node_type_offset[node_type_to_id[dst_type]]
-            coo_src_list.append(torch.tensor(src, dtype=node_dtype))
-            coo_dst_list.append(torch.tensor(dst, dtype=node_dtype))
+            coo_src_list.append(torch.tensor(src))
+            coo_dst_list.append(torch.tensor(dst))
             coo_etype_list.append(
                 torch.full((len(src),), etype_id, dtype=torch.int32)
             )
         total_num_edges = edge_type_offset[-1]
+        if (
+            max(total_num_nodes, total_num_edges) - 1
+            <= torch.iinfo(torch.int32).max
+        ):
+            coo_src_list = [tensor.to(torch.int32) for tensor in coo_src_list]
+            coo_dst_list = [tensor.to(torch.int32) for tensor in coo_dst_list]
 
         coo_src = torch.cat(coo_src_list)
         del coo_src_list
@@ -388,7 +396,9 @@ def preprocess_ondisk_dataset(
         processed_dir_prefix, "fused_csc_sampling_graph.pt"
     )
 
-    node_ids_within_int32 = sampling_graph.total_num_nodes - 1 <= INT32_MAX
+    node_ids_within_int32 = (
+        sampling_graph.total_num_nodes - 1 <= torch.iinfo(torch.int32).max
+    )
     torch.save(
         sampling_graph,
         os.path.join(
