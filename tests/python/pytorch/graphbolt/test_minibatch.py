@@ -8,15 +8,17 @@ relation = "A:r:B"
 reverse_relation = "B:rr:A"
 
 
-def test_minibatch_representation_homo():
+@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
+def test_minibatch_representation_homo(indptr_dtype, indices_dtype):
     csc_formats = [
         gb.CSCFormatBase(
-            indptr=torch.tensor([0, 1, 3, 5, 6]),
-            indices=torch.tensor([0, 1, 2, 2, 1, 2]),
+            indptr=torch.tensor([0, 1, 3, 5, 6], dtype=indptr_dtype),
+            indices=torch.tensor([0, 1, 2, 2, 1, 2], dtype=indices_dtype),
         ),
         gb.CSCFormatBase(
-            indptr=torch.tensor([0, 2, 3]),
-            indices=torch.tensor([1, 2, 0]),
+            indptr=torch.tensor([0, 2, 3], dtype=indptr_dtype),
+            indices=torch.tensor([1, 2, 0], dtype=indices_dtype),
         ),
     ]
     original_column_node_ids = [
@@ -161,21 +163,24 @@ def test_minibatch_representation_homo():
     assert result == expect_result, print(expect_result, result)
 
 
-def test_minibatch_representation_hetero():
+@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
+def test_minibatch_representation_hetero(indptr_dtype, indices_dtype):
     csc_formats = [
         {
             relation: gb.CSCFormatBase(
-                indptr=torch.tensor([0, 1, 2, 3]),
-                indices=torch.tensor([0, 1, 1]),
+                indptr=torch.tensor([0, 1, 2, 3], dtype=indptr_dtype),
+                indices=torch.tensor([0, 1, 1], dtype=indices_dtype),
             ),
             reverse_relation: gb.CSCFormatBase(
-                indptr=torch.tensor([0, 0, 0, 1, 2]),
-                indices=torch.tensor([1, 0]),
+                indptr=torch.tensor([0, 0, 0, 1, 2], dtype=indptr_dtype),
+                indices=torch.tensor([1, 0], dtype=indices_dtype),
             ),
         },
         {
             relation: gb.CSCFormatBase(
-                indptr=torch.tensor([0, 1, 2]), indices=torch.tensor([1, 0])
+                indptr=torch.tensor([0, 1, 2], dtype=indptr_dtype),
+                indices=torch.tensor([1, 0], dtype=indices_dtype),
             )
         },
     ]
@@ -328,7 +333,9 @@ def test_minibatch_representation_hetero():
     assert result == expect_result, print(expect_result, result)
 
 
-def test_get_dgl_blocks_homo():
+@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
+def test_get_dgl_blocks_homo(indptr_dtype, indices_dtype):
     node_pairs = [
         (
             torch.tensor([0, 1, 2, 2, 2, 1]),
@@ -341,12 +348,12 @@ def test_get_dgl_blocks_homo():
     ]
     csc_formats = [
         gb.CSCFormatBase(
-            indptr=torch.tensor([0, 1, 3, 5, 6]),
-            indices=torch.tensor([0, 1, 2, 2, 1, 2]),
+            indptr=torch.tensor([0, 1, 3, 5, 6], dtype=indptr_dtype),
+            indices=torch.tensor([0, 1, 2, 2, 1, 2], dtype=indices_dtype),
         ),
         gb.CSCFormatBase(
-            indptr=torch.tensor([0, 1, 3]),
-            indices=torch.tensor([0, 1, 2]),
+            indptr=torch.tensor([0, 1, 3], dtype=indptr_dtype),
+            indices=torch.tensor([0, 1, 2], dtype=indices_dtype),
         ),
     ]
     original_column_node_ids = [
