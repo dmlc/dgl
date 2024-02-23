@@ -8,6 +8,10 @@ import torch
 __all__ = ["ItemSet", "ItemSetDict"]
 
 
+def is_torch_scalar(x):
+    return isinstance(x, torch.Tensor) and len(x.shape) == 0
+
+
 class ItemSet:
     r"""A wrapper of iterable data or tuple of iterable data.
 
@@ -97,7 +101,7 @@ class ItemSet:
         items: Union[int, Iterable, Tuple[Iterable]],
         names: Union[str, Tuple[str]] = None,
     ) -> None:
-        if isinstance(items, (int, tuple)):
+        if isinstance(items, (int, tuple)) or is_torch_scalar(items):
             self._items = items
         else:
             self._items = (items,)
@@ -117,8 +121,9 @@ class ItemSet:
             self._names = None
 
     def __iter__(self) -> Iterator:
-        if isinstance(self._items, int):
-            yield from torch.arange(self._items)
+        if isinstance(self._items, int) or is_torch_scalar(self._items):
+            dtype = getattr(self._items, "dtype", torch.int64)
+            yield from torch.arange(self._items, dtype=dtype)
             return
 
         if len(self._items) == 1:
@@ -143,8 +148,8 @@ class ItemSet:
                 yield tuple(item)
 
     def __len__(self) -> int:
-        if isinstance(self._items, int):
-            return self._items
+        if isinstance(self._items, int) or is_torch_scalar(self._items):
+            return int(self._items)
         if isinstance(self._items[0], Sized):
             return len(self._items[0])
         raise TypeError(
@@ -158,10 +163,11 @@ class ItemSet:
             raise TypeError(
                 f"{type(self).__name__} instance doesn't support indexing."
             )
-        if isinstance(self._items, int):
+        if isinstance(self._items, int) or is_torch_scalar(self._items):
             if isinstance(idx, slice):
-                start, stop, step = idx.indices(self._items)
-                return torch.arange(start, stop, step)
+                start, stop, step = idx.indices(int(self._items))
+                dtype = getattr(self._items, "dtype", torch.int64)
+                return torch.arange(start, stop, step, dtype=dtype)
             if isinstance(idx, int):
                 if idx < 0:
                     idx += self._items
@@ -169,7 +175,11 @@ class ItemSet:
                     raise IndexError(
                         f"{type(self).__name__} index out of range."
                     )
-                return idx
+                return (
+                    torch.tensor(idx, dtype=self._items.dtype)
+                    if is_torch_scalar(self._items)
+                    else idx
+                )
             raise TypeError(
                 f"{type(self).__name__} indices must be integer or slice."
             )
