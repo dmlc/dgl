@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 
-from .. import backend as F, utils
+from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
 from . import rpc

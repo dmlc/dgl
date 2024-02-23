@@ -2,7 +2,7 @@
 
 import torch as th
 
-from .... import backend as F, utils
+from .... import backend as F
 from ...dist_tensor import DistTensor
 
 

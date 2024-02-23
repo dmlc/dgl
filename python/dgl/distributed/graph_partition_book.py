@@ -4,6 +4,7 @@ import pickle
 from abc import ABC
 
 import numpy as np
+import torch
 
 from .. import backend as F, utils
 from .._ffi.ndarray import empty_shared_mem
