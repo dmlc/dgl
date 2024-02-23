@@ -1254,9 +1254,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
-                        F.gather_row(g.edges[etype].data[name], local_edges)
-                    )
+                    edge_feats[
+                        _etype_tuple_to_str(etype) + "/" + name
+                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1291,9 +1291,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
-                        F.gather_row(g.edges[etype].data[name], local_edges)
-                    )
+                    edge_feats[
+                        _etype_tuple_to_str(etype) + "/" + name
+                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1479,9 +1479,9 @@ def dgl_partition_to_graphbolt(
         torch.save(csc_graph, csc_graph_path)
 
         # Update graph path.
-        new_part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = (
-            os.path.relpath(csc_graph_path, os.path.dirname(part_config))
-        )
+        new_part_meta[f"part-{part_id}"][
+            "part_graph_graphbolt"
+        ] = os.path.relpath(csc_graph_path, os.path.dirname(part_config))
 
     # Update partition config.
     _dump_part_config(part_config, new_part_meta)
