@@ -9,6 +9,7 @@ __all__ = ["ItemSet", "ItemSetDict"]
 
 
 def is_torch_scalar(x):
+    """Checks if the input is a torch.Tensor with 0 dimensions; a scalar."""
     return isinstance(x, torch.Tensor) and len(x.shape) == 0
 
 
