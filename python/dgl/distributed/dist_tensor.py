@@ -9,7 +9,7 @@ from .dist_context import is_initialized
 from .kvstore import get_kvstore
 from .role import get_role
 from .rpc import get_group_id
-from .utils import totensor, toindex
+from .utils import totensor
 
 
 def _default_init_data(shape, dtype):

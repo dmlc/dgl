@@ -788,9 +788,7 @@ class RangePartitionBook(GraphPartitionBook):
         # [TODO][Rui] replace numpy with torch.
         nids = nids.numpy()
         if ntype == DEFAULT_NTYPE:
-            ret = np.searchsorted(
-                self._max_node_ids, nids, side="right"
-            )
+            ret = np.searchsorted(self._max_node_ids, nids, side="right")
         else:
             ret = np.searchsorted(
                 self._typed_max_node_ids[ntype], nids, side="right"
@@ -802,9 +800,7 @@ class RangePartitionBook(GraphPartitionBook):
         # [TODO][Rui] replace numpy with torch.
         eids = eids.numpy()
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
-            ret = np.searchsorted(
-                self._max_edge_ids, eids, side="right"
-            )
+            ret = np.searchsorted(self._max_edge_ids, eids, side="right")
         else:
             c_etype = self.to_canonical_etype(etype)
             ret = np.searchsorted(

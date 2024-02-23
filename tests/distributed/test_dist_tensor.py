@@ -61,7 +61,6 @@ def check_binary_op(key1, key2, key3, op):
         _ = dist_g.edata[key3][F.tensor([100, 20, 10], F.int64)]
 
 
-
 @unittest.skipIf(
     dgl.backend.backend_name == "tensorflow",
     reason="TF doesn't support some of operations in DistGraph",
