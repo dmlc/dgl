@@ -52,7 +52,22 @@ class ItemSet:
     >>> item_set.names
     ('seed_nodes',)
 
-    2. Single iterable: seed nodes.
+    2. Torch scalar: number of nodes. Customizable dtype compared to Integer.
+
+    >>> num = torch.tensor(10, dtype=torch.int32)
+    >>> item_set = gb.ItemSet(num, names="seed_nodes")
+    >>> list(item_set)
+    [tensor(0, dtype=torch.int32), tensor(1, dtype=torch.int32),
+     tensor(2, dtype=torch.int32), tensor(3, dtype=torch.int32),
+     tensor(4, dtype=torch.int32), tensor(5, dtype=torch.int32),
+     tensor(6, dtype=torch.int32), tensor(7, dtype=torch.int32),
+     tensor(8, dtype=torch.int32), tensor(9, dtype=torch.int32)]
+    >>> item_set[:]
+    tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], dtype=torch.int32)
+    >>> item_set.names
+    ('seed_nodes',)
+
+    3. Single iterable: seed nodes.
 
     >>> node_ids = torch.arange(0, 5)
     >>> item_set = gb.ItemSet(node_ids, names="seed_nodes")
@@ -63,7 +78,7 @@ class ItemSet:
     >>> item_set.names
     ('seed_nodes',)
 
-    3. Tuple of iterables with same shape: seed nodes and labels.
+    4. Tuple of iterables with same shape: seed nodes and labels.
 
     >>> node_ids = torch.arange(0, 5)
     >>> labels = torch.arange(5, 10)
@@ -77,7 +92,7 @@ class ItemSet:
     >>> item_set.names
     ('seed_nodes', 'labels')
 
-    4. Tuple of iterables with different shape: node pairs and negative dsts.
+    5. Tuple of iterables with different shape: node pairs and negative dsts.
 
     >>> node_pairs = torch.arange(0, 10).reshape(-1, 2)
     >>> neg_dsts = torch.arange(10, 25).reshape(-1, 3)
