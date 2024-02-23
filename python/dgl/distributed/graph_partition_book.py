@@ -6,7 +6,7 @@ from abc import ABC
 import numpy as np
 import torch
 
-from .. import backend as F, utils
+from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 from ..base import DGLError
 from ..ndarray import exist_shared_mem_array

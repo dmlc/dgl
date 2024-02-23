@@ -2,8 +2,6 @@
 
 import os
 
-import torch
-
 from .. import backend as F
 
 from .dist_context import is_initialized
