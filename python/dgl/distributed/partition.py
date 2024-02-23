@@ -30,8 +30,12 @@ from .graph_partition_book import (
 
 
 RESERVED_FIELD_DTYPE = {
-    "inner_node": F.uint8,  # A flag indicates whether the node is inside a partition.
-    "inner_edge": F.uint8,  # A flag indicates whether the edge is inside a partition.
+    "inner_node": (
+        F.uint8
+    ),  # A flag indicates whether the node is inside a partition.
+    "inner_edge": (
+        F.uint8
+    ),  # A flag indicates whether the edge is inside a partition.
     NID: F.int64,
     EID: F.int64,
     NTYPE: F.int16,
@@ -511,6 +515,23 @@ def load_partition_book(part_config, part_id):
 
     node_map = _get_part_ranges(node_map)
     edge_map = _get_part_ranges(edge_map)
+
+    # Format dtype of node/edge map if dtype is specified.
+    def _format_node_edge_map(part_metadata, map_type, data):
+        key = f"{map_type}_map_dtype"
+        if key not in part_metadata:
+            return data
+        dtype = part_metadata[key]
+        assert dtype in ["int32", "int64"], (
+            f"The {map_type} map dtype should be either int32 or int64, "
+            f"but got {dtype}."
+        )
+        for key in data:
+            data[key] = data[key].astype(dtype)
+        return data
+
+    node_map = _format_node_edge_map(part_metadata, "node", node_map)
+    edge_map = _format_node_edge_map(part_metadata, "edge", edge_map)
 
     # Sort the node/edge maps by the node/edge type ID.
     node_map = dict(sorted(node_map.items(), key=lambda x: ntypes[x[0]]))
@@ -1233,9 +1254,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1270,9 +1291,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1458,9 +1479,9 @@ def dgl_partition_to_graphbolt(
         torch.save(csc_graph, csc_graph_path)
 
         # Update graph path.
-        new_part_meta[f"part-{part_id}"][
-            "part_graph_graphbolt"
-        ] = os.path.relpath(csc_graph_path, os.path.dirname(part_config))
+        new_part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = (
+            os.path.relpath(csc_graph_path, os.path.dirname(part_config))
+        )
 
     # Update partition config.
     _dump_part_config(part_config, new_part_meta)
