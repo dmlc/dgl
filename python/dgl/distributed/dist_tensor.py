@@ -200,13 +200,9 @@ class DistTensor:
             self.kvstore.delete_data(self._name)
 
     def __getitem__(self, idx):
-        idx = utils.toindex(idx)
-        idx = idx.tousertensor()
         return self.kvstore.pull(name=self._name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
-        idx = utils.toindex(idx)
-        idx = idx.tousertensor()
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self._name, id_tensor=idx, data_tensor=val)
 
