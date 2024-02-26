@@ -811,7 +811,7 @@ class DistGraph:
         int
         """
         # TODO(da?): describe when self._g is None and idtype shouldn't be called.
-        return F.int64
+        return self._g.indices.dtype if self._use_graphbolt else F.int64
 
     @property
     def device(self):
