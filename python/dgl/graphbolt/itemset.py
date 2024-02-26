@@ -10,8 +10,8 @@ __all__ = ["ItemSet", "ItemSetDict"]
 
 def is_scalar(x):
     """Checks if the input is a scalar."""
-    return (isinstance(x, torch.Tensor) and len(x.shape) == 0) or isinstance(
-        x, int
+    return (
+        len(x.shape) == 0 if isinstance(x, torch.Tensor) else isinstance(x, int)
     )
 
 
