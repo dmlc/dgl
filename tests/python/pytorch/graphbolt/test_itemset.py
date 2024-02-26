@@ -4,7 +4,6 @@ import dgl
 import pytest
 import torch
 from dgl import graphbolt as gb
-from torch.testing import assert_close
 
 
 def test_ItemSet_names():
@@ -36,6 +35,18 @@ def test_ItemSet_names():
         match=re.escape("Number of items (1) and names (2) must match."),
     ):
         _ = gb.ItemSet(torch.arange(0, 5), names=("seed_nodes", "labels"))
+
+
+@pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
+def test_ItemSet_scalar_dtype(dtype):
+    item_set = gb.ItemSet(torch.tensor(5, dtype=dtype), names="seed_nodes")
+    for i, item in enumerate(item_set):
+        assert i == item
+        assert item.dtype == dtype
+    assert item_set[2] == torch.tensor(2, dtype=dtype)
+    assert torch.equal(
+        item_set[slice(1, 4, 2)], torch.arange(1, 4, 2, dtype=dtype)
+    )
 
 
 def test_ItemSet_length():
