@@ -172,12 +172,13 @@ def _graph_data_to_fused_csc_sampling_graph(
         edge_attributes = {}
         if include_original_edge_id:
             # If uint8 or int16 was chosen above for etypes, we cast to int.
-            temp_types = type_per_edge.int() if dtype_id < 2 else type_per_edge
+            temp_etypes = type_per_edge.int() if dtype_id < 2 else type_per_edge
             edge_ids -= torch.index_select(
                 torch.tensor(edge_type_offset, dtype=edge_ids.dtype),
                 dim=0,
-                index=temp_types,
+                index=temp_etypes,
             )
+            del temp_etypes
             edge_attributes[ORIGINAL_EDGE_ID] = edge_ids
 
     # Load the sampling related node/edge features and add them to
