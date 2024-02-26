@@ -11,6 +11,7 @@ import backend as F
 import dgl
 import numpy as np
 import pytest
+import torch
 from dgl.data import CitationGraphDataset, WN18Dataset
 from dgl.distributed import (
     DistGraph,
@@ -56,7 +57,9 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     try:
         sampled_graph = sample_neighbors(
-            dist_graph, [0, 10, 99, 66, 1024, 2008], 3
+            dist_graph,
+            torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+            3,
         )
     except Exception as e:
         print(traceback.format_exc())
@@ -86,7 +89,10 @@ def start_sample_client_shuffle(
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(
-        dist_graph, [0, 10, 99, 66, 1024, 2008], 3, use_graphbolt=use_graphbolt
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+        use_graphbolt=use_graphbolt,
     )
 
     assert (
@@ -1383,7 +1389,11 @@ def check_standalone_sampling(tmpdir):
     dist_graph = DistGraph(
         "test_sampling", part_config=tmpdir / "test_sampling.json"
     )
-    sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+    sampled_graph = sample_neighbors(
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+    )
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.num_nodes() == g.num_nodes()
@@ -1394,13 +1404,19 @@ def check_standalone_sampling(tmpdir):
     )
 
     sampled_graph = sample_neighbors(
-        dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob="mask"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+        prob="mask",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert mask[eid].all()
 
     sampled_graph = sample_neighbors(
-        dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob="prob"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+        prob="prob",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert (prob[eid] > 0).all()
@@ -1429,7 +1445,11 @@ def check_standalone_etype_sampling(tmpdir):
     dist_graph = DistGraph(
         "test_sampling", part_config=tmpdir / "test_sampling.json"
     )
-    sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], 3)
+    sampled_graph = sample_etype_neighbors(
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+    )
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.num_nodes() == hg.num_nodes()
@@ -1440,13 +1460,19 @@ def check_standalone_etype_sampling(tmpdir):
     )
 
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 10, 99, 66, 1023], 3, prob="mask"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+        prob="mask",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert mask[eid].all()
 
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 10, 99, 66, 1023], 3, prob="prob"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+        prob="prob",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert (prob[eid] > 0).all()
@@ -1479,7 +1505,12 @@ def check_standalone_etype_sampling_heterograph(tmpdir):
         "test_hetero_sampling", part_config=tmpdir / "test_hetero_sampling.json"
     )
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], 1
+        dist_graph,
+        torch.tensor(
+            [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701],
+            dtype=dist_graph.idtype,
+        ),
+        1,
     )
     src, dst = sampled_graph.edges(etype=("paper", "cite", "paper"))
     assert len(src) == 10

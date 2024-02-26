@@ -99,7 +99,7 @@ class DistEmbedding:
 
     def __call__(self, idx, device=th.device("cpu")):
         """
-        node_ids : th.tensor
+        idx : th.tensor
             Index of the embeddings to collect.
         device : th.device
             Target device to put the collected embeddings.
