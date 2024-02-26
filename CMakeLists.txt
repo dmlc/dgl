@@ -530,7 +530,7 @@ if(BUILD_GRAPHBOLT)
   include(ExternalProject)
   ExternalProject_Add(
       liburing
-      URL "https://github.com/axboe/liburing/archive/refs/tags/liburing-2.5.tar.gz"
+      URL "https://github.com/axboe/liburing/archive/refs/tags/liburing-2.5.zip"
       CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
       BUILD_COMMAND bash -c "make -j `nproc`"
       BUILD_IN_SOURCE ON
