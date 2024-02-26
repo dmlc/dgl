@@ -448,9 +448,11 @@ def start_node_dataloader(
     assert len(dist_graph.ntypes) == len(groundtruth_g.ntypes)
     assert len(dist_graph.etypes) == len(groundtruth_g.etypes)
     if len(dist_graph.etypes) == 1:
-        train_nid = th.arange(num_nodes_to_sample)
+        train_nid = th.arange(num_nodes_to_sample, dtype=dist_graph.idtype)
     else:
-        train_nid = {"n3": th.arange(num_nodes_to_sample)}
+        train_nid = {
+            "n3": th.arange(num_nodes_to_sample, dtype=dist_graph.idtype)
+        }
 
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(part_config, i)
