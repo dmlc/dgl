@@ -690,7 +690,7 @@ def check_rpc_hetero_sampling_empty_shuffle(
         pserver_list.append(p)
 
     deg = get_degrees(g, orig_nids["n3"], "n3")
-    empty_nids = F.nonzero_1d(deg == 0)
+    empty_nids = F.nonzero_1d(deg == 0).to(g.idtype)
     block, gpb = start_hetero_sample_client(
         0,
         tmpdir,
@@ -840,7 +840,7 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(
 
     fanout = 3
     deg = get_degrees(g, orig_nids["n3"], "n3")
-    empty_nids = F.nonzero_1d(deg == 0)
+    empty_nids = F.nonzero_1d(deg == 0).to(g.idtype)
     block, gpb = start_hetero_etype_sample_client(
         0,
         tmpdir,
@@ -991,7 +991,7 @@ def check_rpc_bipartite_sampling_empty(
         pserver_list.append(p)
 
     deg = get_degrees(g, orig_nids["game"], "game")
-    empty_nids = F.nonzero_1d(deg == 0)
+    empty_nids = F.nonzero_1d(deg == 0).to(g.idtype)
     nodes = {"game": empty_nids, "user": torch.tensor([1], dtype=g.idtype)}
     block, _ = start_bipartite_sample_client(
         0,
@@ -1132,7 +1132,7 @@ def check_rpc_bipartite_etype_sampling_empty(
         pserver_list.append(p)
 
     deg = get_degrees(g, orig_nids["game"], "game")
-    empty_nids = F.nonzero_1d(deg == 0)
+    empty_nids = F.nonzero_1d(deg == 0).to(g.idtype)
     nodes = {"game": empty_nids, "user": torch.tensor([1], dtype=g.idtype)}
     block, _ = start_bipartite_etype_sample_client(
         0,
