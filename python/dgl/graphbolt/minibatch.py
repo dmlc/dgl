@@ -231,7 +231,7 @@ class MiniBatch:
             self.sampled_subgraphs[0].sampled_csc, Dict
         )
 
-        # casts to minimum dtype in-place and returns self.
+        # Casts to minimum dtype in-place and returns self.
         def cast_to_minimum_dtype(v: CSCFormatBase):
             # Checks if number of vertices and edges fit into an int32.
             dtype = (
