@@ -8,7 +8,7 @@ import torch
 import dgl
 from dgl.utils import recursive_apply
 
-from .base import etype_str_to_tuple, expand_indptr
+from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
@@ -231,6 +231,19 @@ class MiniBatch:
             self.sampled_subgraphs[0].sampled_csc, Dict
         )
 
+        # casts to minimum dtype in-place and returns self.
+        def cast_to_minimum_dtype(v: CSCFormatBase):
+            # Checks if number of vertices and edges fit into an int32.
+            dtype = (
+                torch.int32
+                if max(v.indptr.size(0) - 2, v.indices.size(0))
+                <= torch.iinfo(torch.int32).max
+                else torch.int64
+            )
+            v.indptr = v.indptr.to(dtype)
+            v.indices = v.indices.to(dtype)
+            return v
+
         blocks = []
         for subgraph in self.sampled_subgraphs:
             original_row_node_ids = subgraph.original_row_node_ids
@@ -242,6 +255,8 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
+                for v in subgraph.sampled_csc.values():
+                    cast_to_minimum_dtype(v)
                 sampled_csc = {
                     etype_str_to_tuple(etype): (
                         "csc",
@@ -267,7 +282,7 @@ class MiniBatch:
                     for ntype, nodes in original_column_node_ids.items()
                 }
             else:
-                sampled_csc = subgraph.sampled_csc
+                sampled_csc = cast_to_minimum_dtype(subgraph.sampled_csc)
                 sampled_csc = (
                     "csc",
                     (
@@ -500,7 +515,7 @@ class MiniBatch:
             col_nodes = torch.cat(col_nodes)
             row_nodes = torch.cat(row_nodes)
             edge_index = torch.unique(
-                torch.stack((col_nodes, row_nodes)), dim=1
+                torch.stack((row_nodes, col_nodes)), dim=1
             )
 
         if self.node_features is None:

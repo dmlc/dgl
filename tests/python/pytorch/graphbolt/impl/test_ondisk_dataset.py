@@ -2725,7 +2725,7 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id, edge_fmt):
             ("user", "click", "item"): 20000,
         }
         num_classes = 10
-        gbt.genereate_raw_data_for_hetero_dataset(
+        gbt.generate_raw_data_for_hetero_dataset(
             test_dir,
             dataset_name,
             num_nodes,

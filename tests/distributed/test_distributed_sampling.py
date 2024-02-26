@@ -84,9 +84,7 @@ def start_sample_client_shuffle(
             tmpdir / "test_sampling.json", rank
         )
     dgl.distributed.initialize("rpc_ip_config.txt")
-    dist_graph = DistGraph(
-        "test_sampling", gpb=gpb, use_graphbolt=use_graphbolt
-    )
+    dist_graph = DistGraph("test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(
         dist_graph, [0, 10, 99, 66, 1024, 2008], 3, use_graphbolt=use_graphbolt
     )
@@ -477,9 +475,7 @@ def start_hetero_sample_client(
             tmpdir / "test_sampling.json", rank
         )
     dgl.distributed.initialize("rpc_ip_config.txt")
-    dist_graph = DistGraph(
-        "test_sampling", gpb=gpb, use_graphbolt=use_graphbolt
-    )
+    dist_graph = DistGraph("test_sampling", gpb=gpb)
     assert "feat" in dist_graph.nodes["n1"].data
     assert "feat" not in dist_graph.nodes["n2"].data
     assert "feat" not in dist_graph.nodes["n3"].data
@@ -517,9 +513,7 @@ def start_hetero_etype_sample_client(
             tmpdir / "test_sampling.json", rank
         )
     dgl.distributed.initialize("rpc_ip_config.txt")
-    dist_graph = DistGraph(
-        "test_sampling", gpb=gpb, use_graphbolt=use_graphbolt
-    )
+    dist_graph = DistGraph("test_sampling", gpb=gpb)
     assert "feat" in dist_graph.nodes["n1"].data
     assert "feat" not in dist_graph.nodes["n2"].data
     assert "feat" not in dist_graph.nodes["n3"].data
@@ -876,9 +870,7 @@ def start_bipartite_sample_client(
             tmpdir / "test_sampling.json", rank
         )
     dgl.distributed.initialize("rpc_ip_config.txt")
-    dist_graph = DistGraph(
-        "test_sampling", gpb=gpb, use_graphbolt=use_graphbolt
-    )
+    dist_graph = DistGraph("test_sampling", gpb=gpb)
     assert "feat" in dist_graph.nodes["user"].data
     assert "feat" in dist_graph.nodes["game"].data
     if gpb is None:
@@ -911,9 +903,7 @@ def start_bipartite_etype_sample_client(
             tmpdir / "test_sampling.json", rank
         )
     dgl.distributed.initialize("rpc_ip_config.txt")
-    dist_graph = DistGraph(
-        "test_sampling", gpb=gpb, use_graphbolt=use_graphbolt
-    )
+    dist_graph = DistGraph("test_sampling", gpb=gpb)
     assert "feat" in dist_graph.nodes["user"].data
     assert "feat" in dist_graph.nodes["game"].data
 

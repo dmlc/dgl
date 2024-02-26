@@ -90,9 +90,9 @@ def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
         argument avoids a stream synchronization to calculate the output shape.
 
     Returns
-        -------
-        torch.Tensor
-            The converted COO tensor with values from node_ids.
+    -------
+    torch.Tensor
+        The converted COO tensor with values from node_ids.
     """
     assert indptr.dim() == 1, "Indptr should be 1D tensor."
     assert not (
@@ -127,9 +127,9 @@ def index_select(tensor, index):
         The 1-D tensor containing the indices to index.
 
     Returns
-        -------
-        torch.Tensor
-            The indexed input tensor, equivalent to tensor[index].
+    -------
+    torch.Tensor
+        The indexed input tensor, equivalent to tensor[index].
     """
     assert index.dim() == 1, "Index should be 1D tensor."
     return torch.ops.graphbolt.index_select(tensor, index)

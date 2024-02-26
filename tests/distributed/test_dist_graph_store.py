@@ -141,7 +141,7 @@ def run_client_empty(
     gpb, graph_name, _, _ = load_partition_book(
         "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
-    g = DistGraph(graph_name, gpb=gpb, use_graphbolt=use_graphbolt)
+    g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph_empty(g, num_clients, num_nodes, num_edges)
 
 
@@ -222,7 +222,7 @@ def run_client(
     gpb, graph_name, _, _ = load_partition_book(
         "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
-    g = DistGraph(graph_name, gpb=gpb, use_graphbolt=use_graphbolt)
+    g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph(
         g, num_clients, num_nodes, num_edges, use_graphbolt=use_graphbolt
     )
@@ -322,7 +322,7 @@ def run_client_hierarchy(
     gpb, graph_name, _, _ = load_partition_book(
         "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
-    g = DistGraph(graph_name, gpb=gpb, use_graphbolt=use_graphbolt)
+    g = DistGraph(graph_name, gpb=gpb)
     node_mask = F.tensor(node_mask)
     edge_mask = F.tensor(edge_mask)
     nodes = node_split(
@@ -742,7 +742,7 @@ def run_client_hetero(
     gpb, graph_name, _, _ = load_partition_book(
         "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
-    g = DistGraph(graph_name, gpb=gpb, use_graphbolt=use_graphbolt)
+    g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph_hetero(
         g, num_clients, num_nodes, num_edges, use_graphbolt=use_graphbolt
     )
