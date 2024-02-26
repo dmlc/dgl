@@ -282,6 +282,14 @@ def check_hetero_partition(
         src_ntype_ids, part_src_ids = gpb.map_to_per_ntype(part_src_ids)
         dst_ntype_ids, part_dst_ids = gpb.map_to_per_ntype(part_dst_ids)
         etype_ids, part_eids = gpb.map_to_per_etype(part_eids)
+        # `IdMap` is in int64 by default.
+        assert src_ntype_ids.dtype == F.int64
+        assert dst_ntype_ids.dtype == F.int64
+        assert etype_ids.dtype == F.int64
+        with pytest.raises(dgl.utils.internal.InconsistentDtypeException):
+            gpb.map_to_per_ntype(F.tensor([0], F.int32))
+        with pytest.raises(dgl.utils.internal.InconsistentDtypeException):
+            gpb.map_to_per_etype(F.tensor([0], F.int32))
         # These are original per-type IDs.
         for etype_id, etype in enumerate(hg.canonical_etypes):
             part_src_ids1 = F.boolean_mask(part_src_ids, etype_ids == etype_id)
@@ -541,13 +549,21 @@ def test_partition(
     reset_envs()
 
 
-def test_RangePartitionBook():
+@pytest.mark.parametrize("node_map_dtype", [F.int32, F.int64])
+@pytest.mark.parametrize("edge_map_dtype", [F.int32, F.int64])
+def test_RangePartitionBook(node_map_dtype, edge_map_dtype):
     part_id = 1
     num_parts = 2
 
     # homogeneous
-    node_map = {DEFAULT_NTYPE: F.tensor([[0, 1000], [1000, 2000]])}
-    edge_map = {DEFAULT_ETYPE: F.tensor([[0, 5000], [5000, 10000]])}
+    node_map = {
+        DEFAULT_NTYPE: F.tensor([[0, 1000], [1000, 2000]], dtype=node_map_dtype)
+    }
+    edge_map = {
+        DEFAULT_ETYPE: F.tensor(
+            [[0, 5000], [5000, 10000]], dtype=edge_map_dtype
+        )
+    }
     ntypes = {DEFAULT_NTYPE: 0}
     etypes = {DEFAULT_ETYPE: 0}
     gpb = RangePartitionBook(
@@ -556,6 +572,21 @@ def test_RangePartitionBook():
     assert gpb.etypes == [DEFAULT_ETYPE[1]]
     assert gpb.canonical_etypes == [DEFAULT_ETYPE]
     assert gpb.to_canonical_etype(DEFAULT_ETYPE[1]) == DEFAULT_ETYPE
+    ntype_ids, per_ntype_ids = gpb.map_to_per_ntype(
+        F.tensor([0, 1000], dtype=node_map_dtype)
+    )
+    assert ntype_ids.dtype == node_map_dtype
+    assert per_ntype_ids.dtype == node_map_dtype
+    assert np.all(F.asnumpy(ntype_ids) == 0)
+    assert np.all(F.asnumpy(per_ntype_ids) == [0, 1000])
+
+    etype_ids, per_etype_ids = gpb.map_to_per_etype(
+        F.tensor([0, 5000], dtype=edge_map_dtype)
+    )
+    assert etype_ids.dtype == edge_map_dtype
+    assert per_etype_ids.dtype == edge_map_dtype
+    assert np.all(F.asnumpy(etype_ids) == 0)
+    assert np.all(F.asnumpy(per_etype_ids) == [0, 5000])
 
     node_policy = NodePartitionPolicy(gpb, DEFAULT_NTYPE)
     assert node_policy.type_name == DEFAULT_NTYPE
@@ -564,10 +595,12 @@ def test_RangePartitionBook():
 
     # Init via etype is not supported
     node_map = {
-        "node1": F.tensor([[0, 1000], [1000, 2000]]),
-        "node2": F.tensor([[0, 1000], [1000, 2000]]),
+        "node1": F.tensor([[0, 1000], [1000, 2000]], dtype=node_map_dtype),
+        "node2": F.tensor([[0, 1000], [1000, 2000]], dtype=node_map_dtype),
     }
-    edge_map = {"edge1": F.tensor([[0, 5000], [5000, 10000]])}
+    edge_map = {
+        "edge1": F.tensor([[0, 5000], [5000, 10000]], dtype=edge_map_dtype)
+    }
     ntypes = {"node1": 0, "node2": 1}
     etypes = {"edge1": 0}
     expect_except = False
@@ -587,11 +620,13 @@ def test_RangePartitionBook():
 
     # heterogeneous, init via canonical etype
     node_map = {
-        "node1": F.tensor([[0, 1000], [1000, 2000]]),
-        "node2": F.tensor([[0, 1000], [1000, 2000]]),
+        "node1": F.tensor([[0, 1000], [1000, 2000]], dtype=node_map_dtype),
+        "node2": F.tensor([[0, 1000], [1000, 2000]], dtype=node_map_dtype),
     }
     edge_map = {
-        ("node1", "edge1", "node2"): F.tensor([[0, 5000], [5000, 10000]])
+        ("node1", "edge1", "node2"): F.tensor(
+            [[0, 5000], [5000, 10000]], dtype=edge_map_dtype
+        )
     }
     ntypes = {"node1": 0, "node2": 1}
     etypes = {("node1", "edge1", "node2"): 0}
@@ -603,6 +638,23 @@ def test_RangePartitionBook():
     assert gpb.canonical_etypes == [c_etype]
     assert gpb.to_canonical_etype("edge1") == c_etype
     assert gpb.to_canonical_etype(c_etype) == c_etype
+
+    ntype_ids, per_ntype_ids = gpb.map_to_per_ntype(
+        F.tensor([0, 1000], dtype=node_map_dtype)
+    )
+    assert ntype_ids.dtype == node_map_dtype
+    assert per_ntype_ids.dtype == node_map_dtype
+    assert np.all(F.asnumpy(ntype_ids) == 0)
+    assert np.all(F.asnumpy(per_ntype_ids) == [0, 1000])
+
+    etype_ids, per_etype_ids = gpb.map_to_per_etype(
+        F.tensor([0, 5000], dtype=edge_map_dtype)
+    )
+    assert etype_ids.dtype == edge_map_dtype
+    assert per_etype_ids.dtype == edge_map_dtype
+    assert np.all(F.asnumpy(etype_ids) == 0)
+    assert np.all(F.asnumpy(per_etype_ids) == [0, 5000])
+
     expect_except = False
     try:
         gpb.to_canonical_etype(("node1", "edge2", "node2"))
