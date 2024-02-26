@@ -508,7 +508,7 @@ def start_hetero_etype_sample_client(
     tmpdir,
     disable_shared_mem,
     fanout=3,
-    nodes={"n3": [0, 10, 99, 66, 124, 208]},
+    nodes=None,
     etype_sorted=False,
     use_graphbolt=False,
     return_eids=False,
@@ -748,12 +748,13 @@ def check_rpc_hetero_etype_sampling_shuffle(
     etype_sorted = False
     if graph_formats is not None:
         etype_sorted = "csc" in graph_formats or "csr" in graph_formats
+    nodes = {"n3": torch.tensor([0, 10, 99, 66, 124, 208], dtype=g.idtype)}
     block, gpb = start_hetero_etype_sample_client(
         0,
         tmpdir,
         num_server > 1,
         fanout,
-        nodes={"n3": [0, 10, 99, 66, 124, 208]},
+        nodes=nodes,
         etype_sorted=etype_sorted,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
