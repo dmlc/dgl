@@ -143,7 +143,7 @@ Done! You can now run your GNN program with ARGO enabled.
     
 .. rubric:: Footnotes
 
-.. [#f1] https://github.com/dmlc/dgl/tree/master/examples/pytorch/argo/argo_scale.png)
+.. [#f1] https://github.com/dmlc/dgl/tree/master/examples/pytorch/argo/argo_scale.png
 .. [#f2] https://arxiv.org/abs/2402.03671
 .. [#f3] https://github.com/dmlc/dgl/tree/master/examples/pytorch/argo/ogb_example.py
 .. [#f4] https://github.com/dmlc/dgl/tree/master/examples/pytorch/argo/ogb_example_ARGO.py
