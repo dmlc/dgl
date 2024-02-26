@@ -8,9 +8,11 @@ import torch
 __all__ = ["ItemSet", "ItemSetDict"]
 
 
-def is_torch_scalar(x):
-    """Checks if the input is a torch.Tensor with 0 dimensions; a scalar."""
-    return isinstance(x, torch.Tensor) and len(x.shape) == 0
+def is_scalar(x):
+    """Checks if the input is a scalar."""
+    return (isinstance(x, torch.Tensor) and len(x.shape) == 0) or isinstance(
+        x, int
+    )
 
 
 class ItemSet:
@@ -114,10 +116,10 @@ class ItemSet:
 
     def __init__(
         self,
-        items: Union[int, Iterable, Tuple[Iterable]],
+        items: Union[int, torch.Tensor, Iterable, Tuple[Iterable]],
         names: Union[str, Tuple[str]] = None,
     ) -> None:
-        if isinstance(items, (int, tuple)) or is_torch_scalar(items):
+        if isinstance(items, tuple) or is_scalar(items):
             self._items = items
         else:
             self._items = (items,)
@@ -137,7 +139,7 @@ class ItemSet:
             self._names = None
 
     def __iter__(self) -> Iterator:
-        if isinstance(self._items, int) or is_torch_scalar(self._items):
+        if is_scalar(self._items):
             dtype = getattr(self._items, "dtype", torch.int64)
             yield from torch.arange(self._items, dtype=dtype)
             return
@@ -164,7 +166,7 @@ class ItemSet:
                 yield tuple(item)
 
     def __len__(self) -> int:
-        if isinstance(self._items, int) or is_torch_scalar(self._items):
+        if is_scalar(self._items):
             return int(self._items)
         if isinstance(self._items[0], Sized):
             return len(self._items[0])
@@ -179,7 +181,7 @@ class ItemSet:
             raise TypeError(
                 f"{type(self).__name__} instance doesn't support indexing."
             )
-        if isinstance(self._items, int) or is_torch_scalar(self._items):
+        if is_scalar(self._items):
             if isinstance(idx, slice):
                 start, stop, step = idx.indices(int(self._items))
                 dtype = getattr(self._items, "dtype", torch.int64)
@@ -193,7 +195,7 @@ class ItemSet:
                     )
                 return (
                     torch.tensor(idx, dtype=self._items.dtype)
-                    if is_torch_scalar(self._items)
+                    if isinstance(self._items, torch.Tensor)
                     else idx
                 )
             raise TypeError(
