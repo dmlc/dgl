@@ -87,18 +87,18 @@ def _graph_data_to_fused_csc_sampling_graph(
         src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
         num_nodes = graph_data["nodes"][0]["num"]
         num_edges = len(src)
-        coo_tensor = torch.tensor(
-            np.array([src, dst]),
-            dtype=(
-                torch.int32
-                if max(num_nodes, num_edges) - 1 <= torch.iinfo(torch.int32).max
-                else torch.int64
-            ),
-        )
+        coo_tensor = torch.tensor(np.array([src, dst]))
         sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
         del coo_tensor
         indptr, indices, edge_ids = sparse_matrix.csc()
         del sparse_matrix
+
+        if num_nodes <= torch.iinfo(torch.int32).max:
+            indices = indices.to(torch.int32)
+        if num_edges <= torch.iinfo(torch.int32).max:
+            indptr = indptr.to(torch.int32)
+            edge_ids = edge_ids.to(torch.int32)
+
         node_type_offset = None
         type_per_edge = None
         node_type_to_id = None
@@ -136,21 +136,17 @@ def _graph_data_to_fused_csc_sampling_graph(
             dst += node_type_offset[node_type_to_id[dst_type]]
             coo_src_list.append(torch.tensor(src))
             coo_dst_list.append(torch.tensor(dst))
-            coo_etype_list.append(
-                torch.full((len(src),), etype_id, dtype=torch.int32)
-            )
+            coo_etype_list.append(torch.full((len(src),), etype_id))
         total_num_edges = edge_type_offset[-1]
-        if (
-            max(total_num_nodes, total_num_edges) - 1
-            <= torch.iinfo(torch.int32).max
-        ):
-            coo_src_list = [tensor.to(torch.int32) for tensor in coo_src_list]
-            coo_dst_list = [tensor.to(torch.int32) for tensor in coo_dst_list]
 
         coo_src = torch.cat(coo_src_list)
         del coo_src_list
         coo_dst = torch.cat(coo_dst_list)
         del coo_dst_list
+        if len(edge_type_to_id) <= torch.iinfo(torch.int32).max:
+            coo_etype_list = [
+                tensor.to(torch.int32) for tensor in coo_etype_list
+            ]
         coo_etype = torch.cat(coo_etype_list)
         del coo_etype_list
 
@@ -161,6 +157,13 @@ def _graph_data_to_fused_csc_sampling_graph(
         del coo_src, coo_dst
         indptr, indices, edge_ids = sparse_matrix.csc()
         del sparse_matrix
+
+        if total_num_nodes <= torch.iinfo(torch.int32).max:
+            indices = indices.to(torch.int32)
+        if total_num_edges <= torch.iinfo(torch.int32).max:
+            indptr = indptr.to(torch.int32)
+            edge_ids = edge_ids.to(torch.int32)
+
         node_type_offset = torch.tensor(node_type_offset)
         type_per_edge = torch.index_select(coo_etype, dim=0, index=edge_ids)
         del coo_etype
@@ -168,7 +171,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         edge_attributes = {}
         if include_original_edge_id:
             edge_ids -= torch.index_select(
-                torch.tensor(edge_type_offset),
+                torch.tensor(edge_type_offset, dtype=edge_ids.dtype),
                 dim=0,
                 index=type_per_edge,
             )
@@ -397,7 +400,7 @@ def preprocess_ondisk_dataset(
     )
 
     node_ids_within_int32 = (
-        sampling_graph.total_num_nodes - 1 <= torch.iinfo(torch.int32).max
+        sampling_graph.total_num_nodes <= torch.iinfo(torch.int32).max
     )
     torch.save(
         sampling_graph,
