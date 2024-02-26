@@ -767,7 +767,7 @@ def start_multiple_dataloaders(
     dgl.distributed.initialize(ip_config)
     dist_g = dgl.distributed.DistGraph(graph_name, part_config=part_config)
     if dataloader_type == "node":
-        train_ids = th.arange(orig_g.num_nodes())
+        train_ids = th.arange(orig_g.num_nodes(), dtype=dist_g.idtype)
         batch_size = orig_g.num_nodes() // 100
     else:
         train_ids = th.arange(orig_g.num_edges())
