@@ -1154,11 +1154,7 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
             torch.arange(
                 0,
                 num_samples,
-                dtype=(
-                    torch.int32
-                    if num_nodes <= torch.iinfo(torch.int32).max
-                    else torch.int64
-                ),
+                dtype=fused_csc_sampling_graph.indices.dtype,
             ),
             torch.tensor([fanout]),
         )
@@ -1365,7 +1361,7 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(edge_fmt="numpy"):
             torch.arange(
                 0,
                 num_samples,
-                dtype=torch.int32,
+                dtype=fused_csc_sampling_graph.indices.dtype,
             ),
             torch.tensor([fanout]),
         )
