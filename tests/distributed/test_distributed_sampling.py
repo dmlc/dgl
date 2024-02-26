@@ -596,11 +596,12 @@ def check_rpc_hetero_sampling_shuffle(
         time.sleep(1)
         pserver_list.append(p)
 
+    nodes = {"n3": torch.tensor([0, 10, 99, 66, 124, 208], dtype=g.idtype)}
     block, gpb = start_hetero_sample_client(
         0,
         tmpdir,
         num_server > 1,
-        nodes={"n3": [0, 10, 99, 66, 124, 208]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
