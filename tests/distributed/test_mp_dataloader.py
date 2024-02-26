@@ -124,7 +124,7 @@ def start_dist_dataloader(
     for i in range(2):
         # Create DataLoader for constructing blocks
         dataloader = DistDataLoader(
-            dataset=train_nid.numpy(),
+            dataset=train_nid,
             batch_size=batch_size,
             collate_fn=sampler.sample_blocks,
             shuffle=False,
