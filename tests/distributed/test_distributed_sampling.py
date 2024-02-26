@@ -485,6 +485,9 @@ def start_hetero_sample_client(
     assert "feat" in dist_graph.nodes["n1"].data
     assert "feat" not in dist_graph.nodes["n2"].data
     assert "feat" not in dist_graph.nodes["n3"].data
+    nodes = {
+        k: torch.tensor(v, dtype=dist_graph.idtype) for k, v in nodes.items()
+    }
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:
@@ -523,6 +526,9 @@ def start_hetero_etype_sample_client(
     assert "feat" in dist_graph.nodes["n1"].data
     assert "feat" not in dist_graph.nodes["n2"].data
     assert "feat" not in dist_graph.nodes["n3"].data
+    nodes = {
+        k: torch.tensor(v, dtype=dist_graph.idtype) for k, v in nodes.items()
+    }
 
     if (not use_graphbolt) and dist_graph.local_partition is not None:
         # Check whether etypes are sorted in dist_graph
@@ -881,6 +887,9 @@ def start_bipartite_sample_client(
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     assert "feat" in dist_graph.nodes["user"].data
     assert "feat" in dist_graph.nodes["game"].data
+    nodes = {
+        k: torch.tensor(v, dtype=dist_graph.idtype) for k, v in nodes.items()
+    }
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     # Enable santity check in distributed sampling.
@@ -914,6 +923,9 @@ def start_bipartite_etype_sample_client(
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     assert "feat" in dist_graph.nodes["user"].data
     assert "feat" in dist_graph.nodes["game"].data
+    nodes = {
+        k: torch.tensor(v, dtype=dist_graph.idtype) for k, v in nodes.items()
+    }
 
     if not use_graphbolt and dist_graph.local_partition is not None:
         # Check whether etypes are sorted in dist_graph
