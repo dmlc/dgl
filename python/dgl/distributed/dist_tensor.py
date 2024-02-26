@@ -2,12 +2,13 @@
 
 import os
 
-from .. import backend as F, utils
+from .. import backend as F
 
 from .dist_context import is_initialized
 from .kvstore import get_kvstore
 from .role import get_role
 from .rpc import get_group_id
+from .utils import totensor
 
 
 def _default_init_data(shape, dtype):
@@ -200,13 +201,11 @@ class DistTensor:
             self.kvstore.delete_data(self._name)
 
     def __getitem__(self, idx):
-        idx = utils.toindex(idx)
-        idx = idx.tousertensor()
+        idx = totensor(idx)
         return self.kvstore.pull(name=self._name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
-        idx = utils.toindex(idx)
-        idx = idx.tousertensor()
+        idx = totensor(idx)
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self._name, id_tensor=idx, data_tensor=val)
 
