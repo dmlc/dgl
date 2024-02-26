@@ -195,13 +195,15 @@ def train(args):
                 rmse=count_rmse / count_num,
             )
             logging_str = (
-                "Iter={}, loss={:.4f}, rmse={:.4f}, time={:.4f}".format(
+                "Iter={:4d}, loss={:.4f}, rmse={:.4f}".format(
                     iter_idx,
                     count_loss / iter_idx,
                     count_rmse / count_num,
-                    np.average(dur),
                 )
             )
+            if iter_idx > 3:
+               logging_str += ", time={:.4f}".format(np.average(dur))
+
             count_rmse = 0
             count_num = 0
 
