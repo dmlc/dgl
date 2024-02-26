@@ -88,3 +88,5 @@ if(DEFINED MKL_LIBRARIES)
                           ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
 
+target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${LIBURING_INCLUDE})
+target_link_libraries(${LIB_GRAPHBOLT_NAME} ${LIBURING})

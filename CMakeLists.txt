@@ -527,6 +527,20 @@ endif(BUILD_SPARSE)
 
 if(BUILD_GRAPHBOLT)
   message(STATUS "Configuring graphbolt library")
+  include(ExternalProject)
+  ExternalProject_Add(
+      liburing
+      URL "https://github.com/axboe/liburing/archive/refs/tags/liburing-2.5.tar.gz"
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+      BUILD_COMMAND bash -c "make -j `nproc`"
+      BUILD_IN_SOURCE ON
+      INSTALL_COMMAND make install
+      BUILD_BYPRODUCTS <INSTALL_DIR>/lib/liburing.a
+      BUILD_BYPRODUCTS <INSTALL_DIR>/include
+      DOWNLOAD_EXTRACT_TIMESTAMP true
+  )
+  set(LIBURING_INCLUDE ${CMAKE_BINARY_DIR}liburing-prefix/include)
+  set(LIBURING ${CMAKE_BINARY_DIR}/liburing-prefix/lib/liburing.a)
   string(REPLACE ";" "\\;" CUDA_ARCHITECTURES_ESCAPED "${CUDA_ARCHITECTURES}")
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
   file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
