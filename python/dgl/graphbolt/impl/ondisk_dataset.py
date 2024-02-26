@@ -862,15 +862,29 @@ class OnDiskDataset(Dataset):
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
             dgl_warning(
-                "`all_node_set` is returned as None, since graph is None."
+                "`all_nodes_set` is returned as None, since graph is None."
             )
             return None
+
+        def int_to_dtype(n):
+            return (
+                torch.int32
+                if n <= torch.iinfo(torch.int32).max
+                else torch.int64
+            )
+
         num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
-            return ItemSet(num_nodes, names="seed_nodes")
+            return ItemSet(
+                torch.tensor(num_nodes, dtype=int_to_dtype(num_nodes)),
+                names="seed_nodes",
+            )
         else:
+            dtype = int_to_dtype(sum(num_nodes.values()))
             data = {
-                node_type: ItemSet(num_node, names="seed_nodes")
+                node_type: ItemSet(
+                    torch.tensor(num_node, dtype=dtype), names="seed_nodes"
+                )
                 for node_type, num_node in num_nodes.items()
             }
             return ItemSetDict(data)
