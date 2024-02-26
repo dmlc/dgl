@@ -41,7 +41,7 @@ class NeighborSampler(object):
     def sample_blocks(self, seeds):
         import torch as th
 
-        seeds = th.LongTensor(np.asarray(seeds))
+        seeds = th.tensor(np.asarray(seeds), dtype=self.g.idtype)
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
