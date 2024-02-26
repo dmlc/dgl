@@ -1,5 +1,6 @@
 """GraphBolt OnDiskDataset."""
 
+import bisect
 import json
 import os
 import shutil
@@ -25,7 +26,6 @@ from ..internal import (
     read_edges,
 )
 from ..itemset import ItemSet, ItemSetDict
-from ..minibatch import MiniBatch
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
     fused_csc_sampling_graph,
@@ -46,7 +46,7 @@ NAMES_INDICATING_NODE_IDS = [
     "node_pairs",
     "seeds",
     "negative_srcs",
-    "negative_srcs",
+    "negative_dsts",
 ]
 
 
@@ -143,10 +143,11 @@ def _graph_data_to_fused_csc_sampling_graph(
         del coo_src_list
         coo_dst = torch.cat(coo_dst_list)
         del coo_dst_list
-        if len(edge_type_to_id) <= torch.iinfo(torch.int32).max:
-            coo_etype_list = [
-                tensor.to(torch.int32) for tensor in coo_etype_list
-            ]
+        dtypes = [torch.uint8, torch.int16, torch.int32, torch.int64]
+        dtype_maxes = [torch.iinfo(dtype).max for dtype in dtypes]
+        dtype_id = bisect.bisect_left(dtype_maxes, len(edge_type_to_id) - 1)
+        etype_dtype = dtypes[dtype_id]
+        coo_etype_list = [tensor.to(etype_dtype) for tensor in coo_etype_list]
         coo_etype = torch.cat(coo_etype_list)
         del coo_etype_list
 
@@ -441,7 +442,6 @@ def preprocess_ondisk_dataset(
 
     # 6. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
-        _minibatch = MiniBatch()
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
         ):
@@ -469,7 +469,6 @@ def preprocess_ondisk_dataset(
                             input_data["format"],
                             output_data["format"],
                             within_int32=node_ids_within_int32
-                            and name is not None
                             and name in NAMES_INDICATING_NODE_IDS,
                         )
 

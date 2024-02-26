@@ -1156,7 +1156,7 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
                 num_samples,
                 dtype=(
                     torch.int32
-                    if num_nodes - 1 <= torch.iinfo(torch.int32).max
+                    if num_nodes <= torch.iinfo(torch.int32).max
                     else torch.int64
                 ),
             ),
