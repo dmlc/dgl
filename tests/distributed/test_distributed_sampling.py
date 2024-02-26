@@ -1584,7 +1584,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    nodes = [0, 10, 99, 66, 1024, 2008]
+    nodes = torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=g.idtype)
     sampled_graph = start_in_subgraph_client(0, tmpdir, num_server > 1, nodes)
     for p in pserver_list:
         p.join()
