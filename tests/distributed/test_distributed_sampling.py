@@ -980,11 +980,12 @@ def check_rpc_bipartite_sampling_empty(
 
     deg = get_degrees(g, orig_nids["game"], "game")
     empty_nids = F.nonzero_1d(deg == 0)
+    nodes = {"game": empty_nids, "user": torch.tensor([1], dtype=g.idtype)}
     block, _ = start_bipartite_sample_client(
         0,
         tmpdir,
         num_server > 1,
-        nodes={"game": empty_nids, "user": [1]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
@@ -1040,11 +1041,12 @@ def check_rpc_bipartite_sampling_shuffle(
 
     deg = get_degrees(g, orig_nid_map["game"], "game")
     nids = F.nonzero_1d(deg > 0)
+    nodes = {"game": nids, "user": torch.tensor([0], dtype=g.idtype)}
     block, gpb = start_bipartite_sample_client(
         0,
         tmpdir,
         num_server > 1,
-        nodes={"game": nids, "user": [0]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
@@ -1119,11 +1121,12 @@ def check_rpc_bipartite_etype_sampling_empty(
 
     deg = get_degrees(g, orig_nids["game"], "game")
     empty_nids = F.nonzero_1d(deg == 0)
+    nodes = {"game": empty_nids, "user": torch.tensor([1], dtype=g.idtype)}
     block, _ = start_bipartite_etype_sample_client(
         0,
         tmpdir,
         num_server > 1,
-        nodes={"game": empty_nids, "user": [1]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
@@ -1181,12 +1184,13 @@ def check_rpc_bipartite_etype_sampling_shuffle(
     fanout = 3
     deg = get_degrees(g, orig_nid_map["game"], "game")
     nids = F.nonzero_1d(deg > 0)
+    nodes = {"game": nids, "user": torch.tensor([0], dtype=g.idtype)}
     block, gpb = start_bipartite_etype_sample_client(
         0,
         tmpdir,
         num_server > 1,
         fanout,
-        nodes={"game": nids, "user": [0]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
