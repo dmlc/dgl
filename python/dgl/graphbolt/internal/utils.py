@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import shutil
 from typing import List, Union
 
 import numpy as np
@@ -109,23 +110,23 @@ def copy_or_convert_data(
         output_format == "numpy"
     ), "The output format of the data should be numpy."
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    # If the original format is numpy, just copy the file.
+    # We read the data always in case we need to cast its type.
+    data = read_data(input_path, input_format, in_memory)
+    if within_int32:
+        data = _to_int32(data)
     if input_format == "numpy":
-        data = read_data(input_path, input_format, in_memory)
-        if within_int32:
-            data = _to_int32(data)
         # If dim of the data is 1, reshape it to n * 1 and save it to output_path.
         if is_feature and get_npy_dim(input_path) == 1:
             data = data.reshape(-1, 1)
-        save_data(data, output_path, output_format)
+        # If the data does not need to be modified, just copy the file.
+        elif not within_int32:
+            shutil.copyfile(input_path, output_path)
+            return
     else:
-        # If the original format is not numpy, convert it to numpy.
-        data = read_data(input_path, input_format, in_memory)
-        if within_int32:
-            data = data.to(torch.int32)
+        # If dim of the data is 1, reshape it to n * 1 and save it to output_path.
         if is_feature and data.dim() == 1:
             data = data.reshape(-1, 1)
-        save_data(data, output_path, output_format)
+    save_data(data, output_path, output_format)
 
 
 def get_attributes(_obj) -> list:

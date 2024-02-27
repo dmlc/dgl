@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 
-from .. import backend as F, utils
+from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
 from . import rpc
@@ -1376,8 +1376,6 @@ class KVClient(object):
             a vector storing the global data ID
         """
         assert len(name) > 0, "name cannot be empty."
-        id_tensor = utils.toindex(id_tensor)
-        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, "ID must be a vector."
         # partition data
         machine_id = self._part_policy[name].to_partid(id_tensor)
@@ -1399,8 +1397,6 @@ class KVClient(object):
             a tensor with the same row size of data ID
         """
         assert len(name) > 0, "name cannot be empty."
-        id_tensor = utils.toindex(id_tensor)
-        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, "ID must be a vector."
         assert (
             F.shape(id_tensor)[0] == F.shape(data_tensor)[0]
@@ -1452,8 +1448,6 @@ class KVClient(object):
             a data tensor with the same row size of id_tensor.
         """
         assert len(name) > 0, "name cannot be empty."
-        id_tensor = utils.toindex(id_tensor)
-        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, "ID must be a vector."
         if self._pull_handlers[name] is default_pull_handler:  # Use fast-pull
             part_id = self._part_policy[name].to_partid(id_tensor)

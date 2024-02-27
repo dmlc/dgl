@@ -1,5 +1,6 @@
 """GraphBolt OnDiskDataset."""
 
+import bisect
 import json
 import os
 import shutil
@@ -25,7 +26,6 @@ from ..internal import (
     read_edges,
 )
 from ..itemset import ItemSet, ItemSetDict
-from ..minibatch import MiniBatch
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
     fused_csc_sampling_graph,
@@ -46,7 +46,7 @@ NAMES_INDICATING_NODE_IDS = [
     "node_pairs",
     "seeds",
     "negative_srcs",
-    "negative_srcs",
+    "negative_dsts",
 ]
 
 
@@ -143,10 +143,11 @@ def _graph_data_to_fused_csc_sampling_graph(
         del coo_src_list
         coo_dst = torch.cat(coo_dst_list)
         del coo_dst_list
-        if len(edge_type_to_id) <= torch.iinfo(torch.int32).max:
-            coo_etype_list = [
-                tensor.to(torch.int32) for tensor in coo_etype_list
-            ]
+        dtypes = [torch.uint8, torch.int16, torch.int32, torch.int64]
+        dtype_maxes = [torch.iinfo(dtype).max for dtype in dtypes]
+        dtype_id = bisect.bisect_left(dtype_maxes, len(edge_type_to_id) - 1)
+        etype_dtype = dtypes[dtype_id]
+        coo_etype_list = [tensor.to(etype_dtype) for tensor in coo_etype_list]
         coo_etype = torch.cat(coo_etype_list)
         del coo_etype_list
 
@@ -177,11 +178,14 @@ def _graph_data_to_fused_csc_sampling_graph(
         node_attributes = {}
         edge_attributes = {}
         if include_original_edge_id:
+            # If uint8 or int16 was chosen above for etypes, we cast to int.
+            temp_etypes = type_per_edge.int() if dtype_id < 2 else type_per_edge
             edge_ids -= torch.index_select(
                 torch.tensor(edge_type_offset, dtype=edge_ids.dtype),
                 dim=0,
-                index=type_per_edge,
+                index=temp_etypes,
             )
+            del temp_etypes
             edge_attributes[ORIGINAL_EDGE_ID] = edge_ids
 
     # Load the sampling related node/edge features and add them to
@@ -448,7 +452,6 @@ def preprocess_ondisk_dataset(
 
     # 6. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
-        _minibatch = MiniBatch()
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
         ):
@@ -476,7 +479,6 @@ def preprocess_ondisk_dataset(
                             input_data["format"],
                             output_data["format"],
                             within_int32=node_ids_within_int32
-                            and name is not None
                             and name in NAMES_INDICATING_NODE_IDS,
                         )
 
@@ -869,15 +871,21 @@ class OnDiskDataset(Dataset):
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
             dgl_warning(
-                "`all_node_set` is returned as None, since graph is None."
+                "`all_nodes_set` is returned as None, since graph is None."
             )
             return None
         num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
-            return ItemSet(num_nodes, names="seed_nodes")
+            return ItemSet(
+                torch.tensor(num_nodes, dtype=graph.indices.dtype),
+                names="seed_nodes",
+            )
         else:
             data = {
-                node_type: ItemSet(num_node, names="seed_nodes")
+                node_type: ItemSet(
+                    torch.tensor(num_node, dtype=graph.indices.dtype),
+                    names="seed_nodes",
+                )
                 for node_type, num_node in num_nodes.items()
             }
             return ItemSetDict(data)
