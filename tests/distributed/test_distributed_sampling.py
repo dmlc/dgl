@@ -79,6 +79,7 @@ def start_sample_client_shuffle(
     orig_eid,
     use_graphbolt=False,
     return_eids=False,
+    node_id_dtype=None,
 ):
     os.environ["DGL_GROUP_ID"] = str(group_id)
     gpb = None
@@ -90,10 +91,17 @@ def start_sample_client_shuffle(
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(
         dist_graph,
-        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=node_id_dtype),
         3,
         use_graphbolt=use_graphbolt,
     )
+    assert sampled_graph.idtype == dist_graph.idtype
+    if use_graphbolt:
+        # dtype conversion is applied for GraphBolt partitions.
+        assert sampled_graph.idtype == torch.int32
+    else:
+        # dtype conversion is not applied for non-GraphBolt partitions.
+        assert sampled_graph.idtype == torch.int64
 
     assert (
         dgl.ETYPE not in sampled_graph.edata
@@ -399,7 +407,12 @@ def test_rpc_sampling():
 
 
 def check_rpc_sampling_shuffle(
-    tmpdir, num_server, num_groups=1, use_graphbolt=False, return_eids=False
+    tmpdir,
+    num_server,
+    num_groups=1,
+    use_graphbolt=False,
+    return_eids=False,
+    node_id_dtype=None,
 ):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
@@ -454,6 +467,7 @@ def check_rpc_sampling_shuffle(
                     orig_eids,
                     use_graphbolt,
                     return_eids,
+                    node_id_dtype,
                 ),
             )
             p.start()
@@ -1237,7 +1251,10 @@ def check_rpc_bipartite_etype_sampling_shuffle(
 @pytest.mark.parametrize("num_server", [1])
 @pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("return_eids", [False, True])
-def test_rpc_sampling_shuffle(num_server, use_graphbolt, return_eids):
+@pytest.mark.parametrize("node_id_dtype", [torch.int32, torch.int64])
+def test_rpc_sampling_shuffle(
+    num_server, use_graphbolt, return_eids, node_id_dtype
+):
     reset_envs()
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -1246,6 +1263,7 @@ def test_rpc_sampling_shuffle(num_server, use_graphbolt, return_eids):
             num_server,
             use_graphbolt=use_graphbolt,
             return_eids=return_eids,
+            node_id_dtype=node_id_dtype,
         )
 
 

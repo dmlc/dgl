@@ -1,6 +1,7 @@
 """Module for mapping between node/edge IDs and node/edge types."""
 
 import numpy as np
+import torch
 
 from .. import backend as F, utils
 
@@ -166,6 +167,12 @@ class IdMap:
         )
         ret = utils.toindex(ret, dtype=self.dtype_str).tousertensor()
         return ret[: len(ids)], ret[len(ids) :]
+
+    @property
+    def torch_dtype(self):
+        """Return the data type of the ID map."""
+        # [TODO][Rui] Use torch instead of numpy.
+        return torch.int32 if self.dtype == np.int32 else torch.int64
 
 
 _init_api("dgl.distributed.id_map")
