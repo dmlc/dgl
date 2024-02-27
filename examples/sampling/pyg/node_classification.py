@@ -38,6 +38,8 @@ main
 │           │
 │           ├───> Forward and backward passes
 │           │
+│           ├───> Convert GraphBolt MiniBatch to PyG Data
+│           │
 │           └───> Parameters optimization
 │
 └───> Evaluate the model
@@ -56,6 +58,7 @@ import torch
 import torch.nn.functional as F
 import torchmetrics.functional as MF
 from torch_geometric.nn import SAGEConv
+from tqdm import tqdm
 
 
 class GraphSAGE(torch.nn.Module):
@@ -87,7 +90,7 @@ class GraphSAGE(torch.nn.Module):
 
     def inference(self, args, dataloader, x_all, device):
         """Conduct layer-wise inference to get all the node embeddings."""
-        for i, layer in enumerate(self.layers):
+        for i, layer in tqdm(enumerate(self.layers), "inference"):
             xs = []
             for minibatch in dataloader:
                 # Call `to_pyg_data` to convert GB Minibatch to PyG Data.
@@ -106,24 +109,6 @@ class GraphSAGE(torch.nn.Module):
 def create_dataloader(
     dataset_set, graph, feature, batch_size, fanout, device, job
 ):
-    #####################################################################
-    # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
-    #
-    # - 'ItemSampler' samples mini-batches of node IDs from the dataset.
-    # - 'sample_neighbor' performs neighbor sampling on the graph.
-    # - 'FeatureFetcher' fetches node features based on the sampled subgraph.
-    # - 'CopyTo' copies the fetched data to the specified device.
-
-    #####################################################################
-    # Create a datapipe for mini-batch sampling with a specific neighbor fanout.
-    # Here, [10, 10, 10] specifies the number of neighbors sampled for each
-    # node at each layer. We're using `sample_neighbor` for consistency with
-    # DGL's sampling API.
-    # Note: GraphBolt offers additional sampling methods, such as
-    # `sample_layer_neighbor`, which could provide further optimization and
-    # efficiency for GNN training. Users are encouraged to explore these
-    # advanced features for potentially improved performance.
-
     # Initialize an ItemSampler to sample mini-batches from the dataset.
     datapipe = gb.ItemSampler(
         dataset_set,
@@ -146,29 +131,13 @@ def create_dataloader(
 
 
 def train(model, dataloader, optimizer, num_classes):
-    #####################################################################
-    # (HIGHLIGHT) Train the model for one epoch.
-    #
-    # - Iterates over the data loader, fetching mini-batches of graph data.
-    # - For each mini-batch, it performs a forward pass, computes loss, and
-    #   updates the model parameters.
-    # - The function returns the average loss and accuracy for the epoch.
-    #
-    # Parameters:
-    #   model: The GraphSAGE model.
-    #   dataloader: DataLoader that provides mini-batches of graph data.
-    #   optimizer: Optimizer used for updating model parameters.
-    #   criterion: Loss function used for training.
-    #   device: The device (CPU/GPU) to run the training on.
-    #####################################################################
-
     model.train()  # Set the model to training mode
     total_loss = 0  # Accumulator for the total loss
     total_correct = 0  # Accumulator for the total number of correct predictions
     total_samples = 0  # Accumulator for the total number of samples processed
     num_batches = 0  # Counter for the number of mini-batches processed
 
-    for minibatch in dataloader:
+    for _, minibatch in tqdm(enumerate(dataloader), "training"):
         #####################################################################
         # (HIGHLIGHT) Convert GraphBolt MiniBatch to PyG Data class.
         #
@@ -176,22 +145,21 @@ def train(model, dataloader, optimizer, num_classes):
         # with necessary data and information.
         #####################################################################
         pyg_data = minibatch.to_pyg_data()
+        pass
 
-        optimizer.zero_grad()
-        out = model(pyg_data.x, pyg_data.edge_index)[: pyg_data.y.shape[0]]
-        y = pyg_data.y
-        loss = F.cross_entropy(out, y)
-        loss.backward()
-        optimizer.step()
+        # optimizer.zero_grad()
+        # out = model(pyg_data.x, pyg_data.edge_index)[: pyg_data.y.shape[0]]
+        # y = pyg_data.y
+        # loss = F.cross_entropy(out, y)
+        # loss.backward()
+        # optimizer.step()
 
-        total_loss += loss.item()
-        total_correct += MF.accuracy(
-            out, y, task="multiclass", num_classes=num_classes
-        ) * y.size(0)
-        total_samples += y.size(0)
-        num_batches += 1
-    avg_loss = total_loss / num_batches
-    avg_accuracy = total_correct / total_samples
+        # total_loss += loss.item()
+        # total_correct += int(out.argmax(dim=-1).eq(y).sum())
+        # total_samples += y.size(0)
+        # num_batches += 1
+    avg_loss = 0#total_loss / num_batches
+    avg_accuracy = 0#total_correct / total_samples
     return avg_loss, avg_accuracy
 
 
@@ -200,7 +168,7 @@ def evaluate(model, dataloader, num_classes):
     model.eval()
     y_hats = []
     ys = []
-    for minibatch in dataloader:
+    for _, minibatch in tqdm(enumerate(dataloader), "evaluating"):
         pyg_data = minibatch.to_pyg_data()
         out = model(pyg_data.x, pyg_data.edge_index)[: pyg_data.y.shape[0]]
         y = pyg_data.y
@@ -260,7 +228,7 @@ def main():
     test_set = dataset.tasks[0].test_set
     all_nodes_set = dataset.all_nodes_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_dataloader = create_dataloader(
         train_set,
