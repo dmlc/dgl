@@ -527,6 +527,7 @@ endif(BUILD_SPARSE)
 
 if(BUILD_GRAPHBOLT)
   message(STATUS "Configuring graphbolt library")
+  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   include(ExternalProject)
   ExternalProject_Add(
       liburing
@@ -539,6 +540,7 @@ if(BUILD_GRAPHBOLT)
       BUILD_BYPRODUCTS <INSTALL_DIR>/include
       DOWNLOAD_EXTRACT_TIMESTAMP true
   )
+  endif()
   set(LIBURING_INCLUDE ${CMAKE_BINARY_DIR}liburing-prefix/include)
   set(LIBURING ${CMAKE_BINARY_DIR}/liburing-prefix/lib/liburing.a)
   string(REPLACE ";" "\\;" CUDA_ARCHITECTURES_ESCAPED "${CUDA_ARCHITECTURES}")
