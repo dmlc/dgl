@@ -64,7 +64,6 @@ Normalize.inverse_transform = inverse_transform
 
 
 class ARGO:
-
     def __init__(
         self,
         n_search=10,
