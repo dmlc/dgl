@@ -68,7 +68,7 @@ torch::Tensor DiskIndexSelect(std::string path, torch::Tensor index);
  * @param path Input numpy file path (string).
  * @return torch::Tensor Output tensor shape.
  */
-torch::Tensor DiskFeatureSize(std::string path);
+torch::Tensor DiskFeatureShape(std::string path);
 
 }  // namespace ops
 }  // namespace graphbolt

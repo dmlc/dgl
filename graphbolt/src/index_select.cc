@@ -28,9 +28,9 @@ torch::Tensor DiskIndexSelect(std::string path, torch::Tensor index) {
   return arr.index_select_iouring({index.to(torch::kLong)});
 }
 
-torch::Tensor DiskFeatureSize(std::string path) {
+torch::Tensor DiskFeatureShape(std::string path) {
   storage::OnDiskNpyArray arr(path);
-  return arr.feature_size();
+  return arr.feature_shape();
 }
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(

@@ -77,7 +77,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
   m.def("disk_index_select", &ops::DiskIndexSelect);
-  m.def("disk_feature_size", &ops::DiskFeatureSize);
+  m.def("disk_feature_size", &ops::DiskFeatureShape);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 }

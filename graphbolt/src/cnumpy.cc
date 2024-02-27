@@ -29,7 +29,7 @@ namespace storage {
 torch::Tensor OnDiskNpyArray::index_select_iouring(torch::Tensor idx) {
   int feature_fd = open(filename.c_str(), O_RDONLY | O_DIRECT);
 
-  int64_t feature_size = feature_dim * word_size;
+  int64_t feature_size = feat_dim * word_size;
   int64_t num_idx = idx.numel();
 
   // Multi-thread number.
@@ -123,7 +123,7 @@ torch::Tensor OnDiskNpyArray::index_select_iouring(torch::Tensor idx) {
                      .device(torch::kCPU)
                      .requires_grad(false);
   auto result =
-      torch::from_blob(result_buffer, {num_idx, feature_dim}, options).clone();
+      torch::from_blob(result_buffer, {num_idx, feat_dim}, options).clone();
 
   free(read_buffer);
   free(result_buffer);
@@ -145,14 +145,6 @@ void OnDiskNpyArray::parse_npy_header(FILE *fp) {
 
   size_t loc1, loc2;
 
-  // Get fortran order.
-  loc1 = header.find("fortran_order");
-  if (loc1 == std::string::npos)
-    throw std::runtime_error(
-        "parse_npy_header: failed to find header keyword: 'fortran_order'");
-  loc1 += 16;
-  fortran_order = (header.substr(loc1, 4) == "True" ? true : false);
-
   // Get shape location.
   loc1 = header.find("(");
   loc2 = header.find(")");
@@ -162,7 +154,7 @@ void OnDiskNpyArray::parse_npy_header(FILE *fp) {
 
   std::regex num_regex("[0-9][0-9]*");
   std::smatch sm;
-  shape.clear();
+  std::vector<int64_t> shape;  // The size of each dim.
 
   std::string str_shape = header.substr(loc1 + 1, loc2 - loc1 - 1);
   while (std::regex_search(str_shape, sm, num_regex)) {
@@ -170,15 +162,15 @@ void OnDiskNpyArray::parse_npy_header(FILE *fp) {
     str_shape = sm.suffix().str();
   }
 
-  feature_dim = 1;
+  feat_dim = 1;
   std::vector<int64_t> shape_vec;
   for (size_t i = 1; i < shape.size(); i++) {
-    feature_dim *= shape[i];
+    feat_dim *= shape[i];
     shape_vec.push_back(shape[i]);
   }
 
   at::TensorOptions opts = at::TensorOptions().dtype(at::kInt);
-  feat_size =
+  feat_shape =
       torch::from_blob(shape_vec.data(), {int64_t(shape_vec.size())}, opts)
           .clone();
 

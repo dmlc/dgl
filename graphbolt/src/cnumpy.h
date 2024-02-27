@@ -27,7 +27,7 @@ namespace storage {
 class OnDiskNpyArray {
  public:
   /** @brief Constructor with empty file path. */
-  OnDiskNpyArray() : shape(0), word_size(0), fortran_order(0) {}
+  OnDiskNpyArray() : word_size(0), prefix_len(0), feat_dim(0) {}
 
   /** @brief Constructor with given file path. */
   OnDiskNpyArray(std::string _filename) : filename(_filename) {
@@ -38,15 +38,6 @@ class OnDiskNpyArray {
     fclose(fp);
   }
 
-  /** @brief Get the pointer of numpy data loaded in memory. */
-  template <typename T>
-  T *data() {
-    return reinterpret_cast<T *>(data_holder + prefix_len);
-  }
-  template <typename T>
-  const T *data() const {
-    return reinterpret_cast<T *>(data_holder + prefix_len);
-  }
   /**
    * @brief Parse numpy meta data.
    */
@@ -55,7 +46,7 @@ class OnDiskNpyArray {
   /**
    * @brief Get the feature shape of numpy data according to meta data.
    */
-  torch::Tensor feature_size() { return feat_size; }
+  torch::Tensor feature_shape() { return feat_shape; }
 
   /**
    * @brief Read disk numpy file based on given index and transform to
@@ -64,14 +55,11 @@ class OnDiskNpyArray {
   torch::Tensor index_select_iouring(torch::Tensor idx);
 
  private:
-  char *data_holder;
-  std::string filename;
-  std::vector<int64_t> shape;
-  size_t word_size;
-  bool fortran_order;
-  size_t prefix_len;
-  signed long feature_dim;
-  torch::Tensor feat_size;
+  std::string filename;      // Path to numpy file.
+  torch::Tensor feat_shape;  // Shape of features, e.g. (N,M,K,L).
+  signed long feat_dim;      // Sum dim of a single feature, e.g. M*K*L.
+  size_t word_size;          // Number of bytes of a feature element.
+  size_t prefix_len;         // Length of head data in numpy file.
 };
 
 }  // namespace storage
