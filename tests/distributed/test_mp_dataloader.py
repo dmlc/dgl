@@ -11,6 +11,8 @@ import pytest
 import torch as th
 from dgl.data import CitationGraphDataset
 from dgl.distributed import (
+    DATA_LOADING_BACKEND_DGL,
+    DATA_LOADING_BACKEND_GRAPHBOLT,
     DistDataLoader,
     DistGraph,
     DistGraphServer,
@@ -104,7 +106,6 @@ def start_dist_dataloader(
         "test_sampling",
         gpb=gpb,
         part_config=part_config,
-        use_graphbolt=use_graphbolt,
     )
 
     # Create sampler
@@ -443,7 +444,6 @@ def start_node_dataloader(
         "test_sampling",
         gpb=gpb,
         part_config=part_config,
-        use_graphbolt=use_graphbolt,
     )
     assert len(dist_graph.ntypes) == len(groundtruth_g.ntypes)
     assert len(dist_graph.etypes) == len(groundtruth_g.etypes)
@@ -763,9 +763,7 @@ def start_multiple_dataloaders(
     use_graphbolt,
 ):
     dgl.distributed.initialize(ip_config)
-    dist_g = dgl.distributed.DistGraph(
-        graph_name, part_config=part_config, use_graphbolt=use_graphbolt
-    )
+    dist_g = dgl.distributed.DistGraph(graph_name, part_config=part_config)
     if dataloader_type == "node":
         train_ids = th.arange(orig_g.num_nodes())
         batch_size = orig_g.num_nodes() // 100

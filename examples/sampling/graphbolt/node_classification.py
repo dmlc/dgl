@@ -117,7 +117,7 @@ def create_dataloader(
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(
+    datapipe = getattr(datapipe, args.sample_mode)(
         graph, fanout if job != "infer" else [-1]
     )
 
@@ -157,7 +157,11 @@ def create_dataloader(
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.DataLoader(datapipe, num_workers=num_workers)
+    dataloader = gb.DataLoader(
+        datapipe,
+        num_workers=num_workers,
+        overlap_graph_fetch=args.overlap_graph_fetch,
+    )
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -358,11 +362,33 @@ def parse_args():
         " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-products",
+        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        help="The dataset we can use for node classification example. Currently"
+        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
+    )
+    parser.add_argument(
         "--mode",
         default="pinned-cuda",
         choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
         help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
+    )
+    parser.add_argument(
+        "--sample-mode",
+        default="sample_neighbor",
+        choices=["sample_neighbor", "sample_layer_neighbor"],
+        help="The sampling function when doing layerwise sampling.",
+    )
+    parser.add_argument(
+        "--overlap-graph-fetch",
+        action="store_true",
+        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
+        "If True, the data loader will overlap the UVA graph fetching operations"
+        "with the rest of operations by using an alternative CUDA stream. Disabled"
+        "by default.",
     )
     return parser.parse_args()
 
@@ -379,8 +405,12 @@ def main(args):
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
     # Move the dataset to the selected storage.
-    graph = dataset.graph.to(args.storage_device)
-    features = dataset.feature.to(args.storage_device)
+    if args.storage_device == "pinned":
+        graph = dataset.graph.pin_memory_()
+        features = dataset.feature.pin_memory_()
+    else:
+        graph = dataset.graph.to(args.storage_device)
+        features = dataset.feature.to(args.storage_device)
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set

@@ -14,7 +14,11 @@ from enum import Enum
 from .. import utils
 from ..base import dgl_warning, DGLError
 from . import rpc
-from .constants import MAX_QUEUE_SIZE
+from .constants import (
+    DATA_LOADING_BACKEND_DGL,
+    DATA_LOADING_BACKEND_GRAPHBOLT,
+    MAX_QUEUE_SIZE,
+)
 from .kvstore import close_kvstore, init_kvstore
 from .role import init_role
 from .rpc_client import connect_to_server
@@ -210,6 +214,7 @@ def initialize(
     max_queue_size=MAX_QUEUE_SIZE,
     net_type=None,
     num_worker_threads=1,
+    data_loading_backend=DATA_LOADING_BACKEND_DGL,
 ):
     """Initialize DGL's distributed module
 
@@ -231,6 +236,8 @@ def initialize(
         [Deprecated] Networking type, can be 'socket' only.
     num_worker_threads: int
         The number of OMP threads in each sampler process.
+    data_loading_backend: str, optional
+        The backend for data loading. Can be 'DGL' or 'GraphBolt'.
 
     Note
     ----
@@ -270,6 +277,8 @@ def initialize(
             int(os.environ.get("DGL_NUM_CLIENT")),
             os.environ.get("DGL_CONF_PATH"),
             graph_format=formats,
+            use_graphbolt=data_loading_backend
+            == DATA_LOADING_BACKEND_GRAPHBOLT,
         )
         serv.start()
         sys.exit()
