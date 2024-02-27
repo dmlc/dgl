@@ -156,6 +156,11 @@ def _sample_neighbors_graphbolt(
         output_size=local_src.shape[0],
     )
     global_nid_mapping = g.node_attributes[NID]
+    print(
+        f"----------- global_nid_mapping.dtype: {global_nid_mapping.dtype}, "
+        f"local_src.dtype: {local_src.dtype}, local_dst.dtype: "
+        f"{local_dst.dtype}"
+    )
     global_src = global_nid_mapping[local_src]
     global_dst = global_nid_mapping[local_dst]
 
