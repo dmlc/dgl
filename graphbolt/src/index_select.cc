@@ -24,12 +24,12 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
 }
 
 torch::Tensor DiskIndexSelect(std::string path, torch::Tensor index) {
-  cnpy::NpyArray arr(path);
+  storage::OnDiskNpyArray arr(path);
   return arr.index_select_iouring({index.to(torch::kLong)});
 }
 
 torch::Tensor DiskFeatureSize(std::string path) {
-  cnpy::NpyArray arr(path);
+  storage::OnDiskNpyArray arr(path);
   return arr.feature_size();
 }
 

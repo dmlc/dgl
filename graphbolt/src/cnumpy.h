@@ -18,18 +18,19 @@
 #include <string>
 #include <typeinfo>
 
-namespace cnpy {
+namespace graphbolt {
+namespace storage {
 
 /**
  * @brief Disk Numpy Fetecher class.
  */
-class NpyArray {
+class OnDiskNpyArray {
  public:
   /** @brief Constructor with empty file path. */
-  NpyArray() : shape(0), word_size(0), fortran_order(0) {}
+  OnDiskNpyArray() : shape(0), word_size(0), fortran_order(0) {}
 
   /** @brief Constructor with given file path. */
-  NpyArray(std::string _filename) : filename(_filename) {
+  OnDiskNpyArray(std::string _filename) : filename(_filename) {
     FILE *fp = fopen(_filename.c_str(), "rb");
     if (!fp)
       throw std::runtime_error("npy_load: Unable to open file " + _filename);
@@ -54,11 +55,11 @@ class NpyArray {
   /**
    * @brief Get the feature shape of numpy data according to meta data.
    */
-  torch::Tensor feature_size() { return feature_shape; }
+  torch::Tensor feature_size() { return feat_size; }
 
   /**
    * @brief Read disk numpy file based on given index and transform to
-   tensor.
+   * tensor.
    */
   torch::Tensor index_select_iouring(torch::Tensor idx);
 
@@ -70,7 +71,8 @@ class NpyArray {
   bool fortran_order;
   size_t prefix_len;
   signed long feature_dim;
-  torch::Tensor feature_shape;
+  torch::Tensor feat_size;
 };
 
-}  // namespace cnpy
+}  // namespace storage
+}  // namespace graphbolt
