@@ -528,18 +528,18 @@ endif(BUILD_SPARSE)
 if(BUILD_GRAPHBOLT)
   message(STATUS "Configuring graphbolt library")
   if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-  include(ExternalProject)
-  ExternalProject_Add(
-      liburing
-      SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
-      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
-      BUILD_COMMAND bash -c "make -j `nproc`"
-      BUILD_IN_SOURCE ON
-      INSTALL_COMMAND make install
-      BUILD_BYPRODUCTS <INSTALL_DIR>/lib/liburing.a
-      BUILD_BYPRODUCTS <INSTALL_DIR>/include
-      DOWNLOAD_EXTRACT_TIMESTAMP true
-  )
+    include(ExternalProject)
+    ExternalProject_Add(
+        liburing
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+        BUILD_COMMAND bash -c "make -j `nproc`"
+        BUILD_IN_SOURCE ON
+        INSTALL_COMMAND make install
+        BUILD_BYPRODUCTS <INSTALL_DIR>/lib/liburing.a
+        BUILD_BYPRODUCTS <INSTALL_DIR>/include
+        DOWNLOAD_EXTRACT_TIMESTAMP true
+    )
   endif()
   set(LIBURING_INCLUDE ${CMAKE_BINARY_DIR}liburing-prefix/include)
   set(LIBURING ${CMAKE_BINARY_DIR}/liburing-prefix/lib/liburing.a)
