@@ -164,7 +164,14 @@ def _graph_data_to_fused_csc_sampling_graph(
             indptr = indptr.to(torch.int32)
             edge_ids = edge_ids.to(torch.int32)
 
-        node_type_offset = torch.tensor(node_type_offset)
+        node_type_offset = torch.tensor(
+            node_type_offset,
+            dtype=(
+                torch.int32
+                if total_num_nodes <= torch.iinfo(torch.int32).max
+                else torch.int64
+            ),
+        )
         type_per_edge = torch.index_select(coo_etype, dim=0, index=edge_ids)
         del coo_etype
         node_attributes = {}
