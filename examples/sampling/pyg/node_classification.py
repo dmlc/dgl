@@ -145,21 +145,20 @@ def train(model, dataloader, optimizer, num_classes):
         # with necessary data and information.
         #####################################################################
         pyg_data = minibatch.to_pyg_data()
-        pass
 
-        # optimizer.zero_grad()
-        # out = model(pyg_data.x, pyg_data.edge_index)[: pyg_data.y.shape[0]]
-        # y = pyg_data.y
-        # loss = F.cross_entropy(out, y)
-        # loss.backward()
-        # optimizer.step()
+        optimizer.zero_grad()
+        out = model(pyg_data.x, pyg_data.edge_index)[: pyg_data.y.shape[0]]
+        y = pyg_data.y
+        loss = F.cross_entropy(out, y)
+        loss.backward()
+        optimizer.step()
 
-        # total_loss += loss.item()
-        # total_correct += int(out.argmax(dim=-1).eq(y).sum())
-        # total_samples += y.size(0)
-        # num_batches += 1
-    avg_loss = 0#total_loss / num_batches
-    avg_accuracy = 0#total_correct / total_samples
+        total_loss += float(loss)
+        total_correct += int(out.argmax(dim=-1).eq(y).sum())
+        total_samples += y.shape[0]
+        num_batches += 1
+    avg_loss = total_loss / num_batches
+    avg_accuracy = total_correct / total_samples
     return avg_loss, avg_accuracy
 
 
@@ -219,16 +218,16 @@ def main():
     )
     args = parser.parse_args()
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset_name = args.dataset
     dataset = gb.BuiltinDataset(dataset_name).load()
     graph = dataset.graph
-    feature = dataset.feature
+    feature = dataset.feature.to(device)
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
     all_nodes_set = dataset.all_nodes_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
-    device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_dataloader = create_dataloader(
         train_set,
@@ -258,7 +257,7 @@ def main():
         job="infer",
     )
     in_channels = feature.size("node", None, "feat")[0]
-    hidden_channels = 128
+    hidden_channels = 256
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
     for epoch in range(args.epochs):
