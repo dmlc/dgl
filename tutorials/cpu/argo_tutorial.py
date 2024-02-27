@@ -16,7 +16,7 @@ ARGO utilizes the scikit-optimize library for auto-tuning. Please install scikit
     conda install -c conda-forge "scikit-optimize>=0.9.0" 
 or
 .. code-block:: shell
-    pip install scikit-optimize
+    pip install scikit-optimize>=0.9
 
 Enabling ARGO on your own GNN program
 ```````````````````````````````````````````
