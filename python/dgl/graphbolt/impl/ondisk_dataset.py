@@ -829,10 +829,16 @@ class OnDiskDataset(Dataset):
             return None
         num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
-            return ItemSet(num_nodes, names="seed_nodes")
+            return ItemSet(
+                torch.tensor(num_nodes, dtype=graph.indices.dtype),
+                names="seed_nodes",
+            )
         else:
             data = {
-                node_type: ItemSet(num_node, names="seed_nodes")
+                node_type: ItemSet(
+                    torch.tensor(num_node, dtype=graph.indices.dtype),
+                    names="seed_nodes",
+                )
                 for node_type, num_node in num_nodes.items()
             }
             return ItemSetDict(data)
