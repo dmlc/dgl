@@ -1196,7 +1196,9 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
 
 
 @pytest.mark.parametrize("auto_cast", [False, True])
-def test_OnDiskDataset_preprocess_homogeneous_hardcode(auto_cast, edge_fmt="numpy"):
+def test_OnDiskDataset_preprocess_homogeneous_hardcode(
+    auto_cast, edge_fmt="numpy"
+):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         """Original graph in COO:
@@ -1360,7 +1362,10 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(auto_cast, edge_fmt="nump
         expected_dtype = torch.int32 if auto_cast else torch.int64
         assert fused_csc_sampling_graph.csc_indptr.dtype == expected_dtype
         assert fused_csc_sampling_graph.indices.dtype == expected_dtype
-        assert fused_csc_sampling_graph.edge_attributes[gb.ORIGINAL_EDGE_ID].dtype == expected_dtype
+        assert (
+            fused_csc_sampling_graph.edge_attributes[gb.ORIGINAL_EDGE_ID].dtype
+            == expected_dtype
+        )
 
         num_samples = 5
         fanout = 1
@@ -1376,7 +1381,9 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(auto_cast, edge_fmt="nump
 
 
 @pytest.mark.parametrize("auto_cast", [False, True])
-def test_OnDiskDataset_preprocess_heterogeneous_hardcode(auto_cast, edge_fmt="numpy"):
+def test_OnDiskDataset_preprocess_heterogeneous_hardcode(
+    auto_cast, edge_fmt="numpy"
+):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         """Original graph in COO:
@@ -1568,10 +1575,15 @@ def test_OnDiskDataset_preprocess_heterogeneous_hardcode(auto_cast, edge_fmt="nu
         expected_dtype = torch.int32 if auto_cast else torch.int64
         assert fused_csc_sampling_graph.csc_indptr.dtype == expected_dtype
         assert fused_csc_sampling_graph.indices.dtype == expected_dtype
-        assert fused_csc_sampling_graph.edge_attributes[gb.ORIGINAL_EDGE_ID].dtype == expected_dtype
+        assert (
+            fused_csc_sampling_graph.edge_attributes[gb.ORIGINAL_EDGE_ID].dtype
+            == expected_dtype
+        )
         assert fused_csc_sampling_graph.node_type_offset.dtype == expected_dtype
         expected_etype_dtype = torch.uint8 if auto_cast else torch.int64
-        assert fused_csc_sampling_graph.type_per_edge.dtype == expected_etype_dtype
+        assert (
+            fused_csc_sampling_graph.type_per_edge.dtype == expected_etype_dtype
+        )
 
 
 def test_OnDiskDataset_preprocess_path():
@@ -2649,7 +2661,9 @@ def test_BuiltinDataset():
 @pytest.mark.parametrize("auto_cast", [True, False])
 @pytest.mark.parametrize("include_original_edge_id", [True, False])
 @pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
-def test_OnDiskDataset_homogeneous(auto_cast, include_original_edge_id, edge_fmt):
+def test_OnDiskDataset_homogeneous(
+    auto_cast, include_original_edge_id, edge_fmt
+):
     """Preprocess and instantiate OnDiskDataset for homogeneous graph."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -2672,7 +2686,9 @@ def test_OnDiskDataset_homogeneous(auto_cast, include_original_edge_id, edge_fmt
             f.write(yaml_content)
 
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=include_original_edge_id, auto_cast_to_optimal_dtype=auto_cast
+            test_dir,
+            include_original_edge_id=include_original_edge_id,
+            auto_cast_to_optimal_dtype=auto_cast,
         ).load()
 
         assert dataset.dataset_name == dataset_name
@@ -2731,7 +2747,9 @@ def test_OnDiskDataset_homogeneous(auto_cast, include_original_edge_id, edge_fmt
 @pytest.mark.parametrize("auto_cast", [True, False])
 @pytest.mark.parametrize("include_original_edge_id", [True, False])
 @pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
-def test_OnDiskDataset_heterogeneous(auto_cast, include_original_edge_id, edge_fmt):
+def test_OnDiskDataset_heterogeneous(
+    auto_cast, include_original_edge_id, edge_fmt
+):
     """Preprocess and instantiate OnDiskDataset for heterogeneous graph."""
     with tempfile.TemporaryDirectory() as test_dir:
         dataset_name = "OnDiskDataset_hetero"
@@ -2754,7 +2772,9 @@ def test_OnDiskDataset_heterogeneous(auto_cast, include_original_edge_id, edge_f
         )
 
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=include_original_edge_id, auto_cast_to_optimal_dtype=auto_cast
+            test_dir,
+            include_original_edge_id=include_original_edge_id,
+            auto_cast_to_optimal_dtype=auto_cast,
         ).load()
 
         assert dataset.dataset_name == dataset_name
