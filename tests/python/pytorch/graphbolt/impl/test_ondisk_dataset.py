@@ -1120,9 +1120,14 @@ def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
-        output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, include_original_edge_id=False
-        )
+
+        with pytest.warns(
+            DGLWarning,
+            match="Edge feature is stored, but edge IDs are not saved.",
+        ):
+            output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False
+            )
 
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
@@ -1840,7 +1845,9 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        preprocessed_metadata_path = gb.preprocess_ondisk_dataset(test_dir)
+        preprocessed_metadata_path = gb.preprocess_ondisk_dataset(
+            test_dir, include_original_edge_id=True
+        )
         with open(preprocessed_metadata_path, "r") as f:
             yaml_data = yaml.safe_load(f)
 
@@ -1922,7 +1929,7 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
         # First preprocess on-disk dataset.
         preprocessed_metadata_path = (
             gb.ondisk_dataset.preprocess_ondisk_dataset(
-                test_dir, include_original_edge_id=False, force_preprocess=False
+                test_dir, include_original_edge_id=True, force_preprocess=False
             )
         )
         captured = capsys.readouterr().out.split("\n")
@@ -1955,7 +1962,7 @@ def test_OnDiskDataset_preprocess_force_preprocess(capsys):
         # Force preprocess on-disk dataset.
         preprocessed_metadata_path = (
             gb.ondisk_dataset.preprocess_ondisk_dataset(
-                test_dir, include_original_edge_id=False, force_preprocess=True
+                test_dir, include_original_edge_id=True, force_preprocess=True
             )
         )
         captured = capsys.readouterr().out.split("\n")
@@ -1995,7 +2002,7 @@ def test_OnDiskDataset_preprocess_auto_force_preprocess(capsys):
         # First preprocess on-disk dataset.
         preprocessed_metadata_path = (
             gb.ondisk_dataset.preprocess_ondisk_dataset(
-                test_dir, include_original_edge_id=False
+                test_dir, include_original_edge_id=True
             )
         )
         captured = capsys.readouterr().out.split("\n")
@@ -2016,7 +2023,7 @@ def test_OnDiskDataset_preprocess_auto_force_preprocess(capsys):
             yaml.dump(yaml_data, f)
         preprocessed_metadata_path = (
             gb.ondisk_dataset.preprocess_ondisk_dataset(
-                test_dir, include_original_edge_id=False
+                test_dir, include_original_edge_id=True
             )
         )
         captured = capsys.readouterr().out.split("\n")
@@ -2035,11 +2042,15 @@ def test_OnDiskDataset_preprocess_auto_force_preprocess(capsys):
         edge_feats = np.random.rand(num_edges, num_classes)
         edge_feat_path = os.path.join("data", "edge-feat.npy")
         np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
-        preprocessed_metadata_path = (
-            gb.ondisk_dataset.preprocess_ondisk_dataset(
-                test_dir, include_original_edge_id=False
+        with pytest.warns(
+            DGLWarning,
+            match="Edge feature is stored, but edge IDs are not saved.",
+        ):
+            preprocessed_metadata_path = (
+                gb.ondisk_dataset.preprocess_ondisk_dataset(
+                    test_dir, include_original_edge_id=False
+                )
             )
-        )
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "The on-disk dataset is re-preprocessing, so the existing "
@@ -2137,7 +2148,7 @@ def test_OnDiskDataset_load_name(edge_fmt):
             f.write(yaml_content)
 
         # Check modify `dataset_name` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         dataset.yaml_data["dataset_name"] = "fake_name"
         dataset.load()
         assert dataset.dataset_name == "fake_name"
@@ -2168,7 +2179,9 @@ def test_OnDiskDataset_load_feature(edge_fmt):
             f.write(yaml_content)
 
         # Case1. Test modify the `in_memory` field.
-        dataset = gb.OnDiskDataset(test_dir).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         original_feature_data = dataset.feature
         dataset.yaml_data["feature_data"][0]["in_memory"] = True
         load_dataset(dataset)
@@ -2181,7 +2194,7 @@ def test_OnDiskDataset_load_feature(edge_fmt):
         )
 
         # Case2. Test modify the `format` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         # If `format` is torch and `in_memory` is False, it will
         # raise an AssertionError.
         dataset.yaml_data["feature_data"][0]["in_memory"] = False
@@ -2192,7 +2205,7 @@ def test_OnDiskDataset_load_feature(edge_fmt):
         ):
             load_dataset(dataset)
 
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         dataset.yaml_data["feature_data"][0]["in_memory"] = True
         dataset.yaml_data["feature_data"][0]["format"] = "torch"
         # If `format` is torch and `in_memory` is True, it will
@@ -2201,7 +2214,7 @@ def test_OnDiskDataset_load_feature(edge_fmt):
             load_dataset(dataset)
 
         # Case3. Test modify the `path` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         # Use invalid path will raise an FileNotFoundError.
         dataset.yaml_data["feature_data"][0]["path"] = "fake_path"
         with pytest.raises(
@@ -2214,7 +2227,9 @@ def test_OnDiskDataset_load_feature(edge_fmt):
         # on Windows requires both a drive and a root), then all
         # previous segments are ignored and joining continues from
         # the absolute path segment.
-        dataset = load_dataset(gb.OnDiskDataset(test_dir))
+        dataset = load_dataset(
+            gb.OnDiskDataset(test_dir, include_original_edge_id=True)
+        )
         original_feature_data = dataset.feature
         dataset.yaml_data["feature_data"][0]["path"] = os.path.join(
             test_dir, dataset.yaml_data["feature_data"][0]["path"]
@@ -2263,7 +2278,7 @@ def test_OnDiskDataset_load_graph(edge_fmt):
         )
 
         # Case1. Test modify the `type` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         dataset.yaml_data["graph_topology"]["type"] = "fake_type"
         with pytest.raises(
             pydantic.ValidationError,
@@ -2274,7 +2289,7 @@ def test_OnDiskDataset_load_graph(edge_fmt):
             dataset.load()
 
         # Case2. Test modify the `path` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         dataset.yaml_data["graph_topology"]["path"] = "fake_path"
         with pytest.raises(
             FileNotFoundError,
@@ -2286,7 +2301,9 @@ def test_OnDiskDataset_load_graph(edge_fmt):
         # on Windows requires both a drive and a root), then all
         # previous segments are ignored and joining continues from
         # the absolute path segment.
-        dataset = gb.OnDiskDataset(test_dir).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         original_graph = dataset.graph
         dataset.yaml_data["graph_topology"]["path"] = os.path.join(
             test_dir, dataset.yaml_data["graph_topology"]["path"]
@@ -2322,9 +2339,13 @@ def test_OnDiskDataset_load_graph(edge_fmt):
             f.write(yaml_content)
 
         # Test do not generate original_edge_id.
-        dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=False
-        ).load()
+        with pytest.warns(
+            DGLWarning,
+            match="Edge feature is stored, but edge IDs are not saved.",
+        ):
+            dataset = gb.OnDiskDataset(
+                test_dir, include_original_edge_id=False
+            ).load()
         assert (
             dataset.graph.edge_attributes is None
             or gb.ORIGINAL_EDGE_ID not in dataset.graph.edge_attributes
@@ -2356,19 +2377,19 @@ def test_OnDiskDataset_load_tasks(edge_fmt):
             f.write(yaml_content)
 
         # Case1. Test modify the `name` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         dataset.yaml_data["tasks"][0]["name"] = "fake_name"
         dataset.load()
         assert dataset.tasks[0].metadata["name"] == "fake_name"
 
         # Case2. Test modify the `num_classes` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         dataset.yaml_data["tasks"][0]["num_classes"] = 100
         dataset.load()
         assert dataset.tasks[0].metadata["num_classes"] == 100
 
         # Case3. Test modify the `format` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         # Change the `format` field to torch.
         dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
             "format"
@@ -2376,7 +2397,7 @@ def test_OnDiskDataset_load_tasks(edge_fmt):
         with pytest.raises(pickle.UnpicklingError):
             dataset.load()
 
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
             "format"
         ] = "torch"
@@ -2389,7 +2410,7 @@ def test_OnDiskDataset_load_tasks(edge_fmt):
             dataset.load()
 
         # Case4. Test modify the `path` field.
-        dataset = gb.OnDiskDataset(test_dir)
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
         # Use invalid path will raise an FileNotFoundError.
         dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
             "path"
@@ -2405,7 +2426,9 @@ def test_OnDiskDataset_load_tasks(edge_fmt):
         # on Windows requires both a drive and a root), then all
         # previous segments are ignored and joining continues from
         # the absolute path segment.
-        dataset = gb.OnDiskDataset(test_dir).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         original_train_set = dataset.tasks[0].train_set._items
         dataset.yaml_data["tasks"][0]["train_set"][0]["data"][0][
             "path"
@@ -2578,7 +2601,9 @@ def test_OnDiskDataset_load_1D_feature(fmt):
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        dataset = gb.OnDiskDataset(test_dir).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         feature = dataset.feature.read("node", None, "feat")
         # Test whether feature has changed.
         assert torch.equal(torch.from_numpy(node_feats.reshape(-1, 1)), feature)
@@ -2646,10 +2671,8 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id, edge_fmt):
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=include_original_edge_id
-        ).load()
-
+        dataset = gb.OnDiskDataset(test_dir, include_original_edge_id=True)
+        dataset = dataset.load()
         assert dataset.dataset_name == dataset_name
 
         graph = dataset.graph
@@ -2801,7 +2824,7 @@ def test_OnDiskDataset_force_preprocess(capsys):
 
         # First preprocess on-disk dataset.
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=False, force_preprocess=False
+            test_dir, include_original_edge_id=True, force_preprocess=False
         ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
@@ -2828,7 +2851,7 @@ def test_OnDiskDataset_force_preprocess(capsys):
 
         # Force preprocess on-disk dataset.
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=False, force_preprocess=True
+            test_dir, include_original_edge_id=True, force_preprocess=True
         ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
@@ -2868,7 +2891,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
 
         # First preprocess on-disk dataset.
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=False
+            test_dir, include_original_edge_id=True
         ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
@@ -2886,7 +2909,7 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         with open(yaml_file, "w") as f:
             yaml.dump(yaml_data, f)
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=False
+            test_dir, include_original_edge_id=True
         ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
@@ -2903,9 +2926,13 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
         edge_feats = np.random.rand(num_edges, num_classes)
         edge_feat_path = os.path.join("data", "edge-feat.npy")
         np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
-        dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=False
-        ).load()
+        with pytest.warns(
+            DGLWarning,
+            match="Edge feature is stored, but edge IDs are not saved.",
+        ):
+            dataset = gb.OnDiskDataset(
+                test_dir, include_original_edge_id=False
+            ).load()
         captured = capsys.readouterr().out.split("\n")
         assert captured == [
             "The on-disk dataset is re-preprocessing, so the existing "
@@ -2993,11 +3020,7 @@ def test_OnDiskDataset_not_include_eids():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        with pytest.warns(
-            DGLWarning,
-            match="Edge feature is stored, but edge IDs are not saved.",
-        ):
-            gb.OnDiskDataset(test_dir, include_original_edge_id=False)
+        gb.OnDiskDataset(test_dir, include_original_edge_id=True)
 
 
 def test_OnDiskTask_repr_heterogeneous():
@@ -3077,14 +3100,20 @@ def test_OnDiskDataset_load_tasks_selectively():
             f.write(yaml_content)
 
         # Case1. Test load all tasks.
-        dataset = gb.OnDiskDataset(test_dir).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         assert len(dataset.tasks) == 2
 
         # Case2. Test load tasks selectively.
-        dataset = gb.OnDiskDataset(test_dir).load(tasks="link_prediction")
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load(tasks="link_prediction")
         assert len(dataset.tasks) == 1
         assert dataset.tasks[0].metadata["name"] == "link_prediction"
-        dataset = gb.OnDiskDataset(test_dir).load(tasks=["link_prediction"])
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load(tasks=["link_prediction"])
         assert len(dataset.tasks) == 1
         assert dataset.tasks[0].metadata["name"] == "link_prediction"
 
@@ -3093,12 +3122,16 @@ def test_OnDiskDataset_load_tasks_selectively():
             DGLWarning,
             match="Below tasks are not found in YAML: {'fake-name'}. Skipped.",
         ):
-            dataset = gb.OnDiskDataset(test_dir).load(tasks=["fake-name"])
+            dataset = gb.OnDiskDataset(
+                test_dir, include_original_edge_id=True
+            ).load(tasks=["fake-name"])
             assert len(dataset.tasks) == 0
 
         # Case4. Test load tasks selectively with incorrect task type.
         with pytest.raises(TypeError):
-            dataset = gb.OnDiskDataset(test_dir).load(tasks=2)
+            dataset = gb.OnDiskDataset(
+                test_dir, include_original_edge_id=True
+            ).load(tasks=2)
 
         dataset = None
 
@@ -3159,7 +3192,9 @@ def test_OnDiskDataset_preprocess_graph_with_single_type():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        dataset = gb.OnDiskDataset(test_dir).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         assert dataset.dataset_name == dataset_name
 
         graph = dataset.graph
