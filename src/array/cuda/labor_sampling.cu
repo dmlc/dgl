@@ -34,6 +34,7 @@
 #include <thrust/zip_function.h>
 
 #include <algorithm>
+#include <cub/cub.cuh>
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -44,7 +45,6 @@
 #include "../../graph/transform/cuda/cuda_map_edges.cuh"
 #include "../../random/continuous_seed.h"
 #include "../../runtime/cuda/cuda_common.h"
-#include "./dgl_cub.cuh"
 #include "./functor.cuh"
 #include "./spmm.cuh"
 

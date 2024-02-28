@@ -6,7 +6,8 @@
 
 #include <dgl/runtime/device_api.h>
 
-#include "../../array/cuda/dgl_cub.cuh"
+#include <cub/cub.cuh>
+
 #include "../../runtime/cuda/cuda_common.h"
 #include "../../runtime/workspace.h"
 #include "../partition_op.h"
