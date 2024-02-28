@@ -261,9 +261,7 @@ def main():
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
     for epoch in range(args.epochs):
-        train_loss, train_accuracy = train(
-            model, train_dataloader, optimizer
-        )
+        train_loss, train_accuracy = train(model, train_dataloader, optimizer)
 
         valid_accuracy = evaluate(model, valid_dataloader, num_classes)
         print(
