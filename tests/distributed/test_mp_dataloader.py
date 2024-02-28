@@ -11,8 +11,6 @@ import pytest
 import torch as th
 from dgl.data import CitationGraphDataset
 from dgl.distributed import (
-    DATA_LOADING_BACKEND_DGL,
-    DATA_LOADING_BACKEND_GRAPHBOLT,
     DistDataLoader,
     DistGraph,
     DistGraphServer,
