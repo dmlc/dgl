@@ -15,7 +15,7 @@ rdflib
 requests[security]==2.28
 scikit-learn
 scipy
-torch==1.13.0+cu116
+torch==2.0.0+cu118
 torchdata
 torcheval
 torchmetrics

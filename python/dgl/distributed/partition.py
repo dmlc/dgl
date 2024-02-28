@@ -1346,6 +1346,34 @@ def partition_graph(
         return orig_nids, orig_eids
 
 
+DTYPES_TO_CHECK = {
+    "default": [torch.int32, torch.int64],
+    NID: [torch.int32, torch.int64],
+    EID: [torch.int32, torch.int64],
+    NTYPE: [torch.int8, torch.int16, torch.int32, torch.int64],
+    ETYPE: [torch.int8, torch.int16, torch.int32, torch.int64],
+    "inner_node": [torch.uint8],
+    "inner_edge": [torch.uint8],
+    "part_id": [torch.int8, torch.int16, torch.int32, torch.int64],
+}
+
+
+def _cast_to_minimum_dtype(predicate, data, field=None):
+    if data is None:
+        return data
+    dtypes_to_check = DTYPES_TO_CHECK.get(field, DTYPES_TO_CHECK["default"])
+    if data.dtype not in dtypes_to_check:
+        dgl_warning(
+            f"Skipping as the data type of field {field} is {data.dtype}, "
+            f"while supported data types are {dtypes_to_check}."
+        )
+        return data
+    for dtype in dtypes_to_check:
+        if predicate < torch.iinfo(dtype).max:
+            return data.to(dtype)
+    return data
+
+
 def dgl_partition_to_graphbolt(
     part_config,
     *,
@@ -1459,6 +1487,31 @@ def dgl_partition_to_graphbolt(
             attr: graph.edata[attr][edge_ids] for attr in required_edge_attrs
         }
 
+        # Cast various data to minimum dtype.
+        # Cast 1: indptr.
+        indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
+        # Cast 2: indices.
+        indices = _cast_to_minimum_dtype(graph.num_nodes(), indices)
+        # Cast 3: type_per_edge.
+        type_per_edge = _cast_to_minimum_dtype(
+            len(etypes), type_per_edge, field=ETYPE
+        )
+        # Cast 4: node/edge_attributes.
+        predicates = {
+            NID: part_meta["num_nodes"],
+            "part_id": num_parts,
+            NTYPE: len(ntypes),
+            EID: part_meta["num_edges"],
+            ETYPE: len(etypes),
+        }
+        for attributes in [node_attributes, edge_attributes]:
+            for key in attributes:
+                if key not in predicates:
+                    continue
+                attributes[key] = _cast_to_minimum_dtype(
+                    predicates[key], attributes[key], field=key
+                )
+
         csc_graph = gb.fused_csc_sampling_graph(
             indptr,
             indices,
@@ -1483,6 +1536,17 @@ def dgl_partition_to_graphbolt(
             "part_graph_graphbolt"
         ] = os.path.relpath(csc_graph_path, os.path.dirname(part_config))
 
-    # Update partition config.
+    # Save dtype info into partition config.
+    new_part_meta["node_map_dtype"] = (
+        "int32"
+        if part_meta["num_nodes"] <= torch.iinfo(torch.int32).max
+        else "int64"
+    )
+    new_part_meta["edge_map_dtype"] = (
+        "int32"
+        if part_meta["num_edges"] <= torch.iinfo(torch.int32).max
+        else "int64"
+    )
+
     _dump_part_config(part_config, new_part_meta)
     print(f"Converted partitions to GraphBolt format into {part_config}")

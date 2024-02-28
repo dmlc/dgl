@@ -76,10 +76,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
         if hasattr(self, "_is_inplace_pinned"):
             for tensor in self._is_inplace_pinned:
-                assert (
-                    torch.cuda.cudart().cudaHostUnregister(tensor.data_ptr())
-                    == 0
-                )
+                assert self._inplace_unpinner(tensor.data_ptr()) == 0
 
     @property
     def total_num_nodes(self) -> int:
@@ -1121,6 +1118,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 )
 
                 self._is_inplace_pinned.add(x)
+                self._inplace_unpinner = cudart.cudaHostUnregister
 
             return x
 
