@@ -84,6 +84,13 @@ def cleanup():
             remove_lib("dgl_sparse")
             remove_lib("graphbolt")
 
+    # Remove build artifacts.
+    dir_to_remove = ["build", "dist", "dgl.egg-info"]
+    for dir_ in dir_to_remove:
+        print(f"Removing {dir_}")
+        if os.path.isdir(dir_):
+            shutil.rmtree(dir_)
+
 
 def config_cython():
     """Try to configure cython and return cython configuration"""
