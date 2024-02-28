@@ -4,9 +4,8 @@
  * @brief frequency hashmap - used to select top-k frequency edges of each node
  */
 
-#include <cub/cub.cuh>
-
 #include <algorithm>
+#include <cub/cub.cuh>  // NOLINT
 #include <tuple>
 #include <utility>
 

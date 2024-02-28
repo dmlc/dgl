@@ -33,9 +33,8 @@
 #include <thrust/transform.h>
 #include <thrust/zip_function.h>
 
-#include <cub/cub.cuh>
-
 #include <algorithm>
+#include <cub/cub.cuh>  // NOLINT
 #include <limits>
 #include <numeric>
 #include <type_traits>
