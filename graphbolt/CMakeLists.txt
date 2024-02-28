@@ -94,3 +94,12 @@ if(DEFINED MKL_LIBRARIES)
                           ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
 
+
+target_link_libraries(${LIB_GRAPHBOLT_NAME} uring)
+
+add_library(cnpy SHARED "src/cnpy.cc")
+target_link_libraries(cnpy "${TORCH_LIBRARIES}" uring)
+
+add_executable(cnpytest src/cnpytst.cc)
+target_link_libraries(cnpytest cnpy)
+
