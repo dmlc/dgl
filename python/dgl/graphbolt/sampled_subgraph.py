@@ -312,10 +312,11 @@ def _exclude_homo_edges_2(
 ):
     """Return the indices of edges to be included."""
     if assume_num_node_within_int32:
-        val = edges[0] << 32 | edges[1]
+        val = edges[0].long() << 32 | edges[1].long()
         edges_to_exclude_trans = edges_to_exclude.T
         val_to_exclude = (
-            edges_to_exclude_trans[0] << 32 | edges_to_exclude_trans[1]
+            edges_to_exclude_trans[0].long() << 32
+            | edges_to_exclude_trans[1].long()
         )
     else:
         # TODO: Add support for value > int32.

@@ -93,9 +93,7 @@ class TorchBasedFeature(Feature):
         # cudaHostUnregister to unpin the tensor in the destructor.
         # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
         for tensor in self._is_inplace_pinned:
-            assert (
-                torch.cuda.cudart().cudaHostUnregister(tensor.data_ptr()) == 0
-            )
+            assert self._inplace_unpinner(tensor.data_ptr()) == 0
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -187,14 +185,16 @@ class TorchBasedFeature(Feature):
             assert (
                 x.is_contiguous()
             ), "Tensor pinning is only supported for contiguous tensors."
+            cudart = torch.cuda.cudart()
             assert (
-                torch.cuda.cudart().cudaHostRegister(
+                cudart.cudaHostRegister(
                     x.data_ptr(), x.numel() * x.element_size(), 0
                 )
                 == 0
             )
 
             self._is_inplace_pinned.add(x)
+            self._inplace_unpinner = cudart.cudaHostUnregister
 
         return self
 
