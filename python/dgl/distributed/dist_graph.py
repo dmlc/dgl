@@ -811,7 +811,12 @@ class DistGraph:
         int
         """
         # TODO(da?): describe when self._g is None and idtype shouldn't be called.
-        return F.int64
+        # For GraphBolt partition, we use the global node ID's dtype.
+        return (
+            self.get_partition_book().global_nid_dtype
+            if self._use_graphbolt
+            else F.int64
+        )
 
     @property
     def device(self):

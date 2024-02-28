@@ -768,9 +768,18 @@ def test_dgl_partition_to_graphbolt_homo(
                 part_config, part_id, load_feats=False, use_graphbolt=True
             )[0]
             orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
+            # The original graph is in int64 while the partitioned graph is in
+            # int32 as dtype formatting is applied when converting to graphbolt
+            # format.
+            assert orig_indptr.dtype == th.int64
+            assert orig_indices.dtype == th.int64
+            assert new_g.csc_indptr.dtype == th.int32
+            assert new_g.indices.dtype == th.int32
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
             assert new_g.node_type_offset is None
+            assert orig_g.ndata[dgl.NID].dtype == th.int64
+            assert new_g.node_attributes[dgl.NID].dtype == th.int32
             assert th.equal(
                 orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
             )
@@ -782,6 +791,8 @@ def test_dgl_partition_to_graphbolt_homo(
             else:
                 assert "inner_node" not in new_g.node_attributes
             if store_eids or debug_mode:
+                assert orig_g.edata[dgl.EID].dtype == th.int64
+                assert new_g.edge_attributes[dgl.EID].dtype == th.int32
                 assert th.equal(
                     orig_g.edata[dgl.EID][orig_eids],
                     new_g.edge_attributes[dgl.EID],
@@ -789,6 +800,8 @@ def test_dgl_partition_to_graphbolt_homo(
             else:
                 assert dgl.EID not in new_g.edge_attributes
             if store_inner_edge or debug_mode:
+                assert orig_g.edata["inner_edge"].dtype == th.uint8
+                assert new_g.edge_attributes["inner_edge"].dtype == th.uint8
                 assert th.equal(
                     orig_g.edata["inner_edge"][orig_eids],
                     new_g.edge_attributes["inner_edge"],
@@ -838,8 +851,17 @@ def test_dgl_partition_to_graphbolt_hetero(
                 part_config, part_id, load_feats=False, use_graphbolt=True
             )[0]
             orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
+            # The original graph is in int64 while the partitioned graph is in
+            # int32 as dtype formatting is applied when converting to graphbolt
+            # format.
+            assert orig_indptr.dtype == th.int64
+            assert orig_indices.dtype == th.int64
+            assert new_g.csc_indptr.dtype == th.int32
+            assert new_g.indices.dtype == th.int32
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
+            assert orig_g.ndata[dgl.NID].dtype == th.int64
+            assert new_g.node_attributes[dgl.NID].dtype == th.int32
             assert th.equal(
                 orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
             )
@@ -851,12 +873,16 @@ def test_dgl_partition_to_graphbolt_hetero(
             else:
                 assert "inner_node" not in new_g.node_attributes
             if debug_mode:
+                assert orig_g.ndata[dgl.NTYPE].dtype == th.int32
+                assert new_g.node_attributes[dgl.NTYPE].dtype == th.int8
                 assert th.equal(
                     orig_g.ndata[dgl.NTYPE], new_g.node_attributes[dgl.NTYPE]
                 )
             else:
                 assert dgl.NTYPE not in new_g.node_attributes
             if store_eids or debug_mode:
+                assert orig_g.edata[dgl.EID].dtype == th.int64
+                assert new_g.edge_attributes[dgl.EID].dtype == th.int32
                 assert th.equal(
                     orig_g.edata[dgl.EID][orig_eids],
                     new_g.edge_attributes[dgl.EID],
@@ -864,6 +890,8 @@ def test_dgl_partition_to_graphbolt_hetero(
             else:
                 assert dgl.EID not in new_g.edge_attributes
             if store_inner_edge or debug_mode:
+                assert orig_g.edata["inner_edge"].dtype == th.uint8
+                assert new_g.edge_attributes["inner_edge"].dtype == th.uint8
                 assert th.equal(
                     orig_g.edata["inner_edge"],
                     new_g.edge_attributes["inner_edge"],
@@ -871,6 +899,8 @@ def test_dgl_partition_to_graphbolt_hetero(
             else:
                 assert "inner_edge" not in new_g.edge_attributes
             if debug_mode:
+                assert orig_g.edata[dgl.ETYPE].dtype == th.int32
+                assert new_g.edge_attributes[dgl.ETYPE].dtype == th.int8
                 assert th.equal(
                     orig_g.edata[dgl.ETYPE][orig_eids],
                     new_g.edge_attributes[dgl.ETYPE],
