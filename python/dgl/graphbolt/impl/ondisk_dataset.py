@@ -423,7 +423,7 @@ def preprocess_ondisk_dataset(
     )
 
     node_ids_within_int32 = (
-        sampling_graph.total_num_nodes <= torch.iinfo(torch.int32).max
+        sampling_graph.indices.dtype == torch.int32
         and auto_cast_to_optimal_dtype
     )
     torch.save(
