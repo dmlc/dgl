@@ -670,6 +670,10 @@ class OnDiskDataset(Dataset):
         Whether to include the original edge id in the FusedCSCSamplingGraph.
     force_preprocess: bool, optional
         Whether to force reload the ondisk dataset.
+    auto_cast_to_optimal_dtype: bool, optional
+        Casts the dtypes of tensors in the dataset into smallest possible dtypes
+        for reduced storage requirements and potentially increased performance.
+        Default is True.
     """
 
     def __init__(
@@ -677,12 +681,16 @@ class OnDiskDataset(Dataset):
         path: str,
         include_original_edge_id: bool = False,
         force_preprocess: bool = None,
+        auto_cast_to_optimal_dtype: bool = True,
     ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         self._dataset_dir = path
         yaml_path = preprocess_ondisk_dataset(
-            path, include_original_edge_id, force_preprocess
+            path,
+            include_original_edge_id,
+            force_preprocess,
+            auto_cast_to_optimal_dtype,
         )
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
