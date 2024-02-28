@@ -4,8 +4,9 @@
  * @brief Device level functions for within cuda kernels.
  */
 
-#include <cassert>
 #include <cub/cub.cuh>
+
+#include <cassert>
 
 #include "../../array/cuda/atomic.cuh"
 #include "cuda_common.h"

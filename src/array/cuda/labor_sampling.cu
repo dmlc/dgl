@@ -33,8 +33,9 @@
 #include <thrust/transform.h>
 #include <thrust/zip_function.h>
 
-#include <algorithm>
 #include <cub/cub.cuh>
+
+#include <algorithm>
 #include <limits>
 #include <numeric>
 #include <type_traits>

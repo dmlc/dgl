@@ -4,13 +4,13 @@
  * @brief k-nearest-neighbor (KNN) implementation (cuda)
  */
 
+#include <cub/cub.cuh>
 #include <curand_kernel.h>
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
 
 #include <algorithm>
-#include <cub/cub.cuh>
 #include <limits>
 #include <string>
 #include <type_traits>
