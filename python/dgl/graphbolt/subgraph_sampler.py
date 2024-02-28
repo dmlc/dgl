@@ -264,6 +264,7 @@ class SubgraphSampler(MiniBatchTransformer):
             # Collect nodes from all types of input.
             nodes = defaultdict(list)
             nodes_timestamp = None
+            is_nodes = False
             if use_timestamp:
                 nodes_timestamp = defaultdict(list)
             for etype, pair in seeds.items():
@@ -273,6 +274,8 @@ class SubgraphSampler(MiniBatchTransformer):
                     "Only tensor with shape 1*N and N*2 is "
                     + f"supported now, but got {pair.shape}."
                 )
+                if pair.ndim == 1:
+                    is_nodes = True
                 ntypes = etype[:].split(":")[::2]
                 pair = pair.view(pair.shape[0], -1)
                 if use_timestamp:
@@ -309,6 +312,8 @@ class SubgraphSampler(MiniBatchTransformer):
                     src = compacted[src_type].pop(0)
                     dst = compacted[dst_type].pop(0)
                     compacted_seeds[etype] = torch.cat((src, dst)).view(2, -1).T
+            if is_nodes:
+                unique_seeds = seeds
         else:
             # Collect nodes from all types of input.
             nodes = [seeds.view(-1)]
@@ -337,6 +342,8 @@ class SubgraphSampler(MiniBatchTransformer):
                 nodes_timestamp = None
             # Map back in same order as collect.
             compacted_seeds = compacted[0].view(seeds.shape)
+            if seeds.ndim == 1:
+                unique_seeds = seeds
         return (
             unique_seeds,
             nodes_timestamp,
