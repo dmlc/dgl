@@ -54,6 +54,7 @@ def _graph_data_to_fused_csc_sampling_graph(
     dataset_dir: str,
     graph_data: Dict,
     include_original_edge_id: bool,
+    cast_into_smallest_dtype: bool,
 ) -> FusedCSCSamplingGraph:
     """Convert the raw graph data into FusedCSCSamplingGraph.
 
@@ -65,6 +66,9 @@ def _graph_data_to_fused_csc_sampling_graph(
         The raw data read from yaml file.
     include_original_edge_id : bool
         Whether to include the original edge id in the FusedCSCSamplingGraph.
+    cast_into_smallest_dtype: bool, optional
+        Casts the dtypes of tensors in the dataset into smallest possible dtypes
+        for reduced storage requirements and potentially increased performance.
 
     Returns
     -------
@@ -93,11 +97,12 @@ def _graph_data_to_fused_csc_sampling_graph(
         indptr, indices, edge_ids = sparse_matrix.csc()
         del sparse_matrix
 
-        if num_nodes <= torch.iinfo(torch.int32).max:
-            indices = indices.to(torch.int32)
-        if num_edges <= torch.iinfo(torch.int32).max:
-            indptr = indptr.to(torch.int32)
-            edge_ids = edge_ids.to(torch.int32)
+        if cast_into_smallest_dtype:
+            if num_nodes <= torch.iinfo(torch.int32).max:
+                indices = indices.to(torch.int32)
+            if num_edges <= torch.iinfo(torch.int32).max:
+                indptr = indptr.to(torch.int32)
+                edge_ids = edge_ids.to(torch.int32)
 
         node_type_offset = None
         type_per_edge = None
@@ -143,11 +148,14 @@ def _graph_data_to_fused_csc_sampling_graph(
         del coo_src_list
         coo_dst = torch.cat(coo_dst_list)
         del coo_dst_list
-        dtypes = [torch.uint8, torch.int16, torch.int32, torch.int64]
-        dtype_maxes = [torch.iinfo(dtype).max for dtype in dtypes]
-        dtype_id = bisect.bisect_left(dtype_maxes, len(edge_type_to_id) - 1)
-        etype_dtype = dtypes[dtype_id]
-        coo_etype_list = [tensor.to(etype_dtype) for tensor in coo_etype_list]
+        if cast_into_smallest_dtype:
+            dtypes = [torch.uint8, torch.int16, torch.int32, torch.int64]
+            dtype_maxes = [torch.iinfo(dtype).max for dtype in dtypes]
+            dtype_id = bisect.bisect_left(dtype_maxes, len(edge_type_to_id) - 1)
+            etype_dtype = dtypes[dtype_id]
+            coo_etype_list = [
+                tensor.to(etype_dtype) for tensor in coo_etype_list
+            ]
         coo_etype = torch.cat(coo_etype_list)
         del coo_etype_list
 
@@ -159,11 +167,12 @@ def _graph_data_to_fused_csc_sampling_graph(
         indptr, indices, edge_ids = sparse_matrix.csc()
         del sparse_matrix
 
-        if total_num_nodes <= torch.iinfo(torch.int32).max:
-            indices = indices.to(torch.int32)
-        if total_num_edges <= torch.iinfo(torch.int32).max:
-            indptr = indptr.to(torch.int32)
-            edge_ids = edge_ids.to(torch.int32)
+        if cast_into_smallest_dtype:
+            if total_num_nodes <= torch.iinfo(torch.int32).max:
+                indices = indices.to(torch.int32)
+            if total_num_edges <= torch.iinfo(torch.int32).max:
+                indptr = indptr.to(torch.int32)
+                edge_ids = edge_ids.to(torch.int32)
 
         node_type_offset = torch.tensor(node_type_offset, dtype=indices.dtype)
         type_per_edge = torch.index_select(coo_etype, dim=0, index=edge_ids)
@@ -310,6 +319,7 @@ def preprocess_ondisk_dataset(
     dataset_dir: str,
     include_original_edge_id: bool = False,
     force_preprocess: bool = None,
+    cast_into_smallest_dtype: bool = True,
 ) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
@@ -322,6 +332,10 @@ def preprocess_ondisk_dataset(
         Whether to include the original edge id in the FusedCSCSamplingGraph.
     force_preprocess: bool, optional
         Whether to force reload the ondisk dataset.
+    cast_into_smallest_dtype: bool, optional
+        Casts the dtypes of tensors in the dataset into smallest possible dtypes
+        for reduced storage requirements and potentially increased performance.
+        Default is True.
 
     Returns
     -------
@@ -391,6 +405,7 @@ def preprocess_ondisk_dataset(
         dataset_dir,
         input_config["graph"],
         include_original_edge_id,
+        cast_into_smallest_dtype,
     )
 
     # 3. Record value of include_original_edge_id.
@@ -405,6 +420,7 @@ def preprocess_ondisk_dataset(
 
     node_ids_within_int32 = (
         sampling_graph.total_num_nodes <= torch.iinfo(torch.int32).max
+        and cast_into_smallest_dtype
     )
     torch.save(
         sampling_graph,
