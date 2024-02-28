@@ -130,7 +130,7 @@ def create_dataloader(
     return dataloader
 
 
-def train(model, dataloader, optimizer, num_classes):
+def train(model, dataloader, optimizer):
     model.train()  # Set the model to training mode
     total_loss = 0  # Accumulator for the total loss
     total_correct = 0  # Accumulator for the total number of correct predictions
