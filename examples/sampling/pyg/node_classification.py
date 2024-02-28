@@ -262,7 +262,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
     for epoch in range(args.epochs):
         train_loss, train_accuracy = train(
-            model, train_dataloader, optimizer, num_classes
+            model, train_dataloader, optimizer
         )
 
         valid_accuracy = evaluate(model, valid_dataloader, num_classes)
