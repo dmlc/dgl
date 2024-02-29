@@ -779,7 +779,7 @@ def test_dgl_partition_to_graphbolt_homo(
             assert th.equal(orig_indices, new_g.indices)
             assert new_g.node_type_offset is None
             assert orig_g.ndata[dgl.NID].dtype == th.int64
-            assert new_g.node_attributes[dgl.NID].dtype == th.int32
+            assert new_g.node_attributes[dgl.NID].dtype == th.int64
             assert th.equal(
                 orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
             )
@@ -792,7 +792,7 @@ def test_dgl_partition_to_graphbolt_homo(
                 assert "inner_node" not in new_g.node_attributes
             if store_eids or debug_mode:
                 assert orig_g.edata[dgl.EID].dtype == th.int64
-                assert new_g.edge_attributes[dgl.EID].dtype == th.int32
+                assert new_g.edge_attributes[dgl.EID].dtype == th.int64
                 assert th.equal(
                     orig_g.edata[dgl.EID][orig_eids],
                     new_g.edge_attributes[dgl.EID],
@@ -861,7 +861,7 @@ def test_dgl_partition_to_graphbolt_hetero(
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
             assert orig_g.ndata[dgl.NID].dtype == th.int64
-            assert new_g.node_attributes[dgl.NID].dtype == th.int32
+            assert new_g.node_attributes[dgl.NID].dtype == th.int64
             assert th.equal(
                 orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
             )
@@ -882,7 +882,7 @@ def test_dgl_partition_to_graphbolt_hetero(
                 assert dgl.NTYPE not in new_g.node_attributes
             if store_eids or debug_mode:
                 assert orig_g.edata[dgl.EID].dtype == th.int64
-                assert new_g.edge_attributes[dgl.EID].dtype == th.int32
+                assert new_g.edge_attributes[dgl.EID].dtype == th.int64
                 assert th.equal(
                     orig_g.edata[dgl.EID][orig_eids],
                     new_g.edge_attributes[dgl.EID],

@@ -1346,10 +1346,12 @@ def partition_graph(
         return orig_nids, orig_eids
 
 
+# [TODO][Rui] Due to int64_t is expected in RPC, we have to limit the data type
+# of node/edge IDs to int64_t. See more details in #7175.
 DTYPES_TO_CHECK = {
     "default": [torch.int32, torch.int64],
-    NID: [torch.int32, torch.int64],
-    EID: [torch.int32, torch.int64],
+    NID: [torch.int64],
+    EID: [torch.int64],
     NTYPE: [torch.int8, torch.int16, torch.int32, torch.int64],
     ETYPE: [torch.int8, torch.int16, torch.int32, torch.int64],
     "inner_node": [torch.uint8],
@@ -1537,16 +1539,10 @@ def dgl_partition_to_graphbolt(
         ] = os.path.relpath(csc_graph_path, os.path.dirname(part_config))
 
     # Save dtype info into partition config.
-    new_part_meta["node_map_dtype"] = (
-        "int32"
-        if part_meta["num_nodes"] <= torch.iinfo(torch.int32).max
-        else "int64"
-    )
-    new_part_meta["edge_map_dtype"] = (
-        "int32"
-        if part_meta["num_edges"] <= torch.iinfo(torch.int32).max
-        else "int64"
-    )
+    # [TODO][Rui] Always use int64_t for node/edge IDs in GraphBolt. See more
+    # details in #7175.
+    new_part_meta["node_map_dtype"] = "int64"
+    new_part_meta["edge_map_dtype"] = "int64"
 
     _dump_part_config(part_config, new_part_meta)
     print(f"Converted partitions to GraphBolt format into {part_config}")
