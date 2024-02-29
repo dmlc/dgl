@@ -349,7 +349,23 @@ endif(EXTERNAL_PHMAP_PATH)
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
-
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  include(ExternalProject)
+  set(LIBURING_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/liburing)
+  ExternalProject_Add(
+    liburing
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${LIBURING_INSTALL_DIR}
+    BUILD_COMMAND bash -c "make -j 4"
+    BUILD_IN_SOURCE ON
+    INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
+    BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/lib/liburing.a
+    BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/include
+    DOWNLOAD_EXTRACT_TIMESTAMP true
+  )
+  set(LIBURING_INCLUDE ${LIBURING_INSTALL_DIR}/include)
+  set(LIBURING ${LIBURING_INSTALL_DIR}/lib/liburing.a)
+endif()
 
 if(EXTERNAL_NANOFLANN_PATH)
   include_directories(SYSTEM ${EXTERNAL_NANOFLANN_PATH})
