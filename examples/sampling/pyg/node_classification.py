@@ -95,7 +95,8 @@ class GraphSAGE(torch.nn.Module):
             for minibatch in dataloader:
                 # Call `to_pyg_data` to convert GB Minibatch to PyG Data.
                 pyg_data = minibatch.to_pyg_data()
-                x = x_all[minibatch.node_ids()].to(device)
+                n_ids = minibatch.node_ids().to("cpu")
+                x = x_all[n_ids].to(device)
                 edge_index = pyg_data.edge_index
                 x = layer(x, edge_index)
                 x = x[: 4 * args.batch_size]
@@ -120,10 +121,10 @@ def create_dataloader(
     datapipe = datapipe.sample_neighbor(
         graph, fanout if job != "infer" else [-1]
     )
+    # Copy the data to the specified device.
+    datapipe = datapipe.copy_to(device=device, extra_attrs=["input_nodes"])
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
-    # Copy the data to the specified device.
-    datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
     dataloader = gb.DataLoader(datapipe, num_workers=0)
 
@@ -221,8 +222,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset_name = args.dataset
     dataset = gb.BuiltinDataset(dataset_name).load()
-    graph = dataset.graph
-    feature = dataset.feature.to(device)
+    graph = dataset.graph.pin_memory_()
+    feature = dataset.feature.pin_memory_()
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
@@ -234,7 +235,7 @@ def main():
         graph,
         feature,
         args.batch_size,
-        [10, 10, 10],
+        [15, 10, 5],
         device,
         job="train",
     )
@@ -243,7 +244,7 @@ def main():
         graph,
         feature,
         args.batch_size,
-        [10, 10, 10],
+        [15, 10, 5],
         device,
         job="evaluate",
     )
