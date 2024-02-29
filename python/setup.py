@@ -85,7 +85,7 @@ def cleanup():
             remove_lib("graphbolt")
 
     # Remove build artifacts.
-    dir_to_remove = ["build", "dist", "dgl.egg-info"]
+    dir_to_remove = ["build", "dgl.egg-info"]
     for dir_ in dir_to_remove:
         print(f"Removing {dir_}")
         if os.path.isdir(dir_):
