@@ -402,7 +402,7 @@ def main(args):
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset = gb.BuiltinDataset("ogbn-products").load()
+    dataset = gb.BuiltinDataset(args.dataset).load()
 
     # Move the dataset to the selected storage.
     if args.storage_device == "pinned":

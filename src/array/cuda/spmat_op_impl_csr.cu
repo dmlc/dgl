@@ -7,13 +7,13 @@
 #include <thrust/execution_policy.h>
 #include <thrust/for_each.h>
 
+#include <cub/cub.cuh>
 #include <numeric>
 #include <unordered_set>
 #include <vector>
 
 #include "../../runtime/cuda/cuda_common.h"
 #include "./atomic.cuh"
-#include "./dgl_cub.cuh"
 #include "./utils.h"
 
 namespace dgl {
