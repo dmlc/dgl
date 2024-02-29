@@ -223,7 +223,7 @@ def main():
     dataset_name = args.dataset
     dataset = gb.BuiltinDataset(dataset_name).load()
     graph = dataset.graph
-    feature = dataset.feature.to(device)
+    feature = dataset.feature.pin_memory_()
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
