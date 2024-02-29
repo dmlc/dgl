@@ -222,8 +222,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset_name = args.dataset
     dataset = gb.BuiltinDataset(dataset_name).load()
-    graph = dataset.graph.pin_memory_()
-    feature = dataset.feature.pin_memory_()
+    graph = dataset.graph
+    feature = dataset.feature.to(device)
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
@@ -235,7 +235,7 @@ def main():
         graph,
         feature,
         args.batch_size,
-        [15, 10, 5],
+        [5, 10, 15],
         device,
         job="train",
     )
@@ -244,7 +244,7 @@ def main():
         graph,
         feature,
         args.batch_size,
-        [15, 10, 5],
+        [5, 10, 15],
         device,
         job="evaluate",
     )
