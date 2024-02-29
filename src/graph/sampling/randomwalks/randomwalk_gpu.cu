@@ -10,11 +10,11 @@
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
 
+#include <cub/cub.cuh>
 #include <tuple>
 #include <utility>
 #include <vector>
 
-#include "../../../array/cuda/dgl_cub.cuh"
 #include "../../../runtime/cuda/cuda_common.h"
 #include "frequency_hashmap.cuh"
 

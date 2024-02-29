@@ -10,12 +10,12 @@
 #include <dgl/runtime/device_api.h>
 
 #include <algorithm>
+#include <cub/cub.cuh>  // NOLINT
 #include <limits>
 #include <string>
 #include <type_traits>
 #include <vector>
 
-#include "../../../array/cuda/dgl_cub.cuh"
 #include "../../../array/cuda/utils.h"
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../knn.h"
