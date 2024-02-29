@@ -7,7 +7,7 @@ ARGO is a runtime system that offers scalable performance.
 The figure below shows an example of GNN training on a Xeon 8380H platform with 112 cores. 
 Without ARGO, there is no performance improvement after applying more than 16 cores; we observe a similar scalability limit on a Xeon 6430L platform with 64 cores as well.
 However, with ARGO enabled, we are able to scale over 64 cores, allowing ARGO to speedup GNN training (in terms of epoch time) by up to 4.30x and 3.32x on a Xeon 8380H and a Xeon 6430L, respectively.
-![ARGO](https://github.com/dmlc/dgl/tree/master/examples/pytorch/argo/argo_scale.png)
+![ARGO](https://github.com/dmlc/dgl/blob/master/examples/pytorch/argo/argo_scale.png)
 
 This README includes how to:
 1. [Installation](#1-installation)
