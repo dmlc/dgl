@@ -18,7 +18,6 @@ from ..heterograph import DGLGraph
 from ..ndarray import exist_shared_mem_array
 from ..transforms import compact_graphs
 from . import graph_services, role, rpc
-from .constants import DATA_LOADING_BACKEND_DGL, DATA_LOADING_BACKEND_GRAPHBOLT
 from .dist_tensor import DistTensor
 from .graph_partition_book import (
     _etype_str_to_tuple,
@@ -51,7 +50,7 @@ from .shared_mem_utils import (
 )
 
 INIT_GRAPH = 800001
-QUERY_DATA_LOADING_BACKEND = 800002
+QUERY_IF_USE_GRAPHBOLT = 800002
 
 
 class InitGraphRequest(rpc.Request):
@@ -92,8 +91,8 @@ class InitGraphResponse(rpc.Response):
         self._graph_name = state
 
 
-class QueryDataLoadingBackendRequest(rpc.Request):
-    """Query the data loading backend."""
+class QueryIfUseGraphBoltRequest(rpc.Request):
+    """Query if use GraphBolt."""
 
     def __getstate__(self):
         return None
@@ -102,25 +101,20 @@ class QueryDataLoadingBackendRequest(rpc.Request):
         pass
 
     def process_request(self, server_state):
-        backend = (
-            DATA_LOADING_BACKEND_GRAPHBOLT
-            if server_state.use_graphbolt
-            else DATA_LOADING_BACKEND_DGL
-        )
-        return QueryDataLoadingBackendResponse(backend)
+        return QueryIfUseGraphBoltResponse(server_state.use_graphbolt)
 
 
-class QueryDataLoadingBackendResponse(rpc.Response):
-    """Ack the query data loading backend request"""
+class QueryIfUseGraphBoltResponse(rpc.Response):
+    """Ack the query request about if use GraphBolt."""
 
-    def __init__(self, backend):
-        self._backend = backend
+    def __init__(self, use_graphbolt):
+        self._use_graphbolt = use_graphbolt
 
     def __getstate__(self):
-        return self._backend
+        return self._use_graphbolt
 
     def __setstate__(self, state):
-        self._backend = state
+        self._use_graphbolt = state
 
 
 def _copy_graph_to_shared_mem(g, graph_name, graph_format, use_graphbolt):
@@ -638,10 +632,8 @@ class DistGraph:
             rpc.set_num_client(1)
         else:
             # Query the main server about whether GraphBolt is used.
-            rpc.send_request(0, QueryDataLoadingBackendRequest())
-            self._use_graphbolt = (
-                rpc.recv_response()._backend == DATA_LOADING_BACKEND_GRAPHBOLT
-            )
+            rpc.send_request(0, QueryIfUseGraphBoltRequest())
+            self._use_graphbolt = rpc.recv_response()._use_graphbolt
 
             self._init(gpb)
             # Tell the backup servers to load the graph structure from shared memory.
@@ -811,7 +803,12 @@ class DistGraph:
         int
         """
         # TODO(da?): describe when self._g is None and idtype shouldn't be called.
-        return F.int64
+        # For GraphBolt partition, we use the global node ID's dtype.
+        return (
+            self.get_partition_book().global_nid_dtype
+            if self._use_graphbolt
+            else F.int64
+        )
 
     @property
     def device(self):
@@ -1864,7 +1861,7 @@ def edge_split(
 
 rpc.register_service(INIT_GRAPH, InitGraphRequest, InitGraphResponse)
 rpc.register_service(
-    QUERY_DATA_LOADING_BACKEND,
-    QueryDataLoadingBackendRequest,
-    QueryDataLoadingBackendResponse,
+    QUERY_IF_USE_GRAPHBOLT,
+    QueryIfUseGraphBoltRequest,
+    QueryIfUseGraphBoltResponse,
 )
