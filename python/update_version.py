@@ -16,7 +16,7 @@ import re
 # (usually "aYYMMDD")
 # The environment variable DGL_VERSION_SUFFIX is the local version label
 # suffix for indicating CPU and CUDA versions as in PEP 440 (e.g. "+cu102")
-__version__ = "2.1" + os.getenv("DGL_PRERELEASE", "")
+__version__ = "2.2" + os.getenv("DGL_PRERELEASE", "")
 __version__ += os.getenv("DGL_VERSION_SUFFIX", "")
 print(__version__)
 
