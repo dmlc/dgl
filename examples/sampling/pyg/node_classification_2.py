@@ -60,6 +60,15 @@ from tqdm import tqdm
 
 
 def convert_to_pyg(h, subgraph):
+    #####################################################################
+    # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
+    #
+    #   PyG layers have two modes, bipartite and normal. We slice the given
+    #   features to get src and dst features to use the PyG layers in the
+    #   more efficient bipartite mode. Moreover, we convert the provided
+    #   sampled edges in CSC format from GraphBolt and convert to COO via
+    #   using gb.expand_indptr.
+    #####################################################################
     src = subgraph.sampled_csc.indices
     dst = gb.expand_indptr(
         subgraph.sampled_csc.indptr,
