@@ -58,8 +58,12 @@ class SAGE(LightningModule):
         self.dropout = nn.Dropout(0.5)
         self.n_hidden = n_hidden
         self.n_classes = n_classes
-        self.train_acc = Accuracy(task="multiclass", num_classes=n_classes)
-        self.val_acc = Accuracy(task="multiclass", num_classes=n_classes)
+        self.train_acc = Accuracy(
+            task="multiclass", num_classes=n_classes, top_k=1
+        )
+        self.val_acc = Accuracy(
+            task="multiclass", num_classes=n_classes, top_k=1
+        )
 
     def forward(self, blocks, x):
         h = x
@@ -133,13 +137,14 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, dataset, fanouts, batch_size, num_workers):
+    def __init__(self, dataset, fanouts, batch_size, num_workers, device):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.feature_store = dataset.feature
-        self.graph = dataset.graph
+        self.feature_store = dataset.feature.to(device)
+        self.graph = dataset.graph.to(device)
+        self.device = "cuda" if device != "cpu" else "cpu"
         self.train_set = dataset.tasks[0].train_set
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
@@ -148,9 +153,10 @@ class DataModule(LightningDataModule):
         datapipe = gb.ItemSampler(
             node_set,
             batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=True,
+            shuffle=is_train,
+            drop_last=is_train,
         )
+        datapipe = datapipe.copy_to(self.device, ["seed_nodes"])
         sampler = (
             datapipe.sample_layer_neighbor
             if is_train
@@ -203,7 +209,17 @@ if __name__ == "__main__":
         default=0,
         help="number of workers (default: 0)",
     )
+    parser.add_argument(
+        "--storage_device",
+        default="pinned",
+        choices=["cpu", "pinned", "cuda"],
+        help="Moves the dataset into the selected storage",
+    )
     args = parser.parse_args()
+
+    if not torch.cuda.is_available():
+        args.num_gpus = 0
+        args.storage_device = "cpu"
 
     dataset = gb.BuiltinDataset("ogbn-products").load()
     datamodule = DataModule(
@@ -211,6 +227,7 @@ if __name__ == "__main__":
         [10, 10, 10],
         args.batch_size,
         args.num_workers,
+        args.storage_device,
     )
     in_size = dataset.feature.size("node", None, "feat")[0]
     model = SAGE(in_size, 256, datamodule.num_classes)
@@ -225,7 +242,7 @@ if __name__ == "__main__":
     # https://lightning.ai/docs/pytorch/stable/common/trainer.html.
     ########################################################################
     trainer = Trainer(
-        accelerator="gpu",
+        accelerator="gpu" if args.num_gpus > 0 else "cpu",
         devices=args.num_gpus,
         max_epochs=args.epochs,
         callbacks=[checkpoint_callback, early_stopping_callback],
