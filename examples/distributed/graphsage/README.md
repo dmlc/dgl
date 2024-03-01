@@ -182,17 +182,19 @@ python3 ~/workspace/dgl/tools/launch.py \
 
 Compared to `DGL`, `GraphBolt`'s sampler works faster(reduced to **80%** and **77%** for `ogbn-products` and `ogbn-papers100M` respectively). `Min` and `Max` are statistics of all trainers on all nodes(machines).
 
+As for RAM usage, the shared memory(measured by **shared** field of `free` command) usage is decreased due to smaller graph partitions in `GraphBolt` though the peak memory used by processes(measured by **used** field of `free` command) does not decrease.
+
 `ogbn-products`
 
-| Data Formats | Sample Time Per Epoch (CPU) |      Test Accuracy (10 epochs)   |
-| ------------ | --------------------------- | -------------------------------- |
-|     DGL      | Min: 1.2884s, Max: 1.4159s  | Min: 64.38%, Max: 70.42%         |
-|   GraphBolt  | Min: 1.0589s, Max: 1.1400s  | Min: 61.68%, Max: 71.23%         |
+| Data Formats | Sample Time Per Epoch (CPU) |      Test Accuracy (10 epochs)   |  shared | used (peak) |
+| ------------ | --------------------------- | -------------------------------- |  -----  | ---- |
+|     DGL      | Min: 1.2884s, Max: 1.4159s  | Min: 64.38%, Max: 70.42%         |  2.4GB  | 7.8GB|
+|   GraphBolt  | Min: 1.0589s, Max: 1.1400s  | Min: 61.68%, Max: 71.23%         |  1.1GB  | 7.8GB|
 
 
 `ogbn-papers100M`
 
-| Data Formats | Sample Time Per Epoch (CPU) |      Test Accuracy (10 epochs)   |
-| ------------ | --------------------------- | -------------------------------- |
-|     DGL      | Min: 5.5570s, Max: 6.1900s  | Min: 29.12%, Max: 34.33%         |
-|   GraphBolt  | Min: 4.5046s, Max: 4.7718s  | Min: 29.11%, Max: 33.49%         |
+| Data Formats | Sample Time Per Epoch (CPU) |      Test Accuracy (10 epochs)   |  shared | used (peak) |
+| ------------ | --------------------------- | -------------------------------- |  -----  | ---- |
+|     DGL      | Min: 5.5570s, Max: 6.1900s  | Min: 29.12%, Max: 34.33%         |  84GB   | 43GB |
+|   GraphBolt  | Min: 4.5046s, Max: 4.7718s  | Min: 29.11%, Max: 33.49%         |  67GB   | 43GB |
