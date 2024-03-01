@@ -1,6 +1,6 @@
 package:
   name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
-  version: 2.1{{ environ.get('DGL_VERSION_SUFFIX', '') }}
+  version: 2.2{{ environ.get('DGL_VERSION_SUFFIX', '') }}
 
 source:
   git_rev: {{ environ.get('DGL_RELEASE_BRANCH', 'master') }}

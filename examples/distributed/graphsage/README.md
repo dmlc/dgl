@@ -138,3 +138,63 @@ python3 ~/workspace/dgl/tools/launch.py \
 --ip_config ip_config.txt \
 "python3 node_classification.py --graph_name ogbn-products --ip_config ip_config.txt --num_epochs 30 --batch_size 1000 --num_gpus 4"
 ```
+
+### Running with GraphBolt
+
+In order to run with `GraphBolt`, we need to partition graph into `GraphBolt` data formats.Please note that both `DGL` and `GraphBolt` partitions are saved together.
+
+```
+python3 partition_graph.py --dataset ogbn-products --num_parts 2 --balance_train --balance_edges --use_graphbolt
+```
+
+#### Partition sizes compared to DGL
+
+Compared to `DGL`, `GraphBolt` partitions are much smaller(reduced to **16%** and **19%** for `ogbn-products` and `ogbn-papers100M` respectively).
+
+`ogbn-products`
+
+| Data Formats |         File Name            | Part 0 | Part 1 |
+| ------------ | ---------------------------- | ------ | ------ |
+| DGL          | graph.dgl                    | 1.5GB  | 1.6GB  |
+| GraphBolt    | fused_csc_sampling_graph.pt  | 255MB  | 265MB  |
+
+`ogbn-papers100M`
+
+| Data Formats |         File Name            | Part 0 | Part 1 |
+| ------------ | ---------------------------- | ------ | ------ |
+| DGL          | graph.dgl                    | 23GB   | 22GB   |
+| GraphBolt    | fused_csc_sampling_graph.pt  | 4.4GB  | 4.1GB  |
+
+Then run example with `--use_graphbolt`.
+
+```
+python3 ~/workspace/dgl/tools/launch.py \
+--workspace ~/workspace/dgl/examples/pytorch/graphsage/dist/ \
+--num_trainers 4 \
+--num_samplers 0 \
+--num_servers 2 \
+--part_config data/ogbn-products.json \
+--ip_config ip_config.txt \
+"python3 node_classification.py --graph_name ogbn-products --ip_config ip_config.txt --num_epochs 10 --use_graphbolt"
+```
+
+#### Performance compared to `DGL`
+
+Compared to `DGL`, `GraphBolt`'s sampler works faster(reduced to **80%** and **77%** for `ogbn-products` and `ogbn-papers100M` respectively). `Min` and `Max` are statistics of all trainers on all nodes(machines).
+
+As for RAM usage, the shared memory(measured by **shared** field of `free` command) usage is decreased due to smaller graph partitions in `GraphBolt` though the peak memory used by processes(measured by **used** field of `free` command) does not decrease.
+
+`ogbn-products`
+
+| Data Formats | Sample Time Per Epoch (CPU) |      Test Accuracy (10 epochs)   |  shared | used (peak) |
+| ------------ | --------------------------- | -------------------------------- |  -----  | ---- |
+|     DGL      | Min: 1.2884s, Max: 1.4159s  | Min: 64.38%, Max: 70.42%         |  2.4GB  | 7.8GB|
+|   GraphBolt  | Min: 1.0589s, Max: 1.1400s  | Min: 61.68%, Max: 71.23%         |  1.1GB  | 7.8GB|
+
+
+`ogbn-papers100M`
+
+| Data Formats | Sample Time Per Epoch (CPU) |      Test Accuracy (10 epochs)   |  shared | used (peak) |
+| ------------ | --------------------------- | -------------------------------- |  -----  | ---- |
+|     DGL      | Min: 5.5570s, Max: 6.1900s  | Min: 29.12%, Max: 34.33%         |  84GB   | 43GB |
+|   GraphBolt  | Min: 4.5046s, Max: 4.7718s  | Min: 29.11%, Max: 33.49%         |  67GB   | 43GB |
