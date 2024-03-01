@@ -11,10 +11,10 @@
 #include <dgl/runtime/ndarray.h>
 #include <dmlc/logging.h>
 
+#include <cub/cub.cuh>
 #include <type_traits>
 
 #include "../../runtime/cuda/cuda_common.h"
-#include "dgl_cub.cuh"
 
 namespace dgl {
 namespace cuda {
