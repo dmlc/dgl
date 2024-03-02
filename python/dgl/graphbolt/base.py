@@ -65,6 +65,7 @@ def isin(elements, test_elements):
 
 @torch.library.impl_abstract("graphbolt::expand_indptr")
 def expand_indptr_abstract(indptr, dtype, node_ids, output_size):
+    """Abstract implementation of expand_indptr for torch.compile() support."""
     if output_size is None:
         output_size = torch.library.get_ctx().new_dynamic_size()
     if dtype is None:
