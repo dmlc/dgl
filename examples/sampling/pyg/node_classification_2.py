@@ -50,34 +50,38 @@ main
 """
 
 import argparse
+import time
 
 import dgl.graphbolt as gb
 import torch
 import torch.nn.functional as F
 import torchmetrics.functional as MF
+from torch_geometric import EdgeIndex
 from torch_geometric.nn import SAGEConv
 from tqdm import tqdm
 
 
-def convert_to_pyg(h, subgraph):
+def convert_to_pyg(subgraphs):
     #####################################################################
     # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
     #
-    #   PyG layers have two modes, bipartite and normal. We slice the given
-    #   features to get src and dst features to use the PyG layers in the
-    #   more efficient bipartite mode. Moreover, we convert the provided
-    #   sampled edges in CSC format from GraphBolt and convert to COO via
-    #   using gb.expand_indptr.
+    #   We convert the provided sampled edges in CSC format from GraphBolt and
+    #   convert to COO via using gb.expand_indptr.
     #####################################################################
-    src = subgraph.sampled_csc.indices
-    dst = gb.expand_indptr(
-        subgraph.sampled_csc.indptr,
-        dtype=src.dtype,
-        output_size=len(src),
-    )
-    edge_index = torch.stack([src, dst], dim=0).long()
-    h_src, h_dst = h, h[: len(subgraph.original_column_node_ids)]
-    return (h_src, h_dst), edge_index
+    edge_index_list = []
+    for subgraph in subgraphs:
+        src = subgraph.sampled_csc.indices
+        dst = gb.expand_indptr(
+            subgraph.sampled_csc.indptr,
+            dtype=src.dtype,
+            output_size=len(src),
+        )
+        edge_index = torch.stack([src, dst], dim=0).long()
+        src_size = subgraph.original_row_node_ids.size(0)
+        dst_size = subgraph.original_column_node_ids.size(0)
+        edge_index = EdgeIndex(edge_index, sparse_size=(src_size, dst_size), sort_order="col")
+        edge_index_list.append((edge_index.as_tensor(), edge_index.sparse_size()))
+    return edge_index_list
 
 
 class GraphSAGE(torch.nn.Module):
@@ -99,12 +103,19 @@ class GraphSAGE(torch.nn.Module):
         self.hidden_size = hidden_size
         self.out_size = out_size
 
-    def forward(self, subgraphs, x):
+    def forward(self, edge_index_list, x):
         h = x
-        for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
-            h, edge_index = convert_to_pyg(h, subgraph)
-            h = layer(h, edge_index)
-            if i != len(subgraphs) - 1:
+        for i, (layer, (edge_index, size)) in enumerate(zip(self.layers, edge_index_list)):
+            #####################################################################
+            # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
+            #
+            #   PyG layers have two modes, bipartite and normal. We slice the
+            #   given features to get src and dst features to use the PyG layers
+            #   in the more efficient bipartite mode.
+            #####################################################################
+            h_src, h_dst = h, h[: size[1]]
+            h = layer((h_src, h_dst), edge_index, size=size)
+            if i != len(edge_index_list) - 1:
                 h = F.relu(h)
         return h
 
@@ -123,12 +134,12 @@ class GraphSAGE(torch.nn.Module):
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
-            for data in tqdm(dataloader):
-                # len(blocks) = 1
-                h, edge_index = convert_to_pyg(
-                    data.node_features["feat"], data.sampled_subgraphs[0]
-                )
-                hidden_x = layer(h, edge_index)
+            for data in tqdm(dataloader, "Inferencing"):
+                # len(data.sampled_subgraphs) = 1
+                edge_index, size = convert_to_pyg(data.sampled_subgraphs)[0]
+                h = data.node_features["feat"]
+                h_src, h_dst = h, h[: size[1]]
+                hidden_x = layer((h_src, h_dst), edge_index, size=size)
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                 # By design, our output nodes are contiguous.
@@ -183,7 +194,7 @@ def create_dataloader(
     return gb.DataLoader(datapipe, num_workers=num_workers)
 
 
-def train(train_dataloader, valid_dataloader, num_classes, model):
+def train(train_dataloader, valid_dataloader, num_classes, model, device):
     #####################################################################
     # (HIGHLIGHT) Train the model for one epoch.
     #
@@ -204,19 +215,21 @@ def train(train_dataloader, valid_dataloader, num_classes, model):
     criterion = torch.nn.CrossEntropyLoss()
 
     model.train()  # Set the model to training mode
-    total_loss = 0  # Accumulator for the total loss
+    total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
     total_correct = 0  # Accumulator for the total number of correct predictions
     total_samples = 0  # Accumulator for the total number of samples processed
     num_batches = 0  # Counter for the number of mini-batches processed
 
     for epoch in range(args.epochs):
-        for minibatch in train_dataloader:
+        start = time.time()
+        for minibatch in tqdm(train_dataloader, "Training"):
             node_features = minibatch.node_features["feat"]
             labels = minibatch.labels
             optimizer.zero_grad()
-            out = model(minibatch.sampled_subgraphs, node_features)
+            edge_index_list = convert_to_pyg(minibatch.sampled_subgraphs)
+            out = model(edge_index_list, node_features)
             loss = criterion(out, labels)
-            total_loss += loss.item()
+            total_loss += loss.detach()
             total_correct += MF.accuracy(
                 out, labels, task="multiclass", num_classes=num_classes
             ) * labels.size(0)
@@ -227,9 +240,11 @@ def train(train_dataloader, valid_dataloader, num_classes, model):
         train_loss = total_loss / num_batches
         train_acc = total_correct / total_samples
         val_acc = evaluate(model, valid_dataloader, num_classes)
+        end = time.time()
         print(
-            f"Epoch {epoch:02d}, Loss: {train_loss:.4f}, "
-            f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}"
+            f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
+            f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}, "
+            f"Time: {end - start}s"
         )
 
 
@@ -265,10 +280,11 @@ def evaluate(model, dataloader, num_classes):
     model.eval()
     y_hats = []
     ys = []
-    for minibatch in dataloader:
+    for minibatch in tqdm(dataloader, "Evaluating"):
         node_features = minibatch.node_features["feat"]
         labels = minibatch.labels
-        out = model(minibatch.sampled_subgraphs, node_features)
+        edge_index_list = convert_to_pyg(minibatch.sampled_subgraphs)
+        out = model(edge_index_list, node_features)
         y_hats.append(out)
         ys.append(labels)
 
@@ -386,8 +402,10 @@ def main():
     hidden_channels = 256
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(args.device)
     assert len(args.fanout) == len(model.layers)
+    torch._dynamo.config.cache_size_limit = 32
+    model = torch.compile(model, fullgraph=True, dynamic=True)
 
-    train(train_dataloader, valid_dataloader, num_classes, model)
+    train(train_dataloader, valid_dataloader, num_classes, model, args.device)
 
     # Test the model.
     print("Testing...")
