@@ -74,17 +74,11 @@ def convert_to_pyg(subgraphs):
         dst = gb.expand_indptr(
             subgraph.sampled_csc.indptr,
             dtype=src.dtype,
-            output_size=len(src),
+            output_size=src.size(0),
         )
         edge_index = torch.stack([src, dst], dim=0).long()
-        src_size = subgraph.original_row_node_ids.size(0)
-        dst_size = subgraph.original_column_node_ids.size(0)
-        edge_index = EdgeIndex(
-            edge_index, sparse_size=(src_size, dst_size), sort_order="col"
-        )
-        edge_index_list.append(
-            (edge_index.as_tensor(), edge_index.sparse_size())
-        )
+        dst_size = subgraph.sampled_csc.indptr.size(0) - 1
+        edge_index_list.append((edge_index, dst_size))
     return edge_index_list
 
 
@@ -109,7 +103,7 @@ class GraphSAGE(torch.nn.Module):
 
     def forward(self, edge_index_list, x):
         h = x
-        for i, (layer, (edge_index, size)) in enumerate(
+        for i, (layer, (edge_index, dst_size)) in enumerate(
             zip(self.layers, edge_index_list)
         ):
             #####################################################################
@@ -119,8 +113,8 @@ class GraphSAGE(torch.nn.Module):
             #   given features to get src and dst features to use the PyG layers
             #   in the more efficient bipartite mode.
             #####################################################################
-            h_src, h_dst = h, h[: size[1]]
-            h = layer((h_src, h_dst), edge_index, size=size)
+            h_dst = h[:dst_size]
+            h = layer((h, h_dst), edge_index, size=(h.size(0), dst_size))
             if i != len(edge_index_list) - 1:
                 h = F.relu(h)
         return h
@@ -142,10 +136,12 @@ class GraphSAGE(torch.nn.Module):
             )
             for data in tqdm(dataloader, "Inferencing"):
                 # len(data.sampled_subgraphs) = 1
-                edge_index, size = convert_to_pyg(data.sampled_subgraphs)[0]
+                edge_index, dst_size = convert_to_pyg(data.sampled_subgraphs)[0]
                 h = data.node_features["feat"]
-                h_src, h_dst = h, h[: size[1]]
-                hidden_x = layer((h_src, h_dst), edge_index, size=size)
+                h_dst = h[:dst_size]
+                hidden_x = layer(
+                    (h, h_dst), edge_index, size=(h.size(0), dst_size)
+                )
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                 # By design, our output nodes are contiguous.
