@@ -7,6 +7,7 @@ import backend as F
 import dgl.graphbolt as gb
 import pytest
 import torch
+from torch.testing._internal.optests import opcheck
 
 from . import gb_test_utils
 
@@ -295,6 +296,22 @@ def test_expand_indptr(nodes, dtype):
     assert torch.equal(torch_result, gb_result)
     gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
     assert torch.equal(torch_result, gb_result)
+
+    # Tests torch.compile compatibility
+    for output_size in [None, indptr[-1].item()]:
+        kwargs = {"node_ids": nodes, "output_size": output_size}
+        opcheck(
+            torch.ops.graphbolt.expand_indptr,
+            (indptr, dtype),
+            kwargs,
+            test_utils=[
+                "test_schema",
+                "test_autograd_registration",
+                "test_faketensor",
+                "test_aot_dispatch_dynamic",
+            ],
+            raise_exception=True,
+        )
 
 
 def test_csc_format_base_representation():

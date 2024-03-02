@@ -5,6 +5,7 @@
  * @brief ExpandIndptr operators.
  */
 #include <graphbolt/cuda_ops.h>
+#include <torch/autograd.h>
 
 #include "./macro.h"
 #include "./utils.h"
@@ -27,6 +28,18 @@ torch::Tensor ExpandIndptr(
   }
   return node_ids.value().to(dtype).repeat_interleave(
       indptr.diff(), 0, output_size);
+}
+
+TORCH_LIBRARY_IMPL(graphbolt, CPU, m) {
+  m.impl("expand_indptr", &ExpandIndptr);
+}
+
+TORCH_LIBRARY_IMPL(graphbolt, CUDA, m) {
+  m.impl("expand_indptr", &ExpandIndptrImpl);
+}
+
+TORCH_LIBRARY_IMPL(graphbolt, Autograd, m) {
+  m.impl("expand_indptr", torch::autograd::autogradNotImplementedFallback());
 }
 
 }  // namespace ops

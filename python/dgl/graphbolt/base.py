@@ -63,6 +63,15 @@ def isin(elements, test_elements):
     return torch.ops.graphbolt.isin(elements, test_elements)
 
 
+@torch.library.impl_abstract("graphbolt::expand_indptr")
+def expand_indptr_abstract(indptr, dtype, node_ids, output_size):
+    if output_size is None:
+        output_size = torch.library.get_ctx().new_dynamic_size()
+    if dtype is None:
+        dtype = node_ids.dtype
+    return indptr.new_empty(output_size, dtype=dtype)
+
+
 def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
     """Converts a given indptr offset tensor to a COO format tensor. If
     node_ids is not given, it is assumed to be equal to
