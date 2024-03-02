@@ -35,6 +35,7 @@ def load_graphbolt():
 
 load_graphbolt()
 
+# pylint: disable=wrong-import-position
 from .base import *
 from .minibatch import *
 from .dataloader import *
