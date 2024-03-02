@@ -79,8 +79,12 @@ def convert_to_pyg(subgraphs):
         edge_index = torch.stack([src, dst], dim=0).long()
         src_size = subgraph.original_row_node_ids.size(0)
         dst_size = subgraph.original_column_node_ids.size(0)
-        edge_index = EdgeIndex(edge_index, sparse_size=(src_size, dst_size), sort_order="col")
-        edge_index_list.append((edge_index.as_tensor(), edge_index.sparse_size()))
+        edge_index = EdgeIndex(
+            edge_index, sparse_size=(src_size, dst_size), sort_order="col"
+        )
+        edge_index_list.append(
+            (edge_index.as_tensor(), edge_index.sparse_size())
+        )
     return edge_index_list
 
 
@@ -105,7 +109,9 @@ class GraphSAGE(torch.nn.Module):
 
     def forward(self, edge_index_list, x):
         h = x
-        for i, (layer, (edge_index, size)) in enumerate(zip(self.layers, edge_index_list)):
+        for i, (layer, (edge_index, size)) in enumerate(
+            zip(self.layers, edge_index_list)
+        ):
             #####################################################################
             # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
             #
