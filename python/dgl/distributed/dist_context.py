@@ -241,6 +241,9 @@ def initialize(
     distributed API. For example, when used with Pytorch, users have to invoke this function
     before Pytorch's `pytorch.distributed.init_process_group`.
     """
+    print(
+        f"Initialize the distributed services with graphbolt: {use_graphbolt}"
+    )
     if net_type is not None:
         dgl_warning(
             "net_type is deprecated and will be removed in future release."

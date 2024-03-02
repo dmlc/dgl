@@ -105,4 +105,4 @@ def find_lib_path(name=None, search_path=None, optional=False):
 # We use the version of the incoming release for code
 # that is under development.
 # The following line is set by dgl/python/update_version.py
-__version__ = "2.1"
+__version__ = "2.2"
