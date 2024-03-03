@@ -90,8 +90,8 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def(
-      "expand_indptr(Tensor indptr, ScalarType dtype, Tensor? node_ids, int? "
-      "output_size) -> Tensor",
+      "expand_indptr(Tensor indptr, ScalarType dtype, Tensor? node_ids, "
+      "SymInt? output_size) -> Tensor",
       {at::Tag::pt2_compliant_tag});
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
