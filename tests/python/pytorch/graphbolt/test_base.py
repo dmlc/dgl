@@ -7,7 +7,6 @@ import backend as F
 import dgl.graphbolt as gb
 import pytest
 import torch
-from torch.testing._internal.optests import opcheck
 
 from . import gb_test_utils
 
@@ -297,6 +296,9 @@ def test_expand_indptr(nodes, dtype):
     gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
     assert torch.equal(torch_result, gb_result)
 
+    import torch._dynamo as dynamo
+    from torch.testing._internal.optests import opcheck
+
     # Tests torch.compile compatibility
     for output_size in [None, indptr[-1].item()]:
         kwargs = {"node_ids": nodes, "output_size": output_size}
@@ -312,6 +314,12 @@ def test_expand_indptr(nodes, dtype):
             ],
             raise_exception=True,
         )
+
+        explanation = dynamo.explain(gb.expand_indptr)(
+            indptr, dtype, nodes, output_size
+        )
+        expected_breaks = -1 if output_size is None else 0
+        assert explanation.graph_break_count == expected_breaks
 
 
 def test_csc_format_base_representation():
