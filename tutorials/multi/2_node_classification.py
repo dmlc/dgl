@@ -20,7 +20,6 @@ models with multi-GPU with ``DistributedDataParallel``.
 
 """
 
-
 ######################################################################
 # Importing Packages
 # ---------------
@@ -42,9 +41,9 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-import tqdm
 from torch.distributed.algorithms.join import Join
 from torch.nn.parallel import DistributedDataParallel as DDP
+from tqdm.auto import tqdm
 
 
 ######################################################################
@@ -155,7 +154,7 @@ def evaluate(rank, model, graph, features, itemset, num_classes, device):
         is_train=False,
     )
 
-    for data in tqdm.tqdm(dataloader) if rank == 0 else dataloader:
+    for data in tqdm(dataloader) if rank == 0 else dataloader:
         blocks = data.blocks
         x = data.node_features["feat"]
         y.append(data.labels)
@@ -212,7 +211,7 @@ def train(
         total_loss = torch.tensor(0, dtype=torch.float, device=device)
         num_train_items = 0
         with Join([model]):
-            for data in tqdm.tqdm(dataloader) if rank == 0 else dataloader:
+            for data in tqdm(dataloader) if rank == 0 else dataloader:
                 # The input features are from the source nodes in the first
                 # layer's computation graph.
                 x = data.node_features["feat"]
