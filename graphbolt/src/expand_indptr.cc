@@ -34,9 +34,11 @@ TORCH_LIBRARY_IMPL(graphbolt, CPU, m) {
   m.impl("expand_indptr", &ExpandIndptr);
 }
 
+#ifdef GRAPHBOLT_USE_CUDA
 TORCH_LIBRARY_IMPL(graphbolt, CUDA, m) {
   m.impl("expand_indptr", &ExpandIndptrImpl);
 }
+#endif
 
 TORCH_LIBRARY_IMPL(graphbolt, Autograd, m) {
   m.impl("expand_indptr", torch::autograd::autogradNotImplementedFallback());
