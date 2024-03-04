@@ -5,7 +5,7 @@ import random
 
 import torch
 import torch.nn.functional as F
-import tqdm
+from tqdm.auto import trange
 from torch import nn
 from torch.nn import init
 
@@ -340,7 +340,7 @@ class MetaPath2Vec(nn.Module):
         num_nodes_total = hg.num_nodes()
         node_frequency = torch.zeros(num_nodes_total)
         # random walk
-        for idx in tqdm.trange(hg.num_nodes(node_metapath[0])):
+        for idx in trange(hg.num_nodes(node_metapath[0])):
             traces, _ = random_walk(g=hg, nodes=[idx], metapath=metapath)
             for tr in traces.cpu().numpy():
                 tr_nids = [
