@@ -194,6 +194,8 @@ epub_exclude_files = ["search.html"]
 # -- Extension configuration -------------------------------------------------
 autosummary_generate = True
 autodoc_member_order = "alphabetical"
+# Skip the following members.
+autodoc_mock_imports = ["dgl.nn.mxnet", "dgl.nn.tensorflow"]
 
 intersphinx_mapping = {
     "python": (
