@@ -12,7 +12,7 @@ import networkx.algorithms as A
 
 import numpy as np
 import requests
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .. import backend as F
 from .graph_serialize import load_graphs, load_labels, save_graphs

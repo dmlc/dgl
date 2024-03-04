@@ -1,13 +1,14 @@
 """Network Embedding NN Modules"""
+
 # pylint: disable= invalid-name
 
 import random
 
 import torch
 import torch.nn.functional as F
-import tqdm
 from torch import nn
 from torch.nn import init
+from tqdm.auto import trange
 
 from ...base import NID
 from ...convert import to_heterogeneous, to_homogeneous
@@ -340,7 +341,7 @@ class MetaPath2Vec(nn.Module):
         num_nodes_total = hg.num_nodes()
         node_frequency = torch.zeros(num_nodes_total)
         # random walk
-        for idx in tqdm.trange(hg.num_nodes(node_metapath[0])):
+        for idx in trange(hg.num_nodes(node_metapath[0])):
             traces, _ = random_walk(g=hg, nodes=[idx], metapath=metapath)
             for tr in traces.cpu().numpy():
                 tr_nids = [
