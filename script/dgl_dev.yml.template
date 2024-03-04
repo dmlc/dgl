@@ -47,5 +47,6 @@ dependencies:
     - clang-format
     - pylint
     - lintrunner
+    - jupyterlab
 variables:
   DGL_HOME: __DGL_HOME__
