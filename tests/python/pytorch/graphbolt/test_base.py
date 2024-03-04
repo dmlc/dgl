@@ -297,10 +297,10 @@ def test_expand_indptr(nodes, dtype):
     gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
     assert torch.equal(torch_result, gb_result)
 
-    import torch._dynamo as dynamo
-    from torch.testing._internal.optests import opcheck
-
     if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+        import torch._dynamo as dynamo
+        from torch.testing._internal.optests import opcheck
+
         # Tests torch.compile compatibility
         for output_size in [None, indptr[-1].item()]:
             kwargs = {"node_ids": nodes, "output_size": output_size}
