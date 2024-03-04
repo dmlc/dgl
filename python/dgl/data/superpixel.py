@@ -3,7 +3,7 @@ import pickle
 
 import numpy as np
 from scipy.spatial.distance import cdist
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .. import backend as F
 from ..convert import graph as dgl_graph

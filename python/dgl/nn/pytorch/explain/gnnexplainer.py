@@ -5,7 +5,7 @@ from math import sqrt
 import torch
 
 from torch import nn
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from ....base import EID, NID
 from ....subgraph import khop_in_subgraph
