@@ -24,7 +24,9 @@ namespace graphbolt {
 namespace sampling {
 
 TORCH_LIBRARY(graphbolt, m) {
+#ifdef HAS_IMPL_ABSTRACT_PYSTUB
   m.impl_abstract_pystub("graphbolt", "//dgl.graphbolt");
+#endif
   m.class_<FusedSampledSubgraph>("FusedSampledSubgraph")
       .def(torch::init<>())
       .def_readwrite("indptr", &FusedSampledSubgraph::indptr)
@@ -91,8 +93,12 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def(
       "expand_indptr(Tensor indptr, ScalarType dtype, Tensor? node_ids, "
-      "SymInt? output_size) -> Tensor",
-      {at::Tag::pt2_compliant_tag});
+      "SymInt? output_size) -> Tensor"
+#ifdef HAS_PT2_COMPLIANT_TAG
+      ,
+      {at::Tag::pt2_compliant_tag}
+#endif
+  );
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
