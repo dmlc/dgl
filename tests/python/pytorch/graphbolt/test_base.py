@@ -7,6 +7,7 @@ import backend as F
 import dgl.graphbolt as gb
 import pytest
 import torch
+from torch.torch_version import TorchVersion
 
 from . import gb_test_utils
 
@@ -299,27 +300,28 @@ def test_expand_indptr(nodes, dtype):
     import torch._dynamo as dynamo
     from torch.testing._internal.optests import opcheck
 
-    # Tests torch.compile compatibility
-    for output_size in [None, indptr[-1].item()]:
-        kwargs = {"node_ids": nodes, "output_size": output_size}
-        opcheck(
-            torch.ops.graphbolt.expand_indptr,
-            (indptr, dtype),
-            kwargs,
-            test_utils=[
-                "test_schema",
-                "test_autograd_registration",
-                "test_faketensor",
-                "test_aot_dispatch_dynamic",
-            ],
-            raise_exception=True,
-        )
+    if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+        # Tests torch.compile compatibility
+        for output_size in [None, indptr[-1].item()]:
+            kwargs = {"node_ids": nodes, "output_size": output_size}
+            opcheck(
+                torch.ops.graphbolt.expand_indptr,
+                (indptr, dtype),
+                kwargs,
+                test_utils=[
+                    "test_schema",
+                    "test_autograd_registration",
+                    "test_faketensor",
+                    "test_aot_dispatch_dynamic",
+                ],
+                raise_exception=True,
+            )
 
-        explanation = dynamo.explain(gb.expand_indptr)(
-            indptr, dtype, nodes, output_size
-        )
-        expected_breaks = -1 if output_size is None else 0
-        assert explanation.graph_break_count == expected_breaks
+            explanation = dynamo.explain(gb.expand_indptr)(
+                indptr, dtype, nodes, output_size
+            )
+            expected_breaks = -1 if output_size is None else 0
+            assert explanation.graph_break_count == expected_breaks
 
 
 def test_csc_format_base_representation():
