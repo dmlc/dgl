@@ -20,7 +20,6 @@ models with multi-GPU with ``DistributedDataParallel``.
 
 """
 
-
 ######################################################################
 # Importing Packages
 # ---------------
@@ -42,9 +41,9 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-from tqdm.auto import tqdm
 from torch.distributed.algorithms.join import Join
 from torch.nn.parallel import DistributedDataParallel as DDP
+from tqdm.auto import tqdm
 
 
 ######################################################################

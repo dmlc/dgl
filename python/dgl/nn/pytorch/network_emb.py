@@ -1,13 +1,14 @@
 """Network Embedding NN Modules"""
+
 # pylint: disable= invalid-name
 
 import random
 
 import torch
 import torch.nn.functional as F
-from tqdm.auto import trange
 from torch import nn
 from torch.nn import init
+from tqdm.auto import trange
 
 from ...base import NID
 from ...convert import to_heterogeneous, to_homogeneous
