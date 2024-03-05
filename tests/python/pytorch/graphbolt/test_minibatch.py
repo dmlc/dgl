@@ -869,40 +869,27 @@ def test_dgl_link_predication_hetero(mode):
 
 
 def test_to_pyg_data():
-    test_subgraph_a = gb.SampledSubgraphImpl(
-        sampled_csc=gb.CSCFormatBase(
-            indptr=torch.tensor([0, 1, 3, 5, 6]),
-            indices=torch.tensor([0, 1, 2, 2, 1, 2]),
-        ),
-        original_column_node_ids=torch.tensor([10, 11, 12, 13]),
-        original_row_node_ids=torch.tensor([19, 20, 21, 22, 25, 30]),
-        original_edge_ids=torch.tensor([10, 11, 12, 13]),
-    )
-    test_subgraph_b = gb.SampledSubgraphImpl(
-        sampled_csc=gb.CSCFormatBase(
-            indptr=torch.tensor([0, 1, 3]),
-            indices=torch.tensor([1, 2, 0]),
-        ),
-        original_row_node_ids=torch.tensor([10, 11, 12]),
-        original_edge_ids=torch.tensor([10, 15, 17]),
-        original_column_node_ids=torch.tensor([10, 11]),
-    )
+    test_minibatch = create_homo_minibatch()
+    test_minibatch.seed_nodes = torch.tensor([0, 1])
+    test_minibatch.labels = torch.tensor([7, 8])
+
     expected_edge_index = torch.tensor(
-        [[0, 0, 1, 1, 1, 2, 2, 2], [0, 1, 0, 1, 2, 1, 2, 3]]
+        [[0, 0, 1, 1, 1, 2, 2, 2, 2], [0, 1, 0, 1, 2, 0, 1, 2, 3]]
     )
-    expected_node_features = torch.tensor([[1], [2], [3], [4]])
-    expected_labels = torch.tensor([0, 1])
-    test_minibatch = gb.MiniBatch(
-        sampled_subgraphs=[test_subgraph_a, test_subgraph_b],
-        node_features={"feat": expected_node_features},
-        labels=expected_labels,
-    )
+    expected_node_features = next(iter(test_minibatch.node_features.values()))
+    expected_labels = torch.tensor([7, 8])
+    expected_batch_size = 2
+    expected_n_ids = torch.tensor([10, 11, 12, 13])
+
     pyg_data = test_minibatch.to_pyg_data()
     pyg_data.validate()
     assert torch.equal(pyg_data.edge_index, expected_edge_index)
     assert torch.equal(pyg_data.x, expected_node_features)
     assert torch.equal(pyg_data.y, expected_labels)
+    assert pyg_data.batch_size == expected_batch_size
+    assert torch.equal(pyg_data.n_ids, expected_n_ids)
 
+    subgraph = test_minibatch.sampled_subgraphs[0]
     # Test with sampled_csc as None.
     test_minibatch = gb.MiniBatch(
         sampled_subgraphs=None,
@@ -914,7 +901,7 @@ def test_to_pyg_data():
 
     # Test with node_features as None.
     test_minibatch = gb.MiniBatch(
-        sampled_subgraphs=[test_subgraph_a],
+        sampled_subgraphs=[subgraph],
         node_features=None,
         labels=expected_labels,
     )
@@ -923,7 +910,7 @@ def test_to_pyg_data():
 
     # Test with labels as None.
     test_minibatch = gb.MiniBatch(
-        sampled_subgraphs=[test_subgraph_a],
+        sampled_subgraphs=[subgraph],
         node_features={"feat": expected_node_features},
         labels=None,
     )
@@ -932,7 +919,7 @@ def test_to_pyg_data():
 
     # Test with multiple features.
     test_minibatch = gb.MiniBatch(
-        sampled_subgraphs=[test_subgraph_a],
+        sampled_subgraphs=[subgraph],
         node_features={
             "feat": expected_node_features,
             "extra_feat": torch.tensor([[3], [4]]),
