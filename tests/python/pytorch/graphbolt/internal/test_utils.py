@@ -1,8 +1,11 @@
+import json
 import os
+import re
 import tempfile
 
 import dgl.graphbolt.internal as internal
 import numpy as np
+import pandas as pd
 import pytest
 import torch
 
@@ -141,3 +144,125 @@ def test_copy_or_convert_data(data_fmt, save_fmt, is_feature):
         data = None
         tensor_data = None
         out_data = None
+
+
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_read_edges(edge_fmt):
+    with tempfile.TemporaryDirectory() as test_dir:
+        num_nodes = 40
+        num_edges = 200
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors], axis=1)
+        os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+        if edge_fmt == "csv":
+            # Wrtie into edges/edge.csv
+            edges = pd.DataFrame(edges, columns=["src", "dst"])
+            edge_path = os.path.join("edges", "edge.csv")
+            edges.to_csv(
+                os.path.join(test_dir, edge_path),
+                index=False,
+                header=False,
+            )
+        else:
+            # Wrtie into edges/edge.npy
+            edges = edges.T
+            edge_path = os.path.join("edges", "edge.npy")
+            np.save(os.path.join(test_dir, edge_path), edges)
+        src, dst = internal.read_edges(test_dir, edge_fmt, edge_path)
+        assert src.all() == nodes.all()
+        assert dst.all() == neighbors.all()
+
+
+def test_read_edges_error():
+    # 1. Unsupported file format.
+    with pytest.raises(
+        AssertionError,
+        match="`numpy` or `csv` is expected when reading edges but got `fake-type`.",
+    ):
+        internal.read_edges("test_dir", "fake-type", "edge_path")
+
+    # 2. Unexpected shape of numpy array
+    with tempfile.TemporaryDirectory() as test_dir:
+        num_nodes = 40
+        num_edges = 200
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors, nodes], axis=1)
+        os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+        # Wrtie into edges/edge.npy
+        edges = edges.T
+        edge_path = os.path.join("edges", "edge.npy")
+        np.save(os.path.join(test_dir, edge_path), edges)
+        with pytest.raises(
+            AssertionError,
+            match=re.escape(
+                "The shape of edges should be (2, N), but got torch.Size([3, 200])."
+            ),
+        ):
+            internal.read_edges(test_dir, "numpy", edge_path)
+
+
+def test_calculate_file_hash():
+    with tempfile.TemporaryDirectory() as test_dir:
+        test_file_path = os.path.join(test_dir, "test.txt")
+        with open(test_file_path, "w") as file:
+            file.write("test content")
+        hash_value = internal.calculate_file_hash(
+            test_file_path, hash_algo="md5"
+        )
+        expected_hash_value = "9473fdd0d880a43c21b7778d34872157"
+        assert expected_hash_value == hash_value
+        with pytest.raises(
+            ValueError,
+            match=re.escape(
+                "Hash algorithm must be one of: ['md5', 'sha1', 'sha224', "
+                + "'sha256', 'sha384', 'sha512'], but got `fake`."
+            ),
+        ):
+            hash_value = internal.calculate_file_hash(
+                test_file_path, hash_algo="fake"
+            )
+
+
+def test_calculate_dir_hash():
+    with tempfile.TemporaryDirectory() as test_dir:
+        test_file_path_1 = os.path.join(test_dir, "test_1.txt")
+        test_file_path_2 = os.path.join(test_dir, "test_2.txt")
+        with open(test_file_path_1, "w") as file:
+            file.write("test content")
+        with open(test_file_path_2, "w") as file:
+            file.write("test contents of directory")
+        hash_value = internal.calculate_dir_hash(test_dir, hash_algo="md5")
+        expected_hash_value = [
+            "56e708a2bdf92887d4a7f25cbc13c555",
+            "9473fdd0d880a43c21b7778d34872157",
+        ]
+        assert len(hash_value) == 2
+        for val in hash_value.values():
+            assert val in expected_hash_value
+
+
+def test_check_dataset_change():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # Generate directory and record its hash value.
+        test_file_path_1 = os.path.join(test_dir, "test_1.txt")
+        test_file_path_2 = os.path.join(test_dir, "test_2.txt")
+        with open(test_file_path_1, "w") as file:
+            file.write("test content")
+        with open(test_file_path_2, "w") as file:
+            file.write("test contents of directory")
+        hash_value = internal.calculate_dir_hash(test_dir, hash_algo="md5")
+        hash_value_file = "dataset_hash_value.txt"
+        hash_value_file_paht = os.path.join(
+            test_dir, "preprocessed", hash_value_file
+        )
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        with open(hash_value_file_paht, "w") as file:
+            file.write(json.dumps(hash_value, indent=4))
+
+        # Modify the content of a file.
+        with open(test_file_path_2, "w") as file:
+            file.write("test contents of directory changed")
+
+        assert internal.check_dataset_change(test_dir, "preprocessed")

@@ -7,7 +7,13 @@ import torch
 
 from dgl.utils import recursive_apply
 
-from .base import apply_to, CSCFormatBase, etype_str_to_tuple, isin
+from .base import (
+    apply_to,
+    CSCFormatBase,
+    etype_str_to_tuple,
+    expand_indptr,
+    isin,
+)
 
 
 __all__ = ["SampledSubgraph"]
@@ -24,12 +30,38 @@ class SampledSubgraph:
         self,
     ) -> Union[CSCFormatBase, Dict[str, CSCFormatBase],]:
         """Returns the node pairs representing edges in csc format.
-        - If `sampled_csc` is a CSCFormatBase: It should be in the csc format.
-            `indptr` stores the index in the data array where each column
-            starts. `indices` stores the row indices of the non-zero elements.
-        - If `sampled_csc` is a dictionary: The keys should be edge type and
-            the values should be corresponding node pairs. The ids inside
-            is heterogeneous ids."""
+          - If `sampled_csc` is a CSCFormatBase: It should be in the csc
+            format. `indptr` stores the index in the data array where each
+            column starts. `indices` stores the row indices of the non-zero
+            elements.
+          - If `sampled_csc` is a dictionary: The keys should be edge type and
+            the values should be corresponding node pairs. The ids inside is
+            heterogeneous ids.
+
+        Examples
+        --------
+        1. Homogeneous graph.
+
+        >>> import dgl.graphbolt as gb
+        >>> import torch
+        >>> sampled_csc = gb.CSCFormatBase(
+        ...     indptr=torch.tensor([0, 1, 2, 3]),
+        ...     indices=torch.tensor([0, 1, 2]))
+        >>> print(sampled_csc)
+        CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
+                    indices=tensor([0, 1, 2]),
+        )
+
+        2. Heterogeneous graph.
+
+        >>> sampled_csc = {"A:relation:B": gb.CSCFormatBase(
+        ...     indptr=torch.tensor([0, 1, 2, 3]),
+        ...     indices=torch.tensor([0, 1, 2]))}
+        >>> print(sampled_csc)
+        {'A:relation:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
+                    indices=tensor([0, 1, 2]),
+        )}
+        """
         raise NotImplementedError
 
     @property
@@ -40,9 +72,9 @@ class SampledSubgraph:
         Column's reverse node ids in the original graph. A graph structure
         can be treated as a coordinated row and column pair, and this is
         the mapped ids of the column.
-        - If `original_column_node_ids` is a tensor: It represents the
+          - If `original_column_node_ids` is a tensor: It represents the
             original node ids.
-        - If `original_column_node_ids` is a dictionary: The keys should be
+          - If `original_column_node_ids` is a dictionary: The keys should be
             node type and the values should be corresponding original
             heterogeneous node ids.
         If present, it means column IDs are compacted, and `sampled_csc`
@@ -58,11 +90,11 @@ class SampledSubgraph:
         Row's reverse node ids in the original graph. A graph structure
         can be treated as a coordinated row and column pair, and this is
         the mapped ids of the row.
-        - If `original_row_node_ids` is a tensor: It represents the
-            original node ids.
-        - If `original_row_node_ids` is a dictionary: The keys should be
-            node type and the values should be corresponding original
-            heterogeneous node ids.
+          - If `original_row_node_ids` is a tensor: It represents the original
+            node ids.
+          - If `original_row_node_ids` is a dictionary: The keys should be node
+            type and the values should be corresponding original heterogeneous
+            node ids.
         If present, it means row IDs are compacted, and `sampled_csc`
         row IDs match these compacted ones."""
         return None
@@ -71,12 +103,12 @@ class SampledSubgraph:
     def original_edge_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         """Returns corresponding reverse edge ids the original graph.
         Reverse edge ids in the original graph. This is useful when edge
-            features are needed.
-            - If `original_edge_ids` is a tensor: It represents the
-                original edge ids.
-            - If `original_edge_ids` is a dictionary: The keys should be
-                edge type and the values should be corresponding original
-                heterogeneous edge ids.
+        features are needed.
+          - If `original_edge_ids` is a tensor: It represents the original edge
+            ids.
+          - If `original_edge_ids` is a dictionary: The keys should be edge
+            type and the values should be corresponding original heterogeneous
+            edge ids.
         """
         return None
 
@@ -84,27 +116,29 @@ class SampledSubgraph:
         self,
         edges: Union[
             Dict[str, Tuple[torch.Tensor, torch.Tensor]],
+            Dict[str, torch.Tensor],
             Tuple[torch.Tensor, torch.Tensor],
+            torch.Tensor,
         ],
         assume_num_node_within_int32: bool = True,
     ):
         r"""Exclude edges from the sampled subgraph.
 
-        This function can be used with sampled subgraphs, regardless of whether they
-        have compacted row/column nodes or not. If the original subgraph has
-        compacted row or column nodes, the corresponding row or column nodes in the
-        returned subgraph will also be compacted.
+        This function can be used with sampled subgraphs, regardless of
+        whether they have compacted row/column nodes or not. If the original
+        subgraph has compacted row or column nodes, the corresponding row or
+        column nodes in the returned subgraph will also be compacted.
 
         Parameters
         ----------
         self : SampledSubgraph
             The sampled subgraph.
-        edges : Union[Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-                    Tuple[torch.Tensor, torch.Tensor]]
+        edges : Union[Tuple[torch.Tensor, torch.Tensor],
+                Dict[str, Tuple[torch.Tensor, torch.Tensor]]]
             Edges to exclude. If sampled subgraph is homogeneous, then `edges`
             should be a pair of tensors representing the edges to exclude. If
-            sampled subgraph is heterogeneous, then `edges` should be a dictionary
-            of edge types and the corresponding edges to exclude.
+            sampled subgraph is heterogeneous, then `edges` should be a
+            dictionary of edge types and the corresponding edges to exclude.
         assume_num_node_within_int32: bool
             If True, assumes the value of node IDs in the provided `edges` fall
             within the int32 range, which can significantly enhance computation
@@ -113,7 +147,7 @@ class SampledSubgraph:
         Returns
         -------
         SampledSubgraph
-           An instance of a class that inherits from `SampledSubgraph`.
+            An instance of a class that inherits from `SampledSubgraph`.
 
         Examples
         --------
@@ -151,7 +185,7 @@ class SampledSubgraph:
         ), "Values > int32 are not supported yet."
         assert (
             isinstance(self.sampled_csc, (CSCFormatBase, tuple))
-        ) == isinstance(edges, tuple), (
+        ) == isinstance(edges, (tuple, torch.Tensor)), (
             "The sampled subgraph and the edges to exclude should be both "
             "homogeneous or both heterogeneous."
         )
@@ -168,9 +202,14 @@ class SampledSubgraph:
                 self.original_row_node_ids,
                 self.original_column_node_ids,
             )
-            index = _exclude_homo_edges(
-                reverse_edges, edges, assume_num_node_within_int32
-            )
+            if isinstance(edges, torch.Tensor):
+                index = _exclude_homo_edges_2(
+                    reverse_edges, edges, assume_num_node_within_int32
+                )
+            else:
+                index = _exclude_homo_edges(
+                    reverse_edges, edges, assume_num_node_within_int32
+                )
             return calling_class(*_slice_subgraph(self, index))
         else:
             index = {}
@@ -195,11 +234,18 @@ class SampledSubgraph:
                     original_row_node_ids,
                     original_column_node_ids,
                 )
-                index[etype] = _exclude_homo_edges(
-                    reverse_edges,
-                    edges[etype],
-                    assume_num_node_within_int32,
-                )
+                if isinstance(edges[etype], torch.Tensor):
+                    index[etype] = _exclude_homo_edges_2(
+                        reverse_edges,
+                        edges[etype],
+                        assume_num_node_within_int32,
+                    )
+                else:
+                    index[etype] = _exclude_homo_edges(
+                        reverse_edges,
+                        edges[etype],
+                        assume_num_node_within_int32,
+                    )
             return calling_class(*_slice_subgraph(self, index))
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
@@ -223,15 +269,12 @@ def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
     indptr = node_pair.indptr
     indices = node_pair.indices
     if original_row_node_ids is not None:
-        indices = original_row_node_ids[indices]
-    if original_column_node_ids is not None:
-        indptr = original_column_node_ids.repeat_interleave(
-            indptr[1:] - indptr[:-1]
+        indices = torch.index_select(
+            original_row_node_ids, dim=0, index=indices
         )
-    else:
-        indptr = torch.arange(len(indptr) - 1).repeat_interleave(
-            indptr[1:] - indptr[:-1]
-        )
+    indptr = expand_indptr(
+        indptr, indices.dtype, original_column_node_ids, len(indices)
+    )
     return (indices, indptr)
 
 
@@ -249,8 +292,32 @@ def _exclude_homo_edges(
 ):
     """Return the indices of edges to be included."""
     if assume_num_node_within_int32:
-        val = edges[0] << 32 | edges[1]
-        val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]
+        val = edges[0].long() << 32 | edges[1].long()
+        val_to_exclude = (
+            edges_to_exclude[0].long() << 32 | edges_to_exclude[1].long()
+        )
+    else:
+        # TODO: Add support for value > int32.
+        raise NotImplementedError(
+            "Values out of range int32 are not supported yet"
+        )
+    mask = ~isin(val, val_to_exclude)
+    return torch.nonzero(mask, as_tuple=True)[0]
+
+
+def _exclude_homo_edges_2(
+    edges: Tuple[torch.Tensor, torch.Tensor],
+    edges_to_exclude: torch.Tensor,
+    assume_num_node_within_int32: bool,
+):
+    """Return the indices of edges to be included."""
+    if assume_num_node_within_int32:
+        val = edges[0].long() << 32 | edges[1].long()
+        edges_to_exclude_trans = edges_to_exclude.T
+        val_to_exclude = (
+            edges_to_exclude_trans[0].long() << 32
+            | edges_to_exclude_trans[1].long()
+        )
     else:
         # TODO: Add support for value > int32.
         raise NotImplementedError(

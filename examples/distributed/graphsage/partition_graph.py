@@ -87,6 +87,11 @@ if __name__ == "__main__":
         default="data",
         help="Output path of partitioned graph.",
     )
+    argparser.add_argument(
+        "--use_graphbolt",
+        action="store_true",
+        help="Use GraphBolt for distributed train.",
+    )
     args = argparser.parse_args()
 
     start = time.time()
@@ -127,4 +132,5 @@ if __name__ == "__main__":
         balance_ntypes=balance_ntypes,
         balance_edges=args.balance_edges,
         num_trainers_per_machine=args.num_trainers_per_machine,
+        use_graphbolt=args.use_graphbolt,
     )

@@ -2,7 +2,7 @@
 
 import torch as th
 
-from .... import backend as F, utils
+from .... import backend as F
 from ...dist_tensor import DistTensor
 
 
@@ -99,7 +99,7 @@ class DistEmbedding:
 
     def __call__(self, idx, device=th.device("cpu")):
         """
-        node_ids : th.tensor
+        idx : th.tensor
             Index of the embeddings to collect.
         device : th.device
             Target device to put the collected embeddings.
@@ -109,7 +109,6 @@ class DistEmbedding:
         Tensor
             The requested node embeddings
         """
-        idx = utils.toindex(idx).tousertensor()
         emb = self._tensor[idx].to(device, non_blocking=True)
         if F.is_recording():
             emb = F.attach_grad(emb)

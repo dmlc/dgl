@@ -88,22 +88,34 @@ def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
 
 
 def random_homo_graphbolt_graph(
-    test_dir, dataset_name, num_nodes, num_edges, num_classes
+    test_dir, dataset_name, num_nodes, num_edges, num_classes, edge_fmt="csv"
 ):
     """Generate random graphbolt version homograph"""
     # Generate random edges.
-    nodes = np.repeat(np.arange(num_nodes), 5)
-    neighbors = np.random.randint(0, num_nodes, size=(num_edges))
-    edges = np.stack([nodes, neighbors], axis=1)
-    # Wrtie into edges/edge.csv
-    os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
-    edges = pd.DataFrame(edges, columns=["src", "dst"])
-    edge_path = os.path.join("edges", "edge.csv")
-    edges.to_csv(
-        os.path.join(test_dir, edge_path),
-        index=False,
-        header=False,
+    nodes = np.repeat(np.arange(num_nodes, dtype=np.int64), 5)
+    neighbors = np.random.randint(
+        0, num_nodes, size=(num_edges), dtype=np.int64
     )
+    edges = np.stack([nodes, neighbors], axis=1)
+    os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+    assert edge_fmt in [
+        "numpy",
+        "csv",
+    ], "Only numpy and csv are supported for edges."
+    if edge_fmt == "csv":
+        # Write into edges/edge.csv
+        edges_DataFrame = pd.DataFrame(edges, columns=["src", "dst"])
+        edge_path = os.path.join("edges", "edge.csv")
+        edges_DataFrame.to_csv(
+            os.path.join(test_dir, edge_path),
+            index=False,
+            header=False,
+        )
+    else:
+        # Write into edges/edge.npy
+        edges = edges.T
+        edge_path = os.path.join("edges", "edge.npy")
+        np.save(os.path.join(test_dir, edge_path), edges)
 
     # Generate random graph edge-feats.
     edge_feats = np.random.rand(num_edges, num_classes)
@@ -127,7 +139,7 @@ def random_homo_graphbolt_graph(
         np.arange(each_set_size),
         np.arange(each_set_size, 2 * each_set_size),
     )
-    train_data = np.vstack(train_pairs).T.astype(np.int64)
+    train_data = np.vstack(train_pairs).T.astype(edges.dtype)
     train_path = os.path.join("set", "train.npy")
     np.save(os.path.join(test_dir, train_path), train_data)
 
@@ -135,7 +147,7 @@ def random_homo_graphbolt_graph(
         np.arange(each_set_size, 2 * each_set_size),
         np.arange(2 * each_set_size, 3 * each_set_size),
     )
-    validation_data = np.vstack(validation_pairs).T.astype(np.int64)
+    validation_data = np.vstack(validation_pairs).T.astype(edges.dtype)
     validation_path = os.path.join("set", "validation.npy")
     np.save(os.path.join(test_dir, validation_path), validation_data)
 
@@ -143,19 +155,25 @@ def random_homo_graphbolt_graph(
         np.arange(2 * each_set_size, 3 * each_set_size),
         np.arange(3 * each_set_size, 4 * each_set_size),
     )
-    test_data = np.vstack(test_pairs).T.astype(np.int64)
+    test_data = np.vstack(test_pairs).T.astype(edges.dtype)
     test_path = os.path.join("set", "test.npy")
     np.save(os.path.join(test_dir, test_path), test_data)
 
     yaml_content = f"""
         dataset_name: {dataset_name}
-        graph: # graph structure and required attributes.
+        graph: # Graph structure and required attributes.
             nodes:
                 - num: {num_nodes}
             edges:
-                - format: csv
+                - format: {edge_fmt}
                   path: {edge_path}
             feature_data:
+                - domain: node
+                  type: null
+                  name: feat
+                  format: numpy
+                  in_memory: true
+                  path: {node_feat_path}
                 - domain: edge
                   type: null
                   name: feat
@@ -202,8 +220,8 @@ def random_homo_graphbolt_graph(
     return yaml_content
 
 
-def genereate_raw_data_for_hetero_dataset(
-    test_dir, dataset_name, num_nodes, num_edges, num_classes
+def generate_raw_data_for_hetero_dataset(
+    test_dir, dataset_name, num_nodes, num_edges, num_classes, edge_fmt="csv"
 ):
     # Generate edges.
     edges_path = {}
@@ -211,17 +229,26 @@ def genereate_raw_data_for_hetero_dataset(
         src_ntype, etype_str, dst_ntype = etype
         src = torch.randint(0, num_nodes[src_ntype], (num_edge,))
         dst = torch.randint(0, num_nodes[dst_ntype], (num_edge,))
-        # Write into edges/edge.csv
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
-        edges = pd.DataFrame(
-            np.stack([src, dst], axis=1), columns=["src", "dst"]
-        )
-        edge_path = os.path.join("edges", f"{etype_str}.csv")
-        edges.to_csv(
-            os.path.join(test_dir, edge_path),
-            index=False,
-            header=False,
-        )
+        assert edge_fmt in [
+            "numpy",
+            "csv",
+        ], "Only numpy and csv are supported for edges."
+        if edge_fmt == "csv":
+            # Write into edges/edge.csv
+            edges = pd.DataFrame(
+                np.stack([src, dst], axis=1), columns=["src", "dst"]
+            )
+            edge_path = os.path.join("edges", f"{etype_str}.csv")
+            edges.to_csv(
+                os.path.join(test_dir, edge_path),
+                index=False,
+                header=False,
+            )
+        else:
+            edges = np.stack([src, dst], axis=1).T
+            edge_path = os.path.join("edges", f"{etype_str}.npy")
+            np.save(os.path.join(test_dir, edge_path), edges)
         edges_path[etype_str] = edge_path
 
     # Generate node features.
@@ -233,10 +260,20 @@ def genereate_raw_data_for_hetero_dataset(
         np.save(os.path.join(test_dir, node_feat_path), node_feats)
         node_feats_path[ntype] = node_feat_path
 
+    # Generate edge features.
+    edge_feats_path = {}
+    os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
+    for etype, num_edge in num_edges.items():
+        src_ntype, etype_str, dst_ntype = etype
+        edge_feat_path = os.path.join("data", f"{etype_str}-feat.npy")
+        edge_feats = np.random.rand(num_edge, num_classes)
+        np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
+        edge_feats_path[etype_str] = edge_feat_path
+
     # Generate train/test/valid set.
     os.makedirs(os.path.join(test_dir, "set"), exist_ok=True)
     user_ids = torch.arange(num_nodes["user"])
-    np.random.shuffle(user_ids)
+    np.random.shuffle(user_ids.numpy())
     num_train = int(num_nodes["user"] * 0.6)
     num_validation = int(num_nodes["user"] * 0.2)
     num_test = num_nodes["user"] - num_train - num_validation
@@ -255,7 +292,7 @@ def genereate_raw_data_for_hetero_dataset(
 
     yaml_content = f"""
         dataset_name: {dataset_name}
-        graph: # graph structure and required attributes.
+        graph: # Graph structure and required attributes.
           nodes:
             - type: user
               num: {num_nodes["user"]}
@@ -263,11 +300,36 @@ def genereate_raw_data_for_hetero_dataset(
               num: {num_nodes["item"]}
           edges:
             - type: "user:follow:user"
-              format: csv
+              format: {edge_fmt}
               path: {edges_path["follow"]}
             - type: "user:click:item"
-              format: csv
+              format: {edge_fmt}
               path: {edges_path["click"]}
+          feature_data:
+            - domain: node
+              type: user
+              name: feat
+              format: numpy
+              in_memory: true
+              path: {node_feats_path["user"]}
+            - domain: node
+              type: item
+              name: feat
+              format: numpy
+              in_memory: true
+              path: {node_feats_path["item"]}
+            - domain: edge
+              type: "user:follow:user"
+              name: feat
+              format: numpy
+              in_memory: true
+              path: {edge_feats_path["follow"]}
+            - domain: edge
+              type: "user:click:item"
+              name: feat
+              format: numpy
+              in_memory: true
+              path: {edge_feats_path["click"]}
         feature_data:
           - domain: node
             type: user

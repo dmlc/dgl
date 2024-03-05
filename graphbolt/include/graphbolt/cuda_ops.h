@@ -4,6 +4,8 @@
  * @file graphbolt/cuda_ops.h
  * @brief Available CUDA operations in Graphbolt.
  */
+#ifndef GRAPHBOLT_CUDA_OPS_H_
+#define GRAPHBOLT_CUDA_OPS_H_
 
 #include <torch/script.h>
 
@@ -74,21 +76,45 @@ torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements);
  *
  * NOTE: The shape of all tensors must be 1-D.
  *
- * @param indptr Indptr tensor containing offsets with shape (N,).
+ * @param in_degree Indegree tensor containing degrees of nodes being copied.
+ * @param sliced_indptr Sliced_indptr tensor containing indptr values of nodes
+ * being copied.
  * @param indices Indices tensor with edge information of shape (indptr[N],).
  * @param nodes Nodes tensor with shape (M,).
+ * @param nodes_max An upperbound on `nodes.max()`.
+ * @param output_size The total number of edges being copied.
  * @return (torch::Tensor, torch::Tensor) Output indptr and indices tensors of
  * shapes (M + 1,) and ((indptr[nodes + 1] - indptr[nodes]).sum(),).
  */
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes);
+    torch::Tensor in_degree, torch::Tensor sliced_indptr, torch::Tensor indices,
+    torch::Tensor nodes, int64_t nodes_max,
+    torch::optional<int64_t> output_size = torch::nullopt);
+
+/**
+ * @brief Select columns for a sparse matrix in a CSC format according to nodes
+ * tensor.
+ *
+ * NOTE: The shape of all tensors must be 1-D.
+ *
+ * @param indptr Indptr tensor containing offsets with shape (N,).
+ * @param indices Indices tensor with edge information of shape (indptr[N],).
+ * @param nodes Nodes tensor with shape (M,).
+ * @param output_size The total number of edges being copied.
+ * @return (torch::Tensor, torch::Tensor) Output indptr and indices tensors of
+ * shapes (M + 1,) and ((indptr[nodes + 1] - indptr[nodes]).sum(),).
+ */
+std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
+    torch::optional<int64_t> output_size = torch::nullopt);
 
 /**
  * @brief Slices the indptr tensor with nodes and returns the indegrees of the
  * given nodes and their indptr values.
  *
  * @param indptr The indptr tensor.
- * @param nodes  The nodes to read from indptr
+ * @param nodes  The nodes to read from indptr. If not provided, assumed to be
+ * equal to torch.arange(indptr.size(0) - 1).
  *
  * @return Tuple of tensors with values:
  * (indptr[nodes + 1] - indptr[nodes], indptr[nodes]), the returned indegrees
@@ -96,7 +122,23 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  * on it gives the output indptr.
  */
 std::tuple<torch::Tensor, torch::Tensor> SliceCSCIndptr(
-    torch::Tensor indptr, torch::Tensor nodes);
+    torch::Tensor indptr, torch::optional<torch::Tensor> nodes);
+
+/**
+ * @brief Given the compacted sub_indptr tensor, edge type tensor and
+ * sliced_indptr tensor of the original graph, returns the heterogenous
+ * versions of sub_indptr, indegrees and sliced_indptr.
+ *
+ * @param sub_indptr     The compacted indptr tensor.
+ * @param etypes         The compacted type_per_edge tensor.
+ * @param sliced_indptr  The sliced_indptr tensor of original graph.
+ * @param num_fanouts    The number of fanout values.
+ *
+ * @return Tuple of tensors (new_sub_indptr, new_indegrees, new_sliced_indptr):
+ */
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
+    torch::Tensor sub_indptr, torch::Tensor etypes, torch::Tensor sliced_indptr,
+    int64_t num_fanouts);
 
 /**
  * @brief Computes the exclusive prefix sum of the given input.
@@ -123,16 +165,22 @@ torch::Tensor ExclusiveCumSum(torch::Tensor input);
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
 
 /**
- * @brief CSRToCOO implements conversion from a given indptr offset tensor to a
- * COO format tensor including ids in [0, indptr.size(0) - 1).
+ * @brief ExpandIndptrImpl implements conversion from a given indptr offset
+ * tensor to a COO format tensor. If node_ids is not given, it is assumed to be
+ * equal to torch::arange(indptr.size(0) - 1, dtype=dtype).
  *
- * @param input          A tensor containing IDs.
- * @param output_dtype   Dtype of output.
+ * @param indptr       The indptr offset tensor.
+ * @param dtype        The dtype of the returned output tensor.
+ * @param node_ids     Optional 1D tensor represents the node ids.
+ * @param output_size  Optional value of indptr[-1]. Passing it eliminates CPU
+ * GPU synchronization.
  *
- * @return
- * - The resulting tensor with output_dtype.
+ * @return The resulting tensor.
  */
-torch::Tensor CSRToCOO(torch::Tensor indptr, torch::ScalarType output_dtype);
+torch::Tensor ExpandIndptrImpl(
+    torch::Tensor indptr, torch::ScalarType dtype,
+    torch::optional<torch::Tensor> node_ids = torch::nullopt,
+    torch::optional<int64_t> output_size = torch::nullopt);
 
 /**
  * @brief Removes duplicate elements from the concatenated 'unique_dst_ids' and
@@ -175,3 +223,5 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
 }  //  namespace ops
 }  //  namespace graphbolt
+
+#endif  // GRAPHBOLT_CUDA_OPS_H_

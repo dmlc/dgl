@@ -13,9 +13,12 @@ import torchmetrics.functional as MF
 ############################################################################
 # (HIGHLIGHT) Create a single process dataloader with dgl graphbolt package.
 ############################################################################
-def create_dataloader(dateset, itemset, device):
+def create_dataloader(dataset, itemset, device):
     # Sample seed nodes from the itemset.
     datapipe = gb.ItemSampler(itemset, batch_size=16)
+
+    # Copy the mini-batch to the designated device for sampling and training.
+    datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
 
     # Sample neighbors for the seed nodes.
     datapipe = datapipe.sample_neighbor(dataset.graph, fanouts=[4, 2])
@@ -24,9 +27,6 @@ def create_dataloader(dateset, itemset, device):
     datapipe = datapipe.fetch_feature(
         dataset.feature, node_feature_keys=["feat"]
     )
-
-    # Copy the mini-batch to the designated device for training.
-    datapipe = datapipe.copy_to(device)
 
     # Initiate the dataloader for the datapipe.
     return gb.DataLoader(datapipe)
@@ -118,6 +118,12 @@ if __name__ == "__main__":
     # Load and preprocess dataset.
     print("Loading data...")
     dataset = gb.BuiltinDataset("cora").load()
+
+    # If a CUDA device is selected, we pin the graph and the features so that
+    # the GPU can access them.
+    if device == torch.device("cuda:0"):
+        dataset.graph.pin_memory_()
+        dataset.feature.pin_memory_()
 
     in_size = dataset.feature.size("node", None, "feat")[0]
     out_size = dataset.tasks[0].metadata["num_classes"]

@@ -79,14 +79,10 @@ class SAGE(nn.Module):
                 hidden_x = F.relu(hidden_x)
         return hidden_x
 
-    def inference(self, graph, features, dataloader, device):
+    def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
-        feature = features.read("node", None, "feat")
-
-        buffer_device = torch.device("cpu")
-        # Enable pin_memory for faster CPU to GPU data transfer if the
-        # model is running on a GPU.
-        pin_memory = buffer_device != device
+        pin_memory = storage_device == "pinned"
+        buffer_device = torch.device("cpu" if pin_memory else storage_device)
 
         print("Start node embedding inference.")
         for layer_idx, layer in enumerate(self.layers):
@@ -99,17 +95,17 @@ class SAGE(nn.Module):
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
-            feature = feature.to(device)
-            for step, data in tqdm.tqdm(enumerate(dataloader)):
-                x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+            for data in tqdm.tqdm(dataloader):
+                # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], data.node_features["feat"])
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                 # By design, our seed nodes are contiguous.
                 y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
                     buffer_device, non_blocking=True
                 )
-            feature = y
+            if not is_last_layer:
+                features.update("node", None, "feat", y)
 
         return y
 
@@ -146,6 +142,16 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Input]:
+    # 'device': The device to copy the data to.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device. Copying here
+    # ensures that the rest of the operations run on the GPU.
+    ############################################################################
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
+
+    ############################################################################
+    # [Input]:
     # 'args.neg_ratio': Specify the ratio of negative to positive samples.
     # (E.g., if neg_ratio is 1, for each positive sample there will be 1
     # negative sample.)
@@ -175,7 +181,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph, args.fanout if is_train else [-1]
+    )
 
     ############################################################################
     # [Input]:
@@ -203,12 +211,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs. This step is skipped in evaluation/inference because features
-    # are updated as a whole during it, thus storing features in minibatch is
-    # unnecessary.
+    # subgraphs.
     ############################################################################
-    if is_train:
-        datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
     # [Input]:
@@ -216,7 +221,8 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=args.device)
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
 
     ############################################################################
     # [Input]:
@@ -275,15 +281,12 @@ def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
     model.eval()
     evaluator = Evaluator(name="ogbl-citation2")
 
-    # Since we need to use all neghborhoods for evaluation, we set the fanout
-    # to -1.
-    args.fanout = [-1]
     dataloader = create_dataloader(
         args, graph, features, all_nodes_set, is_train=False
     )
 
     # Compute node embeddings for the entire graph.
-    node_emb = model.inference(graph, features, dataloader, args.device)
+    node_emb = model.inference(graph, features, dataloader, args.storage_device)
     results = []
 
     # Loop over both validation and test sets.
@@ -304,11 +307,11 @@ def train(args, model, graph, features, train_set):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(args, graph, features, train_set)
 
-    for epoch in tqdm.trange(args.epochs):
+    for epoch in range(args.epochs):
         model.train()
         total_loss = 0
         start_epoch_time = time.time()
-        for step, data in enumerate(dataloader):
+        for step, data in tqdm.tqdm(enumerate(dataloader)):
             # Get node pairs with labels for loss calculation.
             compacted_pairs, labels = data.node_pairs_with_labels
 
@@ -329,6 +332,8 @@ def train(args, model, graph, features, train_set):
 
             total_loss += loss.item()
             if step + 1 == args.early_stop:
+                # Early stopping requires a new dataloader to reset its state.
+                dataloader = create_dataloader(args, graph, features, train_set)
                 break
 
         end_epoch_time = time.time()
@@ -366,24 +371,34 @@ def parse_args():
         help="Whether to exclude reverse edges during sampling. Default: 1",
     )
     parser.add_argument(
-        "--device",
-        default="cpu",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.storage_device, args.device = args.mode.split("-")
+    args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data")
     dataset = gb.BuiltinDataset("ogbl-citation2").load()
-    graph = dataset.graph
-    features = dataset.feature
+
+    # Move the dataset to the selected storage.
+    if args.storage_device == "pinned":
+        graph = dataset.graph.pin_memory_()
+        features = dataset.feature.pin_memory_()
+    else:
+        graph = dataset.graph.to(args.storage_device)
+        features = dataset.feature.to(args.storage_device)
+
     train_set = dataset.tasks[0].train_set
     args.fanout = list(map(int, args.fanout.split(",")))
 

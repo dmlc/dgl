@@ -52,6 +52,7 @@ file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
 if(USE_CUDA)
   file(GLOB BOLT_CUDA_SRC
     ${BOLT_DIR}/cuda/*.cu
+    ${BOLT_DIR}/cuda/*.cc
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
   if(DEFINED ENV{CUDAARCHS})
@@ -69,12 +70,15 @@ target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 if(USE_CUDA)
   set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 17)
   message(STATUS "Use external CCCL library for a consistent API and performance for graphbolt.")
-  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE CUB_WRAPPED_NAMESPACE=graphbolt)
-  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE THRUST_NS_QUALIFIER=thrust)
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
                              "../third_party/cccl/libcudacxx/include")
+
+  message(STATUS "Use HugeCTR gpu_cache for graphbolt with INCLUDE_DIRS $ENV{GPU_CACHE_INCLUDE_DIRS}.")
+  target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE $ENV{GPU_CACHE_INCLUDE_DIRS})
+  target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${GPU_CACHE_BUILD_DIR})
+  target_link_libraries(${LIB_GRAPHBOLT_NAME} gpu_cache)
   
   get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
   message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")
@@ -88,8 +92,5 @@ if(DEFINED MKL_LIBRARIES)
                           ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
 
-find_library(LIBURING NAMES uring)
-if(NOT LIBURING)
-    message(FATAL_ERROR "liburing not found")
-endif()
+target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${LIBURING_INCLUDE})
 target_link_libraries(${LIB_GRAPHBOLT_NAME} ${LIBURING})

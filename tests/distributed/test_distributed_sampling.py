@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import os
 import random
-import sys
+import tempfile
 import time
 import traceback
 import unittest
@@ -11,6 +11,7 @@ import backend as F
 import dgl
 import numpy as np
 import pytest
+import torch
 from dgl.data import CitationGraphDataset, WN18Dataset
 from dgl.distributed import (
     DistGraph,
@@ -31,6 +32,7 @@ def start_server(
     disable_shared_mem,
     graph_name,
     graph_format=["csc", "coo"],
+    use_graphbolt=False,
 ):
     g = DistGraphServer(
         rank,
@@ -40,6 +42,7 @@ def start_server(
         tmpdir / (graph_name + ".json"),
         disable_shared_mem=disable_shared_mem,
         graph_format=graph_format,
+        use_graphbolt=use_graphbolt,
     )
     g.start()
 
@@ -54,7 +57,9 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     try:
         sampled_graph = sample_neighbors(
-            dist_graph, [0, 10, 99, 66, 1024, 2008], 3
+            dist_graph,
+            torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+            3,
         )
     except Exception as e:
         print(traceback.format_exc())
@@ -72,6 +77,9 @@ def start_sample_client_shuffle(
     group_id,
     orig_nid,
     orig_eid,
+    use_graphbolt=False,
+    return_eids=False,
+    node_id_dtype=None,
 ):
     os.environ["DGL_GROUP_ID"] = str(group_id)
     gpb = None
@@ -81,16 +89,31 @@ def start_sample_client_shuffle(
         )
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", gpb=gpb)
-    sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+    sampled_graph = sample_neighbors(
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=node_id_dtype),
+        3,
+        use_graphbolt=use_graphbolt,
+    )
+    assert sampled_graph.idtype == dist_graph.idtype
+    assert sampled_graph.idtype == torch.int64
 
+    assert (
+        dgl.ETYPE not in sampled_graph.edata
+    ), "Etype should not be in homogeneous sampled graph."
     src, dst = sampled_graph.edges()
     src = orig_nid[src]
     dst = orig_nid[dst]
     assert sampled_graph.num_nodes() == g.num_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
-    eids = g.edge_ids(src, dst)
-    eids1 = orig_eid[sampled_graph.edata[dgl.EID]]
-    assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
+    if use_graphbolt and not return_eids:
+        assert (
+            dgl.EID not in sampled_graph.edata
+        ), "EID should not be in sampled graph if use_graphbolt=True."
+    else:
+        eids = g.edge_ids(src, dst)
+        eids1 = orig_eid[sampled_graph.edata[dgl.EID]]
+        assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
 
 
 def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids, etype=None):
@@ -378,7 +401,14 @@ def test_rpc_sampling():
         check_rpc_sampling(Path(tmpdirname), 1)
 
 
-def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
+def check_rpc_sampling_shuffle(
+    tmpdir,
+    num_server,
+    num_groups=1,
+    use_graphbolt=False,
+    return_eids=False,
+    node_id_dtype=None,
+):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
@@ -393,6 +423,8 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -406,6 +438,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
                 num_server > 1,
                 "test_sampling",
                 ["csc", "coo"],
+                use_graphbolt,
             ),
         )
         p.start()
@@ -427,6 +460,9 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
                     group_id,
                     orig_nids,
                     orig_eids,
+                    use_graphbolt,
+                    return_eids,
+                    node_id_dtype,
                 ),
             )
             p.start()
@@ -440,7 +476,14 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
         assert p.exitcode == 0
 
 
-def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes):
+def start_hetero_sample_client(
+    rank,
+    tmpdir,
+    disable_shared_mem,
+    nodes,
+    use_graphbolt=False,
+    return_eids=False,
+):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(
@@ -451,12 +494,20 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes):
     assert "feat" in dist_graph.nodes["n1"].data
     assert "feat" not in dist_graph.nodes["n2"].data
     assert "feat" not in dist_graph.nodes["n3"].data
+    nodes = {
+        k: torch.tensor(v, dtype=dist_graph.idtype) for k, v in nodes.items()
+    }
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:
-        sampled_graph = sample_neighbors(dist_graph, nodes, 3)
+        # Enable santity check in distributed sampling.
+        os.environ["DGL_DIST_DEBUG"] = "1"
+        sampled_graph = sample_neighbors(
+            dist_graph, nodes, 3, use_graphbolt=use_graphbolt
+        )
         block = dgl.to_block(sampled_graph, nodes)
-        block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
+        if not use_graphbolt or return_eids:
+            block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
         print(traceback.format_exc())
         block = None
@@ -469,8 +520,10 @@ def start_hetero_etype_sample_client(
     tmpdir,
     disable_shared_mem,
     fanout=3,
-    nodes={"n3": [0, 10, 99, 66, 124, 208]},
+    nodes=None,
     etype_sorted=False,
+    use_graphbolt=False,
+    return_eids=False,
 ):
     gpb = None
     if disable_shared_mem:
@@ -482,8 +535,11 @@ def start_hetero_etype_sample_client(
     assert "feat" in dist_graph.nodes["n1"].data
     assert "feat" not in dist_graph.nodes["n2"].data
     assert "feat" not in dist_graph.nodes["n3"].data
+    nodes = {
+        k: torch.tensor(v, dtype=dist_graph.idtype) for k, v in nodes.items()
+    }
 
-    if dist_graph.local_partition is not None:
+    if (not use_graphbolt) and dist_graph.local_partition is not None:
         # Check whether etypes are sorted in dist_graph
         local_g = dist_graph.local_partition
         local_nids = np.arange(local_g.num_nodes())
@@ -496,11 +552,19 @@ def start_hetero_etype_sample_client(
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:
+        # Enable santity check in distributed sampling.
+        os.environ["DGL_DIST_DEBUG"] = "1"
         sampled_graph = sample_etype_neighbors(
-            dist_graph, nodes, fanout, etype_sorted=etype_sorted
+            dist_graph,
+            nodes,
+            fanout,
+            etype_sorted=etype_sorted,
+            use_graphbolt=use_graphbolt,
         )
         block = dgl.to_block(sampled_graph, nodes)
-        block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
+        if sampled_graph.num_edges() > 0:
+            if not use_graphbolt or return_eids:
+                block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
         print(traceback.format_exc())
         block = None
@@ -508,7 +572,9 @@ def start_hetero_etype_sample_client(
     return block, gpb
 
 
-def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
+def check_rpc_hetero_sampling_shuffle(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero()
@@ -523,6 +589,8 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -530,16 +598,28 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling"),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
+    nodes = {"n3": torch.tensor([0, 10, 99, 66, 124, 208], dtype=g.idtype)}
     block, gpb = start_hetero_sample_client(
-        0, tmpdir, num_server > 1, nodes={"n3": [0, 10, 99, 66, 124, 208]}
+        0,
+        tmpdir,
+        num_server > 1,
+        nodes=nodes,
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
-    print("Done sampling")
     for p in pserver_list:
         p.join()
         assert p.exitcode == 0
@@ -550,10 +630,17 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
         shuffled_dst = F.gather_row(block.dstnodes[dst_type].data[dgl.NID], dst)
-        shuffled_eid = block.edges[etype].data[dgl.EID]
-
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
+
+        assert np.all(
+            F.asnumpy(g.has_edges_between(orig_src, orig_dst, etype=etype))
+        )
+
+        if use_graphbolt and not return_eids:
+            continue
+
+        shuffled_eid = block.edges[etype].data[dgl.EID]
         orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
@@ -572,7 +659,9 @@ def get_degrees(g, nids, ntype):
     return deg
 
 
-def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
+def check_rpc_hetero_sampling_empty_shuffle(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(empty=True)
@@ -587,6 +676,8 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -594,18 +685,29 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling"),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     deg = get_degrees(g, orig_nids["n3"], "n3")
-    empty_nids = F.nonzero_1d(deg == 0)
+    empty_nids = F.nonzero_1d(deg == 0).to(g.idtype)
     block, gpb = start_hetero_sample_client(
-        0, tmpdir, num_server > 1, nodes={"n3": empty_nids}
+        0,
+        tmpdir,
+        num_server > 1,
+        nodes={"n3": empty_nids},
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
-    print("Done sampling")
     for p in pserver_list:
         p.join()
         assert p.exitcode == 0
@@ -615,7 +717,11 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
 
 
 def check_rpc_hetero_etype_sampling_shuffle(
-    tmpdir, num_server, graph_formats=None
+    tmpdir,
+    num_server,
+    graph_formats=None,
+    use_graphbolt=False,
+    return_eids=False,
 ):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
@@ -632,6 +738,8 @@ def check_rpc_hetero_etype_sampling_shuffle(
         part_method="metis",
         return_mapping=True,
         graph_formats=graph_formats,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -639,7 +747,14 @@ def check_rpc_hetero_etype_sampling_shuffle(
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling", ["csc", "coo"]),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
@@ -649,13 +764,16 @@ def check_rpc_hetero_etype_sampling_shuffle(
     etype_sorted = False
     if graph_formats is not None:
         etype_sorted = "csc" in graph_formats or "csr" in graph_formats
+    nodes = {"n3": torch.tensor([0, 10, 99, 66, 124, 208], dtype=g.idtype)}
     block, gpb = start_hetero_etype_sample_client(
         0,
         tmpdir,
         num_server > 1,
         fanout,
-        nodes={"n3": [0, 10, 99, 66, 124, 208]},
+        nodes=nodes,
         etype_sorted=etype_sorted,
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
     print("Done sampling")
     for p in pserver_list:
@@ -673,19 +791,26 @@ def check_rpc_hetero_etype_sampling_shuffle(
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
         shuffled_dst = F.gather_row(block.dstnodes[dst_type].data[dgl.NID], dst)
-        shuffled_eid = block.edges[etype].data[dgl.EID]
-
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
+        assert np.all(
+            F.asnumpy(g.has_edges_between(orig_src, orig_dst, etype=etype))
+        )
+
+        if use_graphbolt and not return_eids:
+            continue
 
         # Check the node Ids and edge Ids.
+        shuffled_eid = block.edges[etype].data[dgl.EID]
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
         assert np.all(F.asnumpy(orig_src1) == orig_src)
         assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 
-def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
+def check_rpc_hetero_etype_sampling_empty_shuffle(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(dense=True, empty=True)
@@ -700,6 +825,8 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -707,7 +834,14 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling"),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
@@ -715,9 +849,15 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
 
     fanout = 3
     deg = get_degrees(g, orig_nids["n3"], "n3")
-    empty_nids = F.nonzero_1d(deg == 0)
+    empty_nids = F.nonzero_1d(deg == 0).to(g.idtype)
     block, gpb = start_hetero_etype_sample_client(
-        0, tmpdir, num_server > 1, fanout, nodes={"n3": empty_nids}
+        0,
+        tmpdir,
+        num_server > 1,
+        fanout,
+        nodes={"n3": empty_nids},
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
     print("Done sampling")
     for p in pserver_list:
@@ -739,28 +879,13 @@ def create_random_bipartite():
     return g
 
 
-def start_bipartite_sample_client(rank, tmpdir, disable_shared_mem, nodes):
-    gpb = None
-    if disable_shared_mem:
-        _, _, _, gpb, _, _, _ = load_partition(
-            tmpdir / "test_sampling.json", rank
-        )
-    dgl.distributed.initialize("rpc_ip_config.txt")
-    dist_graph = DistGraph("test_sampling", gpb=gpb)
-    assert "feat" in dist_graph.nodes["user"].data
-    assert "feat" in dist_graph.nodes["game"].data
-    if gpb is None:
-        gpb = dist_graph.get_partition_book()
-    sampled_graph = sample_neighbors(dist_graph, nodes, 3)
-    block = dgl.to_block(sampled_graph, nodes)
-    if sampled_graph.num_edges() > 0:
-        block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
-    dgl.distributed.exit_client()
-    return block, gpb
-
-
-def start_bipartite_etype_sample_client(
-    rank, tmpdir, disable_shared_mem, fanout=3, nodes={}
+def start_bipartite_sample_client(
+    rank,
+    tmpdir,
+    disable_shared_mem,
+    nodes,
+    use_graphbolt=False,
+    return_eids=False,
 ):
     gpb = None
     if disable_shared_mem:
@@ -771,8 +896,47 @@ def start_bipartite_etype_sample_client(
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     assert "feat" in dist_graph.nodes["user"].data
     assert "feat" in dist_graph.nodes["game"].data
+    nodes = {
+        k: torch.tensor(v, dtype=dist_graph.idtype) for k, v in nodes.items()
+    }
+    if gpb is None:
+        gpb = dist_graph.get_partition_book()
+    # Enable santity check in distributed sampling.
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    sampled_graph = sample_neighbors(
+        dist_graph, nodes, 3, use_graphbolt=use_graphbolt
+    )
+    block = dgl.to_block(sampled_graph, nodes)
+    if sampled_graph.num_edges() > 0:
+        if not use_graphbolt or return_eids:
+            block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
+    dgl.distributed.exit_client()
+    return block, gpb
 
-    if dist_graph.local_partition is not None:
+
+def start_bipartite_etype_sample_client(
+    rank,
+    tmpdir,
+    disable_shared_mem,
+    fanout=3,
+    nodes={},
+    use_graphbolt=False,
+    return_eids=False,
+):
+    gpb = None
+    if disable_shared_mem:
+        _, _, _, gpb, _, _, _ = load_partition(
+            tmpdir / "test_sampling.json", rank
+        )
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    dist_graph = DistGraph("test_sampling", gpb=gpb)
+    assert "feat" in dist_graph.nodes["user"].data
+    assert "feat" in dist_graph.nodes["game"].data
+    nodes = {
+        k: torch.tensor(v, dtype=dist_graph.idtype) for k, v in nodes.items()
+    }
+
+    if not use_graphbolt and dist_graph.local_partition is not None:
         # Check whether etypes are sorted in dist_graph
         local_g = dist_graph.local_partition
         local_nids = np.arange(local_g.num_nodes())
@@ -784,15 +948,20 @@ def start_bipartite_etype_sample_client(
 
     if gpb is None:
         gpb = dist_graph.get_partition_book()
-    sampled_graph = sample_etype_neighbors(dist_graph, nodes, fanout)
+    sampled_graph = sample_etype_neighbors(
+        dist_graph, nodes, fanout, use_graphbolt=use_graphbolt
+    )
     block = dgl.to_block(sampled_graph, nodes)
     if sampled_graph.num_edges() > 0:
-        block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
+        if not use_graphbolt or return_eids:
+            block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     dgl.distributed.exit_client()
     return block, gpb
 
 
-def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
+def check_rpc_bipartite_sampling_empty(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     """sample on bipartite via sample_neighbors() which yields empty sample results"""
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
@@ -808,6 +977,8 @@ def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -815,16 +986,29 @@ def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling"),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     deg = get_degrees(g, orig_nids["game"], "game")
-    empty_nids = F.nonzero_1d(deg == 0)
+    empty_nids = F.nonzero_1d(deg == 0).to(g.idtype)
+    nodes = {"game": empty_nids, "user": torch.tensor([1], dtype=g.idtype)}
     block, _ = start_bipartite_sample_client(
-        0, tmpdir, num_server > 1, nodes={"game": empty_nids, "user": [1]}
+        0,
+        tmpdir,
+        num_server > 1,
+        nodes=nodes,
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
 
     print("Done sampling")
@@ -836,7 +1020,9 @@ def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
     assert len(block.etypes) == len(g.etypes)
 
 
-def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
+def check_rpc_bipartite_sampling_shuffle(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     """sample on bipartite via sample_neighbors() which yields non-empty sample results"""
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
@@ -852,6 +1038,8 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -859,7 +1047,14 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling"),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
@@ -867,8 +1062,14 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
 
     deg = get_degrees(g, orig_nid_map["game"], "game")
     nids = F.nonzero_1d(deg > 0)
+    nodes = {"game": nids, "user": torch.tensor([0], dtype=g.idtype)}
     block, gpb = start_bipartite_sample_client(
-        0, tmpdir, num_server > 1, nodes={"game": nids, "user": [0]}
+        0,
+        tmpdir,
+        num_server > 1,
+        nodes=nodes,
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
     print("Done sampling")
     for p in pserver_list:
@@ -881,10 +1082,16 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
         shuffled_dst = F.gather_row(block.dstnodes[dst_type].data[dgl.NID], dst)
-        shuffled_eid = block.edges[etype].data[dgl.EID]
-
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
+        assert np.all(
+            F.asnumpy(g.has_edges_between(orig_src, orig_dst, etype=etype))
+        )
+
+        if use_graphbolt and not return_eids:
+            continue
+
+        shuffled_eid = block.edges[etype].data[dgl.EID]
         orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
@@ -893,7 +1100,9 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
         assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 
-def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
+def check_rpc_bipartite_etype_sampling_empty(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     """sample on bipartite via sample_etype_neighbors() which yields empty sample results"""
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
@@ -909,6 +1118,8 @@ def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -916,16 +1127,29 @@ def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling"),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     deg = get_degrees(g, orig_nids["game"], "game")
-    empty_nids = F.nonzero_1d(deg == 0)
-    block, gpb = start_bipartite_etype_sample_client(
-        0, tmpdir, num_server > 1, nodes={"game": empty_nids, "user": [1]}
+    empty_nids = F.nonzero_1d(deg == 0).to(g.idtype)
+    nodes = {"game": empty_nids, "user": torch.tensor([1], dtype=g.idtype)}
+    block, _ = start_bipartite_etype_sample_client(
+        0,
+        tmpdir,
+        num_server > 1,
+        nodes=nodes,
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
 
     print("Done sampling")
@@ -938,7 +1162,9 @@ def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
     assert len(block.etypes) == len(g.etypes)
 
 
-def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
+def check_rpc_bipartite_etype_sampling_shuffle(
+    tmpdir, num_server, use_graphbolt=False, return_eids=False
+):
     """sample on bipartite via sample_etype_neighbors() which yields non-empty sample results"""
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
@@ -954,6 +1180,8 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
         num_hops=num_hops,
         part_method="metis",
         return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=return_eids,
     )
 
     pserver_list = []
@@ -961,7 +1189,14 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
-            args=(i, tmpdir, num_server > 1, "test_sampling"),
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                use_graphbolt,
+            ),
         )
         p.start()
         time.sleep(1)
@@ -970,8 +1205,15 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
     fanout = 3
     deg = get_degrees(g, orig_nid_map["game"], "game")
     nids = F.nonzero_1d(deg > 0)
+    nodes = {"game": nids, "user": torch.tensor([0], dtype=g.idtype)}
     block, gpb = start_bipartite_etype_sample_client(
-        0, tmpdir, num_server > 1, fanout, nodes={"game": nids, "user": [0]}
+        0,
+        tmpdir,
+        num_server > 1,
+        fanout,
+        nodes=nodes,
+        use_graphbolt=use_graphbolt,
+        return_eids=return_eids,
     )
     print("Done sampling")
     for p in pserver_list:
@@ -984,57 +1226,176 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
         shuffled_dst = F.gather_row(block.dstnodes[dst_type].data[dgl.NID], dst)
-        shuffled_eid = block.edges[etype].data[dgl.EID]
-
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
+        assert np.all(
+            F.asnumpy(g.has_edges_between(orig_src, orig_dst, etype=etype))
+        )
+
+        if use_graphbolt and not return_eids:
+            continue
 
         # Check the node Ids and edge Ids.
+        shuffled_eid = block.edges[etype].data[dgl.EID]
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
         assert np.all(F.asnumpy(orig_src1) == orig_src)
         assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 
-# Wait non shared memory graph store
-@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-@unittest.skipIf(
-    dgl.backend.backend_name == "tensorflow",
-    reason="Not support tensorflow for now",
-)
-@unittest.skipIf(
-    dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support"
-)
 @pytest.mark.parametrize("num_server", [1])
-def test_rpc_sampling_shuffle(num_server):
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+@pytest.mark.parametrize("node_id_dtype", [torch.int64])
+def test_rpc_sampling_shuffle(
+    num_server, use_graphbolt, return_eids, node_id_dtype
+):
     reset_envs()
-    import tempfile
-
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
-        # [TODO][Rhett] Tests for multiple groups may fail sometimes and
-        # root cause is unknown. Let's disable them for now.
-        # check_rpc_sampling_shuffle(Path(tmpdirname), num_server, num_groups=2)
-        check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
-        check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server)
-        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server)
-        check_rpc_hetero_etype_sampling_shuffle(
-            Path(tmpdirname), num_server, ["csc"]
+        check_rpc_sampling_shuffle(
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
+            node_id_dtype=node_id_dtype,
         )
-        check_rpc_hetero_etype_sampling_shuffle(
-            Path(tmpdirname), num_server, ["csr"]
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("use_graphbolt,", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_hetero_sampling_shuffle(num_server, use_graphbolt, return_eids):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_hetero_sampling_shuffle(
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
         )
-        check_rpc_hetero_etype_sampling_shuffle(
-            Path(tmpdirname), num_server, ["csc", "coo"]
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_hetero_sampling_empty_shuffle(
+    num_server, use_graphbolt, return_eids
+):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_hetero_sampling_empty_shuffle(
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
         )
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize(
+    "graph_formats", [None, ["csc"], ["csr"], ["csc", "coo"]]
+)
+def test_rpc_hetero_etype_sampling_shuffle_dgl(num_server, graph_formats):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_hetero_etype_sampling_shuffle(
+            Path(tmpdirname), num_server, graph_formats=graph_formats
+        )
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_hetero_etype_sampling_shuffle_graphbolt(num_server, return_eids):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_hetero_etype_sampling_shuffle(
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=True,
+            return_eids=return_eids,
+        )
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_hetero_etype_sampling_empty_shuffle(
+    num_server, use_graphbolt, return_eids
+):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_hetero_etype_sampling_empty_shuffle(
-            Path(tmpdirname), num_server
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
         )
-        check_rpc_bipartite_sampling_empty(Path(tmpdirname), num_server)
-        check_rpc_bipartite_sampling_shuffle(Path(tmpdirname), num_server)
-        check_rpc_bipartite_etype_sampling_empty(Path(tmpdirname), num_server)
-        check_rpc_bipartite_etype_sampling_shuffle(Path(tmpdirname), num_server)
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_bipartite_sampling_empty_shuffle(
+    num_server, use_graphbolt, return_eids
+):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_bipartite_sampling_empty(
+            Path(tmpdirname), num_server, use_graphbolt, return_eids
+        )
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_bipartite_sampling_shuffle(num_server, use_graphbolt, return_eids):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_bipartite_sampling_shuffle(
+            Path(tmpdirname), num_server, use_graphbolt, return_eids
+        )
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_bipartite_etype_sampling_empty_shuffle(
+    num_server, use_graphbolt, return_eids
+):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_bipartite_etype_sampling_empty(
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
+        )
+
+
+@pytest.mark.parametrize("num_server", [1])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("return_eids", [False, True])
+def test_rpc_bipartite_etype_sampling_shuffle(
+    num_server, use_graphbolt, return_eids
+):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_bipartite_etype_sampling_shuffle(
+            Path(tmpdirname),
+            num_server,
+            use_graphbolt=use_graphbolt,
+            return_eids=return_eids,
+        )
 
 
 def check_standalone_sampling(tmpdir):
@@ -1059,7 +1420,11 @@ def check_standalone_sampling(tmpdir):
     dist_graph = DistGraph(
         "test_sampling", part_config=tmpdir / "test_sampling.json"
     )
-    sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+    sampled_graph = sample_neighbors(
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+    )
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.num_nodes() == g.num_nodes()
@@ -1070,13 +1435,19 @@ def check_standalone_sampling(tmpdir):
     )
 
     sampled_graph = sample_neighbors(
-        dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob="mask"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+        prob="mask",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert mask[eid].all()
 
     sampled_graph = sample_neighbors(
-        dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob="prob"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+        prob="prob",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert (prob[eid] > 0).all()
@@ -1105,7 +1476,11 @@ def check_standalone_etype_sampling(tmpdir):
     dist_graph = DistGraph(
         "test_sampling", part_config=tmpdir / "test_sampling.json"
     )
-    sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], 3)
+    sampled_graph = sample_etype_neighbors(
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+    )
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.num_nodes() == hg.num_nodes()
@@ -1116,13 +1491,19 @@ def check_standalone_etype_sampling(tmpdir):
     )
 
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 10, 99, 66, 1023], 3, prob="mask"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+        prob="mask",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert mask[eid].all()
 
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 10, 99, 66, 1023], 3, prob="prob"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+        prob="prob",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert (prob[eid] > 0).all()
@@ -1155,7 +1536,12 @@ def check_standalone_etype_sampling_heterograph(tmpdir):
         "test_hetero_sampling", part_config=tmpdir / "test_hetero_sampling.json"
     )
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], 1
+        dist_graph,
+        torch.tensor(
+            [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701],
+            dtype=dist_graph.idtype,
+        ),
+        1,
     )
     src, dst = sampled_graph.edges(etype=("paper", "cite", "paper"))
     assert len(src) == 10
@@ -1223,7 +1609,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    nodes = [0, 10, 99, 66, 1024, 2008]
+    nodes = torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=g.idtype)
     sampled_graph = start_in_subgraph_client(0, tmpdir, num_server > 1, nodes)
     for p in pserver_list:
         p.join()

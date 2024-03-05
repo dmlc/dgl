@@ -8,7 +8,7 @@ import torch
 import dgl
 from dgl.utils import recursive_apply
 
-from .base import etype_str_to_tuple
+from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
@@ -52,6 +52,45 @@ class MiniBatch:
       should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
     - If `labels` is a dictionary: The keys should be node or edge type and the
       value should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
+    """
+
+    seeds: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None
+    """
+    Representation of seed items utilized in node classification tasks, link
+    prediction tasks and hyperlinks tasks.
+    - If `seeds` is a tensor: it indicates that the seeds originate from a
+      homogeneous graph. It can be either a 1-dimensional or 2-dimensional
+      tensor:
+        - 1-dimensional tensor: Each element directly represents a seed node
+          within the graph.
+        - 2-dimensional tensor: Each row designates a seed item, which can
+          encompass various entities such as edges, hyperlinks, or other graph
+          components depending on the specific context.
+    - If `seeds` is a dictionary: it indicates that the seeds originate from a
+      heterogeneous graph. The keys should be edge or node type, and the value
+      should be a tensor, which can be either a 1-dimensional or 2-dimensional
+      tensor:
+        - 1-dimensional tensor: Each element directly represents a seed node
+        of the given type within the graph.
+        - 2-dimensional tensor: Each row designates a seed item of the given
+          type, which can encompass various entities such as edges, hyperlinks,
+          or other graph components depending on the specific context.
+    """
+
+    indexes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    """
+    Indexes associated with seed nodes / node pairs in the graph, which
+    indicates to which query a seed node / node pair belongs.
+    - If `indexes` is a tensor: It indicates the graph is homogeneous. The
+      value should be corresponding query to given 'seed_nodes' or
+      'node_pairs'.
+    - If `indexes` is a dictionary: It indicates the graph is
+      heterogeneous. The keys should be node or edge type and the value should
+      be corresponding query to given 'seed_nodes' or 'node_pairs'. For each
+      key, indexes are consecutive integers starting from zero.
     """
 
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
@@ -114,6 +153,15 @@ class MiniBatch:
     ] = None
     """
     Representation of compacted node pairs corresponding to 'node_pairs', where
+    all node ids inside are compacted.
+    """
+
+    compacted_seeds: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None
+    """
+    Representation of compacted seeds corresponding to 'seeds', where
     all node ids inside are compacted.
     """
 
@@ -183,6 +231,19 @@ class MiniBatch:
             self.sampled_subgraphs[0].sampled_csc, Dict
         )
 
+        # Casts to minimum dtype in-place and returns self.
+        def cast_to_minimum_dtype(v: CSCFormatBase):
+            # Checks if number of vertices and edges fit into an int32.
+            dtype = (
+                torch.int32
+                if max(v.indptr.size(0) - 2, v.indices.size(0))
+                <= torch.iinfo(torch.int32).max
+                else torch.int64
+            )
+            v.indptr = v.indptr.to(dtype)
+            v.indices = v.indices.to(dtype)
+            return v
+
         blocks = []
         for subgraph in self.sampled_subgraphs:
             original_row_node_ids = subgraph.original_row_node_ids
@@ -194,6 +255,8 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
+                for v in subgraph.sampled_csc.values():
+                    cast_to_minimum_dtype(v)
                 sampled_csc = {
                     etype_str_to_tuple(etype): (
                         "csc",
@@ -219,7 +282,7 @@ class MiniBatch:
                     for ntype, nodes in original_column_node_ids.items()
                 }
             else:
-                sampled_csc = subgraph.sampled_csc
+                sampled_csc = cast_to_minimum_dtype(subgraph.sampled_csc)
                 sampled_csc = (
                     "csc",
                     (
@@ -299,15 +362,15 @@ class MiniBatch:
             # For homogeneous graph.
             if isinstance(self.compacted_negative_srcs, torch.Tensor):
                 negative_node_pairs = (
-                    self.compacted_negative_srcs.view(-1),
-                    self.compacted_negative_dsts.view(-1),
+                    self.compacted_negative_srcs,
+                    self.compacted_negative_dsts,
                 )
             # For heterogeneous graph.
             else:
                 negative_node_pairs = {
                     etype: (
-                        neg_src.view(-1),
-                        self.compacted_negative_dsts[etype].view(-1),
+                        neg_src,
+                        self.compacted_negative_dsts[etype],
                     )
                     for etype, neg_src in self.compacted_negative_srcs.items()
                 }
@@ -319,10 +382,10 @@ class MiniBatch:
             if isinstance(self.compacted_negative_srcs, torch.Tensor):
                 negative_ratio = self.compacted_negative_srcs.size(1)
                 negative_node_pairs = (
-                    self.compacted_negative_srcs.view(-1),
-                    self.compacted_node_pairs[1].repeat_interleave(
-                        negative_ratio
-                    ),
+                    self.compacted_negative_srcs,
+                    self.compacted_node_pairs[1]
+                    .repeat_interleave(negative_ratio)
+                    .view(-1, negative_ratio),
                 )
             # For heterogeneous graph.
             else:
@@ -331,10 +394,10 @@ class MiniBatch:
                 ].size(1)
                 negative_node_pairs = {
                     etype: (
-                        neg_src.view(-1),
-                        self.compacted_node_pairs[etype][1].repeat_interleave(
-                            negative_ratio
-                        ),
+                        neg_src,
+                        self.compacted_node_pairs[etype][1]
+                        .repeat_interleave(negative_ratio)
+                        .view(-1, negative_ratio),
                     )
                     for etype, neg_src in self.compacted_negative_srcs.items()
                 }
@@ -346,10 +409,10 @@ class MiniBatch:
             if isinstance(self.compacted_negative_dsts, torch.Tensor):
                 negative_ratio = self.compacted_negative_dsts.size(1)
                 negative_node_pairs = (
-                    self.compacted_node_pairs[0].repeat_interleave(
-                        negative_ratio
-                    ),
-                    self.compacted_negative_dsts.view(-1),
+                    self.compacted_node_pairs[0]
+                    .repeat_interleave(negative_ratio)
+                    .view(-1, negative_ratio),
+                    self.compacted_negative_dsts,
                 )
             # For heterogeneous graph.
             else:
@@ -358,10 +421,10 @@ class MiniBatch:
                 ].size(1)
                 negative_node_pairs = {
                     etype: (
-                        self.compacted_node_pairs[etype][0].repeat_interleave(
-                            negative_ratio
-                        ),
-                        neg_dst.view(-1),
+                        self.compacted_node_pairs[etype][0]
+                        .repeat_interleave(negative_ratio)
+                        .view(-1, negative_ratio),
+                        neg_dst,
                     )
                     for etype, neg_dst in self.compacted_negative_dsts.items()
                 }
@@ -396,6 +459,7 @@ class MiniBatch:
                 for etype in positive_node_pairs:
                     pos_src, pos_dst = positive_node_pairs[etype]
                     neg_src, neg_dst = negative_node_pairs[etype]
+                    neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
                     node_pairs_by_etype[etype] = (
                         torch.cat((pos_src, neg_src), dim=0),
                         torch.cat((pos_dst, neg_dst), dim=0),
@@ -410,6 +474,7 @@ class MiniBatch:
                 # Homogeneous graph.
                 pos_src, pos_dst = positive_node_pairs
                 neg_src, neg_dst = negative_node_pairs
+                neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
                 node_pairs = (
                     torch.cat((pos_src, neg_src), dim=0),
                     torch.cat((pos_dst, neg_dst), dim=0),
@@ -423,6 +488,50 @@ class MiniBatch:
             return (self.compacted_node_pairs, self.labels)
         else:
             return None
+
+    def to_pyg_data(self):
+        """Construct a PyG Data from `MiniBatch`. This function only supports
+        node classification task on a homogeneous graph and the number of
+        features cannot be more than one.
+        """
+        from torch_geometric.data import Data
+
+        if self.sampled_subgraphs is None:
+            edge_index = None
+        else:
+            col_nodes = []
+            row_nodes = []
+            for subgraph in self.sampled_subgraphs:
+                if subgraph is None:
+                    continue
+                sampled_csc = subgraph.sampled_csc
+                indptr = sampled_csc.indptr
+                indices = sampled_csc.indices
+                expanded_indptr = expand_indptr(
+                    indptr, dtype=indices.dtype, output_size=len(indices)
+                )
+                col_nodes.append(expanded_indptr)
+                row_nodes.append(indices)
+            col_nodes = torch.cat(col_nodes)
+            row_nodes = torch.cat(row_nodes)
+            edge_index = torch.unique(
+                torch.stack((row_nodes, col_nodes)), dim=1
+            ).long()
+
+        if self.node_features is None:
+            node_features = None
+        else:
+            assert (
+                len(self.node_features) == 1
+            ), "`to_pyg_data` only supports single feature homogeneous graph."
+            node_features = next(iter(self.node_features.values()))
+
+        pyg_data = Data(
+            x=node_features,
+            edge_index=edge_index,
+            y=self.labels,
+        )
+        return pyg_data
 
     def to(self, device: torch.device):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""

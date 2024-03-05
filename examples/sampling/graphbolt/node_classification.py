@@ -92,6 +92,19 @@ def create_dataloader(
 
     ############################################################################
     # [Step-2]:
+    # self.copy_to()
+    # [Input]:
+    # 'device': The device to copy the data to.
+    # 'extra_attrs': The extra attributes to copy.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device. Copying here
+    # ensures that the rest of the operations run on the GPU.
+    ############################################################################
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+
+    ############################################################################
+    # [Step-3]:
     # self.sample_neighbor()
     # [Input]:
     # 'graph': The network topology for sampling.
@@ -104,12 +117,12 @@ def create_dataloader(
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(
+    datapipe = getattr(datapipe, args.sample_mode)(
         graph, fanout if job != "infer" else [-1]
     )
 
     ############################################################################
-    # [Step-3]:
+    # [Step-4]:
     # self.fetch_feature()
     # [Input]:
     # 'features': The node features.
@@ -118,24 +131,23 @@ def create_dataloader(
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs. This step is skipped in inference because features are updated
-    # as a whole during it, thus storing features in minibatch is unnecessary.
+    # subgraphs.
     ############################################################################
-    if job != "infer":
-        datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
-    # [Step-4]:
+    # [Step-5]:
     # self.copy_to()
     # [Input]:
     # 'device': The device to copy the data to.
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=device)
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
-    # [Step-5]:
+    # [Step-6]:
     # gb.DataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
@@ -145,7 +157,11 @@ def create_dataloader(
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.DataLoader(datapipe, num_workers=num_workers)
+    dataloader = gb.DataLoader(
+        datapipe,
+        num_workers=num_workers,
+        overlap_graph_fetch=args.overlap_graph_fetch,
+    )
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -180,14 +196,10 @@ class SAGE(nn.Module):
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
-    def inference(self, graph, features, dataloader, device):
+    def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
-        feature = features.read("node", None, "feat")
-
-        buffer_device = torch.device("cpu")
-        # Enable pin_memory for faster CPU to GPU data transfer if the
-        # model is running on a GPU.
-        pin_memory = buffer_device != device
+        pin_memory = storage_device == "pinned"
+        buffer_device = torch.device("cpu" if pin_memory else storage_device)
 
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
@@ -199,11 +211,9 @@ class SAGE(nn.Module):
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
-            feature = feature.to(device)
-
-            for step, data in tqdm(enumerate(dataloader)):
-                x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+            for data in tqdm(dataloader):
+                # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], data.node_features["feat"])
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
@@ -211,7 +221,8 @@ class SAGE(nn.Module):
                 y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
                     buffer_device
                 )
-            feature = y
+            if not is_last_layer:
+                features.update("node", None, "feat", y)
 
         return y
 
@@ -231,7 +242,7 @@ def layerwise_infer(
         num_workers=args.num_workers,
         job="infer",
     )
-    pred = model.inference(graph, features, dataloader, args.device)
+    pred = model.inference(graph, features, dataloader, args.storage_device)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
 
@@ -259,7 +270,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         job="evaluate",
     )
 
-    for step, data in tqdm(enumerate(dataloader)):
+    for step, data in tqdm(enumerate(dataloader), "Evaluating"):
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
@@ -273,7 +284,9 @@ def evaluate(args, model, graph, features, itemset, num_classes):
 
 
 def train(args, graph, features, train_set, valid_set, num_classes, model):
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=args.lr, weight_decay=5e-4
+    )
     dataloader = create_dataloader(
         graph=graph,
         features=features,
@@ -289,7 +302,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         t0 = time.time()
         model.train()
         total_loss = 0
-        for step, data in enumerate(dataloader):
+        for step, data in tqdm(enumerate(dataloader), "Training"):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -329,7 +342,7 @@ def parse_args():
     parser.add_argument(
         "--lr",
         type=float,
-        default=0.0005,
+        default=1e-3,
         help="Learning rate for optimization.",
     )
     parser.add_argument(
@@ -349,28 +362,56 @@ def parse_args():
         " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
-        "--device",
-        default="cpu",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
+        "--dataset",
+        type=str,
+        default="ogbn-products",
+        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        help="The dataset we can use for node classification example. Currently"
+        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
+    )
+    parser.add_argument(
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
+    )
+    parser.add_argument(
+        "--sample-mode",
+        default="sample_neighbor",
+        choices=["sample_neighbor", "sample_layer_neighbor"],
+        help="The sampling function when doing layerwise sampling.",
+    )
+    parser.add_argument(
+        "--overlap-graph-fetch",
+        action="store_true",
+        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
+        "If True, the data loader will overlap the UVA graph fetching operations"
+        "with the rest of operations by using an alternative CUDA stream. Disabled"
+        "by default.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.storage_device, args.device = args.mode.split("-")
     args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset = gb.BuiltinDataset("ogbn-products").load()
+    dataset = gb.BuiltinDataset(args.dataset).load()
 
-    graph = dataset.graph
-    # Currently the neighbor-sampling process can only be done on the CPU,
-    # therefore there is no need to copy the graph to the GPU.
-    features = dataset.feature
+    # Move the dataset to the selected storage.
+    if args.storage_device == "pinned":
+        graph = dataset.graph.pin_memory_()
+        features = dataset.feature.pin_memory_()
+    else:
+        graph = dataset.graph.to(args.storage_device)
+        features = dataset.feature.to(args.storage_device)
+
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set

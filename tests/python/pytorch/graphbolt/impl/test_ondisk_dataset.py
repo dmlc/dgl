@@ -12,8 +12,9 @@ import pydantic
 import pytest
 import torch
 import yaml
-
 from dgl import graphbolt as gb
+
+from dgl.base import DGLWarning
 
 from .. import gb_test_utils as gbt
 
@@ -31,9 +32,11 @@ def load_dataset(dataset):
         return dataset.load()
 
 
-def write_yaml_and_load_dataset(yaml_content, dir):
+def write_yaml_and_load_dataset(yaml_content, dir, force_preprocess=False):
     write_yaml_file(yaml_content, dir)
-    return load_dataset(gb.OnDiskDataset(dir))
+    return load_dataset(
+        gb.OnDiskDataset(dir, force_preprocess=force_preprocess)
+    )
 
 
 def test_OnDiskDataset_TVTSet_exceptions():
@@ -51,7 +54,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
         """
         write_yaml_file(yaml_content, test_dir)
         with pytest.raises(pydantic.ValidationError):
-            _ = gb.OnDiskDataset(test_dir).load()
+            _ = gb.OnDiskDataset(test_dir, force_preprocess=False).load()
 
         # Case 2: ``type`` is not specified while multiple TVT sets are
         # specified.
@@ -73,7 +76,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
             AssertionError,
             match=r"Only one TVT set is allowed if type is not specified.",
         ):
-            _ = gb.OnDiskDataset(test_dir).load()
+            _ = gb.OnDiskDataset(test_dir, force_preprocess=False).load()
 
 
 def test_OnDiskDataset_multiple_tasks():
@@ -1000,7 +1003,7 @@ def test_OnDiskDataset_Graph_Exceptions():
             pydantic.ValidationError,
             match="1 validation error for OnDiskMetaData",
         ):
-            _ = gb.OnDiskDataset(test_dir).load()
+            _ = gb.OnDiskDataset(test_dir, force_preprocess=False).load()
 
 
 def test_OnDiskDataset_Graph_homogeneous():
@@ -1095,7 +1098,8 @@ def test_OnDiskDataset_Metadata():
         assert dataset.dataset_name == dataset_name
 
 
-def test_OnDiskDataset_preprocess_homogeneous():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_preprocess_homogeneous(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1111,6 +1115,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1133,15 +1138,24 @@ def test_OnDiskDataset_preprocess_homogeneous():
         assert fused_csc_sampling_graph.total_num_nodes == num_nodes
         assert fused_csc_sampling_graph.total_num_edges == num_edges
         assert (
-            fused_csc_sampling_graph.edge_attributes is None
-            or gb.ORIGINAL_EDGE_ID
+            fused_csc_sampling_graph.node_attributes is not None
+            and "feat" in fused_csc_sampling_graph.node_attributes
+        )
+        assert (
+            fused_csc_sampling_graph.edge_attributes is not None
+            and gb.ORIGINAL_EDGE_ID
             not in fused_csc_sampling_graph.edge_attributes
+            and "feat" in fused_csc_sampling_graph.edge_attributes
         )
 
         num_samples = 100
         fanout = 1
         subgraph = fused_csc_sampling_graph.sample_neighbors(
-            torch.arange(num_samples),
+            torch.arange(
+                0,
+                num_samples,
+                dtype=fused_csc_sampling_graph.indices.dtype,
+            ),
             torch.tensor([fanout]),
         )
         assert len(subgraph.sampled_csc.indices) <= num_samples
@@ -1160,13 +1174,14 @@ def test_OnDiskDataset_preprocess_homogeneous():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
-        # Test do not generate original_edge_id.
+        # Test generating original_edge_id.
         output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, include_original_edge_id=False
+            test_dir, include_original_edge_id=True
         )
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
@@ -1175,10 +1190,400 @@ def test_OnDiskDataset_preprocess_homogeneous():
         )
         assert (
             fused_csc_sampling_graph.edge_attributes is not None
-            and gb.ORIGINAL_EDGE_ID
-            not in fused_csc_sampling_graph.edge_attributes
+            and gb.ORIGINAL_EDGE_ID in fused_csc_sampling_graph.edge_attributes
         )
         fused_csc_sampling_graph = None
+
+
+@pytest.mark.parametrize("auto_cast", [False, True])
+def test_OnDiskDataset_preprocess_homogeneous_hardcode(
+    auto_cast, edge_fmt="numpy"
+):
+    """Test preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        """Original graph in COO:
+        0   1   1   0   0
+        0   0   1   1   0
+        0   0   0   1   1
+        1   0   0   0   1
+        1   1   0   0   0
+
+        node_feats: [0.0, 1.9, 2.8, 3.7, 4.6]
+        edge_feats: [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9]
+        """
+        dataset_name = "graphbolt_test"
+        num_nodes = 5
+        num_edges = 10
+        num_classes = 1
+
+        # Generate edges.
+        edges = np.array(
+            [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [1, 2, 2, 3, 3, 4, 4, 0, 0, 1]],
+            dtype=np.int64,
+        ).T
+        os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+        edges = edges.T
+        edge_path = os.path.join("edges", "edge.npy")
+        np.save(os.path.join(test_dir, edge_path), edges)
+
+        # Generate graph edge-feats.
+        edge_feats = np.array(
+            [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9],
+            dtype=np.float64,
+        )
+        os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
+        edge_feat_path = os.path.join("data", "edge-feat.npy")
+        np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
+
+        # Generate node-feats.
+        node_feats = np.array(
+            [0.0, 1.9, 2.8, 3.7, 4.6],
+            dtype=np.float64,
+        )
+        node_feat_path = os.path.join("data", "node-feat.npy")
+        np.save(os.path.join(test_dir, node_feat_path), node_feats)
+
+        # Generate train/test/valid set.
+        os.makedirs(os.path.join(test_dir, "set"), exist_ok=True)
+        train_data = np.array([0, 1, 2, 3, 4])
+        train_path = os.path.join("set", "train.npy")
+        np.save(os.path.join(test_dir, train_path), train_data)
+        valid_data = np.array([0, 1, 2, 3, 4])
+        valid_path = os.path.join("set", "valid.npy")
+        np.save(os.path.join(test_dir, valid_path), valid_data)
+        test_data = np.array([0, 1, 2, 3, 4])
+        test_path = os.path.join("set", "test.npy")
+        np.save(os.path.join(test_dir, test_path), test_data)
+
+        yaml_content = (
+            f"dataset_name: {dataset_name}\n"
+            f"graph:\n"
+            f"  nodes:\n"
+            f"    - num: {num_nodes}\n"
+            f"  edges:\n"
+            f"    - format: {edge_fmt}\n"
+            f"      path: {edge_path}\n"
+            f"  feature_data:\n"
+            f"    - domain: node\n"
+            f"      type: null\n"
+            f"      name: feat\n"
+            f"      format: numpy\n"
+            f"      in_memory: true\n"
+            f"      path: {node_feat_path}\n"
+            f"    - domain: edge\n"
+            f"      type: null\n"
+            f"      name: feat\n"
+            f"      format: numpy\n"
+            f"      in_memory: true\n"
+            f"      path: {edge_feat_path}\n"
+            f"feature_data:\n"
+            f"  - domain: node\n"
+            f"    type: null\n"
+            f"    name: feat\n"
+            f"    format: numpy\n"
+            f"    in_memory: true\n"
+            f"    path: {node_feat_path}\n"
+            f"  - domain: edge\n"
+            f"    type: null\n"
+            f"    name: feat\n"
+            f"    format: numpy\n"
+            f"    path: {edge_feat_path}\n"
+            f"tasks:\n"
+            f"  - name: node_classification\n"
+            f"    num_classes: {num_classes}\n"
+            f"    train_set:\n"
+            f"      - type: null\n"
+            f"        data:\n"
+            f"          - name: node_pairs\n"
+            f"            format: numpy\n"
+            f"            in_memory: true\n"
+            f"            path: {train_path}\n"
+            f"    validation_set:\n"
+            f"      - type: null\n"
+            f"        data:\n"
+            f"          - name: node_pairs\n"
+            f"            format: numpy\n"
+            f"            in_memory: true\n"
+            f"            path: {valid_path}\n"
+            f"    test_set:\n"
+            f"      - type: null\n"
+            f"        data:\n"
+            f"          - name: node_pairs\n"
+            f"            format: numpy\n"
+            f"            in_memory: true\n"
+            f"            path: {test_path}\n"
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+        output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
+            test_dir,
+            include_original_edge_id=True,
+            auto_cast_to_optimal_dtype=auto_cast,
+        )
+
+        with open(output_file, "rb") as f:
+            processed_dataset = yaml.load(f, Loader=yaml.Loader)
+
+        assert processed_dataset["dataset_name"] == dataset_name
+        assert processed_dataset["tasks"][0]["num_classes"] == num_classes
+        assert "graph" not in processed_dataset
+        assert "graph_topology" in processed_dataset
+
+        fused_csc_sampling_graph = torch.load(
+            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
+        )
+        assert fused_csc_sampling_graph.total_num_nodes == num_nodes
+        assert fused_csc_sampling_graph.total_num_edges == num_edges
+        assert torch.equal(
+            fused_csc_sampling_graph.csc_indptr,
+            torch.tensor([0, 2, 4, 6, 8, 10]),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.indices,
+            torch.tensor([3, 4, 0, 4, 0, 1, 1, 2, 2, 3]),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.node_attributes["feat"],
+            torch.tensor([0.0, 1.9, 2.8, 3.7, 4.6], dtype=torch.float64),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.edge_attributes["feat"],
+            torch.tensor(
+                [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9],
+                dtype=torch.float64,
+            ),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.edge_attributes[gb.ORIGINAL_EDGE_ID],
+            torch.tensor([7, 8, 0, 9, 1, 2, 3, 4, 5, 6]),
+        )
+
+        expected_dtype = torch.int32 if auto_cast else torch.int64
+        assert fused_csc_sampling_graph.csc_indptr.dtype == expected_dtype
+        assert fused_csc_sampling_graph.indices.dtype == expected_dtype
+        assert (
+            fused_csc_sampling_graph.edge_attributes[gb.ORIGINAL_EDGE_ID].dtype
+            == expected_dtype
+        )
+
+        num_samples = 5
+        fanout = 1
+        subgraph = fused_csc_sampling_graph.sample_neighbors(
+            torch.arange(
+                0,
+                num_samples,
+                dtype=fused_csc_sampling_graph.indices.dtype,
+            ),
+            torch.tensor([fanout]),
+        )
+        assert len(subgraph.sampled_csc.indices) <= num_samples
+
+
+@pytest.mark.parametrize("auto_cast", [False, True])
+def test_OnDiskDataset_preprocess_heterogeneous_hardcode(
+    auto_cast, edge_fmt="numpy"
+):
+    """Test preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        """Original graph in COO:
+        0   1   1   0   0
+        0   0   1   1   0
+        0   0   0   1   1
+        1   0   0   0   1
+        1   1   0   0   0
+
+        node_type_0: [0, 1]
+        node_type_1: [2, 3, 4]
+        edge_type_0: node_type_0 -> node_type_0
+        edge_type_1: node_type_0 -> node_type_1
+        edge_type_2: node_type_1 -> node_type_1
+        edge_type_3: node_type_1 -> node_type_0
+
+        node_feats: [0.0, 1.9, 2.8, 3.7, 4.6]
+        edge_feats: [0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9]
+        """
+        dataset_name = "graphbolt_test"
+        num_nodes = {
+            "A": 2,
+            "B": 3,
+        }
+        num_edges = {
+            ("A", "a_a", "A"): 1,
+            ("A", "a_b", "B"): 3,
+            ("B", "b_b", "A"): 3,
+            ("B", "b_a", "B"): 3,
+        }
+        num_classes = 1
+
+        # Generate edges.
+        os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+        np.save(
+            os.path.join(test_dir, "edges", "a_a.npy"),
+            np.array([[0], [1]], dtype=np.int64),
+        )
+        np.save(
+            os.path.join(test_dir, "edges", "a_b.npy"),
+            np.array([[0, 1, 1], [0, 0, 1]], dtype=np.int64),
+        )
+        np.save(
+            os.path.join(test_dir, "edges", "b_b.npy"),
+            np.array([[0, 0, 1], [1, 2, 2]], dtype=np.int64),
+        )
+        np.save(
+            os.path.join(test_dir, "edges", "b_a.npy"),
+            np.array([[1, 2, 2], [0, 0, 1]], dtype=np.int64),
+        )
+
+        # Generate node features.
+        os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
+        np.save(
+            os.path.join(test_dir, "data", "A-feat.npy"),
+            np.array([0.0, 1.9], dtype=np.float64),
+        )
+        np.save(
+            os.path.join(test_dir, "data", "B-feat.npy"),
+            np.array([2.8, 3.7, 4.6], dtype=np.float64),
+        )
+
+        # Generate edge features.
+        os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
+        np.save(
+            os.path.join(test_dir, "data", "a_a-feat.npy"),
+            np.array([0.0], dtype=np.float64),
+        )
+        np.save(
+            os.path.join(test_dir, "data", "a_b-feat.npy"),
+            np.array([1.1, 2.2, 3.3], dtype=np.float64),
+        )
+        np.save(
+            os.path.join(test_dir, "data", "b_b-feat.npy"),
+            np.array([4.4, 5.5, 6.6], dtype=np.float64),
+        )
+        np.save(
+            os.path.join(test_dir, "data", "b_a-feat.npy"),
+            np.array([7.7, 8.8, 9.9], dtype=np.float64),
+        )
+
+        yaml_content = (
+            f"dataset_name: {dataset_name}\n"
+            f"graph:\n"
+            f"  nodes:\n"
+            f"    - type: A\n"
+            f"      num: 2\n"
+            f"    - type: B\n"
+            f"      num: 3\n"
+            f"  edges:\n"
+            f"    - type: A:a_a:A\n"
+            f"      format: {edge_fmt}\n"
+            f"      path: {os.path.join('edges', 'a_a.npy')}\n"
+            f"    - type: A:a_b:B\n"
+            f"      format: {edge_fmt}\n"
+            f"      path: {os.path.join('edges', 'a_b.npy')}\n"
+            f"    - type: B:b_b:B\n"
+            f"      format: {edge_fmt}\n"
+            f"      path: {os.path.join('edges', 'b_b.npy')}\n"
+            f"    - type: B:b_a:A\n"
+            f"      format: {edge_fmt}\n"
+            f"      path: {os.path.join('edges', 'b_a.npy')}\n"
+            f"  feature_data:\n"
+            f"    - domain: node\n"
+            f"      type: A\n"
+            f"      name: feat\n"
+            f"      format: numpy\n"
+            f"      in_memory: true\n"
+            f"      path: {os.path.join(test_dir, 'data', 'A-feat.npy')}\n"
+            f"    - domain: node\n"
+            f"      type: B\n"
+            f"      name: feat\n"
+            f"      format: numpy\n"
+            f"      in_memory: true\n"
+            f"      path: {os.path.join(test_dir, 'data', 'B-feat.npy')}\n"
+            f"    - domain: edge\n"
+            f"      type: A:a_a:A\n"
+            f"      name: feat\n"
+            f"      format: numpy\n"
+            f"      in_memory: true\n"
+            f"      path: {os.path.join(test_dir, 'data', 'a_a-feat.npy')}\n"
+            f"    - domain: edge\n"
+            f"      type: A:a_b:B\n"
+            f"      name: feat\n"
+            f"      format: numpy\n"
+            f"      in_memory: true\n"
+            f"      path: {os.path.join(test_dir, 'data', 'a_b-feat.npy')}\n"
+            f"    - domain: edge\n"
+            f"      type: B:b_b:B\n"
+            f"      name: feat\n"
+            f"      format: numpy\n"
+            f"      in_memory: true\n"
+            f"      path: {os.path.join(test_dir, 'data', 'b_b-feat.npy')}\n"
+            f"    - domain: edge\n"
+            f"      type: B:b_a:A\n"
+            f"      name: feat\n"
+            f"      format: numpy\n"
+            f"      in_memory: true\n"
+            f"      path: {os.path.join(test_dir, 'data', 'b_a-feat.npy')}\n"
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+        output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
+            test_dir,
+            include_original_edge_id=True,
+            auto_cast_to_optimal_dtype=auto_cast,
+        )
+
+        with open(output_file, "rb") as f:
+            processed_dataset = yaml.load(f, Loader=yaml.Loader)
+
+        assert processed_dataset["dataset_name"] == dataset_name
+        assert "graph" not in processed_dataset
+        assert "graph_topology" in processed_dataset
+
+        fused_csc_sampling_graph = torch.load(
+            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
+        )
+        assert fused_csc_sampling_graph.total_num_nodes == 5
+        assert fused_csc_sampling_graph.total_num_edges == 10
+        assert torch.equal(
+            fused_csc_sampling_graph.csc_indptr,
+            torch.tensor([0, 2, 4, 6, 8, 10]),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.indices,
+            torch.tensor([3, 4, 0, 4, 0, 1, 1, 2, 2, 3]),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.node_attributes["feat"],
+            torch.tensor([0.0, 1.9, 2.8, 3.7, 4.6], dtype=torch.float64),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.edge_attributes["feat"],
+            torch.tensor(
+                [0.0, 1.1, 2.2, 3.3, 7.7, 8.8, 9.9, 4.4, 5.5, 6.6],
+                dtype=torch.float64,
+            ),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.type_per_edge,
+            torch.tensor([2, 2, 0, 2, 1, 1, 1, 3, 3, 3]),
+        )
+        assert torch.equal(
+            fused_csc_sampling_graph.edge_attributes[gb.ORIGINAL_EDGE_ID],
+            torch.tensor([0, 1, 0, 2, 0, 1, 2, 0, 1, 2]),
+        )
+        expected_dtype = torch.int32 if auto_cast else torch.int64
+        assert fused_csc_sampling_graph.csc_indptr.dtype == expected_dtype
+        assert fused_csc_sampling_graph.indices.dtype == expected_dtype
+        assert (
+            fused_csc_sampling_graph.edge_attributes[gb.ORIGINAL_EDGE_ID].dtype
+            == expected_dtype
+        )
+        assert fused_csc_sampling_graph.node_type_offset.dtype == expected_dtype
+        expected_etype_dtype = torch.uint8 if auto_cast else torch.int64
+        assert (
+            fused_csc_sampling_graph.type_per_edge.dtype == expected_etype_dtype
+        )
 
 
 def test_OnDiskDataset_preprocess_path():
@@ -1220,8 +1625,7 @@ def test_OnDiskDataset_preprocess_path():
             _ = gb.OnDiskDataset(fake_dir)
 
 
-@unittest.skipIf(os.name == "nt", "Skip on Windows")
-def test_OnDiskDataset_preprocess_yaml_content_unix():
+def test_OnDiskDataset_preprocess_yaml_content():
     """Test if the preprocessed metadata.yaml is correct."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1234,43 +1638,46 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
         nodes = np.repeat(np.arange(num_nodes), 5)
         neighbors = np.random.randint(0, num_nodes, size=(num_edges))
         edges = np.stack([nodes, neighbors], axis=1)
-        # Wrtie into edges/edge.csv
-        os.makedirs(os.path.join(test_dir, "edges/"), exist_ok=True)
+        # Write into edges/edge.csv
+        os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
         edges = pd.DataFrame(edges, columns=["src", "dst"])
+        edge_path = os.path.join("edges", "edge.csv")
         edges.to_csv(
-            os.path.join(test_dir, "edges/edge.csv"),
+            os.path.join(test_dir, edge_path),
             index=False,
             header=False,
         )
 
         # Generate random graph edge-feats.
         edge_feats = np.random.rand(num_edges, 5)
-        os.makedirs(os.path.join(test_dir, "data/"), exist_ok=True)
-        np.save(os.path.join(test_dir, "data/edge-feat.npy"), edge_feats)
+        os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
+        feature_edge = os.path.join("data", "edge-feat.npy")
+        np.save(os.path.join(test_dir, feature_edge), edge_feats)
 
         # Generate random node-feats.
         node_feats = np.random.rand(num_nodes, 10)
-        np.save(os.path.join(test_dir, "data/node-feat.npy"), node_feats)
+        feature_node = os.path.join("data", "node-feat.npy")
+        np.save(os.path.join(test_dir, feature_node), node_feats)
 
         # Generate train/test/valid set.
-        os.makedirs(os.path.join(test_dir, "set/"), exist_ok=True)
+        os.makedirs(os.path.join(test_dir, "set"), exist_ok=True)
         train_pairs = (np.arange(1000), np.arange(1000, 2000))
         train_labels = np.random.randint(0, 10, size=1000)
         train_data = np.vstack([train_pairs, train_labels]).T
-        train_path = os.path.join(test_dir, "set/train.npy")
-        np.save(train_path, train_data)
+        train_path = os.path.join("set", "train.npy")
+        np.save(os.path.join(test_dir, train_path), train_data)
 
         validation_pairs = (np.arange(1000, 2000), np.arange(2000, 3000))
         validation_labels = np.random.randint(0, 10, size=1000)
         validation_data = np.vstack([validation_pairs, validation_labels]).T
-        validation_path = os.path.join(test_dir, "set/validation.npy")
-        np.save(validation_path, validation_data)
+        validation_path = os.path.join("set", "validation.npy")
+        np.save(os.path.join(test_dir, validation_path), validation_data)
 
         test_pairs = (np.arange(2000, 3000), np.arange(3000, 4000))
         test_labels = np.random.randint(0, 10, size=1000)
         test_data = np.vstack([test_pairs, test_labels]).T
-        test_path = os.path.join(test_dir, "set/test.npy")
-        np.save(test_path, test_data)
+        test_path = os.path.join("set", "test.npy")
+        np.save(os.path.join(test_dir, test_path), test_data)
 
         yaml_content = f"""
             dataset_name: {dataset_name}
@@ -1279,174 +1686,21 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
                     - num: {num_nodes}
                 edges:
                     - format: csv
-                      path: edges/edge.csv
-                feature_data:
-                    - domain: edge
-                      type: null
-                      name: feat
-                      format: numpy
-                      path: data/edge-feat.npy
-            feature_data:
-                - domain: node
-                  type: null
-                  name: feat
-                  format: numpy
-                  in_memory: false
-                  path: data/node-feat.npy
-            tasks:
-              - name: node_classification
-                num_classes: {num_classes}
-                train_set:
-                  - type: null
-                    data:
-                      - format: numpy
-                        path: set/train.npy
-                validation_set:
-                  - type: null
-                    data:
-                      - format: numpy
-                        path: set/validation.npy
-                test_set:
-                  - type: null
-                    data:
-                      - format: numpy
-                        path: set/test.npy
-        """
-        yaml_file = os.path.join(test_dir, "metadata.yaml")
-        with open(yaml_file, "w") as f:
-            f.write(yaml_content)
-
-        preprocessed_metadata_path = gb.preprocess_ondisk_dataset(test_dir)
-        with open(preprocessed_metadata_path, "r") as f:
-            yaml_data = yaml.safe_load(f)
-
-        target_yaml_content = f"""
-            dataset_name: {dataset_name}
-            graph_topology:
-              type: FusedCSCSamplingGraph
-              path: preprocessed/fused_csc_sampling_graph.pt
-            feature_data:
-              - domain: node
-                type: null
-                name: feat
-                format: numpy
-                in_memory: false
-                path: preprocessed/data/node-feat.npy
-            tasks:
-              - name: node_classification
-                num_classes: {num_classes}
-                train_set:
-                  - type: null
-                    data:
-                      - format: numpy
-                        path: preprocessed/set/train.npy
-                validation_set:
-                  - type: null
-                    data:
-                      - format: numpy
-                        path: preprocessed/set/validation.npy
-                test_set:
-                  - type: null
-                    data:
-                      - format: numpy
-                        path: preprocessed/set/test.npy
-        """
-        target_yaml_data = yaml.safe_load(target_yaml_content)
-        # Check yaml content.
-        assert (
-            yaml_data == target_yaml_data
-        ), "The preprocessed metadata.yaml is not correct."
-
-        # Check file existence.
-        assert os.path.exists(
-            os.path.join(test_dir, yaml_data["graph_topology"]["path"])
-        )
-        assert os.path.exists(
-            os.path.join(test_dir, yaml_data["feature_data"][0]["path"])
-        )
-        for set_name in ["train_set", "validation_set", "test_set"]:
-            assert os.path.exists(
-                os.path.join(
-                    test_dir,
-                    yaml_data["tasks"][0][set_name][0]["data"][0]["path"],
-                )
-            )
-
-
-@unittest.skipIf(os.name != "nt", "Skip on Unix")
-def test_OnDiskDataset_preprocess_yaml_content_windows():
-    """Test if the preprocessed metadata.yaml is correct."""
-    with tempfile.TemporaryDirectory() as test_dir:
-        # All metadata fields are specified.
-        dataset_name = "graphbolt_test"
-        num_nodes = 4000
-        num_edges = 20000
-        num_classes = 10
-
-        # Generate random edges.
-        nodes = np.repeat(np.arange(num_nodes), 5)
-        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
-        edges = np.stack([nodes, neighbors], axis=1)
-        # Wrtie into edges/edge.csv
-        os.makedirs(os.path.join(test_dir, "edges\\"), exist_ok=True)
-        edges = pd.DataFrame(edges, columns=["src", "dst"])
-        edges.to_csv(
-            os.path.join(test_dir, "edges\\edge.csv"),
-            index=False,
-            header=False,
-        )
-
-        # Generate random graph edge-feats.
-        edge_feats = np.random.rand(num_edges, 5)
-        os.makedirs(os.path.join(test_dir, "data\\"), exist_ok=True)
-        np.save(os.path.join(test_dir, "data\\edge-feat.npy"), edge_feats)
-
-        # Generate random node-feats.
-        node_feats = np.random.rand(num_nodes, 10)
-        np.save(os.path.join(test_dir, "data\\node-feat.npy"), node_feats)
-
-        # Generate train/test/valid set.
-        os.makedirs(os.path.join(test_dir, "set\\"), exist_ok=True)
-        train_pairs = (np.arange(1000), np.arange(1000, 2000))
-        train_labels = np.random.randint(0, 10, size=1000)
-        train_data = np.vstack([train_pairs, train_labels]).T
-        train_path = os.path.join(test_dir, "set\\train.npy")
-        np.save(train_path, train_data)
-
-        validation_pairs = (np.arange(1000, 2000), np.arange(2000, 3000))
-        validation_labels = np.random.randint(0, 10, size=1000)
-        validation_data = np.vstack([validation_pairs, validation_labels]).T
-        validation_path = os.path.join(test_dir, "set\\validation.npy")
-        np.save(validation_path, validation_data)
-
-        test_pairs = (np.arange(2000, 3000), np.arange(3000, 4000))
-        test_labels = np.random.randint(0, 10, size=1000)
-        test_data = np.vstack([test_pairs, test_labels]).T
-        test_path = os.path.join(test_dir, "set\\test.npy")
-        np.save(test_path, test_data)
-
-        yaml_content = f"""
-            dataset_name: {dataset_name}
-            graph: # graph structure and required attributes.
-                nodes:
-                    - num: {num_nodes}
-                edges:
-                    - format: csv
-                      path: edges\\edge.csv
+                      path: {edge_path}
                 feature_data:
                     - domain: edge
                       type: null
                       name: feat
                       format: numpy
                       in_memory: true
-                      path: data\\edge-feat.npy
+                      path: {feature_edge}
             feature_data:
                 - domain: node
                   type: null
                   name: feat
                   format: numpy
                   in_memory: false
-                  path: data\\node-feat.npy
+                  path: {feature_node}
             tasks:
               - name: node_classification
                 num_classes: {num_classes}
@@ -1454,17 +1708,17 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
                   - type: null
                     data:
                       - format: numpy
-                        path: set\\train.npy
+                        path: {train_path}
                 validation_set:
                   - type: null
                     data:
                       - format: numpy
-                        path: set\\validation.npy
+                        path: {validation_path}
                 test_set:
                   - type: null
                     data:
                       - format: numpy
-                        path: set\\test.npy
+                        path: {test_path}
         """
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1474,18 +1728,19 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
         with open(preprocessed_metadata_path, "r") as f:
             yaml_data = yaml.safe_load(f)
 
+        topo_path = os.path.join("preprocessed", "fused_csc_sampling_graph.pt")
         target_yaml_content = f"""
             dataset_name: {dataset_name}
             graph_topology:
               type: FusedCSCSamplingGraph
-              path: preprocessed\\fused_csc_sampling_graph.pt
+              path: {topo_path}
             feature_data:
               - domain: node
                 type: null
                 name: feat
                 format: numpy
                 in_memory: false
-                path: preprocessed\\data\\node-feat.npy
+                path: {os.path.join("preprocessed", feature_node)}
             tasks:
               - name: node_classification
                 num_classes: {num_classes}
@@ -1493,17 +1748,18 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
                   - type: null
                     data:
                       - format: numpy
-                        path: preprocessed\\set\\train.npy
+                        path: {os.path.join("preprocessed", train_path)}
                 validation_set:
                   - type: null
                     data:
                       - format: numpy
-                        path: preprocessed\\set\\validation.npy
+                        path: {os.path.join("preprocessed", validation_path)}
                 test_set:
                   - type: null
                     data:
                       - format: numpy
-                        path: preprocessed\\set\\test.npy
+                        path: {os.path.join("preprocessed", test_path)}
+            include_original_edge_id: False
         """
         target_yaml_data = yaml.safe_load(target_yaml_content)
         # Check yaml content.
@@ -1527,7 +1783,223 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
             )
 
 
-def test_OnDiskDataset_load_name():
+def test_OnDiskDataset_preprocess_force_preprocess(capsys):
+    """Test force preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # First preprocess on-disk dataset.
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False, force_preprocess=False
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["tasks"][0]["name"] == "link_prediction"
+
+        # Change yaml_data, but do not force preprocess on-disk dataset.
+        with open(yaml_file, "r") as f:
+            yaml_data = yaml.safe_load(f)
+        yaml_data["tasks"][0]["name"] = "fake_name"
+        with open(yaml_file, "w") as f:
+            yaml.dump(yaml_data, f)
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False, force_preprocess=False
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == ["The dataset is already preprocessed.", ""]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["tasks"][0]["name"] == "link_prediction"
+
+        # Force preprocess on-disk dataset.
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False, force_preprocess=True
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["tasks"][0]["name"] == "fake_name"
+
+
+def test_OnDiskDataset_preprocess_auto_force_preprocess(capsys):
+    """Test force preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # First preprocess on-disk dataset.
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["tasks"][0]["name"] == "link_prediction"
+
+        # 1. Change yaml_data.
+        with open(yaml_file, "r") as f:
+            yaml_data = yaml.safe_load(f)
+        yaml_data["tasks"][0]["name"] = "fake_name"
+        with open(yaml_file, "w") as f:
+            yaml.dump(yaml_data, f)
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["tasks"][0]["name"] == "fake_name"
+
+        # 2. Change edge feature.
+        edge_feats = np.random.rand(num_edges, num_classes)
+        edge_feat_path = os.path.join("data", "edge-feat.npy")
+        np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        preprocessed_edge_feat = np.load(
+            os.path.join(test_dir, "preprocessed", edge_feat_path)
+        )
+        assert preprocessed_edge_feat.all() == edge_feats.all()
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["include_original_edge_id"] == False
+
+        # 3. Change include_original_edge_id.
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=True
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        with open(preprocessed_metadata_path, "r") as f:
+            target_yaml_data = yaml.safe_load(f)
+        assert target_yaml_data["include_original_edge_id"] == True
+
+        # 4. Change nothing.
+        preprocessed_metadata_path = (
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=True
+            )
+        )
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == ["The dataset is already preprocessed.", ""]
+
+
+def test_OnDiskDataset_preprocess_not_include_eids():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        with pytest.warns(
+            DGLWarning,
+            match="Edge feature is stored, but edge IDs are not saved.",
+        ):
+            gb.ondisk_dataset.preprocess_ondisk_dataset(
+                test_dir, include_original_edge_id=False
+            )
+
+
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_name(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1543,6 +2015,7 @@ def test_OnDiskDataset_load_name():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1556,7 +2029,8 @@ def test_OnDiskDataset_load_name():
         dataset = None
 
 
-def test_OnDiskDataset_load_feature():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_feature(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1572,6 +2046,7 @@ def test_OnDiskDataset_load_feature():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1640,7 +2115,8 @@ def test_OnDiskDataset_load_feature():
         dataset = None
 
 
-def test_OnDiskDataset_load_graph():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_graph(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1656,6 +2132,7 @@ def test_OnDiskDataset_load_graph():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1723,6 +2200,7 @@ def test_OnDiskDataset_load_graph():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1739,7 +2217,8 @@ def test_OnDiskDataset_load_graph():
         dataset = None
 
 
-def test_OnDiskDataset_load_tasks():
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_load_tasks(edge_fmt):
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1755,6 +2234,7 @@ def test_OnDiskDataset_load_tasks():
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -1907,7 +2387,7 @@ def test_OnDiskDataset_load_1D_feature(fmt):
         nodes = np.repeat(np.arange(num_nodes), 5)
         neighbors = np.random.randint(0, num_nodes, size=(num_edges))
         edges = np.stack([nodes, neighbors], axis=1)
-        # Wrtie into edges/edge.csv
+        # Write into edges/edge.csv
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
         edges = pd.DataFrame(edges, columns=["src", "dst"])
         edge_path = os.path.join("edges", "edge.csv")
@@ -2027,8 +2507,12 @@ def test_BuiltinDataset():
             _ = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
 
 
+@pytest.mark.parametrize("auto_cast", [True, False])
 @pytest.mark.parametrize("include_original_edge_id", [True, False])
-def test_OnDiskDataset_homogeneous(include_original_edge_id):
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_homogeneous(
+    auto_cast, include_original_edge_id, edge_fmt
+):
     """Preprocess and instantiate OnDiskDataset for homogeneous graph."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -2044,13 +2528,16 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=include_original_edge_id
+            test_dir,
+            include_original_edge_id=include_original_edge_id,
+            auto_cast_to_optimal_dtype=auto_cast,
         ).load()
 
         assert dataset.dataset_name == dataset_name
@@ -2059,7 +2546,14 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
         assert isinstance(graph, gb.FusedCSCSamplingGraph)
         assert graph.total_num_nodes == num_nodes
         assert graph.total_num_edges == num_edges
-        assert graph.edge_attributes is not None
+        assert (
+            graph.node_attributes is not None
+            and "feat" in graph.node_attributes
+        )
+        assert (
+            graph.edge_attributes is not None
+            and "feat" in graph.edge_attributes
+        )
         assert (
             not include_original_edge_id
         ) or gb.ORIGINAL_EDGE_ID in graph.edge_attributes
@@ -2069,6 +2563,10 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
         assert isinstance(tasks[0].train_set, gb.ItemSet)
         assert isinstance(tasks[0].validation_set, gb.ItemSet)
         assert isinstance(tasks[0].test_set, gb.ItemSet)
+        assert tasks[0].train_set._items[0].dtype == graph.indices.dtype
+        assert tasks[0].validation_set._items[0].dtype == graph.indices.dtype
+        assert tasks[0].test_set._items[0].dtype == graph.indices.dtype
+        assert dataset.all_nodes_set._items.dtype == graph.indices.dtype
         assert tasks[0].metadata["num_classes"] == num_classes
         assert tasks[0].metadata["name"] == "link_prediction"
 
@@ -2079,6 +2577,7 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
             tasks[0].train_set,
             tasks[0].validation_set,
             tasks[0].test_set,
+            dataset.all_nodes_set,
         ]:
             datapipe = gb.ItemSampler(itemset, batch_size=10)
             datapipe = datapipe.sample_neighbor(graph, [-1])
@@ -2094,8 +2593,12 @@ def test_OnDiskDataset_homogeneous(include_original_edge_id):
         dataset = None
 
 
+@pytest.mark.parametrize("auto_cast", [True, False])
 @pytest.mark.parametrize("include_original_edge_id", [True, False])
-def test_OnDiskDataset_heterogeneous(include_original_edge_id):
+@pytest.mark.parametrize("edge_fmt", ["csv", "numpy"])
+def test_OnDiskDataset_heterogeneous(
+    auto_cast, include_original_edge_id, edge_fmt
+):
     """Preprocess and instantiate OnDiskDataset for heterogeneous graph."""
     with tempfile.TemporaryDirectory() as test_dir:
         dataset_name = "OnDiskDataset_hetero"
@@ -2108,16 +2611,19 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
             ("user", "click", "item"): 20000,
         }
         num_classes = 10
-        gbt.genereate_raw_data_for_hetero_dataset(
+        gbt.generate_raw_data_for_hetero_dataset(
             test_dir,
             dataset_name,
             num_nodes,
             num_edges,
             num_classes,
+            edge_fmt=edge_fmt,
         )
 
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=include_original_edge_id
+            test_dir,
+            include_original_edge_id=include_original_edge_id,
+            auto_cast_to_optimal_dtype=auto_cast,
         ).load()
 
         assert dataset.dataset_name == dataset_name
@@ -2130,7 +2636,16 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
         assert graph.total_num_edges == sum(
             num_edge for num_edge in num_edges.values()
         )
-        assert graph.edge_attributes is not None
+        expected_dtype = torch.int32 if auto_cast else torch.int64
+        assert graph.indices.dtype == expected_dtype
+        assert (
+            graph.node_attributes is not None
+            and "feat" in graph.node_attributes
+        )
+        assert (
+            graph.edge_attributes is not None
+            and "feat" in graph.edge_attributes
+        )
         assert (
             not include_original_edge_id
         ) or gb.ORIGINAL_EDGE_ID in graph.edge_attributes
@@ -2150,6 +2665,7 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
             tasks[0].train_set,
             tasks[0].validation_set,
             tasks[0].test_set,
+            dataset.all_nodes_set,
         ]:
             datapipe = gb.ItemSampler(itemset, batch_size=10)
             datapipe = datapipe.sample_neighbor(graph, [-1])
@@ -2165,6 +2681,176 @@ def test_OnDiskDataset_heterogeneous(include_original_edge_id):
         dataset = None
 
 
+def test_OnDiskDataset_force_preprocess(capsys):
+    """Test force preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # First preprocess on-disk dataset.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False, force_preprocess=False
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        tasks = dataset.tasks
+        assert tasks[0].metadata["name"] == "link_prediction"
+
+        # Change yaml_data, but do not force preprocess on-disk dataset.
+        with open(yaml_file, "r") as f:
+            yaml_data = yaml.safe_load(f)
+        yaml_data["tasks"][0]["name"] = "fake_name"
+        with open(yaml_file, "w") as f:
+            yaml.dump(yaml_data, f)
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False, force_preprocess=False
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == ["The dataset is already preprocessed.", ""]
+        tasks = dataset.tasks
+        assert tasks[0].metadata["name"] == "link_prediction"
+
+        # Force preprocess on-disk dataset.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False, force_preprocess=True
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        tasks = dataset.tasks
+        assert tasks[0].metadata["name"] == "fake_name"
+
+        tasks = None
+        dataset = None
+
+
+def test_OnDiskDataset_auto_force_preprocess(capsys):
+    """Test force preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # First preprocess on-disk dataset.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        tasks = dataset.tasks
+        assert tasks[0].metadata["name"] == "link_prediction"
+
+        # 1. Change yaml_data.
+        with open(yaml_file, "r") as f:
+            yaml_data = yaml.safe_load(f)
+        yaml_data["tasks"][0]["name"] = "fake_name"
+        with open(yaml_file, "w") as f:
+            yaml.dump(yaml_data, f)
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        tasks = dataset.tasks
+        assert tasks[0].metadata["name"] == "fake_name"
+
+        # 2. Change edge feature.
+        edge_feats = np.random.rand(num_edges, num_classes)
+        edge_feat_path = os.path.join("data", "edge-feat.npy")
+        np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        assert torch.equal(
+            dataset.feature.read("edge", None, "feat"),
+            torch.from_numpy(edge_feats),
+        )
+        graph = dataset.graph
+        assert gb.ORIGINAL_EDGE_ID not in graph.edge_attributes
+
+        # 3. Change include_original_edge_id.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == [
+            "The on-disk dataset is re-preprocessing, so the existing "
+            + "preprocessed dataset has been removed.",
+            "Start to preprocess the on-disk dataset.",
+            "Finish preprocessing the on-disk dataset.",
+            "",
+        ]
+        graph = dataset.graph
+        assert gb.ORIGINAL_EDGE_ID in graph.edge_attributes
+
+        # 4. Change Nothing.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
+        captured = capsys.readouterr().out.split("\n")
+        assert captured == ["The dataset is already preprocessed.", ""]
+
+        graph = None
+        tasks = None
+        dataset = None
+
+
 def test_OnDiskTask_repr_homogeneous():
     item_set = gb.ItemSet(
         (torch.arange(0, 5), torch.arange(5, 10)),
@@ -2172,20 +2858,49 @@ def test_OnDiskTask_repr_homogeneous():
     )
     metadata = {"name": "node_classification"}
     task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
-    expected_str = str(
-        """OnDiskTask(validation_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
-                                  names=('seed_nodes', 'labels'),
-                          ),
-           train_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
-                             names=('seed_nodes', 'labels'),
-                     ),
-           test_set=ItemSet(items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),
-                            names=('seed_nodes', 'labels'),
-                    ),
-           metadata={'name': 'node_classification'},
-)"""
+    expected_str = (
+        "OnDiskTask(validation_set=ItemSet(\n"
+        "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "               names=('seed_nodes', 'labels'),\n"
+        "           ),\n"
+        "           train_set=ItemSet(\n"
+        "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "               names=('seed_nodes', 'labels'),\n"
+        "           ),\n"
+        "           test_set=ItemSet(\n"
+        "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
+        "               names=('seed_nodes', 'labels'),\n"
+        "           ),\n"
+        "           metadata={'name': 'node_classification'},)"
     )
-    assert str(task) == expected_str, print(task)
+    assert repr(task) == expected_str, task
+
+
+def test_OnDiskDataset_not_include_eids():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        with pytest.warns(
+            DGLWarning,
+            match="Edge feature is stored, but edge IDs are not saved.",
+        ):
+            gb.OnDiskDataset(test_dir, include_original_edge_id=False)
 
 
 def test_OnDiskTask_repr_heterogeneous():
@@ -2197,29 +2912,175 @@ def test_OnDiskTask_repr_heterogeneous():
     )
     metadata = {"name": "node_classification"}
     task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
-    expected_str = str(
-        """OnDiskTask(validation_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
-                                                    names=('seed_nodes',),
-                                            ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
-                                                    names=('seed_nodes',),
-                                            )},
-                                      names=('seed_nodes',),
-                          ),
-           train_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
-                                               names=('seed_nodes',),
-                                       ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
-                                               names=('seed_nodes',),
-                                       )},
-                                 names=('seed_nodes',),
-                     ),
-           test_set=ItemSetDict(items={'user': ItemSet(items=(tensor([0, 1, 2, 3, 4]),),
-                                              names=('seed_nodes',),
-                                      ), 'item': ItemSet(items=(tensor([5, 6, 7, 8, 9]),),
-                                              names=('seed_nodes',),
-                                      )},
-                                names=('seed_nodes',),
-                    ),
-           metadata={'name': 'node_classification'},
-)"""
+    expected_str = (
+        "OnDiskTask(validation_set=ItemSetDict(\n"
+        "               itemsets={'user': ItemSet(\n"
+        "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        ), 'item': ItemSet(\n"
+        "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        )},\n"
+        "               names=('seed_nodes',),\n"
+        "           ),\n"
+        "           train_set=ItemSetDict(\n"
+        "               itemsets={'user': ItemSet(\n"
+        "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        ), 'item': ItemSet(\n"
+        "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        )},\n"
+        "               names=('seed_nodes',),\n"
+        "           ),\n"
+        "           test_set=ItemSetDict(\n"
+        "               itemsets={'user': ItemSet(\n"
+        "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        ), 'item': ItemSet(\n"
+        "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
+        "                            names=('seed_nodes',),\n"
+        "                        )},\n"
+        "               names=('seed_nodes',),\n"
+        "           ),\n"
+        "           metadata={'name': 'node_classification'},)"
     )
-    assert str(task) == expected_str, print(task)
+    assert repr(task) == expected_str, task
+
+
+def test_OnDiskDataset_load_tasks_selectively():
+    """Test preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        train_path = os.path.join("set", "train.npy")
+
+        yaml_content += f"""      - name: node_classification
+            num_classes: {num_classes}
+            train_set:
+              - type: null
+                data:
+                  - format: numpy
+                    path: {train_path}
+        """
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # Case1. Test load all tasks.
+        dataset = gb.OnDiskDataset(test_dir).load()
+        assert len(dataset.tasks) == 2
+
+        # Case2. Test load tasks selectively.
+        dataset = gb.OnDiskDataset(test_dir).load(tasks="link_prediction")
+        assert len(dataset.tasks) == 1
+        assert dataset.tasks[0].metadata["name"] == "link_prediction"
+        dataset = gb.OnDiskDataset(test_dir).load(tasks=["link_prediction"])
+        assert len(dataset.tasks) == 1
+        assert dataset.tasks[0].metadata["name"] == "link_prediction"
+
+        # Case3. Test load tasks with non-existent task name.
+        with pytest.warns(
+            DGLWarning,
+            match="Below tasks are not found in YAML: {'fake-name'}. Skipped.",
+        ):
+            dataset = gb.OnDiskDataset(test_dir).load(tasks=["fake-name"])
+            assert len(dataset.tasks) == 0
+
+        # Case4. Test load tasks selectively with incorrect task type.
+        with pytest.raises(TypeError):
+            dataset = gb.OnDiskDataset(test_dir).load(tasks=2)
+
+        dataset = None
+
+
+def test_OnDiskDataset_preprocess_graph_with_single_type():
+    """Test for graph with single node/edge type."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+
+        # Generate random edges.
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors], axis=1)
+        # Write into edges/edge.csv
+        os.makedirs(os.path.join(test_dir, "edges/"), exist_ok=True)
+        edges = pd.DataFrame(edges, columns=["src", "dst"])
+        edges.to_csv(
+            os.path.join(test_dir, "edges/edge.csv"),
+            index=False,
+            header=False,
+        )
+
+        # Generate random graph edge-feats.
+        edge_feats = np.random.rand(num_edges, 5)
+        os.makedirs(os.path.join(test_dir, "data/"), exist_ok=True)
+        np.save(os.path.join(test_dir, "data/edge-feat.npy"), edge_feats)
+
+        # Generate random node-feats.
+        node_feats = np.random.rand(num_nodes, 10)
+        np.save(os.path.join(test_dir, "data/node-feat.npy"), node_feats)
+
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+            graph: # graph structure and required attributes.
+                nodes:
+                    - num: {num_nodes}
+                      type: author
+                edges:
+                    - type: author:collab:author
+                      format: csv
+                      path: edges/edge.csv
+                feature_data:
+                    - domain: edge
+                      type: author:collab:author
+                      name: feat
+                      format: numpy
+                      path: data/edge-feat.npy
+                    - domain: node
+                      type: author
+                      name: feat
+                      format: numpy
+                      path: data/node-feat.npy
+        """
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+        assert dataset.dataset_name == dataset_name
+
+        graph = dataset.graph
+        assert isinstance(graph, gb.FusedCSCSamplingGraph)
+        assert graph.total_num_nodes == num_nodes
+        assert graph.total_num_edges == num_edges
+        assert (
+            graph.node_attributes is not None
+            and "feat" in graph.node_attributes
+        )
+        assert (
+            graph.edge_attributes is not None
+            and "feat" in graph.edge_attributes
+        )
+        assert torch.equal(graph.node_type_offset, torch.tensor([0, num_nodes]))
+        assert torch.equal(
+            graph.type_per_edge,
+            torch.zeros(num_edges),
+        )
+        assert graph.edge_type_to_id == {"author:collab:author": 0}
+        assert graph.node_type_to_id == {"author": 0}

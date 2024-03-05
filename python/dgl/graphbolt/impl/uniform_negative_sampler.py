@@ -1,5 +1,6 @@
 """Uniform negative sampler for GraphBolt."""
 
+import torch
 from torch.utils.data import functional_datapipe
 
 from ..negative_sampler import NegativeSampler
@@ -32,20 +33,23 @@ class UniformNegativeSampler(NegativeSampler):
     Examples
     --------
     >>> from dgl import graphbolt as gb
-    >>> indptr = torch.LongTensor([0, 2, 4, 5])
-    >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
+    >>> indptr = torch.LongTensor([0, 1, 2, 3, 4])
+    >>> indices = torch.LongTensor([1, 2, 3, 0])
     >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
-    >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
+    >>> node_pairs = torch.tensor([[0, 1], [1, 2], [2, 3], [3, 0]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
-    ...     item_set, batch_size=1,)
+    ...     item_set, batch_size=4,)
     >>> neg_sampler = gb.UniformNegativeSampler(
     ...     item_sampler, graph, 2)
     >>> for minibatch in neg_sampler:
     ...       print(minibatch.negative_srcs)
     ...       print(minibatch.negative_dsts)
-    (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([1, 0, 0]))
-    (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
+    None
+    tensor([[2, 1],
+        [2, 1],
+        [3, 2],
+        [1, 3]])
     """
 
     def __init__(
@@ -57,9 +61,49 @@ class UniformNegativeSampler(NegativeSampler):
         super().__init__(datapipe, negative_ratio)
         self.graph = graph
 
-    def _sample_with_etype(self, node_pairs, etype=None):
-        return self.graph.sample_negative_edges_uniform(
-            etype,
-            node_pairs,
-            self.negative_ratio,
-        )
+    def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
+        if use_seeds:
+            assert node_pairs.ndim == 2 and node_pairs.shape[1] == 2, (
+                "Only tensor with shape N*2 is supported for negative"
+                + f" sampling, but got {node_pairs.shape}."
+            )
+            # Sample negative edges, and concatenate positive edges with them.
+            seeds = self.graph.sample_negative_edges_uniform_2(
+                etype,
+                node_pairs,
+                self.negative_ratio,
+            )
+            # Construct indexes for all node pairs.
+            num_pos_node_pairs = node_pairs.shape[0]
+            negative_ratio = self.negative_ratio
+            pos_indexes = torch.arange(
+                0,
+                num_pos_node_pairs,
+                device=seeds.device,
+            )
+            neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
+            indexes = torch.cat((pos_indexes, neg_indexes))
+            # Construct labels for all node pairs.
+            pos_num = node_pairs.shape[0]
+            neg_num = seeds.shape[0] - pos_num
+            labels = torch.cat(
+                (
+                    torch.ones(
+                        pos_num,
+                        dtype=torch.bool,
+                        device=seeds.device,
+                    ),
+                    torch.zeros(
+                        neg_num,
+                        dtype=torch.bool,
+                        device=seeds.device,
+                    ),
+                ),
+            )
+            return seeds, labels, indexes
+        else:
+            return self.graph.sample_negative_edges_uniform(
+                etype,
+                node_pairs,
+                self.negative_ratio,
+            )

@@ -4,8 +4,9 @@
  * @brief Utilities for CUDA kernels.
  */
 
+#include <cub/cub.cuh>
+
 #include "../../runtime/cuda/cuda_common.h"
-#include "./dgl_cub.cuh"
 #include "./utils.h"
 
 namespace dgl {

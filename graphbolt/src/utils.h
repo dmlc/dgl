@@ -13,10 +13,17 @@ namespace graphbolt {
 namespace utils {
 
 /**
+ * @brief Checks whether the tensor is stored on the GPU.
+ */
+inline bool is_on_gpu(torch::Tensor tensor) {
+  return tensor.device().is_cuda();
+}
+
+/**
  * @brief Checks whether the tensor is stored on the GPU or the pinned memory.
  */
 inline bool is_accessible_from_gpu(torch::Tensor tensor) {
-  return tensor.is_pinned() || tensor.device().type() == c10::DeviceType::CUDA;
+  return is_on_gpu(tensor) || tensor.is_pinned();
 }
 
 /**

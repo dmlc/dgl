@@ -7,23 +7,26 @@ import backend as F
 import dgl.graphbolt as gb
 import pytest
 import torch
+from torch.torch_version import TorchVersion
 
 from . import gb_test_utils
 
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
-    item_sampler = gb.ItemSampler(gb.ItemSet(torch.randn(20)), 4)
+    item_sampler = gb.ItemSampler(
+        gb.ItemSet(torch.arange(20), names="seed_nodes"), 4
+    )
 
     # Invoke CopyTo via class constructor.
     dp = gb.CopyTo(item_sampler, "cuda")
     for data in dp:
-        assert data.device.type == "cuda"
+        assert data.seed_nodes.device.type == "cuda"
 
     # Invoke CopyTo via functional form.
     dp = item_sampler.copy_to("cuda")
     for data in dp:
-        assert data.device.type == "cuda"
+        assert data.seed_nodes.device.type == "cuda"
 
 
 @pytest.mark.parametrize(
@@ -33,6 +36,7 @@ def test_CopyTo():
         "node_inference",
         "link_prediction",
         "edge_classification",
+        "extra_attrs",
         "other",
     ],
 )
@@ -40,7 +44,7 @@ def test_CopyTo():
 def test_CopyToWithMiniBatches(task):
     N = 16
     B = 2
-    if task == "node_classification":
+    if task == "node_classification" or task == "extra_attrs":
         itemset = gb.ItemSet(
             (torch.arange(N), torch.arange(N)), names=("seed_nodes", "labels")
         )
@@ -125,6 +129,15 @@ def test_CopyToWithMiniBatches(task):
             "negative_node_pairs",
             "node_pairs_with_labels",
         ]
+    elif task == "extra_attrs":
+        copied_attrs = [
+            "node_features",
+            "edge_features",
+            "sampled_subgraphs",
+            "labels",
+            "blocks",
+            "seed_nodes",
+        ]
 
     def test_data_device(datapipe):
         for data in datapipe:
@@ -148,11 +161,16 @@ def test_CopyToWithMiniBatches(task):
                         else:
                             assert var.device.type == "cpu"
 
+    if task == "extra_attrs":
+        extra_attrs = ["seed_nodes"]
+    else:
+        extra_attrs = None
+
     # Invoke CopyTo via class constructor.
-    test_data_device(gb.CopyTo(datapipe, "cuda"))
+    test_data_device(gb.CopyTo(datapipe, "cuda", extra_attrs))
 
     # Invoke CopyTo via functional form.
-    test_data_device(datapipe.copy_to("cuda"))
+    test_data_device(datapipe.copy_to("cuda", extra_attrs))
 
 
 def test_etype_tuple_to_str():
@@ -231,6 +249,79 @@ def test_isin_non_1D_dim():
     test_elements = torch.tensor([[2, 5]], device=F.ctx())
     with pytest.raises(Exception):
         gb.isin(elements, test_elements)
+
+
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+@pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("pinned", [False, True])
+def test_index_select(dtype, idtype, pinned):
+    if F._default_context_str != "gpu" and pinned:
+        pytest.skip("Pinned tests are available only on GPU.")
+    tensor = torch.tensor([[2, 3], [5, 5], [20, 13]], dtype=dtype)
+    tensor = tensor.pin_memory() if pinned else tensor.to(F.ctx())
+    index = torch.tensor([0, 2], dtype=idtype, device=F.ctx())
+    gb_result = gb.index_select(tensor, index)
+    torch_result = tensor.to(F.ctx())[index.long()]
+    assert torch.equal(torch_result, gb_result)
+
+
+def torch_expand_indptr(indptr, dtype, nodes=None):
+    if nodes is None:
+        nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
+    return nodes.to(dtype).repeat_interleave(indptr.diff())
+
+
+@pytest.mark.parametrize("nodes", [None, True])
+@pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
+def test_expand_indptr(nodes, dtype):
+    if nodes:
+        nodes = torch.tensor([1, 7, 3, 4, 5, 8], dtype=dtype, device=F.ctx())
+    indptr = torch.tensor([0, 2, 2, 7, 10, 12, 20], device=F.ctx())
+    torch_result = torch_expand_indptr(indptr, dtype, nodes)
+    gb_result = gb.expand_indptr(indptr, dtype, nodes)
+    assert torch.equal(torch_result, gb_result)
+    gb_result = gb.expand_indptr(indptr, dtype, nodes, indptr[-1].item())
+    assert torch.equal(torch_result, gb_result)
+
+    if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+        import torch._dynamo as dynamo
+        from torch.testing._internal.optests import opcheck
+
+        # Tests torch.compile compatibility
+        for output_size in [None, indptr[-1].item()]:
+            kwargs = {"node_ids": nodes, "output_size": output_size}
+            opcheck(
+                torch.ops.graphbolt.expand_indptr,
+                (indptr, dtype),
+                kwargs,
+                test_utils=[
+                    "test_schema",
+                    "test_autograd_registration",
+                    "test_faketensor",
+                    "test_aot_dispatch_dynamic",
+                ],
+                raise_exception=True,
+            )
+
+            explanation = dynamo.explain(gb.expand_indptr)(
+                indptr, dtype, nodes, output_size
+            )
+            expected_breaks = -1 if output_size is None else 0
+            assert explanation.graph_break_count == expected_breaks
 
 
 def test_csc_format_base_representation():

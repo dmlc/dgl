@@ -139,8 +139,6 @@ endif()
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
-  # see https://github.com/NVIDIA/thrust/issues/1401
-  add_definitions(-DTHRUST_CUB_WRAPPED_NAMESPACE=dgl)
   include(cmake/modules/CUDA.cmake)
   message(STATUS "Use external CCCL library for a consistent API and performance.")
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/thrust")
@@ -351,7 +349,23 @@ endif(EXTERNAL_PHMAP_PATH)
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
-
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  include(ExternalProject)
+  set(LIBURING_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/liburing)
+  ExternalProject_Add(
+    liburing
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${LIBURING_INSTALL_DIR}
+    BUILD_COMMAND bash -c "make -j 4"
+    BUILD_IN_SOURCE ON
+    INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
+    BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/lib/liburing.a
+    BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/include
+    DOWNLOAD_EXTRACT_TIMESTAMP true
+  )
+  set(LIBURING_INCLUDE ${LIBURING_INSTALL_DIR}/include)
+  set(LIBURING ${LIBURING_INSTALL_DIR}/lib/liburing.a)
+endif()
 
 if(EXTERNAL_NANOFLANN_PATH)
   include_directories(SYSTEM ${EXTERNAL_NANOFLANN_PATH})
@@ -530,6 +544,10 @@ if(BUILD_GRAPHBOLT)
   string(REPLACE ";" "\\;" CUDA_ARCHITECTURES_ESCAPED "${CUDA_ARCHITECTURES}")
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
   file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  if(USE_CUDA)
+    get_target_property(GPU_CACHE_INCLUDE_DIRS gpu_cache INCLUDE_DIRECTORIES)
+  endif(USE_CUDA)
+  string(REPLACE ";" "\\;" GPU_CACHE_INCLUDE_DIRS_ESCAPED "${GPU_CACHE_INCLUDE_DIRS}")
   if(MSVC)
     file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.bat BUILD_SCRIPT)
     add_custom_target(
@@ -540,6 +558,7 @@ if(BUILD_GRAPHBOLT)
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
       USE_CUDA=${USE_CUDA}
       BINDIR=${BINDIR}
+      GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
       CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
@@ -557,6 +576,7 @@ if(BUILD_GRAPHBOLT)
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
       USE_CUDA=${USE_CUDA}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
       CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
@@ -565,4 +585,7 @@ if(BUILD_GRAPHBOLT)
       DEPENDS ${BUILD_SCRIPT}
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
   endif(MSVC)
+  if(USE_CUDA)
+    add_dependencies(graphbolt gpu_cache)
+  endif(USE_CUDA)
 endif(BUILD_GRAPHBOLT)

@@ -8,15 +8,17 @@ relation = "A:r:B"
 reverse_relation = "B:rr:A"
 
 
-def test_minibatch_representation_homo():
+@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
+def test_minibatch_representation_homo(indptr_dtype, indices_dtype):
     csc_formats = [
         gb.CSCFormatBase(
-            indptr=torch.tensor([0, 1, 3, 5, 6]),
-            indices=torch.tensor([0, 1, 2, 2, 1, 2]),
+            indptr=torch.tensor([0, 1, 3, 5, 6], dtype=indptr_dtype),
+            indices=torch.tensor([0, 1, 2, 2, 1, 2], dtype=indices_dtype),
         ),
         gb.CSCFormatBase(
-            indptr=torch.tensor([0, 2, 3]),
-            indices=torch.tensor([1, 2, 0]),
+            indptr=torch.tensor([0, 2, 3], dtype=indptr_dtype),
+            indices=torch.tensor([1, 2, 0], dtype=indices_dtype),
         ),
     ]
     original_column_node_ids = [
@@ -58,7 +60,8 @@ def test_minibatch_representation_homo():
     # Test minibatch without data.
     minibatch = gb.MiniBatch()
     expect_result = str(
-        """MiniBatch(seed_nodes=None,
+        """MiniBatch(seeds=None,
+          seed_nodes=None,
           sampled_subgraphs=None,
           positive_node_pairs=None,
           node_pairs_with_labels=None,
@@ -69,7 +72,9 @@ def test_minibatch_representation_homo():
           negative_dsts=None,
           labels=None,
           input_nodes=None,
+          indexes=None,
           edge_features=None,
+          compacted_seeds=None,
           compacted_node_pairs=None,
           compacted_negative_srcs=None,
           compacted_negative_dsts=None,
@@ -77,7 +82,7 @@ def test_minibatch_representation_homo():
        )"""
     )
     result = str(minibatch)
-    assert result == expect_result, print(len(expect_result), len(result))
+    assert result == expect_result, print(expect_result, result)
     # Test minibatch with all attributes.
     minibatch = gb.MiniBatch(
         node_pairs=csc_formats,
@@ -93,16 +98,17 @@ def test_minibatch_representation_homo():
         compacted_negative_dsts=compacted_negative_dsts,
     )
     expect_result = str(
-        """MiniBatch(seed_nodes=None,
-          sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6]),
-                                                                         indices=tensor([0, 1, 2, 2, 1, 2]),
+        """MiniBatch(seeds=None,
+          seed_nodes=None,
+          sampled_subgraphs=[SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6], dtype=torch.int32),
+                                                                         indices=tensor([0, 1, 2, 2, 1, 2], dtype=torch.int32),
                                                            ),
                                                original_row_node_ids=tensor([10, 11, 12, 13]),
                                                original_edge_ids=tensor([19, 20, 21, 22, 25, 30]),
                                                original_column_node_ids=tensor([10, 11, 12, 13]),
                             ),
-                            SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 2, 3]),
-                                                                         indices=tensor([1, 2, 0]),
+                            SampledSubgraphImpl(sampled_csc=CSCFormatBase(indptr=tensor([0, 2, 3], dtype=torch.int32),
+                                                                         indices=tensor([1, 2, 0], dtype=torch.int32),
                                                            ),
                                                original_row_node_ids=tensor([10, 11, 12]),
                                                original_edge_ids=tensor([10, 15, 17]),
@@ -115,25 +121,31 @@ def test_minibatch_representation_homo():
                                                indices=tensor([3, 4, 5]),
                                  ),
                                  tensor([0., 1., 2.])),
-          node_pairs=[CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6]),
-                                   indices=tensor([0, 1, 2, 2, 1, 2]),
+          node_pairs=[CSCFormatBase(indptr=tensor([0, 1, 3, 5, 6], dtype=torch.int32),
+                                   indices=tensor([0, 1, 2, 2, 1, 2], dtype=torch.int32),
                      ),
-                     CSCFormatBase(indptr=tensor([0, 2, 3]),
-                                   indices=tensor([1, 2, 0]),
+                     CSCFormatBase(indptr=tensor([0, 2, 3], dtype=torch.int32),
+                                   indices=tensor([1, 2, 0], dtype=torch.int32),
                      )],
           node_features={'x': tensor([5, 0, 2, 1])},
           negative_srcs=tensor([[8],
                                 [1],
                                 [6]]),
-          negative_node_pairs=(tensor([0, 1, 2]),
-                              tensor([6, 0, 0])),
+          negative_node_pairs=(tensor([[0],
+                                      [1],
+                                      [2]]),
+                              tensor([[6],
+                                      [0],
+                                      [0]])),
           negative_dsts=tensor([[2],
                                 [8],
                                 [8]]),
           labels=tensor([0., 1., 2.]),
           input_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
+          indexes=None,
           edge_features=[{'x': tensor([9, 0, 1, 1, 7, 4])},
                         {'x': tensor([0, 2, 2])}],
+          compacted_seeds=None,
           compacted_node_pairs=CSCFormatBase(indptr=tensor([0, 2, 3]),
                                              indices=tensor([3, 4, 5]),
                                ),
@@ -151,21 +163,24 @@ def test_minibatch_representation_homo():
     assert result == expect_result, print(expect_result, result)
 
 
-def test_minibatch_representation_hetero():
+@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
+def test_minibatch_representation_hetero(indptr_dtype, indices_dtype):
     csc_formats = [
         {
             relation: gb.CSCFormatBase(
-                indptr=torch.tensor([0, 1, 2, 3]),
-                indices=torch.tensor([0, 1, 1]),
+                indptr=torch.tensor([0, 1, 2, 3], dtype=indptr_dtype),
+                indices=torch.tensor([0, 1, 1], dtype=indices_dtype),
             ),
             reverse_relation: gb.CSCFormatBase(
-                indptr=torch.tensor([0, 0, 0, 1, 2]),
-                indices=torch.tensor([1, 0]),
+                indptr=torch.tensor([0, 0, 0, 1, 2], dtype=indptr_dtype),
+                indices=torch.tensor([1, 0], dtype=indices_dtype),
             ),
         },
         {
             relation: gb.CSCFormatBase(
-                indptr=torch.tensor([0, 1, 2]), indices=torch.tensor([1, 0])
+                indptr=torch.tensor([0, 1, 2], dtype=indptr_dtype),
+                indices=torch.tensor([1, 0], dtype=indices_dtype),
             )
         },
     ]
@@ -238,18 +253,19 @@ def test_minibatch_representation_hetero():
         compacted_negative_dsts=compacted_negative_dsts,
     )
     expect_result = str(
-        """MiniBatch(seed_nodes={'B': tensor([10, 15])},
-          sampled_subgraphs=[SampledSubgraphImpl(sampled_csc={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
-                                                                         indices=tensor([0, 1, 1]),
-                                                           ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2]),
-                                                                         indices=tensor([1, 0]),
+        """MiniBatch(seeds=None,
+          seed_nodes={'B': tensor([10, 15])},
+          sampled_subgraphs=[SampledSubgraphImpl(sampled_csc={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3], dtype=torch.int32),
+                                                                         indices=tensor([0, 1, 1], dtype=torch.int32),
+                                                           ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2], dtype=torch.int32),
+                                                                         indices=tensor([1, 0], dtype=torch.int32),
                                                            )},
                                                original_row_node_ids={'A': tensor([ 5,  7,  9, 11]), 'B': tensor([10, 11, 12])},
                                                original_edge_ids={'A:r:B': tensor([19, 20, 21]), 'B:rr:A': tensor([23, 26])},
                                                original_column_node_ids={'B': tensor([10, 11, 12]), 'A': tensor([ 5,  7,  9, 11])},
                             ),
-                            SampledSubgraphImpl(sampled_csc={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2]),
-                                                                         indices=tensor([1, 0]),
+                            SampledSubgraphImpl(sampled_csc={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2], dtype=torch.int32),
+                                                                         indices=tensor([1, 0], dtype=torch.int32),
                                                            )},
                                                original_row_node_ids={'A': tensor([5, 7]), 'B': tensor([10, 11])},
                                                original_edge_ids={'A:r:B': tensor([10, 12])},
@@ -266,26 +282,32 @@ def test_minibatch_representation_hetero():
                                                indices=tensor([0, 1]),
                                  )},
                                  {'B': tensor([2, 5])}),
-          node_pairs=[{'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
-                                   indices=tensor([0, 1, 1]),
-                     ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2]),
-                                   indices=tensor([1, 0]),
+          node_pairs=[{'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3], dtype=torch.int32),
+                                   indices=tensor([0, 1, 1], dtype=torch.int32),
+                     ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2], dtype=torch.int32),
+                                   indices=tensor([1, 0], dtype=torch.int32),
                      )},
-                     {'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2]),
-                                   indices=tensor([1, 0]),
+                     {'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2], dtype=torch.int32),
+                                   indices=tensor([1, 0], dtype=torch.int32),
                      )}],
           node_features={('A', 'x'): tensor([6, 4, 0, 1])},
           negative_srcs={'B': tensor([[8],
                                 [1],
                                 [6]])},
-          negative_node_pairs={'A:r:B': (tensor([0, 1, 2]), tensor([6, 0, 0]))},
+          negative_node_pairs={'A:r:B': (tensor([[0],
+                                      [1],
+                                      [2]]), tensor([[6],
+                                      [0],
+                                      [0]]))},
           negative_dsts={'B': tensor([[2],
                                 [8],
                                 [8]])},
           labels={'B': tensor([2, 5])},
           input_nodes={'A': tensor([ 5,  7,  9, 11]), 'B': tensor([10, 11, 12])},
+          indexes=None,
           edge_features=[{('A:r:B', 'x'): tensor([4, 2, 4])},
                         {('A:r:B', 'x'): tensor([0, 6])}],
+          compacted_seeds=None,
           compacted_node_pairs={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2, 3]),
                                              indices=tensor([3, 4, 5]),
                                ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 0, 0, 1, 2]),
@@ -308,10 +330,12 @@ def test_minibatch_representation_hetero():
        )"""
     )
     result = str(minibatch)
-    assert result == expect_result, print(result)
+    assert result == expect_result, print(expect_result, result)
 
 
-def test_get_dgl_blocks_homo():
+@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
+def test_get_dgl_blocks_homo(indptr_dtype, indices_dtype):
     node_pairs = [
         (
             torch.tensor([0, 1, 2, 2, 2, 1]),
@@ -324,12 +348,12 @@ def test_get_dgl_blocks_homo():
     ]
     csc_formats = [
         gb.CSCFormatBase(
-            indptr=torch.tensor([0, 1, 3, 5, 6]),
-            indices=torch.tensor([0, 1, 2, 2, 1, 2]),
+            indptr=torch.tensor([0, 1, 3, 5, 6], dtype=indptr_dtype),
+            indices=torch.tensor([0, 1, 2, 2, 1, 2], dtype=indices_dtype),
         ),
         gb.CSCFormatBase(
-            indptr=torch.tensor([0, 1, 3]),
-            indices=torch.tensor([0, 1, 2]),
+            indptr=torch.tensor([0, 1, 3], dtype=indptr_dtype),
+            indices=torch.tensor([0, 1, 2], dtype=indices_dtype),
         ),
     ]
     original_column_node_ids = [
@@ -664,10 +688,7 @@ def check_dgl_blocks_hetero(minibatch, blocks):
         edges = block.edges(etype=etype)
         dst_ndoes = torch.arange(
             0, len(sampled_csc[i][relation].indptr) - 1
-        ).repeat_interleave(
-            sampled_csc[i][relation].indptr[1:]
-            - sampled_csc[i][relation].indptr[:-1]
-        )
+        ).repeat_interleave(sampled_csc[i][relation].indptr.diff())
         assert torch.equal(edges[0], sampled_csc[i][relation].indices)
         assert torch.equal(edges[1], dst_ndoes)
         assert torch.equal(
@@ -676,10 +697,7 @@ def check_dgl_blocks_hetero(minibatch, blocks):
     edges = blocks[0].edges(etype=gb.etype_str_to_tuple(reverse_relation))
     dst_ndoes = torch.arange(
         0, len(sampled_csc[0][reverse_relation].indptr) - 1
-    ).repeat_interleave(
-        sampled_csc[0][reverse_relation].indptr[1:]
-        - sampled_csc[0][reverse_relation].indptr[:-1]
-    )
+    ).repeat_interleave(sampled_csc[0][reverse_relation].indptr.diff())
     assert torch.equal(edges[0], sampled_csc[0][reverse_relation].indices)
     assert torch.equal(edges[1], dst_ndoes)
     assert torch.equal(
@@ -704,9 +722,7 @@ def check_dgl_blocks_homo(minibatch, blocks):
     for i, block in enumerate(blocks):
         dst_ndoes = torch.arange(
             0, len(sampled_csc[i].indptr) - 1
-        ).repeat_interleave(
-            sampled_csc[i].indptr[1:] - sampled_csc[i].indptr[:-1]
-        )
+        ).repeat_interleave(sampled_csc[i].indptr.diff())
         assert torch.equal(block.edges()[0], sampled_csc[i].indices), print(
             block.edges()
         )
@@ -781,12 +797,12 @@ def test_dgl_link_predication_homo(mode):
     if mode == "neg_graph" or mode == "neg_src":
         assert torch.equal(
             minibatch.negative_node_pairs[0],
-            minibatch.compacted_negative_srcs.view(-1),
+            minibatch.compacted_negative_srcs,
         )
     if mode == "neg_graph" or mode == "neg_dst":
         assert torch.equal(
             minibatch.negative_node_pairs[1],
-            minibatch.compacted_negative_dsts.view(-1),
+            minibatch.compacted_negative_dsts,
         )
     (
         node_pairs,
@@ -842,11 +858,94 @@ def test_dgl_link_predication_hetero(mode):
         for etype, src in minibatch.compacted_negative_srcs.items():
             assert torch.equal(
                 minibatch.negative_node_pairs[etype][0],
-                src.view(-1),
+                src,
             )
     if mode == "neg_graph" or mode == "neg_dst":
         for etype, dst in minibatch.compacted_negative_dsts.items():
             assert torch.equal(
                 minibatch.negative_node_pairs[etype][1],
-                minibatch.compacted_negative_dsts[etype].view(-1),
+                minibatch.compacted_negative_dsts[etype],
             )
+
+
+def test_to_pyg_data():
+    test_subgraph_a = gb.SampledSubgraphImpl(
+        sampled_csc=gb.CSCFormatBase(
+            indptr=torch.tensor([0, 1, 3, 5, 6]),
+            indices=torch.tensor([0, 1, 2, 2, 1, 2]),
+        ),
+        original_column_node_ids=torch.tensor([10, 11, 12, 13]),
+        original_row_node_ids=torch.tensor([19, 20, 21, 22, 25, 30]),
+        original_edge_ids=torch.tensor([10, 11, 12, 13]),
+    )
+    test_subgraph_b = gb.SampledSubgraphImpl(
+        sampled_csc=gb.CSCFormatBase(
+            indptr=torch.tensor([0, 1, 3]),
+            indices=torch.tensor([1, 2, 0]),
+        ),
+        original_row_node_ids=torch.tensor([10, 11, 12]),
+        original_edge_ids=torch.tensor([10, 15, 17]),
+        original_column_node_ids=torch.tensor([10, 11]),
+    )
+    expected_edge_index = torch.tensor(
+        [[0, 0, 1, 1, 1, 2, 2, 2], [0, 1, 0, 1, 2, 1, 2, 3]]
+    )
+    expected_node_features = torch.tensor([[1], [2], [3], [4]])
+    expected_labels = torch.tensor([0, 1])
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph_a, test_subgraph_b],
+        node_features={"feat": expected_node_features},
+        labels=expected_labels,
+    )
+    pyg_data = test_minibatch.to_pyg_data()
+    pyg_data.validate()
+    assert torch.equal(pyg_data.edge_index, expected_edge_index)
+    assert torch.equal(pyg_data.x, expected_node_features)
+    assert torch.equal(pyg_data.y, expected_labels)
+
+    # Test with sampled_csc as None.
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=None,
+        node_features={"feat": expected_node_features},
+        labels=expected_labels,
+    )
+    pyg_data = test_minibatch.to_pyg_data()
+    assert pyg_data.edge_index is None, "Edge index should be none."
+
+    # Test with node_features as None.
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph_a],
+        node_features=None,
+        labels=expected_labels,
+    )
+    pyg_data = test_minibatch.to_pyg_data()
+    assert pyg_data.x is None, "Node features should be None."
+
+    # Test with labels as None.
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph_a],
+        node_features={"feat": expected_node_features},
+        labels=None,
+    )
+    pyg_data = test_minibatch.to_pyg_data()
+    assert pyg_data.y is None, "Labels should be None."
+
+    # Test with multiple features.
+    test_minibatch = gb.MiniBatch(
+        sampled_subgraphs=[test_subgraph_a],
+        node_features={
+            "feat": expected_node_features,
+            "extra_feat": torch.tensor([[3], [4]]),
+        },
+        labels=expected_labels,
+    )
+    try:
+        pyg_data = test_minibatch.to_pyg_data()
+        assert (
+            pyg_data.x is None,
+        ), "Multiple features case should raise an error."
+    except AssertionError as e:
+        assert (
+            str(e)
+            == "`to_pyg_data` only supports single feature homogeneous graph."
+        )

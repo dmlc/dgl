@@ -8,7 +8,7 @@ from collections.abc import MutableMapping
 
 import numpy as np
 
-from .. import backend as F, heterograph_index
+from .. import backend as F, graphbolt as gb, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..base import ALL, DGLError, EID, ETYPE, is_all, NID
 from ..convert import graph as dgl_graph, heterograph as dgl_heterograph
@@ -50,6 +50,7 @@ from .shared_mem_utils import (
 )
 
 INIT_GRAPH = 800001
+QUERY_IF_USE_GRAPHBOLT = 800002
 
 
 class InitGraphRequest(rpc.Request):
@@ -71,7 +72,9 @@ class InitGraphRequest(rpc.Request):
 
     def process_request(self, server_state):
         if server_state.graph is None:
-            server_state.graph = _get_graph_from_shared_mem(self._graph_name)
+            server_state.graph = _get_graph_from_shared_mem(
+                self._graph_name, server_state.use_graphbolt
+            )
         return InitGraphResponse(self._graph_name)
 
 
@@ -88,7 +91,35 @@ class InitGraphResponse(rpc.Response):
         self._graph_name = state
 
 
-def _copy_graph_to_shared_mem(g, graph_name, graph_format):
+class QueryIfUseGraphBoltRequest(rpc.Request):
+    """Query if use GraphBolt."""
+
+    def __getstate__(self):
+        return None
+
+    def __setstate__(self, state):
+        pass
+
+    def process_request(self, server_state):
+        return QueryIfUseGraphBoltResponse(server_state.use_graphbolt)
+
+
+class QueryIfUseGraphBoltResponse(rpc.Response):
+    """Ack the query request about if use GraphBolt."""
+
+    def __init__(self, use_graphbolt):
+        self._use_graphbolt = use_graphbolt
+
+    def __getstate__(self):
+        return self._use_graphbolt
+
+    def __setstate__(self, state):
+        self._use_graphbolt = state
+
+
+def _copy_graph_to_shared_mem(g, graph_name, graph_format, use_graphbolt):
+    if use_graphbolt:
+        return g.copy_to_shared_memory(graph_name)
     new_g = g.shared_memory(graph_name, formats=graph_format)
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
@@ -151,13 +182,15 @@ def _exist_shared_mem_array(graph_name, name):
     return exist_shared_mem_array(_get_edata_path(graph_name, name))
 
 
-def _get_graph_from_shared_mem(graph_name):
+def _get_graph_from_shared_mem(graph_name, use_graphbolt):
     """Get the graph from the DistGraph server.
 
     The DistGraph server puts the graph structure of the local partition in the shared memory.
     The client can access the graph structure and some metadata on nodes and edges directly
     through shared memory to reduce the overhead of data access.
     """
+    if use_graphbolt:
+        return gb.load_from_shared_memory(graph_name)
     g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(
         graph_name
     )
@@ -298,6 +331,30 @@ class EdgeDataView(MutableMapping):
         return repr(reprs)
 
 
+def _format_partition(graph, graph_format):
+    """Format the partition to the specified format."""
+    if isinstance(graph, gb.FusedCSCSamplingGraph):
+        return graph
+    # formatting dtype
+    # TODO(Rui) Formatting forcely is not a perfect solution.
+    #   We'd better store all dtypes when mapping to shared memory
+    #   and map back with original dtypes.
+    for k, dtype in RESERVED_FIELD_DTYPE.items():
+        if k in graph.ndata:
+            graph.ndata[k] = F.astype(graph.ndata[k], dtype)
+        if k in graph.edata:
+            graph.edata[k] = F.astype(graph.edata[k], dtype)
+    # Create the graph formats specified the users.
+    print(
+        "Start to create specified graph formats which may take "
+        "non-trivial time."
+    )
+    graph = graph.formats(graph_format)
+    graph.create_formats_()
+    print(f"Finished creating specified graph formats: {graph_format}")
+    return graph
+
+
 class DistGraphServer(KVServer):
     """The DistGraph server.
 
@@ -330,6 +387,8 @@ class DistGraphServer(KVServer):
         Disable shared memory.
     graph_format : str or list of str
         The graph formats.
+    use_graphbolt : bool
+        Whether to load GraphBolt partition. Default: False.
     """
 
     def __init__(
@@ -341,6 +400,7 @@ class DistGraphServer(KVServer):
         part_config,
         disable_shared_mem=False,
         graph_format=("csc", "coo"),
+        use_graphbolt=False,
     ):
         super(DistGraphServer, self).__init__(
             server_id=server_id,
@@ -350,6 +410,7 @@ class DistGraphServer(KVServer):
         )
         self.ip_config = ip_config
         self.num_servers = num_servers
+        self.use_graphbolt = use_graphbolt
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
@@ -367,32 +428,17 @@ class DistGraphServer(KVServer):
                 graph_name,
                 ntypes,
                 etypes,
-            ) = load_partition(part_config, self.part_id, load_feats=False)
-            print("load " + graph_name)
-            # formatting dtype
-            # TODO(Rui) Formatting forcely is not a perfect solution.
-            #   We'd better store all dtypes when mapping to shared memory
-            #   and map back with original dtypes.
-            for k, dtype in RESERVED_FIELD_DTYPE.items():
-                if k in self.client_g.ndata:
-                    self.client_g.ndata[k] = F.astype(
-                        self.client_g.ndata[k], dtype
-                    )
-                if k in self.client_g.edata:
-                    self.client_g.edata[k] = F.astype(
-                        self.client_g.edata[k], dtype
-                    )
-            # Create the graph formats specified the users.
-            print(
-                "Start to create specified graph formats which may take "
-                "non-trivial time."
+            ) = load_partition(
+                part_config,
+                self.part_id,
+                load_feats=False,
+                use_graphbolt=use_graphbolt,
             )
-            self.client_g = self.client_g.formats(graph_format)
-            self.client_g.create_formats_()
-            print("Finished creating specified graph formats.")
+            print("load " + graph_name)
+            self.client_g = _format_partition(self.client_g, graph_format)
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(
-                    self.client_g, graph_name, graph_format
+                    self.client_g, graph_name, graph_format, use_graphbolt
                 )
 
         if not disable_shared_mem:
@@ -453,6 +499,7 @@ class DistGraphServer(KVServer):
             kv_store=self,
             local_g=self.client_g,
             partition_book=self.gpb,
+            use_graphbolt=self.use_graphbolt,
         )
         print(
             "start graph service on server {} for part {}".format(
@@ -545,6 +592,8 @@ class DistGraph:
     def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
         if os.environ.get("DGL_DIST_MODE", "standalone") == "standalone":
+            # "GraphBolt is not supported in standalone mode."
+            self._use_graphbolt = False
             assert (
                 part_config is not None
             ), "When running in the standalone model, the partition config file is required"
@@ -582,6 +631,10 @@ class DistGraph:
             self._client.map_shared_data(self._gpb)
             rpc.set_num_client(1)
         else:
+            # Query the main server about whether GraphBolt is used.
+            rpc.send_request(0, QueryIfUseGraphBoltRequest())
+            self._use_graphbolt = rpc.recv_response()._use_graphbolt
+
             self._init(gpb)
             # Tell the backup servers to load the graph structure from shared memory.
             for server_id in range(self._client.num_servers):
@@ -592,25 +645,16 @@ class DistGraph:
 
         self._init_ndata_store()
         self._init_edata_store()
-
-        self._num_nodes = 0
-        self._num_edges = 0
-        for part_md in self._gpb.metadata():
-            self._num_nodes += int(part_md["num_nodes"])
-            self._num_edges += int(part_md["num_edges"])
-
-        # When we store node/edge types in a list, they are stored in the order of type IDs.
-        self._ntype_map = {ntype: i for i, ntype in enumerate(self.ntypes)}
-        self._etype_map = {
-            etype: i for i, etype in enumerate(self.canonical_etypes)
-        }
+        self._init_metadata()
 
     def _init(self, gpb):
         self._client = get_kvstore()
         assert (
             self._client is not None
         ), "Distributed module is not initialized. Please call dgl.distributed.initialize."
-        self._g = _get_graph_from_shared_mem(self.graph_name)
+        self._g = _get_graph_from_shared_mem(
+            self.graph_name, self._use_graphbolt
+        )
         self._gpb = get_shared_mem_partition_book(self.graph_name)
         if self._gpb is None:
             self._gpb = gpb
@@ -666,20 +710,29 @@ class DistGraph:
             else:
                 self._edata_store[etype] = data
 
-    def __getstate__(self):
-        return self.graph_name, self._gpb
-
-    def __setstate__(self, state):
-        self.graph_name, gpb = state
-        self._init(gpb)
-
-        self._init_ndata_store()
-        self._init_edata_store()
+    def _init_metadata(self):
         self._num_nodes = 0
         self._num_edges = 0
         for part_md in self._gpb.metadata():
             self._num_nodes += int(part_md["num_nodes"])
             self._num_edges += int(part_md["num_edges"])
+
+        # When we store node/edge types in a list, they are stored in the order of type IDs.
+        self._ntype_map = {ntype: i for i, ntype in enumerate(self.ntypes)}
+        self._etype_map = {
+            etype: i for i, etype in enumerate(self.canonical_etypes)
+        }
+
+    def __getstate__(self):
+        return self.graph_name, self._gpb, self._use_graphbolt
+
+    def __setstate__(self, state):
+        self.graph_name, gpb, self._use_graphbolt = state
+        self._init(gpb)
+
+        self._init_ndata_store()
+        self._init_edata_store()
+        self._init_metadata()
 
     @property
     def local_partition(self):
@@ -750,7 +803,12 @@ class DistGraph:
         int
         """
         # TODO(da?): describe when self._g is None and idtype shouldn't be called.
-        return F.int64
+        # For GraphBolt partition, we use the global node ID's dtype.
+        return (
+            self.get_partition_book().global_nid_dtype
+            if self._use_graphbolt
+            else F.int64
+        )
 
     @property
     def device(self):
@@ -1215,6 +1273,9 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
+        assert (
+            self._use_graphbolt is False
+        ), "find_edges is not supported in GraphBolt."
         if etype is None:
             assert (
                 len(self.etypes) == 1
@@ -1368,10 +1429,16 @@ class DistGraph:
                 replace=replace,
                 etype_sorted=etype_sorted,
                 prob=prob,
+                use_graphbolt=self._use_graphbolt,
             )
         else:
             frontier = graph_services.sample_neighbors(
-                self, seed_nodes, fanout, replace=replace, prob=prob
+                self,
+                seed_nodes,
+                fanout,
+                replace=replace,
+                prob=prob,
+                use_graphbolt=self._use_graphbolt,
             )
         return frontier
 
@@ -1793,3 +1860,8 @@ def edge_split(
 
 
 rpc.register_service(INIT_GRAPH, InitGraphRequest, InitGraphResponse)
+rpc.register_service(
+    QUERY_IF_USE_GRAPHBOLT,
+    QueryIfUseGraphBoltRequest,
+    QueryIfUseGraphBoltResponse,
+)

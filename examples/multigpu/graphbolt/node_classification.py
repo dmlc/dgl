@@ -89,9 +89,7 @@ def create_dataloader(
     features,
     itemset,
     device,
-    drop_last=False,
-    shuffle=True,
-    drop_uneven_inputs=False,
+    is_train,
 ):
     ############################################################################
     # [HIGHLIGHT]
@@ -122,13 +120,10 @@ def create_dataloader(
     datapipe = gb.DistributedItemSampler(
         item_set=itemset,
         batch_size=args.batch_size,
-        drop_last=drop_last,
-        shuffle=shuffle,
-        drop_uneven_inputs=drop_uneven_inputs,
+        drop_last=is_train,
+        shuffle=is_train,
+        drop_uneven_inputs=is_train,
     )
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
-    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
-
     ############################################################################
     # [Note]:
     # datapipe.copy_to() / gb.CopyTo()
@@ -137,11 +132,34 @@ def create_dataloader(
     # [Output]:
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
-    datapipe = datapipe.copy_to(device)
-    dataloader = gb.DataLoader(datapipe, num_workers=args.num_workers)
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    if args.storage_device == "cpu":
+        datapipe = datapipe.copy_to(device)
+
+    dataloader = gb.DataLoader(datapipe, args.num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
+
+
+def weighted_reduce(tensor, weight, dst=0):
+    ########################################################################
+    # (HIGHLIGHT) Collect accuracy and loss values from sub-processes and
+    # obtain overall average values.
+    #
+    # `torch.distributed.reduce` is used to reduce tensors from all the
+    # sub-processes to a specified process, ReduceOp.SUM is used by default.
+    #
+    # Because the GPUs may have differing numbers of processed items, we
+    # perform a weighted mean to calculate the exact loss and accuracy.
+    ########################################################################
+    dist.reduce(tensor=tensor, dst=dst)
+    weight = torch.tensor(weight, device=tensor.device)
+    dist.reduce(tensor=weight, dst=dst)
+    return tensor / weight
 
 
 @torch.no_grad()
@@ -150,9 +168,7 @@ def evaluate(rank, model, dataloader, num_classes, device):
     y = []
     y_hats = []
 
-    for step, data in (
-        tqdm.tqdm(enumerate(dataloader)) if rank == 0 else enumerate(dataloader)
-    ):
+    for data in tqdm.tqdm(dataloader) if rank == 0 else dataloader:
         blocks = data.blocks
         x = data.node_features["feat"]
         y.append(data.labels)
@@ -165,11 +181,10 @@ def evaluate(rank, model, dataloader, num_classes, device):
         num_classes=num_classes,
     )
 
-    return res.to(device)
+    return res.to(device), sum(y_i.size(0) for y_i in y)
 
 
 def train(
-    world_size,
     rank,
     args,
     train_dataloader,
@@ -184,7 +199,8 @@ def train(
         epoch_start = time.time()
 
         model.train()
-        total_loss = torch.tensor(0, dtype=torch.float).to(device)
+        total_loss = torch.tensor(0, dtype=torch.float, device=device)
+        num_train_items = 0
         ########################################################################
         # (HIGHLIGHT) Use Join Context Manager to solve uneven input problem.
         #
@@ -200,10 +216,8 @@ def train(
         # uneven inputs.
         ########################################################################
         with Join([model]):
-            for step, data in (
-                tqdm.tqdm(enumerate(train_dataloader))
-                if rank == 0
-                else enumerate(train_dataloader)
+            for data in (
+                tqdm.tqdm(train_dataloader) if rank == 0 else train_dataloader
             ):
                 # The input features are from the source nodes in the first
                 # layer's computation graph.
@@ -224,38 +238,30 @@ def train(
                 loss.backward()
                 optimizer.step()
 
-                total_loss += loss
+                total_loss += loss.detach() * y.size(0)
+                num_train_items += y.size(0)
 
         # Evaluate the model.
         if rank == 0:
             print("Validating...")
-        acc = (
-            evaluate(
-                rank,
-                model,
-                valid_dataloader,
-                num_classes,
-                device,
-            )
-            / world_size
+        acc, num_val_items = evaluate(
+            rank,
+            model,
+            valid_dataloader,
+            num_classes,
+            device,
         )
-        ########################################################################
-        # (HIGHLIGHT) Collect accuracy and loss values from sub-processes and
-        # obtain overall average values.
-        #
-        # `torch.distributed.reduce` is used to reduce tensors from all the
-        # sub-processes to a specified process, ReduceOp.SUM is used by default.
-        ########################################################################
-        dist.reduce(tensor=acc, dst=0)
-        total_loss /= step + 1
-        dist.reduce(tensor=total_loss, dst=0)
-        dist.barrier()
 
+        total_loss = weighted_reduce(total_loss, num_train_items)
+        acc = weighted_reduce(acc * num_val_items, num_val_items)
+
+        # We synchronize before measuring the epoch time.
+        torch.cuda.synchronize()
         epoch_end = time.time()
         if rank == 0:
             print(
                 f"Epoch {epoch:05d} | "
-                f"Average Loss {total_loss.item() / world_size:.4f} | "
+                f"Average Loss {total_loss.item():.4f} | "
                 f"Accuracy {acc.item():.4f} | "
                 f"Time {epoch_end - epoch_start:.4f}"
             )
@@ -272,17 +278,29 @@ def run(rank, world_size, args, devices, dataset):
         rank=rank,
     )
 
-    graph = dataset.graph
-    features = dataset.feature
+    # Pin the graph and features to enable GPU access.
+    if args.storage_device == "pinned":
+        graph = dataset.graph.pin_memory_()
+        feature = dataset.feature.pin_memory_()
+    else:
+        graph = dataset.graph.to(args.storage_device)
+        feature = dataset.feature.to(args.storage_device)
+
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
     args.fanout = list(map(int, args.fanout.split(",")))
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    in_size = features.size("node", None, "feat")[0]
+    in_size = feature.size("node", None, "feat")[0]
     hidden_size = 256
     out_size = num_classes
+
+    if args.gpu_cache_size > 0 and args.storage_device != "cuda":
+        feature._features[("node", None, "feat")] = gb.GPUCachedFeature(
+            feature._features[("node", None, "feat")],
+            args.gpu_cache_size,
+        )
 
     # Create GraphSAGE model. It should be copied onto a GPU as a replica.
     model = SAGE(in_size, hidden_size, out_size).to(device)
@@ -292,39 +310,32 @@ def run(rank, world_size, args, devices, dataset):
     train_dataloader = create_dataloader(
         args,
         graph,
-        features,
+        feature,
         train_set,
         device,
-        drop_last=False,
-        shuffle=True,
-        drop_uneven_inputs=False,
+        is_train=True,
     )
     valid_dataloader = create_dataloader(
         args,
         graph,
-        features,
+        feature,
         valid_set,
         device,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
+        is_train=False,
     )
     test_dataloader = create_dataloader(
         args,
         graph,
-        features,
+        feature,
         test_set,
         device,
-        drop_last=False,
-        shuffle=False,
-        drop_uneven_inputs=False,
+        is_train=False,
     )
 
     # Model training.
     if rank == 0:
         print("Training...")
     train(
-        world_size,
         rank,
         args,
         train_dataloader,
@@ -337,18 +348,15 @@ def run(rank, world_size, args, devices, dataset):
     # Test the model.
     if rank == 0:
         print("Testing...")
-    test_acc = (
-        evaluate(
-            rank,
-            model,
-            test_dataloader,
-            num_classes,
-            device,
-        )
-        / world_size
+    test_acc, num_test_items = evaluate(
+        rank,
+        model,
+        test_dataloader,
+        num_classes,
+        device,
     )
-    dist.reduce(tensor=test_acc, dst=0)
-    dist.barrier()
+    test_acc = weighted_reduce(test_acc * num_test_items, num_test_items)
+
     if rank == 0:
         print(f"Test Accuracy {test_acc.item():.4f}")
 
@@ -382,10 +390,31 @@ def parse_args():
         type=str,
         default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
-        " identical with the number of layers in your model. Default: 15,10,5",
+        " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
         "--num-workers", type=int, default=0, help="The number of processes."
+    )
+    parser.add_argument(
+        "--gpu-cache-size",
+        type=int,
+        default=0,
+        help="The capacity of the GPU cache, the number of features to store.",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-products",
+        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        help="The dataset we can use for node classification example. Currently"
+        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
+    )
+    parser.add_argument(
+        "--mode",
+        default="pinned-cuda",
+        choices=["cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM"
+        ", 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
@@ -395,6 +424,7 @@ if __name__ == "__main__":
     if not torch.cuda.is_available():
         print(f"Multi-gpu training needs to be in gpu mode.")
         exit(0)
+    args.storage_device, _ = args.mode.split("-")
 
     devices = list(map(int, args.gpu.split(",")))
     world_size = len(devices)
@@ -402,7 +432,7 @@ if __name__ == "__main__":
     print(f"Training with {world_size} gpus.")
 
     # Load and preprocess dataset.
-    dataset = gb.BuiltinDataset("ogbn-products").load()
+    dataset = gb.BuiltinDataset(args.dataset).load()
 
     # Thread limiting to avoid resource competition.
     os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // world_size)
