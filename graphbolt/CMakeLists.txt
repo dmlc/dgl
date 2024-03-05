@@ -64,8 +64,12 @@ add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            ${BOLT_HEADERS}
                            "../third_party/dmlc-core/include"
-                           "../third_party/pcg/include")
+                           "../third_party/pcg/include"
+                           "../third_party/liburing/src/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  target_link_libraries(${LIB_GRAPHBOLT_NAME} liburing)
+endif()
 
 if(USE_CUDA)
   set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 17)
@@ -91,6 +95,3 @@ if(DEFINED MKL_LIBRARIES)
   target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
                           ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
-
-target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${LIBURING_INCLUDE})
-target_link_libraries(${LIB_GRAPHBOLT_NAME} ${LIBURING})

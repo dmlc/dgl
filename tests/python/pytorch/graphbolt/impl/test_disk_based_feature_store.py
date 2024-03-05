@@ -142,21 +142,22 @@ def test_torch_based_feature_repr():
         feature_b = gb.DiskBasedFeature(path_b)
 
         expected_str_feature_a = str(
-            """DiskBasedFeature(feature=tensor([[1, 2, 3],
-                                 [4, 5, 6]]),
-                 metadata={'max_value': 3},
+            """DiskBasedFeature(
+    feature=tensor([[1, 2, 3],
+                    [4, 5, 6]]),
+    metadata={'max_value': 3},
 )"""
         )
         expected_str_feature_b = str(
-            """DiskBasedFeature(feature=tensor([[[1, 2],
-                                  [3, 4]],
-                         
-                                 [[4, 5],
-                                  [6, 7]]]),
-                 metadata={},
+            """DiskBasedFeature(
+    feature=tensor([[[1, 2],
+                     [3, 4]],
+
+                    [[4, 5],
+                     [6, 7]]]),
+    metadata={},
 )"""
         )
-
         assert str(feature_a) == expected_str_feature_a
         assert str(feature_b) == expected_str_feature_b
         a = b = metadata = None

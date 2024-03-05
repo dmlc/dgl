@@ -4,7 +4,6 @@
  * @brief Numpy File Fetecher class.
  */
 
-#include <liburing.h>
 #include <stdint.h>
 #include <torch/script.h>
 #include <zlib.h>

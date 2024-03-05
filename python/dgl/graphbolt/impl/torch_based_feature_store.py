@@ -49,6 +49,7 @@ class DiskBasedFeature(Feature):
 
     def __init__(self, path: str, metadata: Dict = None):
         super().__init__()
+        self._is_inplace_pinned = set()
         mmap_mode = "r+"
         self._tensor = torch.from_numpy(
             np.load(path, mmap_mode=mmap_mode)
@@ -108,8 +109,65 @@ class DiskBasedFeature(Feature):
             self._metadata if self._metadata is not None else super().metadata()
         )
 
+    def pin_memory_(self):
+        """In-place operation to copy the feature to pinned memory. Returns the
+        same object modified in-place."""
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        x = self._tensor
+        if not x.is_pinned() and x.device.type == "cpu":
+            assert (
+                x.is_contiguous()
+            ), "Tensor pinning is only supported for contiguous tensors."
+            cudart = torch.cuda.cudart()
+            assert (
+                cudart.cudaHostRegister(
+                    x.data_ptr(), x.numel() * x.element_size(), 0
+                )
+                == 0
+            )
+
+            self._is_inplace_pinned.add(x)
+            self._inplace_unpinner = cudart.cudaHostUnregister
+
+        return self
+
+    def is_pinned(self):
+        """Returns True if the stored feature is pinned."""
+        return self._tensor.is_pinned()
+
+    def to(self, device):  # pylint: disable=invalid-name
+        """Copy `TorchBasedFeature` to the specified device."""
+        # copy.copy is a shallow copy so it does not copy tensor memory.
+        self2 = copy.copy(self)
+        if device == "pinned":
+            self2._tensor = self2._tensor.pin_memory()
+        else:
+            self2._tensor = self2._tensor.to(device)
+        return self2
+
     def __repr__(self) -> str:
-        return _disk_based_feature_str(self)
+        ret = (
+            "{Classname}(\n"
+            "    feature={feature},\n"
+            "    metadata={metadata},\n"
+            ")"
+        )
+
+        feature_str = textwrap.indent(
+            str(self._tensor), " " * len("    feature=")
+        ).strip()
+        metadata_str = textwrap.indent(
+            str(self.metadata()), " " * len("    metadata=")
+        ).strip()
+
+        return ret.format(
+            Classname=self.__class__.__name__,
+            feature=feature_str,
+            metadata=metadata_str,
+        )
 
 
 class TorchBasedFeature(Feature):
