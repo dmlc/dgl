@@ -355,7 +355,8 @@ def parse_args():
     parser.add_argument(
         "--torch-compile",
         action="store_true",
-        help="Uses torch.compile() on the trained GNN model.",
+        help="Uses torch.compile() on the trained GNN model. Requires "
+        "torch>=2.2.0 to enable this option.",
     )
     return parser.parse_args()
 
