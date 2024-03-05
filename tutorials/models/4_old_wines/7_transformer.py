@@ -589,7 +589,7 @@ Transformer as a Graph Neural Network
 #
 # .. code:: python
 #
-#    from tqdm import tqdm
+#    from tqdm.auto import tqdm
 #    import torch as th
 #    import numpy as np
 #

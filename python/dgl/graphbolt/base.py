@@ -4,6 +4,7 @@ from collections import deque
 from dataclasses import dataclass
 
 import torch
+from torch.torch_version import TorchVersion
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
@@ -61,6 +62,18 @@ def isin(elements, test_elements):
     assert elements.dim() == 1, "Elements should be 1D tensor."
     assert test_elements.dim() == 1, "Test_elements should be 1D tensor."
     return torch.ops.graphbolt.isin(elements, test_elements)
+
+
+if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+
+    @torch.library.impl_abstract("graphbolt::expand_indptr")
+    def expand_indptr_abstract(indptr, dtype, node_ids, output_size):
+        """Abstract implementation of expand_indptr for torch.compile() support."""
+        if output_size is None:
+            output_size = torch.library.get_ctx().new_dynamic_size()
+        if dtype is None:
+            dtype = node_ids.dtype
+        return indptr.new_empty(output_size, dtype=dtype)
 
 
 def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
