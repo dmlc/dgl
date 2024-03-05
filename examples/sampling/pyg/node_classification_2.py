@@ -155,7 +155,7 @@ class GraphSAGE(torch.nn.Module):
 
 
 def create_dataloader(
-    graph, features, itemset, batch_size, fanout, device, num_workers, job
+    graph, features, itemset, batch_size, fanout, device, job
 ):
     #####################################################################
     # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
@@ -193,7 +193,11 @@ def create_dataloader(
     if args.storage_device == "cpu":
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
-    return gb.DataLoader(datapipe, num_workers=num_workers)
+    return gb.DataLoader(
+        datapipe,
+        num_workers=args.num_workers,
+        overlap_graph_fetch=args.overlap_graph_fetch,
+    )
 
 
 def train(train_dataloader, valid_dataloader, num_classes, model, device):
@@ -262,7 +266,6 @@ def layerwise_infer(
         batch_size=4 * args.batch_size,
         fanout=[-1],
         device=args.device,
-        num_workers=args.num_workers,
         job="infer",
     )
     pred = model.inference(graph, features, dataloader, args.storage_device)
@@ -356,6 +359,11 @@ def parse_args():
         "with the rest of operations by using an alternative CUDA stream. Disabled"
         "by default.",
     )
+    parser.add_argument(
+        "--compile",
+        action="store_true",
+        help="Uses torch.compile() on the trained GNN model.",
+    )
     return parser.parse_args()
 
 
@@ -394,7 +402,6 @@ def main():
             batch_size=args.batch_size,
             fanout=args.fanout,
             device=args.device,
-            num_workers=args.num_workers,
             job=job,
         )
         for itemset, job in zip([train_set, valid_set], ["train", "evaluate"])
@@ -404,8 +411,9 @@ def main():
     hidden_channels = 256
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(args.device)
     assert len(args.fanout) == len(model.layers)
-    torch._dynamo.config.cache_size_limit = 32
-    model = torch.compile(model, fullgraph=True, dynamic=True)
+    if args.compile:
+        torch._dynamo.config.cache_size_limit = 32
+        model = torch.compile(model, fullgraph=True, dynamic=True)
 
     train(train_dataloader, valid_dataloader, num_classes, model, args.device)
 
