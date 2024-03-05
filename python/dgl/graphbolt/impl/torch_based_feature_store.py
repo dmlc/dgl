@@ -80,7 +80,7 @@ class DiskBasedFeature(Feature):
             ret = torch.ops.graphbolt.disk_index_select(
                 self._path, ids, self._tensor.dtype
             )
-        except RuntimeError as e:
+        except RuntimeError:
             raise IndexError
         return ret
 
