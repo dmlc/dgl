@@ -360,7 +360,7 @@ def parse_args():
         "by default.",
     )
     parser.add_argument(
-        "--compile",
+        "--torch-compile",
         action="store_true",
         help="Uses torch.compile() on the trained GNN model.",
     )
@@ -411,7 +411,7 @@ def main():
     hidden_channels = 256
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(args.device)
     assert len(args.fanout) == len(model.layers)
-    if args.compile:
+    if args.torch_compile:
         torch._dynamo.config.cache_size_limit = 32
         model = torch.compile(model, fullgraph=True, dynamic=True)
 
