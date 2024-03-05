@@ -176,16 +176,19 @@ def create_dataloader(
         drop_last=(job == "train"),
     )
     # Copy the data to the specified device.
-    if args.storage_device != "cpu":
+    if args.graph_device != "cpu":
         datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
         graph, fanout if job != "infer" else [-1]
     )
+    # Copy the data to the specified device.
+    if args.feature_device != "cpu":
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["input_nodes"])
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     # Copy the data to the specified device.
-    if args.storage_device == "cpu":
+    if args.feature_device == "cpu":
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
     return gb.DataLoader(
@@ -239,8 +242,8 @@ def train(train_dataloader, valid_dataloader, num_classes, model, device):
             num_batches += 1
         train_loss = total_loss / num_batches
         train_acc = total_correct / total_samples
-        val_acc = evaluate(model, valid_dataloader, num_classes)
         end = time.time()
+        val_acc = evaluate(model, valid_dataloader, num_classes)
         print(
             f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
             f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}, "
@@ -262,7 +265,7 @@ def layerwise_infer(
         device=args.device,
         job="infer",
     )
-    pred = model.inference(graph, features, dataloader, args.storage_device)
+    pred = model.inference(graph, features, dataloader, args.feature_device)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
 
@@ -334,8 +337,15 @@ def parse_args():
     parser.add_argument(
         "--mode",
         default="pinned-cuda",
-        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
-        help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
+        choices=[
+            "cpu-cpu-cpu",
+            "cpu-cpu-cuda",
+            "cpu-pinned-cuda",
+            "pinned-pinned-cuda",
+            "cuda-pinned-cuda",
+            "cuda-cuda-cuda",
+        ],
+        help="Graph storage - feature storage - Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     parser.add_argument(
@@ -365,20 +375,23 @@ def main():
     if not torch.cuda.is_available():
         args.mode = "cpu-cpu"
     print(f"Training in {args.mode} mode.")
-    args.storage_device, args.device = args.mode.split("-")
-    args.device = torch.device(args.device)
+    args.graph_device, args.feature_device, args.device = args.mode.split("-")
 
     # Load and preprocess dataset.
     print("Loading data...")
     dataset = gb.BuiltinDataset(args.dataset).load()
 
     # Move the dataset to the selected storage.
-    if args.storage_device == "pinned":
-        graph = dataset.graph.pin_memory_()
-        features = dataset.feature.pin_memory_()
-    else:
-        graph = dataset.graph.to(args.storage_device)
-        features = dataset.feature.to(args.storage_device)
+    graph = (
+        dataset.graph.pin_memory_()
+        if args.graph_device == "pinned"
+        else dataset.graph.to(args.graph_device)
+    )
+    features = (
+        dataset.feature.pin_memory_()
+        if args.feature_device == "pinned"
+        else dataset.feature.to(args.feature_device)
+    )
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
