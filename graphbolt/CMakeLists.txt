@@ -68,7 +68,7 @@ target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            "../third_party/liburing/src/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-  target_link_libraries(${LIB_GRAPHBOLT_NAME} liburing)
+  target_link_libraries(${LIB_GRAPHBOLT_NAME} ${liburing})
 endif()
 
 if(USE_CUDA)
