@@ -1,6 +1,9 @@
 """Torch-based feature store for GraphBolt."""
+
+import platform
 from typing import Dict, List
 
+import numpy as np
 import torch
 
 from ..feature_store import Feature
@@ -43,6 +46,11 @@ class DiskBasedFeature(Feature):
 
     def __init__(self, path: str, metadata: Dict = None):
         super().__init__()
+        mmap_mode = "r+"
+        self._tensor = torch.from_numpy(
+            np.load(path, mmap_mode=mmap_mode)
+        ).contiguous()
+
         # Disk feature path.
         self._path = path
         self._metadata = metadata
@@ -63,7 +71,15 @@ class DiskBasedFeature(Feature):
         torch.Tensor
             The read feature.
         """
-        return torch.ops.graphbolt.disk_index_select(self._path, ids)
+        if ids is None:
+            return self._tensor
+        try:
+            ret = torch.ops.graphbolt.disk_index_select(
+                self._path, ids, self._tensor.dtype
+            )
+        except RuntimeError as e:
+            raise IndexError
+        return ret
 
     def size(self):
         """Get the size of the feature.
@@ -72,7 +88,7 @@ class DiskBasedFeature(Feature):
         torch.Size
             The size of the feature.
         """
-        return torch.ops.graphbolt.disk_feature_size(self._path)
+        return torch.Size(torch.ops.graphbolt.disk_feature_size(self._path))
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         raise NotImplementedError
@@ -90,7 +106,7 @@ class DiskBasedFeature(Feature):
         )
 
     def __repr__(self) -> str:
-        return _torch_based_feature_str(self)
+        return _disk_based_feature_str(self)
 
 
 class TorchBasedFeature(Feature):
@@ -303,10 +319,19 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                features[key] = DiskBasedFeature(
-                    spec.path,
-                    metadata=metadata,
-                )
+                if platform.system() == "Linux":
+                    features[key] = DiskBasedFeature(
+                        spec.path,
+                        metadata=metadata,
+                    )
+                else:
+                    mmap_mode = "r+" if not spec.in_memory else None
+                    features[key] = TorchBasedFeature(
+                        torch.as_tensor(
+                            np.load(spec.path, mmap_mode=mmap_mode)
+                        ),
+                        metadata=metadata,
+                    )
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")
         super().__init__(features)
@@ -318,6 +343,26 @@ class TorchBasedFeatureStore(BasicFeatureStore):
 
     def __repr__(self) -> str:
         return _torch_based_feature_store_str(self._features)
+
+
+def _disk_based_feature_str(feature: DiskBasedFeature) -> str:
+    final_str = "DiskBasedFeature("
+    indent_len = len(final_str)
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    feature_str = "feature=" + _add_indent(
+        str(feature._tensor), indent_len + len("feature=")
+    )
+    final_str += feature_str + ",\n" + " " * indent_len
+    metadata_str = "metadata=" + _add_indent(
+        str(feature.metadata()), indent_len + len("metadata=")
+    )
+    final_str += metadata_str + ",\n)"
+    return final_str
 
 
 def _torch_based_feature_str(feature: TorchBasedFeature) -> str:

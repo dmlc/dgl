@@ -60,7 +60,8 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index);
  * @param index Index tensor with shape (M,).
  * @return torch::Tensor Output tensor with shape (M, ...).
  */
-torch::Tensor DiskIndexSelect(std::string path, torch::Tensor index);
+torch::Tensor DiskIndexSelect(
+    std::string path, torch::Tensor index, torch::ScalarType dtype);
 
 /**
  * @brief Return the shape of disk numpy feature.

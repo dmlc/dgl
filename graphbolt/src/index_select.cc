@@ -23,9 +23,10 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
   return input.index({index.to(torch::kLong)});
 }
 
-torch::Tensor DiskIndexSelect(std::string path, torch::Tensor index) {
+torch::Tensor DiskIndexSelect(
+    std::string path, torch::Tensor index, torch::ScalarType dtype) {
   storage::OnDiskNpyArray arr(path);
-  return arr.index_select_iouring({index.to(torch::kLong)});
+  return arr.index_select_iouring({index.to(torch::kLong)}, dtype);
 }
 
 torch::Tensor DiskFeatureShape(std::string path) {
