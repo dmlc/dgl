@@ -879,7 +879,7 @@ def test_to_pyg_data():
     expected_node_features = next(iter(test_minibatch.node_features.values()))
     expected_labels = torch.tensor([7, 8])
     expected_batch_size = 2
-    expected_n_ids = torch.tensor([10, 11, 12, 13])
+    expected_n_id = torch.tensor([10, 11, 12, 13])
 
     pyg_data = test_minibatch.to_pyg_data()
     pyg_data.validate()
@@ -887,7 +887,7 @@ def test_to_pyg_data():
     assert torch.equal(pyg_data.x, expected_node_features)
     assert torch.equal(pyg_data.y, expected_labels)
     assert pyg_data.batch_size == expected_batch_size
-    assert torch.equal(pyg_data.n_ids, expected_n_ids)
+    assert torch.equal(pyg_data.n_id, expected_n_id)
 
     subgraph = test_minibatch.sampled_subgraphs[0]
     # Test with sampled_csc as None.

@@ -543,7 +543,7 @@ class MiniBatch:
             edge_index=edge_index,
             y=self.labels,
             batch_size=batch_size,
-            n_ids=self.node_ids(),
+            n_id=self.node_ids(),
         )
         return pyg_data
 

@@ -95,8 +95,8 @@ class GraphSAGE(torch.nn.Module):
             for minibatch in dataloader:
                 # Call `to_pyg_data` to convert GB Minibatch to PyG Data.
                 pyg_data = minibatch.to_pyg_data()
-                n_ids = pyg_data.n_ids.to("cpu")
-                x = x_all[n_ids].to(device)
+                n_id = pyg_data.n_id.to("cpu")
+                x = x_all[n_id].to(device)
                 edge_index = pyg_data.edge_index
                 x = layer(x, edge_index)
                 x = x[: pyg_data.batch_size]
