@@ -28,7 +28,7 @@ torch::Tensor DiskIndexSelect(
   storage::OnDiskNpyArray arr(path);
   return arr.index_select_iouring({index.to(torch::kLong)}, dtype);
 #else
-  return torch.empty({0});
+  return torch::empty({0});
 #endif
 }
 
@@ -37,7 +37,7 @@ torch::Tensor DiskFeatureShape(std::string path) {
   storage::OnDiskNpyArray arr(path);
   return arr.feature_shape();
 #else
-  return torch.empty({0});
+  return torch::empty({0});
 #endif
 }
 
