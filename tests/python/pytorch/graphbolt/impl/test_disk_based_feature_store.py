@@ -134,6 +134,11 @@ def test_more_disk_based_feature(dtype, idtype, shape, index):
         )
 
 
+@unittest.skipIf(
+    sys.platform.startswith("win"),
+    reason="Tests for large disk dataset can only deployed on Linux,"
+    "because the io_uring is only supportted by Linux kernel.",
+)
 def test_disk_based_feature_repr():
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 3], [4, 5, 6]])

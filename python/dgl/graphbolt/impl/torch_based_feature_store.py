@@ -110,12 +110,33 @@ class DiskBasedFeature(Feature):
         )
 
     def pin_memory_(self):
-        """Dataset larger than memory should not be pinned to memory."""
-        raise NotImplementedError
+        """In-place operation to copy the feature to pinned memory. Returns the
+        same object modified in-place."""
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        x = self._tensor
+        if not x.is_pinned() and x.device.type == "cpu":
+            assert (
+                x.is_contiguous()
+            ), "Tensor pinning is only supported for contiguous tensors."
+            cudart = torch.cuda.cudart()
+            assert (
+                cudart.cudaHostRegister(
+                    x.data_ptr(), x.numel() * x.element_size(), 0
+                )
+                == 0
+            )
+
+            self._is_inplace_pinned.add(x)
+            self._inplace_unpinner = cudart.cudaHostUnregister
+
+        return self
 
     def is_pinned(self):
         """Returns True if the stored feature is pinned."""
-        return False
+        return self._tensor.is_pinned()
 
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `TorchBasedFeature` to the specified device."""
