@@ -42,7 +42,7 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 NAMES_INDICATING_NODE_IDS = [
-    "seed_nodes",
+    "seeds",
     "node_pairs",
     "seeds",
     "negative_srcs",
@@ -999,7 +999,9 @@ class BuiltinDataset(OnDiskDataset):
         "ogbn-mag",
         "ogbl-citation2",
         "ogbn-products",
+        "ogbn-products-seeds",
         "ogbn-arxiv",
+        "ogbn-arxiv-seeds",
     ]
     _large_datasets = ["ogb-lsc-mag240m", "ogbn-papers100M"]
     _all_datasets = _datasets + _large_datasets

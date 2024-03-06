@@ -101,7 +101,7 @@ def create_dataloader(
     # ensures that the rest of the operations run on the GPU.
     ############################################################################
     if args.storage_device != "cpu":
-        datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["seeds"])
 
     ############################################################################
     # [Step-3]:
@@ -312,6 +312,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             y = data.labels
 
             y_hat = model(data.blocks, x)
+            y_hat = y_hat[data.compacted_seeds]
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)
@@ -364,8 +365,9 @@ def parse_args():
     parser.add_argument(
         "--dataset",
         type=str,
-        default="ogbn-products",
-        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        default="ogbn-products-seeds",
+        choices=["ogbn-arxiv", "ogbn-arxiv-seeds", "ogbn-products", "ogbn-products-seeds", "ogbn-papers100M"],
+        
         help="The dataset we can use for node classification example. Currently"
         " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
     )

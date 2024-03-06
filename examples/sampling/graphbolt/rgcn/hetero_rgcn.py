@@ -117,7 +117,7 @@ def create_dataloader(
     # Move the mini-batch to the appropriate device.
     # `device`:
     #   The device to move the mini-batch to.
-    datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+    datapipe = datapipe.copy_to(device, extra_attrs=["seeds"])
 
     # Sample neighbors for each seed node in the mini-batch.
     # `graph`:
@@ -452,6 +452,7 @@ def evaluate(
         logits = model(blocks, node_features)
 
         logits = logits[category]
+        logits = logits[data.compacted_seeds[category]]
 
         # Apply softmax to the logits and get the prediction by selecting the
         # argmax.
@@ -525,6 +526,7 @@ def train(
             optimizer.zero_grad()
             # Generate predictions.
             logits = model(blocks, node_features)[category]
+            logits = logits[data.compacted_seeds[category]]
 
             y_hat = logits.log_softmax(dim=-1)
             loss = F.nll_loss(y_hat, data.labels[category].long())

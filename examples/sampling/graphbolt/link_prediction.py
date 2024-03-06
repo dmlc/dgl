@@ -265,9 +265,13 @@ def compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst):
         h_dst = (
             node_emb[all_dst.view(-1)].view(*all_dst.shape, -1).to(args.device)
         )
+        print(h_src.shape)
+        print(h_dst.shape)
 
         # Compute prediction scores using the model.
         pred = model.predictor(h_src * h_dst).squeeze(-1)
+        print(pred.shape)
+        input()
 
         # Evaluate the predictions to obtain MRR values.
         input_dict = {"y_pred_pos": pred[:, 0], "y_pred_neg": pred[:, 1:]}
