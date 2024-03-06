@@ -57,7 +57,9 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     try:
         sampled_graph = sample_neighbors(
-            dist_graph, [0, 10, 99, 66, 1024, 2008], 3
+            dist_graph,
+            torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+            3,
         )
     except Exception as e:
         print(traceback.format_exc())
@@ -518,7 +520,7 @@ def start_hetero_etype_sample_client(
     tmpdir,
     disable_shared_mem,
     fanout=3,
-    nodes={"n3": [0, 10, 99, 66, 124, 208]},
+    nodes=None,
     etype_sorted=False,
     use_graphbolt=False,
     return_eids=False,
@@ -613,7 +615,7 @@ def check_rpc_hetero_sampling_shuffle(
         0,
         tmpdir,
         num_server > 1,
-        nodes={"n3": [0, 10, 99, 66, 124, 208]},
+        nodes=None,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
@@ -761,12 +763,13 @@ def check_rpc_hetero_etype_sampling_shuffle(
     etype_sorted = False
     if graph_formats is not None:
         etype_sorted = "csc" in graph_formats or "csr" in graph_formats
+    nodes = {"n3": torch.tensor([0, 10, 99, 66, 124, 208], dtype=g.idtype)}
     block, gpb = start_hetero_etype_sample_client(
         0,
         tmpdir,
         num_server > 1,
         fanout,
-        nodes={"n3": [0, 10, 99, 66, 124, 208]},
+        nodes=nodes,
         etype_sorted=etype_sorted,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
@@ -1002,7 +1005,7 @@ def check_rpc_bipartite_sampling_empty(
         0,
         tmpdir,
         num_server > 1,
-        nodes={"game": empty_nids, "user": [1]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
@@ -1058,11 +1061,12 @@ def check_rpc_bipartite_sampling_shuffle(
 
     deg = get_degrees(g, orig_nid_map["game"], "game")
     nids = F.nonzero_1d(deg > 0)
+    nodes = {"game": nids, "user": torch.tensor([0], dtype=g.idtype)}
     block, gpb = start_bipartite_sample_client(
         0,
         tmpdir,
         num_server > 1,
-        nodes={"game": nids, "user": [0]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
@@ -1142,7 +1146,7 @@ def check_rpc_bipartite_etype_sampling_empty(
         0,
         tmpdir,
         num_server > 1,
-        nodes={"game": empty_nids, "user": [1]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
@@ -1200,12 +1204,13 @@ def check_rpc_bipartite_etype_sampling_shuffle(
     fanout = 3
     deg = get_degrees(g, orig_nid_map["game"], "game")
     nids = F.nonzero_1d(deg > 0)
+    nodes = {"game": nids, "user": torch.tensor([0], dtype=g.idtype)}
     block, gpb = start_bipartite_etype_sample_client(
         0,
         tmpdir,
         num_server > 1,
         fanout,
-        nodes={"game": nids, "user": [0]},
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
@@ -1414,7 +1419,11 @@ def check_standalone_sampling(tmpdir):
     dist_graph = DistGraph(
         "test_sampling", part_config=tmpdir / "test_sampling.json"
     )
-    sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+    sampled_graph = sample_neighbors(
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+    )
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.num_nodes() == g.num_nodes()
@@ -1425,13 +1434,19 @@ def check_standalone_sampling(tmpdir):
     )
 
     sampled_graph = sample_neighbors(
-        dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob="mask"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+        prob="mask",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert mask[eid].all()
 
     sampled_graph = sample_neighbors(
-        dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob="prob"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=dist_graph.idtype),
+        3,
+        prob="prob",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert (prob[eid] > 0).all()
@@ -1460,7 +1475,11 @@ def check_standalone_etype_sampling(tmpdir):
     dist_graph = DistGraph(
         "test_sampling", part_config=tmpdir / "test_sampling.json"
     )
-    sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], 3)
+    sampled_graph = sample_etype_neighbors(
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+    )
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.num_nodes() == hg.num_nodes()
@@ -1471,13 +1490,19 @@ def check_standalone_etype_sampling(tmpdir):
     )
 
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 10, 99, 66, 1023], 3, prob="mask"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+        prob="mask",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert mask[eid].all()
 
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 10, 99, 66, 1023], 3, prob="prob"
+        dist_graph,
+        torch.tensor([0, 10, 99, 66, 1023], dtype=dist_graph.idtype),
+        3,
+        prob="prob",
     )
     eid = F.asnumpy(sampled_graph.edata[dgl.EID])
     assert (prob[eid] > 0).all()
@@ -1510,7 +1535,12 @@ def check_standalone_etype_sampling_heterograph(tmpdir):
         "test_hetero_sampling", part_config=tmpdir / "test_hetero_sampling.json"
     )
     sampled_graph = sample_etype_neighbors(
-        dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], 1
+        dist_graph,
+        torch.tensor(
+            [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701],
+            dtype=dist_graph.idtype,
+        ),
+        1,
     )
     src, dst = sampled_graph.edges(etype=("paper", "cite", "paper"))
     assert len(src) == 10
@@ -1578,7 +1608,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    nodes = [0, 10, 99, 66, 1024, 2008]
+    nodes = torch.tensor([0, 10, 99, 66, 1024, 2008], dtype=g.idtype)
     sampled_graph = start_in_subgraph_client(0, tmpdir, num_server > 1, nodes)
     for p in pserver_list:
         p.join()
