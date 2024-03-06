@@ -88,18 +88,18 @@ class GraphSAGE(torch.nn.Module):
                 x = F.dropout(x, p=0.5, training=self.training)
         return x
 
-    def inference(self, args, dataloader, x_all, device):
+    def inference(self, dataloader, x_all, device):
         """Conduct layer-wise inference to get all the node embeddings."""
         for i, layer in tqdm(enumerate(self.layers), "inference"):
             xs = []
             for minibatch in dataloader:
                 # Call `to_pyg_data` to convert GB Minibatch to PyG Data.
                 pyg_data = minibatch.to_pyg_data()
-                n_ids = minibatch.node_ids().to("cpu")
-                x = x_all[n_ids].to(device)
+                n_id = pyg_data.n_id.to("cpu")
+                x = x_all[n_id].to(device)
                 edge_index = pyg_data.edge_index
                 x = layer(x, edge_index)
-                x = x[: 4 * args.batch_size]
+                x = x[: pyg_data.batch_size]
                 if i != len(self.layers) - 1:
                     x = x.relu()
                 xs.append(x.cpu())
@@ -185,11 +185,11 @@ def evaluate(model, dataloader, num_classes):
 
 @torch.no_grad()
 def layerwise_infer(
-    model, args, infer_dataloader, test_set, feature, num_classes, device
+    model, infer_dataloader, test_set, feature, num_classes, device
 ):
     model.eval()
     features = feature.read("node", None, "feat")
-    pred = model.inference(args, infer_dataloader, features, device)
+    pred = model.inference(infer_dataloader, features, device)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
 
@@ -271,7 +271,7 @@ def main():
             f"Valid Accuracy: {valid_accuracy:.4f}"
         )
     test_accuracy = layerwise_infer(
-        model, args, infer_dataloader, test_set, feature, num_classes, device
+        model, infer_dataloader, test_set, feature, num_classes, device
     )
     print(f"Test Accuracy: {test_accuracy:.4f}")
 
