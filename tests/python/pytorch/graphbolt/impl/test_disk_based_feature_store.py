@@ -1,14 +1,9 @@
 import os
-import re
+import sys
 import tempfile
 import unittest
-from functools import reduce
-from operator import mul
-
-import backend as F
 
 import numpy as np
-import pydantic
 import pytest
 import torch
 
@@ -22,6 +17,11 @@ def to_on_disk_numpy(test_dir, name, t):
     return path
 
 
+@unittest.skipIf(
+    sys.platform.startswith("win"),
+    reason="Tests for large disk dataset can only deployed on Linux,"
+    "because the io_uring is only supportted by Linux kernel.",
+)
 def test_disk_based_feature():
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 3], [4, 5, 6]])
@@ -90,6 +90,11 @@ def test_disk_based_feature():
         feature_c = feature_n = None
 
 
+@unittest.skipIf(
+    sys.platform.startswith("win"),
+    reason="Tests for large disk dataset can only deployed on Linux,"
+    "because the io_uring is only supportted by Linux kernel.",
+)
 @pytest.mark.parametrize(
     "dtype",
     [
@@ -107,7 +112,7 @@ def test_disk_based_feature():
     "shape", [(10, 20), (20, 10), (20, 25, 10), (137, 50, 30)]
 )
 @pytest.mark.parametrize("index", [[0], [1, 2, 3], [0, 6, 2, 8]])
-def test_torch_based_pinned_feature(dtype, idtype, shape, index):
+def test_more_disk_based_feature(dtype, idtype, shape, index):
     if dtype == torch.complex128:
         tensor = torch.complex(
             torch.randint(0, 13, shape, dtype=torch.float64),
@@ -129,7 +134,7 @@ def test_torch_based_pinned_feature(dtype, idtype, shape, index):
         )
 
 
-def test_torch_based_feature_repr():
+def test_disk_based_feature_repr():
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 3], [4, 5, 6]])
         b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
@@ -142,21 +147,21 @@ def test_torch_based_feature_repr():
         feature_b = gb.DiskBasedFeature(path_b)
 
         expected_str_feature_a = str(
-            """DiskBasedFeature(
-    feature=tensor([[1, 2, 3],
-                    [4, 5, 6]]),
-    metadata={'max_value': 3},
-)"""
+            "DiskBasedFeature(\n"
+            "    feature=tensor([[1, 2, 3],\n"
+            "                    [4, 5, 6]]),\n"
+            "    metadata={'max_value': 3},\n"
+            ")"
         )
         expected_str_feature_b = str(
-            """DiskBasedFeature(
-    feature=tensor([[[1, 2],
-                     [3, 4]],
-
-                    [[4, 5],
-                     [6, 7]]]),
-    metadata={},
-)"""
+            "DiskBasedFeature(\n"
+            "    feature=tensor([[[1, 2],\n"
+            "                     [3, 4]],\n"
+            "\n"
+            "                    [[4, 5],\n"
+            "                     [6, 7]]]),\n"
+            "    metadata={},\n"
+            ")"
         )
         assert str(feature_a) == expected_str_feature_a
         assert str(feature_b) == expected_str_feature_b

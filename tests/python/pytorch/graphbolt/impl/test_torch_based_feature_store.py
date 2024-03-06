@@ -412,7 +412,7 @@ def test_torch_based_feature_store_repr(in_memory):
             "        feature=tensor([[1, 2, 4],\n"
             "                        [2, 5, 3]]),\n"
             "        metadata={},\n"
-            "    ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(\n"
+            "    ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): DiskBasedFeature(\n"
             "        feature=tensor([[[1, 2],\n"
             "                         [3, 4]],\n"
             "\n"
