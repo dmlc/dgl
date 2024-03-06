@@ -51,13 +51,11 @@ main
 
 import argparse
 import time
-from typing import Optional
 
 import dgl.graphbolt as gb
 import torch
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-from torch_geometric import EdgeIndex
 from torch_geometric.nn import SAGEConv
 from tqdm import tqdm
 
@@ -336,7 +334,7 @@ def parse_args():
     )
     parser.add_argument(
         "--mode",
-        default="pinned-cuda",
+        default="pinned-pinned-cuda",
         choices=[
             "cpu-cpu-cpu",
             "cpu-cpu-cuda",
