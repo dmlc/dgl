@@ -68,7 +68,7 @@ torch::Tensor OnDiskNpyArray::index_select_iouring(
       // Compute the read block offsets and save them as io_uring requests.
       for (int64_t m = 0; m < r - n; m++) {
         int64_t i = idx_data[n + m];  // feature id.
-        if (i > feat_dim[0]) {
+        if (i >= feat_dim[0]) {
           error_flag = true;
           break;
         }

@@ -37,11 +37,6 @@ class DiskBasedFeature(Feature):
     >>> feature = gb.DiskBasedFeature(torch_feat)
     >>> feature.read(torch.tensor([0]))
     tensor([[0, 1, 2, 3, 4]])
-    >>> feature.update(torch.tensor([[1 for _ in range(5)]]),
-    ...                      torch.tensor([1]))
-    >>> feature.read(torch.tensor([0, 1]))
-    tensor([[0, 1, 2, 3, 4],
-            [1, 1, 1, 1, 1]])
     >>> feature.size()
     torch.Size([5])
 
@@ -58,6 +53,14 @@ class DiskBasedFeature(Feature):
         # Disk feature path.
         self._path = path
         self._metadata = metadata
+
+    def __del__(self):
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        for tensor in self._is_inplace_pinned:
+            assert self._inplace_unpinner(tensor.data_ptr()) == 0
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -76,14 +79,18 @@ class DiskBasedFeature(Feature):
             The read feature.
         """
         if ids is None:
+            if self._tensor.is_pinned():
+                return self._tensor.cuda()
             return self._tensor
-        try:
-            ret = torch.ops.graphbolt.disk_index_select(
-                self._path, ids, self._tensor.dtype
-            )
-        except RuntimeError:
-            raise IndexError
-        return ret
+        elif platform.system() == "Linux":
+            try:
+                return torch.ops.graphbolt.disk_index_select(
+                    self._path, ids.to("cpu"), self._tensor.dtype
+                ).to(ids.device)
+            except RuntimeError:
+                raise IndexError
+        else:
+            return index_select(self._tensor, ids)
 
     def size(self):
         """Get the size of the feature.
@@ -438,19 +445,10 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                if platform.system() == "Linux":
-                    features[key] = DiskBasedFeature(
-                        spec.path,
-                        metadata=metadata,
-                    )
-                else:
-                    mmap_mode = "r+" if not spec.in_memory else None
-                    features[key] = TorchBasedFeature(
-                        torch.as_tensor(
-                            np.load(spec.path, mmap_mode=mmap_mode)
-                        ),
-                        metadata=metadata,
-                    )
+                features[key] = DiskBasedFeature(
+                    spec.path,
+                    metadata=metadata,
+                )
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")
         super().__init__(features)
