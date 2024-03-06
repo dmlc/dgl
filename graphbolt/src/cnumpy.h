@@ -4,6 +4,7 @@
  * @brief Numpy File Fetecher class.
  */
 
+#ifdef __linux__
 #include <stdint.h>
 #include <torch/script.h>
 
@@ -61,3 +62,4 @@ class OnDiskNpyArray {
 
 }  // namespace storage
 }  // namespace graphbolt
+#endif

@@ -4,6 +4,7 @@
  * @brief Numpy File Fetecher class.
  */
 
+#ifdef __linux__
 #include "cnumpy.h"
 
 #include <fcntl.h>
@@ -212,3 +213,4 @@ void OnDiskNpyArray::parse_npy_header(FILE *fp) {
 
 }  // namespace storage
 }  // namespace graphbolt
+#endif
