@@ -705,7 +705,8 @@ def run(args, device, data):
 def main(args):
     dgl.distributed.initialize(args.ip_config, use_graphbolt=args.use_graphbolt)
     if not args.standalone:
-        th.distributed.init_process_group(backend="nccl")
+        backend = "gloo" if args.num_gpus == -1 else "nccl"
+        th.distributed.init_process_group(backend=backend)
 
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.conf_path)
     print("rank:", g.rank())
