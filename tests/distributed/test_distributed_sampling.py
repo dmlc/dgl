@@ -3,7 +3,6 @@ import os
 import random
 import tempfile
 import time
-import torch
 import traceback
 import unittest
 from pathlib import Path
@@ -12,6 +11,7 @@ import backend as F
 import dgl
 import numpy as np
 import pytest
+import torch
 from dgl.data import CitationGraphDataset, WN18Dataset
 from dgl.distributed import (
     DistGraph,
@@ -611,11 +611,12 @@ def check_rpc_hetero_sampling_shuffle(
         time.sleep(1)
         pserver_list.append(p)
 
+    nodes = {"n3": torch.tensor([0, 10, 99, 66, 124, 208], dtype=g.idtype)}
     block, gpb = start_hetero_sample_client(
         0,
         tmpdir,
         num_server > 1,
-        nodes=None,
+        nodes=nodes,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
     )
