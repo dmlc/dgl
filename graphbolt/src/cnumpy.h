@@ -6,17 +6,12 @@
 
 #include <stdint.h>
 #include <torch/script.h>
-#include <zlib.h>
 
 #include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
-#include <map>
-#include <memory>
-#include <numeric>
 #include <string>
-#include <typeinfo>
 
 namespace graphbolt {
 namespace storage {
