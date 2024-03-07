@@ -1,13 +1,11 @@
 """Torch-based feature store for GraphBolt."""
 
 import copy
-import os
 import platform
 import textwrap
 from typing import Dict, List
 
 import numpy as np
-import psutil
 import torch
 
 from ..base import index_select
