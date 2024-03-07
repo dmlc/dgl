@@ -1,6 +1,6 @@
 ## Distributed training
 
-This is an example of training RGCN node classification in a distributed fashion. Currently, the example train RGCN graphs with input node features. The current implementation follows ../rgcn/entity_claasify_mp.py.
+This is an example of training RGCN node classification in a distributed fashion. Currently, the example train RGCN graphs with input node features.
 
 Before training, install python libs by pip:
 
@@ -36,9 +36,9 @@ sudo vim /etc/exports
 
 The server's internal ip can be checked  via `ifconfig` or `ip`. If the ip does not begin with `192.168`, then you may use
 ```bash
-# for ip range 10.0.0.0 – 10.255.255.255
+# for ip range 10.0.0.0 - 10.255.255.255
 /home/ubuntu/workspace  10.0.0.0/8(rw,sync,no_subtree_check)
-# for ip range 172.16.0.0 – 172.31.255.255
+# for ip range 172.16.0.0 - 172.31.255.255
 /home/ubuntu/workspace  172.16.0.0/12(rw,sync,no_subtree_check)
 ```
 
