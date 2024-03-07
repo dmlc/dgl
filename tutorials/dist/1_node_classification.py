@@ -439,7 +439,8 @@ If we split the graph into four partitions as demonstrated at the beginning of t
 Sample neighbors with `GraphBolt`
 ----------------------------------
 
-Since DGL 2.0, we have introduced a new dataloading framework `GraphBolt` in
+Since DGL 2.0, we have introduced a new dataloading framework
+`GraphBolt <https://doc.dgl.ai/stochastic_training/index.html>`_ in
 which sampling is highly improved compared to previous implementations in DGL.
 As a result, we've introduced `GraphBolt` to distributed training to improve
 the performance of distributed sampling. What's more, the graph partitions
