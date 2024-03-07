@@ -4,9 +4,8 @@ import pickle
 from abc import ABC
 
 import numpy as np
-import torch
 
-from .. import backend as F
+from .. import backend as F, utils
 from .._ffi.ndarray import empty_shared_mem
 from ..base import DGLError
 from ..ndarray import exist_shared_mem_array
@@ -762,6 +761,7 @@ class RangePartitionBook(GraphPartitionBook):
 
     def map_to_homo_nid(self, ids, ntype):
         """Map per-node-type IDs to global node IDs in the homogeneous format."""
+        ids = utils.toindex(ids).tousertensor()
         partids = self.nid2partid(ids, ntype)
         typed_max_nids = F.zerocopy_from_numpy(self._typed_max_node_ids[ntype])
         end_diff = F.gather_row(typed_max_nids, partids) - ids
@@ -772,6 +772,7 @@ class RangePartitionBook(GraphPartitionBook):
 
     def map_to_homo_eid(self, ids, etype):
         """Map per-edge-type IDs to global edge IDs in the homoenegeous format."""
+        ids = utils.toindex(ids).tousertensor()
         c_etype = self.to_canonical_etype(etype)
         partids = self.eid2partid(ids, c_etype)
         typed_max_eids = F.zerocopy_from_numpy(
@@ -785,28 +786,32 @@ class RangePartitionBook(GraphPartitionBook):
 
     def nid2partid(self, nids, ntype=DEFAULT_NTYPE):
         """From global node IDs to partition IDs"""
-        # [TODO][Rui] replace numpy with torch.
-        nids = nids.numpy()
+        nids = utils.toindex(nids)
         if ntype == DEFAULT_NTYPE:
-            ret = np.searchsorted(self._max_node_ids, nids, side="right")
+            ret = np.searchsorted(
+                self._max_node_ids, nids.tonumpy(), side="right"
+            )
         else:
             ret = np.searchsorted(
-                self._typed_max_node_ids[ntype], nids, side="right"
+                self._typed_max_node_ids[ntype], nids.tonumpy(), side="right"
             )
-        return torch.from_numpy(ret)
+        ret = utils.toindex(ret)
+        return ret.tousertensor()
 
     def eid2partid(self, eids, etype=DEFAULT_ETYPE):
         """From global edge IDs to partition IDs"""
-        # [TODO][Rui] replace numpy with torch.
-        eids = eids.numpy()
+        eids = utils.toindex(eids)
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
-            ret = np.searchsorted(self._max_edge_ids, eids, side="right")
+            ret = np.searchsorted(
+                self._max_edge_ids, eids.tonumpy(), side="right"
+            )
         else:
             c_etype = self.to_canonical_etype(etype)
             ret = np.searchsorted(
-                self._typed_max_edge_ids[c_etype], eids, side="right"
+                self._typed_max_edge_ids[c_etype], eids.tonumpy(), side="right"
             )
-        return torch.from_numpy(ret)
+        ret = utils.toindex(ret)
+        return ret.tousertensor()
 
     def partid2nids(self, partid, ntype=DEFAULT_NTYPE):
         """From partition ID to global node IDs"""
@@ -847,6 +852,8 @@ class RangePartitionBook(GraphPartitionBook):
                 getting remote tensor of nid2localnid."
             )
 
+        nids = utils.toindex(nids)
+        nids = nids.tousertensor()
         if ntype == DEFAULT_NTYPE:
             start = self._max_node_ids[partid - 1] if partid > 0 else 0
         else:
@@ -863,6 +870,8 @@ class RangePartitionBook(GraphPartitionBook):
                 getting remote tensor of eid2localeid."
             )
 
+        eids = utils.toindex(eids)
+        eids = eids.tousertensor()
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             start = self._max_edge_ids[partid - 1] if partid > 0 else 0
         else:

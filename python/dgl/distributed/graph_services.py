@@ -14,6 +14,7 @@ from ..sampling import (
     sample_neighbors as local_sample_neighbors,
 )
 from ..subgraph import in_subgraph as local_in_subgraph
+from ..utils import toindex
 from .rpc import (
     recv_responses,
     register_service,
@@ -707,6 +708,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     """
     req_list = []
     partition_book = g.get_partition_book()
+    if not isinstance(nodes, torch.Tensor):
+        nodes = toindex(nodes).tousertensor()
     partition_id = partition_book.nid2partid(nodes)
     local_nids = None
     for pid in range(partition_book.num_partitions()):
@@ -900,7 +903,11 @@ def sample_etype_neighbors(
             ), "The sampled node type {} does not exist in the input graph".format(
                 ntype
             )
-            homo_nids.append(gpb.map_to_homo_nid(nodes[ntype], ntype))
+            if F.is_tensor(nodes[ntype]):
+                typed_nodes = nodes[ntype]
+            else:
+                typed_nodes = toindex(nodes[ntype]).tousertensor()
+            homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
         nodes = F.cat(homo_nids, 0)
 
     def issue_remote_req(node_ids):
@@ -1025,7 +1032,11 @@ def sample_neighbors(
             assert (
                 ntype in g.ntypes
             ), "The sampled node type does not exist in the input graph"
-            homo_nids.append(gpb.map_to_homo_nid(nodes[ntype], ntype))
+            if F.is_tensor(nodes[ntype]):
+                typed_nodes = nodes[ntype]
+            else:
+                typed_nodes = toindex(nodes[ntype]).tousertensor()
+            homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
         nodes = F.cat(homo_nids, 0)
     elif isinstance(nodes, dict):
         assert len(nodes) == 1
@@ -1095,6 +1106,7 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     """
     req_list = []
     partition_book = g.get_partition_book()
+    edges = toindex(edges).tousertensor()
     partition_id = partition_book.eid2partid(edges)
     local_eids = None
     reorder_idx = []
@@ -1212,6 +1224,7 @@ def in_subgraph(g, nodes):
 def _distributed_get_node_property(g, n, issue_remote_req, local_access):
     req_list = []
     partition_book = g.get_partition_book()
+    n = toindex(n).tousertensor()
     partition_id = partition_book.nid2partid(n)
     local_nids = None
     reorder_idx = []
@@ -1256,21 +1269,7 @@ def _distributed_get_node_property(g, n, issue_remote_req, local_access):
 
 
 def in_degrees(g, v):
-    """Get in-degrees
-
-    Parameters
-    ----------
-
-    g : DistGraph
-        The distributed graph.
-    v : tensor
-        The node ID array.
-
-    Returns
-    -------
-    tensor
-        The in-degree array.
-    """
+    """Get in-degrees"""
 
     def issue_remote_req(v, order_id):
         return InDegreeRequest(v, order_id)
@@ -1282,21 +1281,7 @@ def in_degrees(g, v):
 
 
 def out_degrees(g, u):
-    """Get out-degrees
-
-    Parameters
-    ----------
-
-    g : DistGraph
-        The distributed graph.
-    u : tensor
-        The node ID array.
-
-    Returns
-    -------
-    tensor
-        The out-degree array.
-    """
+    """Get out-degrees"""
 
     def issue_remote_req(u, order_id):
         return OutDegreeRequest(u, order_id)
