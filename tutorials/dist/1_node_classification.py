@@ -439,14 +439,21 @@ If we split the graph into four partitions as demonstrated at the beginning of t
 Sample neighbors with `GraphBolt`
 ----------------------------------
 
-In order to utilize the `GraphBolt` backend for distributed sampling, we need to
+Since DGL 2.0, we have introduced a new dataloading framework `GraphBolt` in
+which sampling is highly improved compared to previous implementations in DGL.
+As a result, we've introduced `GraphBolt` to distributed training to improve
+the performance of distributed sampling. What's more, the graph partitions
+could be much smaller than before, which is beneficial for the loading speed
+and memory usage during distributed training.
+
+Graph partitioning
+^^^^^^^^^^^^^^^^^^^
+
+In order to benefit from `GraphBolt` for distributed sampling, we need to
 convert partitions from `DGL` format to `GraphBolt` format. This can be done by
 `dgl.distributed.dgl_partition_to_graphbolt` function. Alternatively, we can use
 `dgl.distributed.partition_graph` function to generate partitions in `GraphBolt`
 format directly.
-
-Graph partitioning
-^^^^^^^^^^^^^^^^^^^
 
 1. Convert partitions from `DGL` format to `GraphBolt` format.
 
