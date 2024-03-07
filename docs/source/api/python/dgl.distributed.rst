@@ -104,3 +104,4 @@ Split and Load Partitions
     load_partition_feats
     load_partition_book
     partition_graph
+    dgl_partition_to_graphbolt
