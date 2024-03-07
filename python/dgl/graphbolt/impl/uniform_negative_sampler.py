@@ -86,20 +86,9 @@ class UniformNegativeSampler(NegativeSampler):
             # Construct labels for all node pairs.
             pos_num = node_pairs.shape[0]
             neg_num = seeds.shape[0] - pos_num
-            labels = torch.cat(
-                (
-                    torch.ones(
-                        pos_num,
-                        dtype=torch.bool,
-                        device=seeds.device,
-                    ),
-                    torch.zeros(
-                        neg_num,
-                        dtype=torch.bool,
-                        device=seeds.device,
-                    ),
-                ),
-            )
+            labels = torch.empty(pos_num + neg_num, device=seeds.device)
+            labels[:pos_num] = 1
+            labels[pos_num:] = 0
             return seeds, labels, indexes
         else:
             return self.graph.sample_negative_edges_uniform(

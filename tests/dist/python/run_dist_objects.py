@@ -44,7 +44,6 @@ def run_server(
     server_count,
     num_clients,
     shared_mem,
-    keep_alive=False,
 ):
     # server_count = num_servers_per_machine
     g = dgl.distributed.DistGraphServer(
@@ -55,7 +54,6 @@ def run_server(
         graph_path + "/{}.json".format(graph_name),
         disable_shared_mem=not shared_mem,
         graph_format=["csc", "coo"],
-        keep_alive=keep_alive,
     )
     print("start server", server_id)
     g.start()
@@ -774,7 +772,6 @@ if mode == "server":
         server_count=num_servers_per_machine,
         num_clients=num_part * num_client_per_machine,
         shared_mem=shared_mem,
-        keep_alive=False,
     )
 elif mode == "client":
     os.environ["DGL_NUM_SERVER"] = str(num_servers_per_machine)
