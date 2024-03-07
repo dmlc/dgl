@@ -139,6 +139,10 @@ class TorchBasedFeature(Feature):
         else:
             return index_select(self._tensor, ids)
 
+    def set_disk_fetcher(self, disk_fetcher: bool = True):
+        """Open or close the disk fetcher."""
+        self._disk_fetcher = disk_fetcher
+
     def size(self):
         """Get the size of the feature.
 
@@ -292,13 +296,6 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     def __init__(self, feat_data: List[OnDiskFeatureData]):
         features = {}
 
-        # If feature size large than memory size, use disk fetcher.
-        feature_size = 0
-        for spec in feat_data:
-            feature_size = feature_size + os.path.getsize(spec.path)
-        system_memory = psutil.virtual_memory().total
-        disk_fetcher = feature_size > system_memory
-
         for spec in feat_data:
             key = (spec.domain, spec.type, spec.name)
             metadata = spec.extra_fields
@@ -315,7 +312,6 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                 features[key] = TorchBasedFeature(
                     torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
                     metadata=metadata,
-                    disk_fetcher=disk_fetcher,
                     path=spec.path,
                 )
             else:
