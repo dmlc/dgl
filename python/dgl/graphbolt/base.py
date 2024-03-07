@@ -4,6 +4,7 @@ from collections import deque
 from dataclasses import dataclass
 
 import torch
+from torch.torch_version import TorchVersion
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
@@ -63,6 +64,18 @@ def isin(elements, test_elements):
     return torch.ops.graphbolt.isin(elements, test_elements)
 
 
+if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+
+    @torch.library.impl_abstract("graphbolt::expand_indptr")
+    def expand_indptr_abstract(indptr, dtype, node_ids, output_size):
+        """Abstract implementation of expand_indptr for torch.compile() support."""
+        if output_size is None:
+            output_size = torch.library.get_ctx().new_dynamic_size()
+        if dtype is None:
+            dtype = node_ids.dtype
+        return indptr.new_empty(output_size, dtype=dtype)
+
+
 def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
     """Converts a given indptr offset tensor to a COO format tensor. If
     node_ids is not given, it is assumed to be equal to
@@ -90,9 +103,9 @@ def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
         argument avoids a stream synchronization to calculate the output shape.
 
     Returns
-        -------
-        torch.Tensor
-            The converted COO tensor with values from node_ids.
+    -------
+    torch.Tensor
+        The converted COO tensor with values from node_ids.
     """
     assert indptr.dim() == 1, "Indptr should be 1D tensor."
     assert not (
@@ -127,9 +140,9 @@ def index_select(tensor, index):
         The 1-D tensor containing the indices to index.
 
     Returns
-        -------
-        torch.Tensor
-            The indexed input tensor, equivalent to tensor[index].
+    -------
+    torch.Tensor
+        The indexed input tensor, equivalent to tensor[index].
     """
     assert index.dim() == 1, "Index should be 1D tensor."
     return torch.ops.graphbolt.index_select(tensor, index)

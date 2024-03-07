@@ -954,6 +954,16 @@ class RangePartitionBook(GraphPartitionBook):
             )
         return ret
 
+    @property
+    def global_nid_dtype(self):
+        """Get the node ID's dtype"""
+        return self._nid_map.torch_dtype
+
+    @property
+    def global_eid_dtype(self):
+        """Get the edge ID's dtype"""
+        return self._eid_map.torch_dtype
+
 
 NODE_PART_POLICY = "node"
 EDGE_PART_POLICY = "edge"

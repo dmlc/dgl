@@ -8,7 +8,7 @@ import torch
 import dgl
 from dgl.utils import recursive_apply
 
-from .base import etype_str_to_tuple, expand_indptr
+from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
 from .internal import get_attributes
 from .sampled_subgraph import SampledSubgraph
 
@@ -231,6 +231,19 @@ class MiniBatch:
             self.sampled_subgraphs[0].sampled_csc, Dict
         )
 
+        # Casts to minimum dtype in-place and returns self.
+        def cast_to_minimum_dtype(v: CSCFormatBase):
+            # Checks if number of vertices and edges fit into an int32.
+            dtype = (
+                torch.int32
+                if max(v.indptr.size(0) - 2, v.indices.size(0))
+                <= torch.iinfo(torch.int32).max
+                else torch.int64
+            )
+            v.indptr = v.indptr.to(dtype)
+            v.indices = v.indices.to(dtype)
+            return v
+
         blocks = []
         for subgraph in self.sampled_subgraphs:
             original_row_node_ids = subgraph.original_row_node_ids
@@ -242,6 +255,8 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
+                for v in subgraph.sampled_csc.values():
+                    cast_to_minimum_dtype(v)
                 sampled_csc = {
                     etype_str_to_tuple(etype): (
                         "csc",
@@ -267,7 +282,7 @@ class MiniBatch:
                     for ntype, nodes in original_column_node_ids.items()
                 }
             else:
-                sampled_csc = subgraph.sampled_csc
+                sampled_csc = cast_to_minimum_dtype(subgraph.sampled_csc)
                 sampled_csc = (
                     "csc",
                     (
@@ -501,7 +516,7 @@ class MiniBatch:
             row_nodes = torch.cat(row_nodes)
             edge_index = torch.unique(
                 torch.stack((row_nodes, col_nodes)), dim=1
-            )
+            ).long()
 
         if self.node_features is None:
             node_features = None
@@ -511,10 +526,24 @@ class MiniBatch:
             ), "`to_pyg_data` only supports single feature homogeneous graph."
             node_features = next(iter(self.node_features.values()))
 
+        if self.seed_nodes is not None:
+            if isinstance(self.seed_nodes, Dict):
+                batch_size = len(next(iter(self.seed_nodes.values())))
+            else:
+                batch_size = len(self.seed_nodes)
+        elif self.node_pairs is not None:
+            if isinstance(self.node_pairs, Dict):
+                batch_size = len(next(iter(self.node_pairs.values()))[0])
+            else:
+                batch_size = len(self.node_pairs[0])
+        else:
+            batch_size = None
         pyg_data = Data(
             x=node_features,
             edge_index=edge_index,
             y=self.labels,
+            batch_size=batch_size,
+            n_id=self.node_ids(),
         )
         return pyg_data
 

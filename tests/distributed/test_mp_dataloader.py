@@ -39,7 +39,7 @@ class NeighborSampler(object):
     def sample_blocks(self, seeds):
         import torch as th
 
-        seeds = th.LongTensor(np.asarray(seeds))
+        seeds = th.tensor(np.asarray(seeds), dtype=self.g.idtype)
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
@@ -104,7 +104,6 @@ def start_dist_dataloader(
         "test_sampling",
         gpb=gpb,
         part_config=part_config,
-        use_graphbolt=use_graphbolt,
     )
 
     # Create sampler
@@ -123,7 +122,7 @@ def start_dist_dataloader(
     for i in range(2):
         # Create DataLoader for constructing blocks
         dataloader = DistDataLoader(
-            dataset=train_nid.numpy(),
+            dataset=train_nid,
             batch_size=batch_size,
             collate_fn=sampler.sample_blocks,
             shuffle=False,
@@ -443,14 +442,15 @@ def start_node_dataloader(
         "test_sampling",
         gpb=gpb,
         part_config=part_config,
-        use_graphbolt=use_graphbolt,
     )
     assert len(dist_graph.ntypes) == len(groundtruth_g.ntypes)
     assert len(dist_graph.etypes) == len(groundtruth_g.etypes)
     if len(dist_graph.etypes) == 1:
-        train_nid = th.arange(num_nodes_to_sample)
+        train_nid = th.arange(num_nodes_to_sample, dtype=dist_graph.idtype)
     else:
-        train_nid = {"n3": th.arange(num_nodes_to_sample)}
+        train_nid = {
+            "n3": th.arange(num_nodes_to_sample, dtype=dist_graph.idtype)
+        }
 
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(part_config, i)
@@ -763,11 +763,9 @@ def start_multiple_dataloaders(
     use_graphbolt,
 ):
     dgl.distributed.initialize(ip_config)
-    dist_g = dgl.distributed.DistGraph(
-        graph_name, part_config=part_config, use_graphbolt=use_graphbolt
-    )
+    dist_g = dgl.distributed.DistGraph(graph_name, part_config=part_config)
     if dataloader_type == "node":
-        train_ids = th.arange(orig_g.num_nodes())
+        train_ids = th.arange(orig_g.num_nodes(), dtype=dist_g.idtype)
         batch_size = orig_g.num_nodes() // 100
     else:
         train_ids = th.arange(orig_g.num_edges())

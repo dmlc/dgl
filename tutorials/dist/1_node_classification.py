@@ -436,4 +436,57 @@ If we split the graph into four partitions as demonstrated at the beginning of t
   ip_addr3
   ip_addr4
 
+Sample neighbors with `GraphBolt`
+----------------------------------
+
+Since DGL 2.0, we have introduced a new dataloading framework
+`GraphBolt <https://doc.dgl.ai/stochastic_training/index.html>`_ in
+which sampling is highly improved compared to previous implementations in DGL.
+As a result, we've introduced `GraphBolt` to distributed training to improve
+the performance of distributed sampling. What's more, the graph partitions
+could be much smaller than before, which is beneficial for the loading speed
+and memory usage during distributed training.
+
+Graph partitioning
+^^^^^^^^^^^^^^^^^^^
+
+In order to benefit from `GraphBolt` for distributed sampling, we need to
+convert partitions from `DGL` format to `GraphBolt` format. This can be done by
+`dgl.distributed.dgl_partition_to_graphbolt` function. Alternatively, we can use
+`dgl.distributed.partition_graph` function to generate partitions in `GraphBolt`
+format directly.
+
+1. Convert partitions from `DGL` format to `GraphBolt` format.
+
+.. code-block:: python
+  
+    part_config = "4part_data/ogbn-products.json"
+    dgl.distributed.dgl_partition_to_graphbolt(part_config)
+
+The new partitions will be stored in the same directory as the original
+partitions.
+
+2. Generate partitions in `GraphBolt` format directly. Just set the
+`use_graphbolt` flag to `True` in `partition_graph` function.
+
+.. code-block:: python
+  
+    dgl.distributed.partition_graph(graph, graph_name='ogbn-products', num_parts=4,
+                                    out_path='4part_data',
+                                    balance_ntypes=graph.ndata['train_mask'],
+                                    balance_edges=True,
+                                    use_graphbolt=True)
+
+Enable `GraphBolt` sampling in the training script
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Just set the `use_graphbolt` flag to `True` in `dgl.distributed.initialize`
+function. This is the only change needed in the training script to enable
+`GraphBolt` sampling.
+
+.. code-block:: python
+
+    dgl.distributed.initialize('ip_config.txt', use_graphbolt=True)
+
+  
 """

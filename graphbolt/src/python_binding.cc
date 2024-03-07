@@ -88,11 +88,21 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
-  m.def("expand_indptr", &ops::ExpandIndptr);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
 #endif
+#ifdef HAS_IMPL_ABSTRACT_PYSTUB
+  m.impl_abstract_pystub("dgl.graphbolt.base", "//dgl.graphbolt.base");
+#endif
+  m.def(
+      "expand_indptr(Tensor indptr, ScalarType dtype, Tensor? node_ids, "
+      "SymInt? output_size) -> Tensor"
+#ifdef HAS_PT2_COMPLIANT_TAG
+      ,
+      {at::Tag::pt2_compliant_tag}
+#endif
+  );
 }
 
 }  // namespace sampling

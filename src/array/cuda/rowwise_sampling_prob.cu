@@ -10,11 +10,11 @@
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
 
+#include <cub/cub.cuh>
 #include <numeric>
 
 #include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
-#include "./dgl_cub.cuh"
 #include "./utils.h"
 
 // require CUB 1.17 to use DeviceSegmentedSort

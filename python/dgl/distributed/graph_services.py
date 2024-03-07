@@ -125,6 +125,9 @@ def _sample_neighbors_graphbolt(
 
     # 1. Map global node IDs to local node IDs.
     nodes = gpb.nid2localnid(nodes, gpb.partid)
+    # Local partition may be saved in torch.int32 even though the global graph
+    # is in torch.int64.
+    nodes = nodes.to(dtype=g.indices.dtype)
 
     # 2. Perform sampling.
     # [Rui][TODO] `prob` and `replace` are not tested yet. Skip for now.

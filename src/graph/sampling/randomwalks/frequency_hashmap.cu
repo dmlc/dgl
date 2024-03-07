@@ -5,11 +5,11 @@
  */
 
 #include <algorithm>
+#include <cub/cub.cuh>  // NOLINT
 #include <tuple>
 #include <utility>
 
 #include "../../../array/cuda/atomic.cuh"
-#include "../../../array/cuda/dgl_cub.cuh"
 #include "../../../runtime/cuda/cuda_common.h"
 #include "frequency_hashmap.cuh"
 

@@ -30,8 +30,12 @@ from .graph_partition_book import (
 
 
 RESERVED_FIELD_DTYPE = {
-    "inner_node": F.uint8,  # A flag indicates whether the node is inside a partition.
-    "inner_edge": F.uint8,  # A flag indicates whether the edge is inside a partition.
+    "inner_node": (
+        F.uint8
+    ),  # A flag indicates whether the node is inside a partition.
+    "inner_edge": (
+        F.uint8
+    ),  # A flag indicates whether the edge is inside a partition.
     NID: F.int64,
     EID: F.int64,
     NTYPE: F.int16,
@@ -511,6 +515,23 @@ def load_partition_book(part_config, part_id):
 
     node_map = _get_part_ranges(node_map)
     edge_map = _get_part_ranges(edge_map)
+
+    # Format dtype of node/edge map if dtype is specified.
+    def _format_node_edge_map(part_metadata, map_type, data):
+        key = f"{map_type}_map_dtype"
+        if key not in part_metadata:
+            return data
+        dtype = part_metadata[key]
+        assert dtype in ["int32", "int64"], (
+            f"The {map_type} map dtype should be either int32 or int64, "
+            f"but got {dtype}."
+        )
+        for key in data:
+            data[key] = data[key].astype(dtype)
+        return data
+
+    node_map = _format_node_edge_map(part_metadata, "node", node_map)
+    edge_map = _format_node_edge_map(part_metadata, "edge", edge_map)
 
     # Sort the node/edge maps by the node/edge type ID.
     node_map = dict(sorted(node_map.items(), key=lambda x: ntypes[x[0]]))
@@ -1325,6 +1346,36 @@ def partition_graph(
         return orig_nids, orig_eids
 
 
+# [TODO][Rui] Due to int64_t is expected in RPC, we have to limit the data type
+# of node/edge IDs to int64_t. See more details in #7175.
+DTYPES_TO_CHECK = {
+    "default": [torch.int32, torch.int64],
+    NID: [torch.int64],
+    EID: [torch.int64],
+    NTYPE: [torch.int8, torch.int16, torch.int32, torch.int64],
+    ETYPE: [torch.int8, torch.int16, torch.int32, torch.int64],
+    "inner_node": [torch.uint8],
+    "inner_edge": [torch.uint8],
+    "part_id": [torch.int8, torch.int16, torch.int32, torch.int64],
+}
+
+
+def _cast_to_minimum_dtype(predicate, data, field=None):
+    if data is None:
+        return data
+    dtypes_to_check = DTYPES_TO_CHECK.get(field, DTYPES_TO_CHECK["default"])
+    if data.dtype not in dtypes_to_check:
+        dgl_warning(
+            f"Skipping as the data type of field {field} is {data.dtype}, "
+            f"while supported data types are {dtypes_to_check}."
+        )
+        return data
+    for dtype in dtypes_to_check:
+        if predicate < torch.iinfo(dtype).max:
+            return data.to(dtype)
+    return data
+
+
 def dgl_partition_to_graphbolt(
     part_config,
     *,
@@ -1438,6 +1489,31 @@ def dgl_partition_to_graphbolt(
             attr: graph.edata[attr][edge_ids] for attr in required_edge_attrs
         }
 
+        # Cast various data to minimum dtype.
+        # Cast 1: indptr.
+        indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
+        # Cast 2: indices.
+        indices = _cast_to_minimum_dtype(graph.num_nodes(), indices)
+        # Cast 3: type_per_edge.
+        type_per_edge = _cast_to_minimum_dtype(
+            len(etypes), type_per_edge, field=ETYPE
+        )
+        # Cast 4: node/edge_attributes.
+        predicates = {
+            NID: part_meta["num_nodes"],
+            "part_id": num_parts,
+            NTYPE: len(ntypes),
+            EID: part_meta["num_edges"],
+            ETYPE: len(etypes),
+        }
+        for attributes in [node_attributes, edge_attributes]:
+            for key in attributes:
+                if key not in predicates:
+                    continue
+                attributes[key] = _cast_to_minimum_dtype(
+                    predicates[key], attributes[key], field=key
+                )
+
         csc_graph = gb.fused_csc_sampling_graph(
             indptr,
             indices,
@@ -1462,6 +1538,11 @@ def dgl_partition_to_graphbolt(
             "part_graph_graphbolt"
         ] = os.path.relpath(csc_graph_path, os.path.dirname(part_config))
 
-    # Update partition config.
+    # Save dtype info into partition config.
+    # [TODO][Rui] Always use int64_t for node/edge IDs in GraphBolt. See more
+    # details in #7175.
+    new_part_meta["node_map_dtype"] = "int64"
+    new_part_meta["edge_map_dtype"] = "int64"
+
     _dump_part_config(part_config, new_part_meta)
     print(f"Converted partitions to GraphBolt format into {part_config}")

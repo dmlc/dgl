@@ -70,8 +70,6 @@ target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 if(USE_CUDA)
   set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 17)
   message(STATUS "Use external CCCL library for a consistent API and performance for graphbolt.")
-  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE CUB_WRAPPED_NAMESPACE=graphbolt)
-  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE THRUST_NS_QUALIFIER=thrust)
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
@@ -94,3 +92,5 @@ if(DEFINED MKL_LIBRARIES)
                           ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
 
+target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${LIBURING_INCLUDE})
+target_link_libraries(${LIB_GRAPHBOLT_NAME} ${LIBURING})

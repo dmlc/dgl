@@ -5,9 +5,9 @@
  */
 
 #include <cassert>
+#include <cub/cub.cuh>  // NOLINT
 
 #include "../../array/cuda/atomic.cuh"
-#include "../../array/cuda/dgl_cub.cuh"
 #include "cuda_common.h"
 #include "cuda_hashtable.cuh"
 

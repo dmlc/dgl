@@ -365,8 +365,9 @@ def parse_args():
         "--dataset",
         type=str,
         default="ogbn-products",
+        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
         help="The dataset we can use for node classification example. Currently"
-        "dataset ogbn-products, ogbn-arxiv, ogbn-papers100M is supported.",
+        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
     )
     parser.add_argument(
         "--mode",
@@ -401,11 +402,15 @@ def main(args):
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset = gb.BuiltinDataset("ogbn-products").load()
+    dataset = gb.BuiltinDataset(args.dataset).load()
 
     # Move the dataset to the selected storage.
-    graph = dataset.graph.to(args.storage_device)
-    features = dataset.feature.to(args.storage_device)
+    if args.storage_device == "pinned":
+        graph = dataset.graph.pin_memory_()
+        features = dataset.feature.pin_memory_()
+    else:
+        graph = dataset.graph.to(args.storage_device)
+        features = dataset.feature.to(args.storage_device)
 
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
