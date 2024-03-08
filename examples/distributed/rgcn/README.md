@@ -107,6 +107,12 @@ If we want to train RGCN with `GraphBolt`, we need to append `--use_graphbolt` t
 python3 partition_graph.py --dataset ogbn-mag --num_parts 2 --balance_train --balance_edges --use_graphbolt
 ```
 
+If we have already partitioned into `DGL` format, just convert them directly like below:
+
+```
+    python3 -c "import dgl; dgl.distributed.dgl_partition_to_graphbolt('ogbn-products.json')"
+```
+
 
 ### Step 3: Launch distributed jobs
 
