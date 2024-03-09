@@ -41,7 +41,7 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   /**
    * @brief Parse numpy meta data.
    */
-  void ParseNumpyHeader(FILE* fp);
+  void ParseNumpyHeader();
 
   /**
    * @brief Read disk numpy file based on given index and transform to

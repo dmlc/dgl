@@ -12,6 +12,7 @@
 #ifdef GRAPHBOLT_USE_CUDA
 #include "./cuda/max_uva_threads.h"
 #endif
+#include "./cnumpy.h"
 #include "./expand_indptr.h"
 #include "./index_select.h"
 #include "./random.h"

@@ -8,8 +8,6 @@
 
 #include <torch/script.h>
 
-#include "cnumpy.h"
-
 namespace graphbolt {
 namespace ops {
 

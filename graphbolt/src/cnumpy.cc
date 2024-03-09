@@ -4,7 +4,6 @@
  * @brief Numpy File Fetecher class.
  */
 
-#ifdef __linux__
 #include "cnumpy.h"
 
 #include <torch/torch.h>
@@ -25,12 +24,12 @@ c10::intrusive_ptr<OnDiskNpyArray> CreateDiskFetcher(
 
 OnDiskNpyArray::OnDiskNpyArray(std::string filename, torch::ScalarType dtype)
     : filename_(filename), dtype_(dtype) {
-  FILE *fp = fopen(filename.c_str(), "rb");
-  if (!fp)
-    throw std::runtime_error("npy_load: Unable to open file " + filename);
-  ParseNumpyHeader(fp);
-  fclose(fp);
+#ifdef __linux__
+  ParseNumpyHeader();
   feature_fd_ = open(filename.c_str(), O_RDONLY | O_DIRECT);
+  if (feature_fd_ == -1) {
+    throw std::runtime_error("npy_load: Unable to open file " + filename);
+  }
 
   // Get system max thread number.
   num_thd_ = torch::get_num_threads();
@@ -40,17 +39,23 @@ OnDiskNpyArray::OnDiskNpyArray(std::string filename, torch::ScalarType dtype)
   for (int64_t t = 0; t < num_thd_; t++) {
     io_uring_queue_init(group_size_, &ring_[t], 0);
   }
+#endif
 }
 
 OnDiskNpyArray::~OnDiskNpyArray() {
+#ifdef __linux__
   // IO queue exit.
   for (int64_t t = 0; t < num_thd_; t++) {
     io_uring_queue_exit(&ring_[t]);
   }
   close(feature_fd_);
+#endif
 }
 
-void OnDiskNpyArray::ParseNumpyHeader(FILE *fp) {
+void OnDiskNpyArray::ParseNumpyHeader() {
+  FILE *fp = fopen(filename_.c_str(), "rb");
+  if (!fp)
+    throw std::runtime_error("npy_load: Unable to open file " + filename_);
   char buffer[256];
   size_t res = fread(buffer, sizeof(char), 11, fp);
   if (res != 11) throw std::runtime_error("parse_npy_header: failed fread");
@@ -97,6 +102,7 @@ void OnDiskNpyArray::ParseNumpyHeader(FILE *fp) {
 }
 
 torch::Tensor OnDiskNpyArray::IndexSelectIOuring(torch::Tensor idx) {
+#ifdef __linux__
   idx = idx.to(torch::kLong);
   // The minimum page size to contain one feature.
   int64_t align_len = (feature_size_ + ALIGNMENT) & (long)~(ALIGNMENT - 1);
@@ -202,8 +208,10 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOuring(torch::Tensor idx) {
   free(result_buffer);
 
   return result;
+#else
+  return torch::empty({0});
+#endif
 }
 
 }  // namespace storage
 }  // namespace graphbolt
-#endif
