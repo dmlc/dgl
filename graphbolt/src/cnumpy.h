@@ -11,8 +11,8 @@
 
 #ifdef __linux__
 #include <liburing.h>
-#endif
 #include <unistd.h>
+#endif
 
 #include <cassert>
 #include <cstdio>
@@ -50,17 +50,17 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   torch::Tensor IndexSelectIOuring(torch::Tensor idx);
 
  private:
-  std::string filename;           // Path to numpy file.
-  torch::ScalarType dtype;        // Feature data type.
-  int feature_fd;                 // File description.
-  std::vector<int64_t> feat_dim;  // Shape of features, e.g. {N,M,K,L}.
-  int num_thd = 4;                // Default thread number.
-  int64_t group_size = 512;       // Default group size.
-  int64_t feature_size;           // Number of bytes of feature size.
-  size_t prefix_len;              // Length of head data in numpy file.
+  std::string filename_;           // Path to numpy file.
+  torch::ScalarType dtype_;        // Feature data type.
+  int feature_fd_;                 // File description.
+  std::vector<int64_t> feat_dim_;  // Shape of features, e.g. {N,M,K,L}.
+  int num_thd_;                    // Default thread number.
+  int64_t group_size_ = 512;       // Default group size.
+  int64_t feature_size_;           // Number of bytes of feature size.
+  size_t prefix_len_;              // Length of head data in numpy file.
 
 #ifdef __linux__
-  io_uring ring[4];  // io_uring queue.
+  io_uring* ring_;  // io_uring queue.
 #endif
 };
 
