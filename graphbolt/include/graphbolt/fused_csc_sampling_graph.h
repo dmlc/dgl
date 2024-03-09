@@ -6,6 +6,7 @@
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
+#include <graphbolt/continuous_seed.h>
 #include <graphbolt/fused_sampled_subgraph.h>
 #include <graphbolt/shared_memory.h>
 #include <torch/torch.h>
@@ -27,7 +28,7 @@ struct SamplerArgs<SamplerType::NEIGHBOR> {};
 template <>
 struct SamplerArgs<SamplerType::LABOR> {
   const torch::Tensor& indices;
-  int64_t random_seed;
+  continuous_seed random_seed;
   int64_t num_nodes;
 };
 

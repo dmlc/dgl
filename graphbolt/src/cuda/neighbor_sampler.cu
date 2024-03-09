@@ -6,6 +6,7 @@
  */
 #include <c10/core/ScalarType.h>
 #include <curand_kernel.h>
+#include <graphbolt/continuous_seed.h>
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/cuda_sampling_ops.h>
 #include <thrust/gather.h>
@@ -41,27 +42,17 @@ __global__ void _ComputeRandoms(
     const int64_t num_edges, const indptr_t* const sliced_indptr,
     const indptr_t* const sub_indptr, const indices_t* const csr_rows,
     const weights_t* const sliced_weights, const indices_t* const indices,
-    const uint64_t random_seed, float_t* random_arr, edge_id_t* edge_ids) {
+    const continuous_seed random_seed, float_t* random_arr,
+    edge_id_t* edge_ids) {
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
-  curandStatePhilox4_32_10_t rng;
   const auto labor = indices != nullptr;
-
-  if (!labor) {
-    curand_init(random_seed, i, 0, &rng);
-  }
 
   while (i < num_edges) {
     const auto row_position = csr_rows[i];
     const auto row_offset = i - sub_indptr[row_position];
     const auto in_idx = sliced_indptr[row_position] + row_offset;
-
-    if (labor) {
-      constexpr uint64_t kCurandSeed = 999961;
-      curand_init(kCurandSeed, random_seed, indices[in_idx], &rng);
-    }
-
-    const auto rnd = curand_uniform(&rng);
+    const auto rnd = random_seed.uniform(labor ? indices[in_idx] : i);
     const auto prob =
         sliced_weights ? sliced_weights[i] : static_cast<weights_t>(1);
     const auto exp_rnd = -__logf(rnd);
@@ -211,8 +202,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto coo_rows = ExpandIndptrImpl(
       sub_indptr, indices.scalar_type(), torch::nullopt, num_edges);
   num_edges = coo_rows.size(0);
-  const auto random_seed = RandomEngine::ThreadLocal()->RandInt(
-      static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
+  const continuous_seed random_seed(RandomEngine::ThreadLocal()->RandInt(
+      static_cast<int64_t>(0), std::numeric_limits<int64_t>::max()));
   auto output_indptr = torch::empty_like(sub_indptr);
   torch::Tensor picked_eids;
   torch::Tensor output_indices;
