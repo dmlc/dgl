@@ -554,12 +554,7 @@ def train(
 
 def main(args):
     device = torch.device(
-        "cuda"
-        if args.num_gpus > 0
-        and torch.cuda.is_available()
-        and args.dataset
-        != "ogb-lsc-mag240m"  # Large dataset cannot be putted into GPU.
-        else "cpu"
+        "cuda" if args.num_gpus > 0 and torch.cuda.is_available() else "cpu"
     )
 
     # Load dataset.

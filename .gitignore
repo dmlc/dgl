@@ -140,9 +140,6 @@ examples/.DS_Store
 examples/pytorch/generative_graph/*.p
 .DS_Store
 
-# liburing example
-third_party/liburing/
-
 # data directory
 _download
 

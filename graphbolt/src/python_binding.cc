@@ -36,6 +36,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def_readwrite(
           "original_edge_ids", &FusedSampledSubgraph::original_edge_ids)
       .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge);
+  m.class_<storage::OnDiskNpyArray>("OnDiskNpyArray")
+      .def("index_select", &storage::OnDiskNpyArray::IndexSelectIOuring);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
       .def("num_nodes", &FusedCSCSamplingGraph::NumNodes)
       .def("num_edges", &FusedCSCSamplingGraph::NumEdges)
@@ -87,8 +89,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("unique_and_compact", &UniqueAndCompact);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
-  m.def("disk_index_select", &ops::DiskIndexSelect);
-  m.def("disk_feature_size", &ops::DiskFeatureShape);
+  m.def("disk_fetcher", &storage::CreateDiskFetcher);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA

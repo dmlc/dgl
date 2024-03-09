@@ -95,7 +95,9 @@ class TorchBasedFeature(Feature):
         self._metadata = metadata
         self._disk_fetcher = disk_fetcher
         if self._disk_fetcher is True:
-            self._path = path
+            self._fetcher = torch.ops.graphbolt.disk_fetcher(
+                path, self._tensor.dtype
+            )
 
     def __del__(self):
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
@@ -127,11 +129,9 @@ class TorchBasedFeature(Feature):
             if self._tensor.is_pinned():
                 return self._tensor.cuda()
             return self._tensor
-        elif platform.system() == "Linux" and self._disk_fetcher is True:
+        elif self._disk_fetcher is True and platform.system() == "Linux":
             try:
-                return torch.ops.graphbolt.disk_index_select(
-                    self._path, ids.to("cpu"), self._tensor.dtype
-                ).to(ids.device)
+                return self._fetcher.index_select(ids.to("cpu")).to(ids.device)
             except RuntimeError:
                 raise IndexError
         else:

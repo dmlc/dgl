@@ -3,10 +3,11 @@
  * @file index_select.cc
  * @brief Index select operators.
  */
+#include "./index_select.h"
+
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 
-#include "./cnumpy.h"
 #include "./macro.h"
 #include "./utils.h"
 
@@ -20,25 +21,6 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
         { return UVAIndexSelectImpl(input, index); });
   }
   return input.index({index.to(torch::kLong)});
-}
-
-torch::Tensor DiskIndexSelect(
-    std::string path, torch::Tensor index, torch::ScalarType dtype) {
-#ifdef __linux__
-  storage::OnDiskNpyArray arr(path);
-  return arr.index_select_iouring({index.to(torch::kLong)}, dtype);
-#else
-  return torch::empty({0});
-#endif
-}
-
-torch::Tensor DiskFeatureShape(std::string path) {
-#ifdef __linux__
-  storage::OnDiskNpyArray arr(path);
-  return arr.feature_shape();
-#else
-  return torch::empty({0});
-#endif
 }
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(

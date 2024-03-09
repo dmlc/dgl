@@ -7,16 +7,9 @@
 #ifdef __linux__
 #include "cnumpy.h"
 
-#include <fcntl.h>
-#include <liburing.h>
 #include <omp.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <unistd.h>
 
-#include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <regex>
 #include <stdexcept>
 
@@ -25,26 +18,85 @@
 namespace graphbolt {
 namespace storage {
 
-/**
- * @brief Read disk numpy file based on given index and transform to tensor.
- */
-torch::Tensor OnDiskNpyArray::index_select_iouring(
-    torch::Tensor idx, torch::ScalarType dtype) {
-  int feature_fd = open(filename.c_str(), O_RDONLY | O_DIRECT);
+c10::intrusive_ptr<OnDiskNpyArray> CreateDiskFetcher(
+    std::string path, torch::ScalarType dtype) {
+  return c10::make_intrusive<OnDiskNpyArray>(path, dtype);
+}
 
-  int64_t feature_size = feat_len * word_size;
-  // The min page size to contain one feature.
-  int64_t align_len = (feature_size + ALIGNMENT) & (long)~(ALIGNMENT - 1);
-  int64_t num_idx = idx.numel();
+OnDiskNpyArray::OnDiskNpyArray(std::string filename, torch::ScalarType dtype)
+    : filename(filename), dtype(dtype) {
+  FILE *fp = fopen(filename.c_str(), "rb");
+  if (!fp)
+    throw std::runtime_error("npy_load: Unable to open file " + filename);
+  ParseNumpyHeader(fp);
+  fclose(fp);
+  feature_fd = open(filename.c_str(), O_RDONLY | O_DIRECT);
 
-  static int num_thd = 4;           // default thread number.
-  static int64_t group_size = 512;  // default group size.
-  static struct io_uring ring[4];   // io_uring queue.
-
-  // Init io_uring fetcher.
+  // Init io_uring queue.
   for (int64_t t = 0; t < 4; t++) {
     io_uring_queue_init(group_size, &ring[t], 0);
   }
+}
+
+OnDiskNpyArray::~OnDiskNpyArray() {
+  // IO queue exit.
+  for (int64_t t = 0; t < num_thd; t++) {
+    io_uring_queue_exit(&ring[t]);
+  }
+  close(feature_fd);
+}
+
+void OnDiskNpyArray::ParseNumpyHeader(FILE *fp) {
+  char buffer[256];
+  size_t res = fread(buffer, sizeof(char), 11, fp);
+  if (res != 11) throw std::runtime_error("parse_npy_header: failed fread");
+  std::string header = fgets(buffer, 256, fp);
+  assert(header[header.size() - 1] == '\n');
+  prefix_len = 11 + header.size();
+
+  size_t loc1, loc2;
+
+  // Get shape location.
+  loc1 = header.find("(");
+  loc2 = header.find(")");
+  if (loc1 == std::string::npos || loc2 == std::string::npos)
+    throw std::runtime_error(
+        "parse_npy_header: failed to find header keyword: '(' or ')'");
+
+  std::regex num_regex("[0-9][0-9]*");
+  std::smatch sm;
+  std::string str_shape = header.substr(loc1 + 1, loc2 - loc1 - 1);
+  while (std::regex_search(str_shape, sm, num_regex)) {
+    feat_dim.emplace_back(std::stoi(sm[0].str()));
+    str_shape = sm.suffix().str();
+  }
+
+  loc1 = header.find("descr");
+  if (loc1 == std::string::npos)
+    throw std::runtime_error(
+        "parse_npy_header: failed to find header keyword: 'descr'");
+  loc1 += 9;
+  bool littleEndian =
+      (header[loc1] == '<' || header[loc1] == '|' ? true : false);
+  assert(littleEndian);
+
+  std::string str_ws = header.substr(loc1 + 2);
+  loc2 = str_ws.find("'");
+  size_t word_size = atoi(str_ws.substr(0, loc2).c_str());
+
+  signed long feat_len = 1;
+  for (size_t i = 1; i < feat_dim.size(); i++) {
+    feat_len *= feat_dim[i];
+  }
+
+  feature_size = feat_len * word_size;
+}
+
+torch::Tensor OnDiskNpyArray::IndexSelectIOuring(torch::Tensor idx) {
+  // The min page size to contain one feature.
+  idx = idx.to(torch::kLong);
+  int64_t align_len = (feature_size + ALIGNMENT) & (long)~(ALIGNMENT - 1);
+  int64_t num_idx = idx.numel();
 
   omp_set_num_threads(num_thd);
 
@@ -129,10 +181,6 @@ torch::Tensor OnDiskNpyArray::index_select_iouring(
       }
     }
   }
-  // IO queue exit.
-  for (int64_t t = 0; t < num_thd; t++) {
-    io_uring_queue_exit(&ring[t]);
-  }
 
   auto result = torch::empty({0});
   if (!error_flag) {
@@ -153,62 +201,8 @@ torch::Tensor OnDiskNpyArray::index_select_iouring(
 
   free(read_buffer);
   free(result_buffer);
-  close(feature_fd);
 
   return result;
-}
-
-/**
- * @brief Parse numpy meta data.
- */
-void OnDiskNpyArray::parse_npy_header(FILE *fp) {
-  char buffer[256];
-  size_t res = fread(buffer, sizeof(char), 11, fp);
-  if (res != 11) throw std::runtime_error("parse_npy_header: failed fread");
-  std::string header = fgets(buffer, 256, fp);
-  assert(header[header.size() - 1] == '\n');
-  prefix_len = 11 + header.size();
-
-  size_t loc1, loc2;
-
-  // Get shape location.
-  loc1 = header.find("(");
-  loc2 = header.find(")");
-  if (loc1 == std::string::npos || loc2 == std::string::npos)
-    throw std::runtime_error(
-        "parse_npy_header: failed to find header keyword: '(' or ')'");
-
-  std::regex num_regex("[0-9][0-9]*");
-  std::smatch sm;
-  std::string str_shape = header.substr(loc1 + 1, loc2 - loc1 - 1);
-  while (std::regex_search(str_shape, sm, num_regex)) {
-    feat_dim.emplace_back(std::stoi(sm[0].str()));
-    str_shape = sm.suffix().str();
-  }
-
-  feat_len = 1;
-  std::vector<int64_t> shape;
-  for (size_t i = 1; i < feat_dim.size(); i++) {
-    feat_len *= feat_dim[i];
-    shape.push_back(feat_dim[i]);
-  }
-
-  at::TensorOptions opts = at::TensorOptions().dtype(at::kLong);
-  feat_shape =
-      torch::from_blob(shape.data(), {int64_t(shape.size())}, opts).clone();
-
-  loc1 = header.find("descr");
-  if (loc1 == std::string::npos)
-    throw std::runtime_error(
-        "parse_npy_header: failed to find header keyword: 'descr'");
-  loc1 += 9;
-  bool littleEndian =
-      (header[loc1] == '<' || header[loc1] == '|' ? true : false);
-  assert(littleEndian);
-
-  std::string str_ws = header.substr(loc1 + 2);
-  loc2 = str_ws.find("'");
-  word_size = atoi(str_ws.substr(0, loc2).c_str());
 }
 
 }  // namespace storage
