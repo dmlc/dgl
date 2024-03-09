@@ -1,4 +1,4 @@
-/*!
+/**
  *   Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  *   All rights reserved.
  *
@@ -14,7 +14,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * @file src/continuous_seed.h
+ * @file graphbolt/continuous_seed.h
  * @brief CPU and CUDA implementation for continuous random seeds
  */
 #ifndef GRAPHBOLT_CONTINUOUS_SEED_H_
