@@ -137,10 +137,6 @@ class TorchBasedFeature(Feature):
         else:
             return index_select(self._tensor, ids)
 
-    def set_disk_fetcher(self, disk_fetcher: bool = True):
-        """Open or close the disk fetcher."""
-        self._disk_fetcher = disk_fetcher
-
     def size(self):
         """Get the size of the feature.
 
