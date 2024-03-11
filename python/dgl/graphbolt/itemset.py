@@ -389,3 +389,152 @@ class ItemSetDict:
             itemsets=itemsets_str,
             names=self._names,
         )
+
+
+from typing import List
+from collections.abc import Mapping
+class ItemSet2(torch.utils.data.Dataset):
+    r"""Class for iterating over tensor-like data.
+    Experimental. Implemented both __getitem__() and __getitems__().
+    """
+
+    def __init__(
+        self,
+        items: Union[torch.Tensor, Mapping, Tuple[Mapping]],
+        names: Union[str, Tuple[str]] = None,
+    ):
+        if is_scalar(items):
+            self._length = int(items)
+            self._items = items
+        elif isinstance(items, tuple) :
+            self._length = len(items[0])
+            if any(self._length != len(item) for item in items):
+                raise ValueError("Size mismatch between items.")
+            self._items = items
+        else:
+            self._length = len(items)
+            self._items = (items,)
+        if names is not None:
+            num_items = (
+                len(self._items) if isinstance(self._items, tuple) else 1
+            )
+            if isinstance(names, tuple):
+                self._names = names
+            else:
+                self._names = (names,)
+            assert num_items == len(self._names), (
+                f"Number of items ({num_items}) and "
+                f"names ({len(self._names)}) must match."
+            )
+        else:
+            self._names = None
+
+    def __len__(self) -> int:
+        return self._length
+    
+    def __getitem__(self, index: int):
+        if is_scalar(self._items):
+            if index < 0:
+                index += int(self._items)
+            if index < 0 or index >= int(self._items):
+                raise IndexError(
+                    f"{type(self).__name__} index out of range."
+                )
+            return torch.tensor(index, dtype=self._items.dtype)
+        if len(self._items) == 1:
+            return self._items[0][index]
+        return tuple(item[index] for item in self._items)
+    
+    def __getitems__(self, indices: list):
+        if is_scalar(self._items):
+            data = torch.tensor(indices, dtype=self._items.dtype)
+            assert torch.all((data >= 0) & (data < self._items)), f"{type(self).__name__} indices out of range."
+            return data
+    
+        list_batch: List[list] = [[] for _ in indices]
+        for item in self._items:
+            # if isinstance(item, torch.Tensor):
+            if callable(getattr(item, "__getitems__", None)):
+                data = item.__getitems__(indices)
+                if len(data) != len(indices):
+                    raise ValueError("Nested dataset's output size mismatch."
+                                         f" Expected {len(indices)}, got {len(data)}")
+                for value, t_sample in zip(data, list_batch):
+                    t_sample.append(value)
+            elif isinstance:
+                ...
+
+class ItemSet3(torch.utils.data.Dataset):
+    r"""Class for iterating over tensor-like data.
+    Experimental. Implemented only __getitem__().
+    """
+
+    def __init__(
+        self,
+        items: Union[torch.Tensor, Mapping, Tuple[Mapping]],
+        names: Union[str, Tuple[str]] = None,
+    ):
+        if is_scalar(items):
+            self._length = int(items)
+            self._items = items
+        elif isinstance(items, tuple) :
+            self._length = len(items[0])
+            if any(self._length != len(item) for item in items):
+                raise ValueError("Size mismatch between items.")
+            self._items = items
+        else:
+            self._length = len(items)
+            self._items = (items,)
+        if names is not None:
+            num_items = (
+                len(self._items) if isinstance(self._items, tuple) else 1
+            )
+            if isinstance(names, tuple):
+                self._names = names
+            else:
+                self._names = (names,)
+            assert num_items == len(self._names), (
+                f"Number of items ({num_items}) and "
+                f"names ({len(self._names)}) must match."
+            )
+        else:
+            self._names = None
+
+    def __len__(self) -> int:
+        return self._length
+    
+    def __getitem__(self, index: Union[int, slice, List[int]]):
+        if is_scalar(self._items):
+            if isinstance(index, slice):
+                start, stop, step = index.indices(int(self._items))
+                dtype = getattr(self._items, "dtype", torch.int64)
+                return torch.arange(start, stop, step, dtype=dtype)
+            elif isinstance(index, int):
+                if index < 0:
+                    index += int(self._items)
+                if index < 0 or index >= int(self._items):
+                    raise IndexError(
+                        f"{type(self).__name__} index out of range."
+                    )
+                return torch.tensor(index, dtype=self._items.dtype)
+            else:
+                dtype = getattr(self._items, "dtype", torch.int64)
+                return torch.tensor(index, dtype=dtype)
+        elif len(self._items) == 1:
+            return self._items[0][index]
+        else:
+            return tuple(item[index] for item in self._items)
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
+    
+    def __repr__(self) -> str:
+        ret = (
+            f"{self.__class__.__name__}(\n"
+            f"    items={self._items},\n"
+            f"    names={self._names},\n"
+            f")"
+        )
+        return ret
