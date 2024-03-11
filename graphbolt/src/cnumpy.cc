@@ -15,7 +15,7 @@
 namespace graphbolt {
 namespace storage {
 
-#define ALIGNMENT 4096
+constexpr int disk_alignment_size = 4096;
 
 c10::intrusive_ptr<OnDiskNpyArray> CreateDiskFetcher(
     std::string path, torch::ScalarType dtype) {
@@ -105,13 +105,15 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOuring(torch::Tensor idx) {
 #ifdef __linux__
   idx = idx.to(torch::kLong);
   // The minimum page size to contain one feature.
-  int64_t align_len = (feature_size_ + ALIGNMENT) & (long)~(ALIGNMENT - 1);
+  int64_t align_len =
+      (feature_size_ + disk_alignment_size) & (long)~(disk_alignment_size - 1);
   int64_t num_idx = idx.numel();
 
   char *read_buffer = (char *)aligned_alloc(
-      ALIGNMENT, (align_len + ALIGNMENT) * group_size_ * num_thd_);
+      disk_alignment_size,
+      (align_len + disk_alignment_size) * group_size_ * num_thd_);
   char *result_buffer =
-      (char *)aligned_alloc(ALIGNMENT, feature_size_ * num_idx);
+      (char *)aligned_alloc(disk_alignment_size, feature_size_ * num_idx);
 
   auto idx_data = idx.data_ptr<int64_t>();
 
@@ -120,6 +122,10 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOuring(torch::Tensor idx) {
 
   // Indicator for index error.
   bool error_flag = false;
+  TORCH_CHECK(
+      num_thd_ == torch::get_num_threads(),
+      "The number of threads can not be changed after a disk feature fetcher "
+      "is constructed.");
   torch::parallel_for(0, num_idx, group_size_, [&](int64_t begin, int64_t end) {
     auto thd_id = torch::get_thread_num();
     if (!error_flag) {
@@ -131,12 +137,13 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOuring(torch::Tensor idx) {
           break;
         }
         int64_t offset = i * feature_size_ + prefix_len_;
-        int64_t aligned_offset = offset & (long)~(ALIGNMENT - 1);
+        int64_t aligned_offset = offset & (long)~(disk_alignment_size - 1);
         residual[thd_id * group_size_ + m] = offset - aligned_offset;
 
         int64_t read_size;
-        if (residual[thd_id * group_size_ + m] + feature_size_ > ALIGNMENT) {
-          read_size = align_len + ALIGNMENT;
+        if (residual[thd_id * group_size_ + m] + feature_size_ >
+            disk_alignment_size) {
+          read_size = align_len + disk_alignment_size;
         } else {
           read_size = align_len;
         }
@@ -145,8 +152,9 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOuring(torch::Tensor idx) {
         struct io_uring_sqe *sqe = io_uring_get_sqe(&ring_[thd_id]);
         io_uring_prep_read(
             sqe, feature_fd_,
-            read_buffer + ((align_len + ALIGNMENT) * group_size_ * thd_id) +
-                ((align_len + ALIGNMENT) * m),
+            read_buffer +
+                ((align_len + disk_alignment_size) * group_size_ * thd_id) +
+                ((align_len + disk_alignment_size) * m),
             read_size, aligned_offset);
       }
       if (!error_flag) {
@@ -178,8 +186,9 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOuring(torch::Tensor idx) {
         for (int64_t m = 0; m < end - begin; m++) {
           memcpy(
               result_buffer + feature_size_ * (begin + m),
-              read_buffer + ((align_len + ALIGNMENT) * group_size_ * thd_id) +
-                  ((align_len + ALIGNMENT) * m +
+              read_buffer +
+                  ((align_len + disk_alignment_size) * group_size_ * thd_id) +
+                  ((align_len + disk_alignment_size) * m +
                    residual[thd_id * group_size_ + m]),
               feature_size_);
         }

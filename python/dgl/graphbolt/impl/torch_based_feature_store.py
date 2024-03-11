@@ -131,7 +131,7 @@ class TorchBasedFeature(Feature):
             return self._tensor
         elif self._disk_fetcher is True and platform.system() == "Linux":
             try:
-                return self._fetcher.index_select(ids.to("cpu")).to(ids.device)
+                return self._fetcher.index_select(ids.cpu()).to(ids.device)
             except RuntimeError:
                 raise IndexError
         else:
