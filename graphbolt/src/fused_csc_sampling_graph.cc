@@ -1417,6 +1417,25 @@ inline void safe_divide(T& a, U b) {
   a = b > 0 ? (T)(a / b) : std::numeric_limits<T>::infinity();
 }
 
+namespace labor {
+
+template <typename T>
+inline T invcdf(T u, int64_t n, T rem) {
+  constexpr T one = 1;
+  return rem * (one - std::pow(one - u, one / n));
+}
+
+template <typename T>
+inline T jth_sorted_uniform_random(
+    continuous_seed seed, int64_t t, int64_t c, int64_t j, T& rem, int64_t n) {
+  const T u = seed.uniform(t + j * c);
+  // https://mathematica.stackexchange.com/a/256707
+  rem -= invcdf(u, n, rem);
+  return 1 - rem;
+}
+
+};  // namespace labor
+
 /**
  * @brief Perform uniform-nonuniform sampling of elements depending on the
  * template parameter NonUniform and return the sampled indices.
@@ -1563,8 +1582,7 @@ inline int64_t LaborPick(
           // O(num_neighbors).
           for (uint32_t i = 0; i < fanout; ++i) {
             const auto t = local_indices_data[i];
-            auto rnd =
-                labor::uniform_random<float>(args.random_seed, t);  // r_t
+            auto rnd = args.random_seed.uniform(t);  // r_t
             if constexpr (NonUniform) {
               safe_divide(rnd, local_probs_data[i]);
             }  // r_t / \pi_t
@@ -1575,8 +1593,7 @@ inline int64_t LaborPick(
           }
           for (uint32_t i = fanout; i < num_neighbors; ++i) {
             const auto t = local_indices_data[i];
-            auto rnd =
-                labor::uniform_random<float>(args.random_seed, t);  // r_t
+            auto rnd = args.random_seed.uniform(t);  // r_t
             if constexpr (NonUniform) {
               safe_divide(rnd, local_probs_data[i]);
             }  // r_t / \pi_t
