@@ -397,7 +397,7 @@ from typing import List
 from torch.utils.data import Dataset
 
 
-class ItemSet2(Dataset):
+class ItemSet3(Dataset):
     r"""Class for iterating over tensor-like data.
     Experimental. Implemented both __getitem__() and __getitems__().
     """
@@ -471,7 +471,7 @@ class ItemSet2(Dataset):
                 ...
 
 
-class ItemSet3(Dataset):
+class ItemSet2(Dataset):
     r"""Class for iterating over tensor-like data.
     Experimental. Implemented only __getitem__().
     """
@@ -524,12 +524,16 @@ class ItemSet3(Dataset):
                         f"{type(self).__name__} index out of range."
                     )
                 return torch.tensor(index, dtype=self._items.dtype)
-            else:
+            elif isinstance(index, list):
                 dtype = getattr(self._items, "dtype", torch.int64)
                 return torch.tensor(index, dtype=dtype)
+            else:
+                raise TypeError(
+                    f"{type(self).__name__} indices must be int, slice or list of int."
+                )
         elif len(self._items) == 1:
             return self._items[0][index]
-        else:
+        elif isinstance:
             return tuple(item[index] for item in self._items)
 
     @property
@@ -547,10 +551,10 @@ class ItemSet3(Dataset):
         return ret
 
 
-class ItemSetDict3(Dataset):
+class ItemSetDict2(Dataset):
     r"""Experimental."""
 
-    def __init__(self, itemsets: Dict[str, ItemSet3]) -> None:
+    def __init__(self, itemsets: Dict[str, ItemSet2]) -> None:
         super().__init__()
         self._itemsets = itemsets
         self._names = next(iter(itemsets.values())).names
@@ -559,7 +563,6 @@ class ItemSetDict3(Dataset):
             raise ValueError("All itemsets must have the same names.")
         offset = [0] + [len(itemset) for itemset in self._itemsets.values()]
         self._offsets = torch.tensor(offset).cumsum(0)
-        self
 
     def __len__(self) -> int:
         return self._length
@@ -594,8 +597,33 @@ class ItemSetDict3(Dataset):
                 if stop <= self._offsets[offset_idx]:
                     break
             return data
+        elif isinstance(index, list):
+            data = dict.fromkeys(self._itemsets.keys(), [])
+            for idx in index:
+                if idx < 0:
+                    idx += total_num
+                if idx < 0 or idx >= total_num:
+                    raise IndexError(
+                        f"{type(self).__name__} index out of range."
+                    )
+                offset_idx = torch.searchsorted(self._offsets, idx, right=True)
+                offset_idx -= 1
+                idx -= self._offsets[offset_idx]
+                key = list(self._itemsets.keys())[offset_idx]
+                data[key].append(idx)
+            for key, value in data.items():
+                item_set = self._itemsets[key]
+                try:
+                    value = item_set[value]
+                except TypeError:
+                    value = tuple(item_set[idx] for idx in value)
+                finally:
+                    data[key] = value
+            return data
         else:
-            ...
+            raise TypeError(
+                f"{type(self).__name__} indices must be int, slice or list of int."
+            )
 
     @property
     def names(self) -> Tuple[str]:

@@ -744,3 +744,16 @@ class DistributedItemSampler(ItemSampler):
             )
         self._world_size = dist.get_world_size()
         self._rank = dist.get_rank()
+
+
+from torchdata.datapipes.map import MapDataPipe
+
+from .itemset import ItemSet2, ItemSetDict2
+
+
+class ItemSampler2(MapDataPipe):
+    def __init__(
+        self,
+        item_set: Union[ItemSet2, ItemSetDict2],
+    ) -> None:
+        super().__init__()
