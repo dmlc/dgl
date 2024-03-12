@@ -13,7 +13,162 @@ from ..feature_store import Feature
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
 
-__all__ = ["TorchBasedFeature", "TorchBasedFeatureStore"]
+__all__ = ["TorchBasedFeature", "DiskBasedFeature", "TorchBasedFeatureStore"]
+
+
+class DiskBasedFeature(Feature):
+    r"""A wrapper of disk based feature.
+
+    Initialize a disk based feature fetcher by a numpy file.
+
+    Parameters
+    ----------
+    path : string
+        The path to the numpy feature file.
+        Note that the dimension of the numpy should be greater than 1.
+    Examples
+    --------
+    >>> import torch
+    >>> from dgl import graphbolt as gb
+    >>> torch_feat = torch.arange(10).reshape(2, -1)
+    >>> feature = gb.DiskBasedFeature(torch_feat)
+    >>> feature.read(torch.tensor([0]))
+    tensor([[0, 1, 2, 3, 4]])
+    >>> feature.size()
+    torch.Size([5])
+    """
+
+    def __init__(self, path: str, metadata: Dict = None):
+        super().__init__()
+        self._is_inplace_pinned = set()
+        mmap_mode = "r+"
+        self._tensor = torch.from_numpy(
+            np.load(path, mmap_mode=mmap_mode)
+        ).contiguous()
+
+        self._metadata = metadata
+        self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
+            path, self._tensor.dtype
+        )
+
+    def __del__(self):
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        for tensor in self._is_inplace_pinned:
+            assert self._inplace_unpinner(tensor.data_ptr()) == 0
+
+    def read(self, ids: torch.Tensor = None):
+        """Read the feature by index.
+        The returned tensor will be on CPU.
+        Parameters
+        ----------
+        ids : torch.Tensor
+            The index of the feature. Only the specified indices of the
+            feature are read.
+        Returns
+        -------
+        torch.Tensor
+            The read feature.
+        """
+        if ids is None:
+            if self._tensor.is_pinned():
+                return self._tensor.cuda()
+            return self._tensor
+        elif platform.system() == "Linux":
+            try:
+                return self._ondisk_npy_array.index_select(ids.cpu()).to(
+                    ids.device
+                )
+            except RuntimeError:
+                raise IndexError
+        else:
+            return index_select(self._tensor, ids)
+
+    def size(self):
+        """Get the size of the feature.
+        Returns
+        -------
+        torch.Size
+            The size of the feature.
+        """
+        return self._tensor.size()[1:]
+
+    def update(self, value: torch.Tensor, ids: torch.Tensor = None):
+        """Disk based feature does not support update for now."""
+        raise NotImplementedError
+
+    def metadata(self):
+        """Get the metadata of the feature.
+        Returns
+        -------
+        Dict
+            The metadata of the feature.
+        """
+        return (
+            self._metadata if self._metadata is not None else super().metadata()
+        )
+
+    def pin_memory_(self):
+        """In-place operation to copy the feature to pinned memory. Returns the
+        same object modified in-place."""
+        # torch.Tensor.pin_memory() is not an inplace operation. To make it
+        # truly in-place, we need to use cudaHostRegister. Then, we need to use
+        # cudaHostUnregister to unpin the tensor in the destructor.
+        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
+        x = self._tensor
+        if not x.is_pinned() and x.device.type == "cpu":
+            assert (
+                x.is_contiguous()
+            ), "Tensor pinning is only supported for contiguous tensors."
+            cudart = torch.cuda.cudart()
+            assert (
+                cudart.cudaHostRegister(
+                    x.data_ptr(), x.numel() * x.element_size(), 0
+                )
+                == 0
+            )
+
+            self._is_inplace_pinned.add(x)
+            self._inplace_unpinner = cudart.cudaHostUnregister
+
+        return self
+
+    def is_pinned(self):
+        """Returns True if the stored feature is pinned."""
+        return self._tensor.is_pinned()
+
+    def to(self, device):  # pylint: disable=invalid-name
+        """Copy `DiskBasedFeature` to the specified device."""
+        # copy.copy is a shallow copy so it does not copy tensor memory.
+        self2 = copy.copy(self)
+        if device == "pinned":
+            self2._tensor = self2._tensor.pin_memory()
+        else:
+            self2._tensor = self2._tensor.to(device)
+        return self2
+
+    def __repr__(self) -> str:
+        ret = (
+            "{Classname}(\n"
+            "    feature={feature},\n"
+            "    metadata={metadata},\n"
+            ")"
+        )
+
+        feature_str = textwrap.indent(
+            str(self._tensor), " " * len("    feature=")
+        ).strip()
+        metadata_str = textwrap.indent(
+            str(self.metadata()), " " * len("    metadata=")
+        ).strip()
+
+        return ret.format(
+            Classname=self.__class__.__name__,
+            feature=feature_str,
+            metadata=metadata_str,
+        )
 
 
 class TorchBasedFeature(Feature):
@@ -73,13 +228,7 @@ class TorchBasedFeature(Feature):
     device(type='cuda', index=0)
     """
 
-    def __init__(
-        self,
-        torch_feature: torch.Tensor,
-        metadata: Dict = None,
-        disk_fetcher: bool = False,
-        path: str = None,
-    ):
+    def __init__(self, torch_feature: torch.Tensor, metadata: Dict = None):
         super().__init__()
         self._is_inplace_pinned = set()
         assert isinstance(torch_feature, torch.Tensor), (
@@ -93,11 +242,6 @@ class TorchBasedFeature(Feature):
         # Make sure the tensor is contiguous.
         self._tensor = torch_feature.contiguous()
         self._metadata = metadata
-        self._disk_fetcher = disk_fetcher
-        if self._disk_fetcher is True:
-            self._fetcher = torch.ops.graphbolt.disk_fetcher(
-                path, self._tensor.dtype
-            )
 
     def __del__(self):
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
@@ -129,13 +273,7 @@ class TorchBasedFeature(Feature):
             if self._tensor.is_pinned():
                 return self._tensor.cuda()
             return self._tensor
-        elif self._disk_fetcher is True and platform.system() == "Linux":
-            try:
-                return self._fetcher.index_select(ids.cpu()).to(ids.device)
-            except RuntimeError:
-                raise IndexError
-        else:
-            return index_select(self._tensor, ids)
+        return torch.ops.graphbolt.index_select(self._tensor, ids)
 
     def size(self):
         """Get the size of the feature.
@@ -306,7 +444,6 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                 features[key] = TorchBasedFeature(
                     torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
                     metadata=metadata,
-                    path=spec.path,
                 )
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")

@@ -30,10 +30,8 @@ def test_disk_based_feature():
         path_a = to_on_disk_numpy(test_dir, "a", a)
         path_b = to_on_disk_numpy(test_dir, "b", b)
 
-        feature_a = gb.TorchBasedFeature(
-            a, metadata=metadata, disk_fetcher=True, path=path_a
-        )
-        feature_b = gb.TorchBasedFeature(b, disk_fetcher=True, path=path_b)
+        feature_a = gb.DiskBasedFeature(path=path_a, metadata=metadata)
+        feature_b = gb.DiskBasedFeature(path=path_b)
 
         # Read the entire feature.
         assert torch.equal(
@@ -82,28 +80,8 @@ def test_disk_based_feature():
         np.save(path_contiguous, contiguous_numpy)
         np.save(path_non_contiguous, non_contiguous_numpy)
 
-        cur_mmap_mode = "r+"
-        feature_c = gb.TorchBasedFeature(
-            torch.from_numpy(
-                np.load(
-                    path_contiguous,
-                    mmap_mode=cur_mmap_mode,
-                )
-            ),
-            metadata=metadata,
-            disk_fetcher=True,
-            path=path_contiguous,
-        )
-        feature_n = gb.TorchBasedFeature(
-            torch.from_numpy(
-                np.load(
-                    path_non_contiguous,
-                    mmap_mode=cur_mmap_mode,
-                )
-            ),
-            disk_fetcher=True,
-            path=path_non_contiguous,
-        )
+        feature_c = gb.DiskBasedFeature(path=path_contiguous, metadata=metadata)
+        feature_n = gb.DiskBasedFeature(path=path_non_contiguous)
 
         assert feature_c._tensor.is_contiguous()
         assert feature_n._tensor.is_contiguous()
@@ -148,7 +126,7 @@ def test_more_disk_based_feature(dtype, idtype, shape, index):
     with tempfile.TemporaryDirectory() as test_dir:
         path = to_on_disk_numpy(test_dir, "tensor", tensor)
 
-        feature = gb.TorchBasedFeature(tensor, disk_fetcher=True, path=path)
+        feature = gb.DiskBasedFeature(path=path)
 
         # Test read feature.
         assert torch.equal(
@@ -170,20 +148,18 @@ def test_disk_based_feature_repr():
         path_a = to_on_disk_numpy(test_dir, "a", a)
         path_b = to_on_disk_numpy(test_dir, "b", b)
 
-        feature_a = gb.TorchBasedFeature(
-            a, metadata=metadata, disk_fetcher=True, path=path_a
-        )
-        feature_b = gb.TorchBasedFeature(b, disk_fetcher=True, path=path_b)
+        feature_a = gb.DiskBasedFeature(path=path_a, metadata=metadata)
+        feature_b = gb.DiskBasedFeature(path=path_b)
 
         expected_str_feature_a = str(
-            "TorchBasedFeature(\n"
+            "DiskBasedFeature(\n"
             "    feature=tensor([[1, 2, 3],\n"
             "                    [4, 5, 6]]),\n"
             "    metadata={'max_value': 3},\n"
             ")"
         )
         expected_str_feature_b = str(
-            "TorchBasedFeature(\n"
+            "DiskBasedFeature(\n"
             "    feature=tensor([[[1, 2],\n"
             "                     [3, 4]],\n"
             "\n"

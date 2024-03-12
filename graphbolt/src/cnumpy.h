@@ -32,40 +32,86 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   /** @brief Default constructor. */
   OnDiskNpyArray() = default;
 
-  /** @brief Constructor with given file path. */
+  /**
+   * @brief Constructor with given file path and data type.
+   * @param path Path to the on disk numpy file.
+   * @param dtype Data type of numpy array.
+   *
+   * @return OnDiskNpyArray
+   */
   OnDiskNpyArray(std::string filename, torch::ScalarType dtype);
+
+  /** @brief Create a disk feature fetcher from numpy file. */
+  static c10::intrusive_ptr<OnDiskNpyArray> Create(
+      std::string path, torch::ScalarType dtype);
 
   /** @brief Deconstructor. */
   ~OnDiskNpyArray();
 
   /**
-   * @brief Parse numpy meta data.
-   */
+   * @brief Parses the header of a numpy file to extract feature information.
+   *
+   * Numpy files have a specific binary storage format. This method parses the
+   * header of the numpy file. It first extracts the header information of the
+   * numpy file by string manipulation, ending with a character "\n".
+   * The header contains three descriptors: 'descr' for data format description
+   * 'fortran_order' for row or column order preference, and 'shape' for data
+   * shape. The data format description includes the endianness, data type, and
+   * data length, e.g. '<i8' denotes little-endian storage, integer type, and
+   * 8-byte size (64 bit integer).
+   *
+   * For example, for a tensor `A` having 2 features with following entries:
+   * [[1, 2, 3], [4, 5, 6]]
+   * When `A` is saved as an numpy file, the data is stored as:
+   *   �NUMPY'descr': '<i8', 'fortran_order': False, 'shape': (2, 3), }\n
+   *   1 2 3 4 5 6
+   *
+   * For a tensor `B` having 2 features with following entries:
+   * [[[1, 2], [3, 4]], [[4, 5], [6, 7]]]
+   * When `B` is saved as an numpy file, the data is stored as:
+   *   �NUMPY'descr': '<i8', 'fortran_order': False, 'shape': (2, 2, 2), }\n
+   *   1 2 3 4 4 5 6 7
+   **/
   void ParseNumpyHeader();
 
   /**
    * @brief Read disk numpy file based on given index and transform to
    * tensor.
    */
-  torch::Tensor IndexSelectIOuring(torch::Tensor idx);
-
- private:
-  std::string filename_;           // Path to numpy file.
-  torch::ScalarType dtype_;        // Feature data type.
-  int feature_fd_;                 // File description.
-  std::vector<int64_t> feat_dim_;  // Shape of features, e.g. {N,M,K,L}.
-  int num_thd_;                    // Default thread number.
-  int64_t group_size_ = 512;       // Default group size.
-  int64_t feature_size_;           // Number of bytes of feature size.
-  size_t prefix_len_;              // Length of head data in numpy file.
+  torch::Tensor IndexSelect(torch::Tensor index);
 
 #ifdef __linux__
-  io_uring* ring_;  // io_uring queue.
+  /**
+   * @brief Index-select operation on an on-disk numpy array using IO Uring for
+   * asynchronous I/O.
+   *
+   * This function performs index-select operation on an on-disk numpy array. It
+   * uses IO Uring for asynchronous I/O to efficiently read data from disk. The
+   * input tensor 'index' specifies the indices of features to select. The
+   * function reads features corresponding to the indices from the disk and
+   * returns a new tensor containing the selected features.
+   *
+   * @param index A 1D tensor containing the indices of features to select.
+   * @return A tensor containing the selected features.
+   * @throws std::runtime_error If index is out of range.
+   */
+  torch::Tensor IndexSelectIOUring(torch::Tensor index);
+#endif  // __linux__
+
+ private:
+  std::string filename_;              // Path to numpy file.
+  int file_description_;              // File description.
+  size_t prefix_len_;                 // Length of head data in numpy file.
+  std::vector<int64_t> feature_dim_;  // Shape of features, e.g. {N,M,K,L}.
+  torch::ScalarType dtype_;           // Feature data type.
+  int64_t feature_size_;              // Number of bytes of feature size.
+  int num_thread_;                    // Default thread number.
+  int64_t group_size_ = 512;          // Default group size.
+
+#ifdef __linux__
+  io_uring* io_uring_queue_;  // io_uring queue.
 #endif
 };
-
-c10::intrusive_ptr<OnDiskNpyArray> CreateDiskFetcher(
-    std::string path, torch::ScalarType dtype);
 
 }  // namespace storage
 }  // namespace graphbolt
