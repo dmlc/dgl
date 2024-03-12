@@ -361,7 +361,7 @@ class NeighborSamplerImpl(SubgraphSampler):
                 sampler, fanout, replace, prob_name
             )
             datapipe = datapipe.compact_per_layer(deduplicate)
-            if not layer_dependency:
+            if is_labor and not layer_dependency:
                 datapipe = datapipe.transform(self._increment_seed)
         if is_labor:
             datapipe = datapipe.transform(self._delattr_dependency)
