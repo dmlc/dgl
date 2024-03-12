@@ -314,6 +314,9 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * probabilities corresponding to each neighboring edge of a node. It must be
    * a 1D floating-point or boolean tensor, with the number of elements
    * equalling the total number of edges.
+   * @param random_seed The random seed for the sampler for layer=True.
+   * @param seed2_contribution The contribution of the second random seed,
+   * [0, 1) for layer=True.
    *
    * @return An intrusive pointer to a FusedSampledSubgraph object containing
    * the sampled graph's information.
@@ -321,7 +324,9 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
       torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
       bool replace, bool layer, bool return_eids,
-      torch::optional<std::string> probs_name) const;
+      torch::optional<std::string> probs_name,
+      torch::optional<torch::Tensor> random_seed,
+      double seed2_contribution) const;
 
   /**
    * @brief Sample neighboring edges of the given nodes with a temporal
