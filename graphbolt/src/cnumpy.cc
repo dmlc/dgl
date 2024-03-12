@@ -55,6 +55,7 @@ OnDiskNpyArray::~OnDiskNpyArray() {
 }
 
 void OnDiskNpyArray::ParseNumpyHeader() {
+#ifdef __linux__
   // Parse numpy file header to get basic info of feature.
   int file_description = open(filename_.c_str(), O_RDONLY);
   if (file_description == -1)
@@ -116,6 +117,7 @@ void OnDiskNpyArray::ParseNumpyHeader() {
     feature_length *= feature_dim_[i];
   }
   feature_size_ = feature_length * word_size;
+#endif  // __linux__
 }
 
 torch::Tensor OnDiskNpyArray::IndexSelect(torch::Tensor index) {
@@ -186,43 +188,43 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                     ((align_len + kDiskAlignmentSize) * group_id),
                 read_size, aligned_offset);
           }
-          if (!error_flag.load()) {
-            // Submit I/O requests.
-            io_uring_submit(&io_uring_queue_[thread_id]);
+        }
+        if (!error_flag.load()) {
+          // Submit I/O requests.
+          io_uring_submit(&io_uring_queue_[thread_id]);
 
-            // Wait for completion of I/O requests.
-            int64_t num_finish = 0;
-            // Wait until all the disk blocks are loaded in current group.
-            while (num_finish < end - begin) {
-              struct io_uring_cqe *complete_queue;
-              if (io_uring_wait_cqe(
-                      &io_uring_queue_[thread_id], &complete_queue) < 0) {
-                perror("io_uring_wait_cqe");
-                abort();
-              }
-              struct io_uring_cqe *complete_queues[group_size_];
-              int cqe_count = io_uring_peek_batch_cqe(
-                  &io_uring_queue_[thread_id], complete_queues, group_size_);
-              if (cqe_count == -1) {
-                perror("io_uring_peek_batch error\n");
-                abort();
-              }
-              // Move the head pointer of completion queue.
-              io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
-              num_finish += cqe_count;
+          // Wait for completion of I/O requests.
+          int64_t num_finish = 0;
+          // Wait until all the disk blocks are loaded in current group.
+          while (num_finish < end - begin) {
+            struct io_uring_cqe *complete_queue;
+            if (io_uring_wait_cqe(
+                    &io_uring_queue_[thread_id], &complete_queue) < 0) {
+              perror("io_uring_wait_cqe");
+              abort();
             }
+            struct io_uring_cqe *complete_queues[group_size_];
+            int cqe_count = io_uring_peek_batch_cqe(
+                &io_uring_queue_[thread_id], complete_queues, group_size_);
+            if (cqe_count == -1) {
+              perror("io_uring_peek_batch error\n");
+              abort();
+            }
+            // Move the head pointer of completion queue.
+            io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
+            num_finish += cqe_count;
+          }
 
-            // Copy the features in the disk blocks to the result buffer.
-            for (int64_t group_id = 0; group_id < end - begin; group_id++) {
-              memcpy(
-                  result_buffer + feature_size_ * (begin + group_id),
-                  read_buffer +
-                      ((align_len + kDiskAlignmentSize) * group_size_ *
-                       thread_id) +
-                      ((align_len + kDiskAlignmentSize) * group_id +
-                       residual[thread_id * group_size_ + group_id]),
-                  feature_size_);
-            }
+          // Copy the features in the disk blocks to the result buffer.
+          for (int64_t group_id = 0; group_id < end - begin; group_id++) {
+            memcpy(
+                result_buffer + feature_size_ * (begin + group_id),
+                read_buffer +
+                    ((align_len + kDiskAlignmentSize) * group_size_ *
+                     thread_id) +
+                    ((align_len + kDiskAlignmentSize) * group_id +
+                     residual[thread_id * group_size_ + group_id]),
+                feature_size_);
           }
         }
       });
