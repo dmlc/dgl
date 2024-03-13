@@ -47,7 +47,7 @@ class DiskBasedFeature(Feature):
 
         self._metadata = metadata
         self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
-            path, self._tensor.dtype
+            path, self._tensor.dtype, torch.tensor(self._tensor.shape)
         )
 
     def read(self, ids: torch.Tensor = None):

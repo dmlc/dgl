@@ -16,13 +16,12 @@ namespace graphbolt {
 namespace storage {
 
 static constexpr int kDiskAlignmentSize = 4096;
-static constexpr int kSkipHeaderSize = 11;
-static constexpr int kMaxHeaderSize = 256;
 
-OnDiskNpyArray::OnDiskNpyArray(std::string filename, torch::ScalarType dtype)
+OnDiskNpyArray::OnDiskNpyArray(
+    std::string filename, torch::ScalarType dtype, torch::Tensor shape)
     : filename_(filename), dtype_(dtype) {
 #ifdef __linux__
-  ParseNumpyHeader();
+  ParseNumpyHeader(shape);
   file_description_ = open(filename.c_str(), O_RDONLY | O_DIRECT);
   if (file_description_ == -1) {
     throw std::runtime_error("npy_load: Unable to open file " + filename);
@@ -40,8 +39,8 @@ OnDiskNpyArray::OnDiskNpyArray(std::string filename, torch::ScalarType dtype)
 }
 
 c10::intrusive_ptr<OnDiskNpyArray> OnDiskNpyArray::Create(
-    std::string path, torch::ScalarType dtype) {
-  return c10::make_intrusive<OnDiskNpyArray>(path, dtype);
+    std::string path, torch::ScalarType dtype, torch::Tensor shape) {
+  return c10::make_intrusive<OnDiskNpyArray>(path, dtype, shape);
 }
 
 OnDiskNpyArray::~OnDiskNpyArray() {
@@ -54,69 +53,34 @@ OnDiskNpyArray::~OnDiskNpyArray() {
 #endif  // __linux__
 }
 
-void OnDiskNpyArray::ParseNumpyHeader() {
+void OnDiskNpyArray::ParseNumpyHeader(torch::Tensor shape) {
 #ifdef __linux__
   // Parse numpy file header to get basic info of feature.
-  int file_description = open(filename_.c_str(), O_RDONLY);
-  if (file_description == -1)
-    throw std::runtime_error(
-        "ParseNumpyHeader: Unable to open file " + filename_);
-
-  char buffer[kMaxHeaderSize];
-  // Prefix of length kSkipHeaderSize do not contain information.
-  ssize_t res = read(file_description, buffer, kSkipHeaderSize);
-  if (res != kSkipHeaderSize)
-    throw std::runtime_error("ParseNumpyHeader: failed read numpy header");
-  // Store header string.
-  std::string header;
-  while (read(file_description, buffer, 1) == 1) {
-    header.push_back(buffer[0]);
-    if (buffer[0] == '\n') break;
+  size_t word_size = c10::elementSize(dtype_);
+  int64_t num_dim = shape.numel();
+  auto shape_ptr = shape.data_ptr<int64_t>();
+  for (int64_t d = 0; d < num_dim; d++) {
+    feature_dim_.emplace_back(shape_ptr[d]);
   }
-  assert(header[header.size() - 1] == '\n');
-  // Get prefix length for computing feature offset.
-  prefix_len_ = kSkipHeaderSize + header.size();
-  close(file_description);
-
-  // Get header description string.
-  size_t descr_begin = header.find("descr");
-  size_t descr_end = descr_begin + 9;
-  if (descr_begin == std::string::npos)
-    throw std::runtime_error(
-        "ParseNumpyHeader: failed to find header keyword: 'descr'");
-  // Check little endian format.
-  assert(header[descr_end] == '<' || header[descr_end] == '|');
-
-  // Get word size (feature element size) string.
-  size_t word_size_begin = descr_end + 2;
-  std::string str_word_size = header.substr(word_size_begin);
-  size_t word_size_end = str_word_size.find("'");
-  size_t word_size = atoi(str_word_size.substr(0, word_size_end).c_str());
-
-  // Get shape string.
-  size_t header_begin, header_end;
-  header_begin = header.find("(");
-  header_end = header.find(")");
-  if (header_begin == std::string::npos || header_end == std::string::npos)
-    throw std::runtime_error(
-        "parse_npy_header: failed to find header keyword: '(' or ')'");
-  // Use regex to match every dim information.
-  std::regex num_regex("[0-9][0-9]*");
-  std::smatch sm;
-  std::string str_shape =
-      header.substr(header_begin + 1, header_end - header_begin - 1);
-  // Put each dim into vector.
-  while (std::regex_search(str_shape, sm, num_regex)) {
-    feature_dim_.emplace_back(std::stoi(sm[0].str()));
-    str_shape = sm.suffix().str();
-  }
-
   // Compute single feature size.
   signed long feature_length = 1;
   for (size_t i = 1; i < feature_dim_.size(); i++) {
     feature_length *= feature_dim_[i];
   }
   feature_size_ = feature_length * word_size;
+
+  // Get file prefix length.
+  std::ifstream file(filename_);
+  if (!file.is_open()) {
+    throw std::runtime_error(
+        "ParseNumpyHeader: Unable to open file " + filename_);
+  }
+  std::string header;
+  std::getline(file, header);
+  // Get prefix length for computing feature offset,
+  // add one for new-line character.
+  prefix_len_ = header.size() + 1;
+  file.close();
 #endif  // __linux__
 }
 

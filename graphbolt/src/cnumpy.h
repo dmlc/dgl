@@ -39,40 +39,20 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    *
    * @return OnDiskNpyArray
    */
-  OnDiskNpyArray(std::string filename, torch::ScalarType dtype);
+  OnDiskNpyArray(
+      std::string filename, torch::ScalarType dtype, torch::Tensor shape);
 
   /** @brief Create a disk feature fetcher from numpy file. */
   static c10::intrusive_ptr<OnDiskNpyArray> Create(
-      std::string path, torch::ScalarType dtype);
+      std::string path, torch::ScalarType dtype, torch::Tensor shape);
 
   /** @brief Deconstructor. */
   ~OnDiskNpyArray();
 
   /**
    * @brief Parses the header of a numpy file to extract feature information.
-   *
-   * Numpy files have a specific binary storage format. This method parses the
-   * header of the numpy file. It first extracts the header information of the
-   * numpy file by string manipulation, ending with a character "\n".
-   * The header contains three descriptors: 'descr' for data format description
-   * 'fortran_order' for row or column order preference, and 'shape' for data
-   * shape. The data format description includes the endianness, data type, and
-   * data length, e.g. '<i8' denotes little-endian storage, integer type, and
-   * 8-byte size (64 bit integer).
-   *
-   * For example, for a tensor `A` having 2 features with following entries:
-   * [[1, 2, 3], [4, 5, 6]]
-   * When `A` is saved as an numpy file, the data is stored as:
-   *   �NUMPY'descr': '<i8', 'fortran_order': False, 'shape': (2, 3), }\n
-   *   1 2 3 4 5 6
-   *
-   * For a tensor `B` having 2 features with following entries:
-   * [[[1, 2], [3, 4]], [[4, 5], [6, 7]]]
-   * When `B` is saved as an numpy file, the data is stored as:
-   *   �NUMPY'descr': '<i8', 'fortran_order': False, 'shape': (2, 2, 2), }\n
-   *   1 2 3 4 4 5 6 7
    **/
-  void ParseNumpyHeader();
+  void ParseNumpyHeader(torch::Tensor shape);
 
   /**
    * @brief Read disk numpy file based on given index and transform to
