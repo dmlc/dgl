@@ -52,6 +52,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
 from ogb.linkproppred import Evaluator
+from torchmetrics.retrieval import RetrievalMRR
 
 
 class SAGE(nn.Module):
@@ -273,6 +274,33 @@ def compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst):
         input_dict = {"y_pred_pos": pred[:, 0], "y_pred_neg": pred[:, 1:]}
         rr[start:end] = evaluator.eval(input_dict)["mrr_list"]
     return rr.mean()
+
+
+@torch.no_grad()
+def compute_mrr_seeds(args, model, node_emb, seeds, labels, indexes):
+    """Compute the Mean Reciprocal Rank (MRR) for given source and destination
+    nodes.
+
+    This function computes the MRR for a set of node pairs, dividing the task
+    into batches to handle potentially large graphs.
+    """
+
+    preds = torch.empty(seeds.shape[0])
+    mrr = RetrievalMRR()
+    seeds_src, seeds_dst = seeds.T
+    # Loop over node pairs in batches.
+    eval_size = args.eval_batch_size * 1001
+    for start in tqdm.trange(0, seeds_src.shape[0], eval_size, desc="Evaluate"):
+        end = min(start + eval_size, seeds_src.shape[0])
+
+        # Fetch embeddings for current batch of source and destination nodes.
+        h_src = node_emb[seeds_src[start:end]].to(args.device)
+        h_dst = node_emb[seeds_dst[start:end]].to(args.device)
+
+        # Compute prediction scores using the model.
+        pred = model.predictor(h_src * h_dst).squeeze()
+        preds[start:end] = pred
+    return mrr(preds, labels, indexes=indexes)
 
 
 @torch.no_grad()
