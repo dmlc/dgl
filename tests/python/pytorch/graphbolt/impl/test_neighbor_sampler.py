@@ -75,3 +75,59 @@ def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
     assert len(expected_results) == len(new_results)
     for a, b in zip(expected_results, new_results):
         assert repr(a) == repr(b)
+
+
+@pytest.mark.parametrize("layer_dependency", [False, True])
+@pytest.mark.parametrize("overlap_graph_fetch", [False, True])
+def test_labor_dependent_minibatching(layer_dependency, overlap_graph_fetch):
+    num_edges = 200
+    csc_indptr = torch.cat(
+        (
+            torch.zeros(1, dtype=torch.int64),
+            torch.ones(num_edges + 1, dtype=torch.int64) * num_edges,
+        )
+    )
+    indices = torch.arange(1, num_edges + 1)
+    graph = gb.fused_csc_sampling_graph(
+        csc_indptr.int(),
+        indices.int(),
+    ).to(F.ctx())
+    torch.random.set_rng_state(torch.manual_seed(123).get_state())
+    batch_dependency = 100
+    itemset = gb.ItemSet(
+        torch.zeros(batch_dependency + 1).int(), names="seed_nodes"
+    )
+    datapipe = gb.ItemSampler(itemset, batch_size=1).copy_to(F.ctx())
+    fanouts = [5, 5]
+    datapipe = datapipe.sample_layer_neighbor(
+        graph,
+        fanouts,
+        layer_dependency=layer_dependency,
+        batch_dependency=batch_dependency,
+    )
+    dataloader = gb.DataLoader(
+        datapipe, overlap_graph_fetch=overlap_graph_fetch
+    )
+    res = list(dataloader)
+    assert len(res) == batch_dependency + 1
+    if layer_dependency:
+        assert torch.equal(
+            res[0].input_nodes,
+            res[0].sampled_subgraphs[1].original_row_node_ids,
+        )
+    else:
+        assert res[0].input_nodes.size(0) > res[0].sampled_subgraphs[
+            1
+        ].original_row_node_ids.size(0)
+    delta = 0
+    for i in range(batch_dependency):
+        res_current = (
+            res[i].sampled_subgraphs[-1].original_row_node_ids.tolist()
+        )
+        res_next = (
+            res[i + 1].sampled_subgraphs[-1].original_row_node_ids.tolist()
+        )
+        intersect_len = len(set(res_current).intersection(set(res_next)))
+        assert intersect_len >= fanouts[-1]
+        delta += 1 + fanouts[-1] - intersect_len
+    assert delta >= fanouts[-1]

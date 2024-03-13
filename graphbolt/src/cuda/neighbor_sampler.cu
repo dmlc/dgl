@@ -125,7 +125,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<torch::Tensor> type_per_edge,
-    torch::optional<torch::Tensor> probs_or_mask) {
+    torch::optional<torch::Tensor> probs_or_mask,
+    torch::optional<torch::Tensor> random_seed_tensor,
+    float seed2_contribution) {
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
   // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
@@ -202,8 +204,14 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto coo_rows = ExpandIndptrImpl(
       sub_indptr, indices.scalar_type(), torch::nullopt, num_edges);
   num_edges = coo_rows.size(0);
-  const continuous_seed random_seed(RandomEngine::ThreadLocal()->RandInt(
-      static_cast<int64_t>(0), std::numeric_limits<int64_t>::max()));
+  const continuous_seed random_seed = [&] {
+    if (random_seed_tensor.has_value()) {
+      return continuous_seed(random_seed_tensor.value(), seed2_contribution);
+    } else {
+      return continuous_seed{RandomEngine::ThreadLocal()->RandInt(
+          static_cast<int64_t>(0), std::numeric_limits<int64_t>::max())};
+    }
+  }();
   auto output_indptr = torch::empty_like(sub_indptr);
   torch::Tensor picked_eids;
   torch::Tensor output_indices;

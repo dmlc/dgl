@@ -45,6 +45,9 @@ namespace ops {
  * @param probs_or_mask An optional tensor with (unnormalized) probabilities
  * corresponding to each neighboring edge of a node. It must be
  * a 1D tensor, with the number of elements equaling the total number of edges.
+ * @param random_seed The random seed for the sampler for layer=True.
+ * @param seed2_contribution The contribution of the second random seed, [0, 1)
+ * for layer=True.
  *
  * @return An intrusive pointer to a FusedSampledSubgraph object containing
  * the sampled graph's information.
@@ -54,7 +57,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
-    torch::optional<torch::Tensor> probs_or_mask = torch::nullopt);
+    torch::optional<torch::Tensor> probs_or_mask = torch::nullopt,
+    torch::optional<torch::Tensor> random_seed = torch::nullopt,
+    float seed2_contribution = .0f);
 
 /**
  * @brief Return the subgraph induced on the inbound edges of the given nodes.

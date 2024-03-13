@@ -618,7 +618,9 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
-    torch::optional<std::string> probs_name) const {
+    torch::optional<std::string> probs_name,
+    torch::optional<torch::Tensor> random_seed,
+    double seed2_contribution) const {
   auto probs_or_mask = this->EdgeAttribute(probs_name);
 
   // If nodes does not have a value, then we expect all arguments to be resident
@@ -642,7 +644,7 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
         c10::DeviceType::CUDA, "SampleNeighbors", {
           return ops::SampleNeighbors(
               indptr_, indices_, nodes, fanouts, replace, layer, return_eids,
-              type_per_edge_, probs_or_mask);
+              type_per_edge_, probs_or_mask, random_seed, seed2_contribution);
         });
   }
   TORCH_CHECK(nodes.has_value(), "Nodes can not be None on the CPU.");
@@ -658,9 +660,20 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
   }
 
   if (layer) {
-    const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
-        static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
-    SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
+    SamplerArgs<SamplerType::LABOR> args = [&] {
+      if (random_seed.has_value()) {
+        return SamplerArgs<SamplerType::LABOR>{
+            indices_,
+            {random_seed.value(), static_cast<float>(seed2_contribution)},
+            NumNodes()};
+      } else {
+        return SamplerArgs<SamplerType::LABOR>{
+            indices_,
+            RandomEngine::ThreadLocal()->RandInt(
+                static_cast<int64_t>(0), std::numeric_limits<int64_t>::max()),
+            NumNodes()};
+      }
+    }();
     return SampleNeighborsImpl(
         nodes.value(), return_eids,
         GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
