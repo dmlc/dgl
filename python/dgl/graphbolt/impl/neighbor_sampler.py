@@ -483,7 +483,7 @@ class LayerNeighborSampler(NeighborSamplerImpl):
     Sampler that builds computational dependency of node representations via
     labor sampling for multilayer GNN from the NeurIPS 2023 paper
     `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
-    <https://arxiv.org/abs/2210.13339>`__
+    <https://proceedings.neurips.cc/paper_files/paper/2023/file/51f9036d5e7ae822da8f6d4adda1fb39-Paper-Conference.pdf>`__
 
     Layer-Neighbor sampler is responsible for sampling a subgraph from given
     data. It returns an induced subgraph along with compacted information. In
@@ -526,6 +526,19 @@ class LayerNeighborSampler(NeighborSamplerImpl):
         Boolean indicating whether seeds between hops will be deduplicated.
         If True, the same elements in seeds will be deleted to only one.
         Otherwise, the same elements will be remained.
+    layer_dependency: bool
+        Boolean indicating whether different layers should use the same random
+        variates. Results in a reduction in the number of nodes sampled and
+        turns LayerNeighborSampler into a subgraph sampling method. Later layers
+        will be guaranteed to sample overlapping neighbors as the previous
+        layers.
+    batch_dependency: int
+        Specifies whether consecutive minibatches should use similar random
+        variates. Results in a higher temporal access locality of sampled
+        nodes and edges. Setting it to :math:`\kappa` slows down the change in
+        the random variates proportional to :math:`\frac{1}{\kappa}`. Implements
+        the dependent minibatching approach in `arXiv:2310.12403
+        <https://arxiv.org/abs/2310.12403>__.
 
     Examples
     -------

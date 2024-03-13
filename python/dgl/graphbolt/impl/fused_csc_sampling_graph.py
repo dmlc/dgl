@@ -791,6 +791,32 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        random_seed: torch.Tensor, optional
+            An int64 tensor with one or two elements.
+
+            The passed random_seed makes it so that for any seed node ``s`` and
+            its neighbor ``t``, the rolled random variate ``r_t`` is the same
+            for any call to this function with the same random seed. When
+            sampling as part of the same batch, one would want identical seeds
+            so that LABOR can globally sample. One example is that for
+            heterogenous graphs, there is a single random seed passed for each
+            edge type. This will sample much fewer nodes compared to having
+            unique random seeds for each edge type. If one called this function
+            individually for each edge type for a heterogenous graph with
+            different random seeds, then it would run LABOR locally for each
+            edge type, resulting into a larger number of nodes being sampled.
+
+            If this function is called without a ``random_seed``, we get the
+            random seed by getting a random number from GraphBolt. Use this
+            argument with identical random_seed if multiple calls to this
+            function are used to sample as part of a single batch.
+
+            If given two numbers, then the ``seed2_contribution`` argument
+            determines the interpolation between the two random seeds.
+        seed2_contribution: float, optional
+            A float value between [0, 1) that determines the contribution of the
+            second random seed, ``random_seed[-1]``, to generate the random
+            variates.
 
         Returns
         -------
