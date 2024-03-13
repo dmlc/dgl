@@ -309,6 +309,7 @@ class NeighborSamplerImpl(SubgraphSampler):
         delattr(minibatch, "_seed2_contribution")
         return minibatch
 
+
     @staticmethod
     def _prepare(node_type_to_id, minibatch):
         seeds = minibatch._seed_nodes
