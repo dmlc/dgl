@@ -40,7 +40,6 @@ class DiskBasedFeature(Feature):
 
     def __init__(self, path: str, metadata: Dict = None):
         super().__init__()
-        self._is_inplace_pinned = set()
         mmap_mode = "r+"
         self._tensor = torch.from_numpy(
             np.load(path, mmap_mode=mmap_mode)
@@ -50,14 +49,6 @@ class DiskBasedFeature(Feature):
         self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
             path, self._tensor.dtype
         )
-
-    def __del__(self):
-        # torch.Tensor.pin_memory() is not an inplace operation. To make it
-        # truly in-place, we need to use cudaHostRegister. Then, we need to use
-        # cudaHostUnregister to unpin the tensor in the destructor.
-        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
-        for tensor in self._is_inplace_pinned:
-            assert self._inplace_unpinner(tensor.data_ptr()) == 0
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -111,33 +102,12 @@ class DiskBasedFeature(Feature):
         )
 
     def pin_memory_(self):
-        """In-place operation to copy the feature to pinned memory. Returns the
-        same object modified in-place."""
-        # torch.Tensor.pin_memory() is not an inplace operation. To make it
-        # truly in-place, we need to use cudaHostRegister. Then, we need to use
-        # cudaHostUnregister to unpin the tensor in the destructor.
-        # https://github.com/pytorch/pytorch/issues/32167#issuecomment-753551842
-        x = self._tensor
-        if not x.is_pinned() and x.device.type == "cpu":
-            assert (
-                x.is_contiguous()
-            ), "Tensor pinning is only supported for contiguous tensors."
-            cudart = torch.cuda.cudart()
-            assert (
-                cudart.cudaHostRegister(
-                    x.data_ptr(), x.numel() * x.element_size(), 0
-                )
-                == 0
-            )
-
-            self._is_inplace_pinned.add(x)
-            self._inplace_unpinner = cudart.cudaHostUnregister
-
-        return self
+        """Disk based feature does not support pinning memory for now."""
+        raise NotImplementedError
 
     def is_pinned(self):
         """Returns True if the stored feature is pinned."""
-        return self._tensor.is_pinned()
+        return False
 
     def to(self, device):  # pylint: disable=invalid-name
         """Copy `DiskBasedFeature` to the specified device."""
