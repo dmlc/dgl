@@ -735,9 +735,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             nodes,
             fanouts.tolist(),
             replace,
-            False,
+            False,  # is_labor
             return_eids,
             probs_name,
+            None,  # random_seed, labor parameter
+            0,  # seed2_contribution, labor_parameter
         )
 
     def sample_layer_neighbors(
@@ -746,6 +748,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        random_seed: torch.Tensor = None,
+        seed2_contribution: float = 0.0,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
@@ -833,6 +837,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             True,
             has_original_eids,
             probs_name,
+            random_seed,
+            seed2_contribution,
         )
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
