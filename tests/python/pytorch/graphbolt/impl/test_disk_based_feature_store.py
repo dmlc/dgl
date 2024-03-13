@@ -19,7 +19,7 @@ def to_on_disk_numpy(test_dir, name, t):
 
 @unittest.skipIf(
     sys.platform.startswith("win"),
-    reason="Tests for large disk dataset can only deployed on Linux,"
+    reason="Tests for disk dataset can only deployed on Linux,"
     "because the io_uring is only supportted by Linux kernel.",
 )
 def test_disk_based_feature():
@@ -92,7 +92,7 @@ def test_disk_based_feature():
 
 @unittest.skipIf(
     sys.platform.startswith("win"),
-    reason="Tests for large disk dataset can only deployed on Linux,"
+    reason="Tests for disk dataset can only deployed on Linux,"
     "because the io_uring is only supportted by Linux kernel.",
 )
 @pytest.mark.parametrize(
