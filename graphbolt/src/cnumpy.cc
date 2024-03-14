@@ -80,7 +80,6 @@ void OnDiskNpyArray::ParseNumpyHeader(torch::Tensor shape) {
   // Get prefix length for computing feature offset,
   // add one for new-line character.
   prefix_len_ = header.size() + 1;
-  file.close();
 #endif  // __linux__
 }
 
@@ -88,6 +87,7 @@ torch::Tensor OnDiskNpyArray::IndexSelect(torch::Tensor index) {
 #ifdef __linux__
   return IndexSelectIOUring(index);
 #else
+  TORCH_CHECK(false, "OnDiskNpyArray is not supported on non-Linux systems.");
   return torch::empty({0});
 #endif  // __linux__
 }
@@ -96,13 +96,13 @@ torch::Tensor OnDiskNpyArray::IndexSelect(torch::Tensor index) {
 torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   index = index.to(torch::kLong);
   // The minimum page size to contain one feature.
-  int64_t align_len =
+  int64_t aligned_length =
       (feature_size_ + kDiskAlignmentSize) & (long)~(kDiskAlignmentSize - 1);
   int64_t num_index = index.numel();
 
   char *read_buffer = (char *)aligned_alloc(
       kDiskAlignmentSize,
-      (align_len + kDiskAlignmentSize) * group_size_ * num_thread_);
+      (aligned_length + kDiskAlignmentSize) * group_size_ * num_thread_);
   char *result_buffer =
       (char *)aligned_alloc(kDiskAlignmentSize, feature_size_ * num_index);
 
@@ -136,20 +136,20 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
             int64_t read_size;
             if (residual[thread_id * group_size_ + group_id] + feature_size_ >
                 kDiskAlignmentSize) {
-              read_size = align_len + kDiskAlignmentSize;
+              read_size = aligned_length + kDiskAlignmentSize;
             } else {
-              read_size = align_len;
+              read_size = aligned_length;
             }
 
             // Put requests into io_uring queue.
-            struct io_uring_sqe *sqe =
+            struct io_uring_sqe *submit_queue =
                 io_uring_get_sqe(&io_uring_queue_[thread_id]);
             io_uring_prep_read(
-                sqe, file_description_,
+                submit_queue, file_description_,
                 read_buffer +
-                    ((align_len + kDiskAlignmentSize) * group_size_ *
+                    ((aligned_length + kDiskAlignmentSize) * group_size_ *
                      thread_id) +
-                    ((align_len + kDiskAlignmentSize) * group_id),
+                    ((aligned_length + kDiskAlignmentSize) * group_id),
                 read_size, aligned_offset);
           }
         }
@@ -184,9 +184,9 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
             memcpy(
                 result_buffer + feature_size_ * (begin + group_id),
                 read_buffer +
-                    ((align_len + kDiskAlignmentSize) * group_size_ *
+                    ((aligned_length + kDiskAlignmentSize) * group_size_ *
                      thread_id) +
-                    ((align_len + kDiskAlignmentSize) * group_id +
+                    ((aligned_length + kDiskAlignmentSize) * group_id +
                      residual[thread_id * group_size_ + group_id]),
                 feature_size_);
           }
