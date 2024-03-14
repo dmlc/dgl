@@ -888,7 +888,7 @@ def test_to_pyg_data():
     assert torch.equal(pyg_data.y, expected_labels)
     assert pyg_data.batch_size == expected_batch_size
     assert torch.equal(pyg_data.n_id, expected_n_id)
-    
+
     # Test with seeds in minibatch.
     test_minibatch.seed_nodes = None
     test_minibatch.seeds = torch.tensor([0, 1])
