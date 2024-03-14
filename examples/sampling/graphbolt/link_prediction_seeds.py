@@ -51,6 +51,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
+from ogb.linkproppred import Evaluator
 from torchmetrics.retrieval import RetrievalMRR
 
 
@@ -243,7 +244,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
 
 @torch.no_grad()
-def compute_mrr(args, model, node_emb, seeds, labels, indexes):
+def compute_mrr(args, model, evaluator, node_emb, seeds, labels, indexes):
     """Compute the Mean Reciprocal Rank (MRR) for given source and destination
     nodes.
 
@@ -256,7 +257,9 @@ def compute_mrr(args, model, node_emb, seeds, labels, indexes):
     seeds_src, seeds_dst = seeds.T
     # Loop over node pairs in batches.
     eval_size = args.eval_batch_size * 1001
-    for start in tqdm.trange(0, seeds_src.shape[0], eval_size, desc="Evaluate"):
+    for start in tqdm.trange(
+        0, seeds_src.shape[0], eval_size, desc="Evaluate"
+    ):
         end = min(start + eval_size, seeds_src.shape[0])
 
         # Fetch embeddings for current batch of source and destination nodes.
@@ -273,6 +276,7 @@ def compute_mrr(args, model, node_emb, seeds, labels, indexes):
 def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
     """Evaluate the model on validation and test sets."""
     model.eval()
+    evaluator = Evaluator(name="ogbl-citation2")
 
     dataloader = create_dataloader(
         args, graph, features, all_nodes_set, is_train=False
@@ -291,7 +295,7 @@ def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
 
         # Compute MRR values for the current split.
         results.append(
-            compute_mrr(args, model, node_emb, seeds, labels, indexes)
+            compute_mrr(args, model, evaluator, node_emb, seeds, labels, indexes)
         )
     return results
 
@@ -306,6 +310,7 @@ def train(args, model, graph, features, train_set):
         start_epoch_time = time.time()
         for step, data in tqdm.tqdm(enumerate(dataloader)):
             # Get node pairs with labels for loss calculation.
+            # compacted_pairs, labels = data.node_pairs_with_labels
             compacted_seeds = data.compacted_seeds.T
             labels = data.labels
 
@@ -383,7 +388,8 @@ def main(args):
 
     # Load and preprocess dataset.
     print("Loading data")
-    dataset = gb.BuiltinDataset("ogbl-citation2-seeds").load()
+    # dataset = gb.BuiltinDataset("ogbl-citation2").load()
+    dataset = gb.OnDiskDataset("/home/ubuntu/dgl/ogbl-citation2", force_preprocess=False).load()
 
     # Move the dataset to the selected storage.
     if args.storage_device == "pinned":

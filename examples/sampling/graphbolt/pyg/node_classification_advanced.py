@@ -175,7 +175,7 @@ def create_dataloader(
     )
     # Copy the data to the specified device.
     if args.graph_device != "cpu":
-        datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["seeds"])
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
         graph, fanout if job != "infer" else [-1]
@@ -229,6 +229,7 @@ def train(train_dataloader, valid_dataloader, num_classes, model, device):
             labels = minibatch.labels
             optimizer.zero_grad()
             out = model(minibatch.sampled_subgraphs, node_features)
+            out = out[minibatch.compacted_seeds]
             loss = criterion(out, labels)
             total_loss += loss.detach()
             total_correct += MF.accuracy(
@@ -320,8 +321,15 @@ def parse_args():
     parser.add_argument(
         "--dataset",
         type=str,
-        default="ogbn-products",
-        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        default="ogbn-products-seeds",
+        choices=[
+            "ogbn-arxiv",
+            "ogbn-arxiv-seeds",
+            "ogbn-products",
+            "ogbn-products-seeds",
+            "ogbn-papers100M",
+            "ogbn-papers100M-seeds",
+        ],
         help="The dataset we can use for node classification example. Currently"
         " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
     )
