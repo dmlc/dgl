@@ -293,7 +293,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           max_in_degree_event.synchronize();
           return cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         };
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
         if (layer || probs_or_mask.has_value()) {
+#endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
           const int num_bits = compute_num_bits();
           std::array<int, 4> type_bits = {8, 16, 32, 64};
           const auto type_index =
@@ -407,6 +409,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                       std::min(num_rows - i, max_copy_at_once));
                 }
               }));
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
         } else {  // Non-weighted neighbor sampling.
           picked_eids = torch::zeros(num_edges.value(), sub_indptr.options());
           const auto sort_needed = type_per_edge && fanouts.size() == 1;
@@ -469,6 +472,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                 }));
           }
         }
+#endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
 
         output_indices = torch::empty(
             picked_eids.size(0),
