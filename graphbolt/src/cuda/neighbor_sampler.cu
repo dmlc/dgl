@@ -17,9 +17,9 @@
 #include <algorithm>
 #include <array>
 #include <cub/cub.cuh>
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
+#if __CUDA_ARCH__ >= 700
 #include <cuda/atomic>
-#endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
+#endif  // __CUDA_ARCH__ >= 700
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -32,6 +32,24 @@ namespace graphbolt {
 namespace ops {
 
 constexpr int BLOCK_SIZE = 128;
+
+inline __device__ int64_t AtomicMax(int64_t* const address, const int64_t val) {
+  // match the type of "::atomicCAS", so ignore lint warning
+  using Type = unsigned long long int;  // NOLINT
+
+  static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
+
+  return atomicMax(reinterpret_cast<Type*>(address), static_cast<Type>(val));
+}
+
+inline __device__ int32_t AtomicMax(int32_t* const address, const int32_t val) {
+  // match the type of "::atomicCAS", so ignore lint warning
+  using Type = int;  // NOLINT
+
+  static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
+
+  return atomicMax(reinterpret_cast<Type*>(address), static_cast<Type>(val));
+}
 
 /**
  * @brief Performs neighbor sampling and fills the edge_ids array with
@@ -58,14 +76,15 @@ __global__ void _ComputeRandomsNS(
     const auto rnd =
         row_offset < fanout ? row_offset : curand(&rng) % (row_offset + 1);
     if (rnd < fanout) {
+      const indptr_t edge_id =
+          row_offset + (sliced_indptr ? sliced_indptr[row_position] : 0);
 #if __CUDA_ARCH__ >= 700
       ::cuda::atomic_ref<indptr_t, ::cuda::thread_scope_device> a(
           edge_ids[output_offset + rnd]);
-      const auto edge_id =
-          row_offset + (sliced_indptr ? sliced_indptr[row_position] : 0);
-      a.fetch_max(
-          static_cast<indptr_t>(edge_id), ::cuda::std::memory_order_relaxed);
-#endif  // __CUDA_ARCH__ >= 700
+      a.fetch_max(edge_id, ::cuda::std::memory_order_relaxed);
+#else
+      AtomicMax(edge_ids + output_offset + rnd, edge_id);
+#endif  // __CUDA_ARCH__
     }
 
     i += stride;
@@ -297,11 +316,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           max_in_degree_event.synchronize();
           return cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         };
-        int sm_major;
-        cudaDeviceGetAttribute(
-            &sm_major, cudaDevAttrComputeCapabilityMajor,
-            cuda::GetCurrentStream().device_index());
-        if (sm_major < 7 || layer || probs_or_mask.has_value()) {
+        if (layer || probs_or_mask.has_value()) {
           const int num_bits = compute_num_bits();
           std::array<int, 4> type_bits = {8, 16, 32, 64};
           const auto type_index =
