@@ -366,8 +366,14 @@ def parse_args():
         "--dataset",
         type=str,
         default="ogbn-products-seeds",
-        choices=["ogbn-arxiv", "ogbn-arxiv-seeds", "ogbn-products", "ogbn-products-seeds", "ogbn-papers100M"],
-        
+        choices=[
+            "ogbn-arxiv",
+            "ogbn-arxiv-seeds",
+            "ogbn-products",
+            "ogbn-products-seeds",
+            "ogbn-papers100M",
+            "ogbn-papers100M-seeds",
+        ],
         help="The dataset we can use for node classification example. Currently"
         " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
     )
