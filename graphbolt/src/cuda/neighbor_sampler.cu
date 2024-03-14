@@ -17,7 +17,9 @@
 #include <algorithm>
 #include <array>
 #include <cub/cub.cuh>
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
 #include <cuda/atomic>
+#endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -56,12 +58,14 @@ __global__ void _ComputeRandomsNS(
     const auto rnd =
         row_offset < fanout ? row_offset : curand(&rng) % (row_offset + 1);
     if (rnd < fanout) {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
       ::cuda::atomic_ref<indptr_t, ::cuda::thread_scope_device> a(
           edge_ids[output_offset + rnd]);
       const auto edge_id =
           row_offset + (sliced_indptr ? sliced_indptr[row_position] : 0);
       a.fetch_max(
           static_cast<indptr_t>(edge_id), ::cuda::std::memory_order_relaxed);
+#endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
     }
 
     i += stride;
@@ -293,9 +297,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           max_in_degree_event.synchronize();
           return cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         };
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
-        if (layer || probs_or_mask.has_value()) {
-#endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, cuda::GetCurrentStream().device_index());
+        if (prop.major < 7 || layer || probs_or_mask.has_value()) {
           const int num_bits = compute_num_bits();
           std::array<int, 4> type_bits = {8, 16, 32, 64};
           const auto type_index =
@@ -409,7 +413,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                       std::min(num_rows - i, max_copy_at_once));
                 }
               }));
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
         } else {  // Non-weighted neighbor sampling.
           picked_eids = torch::zeros(num_edges.value(), sub_indptr.options());
           const auto sort_needed = type_per_edge && fanouts.size() == 1;
@@ -472,7 +475,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                 }));
           }
         }
-#endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
 
         output_indices = torch::empty(
             picked_eids.size(0),
