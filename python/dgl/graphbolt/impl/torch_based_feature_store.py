@@ -243,7 +243,7 @@ class TorchBasedFeature(Feature):
             if self._tensor.is_pinned():
                 return self._tensor.cuda()
             return self._tensor
-        return torch.ops.graphbolt.index_select(self._tensor, ids)
+        return index_select(self._tensor, ids)
 
     def size(self):
         """Get the size of the feature.
@@ -397,7 +397,6 @@ class TorchBasedFeatureStore(BasicFeatureStore):
 
     def __init__(self, feat_data: List[OnDiskFeatureData]):
         features = {}
-
         for spec in feat_data:
             key = (spec.domain, spec.type, spec.name)
             metadata = spec.extra_fields
