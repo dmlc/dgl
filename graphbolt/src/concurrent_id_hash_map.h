@@ -159,6 +159,16 @@ class ConcurrentIdHashMap {
   inline void InsertAndSet(IdType key, IdType value);
 
   /**
+   * @brief Insert a key into the hash map. If the key exists, set the value
+   * with the smaller value.
+   *
+   * @param id The key to be inserted.
+   * @param value The value to be set for the `key`.
+   *
+   */
+  inline void InsertAndSetSmaller(IdType id, IdType value);
+
+  /**
    * @brief Attempt to insert the key into the hash map at the given position.
    *
    * @param pos The position in the hash map to be inserted at.

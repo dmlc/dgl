@@ -68,7 +68,7 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
   // Fill in the first `num_seeds` ids.
   torch::parallel_for(0, num_seeds, kGrainSize, [&](int64_t s, int64_t e) {
     for (int64_t i = s; i < e; i++) {
-      InsertAndSet(ids_data[i], static_cast<IdType>(i));
+      InsertAndSetSmaller(ids_data[i], static_cast<IdType>(i));
     }
   });
   // Place the first `num_seeds` ids.
@@ -85,10 +85,20 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
   // Insert all elements in this loop.
   torch::parallel_for(
       num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
+        for (int64_t i = s; i < e; i++) {
+          InsertAndSetSmaller(ids_data[i], static_cast<IdType>(i));
+        }
+      });
+  
+  // Count the valid numbers in each thread.
+  torch::parallel_for(
+      num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
         size_t count = 0;
         for (int64_t i = s; i < e; i++) {
-          valid[i] = Insert(ids_data[i]);
-          count += valid[i];
+          if (MapId(ids_data[i]) == i) {
+            count ++;
+            valid[i] = 1;
+          }
         }
         auto thread_id = torch::get_thread_num();
         block_offset[thread_id + 1] = count;
@@ -197,6 +207,30 @@ inline void ConcurrentIdHashMap<IdType>::InsertAndSet(IdType id, IdType value) {
   }
 
   hash_map_.data_ptr<IdType>()[getValueIndex(pos)] = value;
+}
+
+template <typename IdType>
+void ConcurrentIdHashMap<IdType>::InsertAndSetSmaller(IdType id, IdType value) {
+  IdType pos = (id & mask_), delta = 1;
+  IdType* hash_map_data = hash_map_.data_ptr<IdType>();
+  InsertState state = AttemptInsertAt(pos, id);
+  while (state == InsertState::OCCUPIED) {
+    Next(&pos, &delta);
+    state = AttemptInsertAt(pos, id);
+  }
+
+  if (state == InsertState::INSERTED) {
+    hash_map_data[getValueIndex(pos)] = value;
+    return;
+  }
+
+  IdType val_pos = getValueIndex(pos);
+  IdType old_val = hash_map_data[val_pos];
+  while (old_val > value) {
+    old_val = CompareAndSwap(&(hash_map_data[val_pos]), old_val, value);
+  }
+
+  return;
 }
 
 template <typename IdType>
