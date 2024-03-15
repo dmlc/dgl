@@ -321,7 +321,8 @@ class DiskBasedFeature(Feature):
         )
 
     def read_into_memory(self) -> TorchBasedFeature:
-        return TorchBasedFeature(self._tensor, self.metadata)
+        """Change disk-based feature to torch-based feature."""
+        return TorchBasedFeature(self._tensor, self._metadata)
 
     def __repr__(self) -> str:
         ret = (
