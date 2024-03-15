@@ -102,22 +102,16 @@ class DiskBasedFeature(Feature):
         )
 
     def pin_memory_(self):
-        """Disk based feature does not support pinning memory for now."""
+        """Disk based feature does not support pinning memory."""
         raise NotImplementedError
 
     def is_pinned(self):
         """Returns True if the stored feature is pinned."""
         return False
 
-    def to(self, device):  # pylint: disable=invalid-name
-        """Copy `DiskBasedFeature` to the specified device."""
-        # copy.copy is a shallow copy so it does not copy tensor memory.
-        self2 = copy.copy(self)
-        if device == "pinned":
-            self2._tensor = self2._tensor.pin_memory()
-        else:
-            self2._tensor = self2._tensor.to(device)
-        return self2
+    def to(self, device):
+        """Disk based feature does not support copying to device."""
+        raise NotImplementedError
 
     def __repr__(self) -> str:
         ret = (
