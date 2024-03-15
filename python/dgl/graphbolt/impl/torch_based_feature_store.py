@@ -109,7 +109,7 @@ class DiskBasedFeature(Feature):
         """Returns True if the stored feature is pinned."""
         return False
 
-    def to(self, device):
+    def to(self, device):  # pylint: disable=invalid-name
         """Disk based feature does not support copying to device."""
         raise NotImplementedError
 
