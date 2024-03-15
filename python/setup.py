@@ -227,6 +227,7 @@ install_requires = [
     "tqdm",
     "psutil>=5.8.0",
     "torchdata>=0.5.0",
+    "pandas",
 ]
 if "DGLBACKEND" in os.environ and os.environ["DGLBACKEND"] != "pytorch":
     install_requires.pop(install_requires.index("torchdata>=0.5.0"))
