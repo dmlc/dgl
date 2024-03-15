@@ -89,14 +89,14 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
           InsertAndSetSmaller(ids_data[i], static_cast<IdType>(i));
         }
       });
-  
+
   // Count the valid numbers in each thread.
   torch::parallel_for(
       num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
         size_t count = 0;
         for (int64_t i = s; i < e; i++) {
           if (MapId(ids_data[i]) == i) {
-            count ++;
+            count++;
             valid[i] = 1;
           }
         }
