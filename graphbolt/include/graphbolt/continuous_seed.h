@@ -92,6 +92,30 @@ class continuous_seed {
 #endif  // __CUDA_ARCH__
 };
 
+class single_seed {
+  uint64_t s;
+
+ public:
+  /* implicit */ single_seed(const int64_t seed) : s(seed) {}  // NOLINT
+
+  single_seed(torch::Tensor seed_arr) : s(seed_arr.data_ptr<int64_t>()[0]) {}
+
+#ifdef __CUDACC__
+  __device__ inline float uniform(const uint64_t t) const {
+    const uint64_t kCurandSeed = 999961;  // Could be any random number.
+    curandStatePhilox4_32_10_t rng;
+    curand_init(kCurandSeed, s, t, &rng);
+    return curand_uniform(&rng);
+  }
+#else
+  inline float uniform(const uint64_t t) const {
+    pcg32 ng0(s, t);
+    std::uniform_real_distribution<float> uni;
+    return uni(ng0);
+  }
+#endif  // __CUDA_ARCH__
+};
+
 }  // namespace graphbolt
 
 #endif  // GRAPHBOLT_CONTINUOUS_SEED_H_

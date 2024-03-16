@@ -15,6 +15,7 @@
 #include <limits>
 #include <numeric>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 #include "./macro.h"
@@ -660,26 +661,37 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
   }
 
   if (layer) {
-    SamplerArgs<SamplerType::LABOR> args = [&] {
-      if (random_seed.has_value()) {
-        return SamplerArgs<SamplerType::LABOR>{
-            indices_,
-            {random_seed.value(), static_cast<float>(seed2_contribution)},
-            NumNodes()};
-      } else {
-        return SamplerArgs<SamplerType::LABOR>{
-            indices_,
-            RandomEngine::ThreadLocal()->RandInt(
-                static_cast<int64_t>(0), std::numeric_limits<int64_t>::max()),
-            NumNodes()};
-      }
-    }();
-    return SampleNeighborsImpl(
-        nodes.value(), return_eids,
-        GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
-        GetPickFn(
-            fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
-            args));
+    if (random_seed.has_value() && random_seed->numel() >= 2) {
+      SamplerArgs<SamplerType::LABOR_DEPENDENT> args{
+          indices_,
+          {random_seed.value(), static_cast<float>(seed2_contribution)},
+          NumNodes()};
+      return SampleNeighborsImpl(
+          nodes.value(), return_eids,
+          GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
+          GetPickFn(
+              fanouts, replace, indptr_.options(), type_per_edge_,
+              probs_or_mask, args));
+    } else {
+      auto args = [&] {
+        if (random_seed.has_value() && random_seed->numel() == 1) {
+          return SamplerArgs<SamplerType::LABOR>{
+              indices_, random_seed.value(), NumNodes()};
+        } else {
+          return SamplerArgs<SamplerType::LABOR>{
+              indices_,
+              RandomEngine::ThreadLocal()->RandInt(
+                  static_cast<int64_t>(0), std::numeric_limits<int64_t>::max()),
+              NumNodes()};
+        }
+      }();
+      return SampleNeighborsImpl(
+          nodes.value(), return_eids,
+          GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
+          GetPickFn(
+              fanouts, replace, indptr_.options(), type_per_edge_,
+              probs_or_mask, args));
+    }
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl(
@@ -1297,7 +1309,7 @@ int64_t TemporalPick(
     }
     return picked_indices.numel();
   }
-  if constexpr (S == SamplerType::LABOR) {
+  if constexpr (is_labor(S)) {
     return Pick(
         offset, num_neighbors, fanout, replace, options, masked_prob, args,
         picked_data_ptr);
@@ -1383,12 +1395,12 @@ int64_t TemporalPickByEtype(
   return pick_offset;
 }
 
-template <typename PickedType>
-int64_t Pick(
+template <SamplerType S, typename PickedType>
+std::enable_if_t<is_labor(S), int64_t> Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr) {
   if (fanout == 0) return 0;
   if (probs_or_mask.has_value()) {
     if (fanout < 0) {
@@ -1438,9 +1450,9 @@ inline T invcdf(T u, int64_t n, T rem) {
   return rem * (one - std::pow(one - u, one / n));
 }
 
-template <typename T>
+template <typename T, typename seed_t>
 inline T jth_sorted_uniform_random(
-    continuous_seed seed, int64_t t, int64_t c, int64_t j, T& rem, int64_t n) {
+    seed_t seed, int64_t t, int64_t c, int64_t j, T& rem, int64_t n) {
   const T u = seed.uniform(t + j * c);
   // https://mathematica.stackexchange.com/a/256707
   rem -= invcdf(u, n, rem);
@@ -1474,13 +1486,13 @@ inline T jth_sorted_uniform_random(
  * should be put. Enough memory space should be allocated in advance.
  */
 template <
-    bool NonUniform, bool Replace, typename ProbsType, typename PickedType,
-    int StackSize>
-inline int64_t LaborPick(
+    bool NonUniform, bool Replace, typename ProbsType, SamplerType S,
+    typename PickedType, int StackSize>
+inline std::enable_if_t<is_labor(S), int64_t> LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr) {
   fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
@@ -1504,8 +1516,8 @@ inline int64_t LaborPick(
   }
   AT_DISPATCH_INDEX_TYPES(
       args.indices.scalar_type(), "LaborPickMain", ([&] {
-        const index_t* local_indices_data =
-            args.indices.data_ptr<index_t>() + offset;
+        const auto local_indices_data =
+            reinterpret_cast<index_t*>(args.indices.data_ptr()) + offset;
         if constexpr (Replace) {
           // [Algorithm] @mfbalin
           // Use a max-heap to get rid of the big random numbers and filter the
