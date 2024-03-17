@@ -929,7 +929,7 @@ def test_to_pyg_data():
     try:
         pyg_data = test_minibatch.to_pyg_data()
         assert (
-            pyg_data.x is None,
+            pyg_data.x is None
         ), "Multiple features case should raise an error."
     except AssertionError as e:
         assert (
