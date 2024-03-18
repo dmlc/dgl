@@ -65,8 +65,8 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
   // This code block is to fill the ids into hash_map_.
   auto unique_ids = torch::empty_like(ids);
   IdType* unique_ids_data = unique_ids.data_ptr<IdType>();
-  // Fill in the first `num_seeds` ids.
-  torch::parallel_for(0, num_seeds, kGrainSize, [&](int64_t s, int64_t e) {
+  // Insert all ids into the hash map.
+  torch::parallel_for(0, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     for (int64_t i = s; i < e; i++) {
       InsertAndSetSmaller(ids_data[i], static_cast<IdType>(i));
     }
@@ -82,13 +82,6 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
 
   const int64_t num_threads = torch::get_num_threads();
   std::vector<size_t> block_offset(num_threads + 1, 0);
-  // Insert all elements in this loop.
-  torch::parallel_for(
-      num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
-        for (int64_t i = s; i < e; i++) {
-          InsertAndSetSmaller(ids_data[i], static_cast<IdType>(i));
-        }
-      });
 
   // Count the valid numbers in each thread.
   torch::parallel_for(
@@ -219,14 +212,11 @@ void ConcurrentIdHashMap<IdType>::InsertAndSetSmaller(IdType id, IdType value) {
     state = AttemptInsertAt(pos, id);
   }
 
-  if (state == InsertState::INSERTED) {
-    hash_map_data[getValueIndex(pos)] = value;
-    return;
-  }
-
+  IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType val_pos = getValueIndex(pos);
-  IdType old_val = hash_map_data[val_pos];
-  while (old_val > value) {
+  IdType old_val =
+      state == InsertState::INSERTED ? empty_key : hash_map_data[val_pos];
+  while (old_val == empty_key || old_val > value) {
     old_val = CompareAndSwap(&(hash_map_data[val_pos]), old_val, value);
   }
 
