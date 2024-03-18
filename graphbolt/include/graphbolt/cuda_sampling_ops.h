@@ -55,7 +55,8 @@ namespace ops {
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices,
     torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool layer, bool return_eids,
+    bool replace, bool layer, bool return_eids, bool order_edge_types,
+    int64_t num_etypes,
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
     torch::optional<torch::Tensor> probs_or_mask = torch::nullopt,
     torch::optional<torch::Tensor> random_seed = torch::nullopt,

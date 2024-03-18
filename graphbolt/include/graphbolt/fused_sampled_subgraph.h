@@ -54,7 +54,7 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    */
   FusedSampledSubgraph(
       torch::Tensor indptr, torch::Tensor indices,
-      torch::Tensor original_column_node_ids,
+      torch::optional<torch::Tensor> original_column_node_ids,
       torch::optional<torch::Tensor> original_row_node_ids = torch::nullopt,
       torch::optional<torch::Tensor> original_edge_ids = torch::nullopt,
       torch::optional<torch::Tensor> type_per_edge = torch::nullopt)
@@ -89,7 +89,7 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * @note This is required and the mapping relations can be inconsistent with
    * column's.
    */
-  torch::Tensor original_column_node_ids;
+  torch::optional<torch::Tensor> original_column_node_ids;
 
   /**
    * @brief Row's reverse node ids in the original graph. A graph structure

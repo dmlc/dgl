@@ -123,12 +123,16 @@ struct SegmentEndFunc {
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices,
     torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool layer, bool return_eids,
-    torch::optional<torch::Tensor> type_per_edge,
+    bool replace, bool layer, bool return_eids, bool order_edge_types,
+    int64_t num_etypes, torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<torch::Tensor> random_seed_tensor,
     float seed2_contribution) {
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
+  TORCH_CHECK(
+      fanouts.size() == 1 || fanouts.size() == num_etypes,
+      "Number fanout values should be either 1 or same as the number of "
+      "existing edge types.");
   // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
@@ -400,17 +404,44 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         }
       }));
 
-  // Convert output_indptr back to homo by discarding intermediate offsets.
-  output_indptr =
-      output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
-  torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
-  if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
-  if (!nodes.has_value()) {
-    nodes = torch::arange(indptr.size(0) - 1, indices.options());
+  if (order_edge_types) {
+    if (fanouts.size() == 1 && type_per_edge) {
+      torch::Tensor output_in_degree, sliced_output_indptr;
+      sliced_output_indptr =
+          output_indptr.slice(0, 0, output_indptr.size(0) - 1);
+      std::tie(output_indptr, output_in_degree, sliced_output_indptr) =
+          SliceCSCIndptrHetero(
+              output_indptr, output_type_per_edge.value(), sliced_output_indptr,
+              num_etypes);
+      num_rows = sliced_output_indptr.size(0);
+    }
+    auto permutation = torch::arange(
+        0, num_rows * num_etypes, num_etypes, output_indptr.options());
+    permutation = permutation % num_rows + permutation / num_rows;
+    auto [output_in_degree, sliced_output_indptr] =
+        SliceCSCIndptr(output_indptr, permutation);
+    std::tie(output_indptr, picked_eids) = IndexSelectCSCImpl(
+        output_in_degree, sliced_output_indptr, picked_eids, permutation,
+        num_rows - 1, picked_eids.size(0));
+    std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
+        output_in_degree, sliced_output_indptr, output_indices, permutation,
+        num_rows - 1, output_indices.size(0));
+    if (type_per_edge) {
+      std::tie(output_indptr, output_type_per_edge) = IndexSelectCSCImpl(
+          output_in_degree, sliced_output_indptr, output_type_per_edge.value(),
+          permutation, num_rows - 1, output_type_per_edge.value().size(0));
+    }
+  } else {
+    // Convert output_indptr back to homo by discarding intermediate offsets.
+    output_indptr =
+        output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
   }
 
+  torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
+  if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
+
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-      output_indptr, output_indices, nodes.value(), torch::nullopt,
+      output_indptr, output_indices, nodes, torch::nullopt,
       subgraph_reverse_edge_ids, output_type_per_edge);
 }
 

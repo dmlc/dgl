@@ -617,7 +617,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool layer, bool return_eids,
+    bool replace, bool layer, bool return_eids, bool order_edge_types,
     torch::optional<std::string> probs_name,
     torch::optional<torch::Tensor> random_seed,
     double seed2_contribution) const {
@@ -642,9 +642,12 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
       !replace) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "SampleNeighbors", {
+          const auto num_etypes =
+              edge_type_to_id_.has_value() ? edge_type_to_id_->size() : 1;
           return ops::SampleNeighbors(
               indptr_, indices_, nodes, fanouts, replace, layer, return_eids,
-              type_per_edge_, probs_or_mask, random_seed, seed2_contribution);
+              order_edge_types, num_etypes, type_per_edge_, probs_or_mask,
+              random_seed, seed2_contribution);
         });
   }
   TORCH_CHECK(nodes.has_value(), "Nodes can not be None on the CPU.");

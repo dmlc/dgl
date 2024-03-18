@@ -47,10 +47,12 @@ class FetchInsubgraphData(Mapper):
     def _fetch_per_layer_impl(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
             index = minibatch._seed_nodes
-            if isinstance(index, dict):
+            is_hetero = isinstance(index, dict)
+            if is_hetero:
                 for idx in index.values():
                     idx.record_stream(torch.cuda.current_stream())
-                index = self.graph._convert_to_homogeneous_nodes(index)
+                index, node_offsets = self.graph._convert_to_homogeneous_nodes(index)
+                print(index, node_offsets)
             else:
                 index.record_stream(torch.cuda.current_stream())
 
@@ -59,18 +61,6 @@ class FetchInsubgraphData(Mapper):
                     tensor.record_stream(stream)
                 return tensor
 
-            if self.graph.node_type_offset is None:
-                # sorting not needed.
-                minibatch._subgraph_seed_nodes = None
-            else:
-                index, original_positions = index.sort()
-                if (original_positions.diff() == 1).all().item():
-                    # already sorted.
-                    minibatch._subgraph_seed_nodes = None
-                else:
-                    minibatch._subgraph_seed_nodes = record_stream(
-                        original_positions.sort()[1]
-                    )
             index_select_csc_with_indptr = partial(
                 torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
             )
@@ -99,12 +89,7 @@ class FetchInsubgraphData(Mapper):
                     record_stream(probs_or_mask)
             else:
                 probs_or_mask = None
-            if self.graph.node_type_offset is not None:
-                node_type_offset = torch.searchsorted(
-                    index, self.graph.node_type_offset
-                )
-            else:
-                node_type_offset = None
+            node_type_offset = torch.tensor(node_offsets, dtype=self.graph.indices.dtype) if is_hetero else None
             subgraph = fused_csc_sampling_graph(
                 indptr,
                 indices,
@@ -152,14 +137,12 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
             if hasattr(minibatch, key)
         }
         sampled_subgraph = getattr(subgraph, self.sampler_name)(
-            minibatch._subgraph_seed_nodes,
+            None,
             self.fanout,
             self.replace,
             self.prob_name,
             **kwargs,
         )
-        delattr(minibatch, "_subgraph_seed_nodes")
-        sampled_subgraph.original_column_node_ids = minibatch._seed_nodes
         minibatch.sampled_subgraphs[0] = sampled_subgraph
 
         return minibatch
