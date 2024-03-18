@@ -755,5 +755,18 @@ class ItemSampler2(MapDataPipe):
     def __init__(
         self,
         item_set: Union[ItemSet2, ItemSetDict2],
+        batch_size: int,
+        minibatcher: Optional[Callable] = minibatcher_default,
+        drop_last: Optional[bool] = False,
+        shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
+        self._names = item_set.names
+        self._batch_size = batch_size
+        self._minibatcher = minibatcher
+        self._drop_last = drop_last
+        self._shuffle = shuffle
+
+
+    def _getitem_(self, index):
+        ...
