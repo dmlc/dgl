@@ -17,7 +17,11 @@
 namespace graphbolt {
 namespace sampling {
 
-enum SamplerType { NEIGHBOR, LABOR };
+enum SamplerType { NEIGHBOR, LABOR, LABOR_DEPENDENT };
+
+constexpr bool is_labor(SamplerType S) {
+  return S == SamplerType::LABOR || S == SamplerType::LABOR_DEPENDENT;
+}
 
 template <SamplerType S>
 struct SamplerArgs;
@@ -27,6 +31,13 @@ struct SamplerArgs<SamplerType::NEIGHBOR> {};
 
 template <>
 struct SamplerArgs<SamplerType::LABOR> {
+  const torch::Tensor& indices;
+  single_seed random_seed;
+  int64_t num_nodes;
+};
+
+template <>
+struct SamplerArgs<SamplerType::LABOR_DEPENDENT> {
   const torch::Tensor& indices;
   continuous_seed random_seed;
   int64_t num_nodes;
@@ -555,12 +566,12 @@ int64_t Pick(
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr);
 
-template <typename PickedType>
-int64_t Pick(
+template <SamplerType S, typename PickedType>
+std::enable_if_t<is_labor(S), int64_t> Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr);
 
 template <typename PickedType>
 int64_t TemporalPick(
@@ -619,13 +630,13 @@ int64_t TemporalPickByEtype(
     PickedType* picked_data_ptr);
 
 template <
-    bool NonUniform, bool Replace, typename ProbsType, typename PickedType,
-    int StackSize = 1024>
-int64_t LaborPick(
+    bool NonUniform, bool Replace, typename ProbsType, SamplerType S,
+    typename PickedType, int StackSize = 1024>
+std::enable_if_t<is_labor(S), int64_t> LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr);
 
 }  // namespace sampling
 }  // namespace graphbolt
