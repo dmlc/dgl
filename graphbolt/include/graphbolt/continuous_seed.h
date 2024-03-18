@@ -56,6 +56,8 @@ class continuous_seed {
     c[1] = std::sin(pi * r / 2);
   }
 
+  uint64_t get_seed(int i) const { return s[i != 0]; }
+
 #ifdef __CUDACC__
   __device__ inline float uniform(const uint64_t t) const {
     const uint64_t kCurandSeed = 999961;  // Could be any random number.
