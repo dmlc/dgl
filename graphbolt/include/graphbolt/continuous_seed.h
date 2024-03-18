@@ -93,23 +93,24 @@ class continuous_seed {
 };
 
 class single_seed {
-  uint64_t s;
+  uint64_t seed_;
 
  public:
-  /* implicit */ single_seed(const int64_t seed) : s(seed) {}  // NOLINT
+  /* implicit */ single_seed(const int64_t seed) : seed_(seed) {}  // NOLINT
 
-  single_seed(torch::Tensor seed_arr) : s(seed_arr.data_ptr<int64_t>()[0]) {}
+  single_seed(torch::Tensor seed_arr)
+      : seed_(seed_arr.data_ptr<int64_t>()[0]) {}
 
 #ifdef __CUDACC__
-  __device__ inline float uniform(const uint64_t t) const {
+  __device__ inline float uniform(const uint64_t id) const {
     const uint64_t kCurandSeed = 999961;  // Could be any random number.
     curandStatePhilox4_32_10_t rng;
-    curand_init(kCurandSeed, s, t, &rng);
+    curand_init(kCurandSeed, seed_, id, &rng);
     return curand_uniform(&rng);
   }
 #else
-  inline float uniform(const uint64_t t) const {
-    pcg32 ng0(s, t);
+  inline float uniform(const uint64_t id) const {
+    pcg32 ng0(seed_, id);
     std::uniform_real_distribution<float> uni;
     return uni(ng0);
   }
