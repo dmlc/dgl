@@ -852,6 +852,14 @@ class FusedCSCSamplingGraph(SamplingGraph):
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         self._check_sampler_arguments(nodes, fanouts, probs_name)
+        if random_seed is not None:
+            assert (
+                1 <= len(random_seed) <= 2
+            ), "There should be a 1 or 2 random seeds."
+            if len(random_seed) == 2:
+                assert (
+                    0 <= seed2_contribution <= 1
+                ), "seed2_contribution should be in [0, 1]."
         has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
