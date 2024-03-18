@@ -214,8 +214,7 @@ void ConcurrentIdHashMap<IdType>::InsertAndSetSmaller(IdType id, IdType value) {
 
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType val_pos = getValueIndex(pos);
-  IdType old_val =
-      state == InsertState::INSERTED ? empty_key : hash_map_data[val_pos];
+  IdType old_val = empty_key;
   while (old_val == empty_key || old_val > value) {
     old_val = CompareAndSwap(&(hash_map_data[val_pos]), old_val, value);
   }
