@@ -91,6 +91,7 @@ def train(model, dataset, device):
 
             # Forward.
             y_hat = model(data.blocks, x)
+            y_hat = y_hat[data.compacted_seeds]
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)
@@ -117,7 +118,7 @@ if __name__ == "__main__":
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset = gb.BuiltinDataset("cora").load()
+    dataset = gb.BuiltinDataset("cora-seeds").load()
 
     # If a CUDA device is selected, we pin the graph and the features so that
     # the GPU can access them.
