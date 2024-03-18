@@ -536,6 +536,11 @@ class MiniBatch:
                 batch_size = len(next(iter(self.node_pairs.values()))[0])
             else:
                 batch_size = len(self.node_pairs[0])
+        elif self.seeds is not None:
+            if isinstance(self.seeds, Dict):
+                batch_size = len(next(iter(self.seeds.values())))
+            else:
+                batch_size = len(self.seeds)
         else:
             batch_size = None
         pyg_data = Data(
