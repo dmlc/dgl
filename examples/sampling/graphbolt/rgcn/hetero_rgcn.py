@@ -452,7 +452,6 @@ def evaluate(
         logits = model(blocks, node_features)
 
         logits = logits[category]
-        logits = logits[data.compacted_seeds[category]]
 
         # Apply softmax to the logits and get the prediction by selecting the
         # argmax.
