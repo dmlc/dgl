@@ -768,5 +768,5 @@ class ItemSampler2(MapDataPipe):
         self._shuffle = shuffle
 
 
-    def _getitem_(self, index):
+    def __getitem__(self, index):
         ...
