@@ -367,11 +367,8 @@ def parse_args():
         type=str,
         default="ogbn-products-seeds",
         choices=[
-            "ogbn-arxiv",
             "ogbn-arxiv-seeds",
-            "ogbn-products",
             "ogbn-products-seeds",
-            "ogbn-papers100M",
             "ogbn-papers100M-seeds",
         ],
         help="The dataset we can use for node classification example. Currently"

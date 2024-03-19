@@ -42,7 +42,6 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 NAMES_INDICATING_NODE_IDS = [
-    "seeds",
     "node_pairs",
     "seeds",
     "negative_srcs",

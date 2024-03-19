@@ -153,7 +153,7 @@ def extract_embed(node_embed, input_nodes):
 
 def extract_node_features(name, block, data, node_embed, device):
     """Extract the node features from embedding layer or raw features."""
-    if name == "ogbn-mag":
+    if name == "ogbn-mag-seeds":
         input_nodes = {
             k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
         }
@@ -419,8 +419,8 @@ def evaluate(
     model.eval()
     category = "paper"
     # An evaluator for the dataset.
-    if name == "ogbn-mag":
-        evaluator = Evaluator(name=name)
+    if name == "ogbn-mag-seeds":
+        evaluator = Evaluator(name="ogbn-mag")
     else:
         evaluator = MAG240MEvaluator()
 
@@ -580,7 +580,7 @@ def main(args):
     # `institution` are generated in advance and stored in the feature store.
     # For `ogbn-mag`, we generate the features on the fly.
     embed_layer = None
-    if args.dataset == "ogbn-mag":
+    if args.dataset == "ogbn-mag-seeds":
         # Create the embedding layer and move it to the appropriate device.
         embed_layer = rel_graph_embed(g, feat_size).to(device)
         print(
@@ -654,9 +654,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        default="ogbn-mag",
-        choices=["ogbn-mag", "ogb-lsc-mag240m"],
-        help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m",
+        default="ogbn-mag-seeds",
+        choices=["ogbn-mag-seeds", "ogb-lsc-mag240m"],
+        help="Dataset name. Possible values: ogbn-mag-seeds, ogb-lsc-mag240m",
     )
     parser.add_argument("--num_epochs", type=int, default=3)
     parser.add_argument("--num_workers", type=int, default=0)
