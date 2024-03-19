@@ -254,8 +254,10 @@ def compute_mrr(args, model, node_emb, seeds, labels, indexes):
     preds = torch.empty(seeds.shape[0])
     mrr = RetrievalMRR()
     seeds_src, seeds_dst = seeds.T
-    # Loop over node pairs in batches.
+    # The constant number is 1001, due to negtive ratio in the `ogbl-citation2`
+    # dataset is 1000.
     eval_size = args.eval_batch_size * 1001
+    # Loop over node pairs in batches.
     for start in tqdm.trange(0, seeds_src.shape[0], eval_size, desc="Evaluate"):
         end = min(start + eval_size, seeds_src.shape[0])
 
