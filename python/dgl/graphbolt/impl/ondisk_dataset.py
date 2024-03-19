@@ -996,9 +996,11 @@ class BuiltinDataset(OnDiskDataset):
     )
     _datasets = [
         "cora",
+        "cora-seeds",
         "ogbn-mag",
         "ogbn-mag-seeds",
         "ogbl-citation2",
+        "ogbl-citation2-seeds",
         "ogbn-products",
         "ogbn-products-seeds",
         "ogbn-arxiv",
