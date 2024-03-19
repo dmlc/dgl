@@ -91,7 +91,7 @@ def train(model, dataset, device):
 
             # Forward.
             y_hat = model(data.blocks, x)
-            y_hat = y_hat[data.compacted_seeds]
+            y_hat = y_hat[data.compacted_seeds.long()]
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)
