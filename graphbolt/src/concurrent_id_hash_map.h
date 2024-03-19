@@ -166,7 +166,7 @@ class ConcurrentIdHashMap {
    * @param value The value to be set for the `key`.
    *
    */
-  inline void InsertAndSetSmaller(IdType id, IdType value);
+  inline void InsertAndSetMin(IdType id, IdType value);
 
   /**
    * @brief Attempt to insert the key into the hash map at the given position.

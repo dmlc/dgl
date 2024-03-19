@@ -68,7 +68,7 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
   // Insert all ids into the hash map.
   torch::parallel_for(0, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     for (int64_t i = s; i < e; i++) {
-      InsertAndSetSmaller(ids_data[i], static_cast<IdType>(i));
+      InsertAndSetMin(ids_data[i], static_cast<IdType>(i));
     }
   });
   // Place the first `num_seeds` ids.
@@ -203,7 +203,7 @@ inline void ConcurrentIdHashMap<IdType>::InsertAndSet(IdType id, IdType value) {
 }
 
 template <typename IdType>
-void ConcurrentIdHashMap<IdType>::InsertAndSetSmaller(IdType id, IdType value) {
+void ConcurrentIdHashMap<IdType>::InsertAndSetMin(IdType id, IdType value) {
   IdType pos = (id & mask_), delta = 1;
   IdType* hash_map_data = hash_map_.data_ptr<IdType>();
   InsertState state = AttemptInsertAt(pos, id);
@@ -216,10 +216,13 @@ void ConcurrentIdHashMap<IdType>::InsertAndSetSmaller(IdType id, IdType value) {
   IdType val_pos = getValueIndex(pos);
   IdType old_val = empty_key;
   while (old_val == empty_key || old_val > value) {
-    old_val = CompareAndSwap(&(hash_map_data[val_pos]), old_val, value);
+    IdType replaced_val =
+        CompareAndSwap(&(hash_map_data[val_pos]), old_val, value);
+    if (old_val == replaced_val)
+      break;
+    else
+      old_val = replaced_val;
   }
-
-  return;
 }
 
 template <typename IdType>
