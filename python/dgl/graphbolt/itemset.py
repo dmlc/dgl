@@ -5,7 +5,7 @@ from typing import Dict, Iterable, Iterator, Sized, Tuple, Union
 
 import torch
 
-__all__ = ["ItemSet", "ItemSetDict"]
+__all__ = ["ItemSet", "ItemSetDict", "ItemSet2", "ItemSetDict2"]
 
 
 def is_scalar(x):
