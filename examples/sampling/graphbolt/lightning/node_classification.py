@@ -97,7 +97,6 @@ class SAGE(LightningModule):
         x = batch.node_features["feat"]
         y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
-        y_hat = y_hat[batch.compacted_seeds]
         loss = F.cross_entropy(y_hat, y)
         self.train_acc(torch.argmax(y_hat, 1), y)
         self.log(
