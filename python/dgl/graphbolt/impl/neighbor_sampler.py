@@ -536,9 +536,9 @@ class LayerNeighborSampler(NeighborSamplerImpl):
         Specifies whether consecutive minibatches should use similar random
         variates. Results in a higher temporal access locality of sampled
         nodes and edges. Setting it to :math:`\\kappa` slows down the change in
-        the random variates proportional to :math:`\frac{1}{\\kappa}`. Implements
+        the random variates proportional to :math:`\\frac{1}{\\kappa}`. Implements
         the dependent minibatching approach in `arXiv:2310.12403
-        <https://arxiv.org/abs/2310.12403>__.
+        <https://arxiv.org/abs/2310.12403>`__.
 
     Examples
     -------
