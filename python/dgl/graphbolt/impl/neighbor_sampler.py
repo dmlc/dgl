@@ -51,10 +51,11 @@ class FetchInsubgraphData(Mapper):
             if is_hetero:
                 for idx in index.values():
                     idx.record_stream(torch.cuda.current_stream())
-                index, node_offsets = self.graph._convert_to_homogeneous_nodes(index)
-                print(index, node_offsets)
+                index, node_type_offset = self.graph._convert_to_homogeneous_nodes(index)
+                node_type_offset = torch.tensor(node_type_offset)
             else:
                 index.record_stream(torch.cuda.current_stream())
+                node_type_offset = None
 
             def record_stream(tensor):
                 if stream is not None and tensor.is_cuda:
@@ -89,17 +90,17 @@ class FetchInsubgraphData(Mapper):
                     record_stream(probs_or_mask)
             else:
                 probs_or_mask = None
-            node_type_offset = torch.tensor(node_offsets, dtype=self.graph.indices.dtype) if is_hetero else None
             subgraph = fused_csc_sampling_graph(
                 indptr,
                 indices,
-                node_type_offset=node_type_offset,
+                node_type_offset=self.graph.node_type_offset,
                 type_per_edge=type_per_edge,
                 node_type_to_id=self.graph.node_type_to_id,
                 edge_type_to_id=self.graph.edge_type_to_id,
             )
             if self.prob_name is not None and probs_or_mask is not None:
                 subgraph.edge_attributes = {self.prob_name: probs_or_mask}
+            subgraph._node_type_offset_cached_list = node_type_offset
 
             minibatch.sampled_subgraphs.insert(0, subgraph)
 

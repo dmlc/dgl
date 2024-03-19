@@ -532,8 +532,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         }
       }));
 
-  if (order_edge_types) {
-    if (fanouts.size() == 1 && type_per_edge) {
+  if (order_edge_types && type_per_edge) {
+    if (fanouts.size() == 1) {
       torch::Tensor output_in_degree, sliced_output_indptr;
       sliced_output_indptr =
           output_indptr.slice(0, 0, output_indptr.size(0) - 1);
@@ -545,20 +545,24 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     }
     auto permutation = torch::arange(
         0, num_rows * num_etypes, num_etypes, output_indptr.options());
-    permutation = permutation % num_rows + permutation / num_rows;
+    permutation =
+        permutation.remainder(num_rows) + permutation.div(num_rows, "floor");
+    std::cerr << "here" << std::endl;
     auto [output_in_degree, sliced_output_indptr] =
         SliceCSCIndptr(output_indptr, permutation);
+    std::cerr << "here2" << std::endl;
     std::tie(output_indptr, picked_eids) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, picked_eids, permutation,
         num_rows - 1, picked_eids.size(0));
+    std::cerr << "here3" << std::endl;
     std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, output_indices, permutation,
         num_rows - 1, output_indices.size(0));
-    if (type_per_edge) {
-      std::tie(output_indptr, output_type_per_edge) = IndexSelectCSCImpl(
-          output_in_degree, sliced_output_indptr, output_type_per_edge.value(),
-          permutation, num_rows - 1, output_type_per_edge.value().size(0));
-    }
+    std::cerr << "here4" << std::endl;
+    std::tie(output_indptr, output_type_per_edge) = IndexSelectCSCImpl(
+        output_in_degree, sliced_output_indptr, output_type_per_edge.value(),
+        permutation, num_rows - 1, output_type_per_edge.value().size(0));
+    std::cerr << "here5" << std::endl;
   } else {
     // Convert output_indptr back to homo by discarding intermediate offsets.
     output_indptr =
