@@ -3,7 +3,7 @@
 import textwrap
 
 # pylint: disable= invalid-name
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import torch
 
@@ -460,13 +460,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
         homogeneous_node_offsets = [0]
         homogeneous_timestamps = []
         offset = self._node_type_offset_list
-        for ntype, ids in nodes.items():
-            ntype_id = self.node_type_to_id[ntype]
-            homogeneous_nodes.append(ids + offset[ntype_id])
-            if timestamps is not None:
-                homogeneous_timestamps.append(timestamps[ntype])
-            else:
-                homogeneous_node_offsets.append(homogeneous_node_offsets[-1] + len(homogeneous_nodes[-1]))
+        for ntype, ntype_id in self.node_type_to_id.items():
+            ids = nodes.get(ntype, [])
+            if len(ids) > 0:
+                homogeneous_nodes.append(ids + offset[ntype_id])
+                if timestamps is not None:
+                    homogeneous_timestamps.append(timestamps[ntype])
+            homogeneous_node_offsets.append(
+                homogeneous_node_offsets[-1] + len(ids)
+            )
         if timestamps is not None:
             return torch.cat(homogeneous_nodes), torch.cat(
                 homogeneous_timestamps
@@ -476,6 +478,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def _convert_to_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
+        offset_local: Optional[List] = None,
     ) -> SampledSubgraphImpl:
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'SampledSubgraphImpl'."""
@@ -498,43 +501,25 @@ class FusedCSCSamplingGraph(SamplingGraph):
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
             offset = self._node_type_offset_list
-            num_nodes = self.csc_indptr.size(0) - 1 if column is None else column.size(0)
-            if indptr.size(0) - 1 <= num_nodes:
-                offset = self._node_type_offset_list
-                # UVA sampling requires us to move node_type_offset to GPU.
-                self.node_type_offset = self.node_type_offset.to(column.device)
-                # 1. Find node types for each nodes in column.
-                node_types = (
-                    torch.searchsorted(self.node_type_offset, column, right=True)
-                    - 1
-                )
+            num_nodes = (
+                self.csc_indptr.size(0) - 1
+                if column is None
+                else column.size(0)
+            )
 
             original_hetero_edge_ids = {}
             sub_indices = {}
             sub_indptr = {}
-            if indptr.size(0) - 1 > num_nodes:
-                edge_offsets = []
-                for etype, etype_id in self.edge_type_to_id.items():
-                    src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
-                    ntype_id = self.node_type_to_id[dst_ntype]
-                    edge_offsets.append(num_nodes * etype_id + offset[ntype_id])
-                    edge_offsets.append(num_nodes * etype_id + offset[ntype_id + 1])
-                edge_offsets = torch.tensor(edge_offsets, dtype=indptr.dtype, device=indptr.device)
-                print(indptr)
-                print(edge_offsets)
-                edge_offsets = indptr[edge_offsets].tolist()
-                print(edge_offsets)
-                for etype, etype_id in self.edge_type_to_id.items():
-                    src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
-                    ntype_id = self.node_type_to_id[dst_ntype]
-                    sub_indices[etype] = indices[edge_offsets[2 * etype_id]: edge_offsets[2 * etype_id + 1]]
-                    sub_indptr_ = indptr[num_nodes * etype_id + offset[ntype_id]: num_nodes * etype_id + offset[ntype_id + 1] + 1]
-                    sub_indptr[etype] = sub_indptr_ - sub_indptr_[0]
-                    if has_original_eids:
-                        original_hetero_edge_ids[etype] = original_edge_ids[edge_offsets[2 * etype_id]: edge_offsets[2 * etype_id + 1]]
-                    src_ntype_id = self.node_type_to_id[src_ntype]
-                    sub_indices[etype] -= self.node_type_offset[src_ntype_id]
-            else:
+            if offset_local is None:
+                # UVA sampling requires us to move node_type_offset to GPU.
+                self.node_type_offset = self.node_type_offset.to(column.device)
+                # 1. Find node types for each nodes in column.
+                node_types = (
+                    torch.searchsorted(
+                        self.node_type_offset, column, right=True
+                    )
+                    - 1
+                )
                 # 2. For loop each node type.
                 for ntype, ntype_id in self.node_type_to_id.items():
                     # Get all nodes of a specific node type in column.
@@ -547,7 +532,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
                         # Get all edge ids of a specific edge type.
                         eids = torch.nonzero(type_per_edge == etype_id).view(-1)
                         src_ntype_id = self.node_type_to_id[src_ntype]
-                        sub_indices[etype] = indices[eids] - offset[src_ntype_id]
+                        sub_indices[etype] = (
+                            indices[eids] - offset[src_ntype_id]
+                        )
                         cum_edges = torch.searchsorted(
                             eids, nids_original_indptr, right=False
                         )
@@ -558,6 +545,45 @@ class FusedCSCSamplingGraph(SamplingGraph):
                             original_hetero_edge_ids[etype] = original_edge_ids[
                                 eids
                             ]
+            else:
+                edge_offsets = []
+                for etype, etype_id in self.edge_type_to_id.items():
+                    src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
+                    ntype_id = self.node_type_to_id[dst_ntype]
+                    edge_offsets.append(
+                        num_nodes * etype_id + offset_local[ntype_id]
+                    )
+                    edge_offsets.append(
+                        num_nodes * etype_id + offset_local[ntype_id + 1]
+                    )
+                edge_offsets = torch.tensor(
+                    edge_offsets, dtype=indptr.dtype, device=indptr.device
+                )
+                edge_offsets = indptr[edge_offsets].tolist()
+                for etype, etype_id in self.edge_type_to_id.items():
+                    src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
+                    ntype_id = self.node_type_to_id[dst_ntype]
+                    sub_indices[etype] = indices[
+                        edge_offsets[2 * etype_id] : edge_offsets[
+                            2 * etype_id + 1
+                        ]
+                    ]
+                    sub_indptr_ = indptr[
+                        num_nodes * etype_id
+                        + offset_local[ntype_id] : num_nodes * etype_id
+                        + offset_local[ntype_id + 1]
+                        + 1
+                    ]
+                    sub_indptr[etype] = sub_indptr_ - sub_indptr_[0]
+                    if has_original_eids:
+                        original_hetero_edge_ids[etype] = original_edge_ids[
+                            edge_offsets[2 * etype_id] : edge_offsets[
+                                2 * etype_id + 1
+                            ]
+                        ]
+                    src_ntype_id = self.node_type_to_id[src_ntype]
+                    sub_indices[etype] -= offset[src_ntype_id]
+
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
             sampled_csc = {
@@ -653,9 +679,17 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
 
+        local_node_offsets = None
         if isinstance(nodes, dict):
             nodes, node_offsets = self._convert_to_homogeneous_nodes(nodes)
-            self._node_type_offset_cached_list = node_offsets
+            if nodes.is_cuda:
+                local_node_offsets = node_offsets
+        elif nodes is None:
+            local_node_offsets = (
+                self._node_type_offset_local_list
+                if hasattr(self, "_node_type_offset_local_list")
+                else self._node_type_offset_list
+            )
         C_sampled_subgraph = self._sample_neighbors(
             nodes,
             fanouts,
@@ -663,7 +697,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             probs_name=probs_name,
             return_eids=return_eids,
         )
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, local_node_offsets
+        )
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         if nodes is not None:
@@ -893,9 +929,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
 
+        local_node_offsets = None
         if isinstance(nodes, dict):
             nodes, node_offsets = self._convert_to_homogeneous_nodes(nodes)
-            self._node_type_offset_cached_list = node_offsets
+            if nodes.is_cuda:
+                local_node_offsets = node_offsets
+        elif nodes is None and hasattr(self, "_node_type_offset_local_list"):
+            local_node_offsets = self._node_type_offset_local_list
         self._check_sampler_arguments(nodes, fanouts, probs_name)
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
             nodes,
@@ -908,7 +948,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             random_seed,
             seed2_contribution,
         )
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, local_node_offsets
+        )
 
     def temporal_sample_neighbors(
         self,

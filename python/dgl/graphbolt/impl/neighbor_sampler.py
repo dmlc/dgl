@@ -51,7 +51,10 @@ class FetchInsubgraphData(Mapper):
             if is_hetero:
                 for idx in index.values():
                     idx.record_stream(torch.cuda.current_stream())
-                index, node_type_offset = self.graph._convert_to_homogeneous_nodes(index)
+                (
+                    index,
+                    node_type_offset,
+                ) = self.graph._convert_to_homogeneous_nodes(index)
                 node_type_offset = torch.tensor(node_type_offset)
             else:
                 index.record_stream(torch.cuda.current_stream())
@@ -100,7 +103,7 @@ class FetchInsubgraphData(Mapper):
             )
             if self.prob_name is not None and probs_or_mask is not None:
                 subgraph.edge_attributes = {self.prob_name: probs_or_mask}
-            subgraph._node_type_offset_cached_list = node_type_offset
+            subgraph._node_type_offset_local_list = node_type_offset
 
             minibatch.sampled_subgraphs.insert(0, subgraph)
 

@@ -547,22 +547,17 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         0, num_rows * num_etypes, num_etypes, output_indptr.options());
     permutation =
         permutation.remainder(num_rows) + permutation.div(num_rows, "floor");
-    std::cerr << "here" << std::endl;
     auto [output_in_degree, sliced_output_indptr] =
         SliceCSCIndptr(output_indptr, permutation);
-    std::cerr << "here2" << std::endl;
     std::tie(output_indptr, picked_eids) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, picked_eids, permutation,
         num_rows - 1, picked_eids.size(0));
-    std::cerr << "here3" << std::endl;
     std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, output_indices, permutation,
         num_rows - 1, output_indices.size(0));
-    std::cerr << "here4" << std::endl;
     std::tie(output_indptr, output_type_per_edge) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, output_type_per_edge.value(),
         permutation, num_rows - 1, output_type_per_edge.value().size(0));
-    std::cerr << "here5" << std::endl;
   } else {
     // Convert output_indptr back to homo by discarding intermediate offsets.
     output_indptr =
