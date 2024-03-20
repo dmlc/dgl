@@ -447,10 +447,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
             nodes, _ = self._convert_to_homogeneous_nodes(nodes)
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
-        # Ensure that there are no duplicate nodes.
-        assert len(torch.unique(nodes)) == len(
-            nodes
-        ), "Nodes cannot have duplicate values."
 
         _in_subgraph = self._c_csc_graph.in_subgraph(nodes)
         return self._convert_to_sampled_subgraph(_in_subgraph)
