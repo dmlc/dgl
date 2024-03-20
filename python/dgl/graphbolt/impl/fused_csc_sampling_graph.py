@@ -785,7 +785,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
         `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
-        <https://arxiv.org/abs/2210.13339>`__
+        <https://proceedings.neurips.cc/paper_files/paper/2023/file/51f9036d5e7ae822da8f6d4adda1fb39-Paper-Conference.pdf>`__
 
         Parameters
         ----------
