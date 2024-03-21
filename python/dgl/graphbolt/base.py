@@ -220,6 +220,10 @@ class CopyTo(IterDataPipe):
     ``compacted_negative_srcs``, ``compacted_negative_dsts``,
     ``sampled_subgraphs``, ``node_features`` and ``edge_features`` will be
     transferred.
+    
+    - When ``seeds`` is not None, only ``labels``, ``compacted_seeds``,
+    ``sampled_subgraphs``, ``node_features`` and ``edge_features`` will be
+    transferred.
 
     - Otherwise, all attributes will be transferred.
 
