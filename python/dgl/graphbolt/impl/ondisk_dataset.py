@@ -3,14 +3,15 @@
 import bisect
 import json
 import os
-import pandas as pd
 import shutil
 import textwrap
+import time
 from copy import deepcopy
 from typing import Dict, List, Union
-import time
+
 
 import numpy as np
+import pandas as pd
 
 import torch
 import yaml
@@ -172,21 +173,21 @@ def _graph_data_to_fused_csc_sampling_graph(
         #     we can ensure that the top n element in the merged list is the smallest n
         #     elements in the final result.
         import heapq
-        # 定义结果块的大小
-        result_chunk_size = 10000 * 1000  # 举例，可以根据需要进行调整
+        # define the size of sorted result chunk size
+        result_chunk_size = 10000 * 1000
 
-        # 初始化一个列表来存储当前的结果块
+        # a list for storing current result in memory
         current_result_chunk = []
         arrays_iters = []
         heap = []
         np_array = []
         total_sz = 0
-        # 定义保存结果的文件路径
+        # the file path for storing the result merge file
         output_dir_path = temp_dir + "/"
 
         # 现在在归并排序过程中添加逻辑，以写入结果
         for file_idx, file_path in enumerate(paths):
-            # 使用内存映射方式打开.npy文件
+            # 使用内存映射方式打开.npy file
             # arr = np.lib.format.open_memmap(file_path, mode='r')
             # 这里我们按照文件大小创建迭代器，每次返回一小部分数组
             # array_iter = iter(np.array_split(arr, np.arange(chunk_size, arr.shape[0], chunk_size)))
@@ -212,10 +213,7 @@ def _graph_data_to_fused_csc_sampling_graph(
             current_result_chunk.append(next_item)
             cnt += 1
             if pointer[idx] < np_array[idx].shape[0]:
-                # try:
                 heapq.heappush(pq, (np_array[idx][pointer[idx]][1], np_array[idx][pointer[idx]].tolist(), idx))
-                # except Exception as e:
-                    # print("pointer idx", pointer[idx])
 
                 pointer[idx] += 1
             if len(current_result_chunk) == result_chunk_size:
@@ -240,7 +238,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         #     except StopIteration:
         #         continue
 
-        # 确保所有剩余数据都写入文件
+        # make sure the rest of the result is also stored in a .npy file
         if current_result_chunk:
             with open(output_dir_path + str(chunk_idx) + "sorted.npy", 'wb') as f:
                 np.save(f, np.array(current_result_chunk))
@@ -257,17 +255,15 @@ def _graph_data_to_fused_csc_sampling_graph(
         time4 = time.time()
         print("before convert to csc: ", time4 - time2)
 
-        # 按块读取和迭代数据
+        # read in every npy file
         for i in range(chunk_idx):
-            # 获取当前块的数据
             chunk = np.load(output_dir_path + str(i) + "sorted.npy")
             print("chunk: ", chunk)
-            # 迭代当前块中的每一行
+            # lopp over every row in the npy file 
             for xx in chunk:
-                # 在这里处理每一行，xx是当前行的数据
+                # deal with every line
+                # here we need to consider the edge id, which we do not consider currently
                 # edge_id = xx[0]
-                # row = xx[1]
-                # col = xx[2]
                 row = xx[0]
                 col = xx[1]
                 if i >= 1 and col > last_col:
