@@ -9,7 +9,6 @@ import time
 from copy import deepcopy
 from typing import Dict, List, Union
 
-
 import numpy as np
 import pandas as pd
 
@@ -119,7 +118,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         indice_re = []
         edge_ids_re = []
         # In outer sort mode
-        # 1. first read in part of the csv and sort it 
+        # 1. first read in part of the csv and sort it
         # 2. store the ordered result in the format (dst, src, original_idx) in temp csv
         # 3. we need to add an additional label for the original edge
         def sort_and_save_chunk(df, chunk_id, temp_dir):
@@ -131,13 +130,15 @@ def _graph_data_to_fused_csc_sampling_graph(
             # 使用新的列顺序重新排列DataFrame
             # df_sorted = df_sorted[columns]
             # save the sorted csv
-            sorted_chunk_path = os.path.join(temp_dir, f'sorted_chunk_{chunk_id}.npy')
+            sorted_chunk_path = os.path.join(
+                temp_dir, f'sorted_chunk_{chunk_id}.npy'
+            )
             np_array = df_sorted.to_numpy()
             # print("np_array: ", np_array)
             np.save(sorted_chunk_path, np_array)
             return sorted_chunk_path
 
-        temp_dir = 'temp_chunks'
+        temp_dir = "temp_chunks"
         os.makedirs(temp_dir, exist_ok=True)
         chunk_id = 0
         paths = []
@@ -290,7 +291,7 @@ def _graph_data_to_fused_csc_sampling_graph(
         #     indice_re.append(sorted_src[i])
         #     edge_ids_re.append(new_indices[i])
         # the upper bound
-        while(len(indptr_re) <= num_nodes):
+        while (len(indptr_re) <= num_nodes):
             indptr_re.append(len(dst))
         
         indptr_re = torch.tensor(indptr_re)
