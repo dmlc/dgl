@@ -1007,6 +1007,7 @@ class BuiltinDataset(OnDiskDataset):
     ]
     _large_datasets = [
         "ogb-lsc-mag240m",
+        "ogb-lsc-mag240m-seeds",
         "ogbn-papers100M",
         "ogbn-papers100M-seeds",
     ]
