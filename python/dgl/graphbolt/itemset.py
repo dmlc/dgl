@@ -471,9 +471,9 @@ class ItemSet3(Dataset):
                 ...
 
 
-class ItemSet2(Dataset):
+class ItemSet4(Dataset):
     r"""Class for iterating over tensor-like data.
-    Experimental. Implemented only __getitem__().
+    Experimental. Implemented only __getitem__() accepting slice and list.
     """
 
     def __init__(
@@ -533,7 +533,7 @@ class ItemSet2(Dataset):
                 )
         elif len(self._items) == 1:
             return self._items[0][index]
-        elif isinstance:
+        else:
             return tuple(item[index] for item in self._items)
 
     @property
@@ -550,11 +550,10 @@ class ItemSet2(Dataset):
         )
         return ret
 
-
-class ItemSetDict2(Dataset):
+class ItemSetDict4(Dataset):
     r"""Experimental."""
 
-    def __init__(self, itemsets: Dict[str, ItemSet2]) -> None:
+    def __init__(self, itemsets: Dict[str, ItemSet4]) -> None:
         super().__init__()
         self._itemsets = itemsets
         self._names = next(iter(itemsets.values())).names
@@ -624,6 +623,127 @@ class ItemSetDict2(Dataset):
             raise TypeError(
                 f"{type(self).__name__} indices must be int, slice or list of int."
             )
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
+
+    def __repr__(self) -> str:
+        ret = (
+            "{Classname}(\n"
+            "    itemsets={itemsets},\n"
+            "    names={names},\n"
+            ")"
+        )
+        itemsets_str = textwrap.indent(
+            repr(self._itemsets), " " * len("    itemsets=")
+        ).strip()
+        return ret.format(
+            Classname=self.__class__.__name__,
+            itemsets=itemsets_str,
+            names=self._names,
+        )
+
+
+
+# On the use:
+# Both ItemSet2 and ItemSetDict implemented __getitem__() that only accepts integer.
+
+class ItemSet2(Dataset):
+    r"""Class for iterating over tensor-like data.
+    Experimental. Implemented __getitem__() accepting only int.
+    """
+
+    def __init__(
+        self,
+        items: Union[torch.Tensor, Mapping, Tuple[Mapping]],
+        names: Union[str, Tuple[str]] = None,
+    ):
+        if is_scalar(items):
+            self._length = int(items)
+            self._items = items
+        elif isinstance(items, tuple):
+            self._length = len(items[0])
+            if any(self._length != len(item) for item in items):
+                raise ValueError("Size mismatch between items.")
+            self._items = items
+        else:
+            self._length = len(items)
+            self._items = (items,)
+        if names is not None:
+            num_items = (
+                len(self._items) if isinstance(self._items, tuple) else 1
+            )
+            if isinstance(names, tuple):
+                self._names = names
+            else:
+                self._names = (names,)
+            assert num_items == len(self._names), (
+                f"Number of items ({num_items}) and "
+                f"names ({len(self._names)}) must match."
+            )
+        else:
+            self._names = None
+
+    def __len__(self) -> int:
+        return self._length
+
+    def __getitem__(self, index: int):
+        if is_scalar(self._items):
+            if index < 0:
+                index += self._length
+            if index < 0 or index >= self._length:
+                raise IndexError(
+                    f"{type(self).__name__} index out of range."
+                )
+            return torch.tensor(index, dtype=self._items.dtype)
+        elif len(self._items) == 1:
+            return self._items[0][index]
+        else:
+            return tuple(item[index] for item in self._items)
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
+
+    def __repr__(self) -> str:
+        ret = (
+            f"{self.__class__.__name__}(\n"
+            f"    items={self._items},\n"
+            f"    names={self._names},\n"
+            f")"
+        )
+        return ret
+
+
+class ItemSetDict2(Dataset):
+    r"""Experimental."""
+
+    def __init__(self, itemsets: Dict[str, ItemSet2]) -> None:
+        super().__init__()
+        self._itemsets = itemsets
+        self._names = next(iter(itemsets.values())).names
+        self._length = sum(len(itemset) for itemset in itemsets.values())
+        if any(self._names != itemset.names for itemset in itemsets.values()):
+            raise ValueError("All itemsets must have the same names.")
+        offset = [0] + [len(itemset) for itemset in self._itemsets.values()]
+        self._offsets = torch.tensor(offset).cumsum(0)
+
+    def __len__(self) -> int:
+        return self._length
+
+    def __getitem__(self, index: int):
+        if index < 0:
+            index += self._length
+        if index < 0 or index >= self._length:
+            raise IndexError(f"{type(self).__name__} index out of range.")
+        offset_idx = torch.searchsorted(self._offsets, index, right=True)
+        offset_idx -= 1
+        index -= self._offsets[offset_idx]
+        key = list(self._itemsets.keys())[offset_idx]
+        return {key: self._itemsets[key][index]}
 
     @property
     def names(self) -> Tuple[str]:
