@@ -551,7 +551,7 @@ def create_block(
             data,
             idtype,
             bipartite=True,
-            infer_node_count=False,
+            infer_node_count=need_infer,
         )
         node_tensor_dict[(sty, ety, dty)] = (sparse_fmt, arrays)
         if need_infer:

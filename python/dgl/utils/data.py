@@ -199,8 +199,7 @@ def graphdata2tensors(
         num_src, num_dst = (
             infer_num_nodes(data, bipartite=bipartite)
             if infer_node_count
-            else None,
-            None,
+            else (None, None)
         )
     elif isinstance(data, list):
         src, dst = elist2tensor(data, idtype)
@@ -208,16 +207,14 @@ def graphdata2tensors(
         num_src, num_dst = (
             infer_num_nodes(data, bipartite=bipartite)
             if infer_node_count
-            else None,
-            None,
+            else (None, None)
         )
     elif isinstance(data, sp.sparse.spmatrix):
         # We can get scipy matrix's number of rows and columns easily.
         num_src, num_dst = (
             infer_num_nodes(data, bipartite=bipartite)
             if infer_node_count
-            else None,
-            None,
+            else (None, None)
         )
         data = scipy2tensor(data, idtype)
     elif isinstance(data, nx.Graph):
@@ -225,8 +222,7 @@ def graphdata2tensors(
         num_src, num_dst = (
             infer_num_nodes(data, bipartite=bipartite)
             if infer_node_count
-            else None,
-            None,
+            else (None, None)
         )
         edge_id_attr_name = kwargs.get("edge_id_attr_name", None)
         if bipartite:
