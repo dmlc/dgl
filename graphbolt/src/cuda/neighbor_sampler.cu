@@ -184,16 +184,18 @@ struct SegmentEndFunc {
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices,
     torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool layer, bool return_eids, bool order_edge_types,
-    int64_t num_etypes, torch::optional<torch::Tensor> type_per_edge,
+    bool replace, bool layer, bool return_eids,
+    torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask,
+    torch::optional<std::vector<int64_t>> local_node_offsets,
+    torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id,
+    torch::optional<torch::Dict<std::string, int64_t>> edge_type_to_id,
     torch::optional<torch::Tensor> random_seed_tensor,
     float seed2_contribution) {
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
   TORCH_CHECK(
-      fanouts.size() == 1 || fanouts.size() == num_etypes,
-      "Number fanout values should be either 1 or same as the number of "
-      "existing edge types.");
+      type_per_edge.has_value() == local_node_offsets.has_value(),
+      "local_node_offsets needs to be passed for heterogenous sampling.");
   // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
@@ -532,7 +534,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         }
       }));
 
-  if (order_edge_types && type_per_edge) {
+  torch::optional<torch::Tensor> edge_offsets = torch::nullopt;
+  if (type_per_edge) {
+    const int64_t num_etypes =
+        edge_type_to_id.has_value() ? edge_type_to_id->size() : 1;
     if (fanouts.size() == 1) {
       torch::Tensor output_in_degree, sliced_output_indptr;
       sliced_output_indptr =
@@ -543,6 +548,27 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               num_etypes);
       num_rows = sliced_output_indptr.size(0);
     }
+    std::vector<int64_t> etype_id_to_dst_id(num_etypes);
+    for (auto& etype_and_id : edge_type_to_id.value()) {
+      auto etype = etype_and_id.key();
+      auto id = etype_and_id.value();
+      auto first_seperator_it = std::find(etype.begin(), etype.end(), ':');
+      auto second_seperator_pos =
+          std::find(first_seperator_it + 1, etype.end(), ':') - etype.begin();
+      auto dst_type = etype.substr(second_seperator_pos + 1);
+      etype_id_to_dst_id[id] = node_type_to_id->at(dst_type);
+    }
+    auto indptr_offsets = torch::empty(
+        num_etypes * 2,
+        c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
+    auto indptr_offsets_ptr = indptr_offsets.data_ptr<int64_t>();
+    for (int i = 0; i < num_etypes; i++) {
+      indptr_offsets_ptr[2 * i] = num_rows / num_etypes * i +
+                                  local_node_offsets->at(etype_id_to_dst_id[i]);
+      indptr_offsets_ptr[2 * i + 1] =
+          num_rows / num_etypes * i +
+          local_node_offsets->at(etype_id_to_dst_id[i] + 1);
+    }
     auto permutation = torch::arange(
         0, num_rows * num_etypes, num_etypes, output_indptr.options());
     permutation =
@@ -552,12 +578,51 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     std::tie(output_indptr, picked_eids) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, picked_eids, permutation,
         num_rows - 1, picked_eids.size(0));
+    edge_offsets = torch::empty(
+        num_etypes * 2, c10::TensorOptions()
+                            .dtype(output_indptr.scalar_type())
+                            .pinned_memory(true));
+    at::cuda::CUDAEvent edge_offsets_event;
+    AT_DISPATCH_INDEX_TYPES(
+        indptr.scalar_type(), "SampleNeighborsEdgeOffsets", ([&] {
+          THRUST_CALL(
+              gather, indptr_offsets_ptr,
+              indptr_offsets_ptr + indptr_offsets.size(0),
+              output_indptr.data_ptr<index_t>(),
+              edge_offsets->data_ptr<index_t>());
+        }));
+    edge_offsets_event.record();
     std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, output_indices, permutation,
         num_rows - 1, output_indices.size(0));
     std::tie(output_indptr, output_type_per_edge) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, output_type_per_edge.value(),
         permutation, num_rows - 1, output_type_per_edge.value().size(0));
+    std::vector<torch::Tensor> indptr_list;
+    for (int i = 0; i < num_etypes; i++) {
+      indptr_list.push_back(output_indptr.slice(
+          0, indptr_offsets_ptr[2 * i],
+          indptr_offsets_ptr[2 * i + 1] + (i == num_etypes - 1)));
+    }
+    output_indptr = torch::cat(indptr_list);
+    edge_offsets_event.synchronize();
+    AT_DISPATCH_INDEX_TYPES(
+        indptr.scalar_type(), "SampleNeighborsEdgeOffsetsCheck", ([&] {
+          auto edge_offsets_ptr = edge_offsets->data_ptr<index_t>();
+          TORCH_CHECK(edge_offsets_ptr[0] == 0, "edge_offsets is incorrect.");
+          for (int i = 1; i < num_etypes; i++) {
+            TORCH_CHECK(
+                edge_offsets_ptr[2 * i - 1] == edge_offsets_ptr[2 * i],
+                "edge_offsets is incorrect.");
+          }
+          TORCH_CHECK(
+              edge_offsets_ptr[2 * num_etypes - 1] == picked_eids.size(0),
+              "edge_offsets is incorrect.");
+          for (int i = 0; i < num_etypes; i++) {
+            edge_offsets_ptr[i + 1] = edge_offsets_ptr[2 * i + 1];
+          }
+        }));
+    edge_offsets = edge_offsets->slice(0, 0, num_etypes + 1);
   } else {
     // Convert output_indptr back to homo by discarding intermediate offsets.
     output_indptr =
@@ -569,7 +634,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
       output_indptr, output_indices, nodes, torch::nullopt,
-      subgraph_reverse_edge_ids, output_type_per_edge);
+      subgraph_reverse_edge_ids, output_type_per_edge, edge_offsets);
 }
 
 }  //  namespace ops

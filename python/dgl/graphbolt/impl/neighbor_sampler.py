@@ -55,7 +55,6 @@ class FetchInsubgraphData(Mapper):
                     index,
                     node_type_offset,
                 ) = self.graph._convert_to_homogeneous_nodes(index)
-                node_type_offset = torch.tensor(node_type_offset)
             else:
                 index.record_stream(torch.cuda.current_stream())
                 node_type_offset = None

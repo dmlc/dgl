@@ -334,8 +334,9 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    */
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
       torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool layer, bool return_eids, bool order_edge_types,
+      bool replace, bool layer, bool return_eids,
       torch::optional<std::string> probs_name,
+      torch::optional<std::vector<int64_t>> local_node_offsets,
       torch::optional<torch::Tensor> random_seed,
       double seed2_contribution) const;
 

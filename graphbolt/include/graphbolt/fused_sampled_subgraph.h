@@ -57,13 +57,15 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
       torch::optional<torch::Tensor> original_column_node_ids,
       torch::optional<torch::Tensor> original_row_node_ids = torch::nullopt,
       torch::optional<torch::Tensor> original_edge_ids = torch::nullopt,
-      torch::optional<torch::Tensor> type_per_edge = torch::nullopt)
+      torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
+      torch::optional<torch::Tensor> etype_offsets = torch::nullopt)
       : indptr(indptr),
         indices(indices),
         original_column_node_ids(original_column_node_ids),
         original_row_node_ids(original_row_node_ids),
         original_edge_ids(original_edge_ids),
-        type_per_edge(type_per_edge) {}
+        type_per_edge(type_per_edge),
+        etype_offsets(etype_offsets) {}
 
   FusedSampledSubgraph() = default;
 
@@ -114,6 +116,12 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * subgraph.
    */
   torch::optional<torch::Tensor> type_per_edge;
+
+  /**
+   * @brief Offsets of each etype,
+   * type_per_edge[etype_offsets[i]: etype_offsets[i + 1]] == i
+   */
+  torch::optional<torch::Tensor> etype_offsets;
 };
 
 }  // namespace sampling
