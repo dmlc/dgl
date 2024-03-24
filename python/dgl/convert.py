@@ -387,7 +387,12 @@ def heterograph(data_dict, num_nodes_dict=None, idtype=None, device=None):
 
 
 def create_block(
-    data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None, device=None
+    data_dict,
+    num_src_nodes=None,
+    num_dst_nodes=None,
+    idtype=None,
+    device=None,
+    node_count_check=True,
 ):
     """Create a message flow graph (MFG) as a :class:`DGLBlock` object.
 
@@ -456,6 +461,9 @@ def create_block(
         the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
         returned graph is on CPU.  If the specified :attr:`device` differs from that of the
         provided tensors, it casts the given tensors to the specified device first.
+    node_count_check : bool, optional
+        When num_src_nodes and num_dst_nodes are passed, whether we should perform
+        sanity checks to ensure they are valid.
 
     Returns
     -------
@@ -540,13 +548,16 @@ def create_block(
     node_tensor_dict = {}
     for (sty, ety, dty), data in data_dict.items():
         (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(
-            data, idtype, bipartite=True
+            data,
+            idtype,
+            bipartite=True,
+            infer_node_count=False,
         )
         node_tensor_dict[(sty, ety, dty)] = (sparse_fmt, arrays)
         if need_infer:
             num_src_nodes[sty] = max(num_src_nodes[sty], urange)
             num_dst_nodes[dty] = max(num_dst_nodes[dty], vrange)
-        else:  # sanity check
+        elif node_count_check:  # sanity check
             if num_src_nodes[sty] < urange:
                 raise DGLError(
                     "The given number of nodes of source node type {} must be larger"
