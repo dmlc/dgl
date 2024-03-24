@@ -474,7 +474,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def _convert_to_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
-        offset_local: Optional[list] = None,
+        local_offsets: Optional[list] = None,
     ) -> SampledSubgraphImpl:
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'SampledSubgraphImpl'."""
@@ -546,8 +546,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     ntype_id = self.node_type_to_id[dst_ntype]
                     edge_offsets.append(
                         edge_offsets[-1]
-                        + offset_local[ntype_id + 1]
-                        - offset_local[ntype_id]
+                        + local_offsets[ntype_id + 1]
+                        - local_offsets[ntype_id]
                     )
                 for etype, etype_id in self.edge_type_to_id.items():
                     src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
@@ -663,13 +663,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
 
-        local_node_offsets = None
+        node_offsets = None
         if isinstance(nodes, dict):
             nodes, node_offsets = self._convert_to_homogeneous_nodes(nodes)
-            if nodes.is_cuda:
-                local_node_offsets = node_offsets
         elif nodes is None:
-            local_node_offsets = (
+            node_offsets = (
                 self._node_type_offset_local_list
                 if hasattr(self, "_node_type_offset_local_list")
                 else self._node_type_offset_list
@@ -680,10 +678,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
             replace=replace,
             probs_name=probs_name,
             return_eids=return_eids,
-            local_node_offsets=local_node_offsets,
+            local_node_offsets=node_offsets,
         )
         return self._convert_to_sampled_subgraph(
-            C_sampled_subgraph, local_node_offsets
+            C_sampled_subgraph, node_offsets
         )
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
@@ -915,13 +913,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
 
-        local_node_offsets = None
+        node_offsets = None
         if isinstance(nodes, dict):
             nodes, node_offsets = self._convert_to_homogeneous_nodes(nodes)
-            if nodes.is_cuda:
-                local_node_offsets = node_offsets
         elif nodes is None and hasattr(self, "_node_type_offset_local_list"):
-            local_node_offsets = self._node_type_offset_local_list
+            node_offsets = self._node_type_offset_local_list
         self._check_sampler_arguments(nodes, fanouts, probs_name)
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
             nodes,
@@ -930,12 +926,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
             True,
             has_original_eids,
             probs_name,
-            local_node_offsets,
+            node_offsets,
             random_seed,
             seed2_contribution,
         )
         return self._convert_to_sampled_subgraph(
-            C_sampled_subgraph, local_node_offsets
+            C_sampled_subgraph, node_offsets
         )
 
     def temporal_sample_neighbors(
