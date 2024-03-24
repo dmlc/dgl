@@ -666,12 +666,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         node_offsets = None
         if isinstance(nodes, dict):
             nodes, node_offsets = self._convert_to_homogeneous_nodes(nodes)
-        elif nodes is None:
-            node_offsets = (
-                self._node_type_offset_local_list
-                if hasattr(self, "_node_type_offset_local_list")
-                else self._node_type_offset_list
-            )
+        elif nodes is None and hasattr(self, "_node_type_offset_local_list"):
+            node_offsets = self._node_type_offset_local_list
         C_sampled_subgraph = self._sample_neighbors(
             nodes,
             fanouts,
