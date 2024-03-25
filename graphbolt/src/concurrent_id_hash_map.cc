@@ -65,10 +65,10 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
   // This code block is to fill the ids into hash_map_.
   auto unique_ids = torch::empty_like(ids);
   IdType* unique_ids_data = unique_ids.data_ptr<IdType>();
-  // Fill in the first `num_seeds` ids.
-  torch::parallel_for(0, num_seeds, kGrainSize, [&](int64_t s, int64_t e) {
+  // Insert all ids into the hash map.
+  torch::parallel_for(0, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     for (int64_t i = s; i < e; i++) {
-      InsertAndSet(ids_data[i], static_cast<IdType>(i));
+      InsertAndSetMin(ids_data[i], static_cast<IdType>(i));
     }
   });
   // Place the first `num_seeds` ids.
@@ -82,13 +82,16 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
 
   const int64_t num_threads = torch::get_num_threads();
   std::vector<size_t> block_offset(num_threads + 1, 0);
-  // Insert all elements in this loop.
+
+  // Count the valid numbers in each thread.
   torch::parallel_for(
       num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
         size_t count = 0;
         for (int64_t i = s; i < e; i++) {
-          valid[i] = Insert(ids_data[i]);
-          count += valid[i];
+          if (MapId(ids_data[i]) == i) {
+            count++;
+            valid[i] = 1;
+          }
         }
         auto thread_id = torch::get_thread_num();
         block_offset[thread_id + 1] = count;
@@ -197,6 +200,27 @@ inline void ConcurrentIdHashMap<IdType>::InsertAndSet(IdType id, IdType value) {
   }
 
   hash_map_.data_ptr<IdType>()[getValueIndex(pos)] = value;
+}
+
+template <typename IdType>
+void ConcurrentIdHashMap<IdType>::InsertAndSetMin(IdType id, IdType value) {
+  IdType pos = (id & mask_), delta = 1;
+  IdType* hash_map_data = hash_map_.data_ptr<IdType>();
+  InsertState state = AttemptInsertAt(pos, id);
+  while (state == InsertState::OCCUPIED) {
+    Next(&pos, &delta);
+    state = AttemptInsertAt(pos, id);
+  }
+
+  IdType empty_key = static_cast<IdType>(kEmptyKey);
+  IdType val_pos = getValueIndex(pos);
+  IdType old_val = empty_key;
+  while (old_val == empty_key || old_val > value) {
+    IdType replaced_val =
+        CompareAndSwap(&(hash_map_data[val_pos]), old_val, value);
+    if (old_val == replaced_val) break;
+    old_val = replaced_val;
+  }
 }
 
 template <typename IdType>
