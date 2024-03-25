@@ -218,10 +218,8 @@ void ConcurrentIdHashMap<IdType>::InsertAndSetMin(IdType id, IdType value) {
   while (old_val == empty_key || old_val > value) {
     IdType replaced_val =
         CompareAndSwap(&(hash_map_data[val_pos]), old_val, value);
-    if (old_val == replaced_val)
-      break;
-    else
-      old_val = replaced_val;
+    if (old_val == replaced_val) break;
+    old_val = replaced_val;
   }
 }
 
