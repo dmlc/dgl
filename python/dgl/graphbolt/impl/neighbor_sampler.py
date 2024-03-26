@@ -46,17 +46,17 @@ class FetchInsubgraphData(Mapper):
 
     def _fetch_per_layer_impl(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
-            index = minibatch._seed_nodes
-            is_hetero = isinstance(index, dict)
+            seeds = minibatch._seed_nodes
+            is_hetero = isinstance(seeds, dict)
             if is_hetero:
-                for idx in index.values():
+                for idx in seeds.values():
                     idx.record_stream(torch.cuda.current_stream())
                 (
-                    index,
+                    seeds,
                     node_type_offset,
-                ) = self.graph._convert_to_homogeneous_nodes(index)
+                ) = self.graph._convert_to_homogeneous_nodes(seeds)
             else:
-                index.record_stream(torch.cuda.current_stream())
+                seeds.record_stream(torch.cuda.current_stream())
                 node_type_offset = None
 
             def record_stream(tensor):
@@ -69,14 +69,14 @@ class FetchInsubgraphData(Mapper):
             )
 
             indptr, indices = index_select_csc_with_indptr(
-                self.graph.indices, index, None
+                self.graph.indices, seeds, None
             )
             record_stream(indptr)
             record_stream(indices)
             output_size = len(indices)
             if self.graph.type_per_edge is not None:
                 _, type_per_edge = index_select_csc_with_indptr(
-                    self.graph.type_per_edge, index, output_size
+                    self.graph.type_per_edge, seeds, output_size
                 )
                 record_stream(type_per_edge)
             else:
@@ -87,7 +87,7 @@ class FetchInsubgraphData(Mapper):
                 )
                 if probs_or_mask is not None:
                     _, probs_or_mask = index_select_csc_with_indptr(
-                        probs_or_mask, index, output_size
+                        probs_or_mask, seeds, output_size
                     )
                     record_stream(probs_or_mask)
             else:
