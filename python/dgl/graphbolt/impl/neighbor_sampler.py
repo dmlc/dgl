@@ -53,11 +53,11 @@ class FetchInsubgraphData(Mapper):
                     idx.record_stream(torch.cuda.current_stream())
                 (
                     seeds,
-                    node_type_offset,
+                    seed_offsets,
                 ) = self.graph._convert_to_homogeneous_nodes(seeds)
             else:
                 seeds.record_stream(torch.cuda.current_stream())
-                node_type_offset = None
+                seed_offsets = None
 
             def record_stream(tensor):
                 if stream is not None and tensor.is_cuda:
@@ -102,7 +102,7 @@ class FetchInsubgraphData(Mapper):
             )
             if self.prob_name is not None and probs_or_mask is not None:
                 subgraph.edge_attributes = {self.prob_name: probs_or_mask}
-            subgraph._node_type_offset_local_list = node_type_offset
+            subgraph._seed_offset_list = seed_offsets
 
             minibatch.sampled_subgraphs.insert(0, subgraph)
 
