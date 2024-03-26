@@ -303,6 +303,7 @@ class MiniBatch:
                     sampled_csc,
                     num_src_nodes=num_src_nodes,
                     num_dst_nodes=num_dst_nodes,
+                    node_count_check=False,
                 )
             )
 
