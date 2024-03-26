@@ -19,8 +19,10 @@ namespace ops {
  *
  * @param indptr Index pointer array of the CSC.
  * @param indices Indices array of the CSC.
- * @param nodes The nodes from which to sample neighbors. If not provided,
+ * @param seeds The nodes from which to sample neighbors. If not provided,
  * assumed to be equal to torch.arange(indptr.size(0) - 1).
+ * @param seed_offsets The offsets of the given seeds,
+ * seeds[seed_offsets[i]: seed_offsets[i + 1]] has node type i.
  * @param fanouts The number of edges to be sampled for each node with or
  * without considering edge types.
  *   - When the length is 1, it indicates that the fanout applies to all
@@ -54,11 +56,12 @@ namespace ops {
  */
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices,
-    torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool layer, bool return_eids,
+    torch::optional<torch::Tensor> seeds,
+    torch::optional<std::vector<int64_t>> seed_offsets,
+    const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool return_eids,
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
     torch::optional<torch::Tensor> probs_or_mask = torch::nullopt,
-    torch::optional<std::vector<int64_t>> local_node_offsets = torch::nullopt,
     torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id =
         torch::nullopt,
     torch::optional<torch::Dict<std::string, int64_t>> edge_type_to_id =

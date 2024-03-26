@@ -474,7 +474,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def _convert_to_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
-        local_offsets: Optional[list] = None,
+        seed_offsets: Optional[list] = None,
     ) -> SampledSubgraphImpl:
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'SampledSubgraphImpl'."""
@@ -546,8 +546,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     ntype_id = self.node_type_to_id[dst_ntype]
                     edge_offsets.append(
                         edge_offsets[-1]
-                        + local_offsets[ntype_id + 1]
-                        - local_offsets[ntype_id]
+                        + seed_offsets[ntype_id + 1]
+                        - seed_offsets[ntype_id]
                     )
                 for etype, etype_id in self.edge_type_to_id.items():
                     src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
@@ -584,7 +584,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def sample_neighbors(
         self,
-        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        seeds: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
@@ -594,7 +594,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Parameters
         ----------
-        nodes: torch.Tensor or Dict[str, torch.Tensor]
+        seeds: torch.Tensor or Dict[str, torch.Tensor]
             IDs of the given seed nodes.
               - If `nodes` is a tensor: It means the graph is homogeneous
                 graph, and ids inside are homogeneous ids.
@@ -663,21 +663,21 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
 
-        node_offsets = None
-        if isinstance(nodes, dict):
-            nodes, node_offsets = self._convert_to_homogeneous_nodes(nodes)
-        elif nodes is None and hasattr(self, "_node_type_offset_local_list"):
-            node_offsets = self._node_type_offset_local_list
+        seed_offsets = None
+        if isinstance(seeds, dict):
+            seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
+        elif seeds is None and hasattr(self, "_node_type_offset_local_list"):
+            seed_offsets = self._node_type_offset_local_list
         C_sampled_subgraph = self._sample_neighbors(
-            nodes,
+            seeds,
+            seed_offsets,
             fanouts,
             replace=replace,
             probs_name=probs_name,
             return_eids=return_eids,
-            local_node_offsets=node_offsets,
         )
         return self._convert_to_sampled_subgraph(
-            C_sampled_subgraph, node_offsets
+            C_sampled_subgraph, seed_offsets
         )
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
@@ -725,19 +725,19 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def _sample_neighbors(
         self,
-        nodes: torch.Tensor,
+        seeds: torch.Tensor,
+        seed_offsets: Optional[list],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
         return_eids: bool = False,
-        local_node_offsets: Optional[list] = None,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
 
         Parameters
         ----------
-        nodes: torch.Tensor
+        seeds: torch.Tensor
             IDs of the given seed nodes.
         fanouts: torch.Tensor
             The number of edges to be sampled for each node with or without
@@ -776,22 +776,22 @@ class FusedCSCSamplingGraph(SamplingGraph):
             The sampled C subgraph.
         """
         # Ensure nodes is 1-D tensor.
-        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        self._check_sampler_arguments(seeds, fanouts, probs_name)
         return self._c_csc_graph.sample_neighbors(
-            nodes,
+            seeds,
+            seed_offsets,
             fanouts.tolist(),
             replace,
             False,  # is_labor
             return_eids,
             probs_name,
-            local_node_offsets,
             None,  # random_seed, labor parameter
             0,  # seed2_contribution, labor_parameter
         )
 
     def sample_layer_neighbors(
         self,
-        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        seeds: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
@@ -805,7 +805,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Parameters
         ----------
-        nodes: torch.Tensor or Dict[str, torch.Tensor]
+        seeds: torch.Tensor or Dict[str, torch.Tensor]
             IDs of the given seed nodes.
               - If `nodes` is a tensor: It means the graph is homogeneous
                 graph, and ids inside are homogeneous ids.
@@ -909,25 +909,25 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
 
-        node_offsets = None
-        if isinstance(nodes, dict):
-            nodes, node_offsets = self._convert_to_homogeneous_nodes(nodes)
-        elif nodes is None and hasattr(self, "_node_type_offset_local_list"):
-            node_offsets = self._node_type_offset_local_list
-        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        seed_offsets = None
+        if isinstance(seeds, dict):
+            seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
+        elif seeds is None and hasattr(self, "_node_type_offset_local_list"):
+            seed_offsets = self._node_type_offset_local_list
+        self._check_sampler_arguments(seeds, fanouts, probs_name)
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
-            nodes,
+            seeds,
+            seed_offsets,
             fanouts.tolist(),
             replace,
             True,
             has_original_eids,
             probs_name,
-            node_offsets,
             random_seed,
             seed2_contribution,
         )
         return self._convert_to_sampled_subgraph(
-            C_sampled_subgraph, node_offsets
+            C_sampled_subgraph, seed_offsets
         )
 
     def temporal_sample_neighbors(
