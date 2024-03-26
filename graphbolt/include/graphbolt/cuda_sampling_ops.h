@@ -47,6 +47,12 @@ namespace ops {
  * @param probs_or_mask An optional tensor with (unnormalized) probabilities
  * corresponding to each neighboring edge of a node. It must be
  * a 1D tensor, with the number of elements equaling the total number of edges.
+ * @param node_type_to_id A dictionary mapping node type names to type IDs. The
+ * length of it is equal to the number of node types. The key is the node type
+ * name, and the value is the corresponding type ID.
+ * @param edge_type_to_id A dictionary mapping edge type names to type IDs. The
+ * length of it is equal to the number of edge types. The key is the edge type
+ * name, and the value is the corresponding type ID.
  * @param random_seed The random seed for the sampler for layer=True.
  * @param seed2_contribution The contribution of the second random seed, [0, 1)
  * for layer=True.
