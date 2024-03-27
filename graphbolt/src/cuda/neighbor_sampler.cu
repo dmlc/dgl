@@ -602,6 +602,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               edge_offsets->data_ptr<index_t>());
         }));
     edge_offsets_event.record();
+    // The output_indices is permuted here.
     std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, output_indices, permutation,
         num_rows - 1, output_indices.size(0));
@@ -611,8 +612,13 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           0, indptr_offsets_ptr[2 * i],
           indptr_offsets_ptr[2 * i + 1] + (i == num_etypes - 1)));
     }
+    // We form the final output indptr by concatenating pieces for different
+    // edge types.
     output_indptr = torch::cat(indptr_list);
     edge_offsets_event.synchronize();
+    // We read the edge_offsets here, they are in pairs but we don't need it to
+    // be in pairs. So we remove the duplicate information from it and turn it
+    // into a real offsets array.
     AT_DISPATCH_INDEX_TYPES(
         indptr.scalar_type(), "SampleNeighborsEdgeOffsetsCheck", ([&] {
           auto edge_offsets_ptr = edge_offsets->data_ptr<index_t>();
