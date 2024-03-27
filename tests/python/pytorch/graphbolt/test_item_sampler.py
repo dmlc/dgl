@@ -1108,3 +1108,112 @@ def test_DistributedItemSampler(
         nprocs=nprocs,
         join=True,
     )
+
+
+from time import time
+
+from torch.utils.data import DataLoader
+from torchdata.datapipes.iter import IterableWrapper
+
+
+def test_ItemSampler2():
+    item_set = gb.ItemSet(torch.arange(100000), names="seed_nodes")
+
+    data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
+    t0 = time()
+    for x in data_loader:
+        pass
+    t1 = time()
+    print(f"dl | {t1-t0}")
+
+    data_pipe = IterableWrapper(item_set)
+    t0 = time()
+    for x in data_pipe:
+        pass
+    t1 = time()
+    print(f"it | {t1-t0}")
+
+    item_sampler = gb.ItemSampler(item_set, batch_size=32, shuffle=True)
+
+    t0 = time()
+    for x in item_sampler:
+        pass
+    t1 = time()
+    print(f"is1 | {t1-t0}")
+
+    item_sampler2 = gb.ItemSampler2(item_set, batch_size=32, shuffle=True)
+
+    t0 = time()
+    for x in item_sampler2:
+        pass
+    t1 = time()
+    print(f"is2 | {t1-t0}")
+
+    item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
+
+    t0 = time()
+    for x in item_sampler3:
+        # print(x)
+        pass
+    t1 = time()
+    print(f"is3 | {t1-t0}")
+
+    print(" ")
+    """###########"""
+
+    item_set = gb.ItemSet2(torch.arange(100000), names="seed_nodes")
+
+    data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
+    t0 = time()
+    for x in data_loader:
+        pass
+    t1 = time()
+    print(f"dl | {t1-t0}")
+
+    data_pipe = IterableWrapper(item_set)
+    t0 = time()
+    for x in data_pipe:
+        pass
+    t1 = time()
+    print(f"it | {t1-t0}")
+
+    item_sampler = gb.ItemSampler(item_set, batch_size=32, shuffle=True)
+
+    t0 = time()
+    for x in item_sampler:
+        pass
+    t1 = time()
+    print(f"is1 | {t1-t0}")
+
+    item_sampler2 = gb.ItemSampler2(item_set, batch_size=32, shuffle=True)
+
+    t0 = time()
+    for x in item_sampler2:
+        pass
+    t1 = time()
+    print(f"is2 | {t1-t0}")
+
+    item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
+
+    t0 = time()
+    for x in item_sampler3:
+        # print(x)
+        pass
+    t1 = time()
+    print(f"is3 | {t1-t0}")
+
+    assert 0
+
+
+def test_ItemSampler3():
+    item_set = gb.ItemSet2(torch.arange(100000), names="seed_nodes")
+    item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
+
+    t0 = time()
+    for x in item_sampler3:
+        # print(x)
+        pass
+    t1 = time()
+    print(t1 - t0)
+
+    assert 0

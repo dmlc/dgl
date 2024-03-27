@@ -7,7 +7,9 @@ from typing import Callable, Iterator, Optional, Union
 import numpy as np
 import torch
 import torch.distributed as dist
-from torch.utils.data import default_collate
+from torch.utils.data import Dataset, default_collate, Sampler
+from torch.utils.data.dataloader import _collate_fn_t, _worker_init_fn_t
+from torchdata.dataloader2.dataloader2 import DataLoader2Iterator
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
 from ..base import dgl_warning
@@ -18,7 +20,13 @@ from .internal import calculate_range
 from .itemset import ItemSet, ItemSetDict
 from .minibatch import MiniBatch
 
-__all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
+__all__ = [
+    "ItemSampler",
+    "DistributedItemSampler",
+    "minibatcher_default",
+    "ItemSampler2",
+    "ItemSampler3",
+]
 
 
 def minibatcher_default(batch, names):
@@ -746,12 +754,17 @@ class DistributedItemSampler(ItemSampler):
         self._rank = dist.get_rank()
 
 
+from typing import List
+
+from torch.utils.data import (  # test for subclassing Dataloader directly.
+    DataLoader,
+)
 from torchdata.datapipes.map import MapDataPipe
 
 from .itemset import ItemSet2, ItemSetDict2
 
 
-class ItemSampler2(MapDataPipe):
+class _deprecated_ItemSampler(MapDataPipe):
     def __init__(
         self,
         item_set: Union[ItemSet2, ItemSetDict2],
@@ -761,12 +774,140 @@ class ItemSampler2(MapDataPipe):
         shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
+        self._item_set = item_set
         self._names = item_set.names
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
         self._shuffle = shuffle
 
+    def __getitem__(self, index): ...
 
-    def __getitem__(self, index):
-        ...
+
+from torchdata.datapipes.iter import Mapper
+
+
+class ItemSampler2:
+    """Experimental. Subclasses IterDataPipe."""
+
+    def __init__(
+        self,
+        item_set: Union[ItemSet2, ItemSetDict2],
+        batch_size: int = 1,
+        shuffle: Optional[bool] = False,
+        drop_last: bool = False,
+        minibatcher: Optional[Callable] = None,
+    ):
+        # super().__init__()
+        self._item_set = item_set
+        self._names = item_set.names
+        self._batch_size = batch_size
+        self._minibatcher = minibatcher
+        self._drop_last = drop_last
+        self._shuffle = shuffle
+
+    def __iter__(self) -> Iterator:
+        data_pipe = DataLoader(
+            dataset=self._item_set,
+            batch_size=self._batch_size,
+            shuffle=self._shuffle,
+            drop_last=self._drop_last,
+            collate_fn=self._collate,
+        )
+
+        data_pipe = Mapper(
+            data_pipe, partial(minibatcher_default, names=self._names)
+        )
+
+        return iter(data_pipe)
+
+    @staticmethod
+    def _collate(batch):
+        """Collate items into a batch. For internal use only."""
+        data = next(iter(batch))
+        if isinstance(data, DGLGraph):
+            return dgl_batch(batch)
+        elif isinstance(data, Mapping):
+            assert len(data) == 1, "Only one type of data is allowed."
+            # Collect all the keys.
+            keys = {key for item in batch for key in item.keys()}
+            # Collate each key.
+            return {
+                key: default_collate(
+                    [item[key] for item in batch if key in item]
+                )
+                for key in keys
+            }
+        return default_collate(batch)
+
+
+class ItemSampler3(DataLoader):
+    """Experimental. Subclasses DataLoader."""
+
+    def __init__(
+        self,
+        item_set: Union[ItemSet2, ItemSetDict2],
+        batch_size: int = 1,
+        shuffle: Optional[bool] = False,
+        drop_last: bool = False,
+        minibatcher: Optional[Callable] = minibatcher_default,
+    ):
+        self._item_set = item_set
+        self._names = item_set.names
+        self._batch_size = batch_size
+        self._minibatcher = minibatcher
+        self._drop_last = drop_last
+        self._shuffle = shuffle
+        super().__init__(
+            dataset=self._item_set,
+            batch_size=self._batch_size,
+            shuffle=self._shuffle,
+            collate_fn=self._collate_fn,
+            drop_last=self._drop_last,
+        )
+
+    @staticmethod
+    def _collate(batch):
+        """Collate items into a batch. For internal use only."""
+        data = next(iter(batch))
+        if isinstance(data, DGLGraph):
+            return dgl_batch(batch)
+        elif isinstance(data, Mapping):
+            assert len(data) == 1, "Only one type of data is allowed."
+            # Collect all the keys.
+            keys = {key for item in batch for key in item.keys()}
+            # Collate each key.
+            return {
+                key: default_collate(
+                    [item[key] for item in batch if key in item]
+                )
+                for key in keys
+            }
+        return default_collate(batch)
+
+    def _collate_fn(self, batch: List):
+        return self._minibatcher(self._collate(batch), names=self._names)
+
+
+from torchdata.dataloader2 import DataLoader2
+
+
+class ItemSampler4(DataLoader2):
+    """Experimental. Subclasses DataLoader2."""
+
+    def __init__(
+        self,
+        item_set: Union[ItemSet2, ItemSetDict2],
+        batch_size: int = 1,
+        shuffle: Optional[bool] = False,
+        drop_last: bool = False,
+        minibatcher: Optional[Callable] = minibatcher_default,
+    ):
+        self._item_set = item_set
+        self._names = item_set.names
+        self._batch_size = batch_size
+        self._minibatcher = minibatcher
+        self._drop_last = drop_last
+        self._shuffle = shuffle
+
+    def __iter__(self): ...

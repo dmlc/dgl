@@ -550,6 +550,7 @@ class ItemSet4(Dataset):
         )
         return ret
 
+
 class ItemSetDict4(Dataset):
     r"""Experimental."""
 
@@ -646,9 +647,9 @@ class ItemSetDict4(Dataset):
         )
 
 
-
 # On the use:
 # Both ItemSet2 and ItemSetDict implemented __getitem__() that only accepts integer.
+
 
 class ItemSet2(Dataset):
     r"""Class for iterating over tensor-like data.
@@ -694,9 +695,7 @@ class ItemSet2(Dataset):
             if index < 0:
                 index += self._length
             if index < 0 or index >= self._length:
-                raise IndexError(
-                    f"{type(self).__name__} index out of range."
-                )
+                raise IndexError(f"{type(self).__name__} index out of range.")
             return torch.tensor(index, dtype=self._items.dtype)
         elif len(self._items) == 1:
             return self._items[0][index]
