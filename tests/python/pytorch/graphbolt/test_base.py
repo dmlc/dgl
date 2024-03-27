@@ -252,7 +252,7 @@ def test_CopyToWithMiniBatches(task):
             "node_features",
             "edge_features",
             "blocks",
-            "seeds"
+            "seeds",
         ]
     elif task == "extra_attrs":
         copied_attrs = [
@@ -262,7 +262,7 @@ def test_CopyToWithMiniBatches(task):
             "labels",
             "blocks",
             "seed_nodes",
-            "seeds"
+            "seeds",
         ]
 
     def test_data_device(datapipe):
