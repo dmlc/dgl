@@ -44,4 +44,5 @@ Scenarios
   neighbor_sampling_overview.nblink
   node_classification.nblink
   link_prediction.nblink
+  multigpu_node_classification.nblink
   ondisk-dataset.rst
