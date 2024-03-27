@@ -32,7 +32,7 @@ class InvertibleCheckpoint(torch.autograd.Function):
             outputs = ctx.fn(*x).detach_()
 
         # clear memory of input node features
-        inputs[1].storage().resize_(0)
+        inputs[1].untyped_storage().resize_(0)
 
         # store for backward pass
         ctx.inputs = [inputs]
@@ -63,10 +63,10 @@ class InvertibleCheckpoint(torch.autograd.Function):
                 *((inputs[0], outputs) + inputs[2:])
             )
             # clear memory of outputs
-            outputs.storage().resize_(0)
+            outputs.untyped_storage().resize_(0)
 
             x = inputs[1]
-            x.storage().resize_(int(np.prod(x.size())))
+            x.untyped_storage().resize_(int(np.prod(x.size())))
             x.set_(inputs_inverted)
 
         # compute gradients
