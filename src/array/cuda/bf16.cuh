@@ -19,7 +19,6 @@
 #ifndef DGL_ARRAY_CUDA_BF16_CUH_
 #define DGL_ARRAY_CUDA_BF16_CUH_
 
-#if BF16_ENABLED
 #include <cuda_bf16.h>
 
 #include <algorithm>
@@ -143,7 +142,5 @@ __device__ __forceinline__ bool operator<=(
 #endif  // defined(CUDART_VERSION) && (CUDART_VERSION < 12020)
 #endif  // defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 800)
 #endif  // __CUDACC__
-
-#endif  // BF16_ENABLED
 
 #endif  // DGL_ARRAY_CUDA_BF16_CUH_

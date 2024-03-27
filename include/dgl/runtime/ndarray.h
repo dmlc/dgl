@@ -18,14 +18,9 @@
 #include "shared_mem.h"
 
 #ifdef DGL_USE_CUDA
-#include <cuda_runtime.h>
-
-#define BF16_ENABLED (defined(CUDART_VERSION) && CUDART_VERSION >= 11000)
-
-#include <cuda_fp16.h>
-#if BF16_ENABLED
 #include <cuda_bf16.h>
-#endif  // BF16_ENABLED
+#include <cuda_fp16.h>
+#include <cuda_runtime.h>
 #endif  // DGL_USE_CUDA
 
 // forward declaration
@@ -59,9 +54,7 @@ GEN_DGLDATATYPETRAITS_FOR(uint32_t, kDGLInt, 32);
 GEN_DGLDATATYPETRAITS_FOR(uint64_t, kDGLInt, 64);
 #ifdef DGL_USE_CUDA
 GEN_DGLDATATYPETRAITS_FOR(__half, kDGLFloat, 16);
-#if BF16_ENABLED
 GEN_DGLDATATYPETRAITS_FOR(__nv_bfloat16, kDGLBfloat, 16);
-#endif  // BF16_ENABLED
 #endif  // DGL_USE_CUDA
 GEN_DGLDATATYPETRAITS_FOR(float, kDGLFloat, 32);
 GEN_DGLDATATYPETRAITS_FOR(double, kDGLFloat, 64);
