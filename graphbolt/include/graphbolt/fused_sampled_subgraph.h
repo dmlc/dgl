@@ -88,8 +88,9 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * can be treated as a coordinated row and column pair, and this is the the
    * mapped ids of the column.
    *
-   * @note This is required and the mapping relations can be inconsistent with
-   * column's.
+   * @note This is optional and the mapping relations can be inconsistent with
+   * column's. It can be missing when the sampling algorithm is called via a
+   * sliced sampled subgraph with missing seeds argument.
    */
   torch::optional<torch::Tensor> original_column_node_ids;
 

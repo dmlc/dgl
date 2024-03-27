@@ -301,7 +301,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @param seeds The nodes from which to sample neighbors. If not provided,
    * assumed to be equal to torch.arange(NumNodes()).
    * @param seed_offsets The offsets of the given seeds,
-   * seeds[seed_offsets[i]: seed_offsets[i + 1]] has node type i.
+   * seeds[seed_offsets[i]: seed_offsets[i + 1]] has node type id i.
    * @param fanouts The number of edges to be sampled for each node with or
    * without considering edge types.
    *   - When the length is 1, it indicates that the fanout applies to all

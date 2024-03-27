@@ -495,7 +495,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             original_edge_ids = torch.ops.graphbolt.index_select(
                 self.edge_attributes[ORIGINAL_EDGE_ID], original_edge_ids
             )
-        if type_per_edge is None:
+        if type_per_edge is None and etype_offsets is None:
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
