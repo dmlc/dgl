@@ -900,13 +900,13 @@ class OnDiskDataset(Dataset):
         if isinstance(num_nodes, int):
             return ItemSet(
                 torch.tensor(num_nodes, dtype=dtype),
-                names="seed_nodes",
+                names="seeds",
             )
         else:
             data = {
                 node_type: ItemSet(
                     torch.tensor(num_node, dtype=dtype),
-                    names="seed_nodes",
+                    names="seeds",
                 )
                 for node_type, num_node in num_nodes.items()
             }
