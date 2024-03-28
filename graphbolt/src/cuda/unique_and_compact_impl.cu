@@ -406,12 +406,17 @@ UniqueAndCompactBatchedMap(
         }
         std::exclusive_scan(
             offsets_ptr, offsets_ptr + 3 * num_batches + 1, offsets_ptr, 0ll);
-        auto pointers_and_offsets_dev =
-            pointers_and_offsets.to(stream.device());
+        auto pointers_and_offsets_dev = torch::empty(
+            pointers_and_offsets.size(0),
+            src_ids[0].options().dtype(pointers_and_offsets.scalar_type()));
         auto offsets_dev = pointers_and_offsets_dev.slice(0, 3 * num_batches);
         auto pointers_dev_ptr =
             reinterpret_cast<index_t**>(pointers_and_offsets_dev.data_ptr());
         auto offsets_dev_ptr = offsets_dev.data_ptr<int64_t>();
+        CUDA_CALL(cudaMemcpyAsync(
+            pointers_dev_ptr, pointers_ptr,
+            sizeof(int64_t) * pointers_and_offsets.size(0),
+            cudaMemcpyHostToDevice, stream));
         auto indexes = ExpandIndptrImpl(
             offsets_dev, torch::kInt32, torch::nullopt,
             offsets_ptr[3 * num_batches]);
