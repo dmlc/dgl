@@ -205,7 +205,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    dataset = gb.BuiltinDataset("ogbn-products").load()
+    dataset = gb.BuiltinDataset("ogbn-products-seeds").load()
     datamodule = DataModule(
         dataset,
         [10, 10, 10],

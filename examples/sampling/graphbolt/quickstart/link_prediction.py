@@ -85,7 +85,8 @@ def evaluate(model, dataset, device):
     labels = []
     for step, data in enumerate(dataloader):
         # Get node pairs with labels for loss calculation.
-        compacted_pairs, label = data.node_pairs_with_labels
+        compacted_seeds = data.compacted_seeds.T
+        label = data.labels
 
         # The features of sampled nodes.
         x = data.node_features["feat"]
@@ -94,7 +95,7 @@ def evaluate(model, dataset, device):
         y = model(data.blocks, x)
         logit = (
             model.predictor(
-                y[compacted_pairs[0].long()] * y[compacted_pairs[1].long()]
+                y[compacted_seeds[0].long()] * y[compacted_seeds[1].long()]
             )
             .squeeze()
             .detach()
@@ -126,7 +127,8 @@ def train(model, dataset, device):
         ########################################################################
         for step, data in enumerate(dataloader):
             # Get node pairs with labels for loss calculation.
-            compacted_pairs, labels = data.node_pairs_with_labels
+            compacted_seeds = data.compacted_seeds.T
+            labels = data.labels
 
             # The features of sampled nodes.
             x = data.node_features["feat"]
@@ -134,7 +136,7 @@ def train(model, dataset, device):
             # Forward.
             y = model(data.blocks, x)
             logits = model.predictor(
-                y[compacted_pairs[0].long()] * y[compacted_pairs[1].long()]
+                y[compacted_seeds[0].long()] * y[compacted_seeds[1].long()]
             ).squeeze()
 
             # Compute loss.
@@ -156,7 +158,7 @@ if __name__ == "__main__":
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset = gb.BuiltinDataset("cora").load()
+    dataset = gb.BuiltinDataset("cora-seeds").load()
 
     # If a CUDA device is selected, we pin the graph and the features so that
     # the GPU can access them.
