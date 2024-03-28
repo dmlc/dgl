@@ -28,3 +28,6 @@
 [submodule "third_party/liburing"]
 	path = third_party/liburing
 	url = https://github.com/axboe/liburing.git
+[submodule "third_party/cuco"]
+	path = third_party/cuco
+	url = https://github.com/NVIDIA/cuCollections.git

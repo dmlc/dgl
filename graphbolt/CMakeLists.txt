@@ -73,7 +73,8 @@ if(USE_CUDA)
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
                              "../third_party/cccl/thrust"
                              "../third_party/cccl/cub"
-                             "../third_party/cccl/libcudacxx/include")
+                             "../third_party/cccl/libcudacxx/include"
+                             "../third_party/cuco/include")
 
   message(STATUS "Use HugeCTR gpu_cache for graphbolt with INCLUDE_DIRS $ENV{GPU_CACHE_INCLUDE_DIRS}.")
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE $ENV{GPU_CACHE_INCLUDE_DIRS})

@@ -38,11 +38,16 @@ namespace cuda {
  *
  * int_array.get() gives the raw pointer.
  */
+template <typename value_t = char>
 struct CUDAWorkspaceAllocator {
+  static_assert(sizeof(char) == 1, "sizeof(char) == 1 should hold.");
   // Required by thrust to satisfy allocator requirements.
-  using value_type = char;
+  using value_type = value_t;
 
   explicit CUDAWorkspaceAllocator() { at::globalContext().lazyInitCUDA(); }
+
+  template <class U>
+  CUDAWorkspaceAllocator(CUDAWorkspaceAllocator<U> const&) noexcept {}
 
   CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
 
@@ -53,7 +58,7 @@ struct CUDAWorkspaceAllocator {
   // Required by thrust to satisfy allocator requirements.
   value_type* allocate(std::ptrdiff_t size) const {
     return reinterpret_cast<value_type*>(
-        c10::cuda::CUDACachingAllocator::raw_alloc(size));
+        c10::cuda::CUDACachingAllocator::raw_alloc(size * sizeof(value_type)));
   }
 
   // Required by thrust to satisfy allocator requirements.
@@ -63,7 +68,9 @@ struct CUDAWorkspaceAllocator {
   std::unique_ptr<T, CUDAWorkspaceAllocator> AllocateStorage(
       std::size_t size) const {
     return std::unique_ptr<T, CUDAWorkspaceAllocator>(
-        reinterpret_cast<T*>(allocate(sizeof(T) * size)), *this);
+        reinterpret_cast<T*>(
+            c10::cuda::CUDACachingAllocator::raw_alloc(sizeof(T) * size)),
+        *this);
   }
 };
 

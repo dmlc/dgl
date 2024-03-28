@@ -792,22 +792,40 @@ def test_SubgraphSampler_unique_csc_format_Homo_gpu_seed_nodes(labor):
         deduplicate=True,
     )
 
-    original_row_node_ids = [
-        torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-    ]
-    compacted_indices = [
-        torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
-        torch.tensor([4, 3, 2]).to(F.ctx()),
-    ]
-    indptr = [
-        torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
-        torch.tensor([0, 1, 2, 3]).to(F.ctx()),
-    ]
-    seeds = [
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-        torch.tensor([0, 3, 4]).to(F.ctx()),
-    ]
+    if torch.cuda.get_device_capability()[0] < 7:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([4, 3, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+    else:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 5, 2, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([3, 4, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([3, 4, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 3, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
     _assert_homo_values(
         datapipe, original_row_node_ids, compacted_indices, indptr, seeds
     )
@@ -1656,22 +1674,41 @@ def test_SubgraphSampler_unique_csc_format_Homo_Node_gpu(labor):
         deduplicate=True,
     )
 
-    original_row_node_ids = [
-        torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-    ]
-    compacted_indices = [
-        torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
-        torch.tensor([4, 3, 2]).to(F.ctx()),
-    ]
-    indptr = [
-        torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
-        torch.tensor([0, 1, 2, 3]).to(F.ctx()),
-    ]
-    seeds = [
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-        torch.tensor([0, 3, 4]).to(F.ctx()),
-    ]
+    if torch.cuda.get_device_capability()[0] < 7:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([4, 3, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+    else:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 5, 2, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([3, 4, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([3, 4, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 3, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert torch.equal(
@@ -2070,22 +2107,41 @@ def test_SubgraphSampler_unique_csc_format_Homo_Link_gpu(labor):
         deduplicate=True,
     )
 
-    original_row_node_ids = [
-        torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-    ]
-    compacted_indices = [
-        torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
-        torch.tensor([4, 3, 2]).to(F.ctx()),
-    ]
-    indptr = [
-        torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
-        torch.tensor([0, 1, 2, 3]).to(F.ctx()),
-    ]
-    seeds = [
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-        torch.tensor([0, 3, 4]).to(F.ctx()),
-    ]
+    if torch.cuda.get_device_capability()[0] < 7:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([4, 3, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+    else:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 5, 2, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([3, 4, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([3, 4, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 3, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert torch.equal(

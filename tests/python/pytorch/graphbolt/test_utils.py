@@ -175,22 +175,40 @@ def test_exclude_seed_edges_gpu():
         deduplicate=True,
     )
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    original_row_node_ids = [
-        torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-    ]
-    compacted_indices = [
-        torch.tensor([4, 3, 5, 5]).to(F.ctx()),
-        torch.tensor([4, 3]).to(F.ctx()),
-    ]
-    indptr = [
-        torch.tensor([0, 1, 2, 2, 4, 4]).to(F.ctx()),
-        torch.tensor([0, 1, 2, 2]).to(F.ctx()),
-    ]
-    seeds = [
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-        torch.tensor([0, 3, 4]).to(F.ctx()),
-    ]
+    if torch.cuda.get_device_capability()[0] < 7:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([4, 3, 5, 5]).to(F.ctx()),
+            torch.tensor([4, 3]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 2]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+    else:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 5, 2, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([3, 4, 5, 5]).to(F.ctx()),
+            torch.tensor([3, 4]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 2, 2, 4]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 2]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert torch.equal(
