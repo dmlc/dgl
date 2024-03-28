@@ -85,6 +85,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
+  m.def("unique_and_compact_batched", &UniqueAndCompactBatched);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);

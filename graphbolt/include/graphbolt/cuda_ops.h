@@ -221,6 +221,12 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
     const torch::Tensor unique_dst_ids, int num_bits = 0);
 
+std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+UniqueAndCompactBatched(
+    const std::vector<torch::Tensor>& src_ids,
+    const std::vector<torch::Tensor>& dst_ids,
+    const std::vector<torch::Tensor> unique_dst_ids, int num_bits = 0);
+
 }  //  namespace ops
 }  //  namespace graphbolt
 
