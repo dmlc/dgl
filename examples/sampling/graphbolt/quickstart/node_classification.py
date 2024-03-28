@@ -18,7 +18,7 @@ def create_dataloader(dataset, itemset, device):
     datapipe = gb.ItemSampler(itemset, batch_size=16)
 
     # Copy the mini-batch to the designated device for sampling and training.
-    datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+    datapipe = datapipe.copy_to(device, extra_attrs=["seeds"])
 
     # Sample neighbors for the seed nodes.
     datapipe = datapipe.sample_neighbor(dataset.graph, fanouts=[4, 2])
@@ -91,7 +91,6 @@ def train(model, dataset, device):
 
             # Forward.
             y_hat = model(data.blocks, x)
-            y_hat = y_hat[data.compacted_seeds.long()]
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)

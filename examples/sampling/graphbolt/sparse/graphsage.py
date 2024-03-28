@@ -200,7 +200,6 @@ def train(device, A, features, dataset, num_classes, model):
             blocks = data.sampled_subgraphs
             y = data.labels
             y_hat = model(blocks, node_feature)
-            y_hat = y_hat[data.compacted_seeds]
             loss = F.cross_entropy(y_hat, y)
             optimizer.zero_grad()
             loss.backward()

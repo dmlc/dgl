@@ -525,7 +525,6 @@ def train(
             optimizer.zero_grad()
             # Generate predictions.
             logits = model(blocks, node_features)[category]
-            logits = logits[data.compacted_seeds[category]]
 
             y_hat = logits.log_softmax(dim=-1)
             loss = F.nll_loss(y_hat, data.labels[category].long())

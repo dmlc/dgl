@@ -312,7 +312,6 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             y = data.labels
 
             y_hat = model(data.blocks, x)
-            y_hat = y_hat[data.compacted_seeds]
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)

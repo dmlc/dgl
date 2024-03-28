@@ -97,7 +97,6 @@ class SAGE(LightningModule):
         x = batch.node_features["feat"]
         y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
-        y_hat = y_hat[batch.compacted_seeds]
         loss = F.cross_entropy(y_hat, y)
         self.train_acc(torch.argmax(y_hat, 1), y)
         self.log(
@@ -178,7 +177,7 @@ class DataModule(LightningDataModule):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="GNN baselines on ogbn-products-seeds data with GraphBolt"
+        description="GNN baselines on ogbn-products data with GraphBolt"
     )
     parser.add_argument(
         "--num_gpus",

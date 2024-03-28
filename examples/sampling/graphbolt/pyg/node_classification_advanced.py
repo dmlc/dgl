@@ -229,7 +229,6 @@ def train(train_dataloader, valid_dataloader, num_classes, model, device):
             labels = minibatch.labels
             optimizer.zero_grad()
             out = model(minibatch.sampled_subgraphs, node_features)
-            out = out[minibatch.compacted_seeds]
             loss = criterion(out, labels)
             total_loss += loss.detach()
             total_correct += MF.accuracy(
