@@ -591,15 +591,10 @@ class MiniBatch:
                 "sampled_subgraphs",
                 "node_features",
                 "edge_features",
+                "compacted_seeds",
+                "indexes",
+                "seeds",
             ]
-            # Link/edge related tasks.
-            if self.compacted_seeds is not None:
-                transfer_attrs.append("compacted_seeds")
-            if self.indexes is not None:
-                transfer_attrs.append("indexes")
-            if self.labels is None:
-                # Layerwise inference
-                transfer_attrs.append("seeds")
         else:
             # Otherwise copy all the attributes to the device.
             transfer_attrs = get_attributes(self)
