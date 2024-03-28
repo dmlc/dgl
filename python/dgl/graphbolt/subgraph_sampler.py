@@ -266,24 +266,32 @@ class SubgraphSampler(MiniBatchTransformer):
             nodes_timestamp = None
             if use_timestamp:
                 nodes_timestamp = defaultdict(list)
-            for etype, pair in seeds.items():
-                assert pair.ndim == 1 or (
-                    pair.ndim == 2 and pair.shape[1] == 2
-                ), (
+            for etype, typed_seeds in seeds.items():
+                # When typed_seeds is a one-dimensional tensor, it represents
+                # seed nodes, which does not need to do unique and compact.
+                if typed_seeds.ndim == 1:
+                    nodes_timestamp = (
+                        minibatch.timestamp
+                        if hasattr(minibatch, "timestamp")
+                        else None
+                    )
+                    return seeds, nodes_timestamp, None
+                assert typed_seeds.ndim == 2 and typed_seeds.shape[1] == 2, (
                     "Only tensor with shape 1*N and N*2 is "
-                    + f"supported now, but got {pair.shape}."
+                    + f"supported now, but got {typed_seeds.shape}."
                 )
                 ntypes = etype[:].split(":")[::2]
-                pair = pair.view(pair.shape[0], -1)
                 if use_timestamp:
                     negative_ratio = (
-                        pair.shape[0] // minibatch.timestamp[etype].shape[0] - 1
+                        typed_seeds.shape[0]
+                        // minibatch.timestamp[etype].shape[0]
+                        - 1
                     )
                     neg_timestamp = minibatch.timestamp[
                         etype
                     ].repeat_interleave(negative_ratio)
                 for i, ntype in enumerate(ntypes):
-                    nodes[ntype].append(pair[:, i])
+                    nodes[ntype].append(typed_seeds[:, i])
                     if use_timestamp:
                         nodes_timestamp[ntype].append(
                             minibatch.timestamp[etype]
@@ -301,15 +309,21 @@ class SubgraphSampler(MiniBatchTransformer):
                 nodes_timestamp = None
             compacted_seeds = {}
             # Map back in same order as collect.
-            for etype, pair in seeds.items():
-                if pair.ndim == 1:
-                    compacted_seeds[etype] = compacted[etype].pop(0)
-                else:
-                    src_type, _, dst_type = etype_str_to_tuple(etype)
-                    src = compacted[src_type].pop(0)
-                    dst = compacted[dst_type].pop(0)
-                    compacted_seeds[etype] = torch.cat((src, dst)).view(2, -1).T
+            for etype, typed_seeds in seeds.items():
+                src_type, _, dst_type = etype_str_to_tuple(etype)
+                src = compacted[src_type].pop(0)
+                dst = compacted[dst_type].pop(0)
+                compacted_seeds[etype] = torch.cat((src, dst)).view(2, -1).T
         else:
+            # When seeds is a one-dimensional tensor, it represents seed nodes,
+            # which does not need to do unique and compact.
+            if seeds.ndim == 1:
+                nodes_timestamp = (
+                    minibatch.timestamp
+                    if hasattr(minibatch, "timestamp")
+                    else None
+                )
+                return seeds, nodes_timestamp, None
             # Collect nodes from all types of input.
             nodes = [seeds.view(-1)]
             nodes_timestamp = None

@@ -231,15 +231,14 @@ def test_CopyToWithMiniBatches(task):
         copied_attrs = [
             "node_features",
             "edge_features",
-            "compacted_seeds",
             "sampled_subgraphs",
             "labels",
             "blocks",
+            "seeds",
         ]
     elif task == "node_inference":
         copied_attrs = [
             "seeds",
-            "compacted_seeds",
             "sampled_subgraphs",
             "blocks",
             "labels",
@@ -253,16 +252,17 @@ def test_CopyToWithMiniBatches(task):
             "node_features",
             "edge_features",
             "blocks",
+            "seeds",
         ]
     elif task == "extra_attrs":
         copied_attrs = [
             "node_features",
             "edge_features",
-            "compacted_seeds",
             "sampled_subgraphs",
             "labels",
             "blocks",
             "seed_nodes",
+            "seeds",
         ]
 
     def test_data_device(datapipe):
