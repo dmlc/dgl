@@ -8,6 +8,7 @@ from . import citation_graph as citegrh
 from .actor import ActorDataset
 from .movielens import MovieLensDataset
 from .adapter import *
+from .airfrans import AirfRANSDataset
 from .bitcoinotc import BitcoinOTC, BitcoinOTCDataset
 from .citation_graph import (
     CitationGraphDataset,
