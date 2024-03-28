@@ -4,7 +4,6 @@
  * @file cuda/unique_and_compact_impl.cu
  * @brief Unique and compact operator implementation on CUDA.
  */
-#include <c10/cuda/driver_api.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
 #include <thrust/functional.h>
@@ -503,7 +502,7 @@ UniqueAndCompactBatched(
       return it->second;
     } else {
       int major;
-      C10_CUDA_DRIVER_CHECK(cuDeviceGetAttribute(
+      CUDA_DRIVER_CHECK(cuDeviceGetAttribute(
           &major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, dev_id));
       return compute_capability_cache[dev_id] = major;
     }
