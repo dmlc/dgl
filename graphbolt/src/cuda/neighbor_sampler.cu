@@ -183,19 +183,25 @@ struct SegmentEndFunc {
 
 c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::Tensor indptr, torch::Tensor indices,
-    torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool layer, bool return_eids,
-    torch::optional<torch::Tensor> type_per_edge,
+    torch::optional<torch::Tensor> seeds,
+    torch::optional<std::vector<int64_t>> seed_offsets,
+    const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool return_eids, torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask,
+    torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id,
+    torch::optional<torch::Dict<std::string, int64_t>> edge_type_to_id,
     torch::optional<torch::Tensor> random_seed_tensor,
     float seed2_contribution) {
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
-  // Assume that indptr, indices, nodes, type_per_edge and probs_or_mask
+  TORCH_CHECK(
+      type_per_edge.has_value() == seed_offsets.has_value(),
+      "seed_offsets needs to be passed for heterogenous sampling.");
+  // Assume that indptr, indices, seeds, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
   auto allocator = cuda::GetAllocator();
   auto num_rows =
-      nodes.has_value() ? nodes.value().size(0) : indptr.size(0) - 1;
+      seeds.has_value() ? seeds.value().size(0) : indptr.size(0) - 1;
   auto fanouts_pinned = torch::empty(
       fanouts.size(),
       c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
@@ -210,7 +216,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       fanouts_device.get(), fanouts_pinned_ptr,
       sizeof(int64_t) * fanouts.size(), cudaMemcpyHostToDevice,
       cuda::GetCurrentStream()));
-  auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, nodes);
+  auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, seeds);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
   auto max_in_degree = torch::empty(
@@ -227,16 +233,16 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   max_in_degree_event.record();
   torch::optional<int64_t> num_edges;
   torch::Tensor sub_indptr;
-  if (!nodes.has_value()) {
+  if (!seeds.has_value()) {
     num_edges = indices.size(0);
     sub_indptr = indptr;
   }
   torch::optional<torch::Tensor> sliced_probs_or_mask;
   if (probs_or_mask.has_value()) {
-    if (nodes.has_value()) {
+    if (seeds.has_value()) {
       torch::Tensor sliced_probs_or_mask_tensor;
       std::tie(sub_indptr, sliced_probs_or_mask_tensor) = IndexSelectCSCImpl(
-          in_degree, sliced_indptr, probs_or_mask.value(), nodes.value(),
+          in_degree, sliced_indptr, probs_or_mask.value(), seeds.value(),
           indptr.size(0) - 2, num_edges);
       sliced_probs_or_mask = sliced_probs_or_mask_tensor;
       num_edges = sliced_probs_or_mask_tensor.size(0);
@@ -246,9 +252,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   }
   if (fanouts.size() > 1) {
     torch::Tensor sliced_type_per_edge;
-    if (nodes.has_value()) {
+    if (seeds.has_value()) {
       std::tie(sub_indptr, sliced_type_per_edge) = IndexSelectCSCImpl(
-          in_degree, sliced_indptr, type_per_edge.value(), nodes.value(),
+          in_degree, sliced_indptr, type_per_edge.value(), seeds.value(),
           indptr.size(0) - 2, num_edges);
     } else {
       sliced_type_per_edge = type_per_edge.value();
@@ -259,7 +265,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     num_edges = sliced_type_per_edge.size(0);
   }
   // If sub_indptr was not computed in the two code blocks above:
-  if (nodes.has_value() && !probs_or_mask.has_value() && fanouts.size() <= 1) {
+  if (seeds.has_value() && !probs_or_mask.has_value() && fanouts.size() <= 1) {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
   auto coo_rows = ExpandIndptrImpl(
@@ -276,7 +282,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto output_indptr = torch::empty_like(sub_indptr);
   torch::Tensor picked_eids;
   torch::Tensor output_indices;
-  torch::optional<torch::Tensor> output_type_per_edge;
 
   AT_DISPATCH_INDEX_TYPES(
       indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
@@ -507,39 +512,138 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                   indices.data_ptr<indices_t>(),
                   output_indices.data_ptr<indices_t>());
             }));
-
-        if (type_per_edge) {
-          // output_type_per_edge = type_per_edge.gather(0, picked_eids);
-          // The commented out torch equivalent above does not work when
-          // type_per_edge is on pinned memory. That is why, we have to
-          // reimplement it, similar to the indices gather operation above.
-          auto types = type_per_edge.value();
-          output_type_per_edge = torch::empty(
-              picked_eids.size(0),
-              picked_eids.options().dtype(types.scalar_type()));
-          AT_DISPATCH_INTEGRAL_TYPES(
-              types.scalar_type(), "SampleNeighborsOutputTypePerEdge", ([&] {
-                THRUST_CALL(
-                    gather, picked_eids.data_ptr<indptr_t>(),
-                    picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
-                    types.data_ptr<scalar_t>(),
-                    output_type_per_edge.value().data_ptr<scalar_t>());
-              }));
-        }
       }));
 
-  // Convert output_indptr back to homo by discarding intermediate offsets.
-  output_indptr =
-      output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
-  torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
-  if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
-  if (!nodes.has_value()) {
-    nodes = torch::arange(indptr.size(0) - 1, indices.options());
+  torch::optional<torch::Tensor> edge_offsets = torch::nullopt;
+  if (type_per_edge) {
+    const int64_t num_etypes =
+        edge_type_to_id.has_value() ? edge_type_to_id->size() : 1;
+    // If we performed homogenous sampling on hetero graph, we have to look at
+    // type_per_edge of sampled edges and determine the offsets of different
+    // sampled etypes and convert to fused hetero indptr representation.
+    if (fanouts.size() == 1) {
+      // output_type_per_edge = type_per_edge.gather(0, picked_eids);
+      // The commented out torch equivalent above does not work when
+      // type_per_edge is on pinned memory. That is why, we have to
+      // reimplement it, similar to the indices gather operation above.
+      auto types = type_per_edge.value();
+      auto output_type_per_edge = torch::empty(
+          picked_eids.size(0),
+          picked_eids.options().dtype(types.scalar_type()));
+      AT_DISPATCH_INDEX_TYPES(
+          indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
+            using indptr_t = index_t;
+            AT_DISPATCH_INTEGRAL_TYPES(
+                types.scalar_type(), "SampleNeighborsOutputTypePerEdge", ([&] {
+                  THRUST_CALL(
+                      gather, picked_eids.data_ptr<indptr_t>(),
+                      picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
+                      types.data_ptr<scalar_t>(),
+                      output_type_per_edge.data_ptr<scalar_t>());
+                }));
+          }));
+      torch::Tensor output_in_degree, sliced_output_indptr;
+      sliced_output_indptr =
+          output_indptr.slice(0, 0, output_indptr.size(0) - 1);
+      std::tie(output_indptr, output_in_degree, sliced_output_indptr) =
+          SliceCSCIndptrHetero(
+              output_indptr, output_type_per_edge, sliced_output_indptr,
+              num_etypes);
+      num_rows = sliced_output_indptr.size(0);
+    }
+    // Here, we check what are the dst node types for the given seeds so that
+    // we can compute the output indptr space later.
+    std::vector<int64_t> etype_id_to_dst_id(num_etypes);
+    for (auto& etype_and_id : edge_type_to_id.value()) {
+      auto etype = etype_and_id.key();
+      auto id = etype_and_id.value();
+      auto first_seperator_it = std::find(etype.begin(), etype.end(), ':');
+      auto second_seperator_pos =
+          std::find(first_seperator_it + 1, etype.end(), ':') - etype.begin();
+      auto dst_type = etype.substr(second_seperator_pos + 1);
+      etype_id_to_dst_id[id] = node_type_to_id->at(dst_type);
+    }
+    auto indptr_offsets = torch::empty(
+        num_etypes * 2,
+        c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
+    auto indptr_offsets_ptr = indptr_offsets.data_ptr<int64_t>();
+    // We compute the indptr offsets here, right now, output_indptr is of size
+    // # seeds * num_etypes + 1. We can simply take slices to get correct output
+    // indptr.
+    for (int i = 0; i < num_etypes; i++) {
+      indptr_offsets_ptr[2 * i] =
+          num_rows / num_etypes * i + seed_offsets->at(etype_id_to_dst_id[i]);
+      indptr_offsets_ptr[2 * i + 1] =
+          num_rows / num_etypes * i +
+          seed_offsets->at(etype_id_to_dst_id[i] + 1);
+    }
+    auto permutation = torch::arange(
+        0, num_rows * num_etypes, num_etypes, output_indptr.options());
+    permutation =
+        permutation.remainder(num_rows) + permutation.div(num_rows, "floor");
+    // This permutation, when applied sorts the sampled edges with respect to
+    // edge types.
+    auto [output_in_degree, sliced_output_indptr] =
+        SliceCSCIndptr(output_indptr, permutation);
+    std::tie(output_indptr, picked_eids) = IndexSelectCSCImpl(
+        output_in_degree, sliced_output_indptr, picked_eids, permutation,
+        num_rows - 1, picked_eids.size(0));
+    edge_offsets = torch::empty(
+        num_etypes * 2, c10::TensorOptions()
+                            .dtype(output_indptr.scalar_type())
+                            .pinned_memory(true));
+    at::cuda::CUDAEvent edge_offsets_event;
+    AT_DISPATCH_INDEX_TYPES(
+        indptr.scalar_type(), "SampleNeighborsEdgeOffsets", ([&] {
+          THRUST_CALL(
+              gather, indptr_offsets_ptr,
+              indptr_offsets_ptr + indptr_offsets.size(0),
+              output_indptr.data_ptr<index_t>(),
+              edge_offsets->data_ptr<index_t>());
+        }));
+    edge_offsets_event.record();
+    // The output_indices is permuted here.
+    std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
+        output_in_degree, sliced_output_indptr, output_indices, permutation,
+        num_rows - 1, output_indices.size(0));
+    std::vector<torch::Tensor> indptr_list;
+    for (int i = 0; i < num_etypes; i++) {
+      indptr_list.push_back(output_indptr.slice(
+          0, indptr_offsets_ptr[2 * i],
+          indptr_offsets_ptr[2 * i + 1] + (i == num_etypes - 1)));
+    }
+    // We form the final output indptr by concatenating pieces for different
+    // edge types.
+    output_indptr = torch::cat(indptr_list);
+    edge_offsets_event.synchronize();
+    // We read the edge_offsets here, they are in pairs but we don't need it to
+    // be in pairs. So we remove the duplicate information from it and turn it
+    // into a real offsets array.
+    AT_DISPATCH_INDEX_TYPES(
+        indptr.scalar_type(), "SampleNeighborsEdgeOffsetsCheck", ([&] {
+          auto edge_offsets_ptr = edge_offsets->data_ptr<index_t>();
+          TORCH_CHECK(edge_offsets_ptr[0] == 0, "edge_offsets is incorrect.");
+          for (int i = 1; i < num_etypes; i++) {
+            TORCH_CHECK(
+                edge_offsets_ptr[2 * i - 1] == edge_offsets_ptr[2 * i],
+                "edge_offsets is incorrect.");
+          }
+          TORCH_CHECK(
+              edge_offsets_ptr[2 * num_etypes - 1] == picked_eids.size(0),
+              "edge_offsets is incorrect.");
+          for (int i = 0; i < num_etypes; i++) {
+            edge_offsets_ptr[i + 1] = edge_offsets_ptr[2 * i + 1];
+          }
+        }));
+    edge_offsets = edge_offsets->slice(0, 0, num_etypes + 1);
   }
 
+  torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
+  if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
+
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-      output_indptr, output_indices, nodes.value(), torch::nullopt,
-      subgraph_reverse_edge_ids, output_type_per_edge);
+      output_indptr, output_indices, seeds, torch::nullopt,
+      subgraph_reverse_edge_ids, torch::nullopt, edge_offsets);
 }
 
 }  //  namespace ops

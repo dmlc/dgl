@@ -298,8 +298,10 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Sample neighboring edges of the given nodes and return the induced
    * subgraph.
    *
-   * @param nodes The nodes from which to sample neighbors. If not provided,
+   * @param seeds The nodes from which to sample neighbors. If not provided,
    * assumed to be equal to torch.arange(NumNodes()).
+   * @param seed_offsets The offsets of the given seeds,
+   * seeds[seed_offsets[i]: seed_offsets[i + 1]] has node type id i.
    * @param fanouts The number of edges to be sampled for each node with or
    * without considering edge types.
    *   - When the length is 1, it indicates that the fanout applies to all
@@ -333,9 +335,10 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * the sampled graph's information.
    */
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
-      torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool layer, bool return_eids,
-      torch::optional<std::string> probs_name,
+      torch::optional<torch::Tensor> seeds,
+      torch::optional<std::vector<int64_t>> seed_offsets,
+      const std::vector<int64_t>& fanouts, bool replace, bool layer,
+      bool return_eids, torch::optional<std::string> probs_name,
       torch::optional<torch::Tensor> random_seed,
       double seed2_contribution) const;
 

@@ -146,7 +146,7 @@ def _sample_neighbors_graphbolt(
 
     return_eids = g.edge_attributes is not None and EID in g.edge_attributes
     subgraph = g._sample_neighbors(
-        nodes, fanout, replace=replace, return_eids=return_eids
+        nodes, None, fanout, replace=replace, return_eids=return_eids
     )
 
     # 3. Map local node IDs to global node IDs.

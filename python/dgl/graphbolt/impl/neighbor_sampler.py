@@ -46,44 +46,37 @@ class FetchInsubgraphData(Mapper):
 
     def _fetch_per_layer_impl(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
-            index = minibatch._seed_nodes
-            if isinstance(index, dict):
-                for idx in index.values():
+            seeds = minibatch._seed_nodes
+            is_hetero = isinstance(seeds, dict)
+            if is_hetero:
+                for idx in seeds.values():
                     idx.record_stream(torch.cuda.current_stream())
-                index = self.graph._convert_to_homogeneous_nodes(index)
+                (
+                    seeds,
+                    seed_offsets,
+                ) = self.graph._convert_to_homogeneous_nodes(seeds)
             else:
-                index.record_stream(torch.cuda.current_stream())
+                seeds.record_stream(torch.cuda.current_stream())
+                seed_offsets = None
 
             def record_stream(tensor):
                 if stream is not None and tensor.is_cuda:
                     tensor.record_stream(stream)
                 return tensor
 
-            if self.graph.node_type_offset is None:
-                # sorting not needed.
-                minibatch._subgraph_seed_nodes = None
-            else:
-                index, original_positions = index.sort()
-                if (original_positions.diff() == 1).all().item():
-                    # already sorted.
-                    minibatch._subgraph_seed_nodes = None
-                else:
-                    minibatch._subgraph_seed_nodes = record_stream(
-                        original_positions.sort()[1]
-                    )
             index_select_csc_with_indptr = partial(
                 torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
             )
 
             indptr, indices = index_select_csc_with_indptr(
-                self.graph.indices, index, None
+                self.graph.indices, seeds, None
             )
             record_stream(indptr)
             record_stream(indices)
             output_size = len(indices)
             if self.graph.type_per_edge is not None:
                 _, type_per_edge = index_select_csc_with_indptr(
-                    self.graph.type_per_edge, index, output_size
+                    self.graph.type_per_edge, seeds, output_size
                 )
                 record_stream(type_per_edge)
             else:
@@ -94,27 +87,22 @@ class FetchInsubgraphData(Mapper):
                 )
                 if probs_or_mask is not None:
                     _, probs_or_mask = index_select_csc_with_indptr(
-                        probs_or_mask, index, output_size
+                        probs_or_mask, seeds, output_size
                     )
                     record_stream(probs_or_mask)
             else:
                 probs_or_mask = None
-            if self.graph.node_type_offset is not None:
-                node_type_offset = torch.searchsorted(
-                    index, self.graph.node_type_offset
-                )
-            else:
-                node_type_offset = None
             subgraph = fused_csc_sampling_graph(
                 indptr,
                 indices,
-                node_type_offset=node_type_offset,
+                node_type_offset=self.graph.node_type_offset,
                 type_per_edge=type_per_edge,
                 node_type_to_id=self.graph.node_type_to_id,
                 edge_type_to_id=self.graph.edge_type_to_id,
             )
             if self.prob_name is not None and probs_or_mask is not None:
                 subgraph.edge_attributes = {self.prob_name: probs_or_mask}
+            subgraph._seed_offset_list = seed_offsets
 
             minibatch.sampled_subgraphs.insert(0, subgraph)
 
@@ -152,14 +140,12 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
             if hasattr(minibatch, key)
         }
         sampled_subgraph = getattr(subgraph, self.sampler_name)(
-            minibatch._subgraph_seed_nodes,
+            None,
             self.fanout,
             self.replace,
             self.prob_name,
             **kwargs,
         )
-        delattr(minibatch, "_subgraph_seed_nodes")
-        sampled_subgraph.original_column_node_ids = minibatch._seed_nodes
         minibatch.sampled_subgraphs[0] = sampled_subgraph
 
         return minibatch

@@ -35,7 +35,8 @@ TORCH_LIBRARY(graphbolt, m) {
           &FusedSampledSubgraph::original_column_node_ids)
       .def_readwrite(
           "original_edge_ids", &FusedSampledSubgraph::original_edge_ids)
-      .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge);
+      .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge)
+      .def_readwrite("etype_offsets", &FusedSampledSubgraph::etype_offsets);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
       .def("num_nodes", &FusedCSCSamplingGraph::NumNodes)
       .def("num_edges", &FusedCSCSamplingGraph::NumEdges)
