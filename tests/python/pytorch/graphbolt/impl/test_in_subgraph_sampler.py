@@ -176,9 +176,7 @@ def test_InSubgraphSampler_hetero():
     it = iter(in_subgraph_sampler)
 
     mn = next(it)
-    assert torch.equal(
-        mn.seeds["N0"], torch.LongTensor([1, 0]).to(F.ctx())
-    )
+    assert torch.equal(mn.seeds["N0"], torch.LongTensor([1, 0]).to(F.ctx()))
     expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 1, 3]),
@@ -230,9 +228,7 @@ def test_InSubgraphSampler_hetero():
         )
 
     mn = next(it)
-    assert torch.equal(
-        mn.seeds["N1"], torch.LongTensor([2, 1]).to(F.ctx())
-    )
+    assert torch.equal(mn.seeds["N1"], torch.LongTensor([2, 1]).to(F.ctx()))
     expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0]), indices=torch.LongTensor([])

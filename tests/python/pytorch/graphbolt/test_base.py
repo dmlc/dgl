@@ -118,7 +118,7 @@ def test_CopyToWithMiniBatches_original(task):
             "labels",
             "blocks",
             "seed_nodes",
-            "seeds"
+            "seeds",
         ]
 
     def test_data_device(datapipe):

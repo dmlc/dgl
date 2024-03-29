@@ -138,12 +138,21 @@ def test_Uniform_NegativeSampler_node_pairs(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        expected_labels = torch.empty(batch_size * (negative_ratio + 1), device=F.ctx())
+        expected_labels = torch.empty(
+            batch_size * (negative_ratio + 1), device=F.ctx()
+        )
         expected_labels[:batch_size] = 1
         expected_labels[batch_size:] = 0
         expected_indexes = torch.arange(batch_size, device=F.ctx())
-        expected_indexes = torch.cat((expected_indexes, expected_indexes.repeat_interleave(negative_ratio)))
-        expected_neg_src = data.seeds[:batch_size][:,0].repeat_interleave(negative_ratio)
+        expected_indexes = torch.cat(
+            (
+                expected_indexes,
+                expected_indexes.repeat_interleave(negative_ratio),
+            )
+        )
+        expected_neg_src = data.seeds[:batch_size][:, 0].repeat_interleave(
+            negative_ratio
+        )
         # Assertation
         assert data.negative_srcs is None
         assert data.negative_dsts is None
@@ -152,7 +161,7 @@ def test_Uniform_NegativeSampler_node_pairs(negative_ratio):
         assert data.seeds.size(0) == batch_size * (negative_ratio + 1)
         assert torch.equal(data.labels, expected_labels)
         assert torch.equal(data.indexes, expected_indexes)
-        assert torch.equal(data.seeds[batch_size:][:,0], expected_neg_src)
+        assert torch.equal(data.seeds[batch_size:][:, 0], expected_neg_src)
 
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
