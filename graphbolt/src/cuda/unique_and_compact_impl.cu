@@ -12,9 +12,9 @@
 
 #include <cub/cub.cuh>
 #include <nv/target>  // __CUDA_MINIMUM_ARCH__ and friends
-#if defined(__CUDA_MINIMUM_ARCH__) &&                                        \
-    ((!defined(_LIBCUDACXX_COMPILER_MSVC) && __CUDA_MINIMUM_ARCH__ < 600) || \
-     (defined(_LIBCUDACXX_COMPILER_MSVC) && __CUDA_MINIMUM_ARCH__ < 700))
+#if defined(__CUDA_MINIMUM_ARCH__) &&                                  \
+    ((!defined(_CCCL_COMPILER_MSVC) && __CUDA_MINIMUM_ARCH__ < 600) || \
+     (defined(_CCCL_COMPILER_MSVC) && __CUDA_MINIMUM_ARCH__ < 700))
 #else
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
