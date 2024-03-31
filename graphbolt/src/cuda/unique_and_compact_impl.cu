@@ -11,8 +11,15 @@
 #include <thrust/logical.h>
 
 #include <cub/cub.cuh>
+#include <nv/target>  // __CUDA_MINIMUM_ARCH__ and friends
+#if defined(__CUDA_MINIMUM_ARCH__) &&                                        \
+    ((!defined(_LIBCUDACXX_COMPILER_MSVC) && __CUDA_MINIMUM_ARCH__ < 600) || \
+     (defined(_LIBCUDACXX_COMPILER_MSVC) && __CUDA_MINIMUM_ARCH__ < 700))
+#else
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
+#define USE_MAP_BASED_IMPL
+#endif
 #include <mutex>
 #include <numeric>
 #include <type_traits>
@@ -45,6 +52,8 @@ struct EqualityFunc {
 
 DefineCubReductionFunction(DeviceReduce::Max, Max);
 DefineCubReductionFunction(DeviceReduce::Min, Min);
+
+#ifdef USE_MAP_BASED_IMPL
 
 template <typename index_t, typename map_t>
 __global__ void _InsertAndSetMinBatched(
@@ -158,6 +167,129 @@ __global__ void _MapIdsBatched(
     i += stride;
   }
 }
+
+std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+UniqueAndCompactBatchedMap(
+    const std::vector<torch::Tensor>& src_ids,
+    const std::vector<torch::Tensor>& dst_ids,
+    const std::vector<torch::Tensor> unique_dst_ids) {
+  auto allocator = cuda::GetAllocator();
+  auto stream = cuda::GetCurrentStream();
+  auto scalar_type = src_ids.at(0).scalar_type();
+  constexpr int BLOCK_SIZE = 512;
+  const auto num_batches = src_ids.size();
+  static_assert(
+      sizeof(std::ptrdiff_t) == sizeof(int64_t),
+      "Need to be compiled on a 64-bit system.");
+  TORCH_CHECK(
+      num_batches <= (1 << 15),
+      "UniqueAndCompactBatched supports a batch size of up to 32768");
+  return AT_DISPATCH_INDEX_TYPES(
+      scalar_type, "unique_and_compact", ([&] {
+        auto pointers_and_offsets = torch::empty(
+            6 * num_batches + 1,
+            c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
+        auto pointers_ptr =
+            reinterpret_cast<index_t**>(pointers_and_offsets.data_ptr());
+        auto offsets_ptr =
+            pointers_and_offsets.data_ptr<int64_t>() + 3 * num_batches;
+        for (std::size_t i = 0; i < num_batches; i++) {
+          pointers_ptr[2 * i] = unique_dst_ids[i].data_ptr<index_t>();
+          offsets_ptr[2 * i] = unique_dst_ids[i].size(0);
+          pointers_ptr[2 * i + 1] = src_ids[i].data_ptr<index_t>();
+          offsets_ptr[2 * i + 1] = src_ids[i].size(0);
+          pointers_ptr[2 * num_batches + i] = dst_ids[i].data_ptr<index_t>();
+          offsets_ptr[2 * num_batches + i] = dst_ids[i].size(0);
+        }
+        std::exclusive_scan(
+            offsets_ptr, offsets_ptr + 3 * num_batches + 1, offsets_ptr, 0ll);
+        auto pointers_and_offsets_dev = torch::empty(
+            pointers_and_offsets.size(0),
+            src_ids[0].options().dtype(pointers_and_offsets.scalar_type()));
+        auto offsets_dev = pointers_and_offsets_dev.slice(0, 3 * num_batches);
+        auto pointers_dev_ptr =
+            reinterpret_cast<index_t**>(pointers_and_offsets_dev.data_ptr());
+        auto offsets_dev_ptr = offsets_dev.data_ptr<int64_t>();
+        CUDA_CALL(cudaMemcpyAsync(
+            pointers_dev_ptr, pointers_ptr,
+            sizeof(int64_t) * pointers_and_offsets.size(0),
+            cudaMemcpyHostToDevice, stream));
+        auto indexes = ExpandIndptrImpl(
+            offsets_dev, torch::kInt32, torch::nullopt,
+            offsets_ptr[3 * num_batches]);
+        auto map = cuco::static_map{
+            offsets_ptr[2 * num_batches],
+            0.5,  // load_factor
+            cuco::empty_key{static_cast<int64_t>(-1)},
+            cuco::empty_value{static_cast<int64_t>(-1)},
+            {},
+            cuco::linear_probing<1, cuco::default_hash_function<int64_t>>{},
+            {},
+            {},
+            cuda::CUDAWorkspaceAllocator<cuco::pair<int64_t, int64_t>>{},
+            cuco::cuda_stream_ref{stream},
+        };
+        C10_CUDA_KERNEL_LAUNCH_CHECK();  // Check the map constructor's success.
+        const dim3 block(BLOCK_SIZE);
+        const dim3 grid(
+            (offsets_ptr[2 * num_batches] + BLOCK_SIZE - 1) / BLOCK_SIZE);
+        CUDA_KERNEL_CALL(
+            _InsertAndSetMinBatched, grid, block, 0,
+            offsets_ptr[2 * num_batches], indexes.data_ptr<int32_t>(),
+            pointers_dev_ptr, offsets_dev_ptr, map.ref(cuco::insert_and_find));
+        auto valid = torch::empty(
+            offsets_ptr[2 * num_batches] + 1,
+            src_ids[0].options().dtype(torch::kInt64));
+        CUDA_KERNEL_CALL(
+            _IsInsertedBatched, grid, block, 0, offsets_ptr[2 * num_batches],
+            indexes.data_ptr<int32_t>(), pointers_dev_ptr, offsets_dev_ptr,
+            map.ref(cuco::find), valid.data_ptr<int64_t>());
+        valid = ExclusiveCumSum(valid);
+        auto unique_ids_offsets = torch::empty(
+            num_batches + 1,
+            c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
+        auto unique_ids_offsets_ptr = unique_ids_offsets.data_ptr<int64_t>();
+        for (int64_t i = 0; i <= num_batches; i++) {
+          unique_ids_offsets_ptr[i] = offsets_ptr[2 * i];
+        }
+        THRUST_CALL(
+            gather, unique_ids_offsets_ptr,
+            unique_ids_offsets_ptr + unique_ids_offsets.size(0),
+            valid.data_ptr<int64_t>(), unique_ids_offsets_ptr);
+        at::cuda::CUDAEvent unique_ids_offsets_event;
+        unique_ids_offsets_event.record();
+        auto unique_ids =
+            torch::empty(offsets_ptr[2 * num_batches], src_ids[0].options());
+        CUDA_KERNEL_CALL(
+            _GetInsertedBatched, grid, block, 0, offsets_ptr[2 * num_batches],
+            indexes.data_ptr<int32_t>(), pointers_dev_ptr, offsets_dev_ptr,
+            map.ref(cuco::find), valid.data_ptr<int64_t>(),
+            unique_ids.data_ptr<index_t>());
+        auto mapped_ids =
+            torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());
+        CUDA_KERNEL_CALL(
+            _MapIdsBatched, grid, block, 0, num_batches,
+            offsets_ptr[3 * num_batches], indexes.data_ptr<int32_t>(),
+            pointers_dev_ptr, offsets_dev_ptr, map.ref(cuco::find),
+            mapped_ids.data_ptr<index_t>());
+        std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+            results;
+        unique_ids_offsets_event.synchronize();
+        for (int64_t i = 0; i < num_batches; i++) {
+          results.emplace_back(
+              unique_ids.slice(
+                  0, unique_ids_offsets_ptr[i], unique_ids_offsets_ptr[i + 1]),
+              mapped_ids.slice(
+                  0, offsets_ptr[2 * i + 1], offsets_ptr[2 * i + 2]),
+              mapped_ids.slice(
+                  0, offsets_ptr[2 * num_batches + i],
+                  offsets_ptr[2 * num_batches + i + 1]));
+        }
+        return results;
+      }));
+}
+
+#endif  // USE_MAP_BASED_IMPL
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatchedSort(
@@ -375,131 +507,11 @@ UniqueAndCompactBatchedSort(
 }
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
-UniqueAndCompactBatchedMap(
-    const std::vector<torch::Tensor>& src_ids,
-    const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor> unique_dst_ids) {
-  auto allocator = cuda::GetAllocator();
-  auto stream = cuda::GetCurrentStream();
-  auto scalar_type = src_ids.at(0).scalar_type();
-  constexpr int BLOCK_SIZE = 512;
-  const auto num_batches = src_ids.size();
-  static_assert(
-      sizeof(std::ptrdiff_t) == sizeof(int64_t),
-      "Need to be compiled on a 64-bit system.");
-  TORCH_CHECK(
-      num_batches <= (1 << 15),
-      "UniqueAndCompactBatched supports a batch size of up to 32768");
-  return AT_DISPATCH_INDEX_TYPES(
-      scalar_type, "unique_and_compact", ([&] {
-        auto pointers_and_offsets = torch::empty(
-            6 * num_batches + 1,
-            c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
-        auto pointers_ptr =
-            reinterpret_cast<index_t**>(pointers_and_offsets.data_ptr());
-        auto offsets_ptr =
-            pointers_and_offsets.data_ptr<int64_t>() + 3 * num_batches;
-        for (std::size_t i = 0; i < num_batches; i++) {
-          pointers_ptr[2 * i] = unique_dst_ids[i].data_ptr<index_t>();
-          offsets_ptr[2 * i] = unique_dst_ids[i].size(0);
-          pointers_ptr[2 * i + 1] = src_ids[i].data_ptr<index_t>();
-          offsets_ptr[2 * i + 1] = src_ids[i].size(0);
-          pointers_ptr[2 * num_batches + i] = dst_ids[i].data_ptr<index_t>();
-          offsets_ptr[2 * num_batches + i] = dst_ids[i].size(0);
-        }
-        std::exclusive_scan(
-            offsets_ptr, offsets_ptr + 3 * num_batches + 1, offsets_ptr, 0ll);
-        auto pointers_and_offsets_dev = torch::empty(
-            pointers_and_offsets.size(0),
-            src_ids[0].options().dtype(pointers_and_offsets.scalar_type()));
-        auto offsets_dev = pointers_and_offsets_dev.slice(0, 3 * num_batches);
-        auto pointers_dev_ptr =
-            reinterpret_cast<index_t**>(pointers_and_offsets_dev.data_ptr());
-        auto offsets_dev_ptr = offsets_dev.data_ptr<int64_t>();
-        CUDA_CALL(cudaMemcpyAsync(
-            pointers_dev_ptr, pointers_ptr,
-            sizeof(int64_t) * pointers_and_offsets.size(0),
-            cudaMemcpyHostToDevice, stream));
-        auto indexes = ExpandIndptrImpl(
-            offsets_dev, torch::kInt32, torch::nullopt,
-            offsets_ptr[3 * num_batches]);
-        auto map = cuco::static_map{
-            offsets_ptr[2 * num_batches],
-            0.5,  // load_factor
-            cuco::empty_key{static_cast<int64_t>(-1)},
-            cuco::empty_value{static_cast<int64_t>(-1)},
-            {},
-            cuco::linear_probing<1, cuco::default_hash_function<int64_t>>{},
-            {},
-            {},
-            cuda::CUDAWorkspaceAllocator<cuco::pair<int64_t, int64_t>>{},
-            cuco::cuda_stream_ref{stream},
-        };
-        C10_CUDA_KERNEL_LAUNCH_CHECK();  // Check the map constructor's success.
-        const dim3 block(BLOCK_SIZE);
-        const dim3 grid(
-            (offsets_ptr[2 * num_batches] + BLOCK_SIZE - 1) / BLOCK_SIZE);
-        CUDA_KERNEL_CALL(
-            _InsertAndSetMinBatched, grid, block, 0,
-            offsets_ptr[2 * num_batches], indexes.data_ptr<int32_t>(),
-            pointers_dev_ptr, offsets_dev_ptr, map.ref(cuco::insert_and_find));
-        auto valid = torch::empty(
-            offsets_ptr[2 * num_batches] + 1,
-            src_ids[0].options().dtype(torch::kInt64));
-        CUDA_KERNEL_CALL(
-            _IsInsertedBatched, grid, block, 0, offsets_ptr[2 * num_batches],
-            indexes.data_ptr<int32_t>(), pointers_dev_ptr, offsets_dev_ptr,
-            map.ref(cuco::find), valid.data_ptr<int64_t>());
-        valid = ExclusiveCumSum(valid);
-        auto unique_ids_offsets = torch::empty(
-            num_batches + 1,
-            c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
-        auto unique_ids_offsets_ptr = unique_ids_offsets.data_ptr<int64_t>();
-        for (int64_t i = 0; i <= num_batches; i++) {
-          unique_ids_offsets_ptr[i] = offsets_ptr[2 * i];
-        }
-        THRUST_CALL(
-            gather, unique_ids_offsets_ptr,
-            unique_ids_offsets_ptr + unique_ids_offsets.size(0),
-            valid.data_ptr<int64_t>(), unique_ids_offsets_ptr);
-        at::cuda::CUDAEvent unique_ids_offsets_event;
-        unique_ids_offsets_event.record();
-        auto unique_ids =
-            torch::empty(offsets_ptr[2 * num_batches], src_ids[0].options());
-        CUDA_KERNEL_CALL(
-            _GetInsertedBatched, grid, block, 0, offsets_ptr[2 * num_batches],
-            indexes.data_ptr<int32_t>(), pointers_dev_ptr, offsets_dev_ptr,
-            map.ref(cuco::find), valid.data_ptr<int64_t>(),
-            unique_ids.data_ptr<index_t>());
-        auto mapped_ids =
-            torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());
-        CUDA_KERNEL_CALL(
-            _MapIdsBatched, grid, block, 0, num_batches,
-            offsets_ptr[3 * num_batches], indexes.data_ptr<int32_t>(),
-            pointers_dev_ptr, offsets_dev_ptr, map.ref(cuco::find),
-            mapped_ids.data_ptr<index_t>());
-        std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
-            results;
-        unique_ids_offsets_event.synchronize();
-        for (int64_t i = 0; i < num_batches; i++) {
-          results.emplace_back(
-              unique_ids.slice(
-                  0, unique_ids_offsets_ptr[i], unique_ids_offsets_ptr[i + 1]),
-              mapped_ids.slice(
-                  0, offsets_ptr[2 * i + 1], offsets_ptr[2 * i + 2]),
-              mapped_ids.slice(
-                  0, offsets_ptr[2 * num_batches + i],
-                  offsets_ptr[2 * num_batches + i + 1]));
-        }
-        return results;
-      }));
-}
-
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor> unique_dst_ids, int num_bits) {
+#ifdef USE_MAP_BASED_IMPL
   auto dev_id = cuda::GetCurrentStream().device_index();
   static std::mutex mtx;
   static std::unordered_map<decltype(dev_id), int> compute_capability_cache;
@@ -517,10 +529,10 @@ UniqueAndCompactBatched(
   }();
   if (compute_capability_major >= 7) {
     return UniqueAndCompactBatchedMap(src_ids, dst_ids, unique_dst_ids);
-  } else {
-    return UniqueAndCompactBatchedSort(
-        src_ids, dst_ids, unique_dst_ids, num_bits);
   }
+#endif  // USE_MAP_BASED_IMPL
+  return UniqueAndCompactBatchedSort(
+      src_ids, dst_ids, unique_dst_ids, num_bits);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
