@@ -50,6 +50,8 @@ template <typename index_t, typename map_t>
 __global__ void _InsertAndSetMinBatched(
     const int64_t num_edges, const int32_t* const indexes, index_t** pointers,
     const int64_t* const offsets, map_t map) {
+// Code path not used when __CUDA_ARCH__ < 700
+#if __CUDA_ARCH__ >= 700
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
 
@@ -70,6 +72,7 @@ __global__ void _InsertAndSetMinBatched(
 
     i += stride;
   }
+#endif  // __CUDA_ARCH__ >= 700
 }
 
 template <typename index_t, typename map_t>

@@ -56,7 +56,16 @@ if(USE_CUDA)
   )
   list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
   if(DEFINED ENV{CUDAARCHS})
-    set(CMAKE_CUDA_ARCHITECTURES $ENV{CUDAARCHS})
+    message(STATUS "graphbolt ENV{CUDAARCHS}: $ENV{CUDAARCHS}")
+    set(cuda_architectures_filtered $ENV{CUDAARCHS})
+    if(MSVC)
+      # Windows supports only sm_70 and up (Volta+).
+      list(FILTER cuda_architectures_filtered EXCLUDE REGEX "[2-6][0-9]")
+    else(MSVC)
+      # Unix supports only sm_60 and up (Pascal+).
+      list(FILTER cuda_architectures_filtered EXCLUDE REGEX "[2-5][0-9]")
+    endif(MSVC)
+    set(CMAKE_CUDA_ARCHITECTURES ${cuda_architectures_filtered})
   endif()
 endif()
 
