@@ -58,6 +58,7 @@ if(USE_CUDA)
   if(DEFINED ENV{CUDAARCHS})
     set(CMAKE_CUDA_ARCHITECTURES $ENV{CUDAARCHS})
   endif()
+  set(CMAKE_CUDA_ARCHITECTURES_UNFILTERED ${CMAKE_CUDA_ARCHITECTURES})
   if(MSVC)
     # Windows supports only sm_70 and up (Volta+).
     list(FILTER CMAKE_CUDA_ARCHITECTURES EXCLUDE REGEX "[2-6][0-9]")
@@ -65,6 +66,11 @@ if(USE_CUDA)
     # Unix supports only sm_60 and up (Pascal+).
     list(FILTER CMAKE_CUDA_ARCHITECTURES EXCLUDE REGEX "[2-5][0-9]")
   endif(MSVC)
+  list(LENGTH CMAKE_CUDA_ARCHITECTURES CMAKE_CUDA_ARCHITECTURES_LEN)
+  # If no architectures are left due to filtering, use unfiltered list.
+  if(CMAKE_CUDA_ARCHITECTURES_LEN EQUAL 0)
+    set(CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES_UNFILTERED})
+  endif()
 endif()
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
