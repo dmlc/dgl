@@ -25,8 +25,8 @@ UniqueAndCompactBatchedMap(
   TORCH_CHECK(
       false,
       "The map implementation was not compiled. Please compile for CUDA "
-      "architectures >= 70.")
-  return {}
+      "architectures >= 70.");
+  return {};
 }
 }  // namespace ops
 }  // namespace graphbolt
