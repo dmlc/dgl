@@ -116,7 +116,7 @@ class SparseNeighborSampler(SubgraphSampler):
 
     def sample_subgraphs(self, seeds, seeds_timestamp=None):
         sampled_matrices = []
-        src = seeds
+        src = seeds.long()
 
         #####################################################################
         # (HIGHLIGHT) Using the sparse sample operator to preform random
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     # Load and preprocess dataset.
     print("Loading data")
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
-    dataset = gb.BuiltinDataset("ogbn-products").load()
+    dataset = gb.BuiltinDataset("ogbn-products-seeds").load()
     g = dataset.graph
     features = dataset.feature
 
@@ -254,7 +254,7 @@ if __name__ == "__main__":
 
     # Create sparse.
     N = g.num_nodes
-    A = dglsp.from_csc(g.csc_indptr, g.indices, shape=(N, N))
+    A = dglsp.from_csc(g.csc_indptr.long(), g.indices.long(), shape=(N, N))
 
     # Model training.
     print("Training...")

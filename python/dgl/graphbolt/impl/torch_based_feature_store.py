@@ -1,6 +1,7 @@
 """Torch-based feature store for GraphBolt."""
 
 import copy
+import platform
 import textwrap
 from typing import Dict, List
 
@@ -12,7 +13,7 @@ from ..feature_store import Feature
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
 
-__all__ = ["TorchBasedFeature", "TorchBasedFeatureStore"]
+__all__ = ["TorchBasedFeature", "DiskBasedFeature", "TorchBasedFeatureStore"]
 
 
 class TorchBasedFeature(Feature):
@@ -211,6 +212,117 @@ class TorchBasedFeature(Feature):
         else:
             self2._tensor = self2._tensor.to(device)
         return self2
+
+    def __repr__(self) -> str:
+        ret = (
+            "{Classname}(\n"
+            "    feature={feature},\n"
+            "    metadata={metadata},\n"
+            ")"
+        )
+
+        feature_str = textwrap.indent(
+            str(self._tensor), " " * len("    feature=")
+        ).strip()
+        metadata_str = textwrap.indent(
+            str(self.metadata()), " " * len("    metadata=")
+        ).strip()
+
+        return ret.format(
+            Classname=self.__class__.__name__,
+            feature=feature_str,
+            metadata=metadata_str,
+        )
+
+
+class DiskBasedFeature(Feature):
+    r"""A wrapper of disk based feature.
+
+    Initialize a disk based feature fetcher by a numpy file.
+
+    Parameters
+    ----------
+    path : string
+        The path to the numpy feature file.
+        Note that the dimension of the numpy should be greater than 1.
+    Examples
+    --------
+    >>> import torch
+    >>> from dgl import graphbolt as gb
+    >>> torch_feat = torch.arange(10).reshape(2, -1)
+    >>> feature = gb.DiskBasedFeature(torch_feat)
+    >>> feature.read(torch.tensor([0]))
+    tensor([[0, 1, 2, 3, 4]])
+    >>> feature.size()
+    torch.Size([5])
+    """
+
+    def __init__(self, path: str, metadata: Dict = None):
+        super().__init__()
+        mmap_mode = "r+"
+        self._tensor = torch.from_numpy(
+            np.load(path, mmap_mode=mmap_mode)
+        ).contiguous()
+
+        self._metadata = metadata
+        self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
+            path, self._tensor.dtype, torch.tensor(self._tensor.shape)
+        )
+
+    def read(self, ids: torch.Tensor = None):
+        """Read the feature by index.
+        The returned tensor will be on CPU.
+        Parameters
+        ----------
+        ids : torch.Tensor
+            The index of the feature. Only the specified indices of the
+            feature are read.
+        Returns
+        -------
+        torch.Tensor
+            The read feature.
+        """
+        if ids is None:
+            if self._tensor.is_pinned():
+                return self._tensor.cuda()
+            return self._tensor
+        elif platform.system() == "Linux":
+            try:
+                return self._ondisk_npy_array.index_select(ids.cpu()).to(
+                    ids.device
+                )
+            except RuntimeError:
+                raise IndexError
+        else:
+            return index_select(self._tensor, ids)
+
+    def size(self):
+        """Get the size of the feature.
+        Returns
+        -------
+        torch.Size
+            The size of the feature.
+        """
+        return self._tensor.size()[1:]
+
+    def update(self, value: torch.Tensor, ids: torch.Tensor = None):
+        """Disk based feature does not support update for now."""
+        raise NotImplementedError
+
+    def metadata(self):
+        """Get the metadata of the feature.
+        Returns
+        -------
+        Dict
+            The metadata of the feature.
+        """
+        return (
+            self._metadata if self._metadata is not None else super().metadata()
+        )
+
+    def read_into_memory(self) -> TorchBasedFeature:
+        """Change disk-based feature to torch-based feature."""
+        return TorchBasedFeature(self._tensor, self._metadata)
 
     def __repr__(self) -> str:
         ret = (

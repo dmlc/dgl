@@ -175,7 +175,7 @@ def create_dataloader(
     )
     # Copy the data to the specified device.
     if args.graph_device != "cpu":
-        datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["seeds"])
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
         graph, fanout if job != "infer" else [-1]
@@ -320,8 +320,12 @@ def parse_args():
     parser.add_argument(
         "--dataset",
         type=str,
-        default="ogbn-products",
-        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        default="ogbn-products-seeds",
+        choices=[
+            "ogbn-arxiv-seeds",
+            "ogbn-products-seeds",
+            "ogbn-papers100M-seeds",
+        ],
         help="The dataset we can use for node classification example. Currently"
         " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
     )

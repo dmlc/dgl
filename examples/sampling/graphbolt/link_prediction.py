@@ -51,7 +51,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
-from ogb.linkproppred import Evaluator
+from torchmetrics.retrieval import RetrievalMRR
 
 
 class SAGE(nn.Module):
@@ -243,43 +243,38 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
 
 @torch.no_grad()
-def compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst):
+def compute_mrr(args, model, node_emb, seeds, labels, indexes):
     """Compute the Mean Reciprocal Rank (MRR) for given source and destination
     nodes.
 
     This function computes the MRR for a set of node pairs, dividing the task
     into batches to handle potentially large graphs.
     """
-    rr = torch.zeros(src.shape[0])
-    # Loop over node pairs in batches.
-    for start in tqdm.trange(
-        0, src.shape[0], args.eval_batch_size, desc="Evaluate"
-    ):
-        end = min(start + args.eval_batch_size, src.shape[0])
 
-        # Concatenate positive and negative destination nodes.
-        all_dst = torch.cat([dst[start:end, None], neg_dst[start:end]], 1)
+    preds = torch.empty(seeds.shape[0])
+    mrr = RetrievalMRR()
+    seeds_src, seeds_dst = seeds.T
+    # The constant number is 1001, due to negtive ratio in the `ogbl-citation2`
+    # dataset is 1000.
+    eval_size = args.eval_batch_size * 1001
+    # Loop over node pairs in batches.
+    for start in tqdm.trange(0, seeds_src.shape[0], eval_size, desc="Evaluate"):
+        end = min(start + eval_size, seeds_src.shape[0])
 
         # Fetch embeddings for current batch of source and destination nodes.
-        h_src = node_emb[src[start:end]][:, None, :].to(args.device)
-        h_dst = (
-            node_emb[all_dst.view(-1)].view(*all_dst.shape, -1).to(args.device)
-        )
+        h_src = node_emb[seeds_src[start:end]].to(args.device)
+        h_dst = node_emb[seeds_dst[start:end]].to(args.device)
 
         # Compute prediction scores using the model.
-        pred = model.predictor(h_src * h_dst).squeeze(-1)
-
-        # Evaluate the predictions to obtain MRR values.
-        input_dict = {"y_pred_pos": pred[:, 0], "y_pred_neg": pred[:, 1:]}
-        rr[start:end] = evaluator.eval(input_dict)["mrr_list"]
-    return rr.mean()
+        pred = model.predictor(h_src * h_dst).squeeze()
+        preds[start:end] = pred
+    return mrr(preds, labels, indexes=indexes)
 
 
 @torch.no_grad()
 def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
     """Evaluate the model on validation and test sets."""
     model.eval()
-    evaluator = Evaluator(name="ogbl-citation2")
 
     dataloader = create_dataloader(
         args, graph, features, all_nodes_set, is_train=False
@@ -292,13 +287,13 @@ def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
     # Loop over both validation and test sets.
     for split in [valid_set, test_set]:
         # Unpack the item set.
-        src = split._items[0][:, 0].to(node_emb.device)
-        dst = split._items[0][:, 1].to(node_emb.device)
-        neg_dst = split._items[1].to(node_emb.device)
+        seeds = split._items[0].to(node_emb.device)
+        labels = split._items[1].to(node_emb.device)
+        indexes = split._items[2].to(node_emb.device)
 
         # Compute MRR values for the current split.
         results.append(
-            compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst)
+            compute_mrr(args, model, node_emb, seeds, labels, indexes)
         )
     return results
 
@@ -313,7 +308,8 @@ def train(args, model, graph, features, train_set):
         start_epoch_time = time.time()
         for step, data in tqdm.tqdm(enumerate(dataloader)):
             # Get node pairs with labels for loss calculation.
-            compacted_pairs, labels = data.node_pairs_with_labels
+            compacted_seeds = data.compacted_seeds.T
+            labels = data.labels
 
             node_feature = data.node_features["feat"]
             blocks = data.blocks
@@ -321,7 +317,7 @@ def train(args, model, graph, features, train_set):
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)
             logits = model.predictor(
-                y[compacted_pairs[0]] * y[compacted_pairs[1]]
+                y[compacted_seeds[0]] * y[compacted_seeds[1]]
             ).squeeze()
 
             # Compute loss.
@@ -389,7 +385,7 @@ def main(args):
 
     # Load and preprocess dataset.
     print("Loading data")
-    dataset = gb.BuiltinDataset("ogbl-citation2").load()
+    dataset = gb.BuiltinDataset("ogbl-citation2-seeds").load()
 
     # Move the dataset to the selected storage.
     if args.storage_device == "pinned":
