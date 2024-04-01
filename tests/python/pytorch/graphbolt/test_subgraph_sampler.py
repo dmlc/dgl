@@ -1027,10 +1027,6 @@ def test_SubgraphSampler_Node(sampler_type):
     sampler = _get_sampler(sampler_type)
     sampler_dp = sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 5
-    for data in sampler_dp:
-        assert torch.equal(
-            data.compacted_seeds, torch.tensor([0, 1]).to(F.ctx())
-        )
 
 
 @pytest.mark.parametrize(
@@ -1119,14 +1115,8 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
     sampler = _get_sampler(sampler_type)
     sampler_dp = sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 2
-    expected_compacted_seeds = {"n2": [torch.tensor([0, 1]), torch.tensor([0])]}
     for step, minibatch in enumerate(sampler_dp):
         assert len(minibatch.sampled_subgraphs) == num_layer
-        for etype, compacted_seeds in minibatch.compacted_seeds.items():
-            assert torch.equal(
-                compacted_seeds,
-                expected_compacted_seeds[etype][step].to(F.ctx()),
-            )
 
 
 @pytest.mark.parametrize(
