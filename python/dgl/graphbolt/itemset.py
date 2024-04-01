@@ -5,7 +5,15 @@ from typing import Dict, Iterable, Iterator, Sized, Tuple, Union
 
 import torch
 
-__all__ = ["ItemSet", "ItemSetDict", "ItemSet2", "ItemSetDict2"]
+__all__ = [
+    "ItemSet",
+    "ItemSetDict",
+    "ItemSet2",
+    "ItemSetDict2",
+    "ItemSet3",
+    "ItemSet4",
+    "ItemSet0",
+]
 
 
 def is_scalar(x):
@@ -764,3 +772,69 @@ class ItemSetDict2(Dataset):
             itemsets=itemsets_str,
             names=self._names,
         )
+
+
+class ItemSet0:
+    r"""Class for iterating over tensor-like data.
+    Experimental. all attributes and functions are identical to ItemSet2, but just doesn't subclass torch.utils.data.Dataset.
+    """
+
+    def __init__(
+        self,
+        items: Union[torch.Tensor, Mapping, Tuple[Mapping]],
+        names: Union[str, Tuple[str]] = None,
+    ):
+        if is_scalar(items):
+            self._length = int(items)
+            self._items = items
+        elif isinstance(items, tuple):
+            self._length = len(items[0])
+            if any(self._length != len(item) for item in items):
+                raise ValueError("Size mismatch between items.")
+            self._items = items
+        else:
+            self._length = len(items)
+            self._items = (items,)
+        if names is not None:
+            num_items = (
+                len(self._items) if isinstance(self._items, tuple) else 1
+            )
+            if isinstance(names, tuple):
+                self._names = names
+            else:
+                self._names = (names,)
+            assert num_items == len(self._names), (
+                f"Number of items ({num_items}) and "
+                f"names ({len(self._names)}) must match."
+            )
+        else:
+            self._names = None
+
+    def __len__(self) -> int:
+        return self._length
+
+    def __getitem__(self, index: int):
+        if is_scalar(self._items):
+            if index < 0:
+                index += self._length
+            if index < 0 or index >= self._length:
+                raise IndexError(f"{type(self).__name__} index out of range.")
+            return torch.tensor(index, dtype=self._items.dtype)
+        elif len(self._items) == 1:
+            return self._items[0][index]
+        else:
+            return tuple(item[index] for item in self._items)
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
+
+    def __repr__(self) -> str:
+        ret = (
+            f"{self.__class__.__name__}(\n"
+            f"    items={self._items},\n"
+            f"    names={self._names},\n"
+            f")"
+        )
+        return ret

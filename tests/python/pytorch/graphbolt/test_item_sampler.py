@@ -1117,103 +1117,144 @@ from torchdata.datapipes.iter import IterableWrapper
 
 
 def test_ItemSampler2():
-    item_set = gb.ItemSet(torch.arange(1000000), names="seed_nodes")
+    # item_set = gb.ItemSet(torch.arange(1000000), names="seed_nodes")
 
-    data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
-    t0 = time()
-    for x in data_loader:
-        pass
-    t1 = time()
-    print(f"dl | {t1-t0}")
+    # data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
+    # t0 = time()
+    # for x in data_loader:
+    #     pass
+    # t1 = time()
+    # print(f"dl | {t1-t0}")
 
-    data_pipe = IterableWrapper(item_set)
-    t0 = time()
-    for x in data_pipe:
-        pass
-    t1 = time()
-    print(f"it | {t1-t0}")
+    # data_pipe = IterableWrapper(item_set)
+    # t0 = time()
+    # for x in data_pipe:
+    #     pass
+    # t1 = time()
+    # print(f"it | {t1-t0}")
 
-    item_sampler = gb.ItemSampler(item_set, batch_size=32, shuffle=True)
+    # item_sampler = gb.ItemSampler(item_set, batch_size=32, shuffle=True)
 
-    t0 = time()
-    for x in item_sampler:
-        pass
-    t1 = time()
-    print(f"is1 | {t1-t0}")
+    # t0 = time()
+    # for x in item_sampler:
+    #     pass
+    # t1 = time()
+    # print(f"is1 | {t1-t0}")
 
-    item_sampler2 = gb.ItemSampler2(item_set, batch_size=32, shuffle=True)
+    # item_sampler2 = gb.ItemSampler2(item_set, batch_size=32, shuffle=True)
 
-    t0 = time()
-    for x in item_sampler2:
-        pass
-    t1 = time()
-    print(f"is2 | {t1-t0}")
+    # t0 = time()
+    # for x in item_sampler2:
+    #     pass
+    # t1 = time()
+    # print(f"is2 | {t1-t0}")
 
-    item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
+    # item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
 
-    t0 = time()
-    for x in item_sampler3:
-        # print(x)
-        pass
-    t1 = time()
-    print(f"is3 | {t1-t0}")
+    # t0 = time()
+    # for x in item_sampler3:
+    #     # print(x)
+    #     pass
+    # t1 = time()
+    # print(f"is3 | {t1-t0}")
 
-    print(" ")
-    """###########"""
+    # print(" ")
+    # """###########"""
 
-    item_set = gb.ItemSet2(torch.arange(1000000), names="seed_nodes")
+    # item_set = gb.ItemSet2(torch.arange(1000000), names="seed_nodes")
 
-    data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
-    t0 = time()
-    for x in data_loader:
-        pass
-    t1 = time()
-    print(f"dl | {t1-t0}")
+    # data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
+    # t0 = time()
+    # for x in data_loader:
+    #     pass
+    # t1 = time()
+    # print(f"dl | {t1-t0}")
 
-    data_pipe = IterableWrapper(item_set)
-    t0 = time()
-    for x in data_pipe:
-        pass
-    t1 = time()
-    print(f"it | {t1-t0}")
+    # data_pipe = IterableWrapper(item_set)
+    # t0 = time()
+    # for x in data_pipe:
+    #     pass
+    # t1 = time()
+    # print(f"it | {t1-t0}")
 
-    item_sampler = gb.ItemSampler(item_set, batch_size=32, shuffle=True)
+    # item_sampler = gb.ItemSampler(item_set, batch_size=32, shuffle=True)
 
-    t0 = time()
-    for x in item_sampler:
-        pass
-    t1 = time()
-    print(f"is1 | {t1-t0}")
+    # t0 = time()
+    # for x in item_sampler:
+    #     pass
+    # t1 = time()
+    # print(f"is1 | {t1-t0}")
 
-    item_sampler2 = gb.ItemSampler2(item_set, batch_size=32, shuffle=True)
+    # item_sampler2 = gb.ItemSampler2(item_set, batch_size=32, shuffle=True)
 
-    t0 = time()
-    for x in item_sampler2:
-        pass
-    t1 = time()
-    print(f"is2 | {t1-t0}")
+    # t0 = time()
+    # for x in item_sampler2:
+    #     pass
+    # t1 = time()
+    # print(f"is2 | {t1-t0}")
 
-    item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
+    # item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
 
-    t0 = time()
-    for x in item_sampler3:
-        # print(x)
-        pass
-    t1 = time()
-    print(f"is3 | {t1-t0}")
+    # t0 = time()
+    # for x in item_sampler3:
+    #     # print(x)
+    #     pass
+    # t1 = time()
+    # print(f"is3 | {t1-t0}")
+
+    item_set_versions = [gb.ItemSet, gb.ItemSet2]  # , gb.ItemSet0]
+    dl_versions = [DataLoader, gb.ItemSampler, gb.ItemSampler2, gb.ItemSampler3]
+    for item_set in item_set_versions:
+        print(" ")
+        it = item_set(torch.arange(1000000), names="seed_nodes")
+        for dl in dl_versions:
+            for shuffle in [True]:
+                item_sampler = dl(it, batch_size=32, shuffle=shuffle)
+                t0 = time()
+                for x in item_sampler:
+                    pass
+                t1 = time()
+                print(
+                    f"{it.__class__.__name__} | {item_sampler.__class__.__name__} | {shuffle} | {t1-t0}"
+                )
 
     assert 0
 
 
 def test_ItemSampler3():
-    item_set = gb.ItemSet2(torch.arange(100000), names="seed_nodes")
-    item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
+    item_set_versions = [gb.ItemSet, gb.ItemSet2]
 
-    t0 = time()
-    for x in item_sampler3:
-        # print(x)
-        pass
-    t1 = time()
-    print(t1 - t0)
+    for item_set in item_set_versions:
+        it = item_set(torch.arange(1000000), names="seed_nodes")
+        t0 = time()
+        for x in it:
+            pass
+        t1 = time()
+        print(f"{it.__class__.__name__} | {t1-t0}")
 
     assert 0
+
+
+def test_diff_dataloader():
+    it1 = gb.ItemSet(torch.arange(1000000), names="seed_nodes")
+    it2 = gb.ItemSet2(torch.arange(1000000), names="seed_nodes")
+
+    dl1 = DataLoader(it1, batch_size=32, shuffle=False)
+    dl2 = DataLoader(it2, batch_size=32, shuffle=False)
+
+    # print(vars(dl1))
+    print(dl1._dataset_kind)
+    print(dl2._dataset_kind)
+
+    for attr_name in vars(dl1):
+        if getattr(dl1, attr_name) != getattr(dl2, attr_name):
+            print(
+                f"{attr_name} | {getattr(dl1, attr_name)} | {getattr(dl2, attr_name)}"
+            )
+
+    # assert 0
+
+
+# test_ItemSampler2()
+# test_ItemSampler3()
+# test_diff_dataloader()
