@@ -667,7 +667,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         if isinstance(seeds, dict):
             seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
         elif seeds is None and hasattr(self, "_seed_offset_list"):
-            seed_offsets = self._seed_offset_list
+            seed_offsets = self._seed_offset_list  # pylint: disable=no-member
         C_sampled_subgraph = self._sample_neighbors(
             seeds,
             seed_offsets,
@@ -913,7 +913,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         if isinstance(seeds, dict):
             seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
         elif seeds is None and hasattr(self, "_seed_offset_list"):
-            seed_offsets = self._seed_offset_list
+            seed_offsets = self._seed_offset_list  # pylint: disable=no-member
         self._check_sampler_arguments(seeds, fanouts, probs_name)
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
             seeds,
