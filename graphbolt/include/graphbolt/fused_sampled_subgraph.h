@@ -73,6 +73,9 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * @brief CSC format index pointer array, where the implicit node ids are
    * already compacted. And the original ids are stored in the
    * `original_column_node_ids` field.
+   *
+   * @note When created by the CUDA implementation, its length is equal to:
+   * 1 + \sum_{etype} #seeds with dst_node_type(etype)
    */
   torch::Tensor indptr;
 
@@ -115,12 +118,18 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * @brief Type id of each edge, where type id is the corresponding index of
    * edge types. The length of it is equal to the number of edges in the
    * subgraph.
+   *
+   * @note This output is not created by the CUDA implementation as the edges
+   * are sorted w.r.t edge types, one has to use etype_offsets to infer the edge
+   * type information.
    */
   torch::optional<torch::Tensor> type_per_edge;
 
   /**
    * @brief Offsets of each etype,
    * type_per_edge[etype_offsets[i]: etype_offsets[i + 1]] == i
+   * It has length equal to (1 + #etype), and the edges are guaranteed to be
+   * sorted w.r.t. their edge types.
    */
   torch::optional<torch::Tensor> etype_offsets;
 };
