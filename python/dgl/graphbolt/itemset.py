@@ -119,30 +119,39 @@ class ItemSet:
         items: Union[int, torch.Tensor, Iterable, Tuple[Iterable]],
         names: Union[str, Tuple[str]] = None,
     ) -> None:
-        if isinstance(items, tuple) or is_scalar(items):
+        if is_scalar(items):
+            self._length = int(items)
             self._items = items
+            self._num_items = 1
+        elif isinstance(items, tuple):
+            try:
+                self._length = len(items[0])
+            except TypeError:
+                self._length = None
+            if self._length is not None:
+                if any(self._length != len(item) for item in items):
+                    raise ValueError("Size mismatch between items.")
+            self._items = items
+            self._num_items = len(items)
         else:
+            try:
+                self._length = len(items)
+            except TypeError:
+                self._length = None
             self._items = (items,)
+            self._num_items = 1
+
         if names is not None:
-            num_items = (
-                len(self._items) if isinstance(self._items, tuple) else 1
-            )
             if isinstance(names, tuple):
                 self._names = names
             else:
                 self._names = (names,)
-            assert num_items == len(self._names), (
-                f"Number of items ({num_items}) and "
+            assert self._num_items == len(self._names), (
+                f"Number of items ({self._num_items}) and "
                 f"names ({len(self._names)}) must match."
             )
         else:
             self._names = None
-        if is_scalar(self._items):
-            self._length = int(self._items)
-        elif isinstance(self._items[0], Sized):
-            self._length = len(self._items[0])
-        else:
-            self._length = None
 
     def __iter__(self) -> Iterator:
         if is_scalar(self._items):
@@ -204,6 +213,11 @@ class ItemSet:
     def names(self) -> Tuple[str]:
         """Return the names of the items."""
         return self._names
+
+    @property
+    def num_items(self) -> int:
+        """Return the number of the items."""
+        return self._num_items
 
     def __len__(self):
         if self._length is None:
