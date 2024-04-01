@@ -11,18 +11,12 @@
 #include <thrust/logical.h>
 
 #include <cub/cub.cuh>
-#include <nv/target>  // __CUDA_MINIMUM_ARCH__ and friends
-#if defined(__CUDA_MINIMUM_ARCH__) &&                       \
-    ((!defined(_MSC_VER) && __CUDA_MINIMUM_ARCH__ < 600) || \
-     (defined(_MSC_VER) && __CUDA_MINIMUM_ARCH__ < 700))
-#else
-#define USE_MAP_BASED_IMPL
-#endif
 #include <mutex>
 #include <type_traits>
 #include <unordered_map>
 
 #include "./common.h"
+#include "./unique_and_compact.h"
 #include "./utils.h"
 
 namespace graphbolt {
@@ -264,12 +258,6 @@ UniqueAndCompactBatchedSort(
         return results;
       }));
 }
-
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
-UniqueAndCompactBatchedMap(
-    const std::vector<torch::Tensor>& src_ids,
-    const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor> unique_dst_ids);
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(

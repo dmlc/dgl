@@ -7,33 +7,15 @@
 #include <thrust/gather.h>
 
 #include <numeric>
-#include <nv/target>  // __CUDA_MINIMUM_ARCH__ and friends
 
 #include "./common.h"
+#include "./unique_and_compact.h"
 #include "./utils.h"
-#if defined(__CUDA_MINIMUM_ARCH__) &&                       \
-    ((!defined(_MSC_VER) && __CUDA_MINIMUM_ARCH__ < 600) || \
-     (defined(_MSC_VER) && __CUDA_MINIMUM_ARCH__ < 700))
 
-namespace graphbolt {
-namespace ops {
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> >
-UniqueAndCompactBatchedMap(
-    const std::vector<torch::Tensor>& src_ids,
-    const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor> unique_dst_ids) {
-  TORCH_CHECK(
-      false,
-      "The map implementation was not compiled. Please compile for CUDA "
-      "architectures >= 70.");
-  return {};
-}
-}  // namespace ops
-}  // namespace graphbolt
-#else
-
+#ifdef USE_MAP_BASED_IMPL
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
+#endif
 
 namespace graphbolt {
 namespace ops {
@@ -156,6 +138,7 @@ UniqueAndCompactBatchedMap(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor> unique_dst_ids) {
+#ifdef USE_MAP_BASED_IMPL
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
   auto scalar_type = src_ids.at(0).scalar_type();
@@ -270,9 +253,14 @@ UniqueAndCompactBatchedMap(
         }
         return results;
       }));
+#else   // USE_MAP_BASED_IMPL
+  TORCH_CHECK(
+      false,
+      "The map implementation was not compiled. Please compile for CUDA "
+      "architectures >= 70.");
+  return {};
+#endif  // USE_MAP_BASED_IMPL
 }
 
 }  // namespace ops
 }  // namespace graphbolt
-
-#endif  // USE_MAP_BASED_IMPL
