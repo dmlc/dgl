@@ -164,11 +164,11 @@ UniqueAndCompactBatchedMap(
         auto offsets_ptr =
             pointers_and_offsets.data_ptr<int64_t>() + 3 * num_batches;
         for (std::size_t i = 0; i < num_batches; i++) {
-          pointers_ptr[2 * i] = unique_dst_ids[i].data_ptr<index_t>();
+          pointers_ptr[2 * i] = unique_dst_ids.at(i).data_ptr<index_t>();
           offsets_ptr[2 * i] = unique_dst_ids[i].size(0);
-          pointers_ptr[2 * i + 1] = src_ids[i].data_ptr<index_t>();
+          pointers_ptr[2 * i + 1] = src_ids.at(i).data_ptr<index_t>();
           offsets_ptr[2 * i + 1] = src_ids[i].size(0);
-          pointers_ptr[2 * num_batches + i] = dst_ids[i].data_ptr<index_t>();
+          pointers_ptr[2 * num_batches + i] = dst_ids.at(i).data_ptr<index_t>();
           offsets_ptr[2 * num_batches + i] = dst_ids[i].size(0);
         }
         std::exclusive_scan(
