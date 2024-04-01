@@ -170,7 +170,7 @@ As for RAM usage, the shared memory(measured by **shared** field of `free` comma
 
 `ogbn-mag`
 
-| Data Formats | Sample Time Per Epoch (CPU) |  Test Accuracy (3 epochs) | shared | used (peak) |
-| ------------ | --------------------------- | ------------------------- |  -----  | ---- |
-|     DGL      | Min: 48.2s, Max: 91.4s      |            42.76%         |  1.3GB  | 9.2GB|
-|   GraphBolt  | Min: 9.2s, Max: 11.9s       |            42.46%         |  742MB  | 5.9GB|
+| Data Formats | Sample Time Per Epoch (CPU) |  Test Accuracy (3 epochs) | shared | used (peak) | CPU Util |
+| ------------ | --------------------------- | ------------------------- |  -----  | ---- | ----- |
+|     DGL      | Min: 48.2s, Max: 91.4s      |            42.76%         |  1.3GB  | 9.2GB| 10.4% |
+|   GraphBolt  | Min: 9.2s, Max: 11.9s       |            42.46%         |  742MB  | 5.9GB| 18.1% |
