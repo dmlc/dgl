@@ -221,11 +221,16 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
     const torch::Tensor unique_dst_ids, int num_bits = 0);
 
+/**
+ * @brief Batched version of UniqueAndCompact. The ith element of the return
+ * value is equal to the passing the ith elements of the input arguments to
+ * UniqueAndCompact.
+ */
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor> unique_dst_ids, int num_bits = 0);
+    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits = 0);
 
 }  //  namespace ops
 }  //  namespace graphbolt

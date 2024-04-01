@@ -20,6 +20,8 @@
 namespace graphbolt {
 namespace ops {
 
+constexpr int node_id_bits = 40;
+
 template <typename index_t, typename map_t>
 __global__ void _InsertAndSetMinBatched(
     const int64_t num_edges, const int32_t* const indexes, index_t** pointers,
@@ -34,7 +36,7 @@ __global__ void _InsertAndSetMinBatched(
     const auto tensor_offset = i - offsets[tensor_index];
     const int64_t node_id = pointers[tensor_index][tensor_offset];
     const auto batch_index = tensor_index / 2;
-    const int64_t key = node_id | (batch_index << 48);
+    const int64_t key = node_id | (batch_index << node_id_bits);
 
     auto [slot, is_new_key] = map.insert_and_find(cuco::pair{key, i});
 
@@ -61,7 +63,7 @@ __global__ void _IsInsertedBatched(
     const auto tensor_offset = i - offsets[tensor_index];
     const int64_t node_id = pointers[tensor_index][tensor_offset];
     const auto batch_index = tensor_index / 2;
-    const int64_t key = node_id | (batch_index << 48);
+    const int64_t key = node_id | (batch_index << node_id_bits);
 
     auto slot = map.find(key);
     valid[i] = slot->second == i;
@@ -86,7 +88,7 @@ __global__ void _GetInsertedBatched(
       const auto tensor_offset = i - offsets[tensor_index];
       const int64_t node_id = pointers[tensor_index][tensor_offset];
       const auto batch_index = tensor_index / 2;
-      const int64_t key = node_id | (batch_index << 48);
+      const int64_t key = node_id | (batch_index << node_id_bits);
 
       auto slot = map.find(key);
       const auto batch_offset = offsets[batch_index * 2];
@@ -123,7 +125,7 @@ __global__ void _MapIdsBatched(
     if (batch_index >= 0) {
       const auto tensor_offset = i - offsets[tensor_index];
       const int64_t node_id = pointers[tensor_index][tensor_offset];
-      const int64_t key = node_id | (batch_index << 48);
+      const int64_t key = node_id | (batch_index << node_id_bits);
 
       auto slot = map.find(key);
       mapped_ids[i] = slot->second;
@@ -137,7 +139,7 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> >
 UniqueAndCompactBatchedMap(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor> unique_dst_ids) {
+    const std::vector<torch::Tensor>& unique_dst_ids) {
 #ifdef USE_MAP_BASED_IMPL
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
@@ -147,9 +149,11 @@ UniqueAndCompactBatchedMap(
   static_assert(
       sizeof(std::ptrdiff_t) == sizeof(int64_t),
       "Need to be compiled on a 64-bit system.");
+  constexpr int batch_id_bits = sizeof(int64_t) * 8 - 1 - node_id_bits;
   TORCH_CHECK(
-      num_batches <= (1 << 15),
-      "UniqueAndCompactBatched supports a batch size of up to 32768");
+      num_batches <= (1 << batch_id_bits),
+      "UniqueAndCompactBatched supports a batch size of up to ",
+      1 << batch_id_bits);
   return AT_DISPATCH_INDEX_TYPES(
       scalar_type, "unique_and_compact", ([&] {
         auto pointers_and_offsets = torch::empty(

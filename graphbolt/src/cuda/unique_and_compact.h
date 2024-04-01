@@ -22,7 +22,7 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> >
 UniqueAndCompactBatchedMap(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor> unique_dst_ids);
+    const std::vector<torch::Tensor>& unique_dst_ids);
 #endif
 
 #endif  // GRAPHBOLT_CUDA_UNIQUE_AND_COMPACT_H_

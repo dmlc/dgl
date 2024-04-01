@@ -48,7 +48,7 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatchedSort(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor> unique_dst_ids, int num_bits) {
+    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
   auto scalar_type = src_ids.at(0).scalar_type();
@@ -263,7 +263,7 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor> unique_dst_ids, int num_bits) {
+    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
 #ifdef USE_MAP_BASED_IMPL
   auto dev_id = cuda::GetCurrentStream().device_index();
   static std::mutex mtx;
