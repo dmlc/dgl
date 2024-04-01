@@ -62,6 +62,8 @@ def minibatcher_default(batch, names):
         else:
             init_data = {name: item for item, name in zip(batch, names)}
     minibatch = MiniBatch()
+    # TODO(#7254): Hacks for original `seed_nodes` and `node_pairs`, which need
+    # to be cleaned up later.
     if "node_pairs" in names:
         pos_seeds = init_data["node_pairs"]
         # Build negative graph.
@@ -98,8 +100,8 @@ def minibatcher_default(batch, names):
                 "`MiniBatch`. You probably need to provide a customized "
                 "`MiniBatcher`."
             )
-        # Hakcing for original seed_nodes and node_pairs, which will be
-        # deprecated later.
+        # TODO(#7254): Hacks for original `seed_nodes` and `node_pairs`, which
+        # need to be cleaned up later.
         if name == "seed_nodes":
             name = "seeds"
         if name in ("node_pairs", "negative_srcs", "negative_dsts"):
