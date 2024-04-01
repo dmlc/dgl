@@ -1117,7 +1117,7 @@ from torchdata.datapipes.iter import IterableWrapper
 
 
 def test_ItemSampler2():
-    item_set = gb.ItemSet(torch.arange(100000), names="seed_nodes")
+    item_set = gb.ItemSet(torch.arange(1000000), names="seed_nodes")
 
     data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
     t0 = time()
@@ -1161,7 +1161,7 @@ def test_ItemSampler2():
     print(" ")
     """###########"""
 
-    item_set = gb.ItemSet2(torch.arange(100000), names="seed_nodes")
+    item_set = gb.ItemSet2(torch.arange(1000000), names="seed_nodes")
 
     data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
     t0 = time()

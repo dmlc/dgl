@@ -787,7 +787,18 @@ class _deprecated_ItemSampler(MapDataPipe):
 from torchdata.datapipes.iter import Mapper
 
 
-class ItemSampler2:
+def _get_numworkers_and_workerid():
+    worker_info = torch.utils.data.get_worker_info()
+    if worker_info is not None:
+        num_workers = worker_info.num_workers
+        worker_id = worker_info.id
+    else:
+        num_workers = 1
+        worker_id = 0
+    return num_workers, worker_id
+
+
+class ItemSampler3(Mapper):
     """Experimental. Subclasses IterDataPipe."""
 
     def __init__(
@@ -798,28 +809,22 @@ class ItemSampler2:
         drop_last: bool = False,
         minibatcher: Optional[Callable] = None,
     ):
-        # super().__init__()
         self._item_set = item_set
         self._names = item_set.names
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
         self._shuffle = shuffle
-
-    def __iter__(self) -> Iterator:
-        data_pipe = DataLoader(
+        self._data_loader = DataLoader(
             dataset=self._item_set,
             batch_size=self._batch_size,
             shuffle=self._shuffle,
             drop_last=self._drop_last,
             collate_fn=self._collate,
         )
-
-        data_pipe = Mapper(
-            data_pipe, partial(minibatcher_default, names=self._names)
+        super().__init__(
+            self._data_loader, partial(minibatcher_default, names=self._names)
         )
-
-        return iter(data_pipe)
 
     @staticmethod
     def _collate(batch):
@@ -841,7 +846,7 @@ class ItemSampler2:
         return default_collate(batch)
 
 
-class ItemSampler3(DataLoader):
+class ItemSampler2(DataLoader):
     """Experimental. Subclasses DataLoader."""
 
     def __init__(
