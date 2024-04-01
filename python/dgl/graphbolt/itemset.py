@@ -137,6 +137,12 @@ class ItemSet:
             )
         else:
             self._names = None
+        if is_scalar(self._items):
+            self._length = int(self._items)
+        elif isinstance(self._items[0], Sized):
+            self._length = len(self._items[0])
+        else:
+            self._length = None
 
     def __iter__(self) -> Iterator:
         if is_scalar(self._items):
@@ -165,19 +171,8 @@ class ItemSet:
             for item in zip_items:
                 yield tuple(item)
 
-    def __len__(self) -> int:
-        if is_scalar(self._items):
-            return int(self._items)
-        if isinstance(self._items[0], Sized):
-            return len(self._items[0])
-        raise TypeError(
-            f"{type(self).__name__} instance doesn't have valid length."
-        )
-
     def __getitem__(self, idx: Union[int, slice, Iterable]) -> Tuple:
-        try:
-            len(self)
-        except TypeError:
+        if self._length is None:
             raise TypeError(
                 f"{type(self).__name__} instance doesn't support indexing."
             )
@@ -209,6 +204,13 @@ class ItemSet:
     def names(self) -> Tuple[str]:
         """Return the names of the items."""
         return self._names
+
+    def __len__(self):
+        if self._length is None:
+            raise TypeError(
+                f"{type(self).__name__} instance doesn't have valid length."
+            )
+        return self._length
 
     def __repr__(self) -> str:
         ret = (
