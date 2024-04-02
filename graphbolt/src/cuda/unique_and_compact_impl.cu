@@ -16,7 +16,7 @@
 #include <unordered_map>
 
 #include "./common.h"
-#include "./unique_and_compact.h"
+#include "./extension/unique_and_compact.h"
 #include "./utils.h"
 
 namespace graphbolt {
@@ -264,7 +264,6 @@ UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
-#ifdef USE_MAP_BASED_IMPL
   auto dev_id = cuda::GetCurrentStream().device_index();
   static std::mutex mtx;
   static std::unordered_map<decltype(dev_id), int> compute_capability_cache;
@@ -283,7 +282,6 @@ UniqueAndCompactBatched(
   if (compute_capability_major >= 7) {
     return UniqueAndCompactBatchedMap(src_ids, dst_ids, unique_dst_ids);
   }
-#endif  // USE_MAP_BASED_IMPL
   return UniqueAndCompactBatchedSort(
       src_ids, dst_ids, unique_dst_ids, num_bits);
 }

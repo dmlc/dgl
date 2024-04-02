@@ -58,23 +58,19 @@ if(USE_CUDA)
   if(DEFINED ENV{CUDAARCHS})
     set(CMAKE_CUDA_ARCHITECTURES $ENV{CUDAARCHS})
   endif()
-  set(CMAKE_CUDA_ARCHITECTURES_UNFILTERED ${CMAKE_CUDA_ARCHITECTURES})
-  if(MSVC)
-    # Windows supports only sm_70 and up (Volta+).
-    list(FILTER CMAKE_CUDA_ARCHITECTURES EXCLUDE REGEX "[2-6][0-9]")
-  else(MSVC)
-    # Unix supports only sm_60 and up (Pascal+).
-    list(FILTER CMAKE_CUDA_ARCHITECTURES EXCLUDE REGEX "[2-5][0-9]")
-  endif(MSVC)
-  list(LENGTH CMAKE_CUDA_ARCHITECTURES CMAKE_CUDA_ARCHITECTURES_LEN)
-  # If no architectures are left due to filtering, use unfiltered list.
-  if(CMAKE_CUDA_ARCHITECTURES_LEN EQUAL 0)
-    set(CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES_UNFILTERED})
+  set(CMAKE_CUDA_ARCHITECTURES_FILTERED ${CMAKE_CUDA_ARCHITECTURES})
+  # CUDA extension supports only sm_70 and up (Volta+).
+  list(FILTER CMAKE_CUDA_ARCHITECTURES_FILTERED EXCLUDE REGEX "[2-6][0-9]")
+  list(LENGTH CMAKE_CUDA_ARCHITECTURES_FILTERED CMAKE_CUDA_ARCHITECTURES_FILTERED_LEN)
+  if(CMAKE_CUDA_ARCHITECTURES_FILTERED_LEN EQUAL 0)
+    # Build the CUDA extension at least build for Volta.
+    set(CMAKE_CUDA_ARCHITECTURES_FILTERED "70")
   endif()
+  set(LIB_GRAPHBOLT_CUDA_NAME "${LIB_GRAPHBOLT_NAME}_cuda")
 endif()
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
-target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
+include_directories(BEFORE ${BOLT_DIR}
                            ${BOLT_HEADERS}
                            "../third_party/dmlc-core/include"
                            "../third_party/pcg/include")
@@ -86,13 +82,22 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 endif()
 
 if(USE_CUDA)
+  file(GLOB BOLT_CUDA_EXTENSION_SRC
+    ${BOLT_DIR}/cuda/extension/*.cu
+    ${BOLT_DIR}/cuda/extension/*.cc
+  )
+  add_library(${LIB_GRAPHBOLT_CUDA_NAME} SHARED ${BOLT_CUDA_EXTENSION_SRC} ${BOLT_HEADERS})
+  target_link_libraries(${LIB_GRAPHBOLT_CUDA_NAME} "${TORCH_LIBRARIES}")
+
   set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 17)
+  set_target_properties(${LIB_GRAPHBOLT_CUDA_NAME} PROPERTIES CUDA_STANDARD 17)
+  set_target_properties(${LIB_GRAPHBOLT_CUDA_NAME} PROPERTIES CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES_FILTERED}")
   message(STATUS "Use external CCCL library for a consistent API and performance for graphbolt.")
-  target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
-                             "../third_party/cccl/thrust"
-                             "../third_party/cccl/cub"
-                             "../third_party/cccl/libcudacxx/include"
-                             "../third_party/cuco/include")
+  include_directories(BEFORE
+                      "../third_party/cccl/thrust"
+                      "../third_party/cccl/cub"
+                      "../third_party/cccl/libcudacxx/include"
+                      "../third_party/cuco/include")
 
   message(STATUS "Use HugeCTR gpu_cache for graphbolt with INCLUDE_DIRS $ENV{GPU_CACHE_INCLUDE_DIRS}.")
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE $ENV{GPU_CACHE_INCLUDE_DIRS})
@@ -101,6 +106,11 @@ if(USE_CUDA)
   
   get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
   message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")
+
+  get_property(archs TARGET ${LIB_GRAPHBOLT_CUDA_NAME} PROPERTY CUDA_ARCHITECTURES)
+  message(STATUS "CUDA_ARCHITECTURES for graphbolt extension: ${archs}")
+
+  target_link_libraries(${LIB_GRAPHBOLT_NAME} ${LIB_GRAPHBOLT_CUDA_NAME})
 endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when
