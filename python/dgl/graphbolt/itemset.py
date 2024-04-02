@@ -159,12 +159,11 @@ class ItemSet:
             yield from torch.arange(self._items, dtype=dtype)
             return
 
-        if len(self._items) == 1:
+        if self._num_items == 1:
             yield from self._items[0]
             return
 
-        if isinstance(self._items[0], Sized):
-            items_len = len(self._items[0])
+        if self._length is not None:
             # Use for-loop to iterate over the items. It can avoid a long
             # waiting time when the items are torch tensors. Since torch
             # tensors need to call self.unbind(0) to slice themselves.
@@ -172,7 +171,7 @@ class ItemSet:
             # wait times during the loading phase, and the impact on overall
             # performance during the training/testing stage is minimal.
             # For more details, see https://github.com/dmlc/dgl/pull/6293.
-            for i in range(items_len):
+            for i in range(self._length):
                 yield tuple(item[i] for item in self._items)
         else:
             # If the items are not Sized, we use zip to iterate over them.
@@ -187,13 +186,13 @@ class ItemSet:
             )
         if is_scalar(self._items):
             if isinstance(idx, slice):
-                start, stop, step = idx.indices(int(self._items))
+                start, stop, step = idx.indices(self._length)
                 dtype = getattr(self._items, "dtype", torch.int64)
                 return torch.arange(start, stop, step, dtype=dtype)
             if isinstance(idx, int):
                 if idx < 0:
-                    idx += self._items
-                if idx < 0 or idx >= self._items:
+                    idx += self._length
+                if idx < 0 or idx >= self._length:
                     raise IndexError(
                         f"{type(self).__name__} index out of range."
                     )
@@ -205,7 +204,7 @@ class ItemSet:
             raise TypeError(
                 f"{type(self).__name__} indices must be integer or slice."
             )
-        if len(self._items) == 1:
+        if self._num_items == 1:
             return self._items[0][idx]
         return tuple(item[idx] for item in self._items)
 
@@ -380,8 +379,10 @@ class ItemSetDict:
                 if stop <= self._offsets[offset_idx]:
                     break
             return data
-
-        raise TypeError(f"{type(self).__name__} indices must be int or slice.")
+        else:
+            raise TypeError(
+                f"{type(self).__name__} indices must be int or slice."
+            )
 
     @property
     def names(self) -> Tuple[str]:
