@@ -78,7 +78,7 @@ def test_FeatureFetcher_with_edges_homo():
     )
 
     def add_node_and_edge_ids(minibatch):
-        seeds = minibatch.seed_nodes
+        seeds = minibatch.seeds
         subgraphs = []
         for _ in range(3):
             sampled_csc = gb.CSCFormatBase(
@@ -172,7 +172,7 @@ def test_FeatureFetcher_with_edges_hetero():
     b = torch.tensor([[random.randint(0, 10)] for _ in range(50)])
 
     def add_node_and_edge_ids(minibatch):
-        seeds = minibatch.seed_nodes
+        seeds = minibatch.seeds
         subgraphs = []
         original_edge_ids = {
             "n1:e1:n2": torch.randint(0, 50, (10,)),
