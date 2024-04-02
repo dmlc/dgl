@@ -150,11 +150,17 @@ UniqueAndCompactBatchedMap(
       1 << batch_id_bits);
   return AT_DISPATCH_INDEX_TYPES(
       scalar_type, "unique_and_compact", ([&] {
+        // For 2 batches of inputs, stored the input tensor pointers in the
+        // unique_dst, src, unique_dst, src, dst, dst order. Then, we store
+        // offsets in the rest of the 3 * num_batches + 1 space as if they were
+        // stored contiguously.
         auto pointers_and_offsets = torch::empty(
             6 * num_batches + 1,
             c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
+        // Points to the input tensor pointers.
         auto pointers_ptr =
             reinterpret_cast<index_t**>(pointers_and_offsets.data_ptr());
+        // Points to the input tensor storage logical offsets.
         auto offsets_ptr =
             pointers_and_offsets.data_ptr<int64_t>() + 3 * num_batches;
         for (std::size_t i = 0; i < num_batches; i++) {
@@ -165,8 +171,11 @@ UniqueAndCompactBatchedMap(
           pointers_ptr[2 * num_batches + i] = dst_ids.at(i).data_ptr<index_t>();
           offsets_ptr[2 * num_batches + i] = dst_ids[i].size(0);
         }
+        // Finish computing the offsets by taking a cumulative sum.
         std::exclusive_scan(
             offsets_ptr, offsets_ptr + 3 * num_batches + 1, offsets_ptr, 0ll);
+        // Device version of the tensors defined above. We store the information
+        // initially on the CPU, which are later copied to the device.
         auto pointers_and_offsets_dev = torch::empty(
             pointers_and_offsets.size(0),
             src_ids[0].options().dtype(pointers_and_offsets.scalar_type()));
