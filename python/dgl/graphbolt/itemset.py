@@ -1,7 +1,7 @@
 """GraphBolt Itemset."""
 
 import textwrap
-from typing import Dict, Iterable, Iterator, Sized, Tuple, Union
+from typing import Dict, Iterable, Iterator, Tuple, Union
 
 import torch
 
@@ -119,20 +119,35 @@ class ItemSet:
         items: Union[int, torch.Tensor, Iterable, Tuple[Iterable]],
         names: Union[str, Tuple[str]] = None,
     ) -> None:
-        if isinstance(items, tuple) or is_scalar(items):
+        if is_scalar(items):
+            self._length = int(items)
             self._items = items
+            self._num_items = 1
+        elif isinstance(items, tuple):
+            try:
+                self._length = len(items[0])
+            except TypeError:
+                self._length = None
+            if self._length is not None:
+                if any(self._length != len(item) for item in items):
+                    raise ValueError("Size mismatch between items.")
+            self._items = items
+            self._num_items = len(items)
         else:
+            try:
+                self._length = len(items)
+            except TypeError:
+                self._length = None
             self._items = (items,)
+            self._num_items = 1
+
         if names is not None:
-            num_items = (
-                len(self._items) if isinstance(self._items, tuple) else 1
-            )
             if isinstance(names, tuple):
                 self._names = names
             else:
                 self._names = (names,)
-            assert num_items == len(self._names), (
-                f"Number of items ({num_items}) and "
+            assert self._num_items == len(self._names), (
+                f"Number of items ({self._num_items}) and "
                 f"names ({len(self._names)}) must match."
             )
         else:
@@ -144,12 +159,11 @@ class ItemSet:
             yield from torch.arange(self._items, dtype=dtype)
             return
 
-        if len(self._items) == 1:
+        if self._num_items == 1:
             yield from self._items[0]
             return
 
-        if isinstance(self._items[0], Sized):
-            items_len = len(self._items[0])
+        if self._length is not None:
             # Use for-loop to iterate over the items. It can avoid a long
             # waiting time when the items are torch tensors. Since torch
             # tensors need to call self.unbind(0) to slice themselves.
@@ -157,7 +171,7 @@ class ItemSet:
             # wait times during the loading phase, and the impact on overall
             # performance during the training/testing stage is minimal.
             # For more details, see https://github.com/dmlc/dgl/pull/6293.
-            for i in range(items_len):
+            for i in range(self._length):
                 yield tuple(item[i] for item in self._items)
         else:
             # If the items are not Sized, we use zip to iterate over them.
@@ -165,31 +179,20 @@ class ItemSet:
             for item in zip_items:
                 yield tuple(item)
 
-    def __len__(self) -> int:
-        if is_scalar(self._items):
-            return int(self._items)
-        if isinstance(self._items[0], Sized):
-            return len(self._items[0])
-        raise TypeError(
-            f"{type(self).__name__} instance doesn't have valid length."
-        )
-
     def __getitem__(self, idx: Union[int, slice, Iterable]) -> Tuple:
-        try:
-            len(self)
-        except TypeError:
+        if self._length is None:
             raise TypeError(
                 f"{type(self).__name__} instance doesn't support indexing."
             )
         if is_scalar(self._items):
             if isinstance(idx, slice):
-                start, stop, step = idx.indices(int(self._items))
+                start, stop, step = idx.indices(self._length)
                 dtype = getattr(self._items, "dtype", torch.int64)
                 return torch.arange(start, stop, step, dtype=dtype)
             if isinstance(idx, int):
                 if idx < 0:
-                    idx += self._items
-                if idx < 0 or idx >= self._items:
+                    idx += self._length
+                if idx < 0 or idx >= self._length:
                     raise IndexError(
                         f"{type(self).__name__} index out of range."
                     )
@@ -201,7 +204,7 @@ class ItemSet:
             raise TypeError(
                 f"{type(self).__name__} indices must be integer or slice."
             )
-        if len(self._items) == 1:
+        if self._num_items == 1:
             return self._items[0][idx]
         return tuple(item[idx] for item in self._items)
 
@@ -209,6 +212,18 @@ class ItemSet:
     def names(self) -> Tuple[str]:
         """Return the names of the items."""
         return self._names
+
+    @property
+    def num_items(self) -> int:
+        """Return the number of the items."""
+        return self._num_items
+
+    def __len__(self):
+        if self._length is None:
+            raise TypeError(
+                f"{type(self).__name__} instance doesn't have valid length."
+            )
+        return self._length
 
     def __repr__(self) -> str:
         ret = (
@@ -364,8 +379,10 @@ class ItemSetDict:
                 if stop <= self._offsets[offset_idx]:
                     break
             return data
-
-        raise TypeError(f"{type(self).__name__} indices must be int or slice.")
+        else:
+            raise TypeError(
+                f"{type(self).__name__} indices must be int or slice."
+            )
 
     @property
     def names(self) -> Tuple[str]:
