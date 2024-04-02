@@ -99,14 +99,14 @@ def test_InSubgraphSampler_homo():
         return _indices
 
     mn = next(it)
-    assert torch.equal(mn.seed_nodes, torch.LongTensor([0]).to(F.ctx()))
+    assert torch.equal(mn.seeds, torch.LongTensor([0]).to(F.ctx()))
     assert torch.equal(
         mn.sampled_subgraphs[0].sampled_csc.indptr,
         torch.tensor([0, 3]).to(F.ctx()),
     )
 
     mn = next(it)
-    assert torch.equal(mn.seed_nodes, torch.LongTensor([5]).to(F.ctx()))
+    assert torch.equal(mn.seeds, torch.LongTensor([5]).to(F.ctx()))
     assert torch.equal(
         mn.sampled_subgraphs[0].sampled_csc.indptr,
         torch.tensor([0, 2]).to(F.ctx()),
@@ -114,7 +114,7 @@ def test_InSubgraphSampler_homo():
     assert torch.equal(original_indices(mn), torch.tensor([1, 4]).to(F.ctx()))
 
     mn = next(it)
-    assert torch.equal(mn.seed_nodes, torch.LongTensor([3]).to(F.ctx()))
+    assert torch.equal(mn.seeds, torch.LongTensor([3]).to(F.ctx()))
     assert torch.equal(
         mn.sampled_subgraphs[0].sampled_csc.indptr,
         torch.tensor([0, 2]).to(F.ctx()),
@@ -176,9 +176,7 @@ def test_InSubgraphSampler_hetero():
     it = iter(in_subgraph_sampler)
 
     mn = next(it)
-    assert torch.equal(
-        mn.seed_nodes["N0"], torch.LongTensor([1, 0]).to(F.ctx())
-    )
+    assert torch.equal(mn.seeds["N0"], torch.LongTensor([1, 0]).to(F.ctx()))
     expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 1, 3]),
@@ -203,7 +201,7 @@ def test_InSubgraphSampler_hetero():
         )
 
     mn = next(it)
-    assert mn.seed_nodes == {
+    assert mn.seeds == {
         "N0": torch.LongTensor([2]).to(F.ctx()),
         "N1": torch.LongTensor([0]).to(F.ctx()),
     }
@@ -230,9 +228,7 @@ def test_InSubgraphSampler_hetero():
         )
 
     mn = next(it)
-    assert torch.equal(
-        mn.seed_nodes["N1"], torch.LongTensor([2, 1]).to(F.ctx())
-    )
+    assert torch.equal(mn.seeds["N1"], torch.LongTensor([2, 1]).to(F.ctx()))
     expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0]), indices=torch.LongTensor([])
