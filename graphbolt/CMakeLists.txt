@@ -86,6 +86,8 @@ if(USE_CUDA)
     ${BOLT_DIR}/cuda/extension/*.cu
     ${BOLT_DIR}/cuda/extension/*.cc
   )
+  # Until https://github.com/NVIDIA/cccl/issues/1083 is resolved, we need to
+  # compile the cuda/extension folder with Volta+ CUDA architectures.
   add_library(${LIB_GRAPHBOLT_CUDA_NAME} STATIC ${BOLT_CUDA_EXTENSION_SRC} ${BOLT_HEADERS})
   target_link_libraries(${LIB_GRAPHBOLT_CUDA_NAME} "${TORCH_LIBRARIES}")
 
