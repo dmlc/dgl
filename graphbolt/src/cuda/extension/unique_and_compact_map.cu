@@ -7,12 +7,10 @@
 #include <thrust/gather.h>
 
 #include <nv/target>
-// with line number
-#define STRING2(x) #x
-#define STRING(x) STRING2(x)
-#pragma message("__CUDA_ARCH_LIST__: " STRING(__CUDA_ARCH_LIST__))
-#pragma message("__CUDA_ARCH__: " STRING(__CUDA_ARCH__))
-#pragma message("__CUDA_MINIMUM_ARCH__: " STRING(__CUDA_MINIMUM_ARCH__))
+#define XSTR(x) STR(x)
+#define STR(x) #x
+#pragma message "__CUDA_ARCH__: " XSTR(__CUDA_ARCH__)
+#pragma message "__CUDA_MINIMUM_ARCH__: " XSTR(__CUDA_MINIMUM_ARCH__)
 
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
