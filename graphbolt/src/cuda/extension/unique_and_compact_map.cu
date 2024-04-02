@@ -17,6 +17,7 @@
 namespace graphbolt {
 namespace ops {
 
+// Support graphs with up to 2^node_id_bits nodes.
 constexpr int node_id_bits = 40;
 
 template <typename index_t, typename map_t>
