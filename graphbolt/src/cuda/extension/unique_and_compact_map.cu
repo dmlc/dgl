@@ -151,9 +151,10 @@ UniqueAndCompactBatchedMap(
   return AT_DISPATCH_INDEX_TYPES(
       scalar_type, "unique_and_compact", ([&] {
         // For 2 batches of inputs, stored the input tensor pointers in the
-        // unique_dst, src, unique_dst, src, dst, dst order. Then, we store
-        // offsets in the rest of the 3 * num_batches + 1 space as if they were
-        // stored contiguously.
+        // unique_dst, src, unique_dst, src, dst, dst order. Since there are
+        // 3 * num_batches input tensors, we need the first 3 * num_batches to
+        // store the input tensor pointers. Then, we store offsets in the rest
+        // of the 3 * num_batches + 1 space as if they were stored contiguously.
         auto pointers_and_offsets = torch::empty(
             6 * num_batches + 1,
             c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
