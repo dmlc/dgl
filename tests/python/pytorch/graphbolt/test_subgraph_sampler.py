@@ -529,7 +529,7 @@ def test_SubgraphSampler_Random_Hetero_Graph_seed_ndoes(sampler_type, replace):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Homo_seed_nodes(sampler_type):
+def test_SubgraphSampler_without_deduplication_Homo_seed_nodes(sampler_type):
     _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
@@ -643,7 +643,7 @@ def _assert_homo_values(
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Hetero_seed_nodes(sampler_type):
+def test_SubgraphSampler_without_deduplication_Hetero_seed_nodes(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2)
@@ -1427,7 +1427,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Homo_Node(sampler_type):
+def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
     _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
@@ -1491,7 +1491,7 @@ def test_SubgraphSampler_without_dedpulication_Homo_Node(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Hetero_Node(sampler_type):
+def test_SubgraphSampler_without_deduplication_Hetero_Node(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2)
@@ -1866,7 +1866,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Homo_Link(sampler_type):
+def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
     _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
@@ -1882,7 +1882,7 @@ def test_SubgraphSampler_without_dedpulication_Homo_Link(sampler_type):
         graph.edge_attributes = {
             "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
         }
-        items = (items, torch.randint(1, 10, (3,)))
+        items = (items, torch.randint(1, 10, (2,)))
         names = (names, "timestamp")
 
     itemset = gb.ItemSet(items, names=names)
@@ -1928,7 +1928,7 @@ def test_SubgraphSampler_without_dedpulication_Homo_Link(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Hetero_Link(sampler_type):
+def test_SubgraphSampler_without_deduplication_Hetero_Link(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2).view(1, 2)
@@ -1940,7 +1940,7 @@ def test_SubgraphSampler_without_dedpulication_Hetero_Link(sampler_type):
         graph.edge_attributes = {
             "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
         }
-        items = (items, torch.randint(1, 10, (2,)))
+        items = (items, torch.randint(1, 10, (1,)))
         names = (names, "timestamp")
     itemset = gb.ItemSetDict({"n1:e1:n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
