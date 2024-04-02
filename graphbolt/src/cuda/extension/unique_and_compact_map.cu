@@ -6,12 +6,6 @@
 #include <graphbolt/cuda_ops.h>
 #include <thrust/gather.h>
 
-#include <nv/target>
-#define XSTR(x) STR(x)
-#define STR(x) #x
-#pragma message "__CUDA_ARCH__: " XSTR(__CUDA_ARCH__)
-#pragma message "__CUDA_MINIMUM_ARCH__: " XSTR(__CUDA_MINIMUM_ARCH__)
-
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
 #include <numeric>
