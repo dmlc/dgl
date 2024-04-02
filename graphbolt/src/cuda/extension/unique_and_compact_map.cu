@@ -191,7 +191,7 @@ UniqueAndCompactBatchedMap(
         auto indexes = ExpandIndptrImpl(
             offsets_dev, torch::kInt32, torch::nullopt,
             offsets_ptr[3 * num_batches]);
-        auto map = cuco::static_map{
+        cuco::static_map map{
             offsets_ptr[2 * num_batches],
             0.5,  // load_factor
             cuco::empty_key{static_cast<int64_t>(-1)},
