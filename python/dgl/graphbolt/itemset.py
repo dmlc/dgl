@@ -1,7 +1,7 @@
 """GraphBolt Itemset."""
 
 import textwrap
-from typing import Dict, Iterable, Iterator, Sized, Tuple, Union
+from typing import Dict, Iterable, Iterator, Tuple, Union
 
 import torch
 
