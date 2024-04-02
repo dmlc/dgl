@@ -514,7 +514,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     )
                     - 1
                 )
-                # 2. For loop each node type.
                 for ntype, ntype_id in self.node_type_to_id.items():
                     # Get all nodes of a specific node type in column.
                     nids = torch.nonzero(node_types == ntype_id).view(-1)

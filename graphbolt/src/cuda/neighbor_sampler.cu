@@ -25,6 +25,7 @@
 #include <type_traits>
 
 #include "../random.h"
+#include "../utils.h"
 #include "./common.h"
 #include "./utils.h"
 
@@ -193,6 +194,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> random_seed_tensor,
     float seed2_contribution) {
   TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
+  // For the hetero case, we compute the output of sample_neighbors
+  // _convert_to_sampled_subgraph in a fused manner so that
+  // _convert_to_sampled_subgraph only has to perform slices over the returned
+  // indptr and indices tensors to form CSC outputs for each edge type.
   TORCH_CHECK(
       type_per_edge.has_value() == seed_offsets.has_value(),
       "seed_offsets needs to be passed for heterogenous sampling.");
@@ -522,10 +527,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     // type_per_edge of sampled edges and determine the offsets of different
     // sampled etypes and convert to fused hetero indptr representation.
     if (fanouts.size() == 1) {
+      // The code behaves same as:
       // output_type_per_edge = type_per_edge.gather(0, picked_eids);
-      // The commented out torch equivalent above does not work when
-      // type_per_edge is on pinned memory. That is why, we have to
-      // reimplement it, similar to the indices gather operation above.
+      // The reimplementation is required due to the torch equivalent does
+      // not work when type_per_edge is on pinned memory
       auto types = type_per_edge.value();
       auto output_type_per_edge = torch::empty(
           picked_eids.size(0),
@@ -549,33 +554,38 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           SliceCSCIndptrHetero(
               output_indptr, output_type_per_edge, sliced_output_indptr,
               num_etypes);
+      // We use num_rows to hold num_seeds * num_etypes. So, it needs to be
+      // updated when sampling with a single fanout value when the graph is
+      // heterogenous.
       num_rows = sliced_output_indptr.size(0);
     }
     // Here, we check what are the dst node types for the given seeds so that
     // we can compute the output indptr space later.
-    std::vector<int64_t> etype_id_to_dst_id(num_etypes);
+    std::vector<int64_t> etype_id_to_dst_ntype_id(num_etypes);
     for (auto& etype_and_id : edge_type_to_id.value()) {
       auto etype = etype_and_id.key();
       auto id = etype_and_id.value();
-      auto first_seperator_it = std::find(etype.begin(), etype.end(), ':');
-      auto second_seperator_pos =
-          std::find(first_seperator_it + 1, etype.end(), ':') - etype.begin();
-      auto dst_type = etype.substr(second_seperator_pos + 1);
-      etype_id_to_dst_id[id] = node_type_to_id->at(dst_type);
+      auto dst_type = utils::parse_dst_ntype_from_etype(etype);
+      etype_id_to_dst_ntype_id[id] = node_type_to_id->at(dst_type);
     }
+    // For each edge type, we compute the start and end offsets to index into
+    // indptr to form the final output_indptr.
     auto indptr_offsets = torch::empty(
         num_etypes * 2,
         c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
     auto indptr_offsets_ptr = indptr_offsets.data_ptr<int64_t>();
     // We compute the indptr offsets here, right now, output_indptr is of size
     // # seeds * num_etypes + 1. We can simply take slices to get correct output
-    // indptr.
+    // indptr. The final output_indptr is same as current indptr except that
+    // some intermediate values are removed to change the node ids space from
+    // all of the seed vertices to the node id space of the dst node type of
+    // each edge type.
     for (int i = 0; i < num_etypes; i++) {
-      indptr_offsets_ptr[2 * i] =
-          num_rows / num_etypes * i + seed_offsets->at(etype_id_to_dst_id[i]);
+      indptr_offsets_ptr[2 * i] = num_rows / num_etypes * i +
+                                  seed_offsets->at(etype_id_to_dst_ntype_id[i]);
       indptr_offsets_ptr[2 * i + 1] =
           num_rows / num_etypes * i +
-          seed_offsets->at(etype_id_to_dst_id[i] + 1);
+          seed_offsets->at(etype_id_to_dst_ntype_id[i] + 1);
     }
     auto permutation = torch::arange(
         0, num_rows * num_etypes, num_etypes, output_indptr.options());
