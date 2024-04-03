@@ -51,6 +51,8 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * graph.
    * @param original_edge_ids Reverse edge ids in the original graph.
    * @param type_per_edge Type id of each edge.
+   * @param etype_offsets Edge offsets for the sampled edges for the sampled
+   * edges that are sorted w.r.t. edge types.
    */
   FusedSampledSubgraph(
       torch::Tensor indptr, torch::Tensor indices,
@@ -72,9 +74,7 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
   /**
    * @brief CSC format index pointer array, where the implicit node ids are
    * already compacted. And the original ids are stored in the
-   * `original_column_node_ids` field.
-   *
-   * @note When created by the CUDA implementation, its length is equal to:
+   * `original_column_node_ids` field. Its length is equal to:
    * 1 + \sum_{etype} #seeds with dst_node_type(etype)
    */
   torch::Tensor indptr;
@@ -82,7 +82,8 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
   /**
    * @brief CSC format index array, where the node ids can be compacted ids or
    * original ids. If compacted, the original ids are stored in the
-   * `original_row_node_ids` field.
+   * `original_row_node_ids` field. The indices are sorted w.r.t. their edge
+   * types for the heterogenous case.
    */
   torch::Tensor indices;
 
@@ -110,7 +111,8 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
   /**
    * @brief Reverse edge ids in the original graph, the edge with id
    * `original_edge_ids[i]` in the original graph is mapped to `i` in this
-   * subgraph. This is useful when edge features are needed.
+   * subgraph. This is useful when edge features are needed. The edges are
+   * sorted w.r.t. their edge types for the heterogenous case.
    */
   torch::optional<torch::Tensor> original_edge_ids;
 
@@ -121,7 +123,8 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    *
    * @note This output is not created by the CUDA implementation as the edges
    * are sorted w.r.t edge types, one has to use etype_offsets to infer the edge
-   * type information.
+   * type information. This field is going to be deprecated. It can be generated
+   * when needed by computing gb.expand_indptr(etype_offsets).
    */
   torch::optional<torch::Tensor> type_per_edge;
 
