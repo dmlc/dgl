@@ -193,14 +193,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Dict<std::string, int64_t>> edge_type_to_id,
     torch::optional<torch::Tensor> random_seed_tensor,
     float seed2_contribution) {
-  TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
-  // For the hetero case, we compute the output of sample_neighbors
-  // _convert_to_sampled_subgraph in a fused manner so that
+  // When seed_offsets.has_value() in the hetero case, we compute the output of
+  // sample_neighbors _convert_to_sampled_subgraph in a fused manner so that
   // _convert_to_sampled_subgraph only has to perform slices over the returned
   // indptr and indices tensors to form CSC outputs for each edge type.
-  TORCH_CHECK(
-      type_per_edge.has_value() == seed_offsets.has_value(),
-      "seed_offsets needs to be passed for heterogenous sampling.");
+  TORCH_CHECK(!replace, "Sampling with replacement is not supported yet!");
   // Assume that indptr, indices, seeds, type_per_edge and probs_or_mask
   // are all resident on the GPU. If not, it is better to first extract them
   // before calling this function.
@@ -519,40 +516,44 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
             }));
       }));
 
-  torch::optional<torch::Tensor> edge_offsets = torch::nullopt;
-  if (type_per_edge) {
+  auto index_type_per_edge_for_sampled_edges = [&] {
+    // The code behaves same as:
+    // output_type_per_edge = type_per_edge.gather(0, picked_eids);
+    // The reimplementation is required due to the torch equivalent does
+    // not work when type_per_edge is on pinned memory
+    auto types = type_per_edge.value();
+    auto output = torch::empty(
+        picked_eids.size(0), picked_eids.options().dtype(types.scalar_type()));
+    AT_DISPATCH_INDEX_TYPES(
+        indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
+          using indptr_t = index_t;
+          AT_DISPATCH_INTEGRAL_TYPES(
+              types.scalar_type(), "SampleNeighborsOutputTypePerEdge", ([&] {
+                THRUST_CALL(
+                    gather, picked_eids.data_ptr<indptr_t>(),
+                    picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
+                    types.data_ptr<scalar_t>(), output.data_ptr<scalar_t>());
+              }));
+        }));
+    return output;
+  };
+
+  torch::optional<torch::Tensor> output_type_per_edge;
+  torch::optional<torch::Tensor> edge_offsets;
+  if (type_per_edge && seed_offsets) {
     const int64_t num_etypes =
         edge_type_to_id.has_value() ? edge_type_to_id->size() : 1;
     // If we performed homogenous sampling on hetero graph, we have to look at
     // type_per_edge of sampled edges and determine the offsets of different
     // sampled etypes and convert to fused hetero indptr representation.
     if (fanouts.size() == 1) {
-      // The code behaves same as:
-      // output_type_per_edge = type_per_edge.gather(0, picked_eids);
-      // The reimplementation is required due to the torch equivalent does
-      // not work when type_per_edge is on pinned memory
-      auto types = type_per_edge.value();
-      auto output_type_per_edge = torch::empty(
-          picked_eids.size(0),
-          picked_eids.options().dtype(types.scalar_type()));
-      AT_DISPATCH_INDEX_TYPES(
-          indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
-            using indptr_t = index_t;
-            AT_DISPATCH_INTEGRAL_TYPES(
-                types.scalar_type(), "SampleNeighborsOutputTypePerEdge", ([&] {
-                  THRUST_CALL(
-                      gather, picked_eids.data_ptr<indptr_t>(),
-                      picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
-                      types.data_ptr<scalar_t>(),
-                      output_type_per_edge.data_ptr<scalar_t>());
-                }));
-          }));
+      output_type_per_edge = index_type_per_edge_for_sampled_edges();
       torch::Tensor output_in_degree, sliced_output_indptr;
       sliced_output_indptr =
           output_indptr.slice(0, 0, output_indptr.size(0) - 1);
       std::tie(output_indptr, output_in_degree, sliced_output_indptr) =
           SliceCSCIndptrHetero(
-              output_indptr, output_type_per_edge, sliced_output_indptr,
+              output_indptr, output_type_per_edge.value(), sliced_output_indptr,
               num_etypes);
       // We use num_rows to hold num_seeds * num_etypes. So, it needs to be
       // updated when sampling with a single fanout value when the graph is
@@ -646,6 +647,12 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           }
         }));
     edge_offsets = edge_offsets->slice(0, 0, num_etypes + 1);
+  } else {
+    // Convert output_indptr back to homo by discarding intermediate offsets.
+    output_indptr =
+        output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
+    if (type_per_edge)
+      output_type_per_edge = index_type_per_edge_for_sampled_edges();
   }
 
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
@@ -653,7 +660,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
       output_indptr, output_indices, seeds, torch::nullopt,
-      subgraph_reverse_edge_ids, torch::nullopt, edge_offsets);
+      subgraph_reverse_edge_ids, output_type_per_edge, edge_offsets);
 }
 
 }  //  namespace ops

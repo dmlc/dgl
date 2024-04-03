@@ -738,6 +738,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         ----------
         seeds: torch.Tensor
             IDs of the given seed nodes.
+        seeds_offsets: list, optional
+            The offsets of the given seeds,
+            seeds[seed_offsets[i]: seed_offsets[i + 1]] has node type i.
         fanouts: torch.Tensor
             The number of edges to be sampled for each node with or without
             considering edge types.
