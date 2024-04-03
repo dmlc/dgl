@@ -280,8 +280,14 @@ UniqueAndCompactBatched(
     }
   }();
   if (compute_capability_major >= 7) {
+    // Utilizes a hash table based implementation, the mapped id of a vertex
+    // will be monotonically increasing as the first occurrence index of it in
+    // torch.cat([unique_dst_ids, src_ids]). Thus, it is deterministic.
     return UniqueAndCompactBatchedMap(src_ids, dst_ids, unique_dst_ids);
   }
+  // Utilizes a sort based algorithm, the mapped id of a vertex part of the
+  // src_ids but not part of the unique_dst_ids will be monotonically increasing
+  // as the actual vertex id increases. Thus, it is deterministic.
   return UniqueAndCompactBatchedSort(
       src_ids, dst_ids, unique_dst_ids, num_bits);
 }
