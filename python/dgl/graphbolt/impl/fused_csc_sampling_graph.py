@@ -444,7 +444,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         )}
         """
         if isinstance(nodes, dict):
-            nodes = self._convert_to_homogeneous_nodes(nodes)
+            nodes, _ = self._convert_to_homogeneous_nodes(nodes)
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
 
@@ -453,22 +453,28 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def _convert_to_homogeneous_nodes(self, nodes, timestamps=None):
         homogeneous_nodes = []
+        homogeneous_node_offsets = [0]
         homogeneous_timestamps = []
         offset = self._node_type_offset_list
-        for ntype, ids in nodes.items():
-            ntype_id = self.node_type_to_id[ntype]
-            homogeneous_nodes.append(ids + offset[ntype_id])
-            if timestamps is not None:
-                homogeneous_timestamps.append(timestamps[ntype])
+        for ntype, ntype_id in self.node_type_to_id.items():
+            ids = nodes.get(ntype, [])
+            if len(ids) > 0:
+                homogeneous_nodes.append(ids + offset[ntype_id])
+                if timestamps is not None:
+                    homogeneous_timestamps.append(timestamps[ntype])
+            homogeneous_node_offsets.append(
+                homogeneous_node_offsets[-1] + len(ids)
+            )
         if timestamps is not None:
             return torch.cat(homogeneous_nodes), torch.cat(
                 homogeneous_timestamps
             )
-        return torch.cat(homogeneous_nodes)
+        return torch.cat(homogeneous_nodes), homogeneous_node_offsets
 
     def _convert_to_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
+        seed_offsets: Optional[list] = None,
     ) -> SampledSubgraphImpl:
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'SampledSubgraphImpl'."""
@@ -477,6 +483,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         type_per_edge = C_sampled_subgraph.type_per_edge
         column = C_sampled_subgraph.original_column_node_ids
         original_edge_ids = C_sampled_subgraph.original_edge_ids
+        etype_offsets = C_sampled_subgraph.etype_offsets
+        if etype_offsets is not None:
+            etype_offsets = etype_offsets.tolist()
 
         has_original_eids = (
             self.edge_attributes is not None
@@ -486,45 +495,78 @@ class FusedCSCSamplingGraph(SamplingGraph):
             original_edge_ids = torch.ops.graphbolt.index_select(
                 self.edge_attributes[ORIGINAL_EDGE_ID], original_edge_ids
             )
-        if type_per_edge is None:
+        if type_per_edge is None and etype_offsets is None:
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
         else:
-            # UVA sampling requires us to move node_type_offset to GPU.
-            self.node_type_offset = self.node_type_offset.to(column.device)
-            # 1. Find node types for each nodes in column.
-            node_types = (
-                torch.searchsorted(self.node_type_offset, column, right=True)
-                - 1
-            )
+            offset = self._node_type_offset_list
 
             original_hetero_edge_ids = {}
             sub_indices = {}
             sub_indptr = {}
-            offset = self._node_type_offset_list
-            # 2. For loop each node type.
-            for ntype, ntype_id in self.node_type_to_id.items():
-                # Get all nodes of a specific node type in column.
-                nids = torch.nonzero(node_types == ntype_id).view(-1)
-                nids_original_indptr = indptr[nids + 1]
+            if etype_offsets is None:
+                # UVA sampling requires us to move node_type_offset to GPU.
+                self.node_type_offset = self.node_type_offset.to(column.device)
+                # 1. Find node types for each nodes in column.
+                node_types = (
+                    torch.searchsorted(
+                        self.node_type_offset, column, right=True
+                    )
+                    - 1
+                )
+                for ntype, ntype_id in self.node_type_to_id.items():
+                    # Get all nodes of a specific node type in column.
+                    nids = torch.nonzero(node_types == ntype_id).view(-1)
+                    nids_original_indptr = indptr[nids + 1]
+                    for etype, etype_id in self.edge_type_to_id.items():
+                        src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
+                        if dst_ntype != ntype:
+                            continue
+                        # Get all edge ids of a specific edge type.
+                        eids = torch.nonzero(type_per_edge == etype_id).view(-1)
+                        src_ntype_id = self.node_type_to_id[src_ntype]
+                        sub_indices[etype] = (
+                            indices[eids] - offset[src_ntype_id]
+                        )
+                        cum_edges = torch.searchsorted(
+                            eids, nids_original_indptr, right=False
+                        )
+                        sub_indptr[etype] = torch.cat(
+                            (torch.tensor([0], device=indptr.device), cum_edges)
+                        )
+                        if has_original_eids:
+                            original_hetero_edge_ids[etype] = original_edge_ids[
+                                eids
+                            ]
+            else:
+                edge_offsets = [0]
                 for etype, etype_id in self.edge_type_to_id.items():
                     src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
-                    if dst_ntype != ntype:
-                        continue
-                    # Get all edge ids of a specific edge type.
-                    eids = torch.nonzero(type_per_edge == etype_id).view(-1)
-                    src_ntype_id = self.node_type_to_id[src_ntype]
-                    sub_indices[etype] = indices[eids] - offset[src_ntype_id]
-                    cum_edges = torch.searchsorted(
-                        eids, nids_original_indptr, right=False
+                    ntype_id = self.node_type_to_id[dst_ntype]
+                    edge_offsets.append(
+                        edge_offsets[-1]
+                        + seed_offsets[ntype_id + 1]
+                        - seed_offsets[ntype_id]
                     )
-                    sub_indptr[etype] = torch.cat(
-                        (torch.tensor([0], device=indptr.device), cum_edges)
-                    )
+                for etype, etype_id in self.edge_type_to_id.items():
+                    src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
+                    ntype_id = self.node_type_to_id[dst_ntype]
+                    sub_indptr_ = indptr[
+                        edge_offsets[etype_id] : edge_offsets[etype_id + 1] + 1
+                    ]
+                    sub_indptr[etype] = sub_indptr_ - sub_indptr_[0]
+                    sub_indices[etype] = indices[
+                        etype_offsets[etype_id] : etype_offsets[etype_id + 1]
+                    ]
                     if has_original_eids:
                         original_hetero_edge_ids[etype] = original_edge_ids[
-                            eids
+                            etype_offsets[etype_id] : etype_offsets[
+                                etype_id + 1
+                            ]
                         ]
+                    src_ntype_id = self.node_type_to_id[src_ntype]
+                    sub_indices[etype] -= offset[src_ntype_id]
+
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
             sampled_csc = {
@@ -541,7 +583,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def sample_neighbors(
         self,
-        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        seeds: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
@@ -551,7 +593,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Parameters
         ----------
-        nodes: torch.Tensor or Dict[str, torch.Tensor]
+        seeds: torch.Tensor or Dict[str, torch.Tensor]
             IDs of the given seed nodes.
               - If `nodes` is a tensor: It means the graph is homogeneous
                 graph, and ids inside are homogeneous ids.
@@ -615,21 +657,27 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     indices=tensor([2]),
         )}
         """
-        if isinstance(nodes, dict):
-            nodes = self._convert_to_homogeneous_nodes(nodes)
-
         return_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
+
+        seed_offsets = None
+        if isinstance(seeds, dict):
+            seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
+        elif seeds is None and hasattr(self, "_seed_offset_list"):
+            seed_offsets = self._seed_offset_list  # pylint: disable=no-member
         C_sampled_subgraph = self._sample_neighbors(
-            nodes,
+            seeds,
+            seed_offsets,
             fanouts,
             replace=replace,
             probs_name=probs_name,
             return_eids=return_eids,
         )
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, seed_offsets
+        )
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         if nodes is not None:
@@ -676,7 +724,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def _sample_neighbors(
         self,
-        nodes: torch.Tensor,
+        seeds: torch.Tensor,
+        seed_offsets: Optional[list],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
@@ -687,8 +736,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Parameters
         ----------
-        nodes: torch.Tensor
+        seeds: torch.Tensor
             IDs of the given seed nodes.
+        seeds_offsets: list, optional
+            The offsets of the given seeds,
+            seeds[seed_offsets[i]: seed_offsets[i + 1]] has node type i.
         fanouts: torch.Tensor
             The number of edges to be sampled for each node with or without
             considering edge types.
@@ -726,9 +778,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
             The sampled C subgraph.
         """
         # Ensure nodes is 1-D tensor.
-        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        self._check_sampler_arguments(seeds, fanouts, probs_name)
         return self._c_csc_graph.sample_neighbors(
-            nodes,
+            seeds,
+            seed_offsets,
             fanouts.tolist(),
             replace,
             False,  # is_labor
@@ -740,7 +793,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def sample_layer_neighbors(
         self,
-        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        seeds: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
@@ -754,7 +807,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Parameters
         ----------
-        nodes: torch.Tensor or Dict[str, torch.Tensor]
+        seeds: torch.Tensor or Dict[str, torch.Tensor]
             IDs of the given seed nodes.
               - If `nodes` is a tensor: It means the graph is homogeneous
                 graph, and ids inside are homogeneous ids.
@@ -844,10 +897,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     indices=tensor([2]),
         )}
         """
-        if isinstance(nodes, dict):
-            nodes = self._convert_to_homogeneous_nodes(nodes)
-
-        self._check_sampler_arguments(nodes, fanouts, probs_name)
         if random_seed is not None:
             assert (
                 1 <= len(random_seed) <= 2
@@ -856,12 +905,21 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 assert (
                     0 <= seed2_contribution <= 1
                 ), "seed2_contribution should be in [0, 1]."
+
         has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
+
+        seed_offsets = None
+        if isinstance(seeds, dict):
+            seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
+        elif seeds is None and hasattr(self, "_seed_offset_list"):
+            seed_offsets = self._seed_offset_list  # pylint: disable=no-member
+        self._check_sampler_arguments(seeds, fanouts, probs_name)
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
-            nodes,
+            seeds,
+            seed_offsets,
             fanouts.tolist(),
             replace,
             True,
@@ -870,7 +928,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             random_seed,
             seed2_contribution,
         )
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, seed_offsets
+        )
 
     def temporal_sample_neighbors(
         self,
