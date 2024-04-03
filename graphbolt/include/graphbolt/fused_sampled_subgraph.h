@@ -51,33 +51,39 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * graph.
    * @param original_edge_ids Reverse edge ids in the original graph.
    * @param type_per_edge Type id of each edge.
+   * @param etype_offsets Edge offsets for the sampled edges for the sampled
+   * edges that are sorted w.r.t. edge types.
    */
   FusedSampledSubgraph(
       torch::Tensor indptr, torch::Tensor indices,
-      torch::Tensor original_column_node_ids,
+      torch::optional<torch::Tensor> original_column_node_ids,
       torch::optional<torch::Tensor> original_row_node_ids = torch::nullopt,
       torch::optional<torch::Tensor> original_edge_ids = torch::nullopt,
-      torch::optional<torch::Tensor> type_per_edge = torch::nullopt)
+      torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
+      torch::optional<torch::Tensor> etype_offsets = torch::nullopt)
       : indptr(indptr),
         indices(indices),
         original_column_node_ids(original_column_node_ids),
         original_row_node_ids(original_row_node_ids),
         original_edge_ids(original_edge_ids),
-        type_per_edge(type_per_edge) {}
+        type_per_edge(type_per_edge),
+        etype_offsets(etype_offsets) {}
 
   FusedSampledSubgraph() = default;
 
   /**
    * @brief CSC format index pointer array, where the implicit node ids are
    * already compacted. And the original ids are stored in the
-   * `original_column_node_ids` field.
+   * `original_column_node_ids` field. Its length is equal to:
+   * 1 + \sum_{etype} #seeds with dst_node_type(etype)
    */
   torch::Tensor indptr;
 
   /**
    * @brief CSC format index array, where the node ids can be compacted ids or
    * original ids. If compacted, the original ids are stored in the
-   * `original_row_node_ids` field.
+   * `original_row_node_ids` field. The indices are sorted w.r.t. their edge
+   * types for the heterogenous case.
    */
   torch::Tensor indices;
 
@@ -86,10 +92,11 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * can be treated as a coordinated row and column pair, and this is the the
    * mapped ids of the column.
    *
-   * @note This is required and the mapping relations can be inconsistent with
-   * column's.
+   * @note This is optional and the mapping relations can be inconsistent with
+   * column's. It can be missing when the sampling algorithm is called via a
+   * sliced sampled subgraph with missing seeds argument.
    */
-  torch::Tensor original_column_node_ids;
+  torch::optional<torch::Tensor> original_column_node_ids;
 
   /**
    * @brief Row's reverse node ids in the original graph. A graph structure
@@ -104,7 +111,8 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
   /**
    * @brief Reverse edge ids in the original graph, the edge with id
    * `original_edge_ids[i]` in the original graph is mapped to `i` in this
-   * subgraph. This is useful when edge features are needed.
+   * subgraph. This is useful when edge features are needed. The edges are
+   * sorted w.r.t. their edge types for the heterogenous case.
    */
   torch::optional<torch::Tensor> original_edge_ids;
 
@@ -112,8 +120,21 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * @brief Type id of each edge, where type id is the corresponding index of
    * edge types. The length of it is equal to the number of edges in the
    * subgraph.
+   *
+   * @note This output is not created by the CUDA implementation as the edges
+   * are sorted w.r.t edge types, one has to use etype_offsets to infer the edge
+   * type information. This field is going to be deprecated. It can be generated
+   * when needed by computing gb.expand_indptr(etype_offsets).
    */
   torch::optional<torch::Tensor> type_per_edge;
+
+  /**
+   * @brief Offsets of each etype,
+   * type_per_edge[etype_offsets[i]: etype_offsets[i + 1]] == i
+   * It has length equal to (1 + #etype), and the edges are guaranteed to be
+   * sorted w.r.t. their edge types.
+   */
+  torch::optional<torch::Tensor> etype_offsets;
 };
 
 }  // namespace sampling

@@ -15,10 +15,10 @@ def get_hetero_graph():
     # [2, 4, 2, 3, 0, 1, 1, 0, 0, 1]
     # [1, 1, 1, 1, 0, 0, 0, 0, 0] - > edge type.
     # num_nodes = 5, num_n1 = 2, num_n2 = 3
-    ntypes = {"n1": 0, "n2": 1}
-    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
-    indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
-    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {"n2:e1:n3": 0, "n3:e2:n2": 1}
+    indptr = torch.LongTensor([0, 0, 2, 4, 6, 8, 10])
+    indices = torch.LongTensor([3, 5, 3, 4, 1, 2, 2, 1, 1, 2])
     type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     edge_attributes = {
         "weight": torch.FloatTensor(
@@ -26,7 +26,7 @@ def get_hetero_graph():
         ),
         "mask": torch.BoolTensor([1, 0, 1, 0, 1, 1, 1, 0, 1, 1]),
     }
-    node_type_offset = torch.LongTensor([0, 2, 5])
+    node_type_offset = torch.LongTensor([0, 1, 3, 6])
     return gb.fused_csc_sampling_graph(
         indptr,
         indices,
@@ -51,7 +51,7 @@ def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
     itemset = gb.ItemSet(items, names=names)
     graph = get_hetero_graph().to(F.ctx())
     if hetero:
-        itemset = gb.ItemSetDict({"n2": itemset})
+        itemset = gb.ItemSetDict({"n3": itemset})
     else:
         graph.type_per_edge = None
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
