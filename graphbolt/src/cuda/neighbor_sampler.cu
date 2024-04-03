@@ -270,9 +270,6 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   if (seeds.has_value() && !probs_or_mask.has_value() && fanouts.size() <= 1) {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
-  auto coo_rows = ExpandIndptrImpl(
-      sub_indptr, indices.scalar_type(), torch::nullopt, num_edges);
-  num_edges = coo_rows.size(0);
   const continuous_seed random_seed = [&] {
     if (random_seed_tensor.has_value()) {
       return continuous_seed(random_seed_tensor.value(), seed2_contribution);
@@ -316,6 +313,12 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
         auto num_sampled_edges =
             cuda::CopyScalar{output_indptr.data_ptr<indptr_t>() + num_rows};
+
+        // This operation is placed after num_sampled_edges copy is started to
+        // hide the latency of copy synchronization later.
+        auto coo_rows = ExpandIndptrImpl(
+            sub_indptr, indices.scalar_type(), torch::nullopt, num_edges);
+        num_edges = coo_rows.size(0);
 
         // Find the smallest integer type to store the edge id offsets. We synch
         // the CUDAEvent so that the access is safe.
