@@ -500,43 +500,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           }
         }
 
-        output_indices = torch::empty(
-            picked_eids.size(0),
-            picked_eids.options().dtype(indices.scalar_type()));
-
-        // Compute: output_indices = indices.gather(0, picked_eids);
-        AT_DISPATCH_INDEX_TYPES(
-            indices.scalar_type(), "SampleNeighborsOutputIndices", ([&] {
-              using indices_t = index_t;
-              THRUST_CALL(
-                  gather, picked_eids.data_ptr<indptr_t>(),
-                  picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
-                  indices.data_ptr<indices_t>(),
-                  output_indices.data_ptr<indices_t>());
-            }));
+        output_indices = Gather(indices, picked_eids);
       }));
-
-  auto index_type_per_edge_for_sampled_edges = [&] {
-    // The code behaves same as:
-    // output_type_per_edge = type_per_edge.gather(0, picked_eids);
-    // The reimplementation is required due to the torch equivalent does
-    // not work when type_per_edge is on pinned memory
-    auto types = type_per_edge.value();
-    auto output = torch::empty(
-        picked_eids.size(0), picked_eids.options().dtype(types.scalar_type()));
-    AT_DISPATCH_INDEX_TYPES(
-        indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
-          using indptr_t = index_t;
-          AT_DISPATCH_INTEGRAL_TYPES(
-              types.scalar_type(), "SampleNeighborsOutputTypePerEdge", ([&] {
-                THRUST_CALL(
-                    gather, picked_eids.data_ptr<indptr_t>(),
-                    picked_eids.data_ptr<indptr_t>() + picked_eids.size(0),
-                    types.data_ptr<scalar_t>(), output.data_ptr<scalar_t>());
-              }));
-        }));
-    return output;
-  };
 
   torch::optional<torch::Tensor> output_type_per_edge;
   torch::optional<torch::Tensor> edge_offsets;
@@ -547,7 +512,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     // type_per_edge of sampled edges and determine the offsets of different
     // sampled etypes and convert to fused hetero indptr representation.
     if (fanouts.size() == 1) {
-      output_type_per_edge = index_type_per_edge_for_sampled_edges();
+      output_type_per_edge = Gather(*type_per_edge, picked_eids);
       torch::Tensor output_in_degree, sliced_output_indptr;
       sliced_output_indptr =
           output_indptr.slice(0, 0, output_indptr.size(0) - 1);
@@ -652,7 +617,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     output_indptr =
         output_indptr.slice(0, 0, output_indptr.size(0), fanouts.size());
     if (type_per_edge)
-      output_type_per_edge = index_type_per_edge_for_sampled_edges();
+      output_type_per_edge = Gather(*type_per_edge, picked_eids);
   }
 
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
