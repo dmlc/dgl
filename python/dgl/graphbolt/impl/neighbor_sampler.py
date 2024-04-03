@@ -102,9 +102,9 @@ class FetchInsubgraphData(Mapper):
             )
             if self.prob_name is not None and probs_or_mask is not None:
                 subgraph.edge_attributes = {self.prob_name: probs_or_mask}
-            subgraph._seed_offset_list = seed_offsets
 
-            minibatch.sampled_subgraphs.insert(0, subgraph)
+            subgraph._indptr_node_type_offset_list = seed_offsets
+            minibatch._sliced_sampling_graph = subgraph
 
             if self.stream is not None:
                 minibatch.wait = torch.cuda.current_stream().record_event().wait
@@ -133,7 +133,8 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
         self.prob_name = sample_per_layer_obj.prob_name
 
     def _sample_per_layer_from_fetched_subgraph(self, minibatch):
-        subgraph = minibatch.sampled_subgraphs[0]
+        subgraph = minibatch._sliced_sampling_graph
+        delattr(minibatch, "_sliced_sampling_graph")
         kwargs = {
             key[1:]: getattr(minibatch, key)
             for key in ["_random_seed", "_seed2_contribution"]
@@ -146,7 +147,7 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
             self.prob_name,
             **kwargs,
         )
-        minibatch.sampled_subgraphs[0] = sampled_subgraph
+        minibatch.sampled_subgraphs.insert(0, sampled_subgraph)
 
         return minibatch
 
