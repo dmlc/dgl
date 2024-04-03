@@ -289,7 +289,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Sets the node type offset tensor if present."""
         self._c_csc_graph.set_node_type_offset(node_type_offset)
         self._node_type_offset_cached_list = None
-    
+
     @property
     def _indptr_node_type_offset_list(self) -> Optional[list]:
         """Returns the indptr node type offset list which presents the column id
@@ -313,7 +313,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         )
 
     @_indptr_node_type_offset_list.setter
-    def _indptr_node_type_offset_list(self, indptr_node_type_offset_list: Optional[torch.Tensor]):
+    def _indptr_node_type_offset_list(
+        self, indptr_node_type_offset_list: Optional[torch.Tensor]
+    ):
         """Sets the indptr node type offset list if present."""
         self._indptr_node_type_offset_list_ = indptr_node_type_offset_list
 
