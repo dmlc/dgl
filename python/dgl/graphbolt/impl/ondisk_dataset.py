@@ -877,16 +877,16 @@ class OnDiskDataset(Dataset):
                 names=tuple(data.name for data in tvt_set[0].data),
             )
         else:
-            data = {}
+            itemsets = {}
             for tvt in tvt_set:
-                data[tvt.type] = ItemSet(
+                itemsets[tvt.type] = ItemSet(
                     tuple(
                         read_data(data.path, data.format, data.in_memory)
                         for data in tvt.data
                     ),
                     names=tuple(data.name for data in tvt.data),
                 )
-            ret = ItemSetDict(data)
+            ret = ItemSetDict(itemsets)
         return ret
 
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
