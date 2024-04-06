@@ -291,6 +291,35 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._node_type_offset_cached_list = None
 
     @property
+    def _indptr_node_type_offset_list(self) -> Optional[list]:
+        """Returns the indptr node type offset list which presents the column id
+        space when it does not match the global id space. It is useful when we
+        slice a subgraph from another FusedCSCSamplingGraph.
+
+        Returns
+        -------
+        list or None
+            If present, returns a 1D integer list of shape
+            `(num_node_types + 1,)`. The list is in ascending order as nodes
+            of the same type have continuous IDs, and larger node IDs are
+            paired with larger node type IDs. The first value is 0 and last
+            value is the number of nodes. And nodes with IDs between
+            `node_type_offset_[i]~node_type_offset_[i+1]` are of type id 'i'.
+        """
+        return (
+            self._indptr_node_type_offset_list_
+            if hasattr(self, "_indptr_node_type_offset_list_")
+            else None
+        )
+
+    @_indptr_node_type_offset_list.setter
+    def _indptr_node_type_offset_list(
+        self, indptr_node_type_offset_list: Optional[torch.Tensor]
+    ):
+        """Sets the indptr node type offset list if present."""
+        self._indptr_node_type_offset_list_ = indptr_node_type_offset_list
+
+    @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
         """Returns the edge type tensor if present.
 
@@ -665,8 +694,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         seed_offsets = None
         if isinstance(seeds, dict):
             seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
-        elif seeds is None and hasattr(self, "_seed_offset_list"):
-            seed_offsets = self._seed_offset_list  # pylint: disable=no-member
+        elif seeds is None:
+            seed_offsets = self._indptr_node_type_offset_list
         C_sampled_subgraph = self._sample_neighbors(
             seeds,
             seed_offsets,
@@ -914,8 +943,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         seed_offsets = None
         if isinstance(seeds, dict):
             seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
-        elif seeds is None and hasattr(self, "_seed_offset_list"):
-            seed_offsets = self._seed_offset_list  # pylint: disable=no-member
+        elif seeds is None:
+            seed_offsets = self._indptr_node_type_offset_list
         self._check_sampler_arguments(seeds, fanouts, probs_name)
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
             seeds,
