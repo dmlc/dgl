@@ -45,7 +45,7 @@ DefineCubReductionFunction(DeviceReduce::Max, Max);
 DefineCubReductionFunction(DeviceReduce::Min, Min);
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
-UniqueAndCompactBatchedSort(
+UniqueAndCompactBatchedSortBased(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
@@ -283,12 +283,13 @@ UniqueAndCompactBatched(
     // Utilizes a hash table based implementation, the mapped id of a vertex
     // will be monotonically increasing as the first occurrence index of it in
     // torch.cat([unique_dst_ids, src_ids]). Thus, it is deterministic.
-    return UniqueAndCompactBatchedMap(src_ids, dst_ids, unique_dst_ids);
+    return UniqueAndCompactBatchedHashMapBased(
+        src_ids, dst_ids, unique_dst_ids);
   }
   // Utilizes a sort based algorithm, the mapped id of a vertex part of the
   // src_ids but not part of the unique_dst_ids will be monotonically increasing
   // as the actual vertex id increases. Thus, it is deterministic.
-  return UniqueAndCompactBatchedSort(
+  return UniqueAndCompactBatchedSortBased(
       src_ids, dst_ids, unique_dst_ids, num_bits);
 }
 

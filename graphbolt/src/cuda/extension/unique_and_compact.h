@@ -15,7 +15,7 @@ namespace graphbolt {
 namespace ops {
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> >
-UniqueAndCompactBatchedMap(
+UniqueAndCompactBatchedHashMapBased(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor>& unique_dst_ids);
