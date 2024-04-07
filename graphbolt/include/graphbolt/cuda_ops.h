@@ -150,6 +150,20 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
 torch::Tensor ExclusiveCumSum(torch::Tensor input);
 
 /**
+ * @brief Computes the gather operation on a given input and index tensor.
+ *
+ * @param input The input tensor.
+ * @param index The index tensor.
+ * @param dtype The optional output dtype. If not given, inferred from the input
+ * tensor.
+ *
+ * @return The result of the input.gather(0, index).to(dtype) operation.
+ */
+torch::Tensor Gather(
+    torch::Tensor input, torch::Tensor index,
+    torch::optional<torch::ScalarType> dtype = torch::nullopt);
+
+/**
  * @brief Select rows from input tensor according to index tensor.
  *
  * NOTE:
