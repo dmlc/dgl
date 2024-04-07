@@ -12,7 +12,11 @@ else
   CPSOURCE=*.so
 fi
 
-CMAKE_FLAGS="-DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DUSE_CUDA=$USE_CUDA -DGPU_CACHE_BUILD_DIR=$BINDIR"
+# We build for the same architectures as DGL, thus we hardcode
+# TORCH_CUDA_ARCH_LIST and we need to at least compile for Volta. Until
+# https://github.com/NVIDIA/cccl/issues/1083 is resolved, we need to compile the
+# cuda/extension folder with Volta+ CUDA architectures.
+CMAKE_FLAGS="-DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DUSE_CUDA=$USE_CUDA -DGPU_CACHE_BUILD_DIR=$BINDIR -DTORCH_CUDA_ARCH_LIST=Volta"
 echo $CMAKE_FLAGS
 
 if [ $# -eq 0 ]; then

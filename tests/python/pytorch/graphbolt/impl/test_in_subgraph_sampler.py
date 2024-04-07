@@ -244,7 +244,7 @@ def test_InSubgraphSampler_hetero():
             indices=torch.LongTensor([1, 2, 0]),
         ),
     }
-    if graph.csc_indptr.is_cuda:
+    if graph.csc_indptr.is_cuda and torch.cuda.get_device_capability()[0] < 7:
         expected_sampled_csc["N0:R1:N1"] = gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 1, 2]), indices=torch.LongTensor([1, 0])
         )
