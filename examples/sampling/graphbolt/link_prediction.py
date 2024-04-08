@@ -385,7 +385,7 @@ def main(args):
 
     # Load and preprocess dataset.
     print("Loading data")
-    dataset = gb.BuiltinDataset("ogbl-citation2-seeds").load()
+    dataset = gb.BuiltinDataset("ogbl-citation2").load()
 
     # Move the dataset to the selected storage.
     if args.storage_device == "pinned":
