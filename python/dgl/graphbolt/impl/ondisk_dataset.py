@@ -1015,6 +1015,11 @@ class BuiltinDataset(OnDiskDataset):
     _all_datasets = _datasets + _large_datasets
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
+        # For user using DGL 2.2 or later version, we prefer them to use
+        # datasets with `seeds` suffix. This hack should be removed, when the
+        # datasets with `seed` suffix have covered previous ones.
+        if "seeds" not in name:
+            name += "-seeds"
         dataset_dir = os.path.join(root, name)
         if not os.path.exists(dataset_dir):
             if name not in self._all_datasets:

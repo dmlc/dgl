@@ -242,7 +242,7 @@ if __name__ == "__main__":
     # Load and preprocess dataset.
     print("Loading data")
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
-    dataset = gb.BuiltinDataset("ogbn-products-seeds").load()
+    dataset = gb.BuiltinDataset("ogbn-products").load()
     g = dataset.graph
     features = dataset.feature
 

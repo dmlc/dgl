@@ -158,7 +158,7 @@ if __name__ == "__main__":
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset = gb.BuiltinDataset("cora-seeds").load()
+    dataset = gb.BuiltinDataset("cora").load()
 
     # If a CUDA device is selected, we pin the graph and the features so that
     # the GPU can access them.
