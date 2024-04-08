@@ -2481,7 +2481,9 @@ def test_BuiltinDataset():
     with tempfile.TemporaryDirectory() as test_dir:
         # Case 1: download from DGL S3 storage.
         dataset_name = "test-dataset-231207"
-        # Add dataset to the builtin dataset list for testing only.
+        # Add dataset to the builtin dataset list for testing only. Due to we
+        # add `seeds` suffix to datasets when downloading, so we append
+        # dataset name with `-seeds` suffix here.
         gb.BuiltinDataset._all_datasets.append(dataset_name + "-seeds")
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
         assert dataset.graph is not None
