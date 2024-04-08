@@ -209,8 +209,7 @@ def main():
         "--dataset",
         type=str,
         default="ogbn-products",
-        help='Name of the dataset to use (e.g., "ogbn-products",'
-        + ' "ogbn-arxiv")',
+        help='Name of the dataset to use (e.g., "ogbn-products", "ogbn-arxiv")',
     )
     parser.add_argument(
         "--epochs", type=int, default=10, help="Number of training epochs."
