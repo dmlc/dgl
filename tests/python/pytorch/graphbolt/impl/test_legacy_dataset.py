@@ -12,11 +12,11 @@ def test_LegacyDataset_homo_node_pred():
     # Check tasks.
     assert len(dataset.tasks) == 1
     task = dataset.tasks[0]
-    assert task.train_set.names == ("seed_nodes", "labels")
+    assert task.train_set.names == ("seeds", "labels")
     assert len(task.train_set) == 140
-    assert task.validation_set.names == ("seed_nodes", "labels")
+    assert task.validation_set.names == ("seeds", "labels")
     assert len(task.validation_set) == 500
-    assert task.test_set.names == ("seed_nodes", "labels")
+    assert task.test_set.names == ("seeds", "labels")
     assert len(task.test_set) == 1000
     assert task.metadata["num_classes"] == 7
 
