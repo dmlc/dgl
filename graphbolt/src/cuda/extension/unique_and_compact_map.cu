@@ -5,6 +5,7 @@
  */
 #include <graphbolt/cuda_ops.h>
 #include <thrust/gather.h>
+#include <thrust/logical.h>
 
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
@@ -61,6 +62,9 @@ __global__ void _IsInsertedBatched(
     const int64_t key = node_id | (batch_index << kNodeIdBits);
 
     auto slot = map.find(key);
+    CUDA_KERNEL_ASSERT(
+        slot != map.end() && slot->second <= i &&
+        "_IsInsertedBatched has a bug");
     valid[i] = slot->second == i;
 
     i += stride;
@@ -86,6 +90,9 @@ __global__ void _GetInsertedBatched(
       const int64_t key = node_id | (batch_index << kNodeIdBits);
 
       auto slot = map.find(key);
+      CUDA_KERNEL_ASSERT(
+          slot != map.end() && slot->second == i &&
+          "_GetInsertedBatched has a bug");
       const auto batch_offset = offsets[batch_index * 2];
       const auto new_id = valid_i - valid[batch_offset];
       unique_ids[valid_i] = node_id;
@@ -123,6 +130,8 @@ __global__ void _MapIdsBatched(
       const int64_t key = node_id | (batch_index << kNodeIdBits);
 
       auto slot = map.find(key);
+      CUDA_KERNEL_ASSERT(
+          slot != map.end() && slot->second >= 0 && "_MapIdsBatched has a bug");
       mapped_ids[i] = slot->second;
     }
 
@@ -259,6 +268,30 @@ UniqueAndCompactBatchedHashMapBased(
               mapped_ids.slice(
                   0, offsets_ptr[2 * num_batches + i],
                   offsets_ptr[2 * num_batches + i + 1]));
+          const auto& [uniq, src, dst] = results.back();
+          const auto num_unique_ids = uniq.size(0);
+          const auto uniq_truth = std::get<0>(torch::_unique(
+              torch::cat({unique_dst_ids[i], src_ids[i]}), false));
+          const auto num_unique_ids_truth = uniq_truth.size(0);
+          TORCH_CHECK(num_unique_ids == num_unique_ids_truth);
+          TORCH_CHECK(
+              torch::all(uniq.index_select(0, src) == src_ids[i]).item<bool>());
+          TORCH_CHECK(
+              torch::all(uniq.index_select(0, dst) == dst_ids[i]).item<bool>());
+          TORCH_CHECK(
+              torch::all(
+                  std::get<0>(uniq.sort()) == std::get<0>(uniq_truth.sort()))
+                  .item<bool>());
+          TORCH_CHECK(THRUST_CALL(
+              all_of, src.data_ptr<index_t>(),
+              src.data_ptr<index_t>() + src.size(0), [=] __device__(auto key) {
+                return 0 <= key && key < num_unique_ids;
+              }));
+          TORCH_CHECK(THRUST_CALL(
+              all_of, dst.data_ptr<index_t>(),
+              dst.data_ptr<index_t>() + dst.size(0), [=] __device__(auto key) {
+                return 0 <= key && key < num_unique_ids;
+              }));
         }
         return results;
       }));
