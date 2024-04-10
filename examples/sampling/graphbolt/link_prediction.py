@@ -251,7 +251,7 @@ def compute_mrr(args, model, node_emb, seeds, labels, indexes):
     into batches to handle potentially large graphs.
     """
 
-    preds = torch.empty(seeds.shape[0])
+    preds = torch.empty(seeds.shape[0], device=indexes.device)
     mrr = RetrievalMRR()
     seeds_src, seeds_dst = seeds.T
     # The constant number is 1001, due to negtive ratio in the `ogbl-citation2`
