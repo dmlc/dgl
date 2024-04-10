@@ -160,7 +160,8 @@ class ItemShufflerAndBatcher:
         if isinstance(buffer, torch.Tensor):
             # For item set that's initialized with integer or single tensor,
             # `buffer` is a tensor.
-            return torch.index_select(buffer, dim=0, index=indices)
+            # return torch.index_select(buffer, dim=0, index=indices)
+            return buffer[indices] # test for original impl.
         elif isinstance(buffer, list) and isinstance(buffer[0], DGLGraph):
             # For item set that's initialized with a list of
             # DGLGraphs, `buffer` is a list of DGLGraphs.

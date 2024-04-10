@@ -463,20 +463,40 @@ class ItemSet3(Dataset):
             ), f"{type(self).__name__} indices out of range."
             return data
 
-        list_batch: List[list] = [[] for _ in indices]
-        for item in self._items:
-            # if isinstance(item, torch.Tensor):
-            if callable(getattr(item, "__getitems__", None)):
-                data = item.__getitems__(indices)
-                if len(data) != len(indices):
-                    raise ValueError(
-                        "Nested dataset's output size mismatch."
-                        f" Expected {len(indices)}, got {len(data)}"
-                    )
-                for value, t_sample in zip(data, list_batch):
-                    t_sample.append(value)
-            elif isinstance:
-                ...
+        # list_batch: List[list] = [[] for _ in indices]
+        # for item in self._items:
+        #     # if isinstance(item, torch.Tensor):
+        #     if callable(getattr(item, "__getitems__", None)):
+        #         data = item.__getitems__(indices)
+        #         if len(data) != len(indices):
+        #             raise ValueError(
+        #                 "Nested dataset's output size mismatch."
+        #                 f" Expected {len(indices)}, got {len(data)}"
+        #             )
+        #         for value, t_sample in zip(data, list_batch):
+        #             t_sample.append(value)
+        #     elif isinstance:
+        #         ...
+
+        # elif len(self._items) == 1:
+        #     return self._items[0][indices]
+        # else:
+        #     return tuple(item[indices] for item in self._items)
+        return tuple(item[indices] for item in self._items) # Always return tuple.
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
+
+    def __repr__(self) -> str:
+        ret = (
+            f"{self.__class__.__name__}(\n"
+            f"    items={self._items},\n"
+            f"    names={self._names},\n"
+            f")"
+        )
+        return ret
 
 
 class ItemSet4(Dataset):

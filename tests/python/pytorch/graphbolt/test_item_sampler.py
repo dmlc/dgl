@@ -1117,92 +1117,8 @@ from torchdata.datapipes.iter import IterableWrapper
 
 
 def test_ItemSampler2():
-    # item_set = gb.ItemSet(torch.arange(1000000), names="seed_nodes")
-
-    # data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
-    # t0 = time()
-    # for x in data_loader:
-    #     pass
-    # t1 = time()
-    # print(f"dl | {t1-t0}")
-
-    # data_pipe = IterableWrapper(item_set)
-    # t0 = time()
-    # for x in data_pipe:
-    #     pass
-    # t1 = time()
-    # print(f"it | {t1-t0}")
-
-    # item_sampler = gb.ItemSampler(item_set, batch_size=32, shuffle=True)
-
-    # t0 = time()
-    # for x in item_sampler:
-    #     pass
-    # t1 = time()
-    # print(f"is1 | {t1-t0}")
-
-    # item_sampler2 = gb.ItemSampler2(item_set, batch_size=32, shuffle=True)
-
-    # t0 = time()
-    # for x in item_sampler2:
-    #     pass
-    # t1 = time()
-    # print(f"is2 | {t1-t0}")
-
-    # item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
-
-    # t0 = time()
-    # for x in item_sampler3:
-    #     # print(x)
-    #     pass
-    # t1 = time()
-    # print(f"is3 | {t1-t0}")
-
-    # print(" ")
-    # """###########"""
-
-    # item_set = gb.ItemSet2(torch.arange(1000000), names="seed_nodes")
-
-    # data_loader = DataLoader(item_set, batch_size=32, shuffle=True)
-    # t0 = time()
-    # for x in data_loader:
-    #     pass
-    # t1 = time()
-    # print(f"dl | {t1-t0}")
-
-    # data_pipe = IterableWrapper(item_set)
-    # t0 = time()
-    # for x in data_pipe:
-    #     pass
-    # t1 = time()
-    # print(f"it | {t1-t0}")
-
-    # item_sampler = gb.ItemSampler(item_set, batch_size=32, shuffle=True)
-
-    # t0 = time()
-    # for x in item_sampler:
-    #     pass
-    # t1 = time()
-    # print(f"is1 | {t1-t0}")
-
-    # item_sampler2 = gb.ItemSampler2(item_set, batch_size=32, shuffle=True)
-
-    # t0 = time()
-    # for x in item_sampler2:
-    #     pass
-    # t1 = time()
-    # print(f"is2 | {t1-t0}")
-
-    # item_sampler3 = gb.ItemSampler3(item_set, batch_size=32, shuffle=True)
-
-    # t0 = time()
-    # for x in item_sampler3:
-    #     # print(x)
-    #     pass
-    # t1 = time()
-    # print(f"is3 | {t1-t0}")
-
-    item_set_versions = [gb.ItemSet, gb.ItemSet2]  # , gb.ItemSet0]
+    item_set_versions = [gb.ItemSet, gb.ItemSet2, gb.ItemSet3, gb.ItemSet4, gb.ItemSet0]
+    # item_set_versions = [gb.ItemSet3]
     dl_versions = [DataLoader, gb.ItemSampler, gb.ItemSampler2, gb.ItemSampler3]
     for item_set in item_set_versions:
         print(" ")
@@ -1211,7 +1127,7 @@ def test_ItemSampler2():
             for shuffle in [True]:
                 item_sampler = dl(it, batch_size=32, shuffle=shuffle)
                 t0 = time()
-                for x in item_sampler:
+                for _ in item_sampler:
                     pass
                 t1 = time()
                 print(
@@ -1255,6 +1171,6 @@ def test_diff_dataloader():
     # assert 0
 
 
-# test_ItemSampler2()
+test_ItemSampler2()
 # test_ItemSampler3()
 # test_diff_dataloader()
