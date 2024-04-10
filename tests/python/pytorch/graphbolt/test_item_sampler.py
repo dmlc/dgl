@@ -1132,21 +1132,21 @@ from torchdata.datapipes.iter import IterableWrapper
 
 
 def test_ItemSampler2():
-    item_set_versions = [gb.ItemSet, gb.ItemSet2, gb.ItemSet3, gb.ItemSet4, gb.ItemSet0]
+    item_set_versions = [gb.ItemSet, gb.ItemSet3]
     # item_set_versions = [gb.ItemSet3]
     dl_versions = [DataLoader, gb.ItemSampler, gb.ItemSampler2, gb.ItemSampler3]
     for item_set in item_set_versions:
         print(" ")
-        it = item_set(torch.arange(1000000), names="seed_nodes")
+        it = item_set(torch.arange(100000), names="seed_nodes")
         for dl in dl_versions:
-            for shuffle in [True]:
+            for shuffle in [False]:
                 item_sampler = dl(it, batch_size=32, shuffle=shuffle)
                 t0 = time()
                 for _ in item_sampler:
                     pass
                 t1 = time()
                 print(
-                    f"{it.__class__.__name__} | {item_sampler.__class__.__name__} | {shuffle} | {t1-t0}"
+                    f"{it.__class__.__name__} | {item_sampler.__class__.__name__} | {shuffle} | {(t1-t0).__round__(6)}"
                 )
 
     assert 0
@@ -1161,7 +1161,7 @@ def test_ItemSampler3():
         for x in it:
             pass
         t1 = time()
-        print(f"{it.__class__.__name__} | {t1-t0}")
+        print(f"{it.__class__.__name__} | {(t1-t0)}")
 
     assert 0
 

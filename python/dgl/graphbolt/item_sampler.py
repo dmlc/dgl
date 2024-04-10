@@ -947,6 +947,8 @@ class ItemSampler4(DataLoader2):
         self._shuffle = shuffle
 
     def __iter__(self): ...
+
+
 def _construct_seeds(pos_seeds, neg_srcs=None, neg_dsts=None):
     # For homogeneous graph.
     if isinstance(pos_seeds, torch.Tensor):
