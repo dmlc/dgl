@@ -11,6 +11,7 @@
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAStream.h>
+#include <cuda.h>
 #include <cuda_runtime.h>
 #include <torch/script.h>
 
@@ -38,11 +39,16 @@ namespace cuda {
  *
  * int_array.get() gives the raw pointer.
  */
+template <typename value_t = char>
 struct CUDAWorkspaceAllocator {
+  static_assert(sizeof(char) == 1, "sizeof(char) == 1 should hold.");
   // Required by thrust to satisfy allocator requirements.
-  using value_type = char;
+  using value_type = value_t;
 
   explicit CUDAWorkspaceAllocator() { at::globalContext().lazyInitCUDA(); }
+
+  template <class U>
+  CUDAWorkspaceAllocator(CUDAWorkspaceAllocator<U> const&) noexcept {}
 
   CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
 
@@ -53,7 +59,7 @@ struct CUDAWorkspaceAllocator {
   // Required by thrust to satisfy allocator requirements.
   value_type* allocate(std::ptrdiff_t size) const {
     return reinterpret_cast<value_type*>(
-        c10::cuda::CUDACachingAllocator::raw_alloc(size));
+        c10::cuda::CUDACachingAllocator::raw_alloc(size * sizeof(value_type)));
   }
 
   // Required by thrust to satisfy allocator requirements.
@@ -63,7 +69,9 @@ struct CUDAWorkspaceAllocator {
   std::unique_ptr<T, CUDAWorkspaceAllocator> AllocateStorage(
       std::size_t size) const {
     return std::unique_ptr<T, CUDAWorkspaceAllocator>(
-        reinterpret_cast<T*>(allocate(sizeof(T) * size)), *this);
+        reinterpret_cast<T*>(
+            c10::cuda::CUDACachingAllocator::raw_alloc(sizeof(T) * size)),
+        *this);
   }
 };
 
@@ -80,6 +88,21 @@ template <>
 inline bool is_zero<dim3>(dim3 size) {
   return size.x == 0 || size.y == 0 || size.z == 0;
 }
+
+#define CUDA_DRIVER_CHECK(EXPR)                       \
+  do {                                                \
+    CUresult __err = EXPR;                            \
+    if (__err != CUDA_SUCCESS) {                      \
+      const char* err_str;                            \
+      CUresult get_error_str_err C10_UNUSED =         \
+          cuGetErrorString(__err, &err_str);          \
+      if (get_error_str_err != CUDA_SUCCESS) {        \
+        AT_ERROR("CUDA driver error: unknown error"); \
+      } else {                                        \
+        AT_ERROR("CUDA driver error: ", err_str);     \
+      }                                               \
+    }                                                 \
+  } while (0)
 
 #define CUDA_CALL(func) C10_CUDA_CHECK((func))
 

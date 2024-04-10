@@ -150,6 +150,20 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SliceCSCIndptrHetero(
 torch::Tensor ExclusiveCumSum(torch::Tensor input);
 
 /**
+ * @brief Computes the gather operation on a given input and index tensor.
+ *
+ * @param input The input tensor.
+ * @param index The index tensor.
+ * @param dtype The optional output dtype. If not given, inferred from the input
+ * tensor.
+ *
+ * @return The result of the input.gather(0, index).to(dtype) operation.
+ */
+torch::Tensor Gather(
+    torch::Tensor input, torch::Tensor index,
+    torch::optional<torch::ScalarType> dtype = torch::nullopt);
+
+/**
  * @brief Select rows from input tensor according to index tensor.
  *
  * NOTE:
@@ -220,6 +234,17 @@ torch::Tensor ExpandIndptrImpl(
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
     const torch::Tensor unique_dst_ids, int num_bits = 0);
+
+/**
+ * @brief Batched version of UniqueAndCompact. The ith element of the return
+ * value is equal to the passing the ith elements of the input arguments to
+ * UniqueAndCompact.
+ */
+std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+UniqueAndCompactBatched(
+    const std::vector<torch::Tensor>& src_ids,
+    const std::vector<torch::Tensor>& dst_ids,
+    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits = 0);
 
 }  //  namespace ops
 }  //  namespace graphbolt

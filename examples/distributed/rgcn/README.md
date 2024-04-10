@@ -107,6 +107,12 @@ If we want to train RGCN with `GraphBolt`, we need to append `--use_graphbolt` t
 python3 partition_graph.py --dataset ogbn-mag --num_parts 2 --balance_train --balance_edges --use_graphbolt
 ```
 
+If we have already partitioned into `DGL` format, just convert them directly like below:
+
+```
+    python3 -c "import dgl; dgl.distributed.dgl_partition_to_graphbolt('ogbn-products.json')"
+```
+
 
 ### Step 3: Launch distributed jobs
 
@@ -164,7 +170,7 @@ As for RAM usage, the shared memory(measured by **shared** field of `free` comma
 
 `ogbn-mag`
 
-| Data Formats | Sample Time Per Epoch (CPU) |  Test Accuracy (3 epochs) | shared | used (peak) |
-| ------------ | --------------------------- | ------------------------- |  -----  | ---- |
-|     DGL      | Min: 48.2s, Max: 91.4s      |            42.76%         |  1.3GB  | 9.2GB|
-|   GraphBolt  | Min: 9.2s, Max: 11.9s       |            42.46%         |  742MB  | 5.9GB|
+| Data Formats | Sample Time Per Epoch (CPU) |  Test Accuracy (3 epochs) | shared | used (peak) | CPU Util |
+| ------------ | --------------------------- | ------------------------- |  -----  | ---- | ----- |
+|     DGL      | Min: 48.2s, Max: 91.4s      |            42.76%         |  1.3GB  | 9.2GB| 10.4% |
+|   GraphBolt  | Min: 9.2s, Max: 11.9s       |            42.46%         |  742MB  | 5.9GB| 18.1% |

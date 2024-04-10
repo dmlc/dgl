@@ -143,6 +143,14 @@ python3 ~/workspace/dgl/tools/launch.py \
 
 In order to run with `GraphBolt`, we need to partition graph into `GraphBolt` data formats.Please note that both `DGL` and `GraphBolt` partitions are saved together.
 
+If we have already partitioned into `DGL` format, just convert them directly like below:
+
+```
+    python3 -c "import dgl; dgl.distributed.dgl_partition_to_graphbolt('ogbn-products.json')"
+```
+
+Or partition from scratch like this:
+
 ```
 python3 partition_graph.py --dataset ogbn-products --num_parts 2 --balance_train --balance_edges --use_graphbolt
 ```

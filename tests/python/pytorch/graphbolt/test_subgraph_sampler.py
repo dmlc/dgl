@@ -529,7 +529,7 @@ def test_SubgraphSampler_Random_Hetero_Graph_seed_ndoes(sampler_type, replace):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Homo_seed_nodes(sampler_type):
+def test_SubgraphSampler_without_deduplication_Homo_seed_nodes(sampler_type):
     _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
@@ -643,7 +643,7 @@ def _assert_homo_values(
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Hetero_seed_nodes(sampler_type):
+def test_SubgraphSampler_without_deduplication_Hetero_seed_nodes(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2)
@@ -792,22 +792,40 @@ def test_SubgraphSampler_unique_csc_format_Homo_gpu_seed_nodes(labor):
         deduplicate=True,
     )
 
-    original_row_node_ids = [
-        torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-    ]
-    compacted_indices = [
-        torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
-        torch.tensor([4, 3, 2]).to(F.ctx()),
-    ]
-    indptr = [
-        torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
-        torch.tensor([0, 1, 2, 3]).to(F.ctx()),
-    ]
-    seeds = [
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-        torch.tensor([0, 3, 4]).to(F.ctx()),
-    ]
+    if torch.cuda.get_device_capability()[0] < 7:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([4, 3, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+    else:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 5, 2, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([3, 4, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([3, 4, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 3, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
     _assert_homo_values(
         datapipe, original_row_node_ids, compacted_indices, indptr, seeds
     )
@@ -1027,10 +1045,6 @@ def test_SubgraphSampler_Node(sampler_type):
     sampler = _get_sampler(sampler_type)
     sampler_dp = sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 5
-    for data in sampler_dp:
-        assert torch.equal(
-            data.compacted_seeds, torch.tensor([0, 1]).to(F.ctx())
-        )
 
 
 @pytest.mark.parametrize(
@@ -1119,14 +1133,8 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
     sampler = _get_sampler(sampler_type)
     sampler_dp = sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 2
-    expected_compacted_seeds = {"n2": [torch.tensor([0, 1]), torch.tensor([0])]}
     for step, minibatch in enumerate(sampler_dp):
         assert len(minibatch.sampled_subgraphs) == num_layer
-        for etype, compacted_seeds in minibatch.compacted_seeds.items():
-            assert torch.equal(
-                compacted_seeds,
-                expected_compacted_seeds[etype][step].to(F.ctx()),
-            )
 
 
 @pytest.mark.parametrize(
@@ -1419,7 +1427,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Homo_Node(sampler_type):
+def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
     _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
@@ -1483,7 +1491,7 @@ def test_SubgraphSampler_without_dedpulication_Homo_Node(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Hetero_Node(sampler_type):
+def test_SubgraphSampler_without_deduplication_Hetero_Node(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2)
@@ -1656,22 +1664,41 @@ def test_SubgraphSampler_unique_csc_format_Homo_Node_gpu(labor):
         deduplicate=True,
     )
 
-    original_row_node_ids = [
-        torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-    ]
-    compacted_indices = [
-        torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
-        torch.tensor([4, 3, 2]).to(F.ctx()),
-    ]
-    indptr = [
-        torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
-        torch.tensor([0, 1, 2, 3]).to(F.ctx()),
-    ]
-    seeds = [
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-        torch.tensor([0, 3, 4]).to(F.ctx()),
-    ]
+    if torch.cuda.get_device_capability()[0] < 7:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([4, 3, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+    else:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 5, 2, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([3, 4, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([3, 4, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 3, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert torch.equal(
@@ -1839,7 +1866,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Homo_Link(sampler_type):
+def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
     _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
@@ -1855,7 +1882,7 @@ def test_SubgraphSampler_without_dedpulication_Homo_Link(sampler_type):
         graph.edge_attributes = {
             "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
         }
-        items = (items, torch.randint(1, 10, (3,)))
+        items = (items, torch.randint(1, 10, (2,)))
         names = (names, "timestamp")
 
     itemset = gb.ItemSet(items, names=names)
@@ -1901,7 +1928,7 @@ def test_SubgraphSampler_without_dedpulication_Homo_Link(sampler_type):
     "sampler_type",
     [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
 )
-def test_SubgraphSampler_without_dedpulication_Hetero_Link(sampler_type):
+def test_SubgraphSampler_without_deduplication_Hetero_Link(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2).view(1, 2)
@@ -1913,7 +1940,7 @@ def test_SubgraphSampler_without_dedpulication_Hetero_Link(sampler_type):
         graph.edge_attributes = {
             "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
         }
-        items = (items, torch.randint(1, 10, (2,)))
+        items = (items, torch.randint(1, 10, (1,)))
         names = (names, "timestamp")
     itemset = gb.ItemSetDict({"n1:e1:n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
@@ -2070,22 +2097,41 @@ def test_SubgraphSampler_unique_csc_format_Homo_Link_gpu(labor):
         deduplicate=True,
     )
 
-    original_row_node_ids = [
-        torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-    ]
-    compacted_indices = [
-        torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
-        torch.tensor([4, 3, 2]).to(F.ctx()),
-    ]
-    indptr = [
-        torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
-        torch.tensor([0, 1, 2, 3]).to(F.ctx()),
-    ]
-    seeds = [
-        torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
-        torch.tensor([0, 3, 4]).to(F.ctx()),
-    ]
+    if torch.cuda.get_device_capability()[0] < 7:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([4, 3, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([4, 3, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 5, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+    else:
+        original_row_node_ids = [
+            torch.tensor([0, 3, 4, 5, 2, 7]).to(F.ctx()),
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+        ]
+        compacted_indices = [
+            torch.tensor([3, 4, 2, 5, 5]).to(F.ctx()),
+            torch.tensor([3, 4, 2]).to(F.ctx()),
+        ]
+        indptr = [
+            torch.tensor([0, 1, 2, 3, 3, 5]).to(F.ctx()),
+            torch.tensor([0, 1, 2, 3]).to(F.ctx()),
+        ]
+        seeds = [
+            torch.tensor([0, 3, 4, 5, 2]).to(F.ctx()),
+            torch.tensor([0, 3, 4]).to(F.ctx()),
+        ]
+
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert torch.equal(

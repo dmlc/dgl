@@ -6,6 +6,7 @@
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
+#include <graphbolt/continuous_seed.h>
 #include <graphbolt/fused_sampled_subgraph.h>
 #include <graphbolt/shared_memory.h>
 #include <torch/torch.h>
@@ -16,7 +17,11 @@
 namespace graphbolt {
 namespace sampling {
 
-enum SamplerType { NEIGHBOR, LABOR };
+enum SamplerType { NEIGHBOR, LABOR, LABOR_DEPENDENT };
+
+constexpr bool is_labor(SamplerType S) {
+  return S == SamplerType::LABOR || S == SamplerType::LABOR_DEPENDENT;
+}
 
 template <SamplerType S>
 struct SamplerArgs;
@@ -27,7 +32,14 @@ struct SamplerArgs<SamplerType::NEIGHBOR> {};
 template <>
 struct SamplerArgs<SamplerType::LABOR> {
   const torch::Tensor& indices;
-  int64_t random_seed;
+  single_seed random_seed;
+  int64_t num_nodes;
+};
+
+template <>
+struct SamplerArgs<SamplerType::LABOR_DEPENDENT> {
+  const torch::Tensor& indices;
+  continuous_seed random_seed;
   int64_t num_nodes;
 };
 
@@ -286,8 +298,10 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Sample neighboring edges of the given nodes and return the induced
    * subgraph.
    *
-   * @param nodes The nodes from which to sample neighbors. If not provided,
+   * @param seeds The nodes from which to sample neighbors. If not provided,
    * assumed to be equal to torch.arange(NumNodes()).
+   * @param seed_offsets The offsets of the given seeds,
+   * seeds[seed_offsets[i]: seed_offsets[i + 1]] has node type id i.
    * @param fanouts The number of edges to be sampled for each node with or
    * without considering edge types.
    *   - When the length is 1, it indicates that the fanout applies to all
@@ -313,14 +327,20 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * probabilities corresponding to each neighboring edge of a node. It must be
    * a 1D floating-point or boolean tensor, with the number of elements
    * equalling the total number of edges.
+   * @param random_seed The random seed for the sampler for layer=True.
+   * @param seed2_contribution The contribution of the second random seed,
+   * [0, 1) for layer=True.
    *
    * @return An intrusive pointer to a FusedSampledSubgraph object containing
    * the sampled graph's information.
    */
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
-      torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool layer, bool return_eids,
-      torch::optional<std::string> probs_name) const;
+      torch::optional<torch::Tensor> seeds,
+      torch::optional<std::vector<int64_t>> seed_offsets,
+      const std::vector<int64_t>& fanouts, bool replace, bool layer,
+      bool return_eids, torch::optional<std::string> probs_name,
+      torch::optional<torch::Tensor> random_seed,
+      double seed2_contribution) const;
 
   /**
    * @brief Sample neighboring edges of the given nodes with a temporal
@@ -549,12 +569,12 @@ int64_t Pick(
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr);
 
-template <typename PickedType>
-int64_t Pick(
+template <SamplerType S, typename PickedType>
+std::enable_if_t<is_labor(S), int64_t> Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr);
 
 template <typename PickedType>
 int64_t TemporalPick(
@@ -613,13 +633,13 @@ int64_t TemporalPickByEtype(
     PickedType* picked_data_ptr);
 
 template <
-    bool NonUniform, bool Replace, typename ProbsType, typename PickedType,
-    int StackSize = 1024>
-int64_t LaborPick(
+    bool NonUniform, bool Replace, typename ProbsType, SamplerType S,
+    typename PickedType, int StackSize = 1024>
+std::enable_if_t<is_labor(S), int64_t> LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr);
 
 }  // namespace sampling
 }  // namespace graphbolt

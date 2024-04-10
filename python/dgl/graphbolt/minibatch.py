@@ -303,6 +303,7 @@ class MiniBatch:
                     sampled_csc,
                     num_src_nodes=num_src_nodes,
                     num_dst_nodes=num_dst_nodes,
+                    node_count_check=False,
                 )
             )
 
@@ -536,6 +537,11 @@ class MiniBatch:
                 batch_size = len(next(iter(self.node_pairs.values()))[0])
             else:
                 batch_size = len(self.node_pairs[0])
+        elif self.seeds is not None:
+            if isinstance(self.seeds, Dict):
+                batch_size = len(next(iter(self.seeds.values())))
+            else:
+                batch_size = len(self.seeds)
         else:
             batch_size = None
         pyg_data = Data(
@@ -577,6 +583,17 @@ class MiniBatch:
                 "sampled_subgraphs",
                 "node_features",
                 "edge_features",
+            ]
+        elif self.seeds is not None:
+            # Node/link/edge related tasks.
+            transfer_attrs = [
+                "labels",
+                "sampled_subgraphs",
+                "node_features",
+                "edge_features",
+                "compacted_seeds",
+                "indexes",
+                "seeds",
             ]
         else:
             # Otherwise copy all the attributes to the device.

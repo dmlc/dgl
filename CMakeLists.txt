@@ -355,7 +355,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   ExternalProject_Add(
     liburing
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${LIBURING_INSTALL_DIR}
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=/
     BUILD_COMMAND bash -c "make -j 4"
     BUILD_IN_SOURCE ON
     INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
@@ -588,4 +588,7 @@ if(BUILD_GRAPHBOLT)
   if(USE_CUDA)
     add_dependencies(graphbolt gpu_cache)
   endif(USE_CUDA)
+  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    add_dependencies(graphbolt liburing)
+  endif()
 endif(BUILD_GRAPHBOLT)

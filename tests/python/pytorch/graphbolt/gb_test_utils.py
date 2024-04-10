@@ -198,21 +198,21 @@ def random_homo_graphbolt_graph(
             train_set:
               - type: null
                 data:
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy
                     in_memory: true
                     path: {train_path}
             validation_set:
               - type: null
                 data:
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy
                     in_memory: true
                     path: {validation_path}
             test_set:
               - type: null
                 data:
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy
                     in_memory: true
                     path: {test_path}
@@ -349,21 +349,21 @@ def generate_raw_data_for_hetero_dataset(
             train_set:
               - type: user
                 data:
-                  - name: seed_nodes
+                  - name: seeds
                     format: numpy
                     in_memory: true
                     path: {train_path}
             validation_set:
               - type: user
                 data:
-                  - name: seed_nodes
+                  - name: seeds
                     format: numpy
                     in_memory: true
                     path: {validation_path}
             test_set:
               - type: user
                 data:
-                  - name: seed_nodes
+                  - name: seeds
                     format: numpy
                     in_memory: true
                     path: {test_path}

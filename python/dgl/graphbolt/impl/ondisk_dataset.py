@@ -877,16 +877,16 @@ class OnDiskDataset(Dataset):
                 names=tuple(data.name for data in tvt_set[0].data),
             )
         else:
-            data = {}
+            itemsets = {}
             for tvt in tvt_set:
-                data[tvt.type] = ItemSet(
+                itemsets[tvt.type] = ItemSet(
                     tuple(
                         read_data(data.path, data.format, data.in_memory)
                         for data in tvt.data
                     ),
                     names=tuple(data.name for data in tvt.data),
                 )
-            ret = ItemSetDict(data)
+            ret = ItemSetDict(itemsets)
         return ret
 
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
@@ -900,13 +900,13 @@ class OnDiskDataset(Dataset):
         if isinstance(num_nodes, int):
             return ItemSet(
                 torch.tensor(num_nodes, dtype=dtype),
-                names="seed_nodes",
+                names="seeds",
             )
         else:
             data = {
                 node_type: ItemSet(
                     torch.tensor(num_node, dtype=dtype),
-                    names="seed_nodes",
+                    names="seeds",
                 )
                 for node_type, num_node in num_nodes.items()
             }
@@ -996,15 +996,30 @@ class BuiltinDataset(OnDiskDataset):
     )
     _datasets = [
         "cora",
+        "cora-seeds",
         "ogbn-mag",
+        "ogbn-mag-seeds",
         "ogbl-citation2",
+        "ogbl-citation2-seeds",
         "ogbn-products",
+        "ogbn-products-seeds",
         "ogbn-arxiv",
+        "ogbn-arxiv-seeds",
     ]
-    _large_datasets = ["ogb-lsc-mag240m", "ogbn-papers100M"]
+    _large_datasets = [
+        "ogb-lsc-mag240m",
+        "ogb-lsc-mag240m-seeds",
+        "ogbn-papers100M",
+        "ogbn-papers100M-seeds",
+    ]
     _all_datasets = _datasets + _large_datasets
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
+        # For user using DGL 2.2 or later version, we prefer them to use
+        # datasets with `seeds` suffix. This hack should be removed, when the
+        # datasets with `seeds` suffix have covered previous ones.
+        if "seeds" not in name:
+            name += "-seeds"
         dataset_dir = os.path.join(root, name)
         if not os.path.exists(dataset_dir):
             if name not in self._all_datasets:

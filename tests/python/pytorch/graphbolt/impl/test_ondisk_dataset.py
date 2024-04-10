@@ -2326,7 +2326,7 @@ def test_OnDiskDataset_all_nodes_set_homo():
         dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         all_nodes_set = dataset.all_nodes_set
         assert isinstance(all_nodes_set, gb.ItemSet)
-        assert all_nodes_set.names == ("seed_nodes",)
+        assert all_nodes_set.names == ("seeds",)
         for i, item in enumerate(all_nodes_set):
             assert i == item
 
@@ -2365,7 +2365,7 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         all_nodes_set = dataset.all_nodes_set
         assert isinstance(all_nodes_set, gb.ItemSetDict)
-        assert all_nodes_set.names == ("seed_nodes",)
+        assert all_nodes_set.names == ("seeds",)
         for i, item in enumerate(all_nodes_set):
             assert len(item) == 1
             assert isinstance(item, dict)
@@ -2481,8 +2481,10 @@ def test_BuiltinDataset():
     with tempfile.TemporaryDirectory() as test_dir:
         # Case 1: download from DGL S3 storage.
         dataset_name = "test-dataset-231207"
-        # Add dataset to the builtin dataset list for testing only.
-        gb.BuiltinDataset._all_datasets.append(dataset_name)
+        # Add dataset to the builtin dataset list for testing only. Due to we
+        # add `seeds` suffix to datasets when downloading, so we append
+        # dataset name with `-seeds` suffix here.
+        gb.BuiltinDataset._all_datasets.append(dataset_name + "-seeds")
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
         assert dataset.graph is not None
         assert dataset.feature is not None
@@ -2499,7 +2501,7 @@ def test_BuiltinDataset():
         dataset = None
 
         # Case 3: dataset is not available.
-        dataset_name = "fake_name"
+        dataset_name = "fake_name-seeds"
         with pytest.raises(
             RuntimeError,
             match=rf"Dataset {dataset_name} is not available.*",

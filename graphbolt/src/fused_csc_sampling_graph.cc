@@ -15,6 +15,7 @@
 #include <limits>
 #include <numeric>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 #include "./macro.h"
@@ -616,21 +617,24 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 }
 
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
-    torch::optional<torch::Tensor> nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool layer, bool return_eids,
-    torch::optional<std::string> probs_name) const {
+    torch::optional<torch::Tensor> seeds,
+    torch::optional<std::vector<int64_t>> seed_offsets,
+    const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool return_eids, torch::optional<std::string> probs_name,
+    torch::optional<torch::Tensor> random_seed,
+    double seed2_contribution) const {
   auto probs_or_mask = this->EdgeAttribute(probs_name);
 
-  // If nodes does not have a value, then we expect all arguments to be resident
-  // on the GPU. If nodes has a value, then we expect them to be accessible from
+  // If seeds does not have a value, then we expect all arguments to be resident
+  // on the GPU. If seeds has a value, then we expect them to be accessible from
   // GPU. This is required for the dispatch to work when CUDA is not available.
-  if (((!nodes.has_value() && utils::is_on_gpu(indptr_) &&
+  if (((!seeds.has_value() && utils::is_on_gpu(indptr_) &&
         utils::is_on_gpu(indices_) &&
         (!probs_or_mask.has_value() ||
          utils::is_on_gpu(probs_or_mask.value())) &&
         (!type_per_edge_.has_value() ||
          utils::is_on_gpu(type_per_edge_.value()))) ||
-       (nodes.has_value() && utils::is_on_gpu(nodes.value()) &&
+       (seeds.has_value() && utils::is_on_gpu(seeds.value()) &&
         utils::is_accessible_from_gpu(indptr_) &&
         utils::is_accessible_from_gpu(indices_) &&
         (!probs_or_mask.has_value() ||
@@ -641,11 +645,12 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "SampleNeighbors", {
           return ops::SampleNeighbors(
-              indptr_, indices_, nodes, fanouts, replace, layer, return_eids,
-              type_per_edge_, probs_or_mask);
+              indptr_, indices_, seeds, seed_offsets, fanouts, replace, layer,
+              return_eids, type_per_edge_, probs_or_mask, node_type_to_id_,
+              edge_type_to_id_, random_seed, seed2_contribution);
         });
   }
-  TORCH_CHECK(nodes.has_value(), "Nodes can not be None on the CPU.");
+  TORCH_CHECK(seeds.has_value(), "Nodes can not be None on the CPU.");
 
   if (probs_or_mask.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
@@ -658,19 +663,41 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
   }
 
   if (layer) {
-    const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
-        static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
-    SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
-    return SampleNeighborsImpl(
-        nodes.value(), return_eids,
-        GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
-        GetPickFn(
-            fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
-            args));
+    if (random_seed.has_value() && random_seed->numel() >= 2) {
+      SamplerArgs<SamplerType::LABOR_DEPENDENT> args{
+          indices_,
+          {random_seed.value(), static_cast<float>(seed2_contribution)},
+          NumNodes()};
+      return SampleNeighborsImpl(
+          seeds.value(), return_eids,
+          GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
+          GetPickFn(
+              fanouts, replace, indptr_.options(), type_per_edge_,
+              probs_or_mask, args));
+    } else {
+      auto args = [&] {
+        if (random_seed.has_value() && random_seed->numel() == 1) {
+          return SamplerArgs<SamplerType::LABOR>{
+              indices_, random_seed.value(), NumNodes()};
+        } else {
+          return SamplerArgs<SamplerType::LABOR>{
+              indices_,
+              RandomEngine::ThreadLocal()->RandInt(
+                  static_cast<int64_t>(0), std::numeric_limits<int64_t>::max()),
+              NumNodes()};
+        }
+      }();
+      return SampleNeighborsImpl(
+          seeds.value(), return_eids,
+          GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
+          GetPickFn(
+              fanouts, replace, indptr_.options(), type_per_edge_,
+              probs_or_mask, args));
+    }
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl(
-        nodes.value(), return_eids,
+        seeds.value(), return_eids,
         GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
         GetPickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
@@ -1284,7 +1311,7 @@ int64_t TemporalPick(
     }
     return picked_indices.numel();
   }
-  if constexpr (S == SamplerType::LABOR) {
+  if constexpr (is_labor(S)) {
     return Pick(
         offset, num_neighbors, fanout, replace, options, masked_prob, args,
         picked_data_ptr);
@@ -1370,12 +1397,12 @@ int64_t TemporalPickByEtype(
   return pick_offset;
 }
 
-template <typename PickedType>
-int64_t Pick(
+template <SamplerType S, typename PickedType>
+std::enable_if_t<is_labor(S), int64_t> Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr) {
   if (fanout == 0) return 0;
   if (probs_or_mask.has_value()) {
     if (fanout < 0) {
@@ -1417,6 +1444,25 @@ inline void safe_divide(T& a, U b) {
   a = b > 0 ? (T)(a / b) : std::numeric_limits<T>::infinity();
 }
 
+namespace labor {
+
+template <typename T>
+inline T invcdf(T u, int64_t n, T rem) {
+  constexpr T one = 1;
+  return rem * (one - std::pow(one - u, one / n));
+}
+
+template <typename T, typename seed_t>
+inline T jth_sorted_uniform_random(
+    seed_t seed, int64_t t, int64_t c, int64_t j, T& rem, int64_t n) {
+  const T u = seed.uniform(t + j * c);
+  // https://mathematica.stackexchange.com/a/256707
+  rem -= invcdf(u, n, rem);
+  return 1 - rem;
+}
+
+};  // namespace labor
+
 /**
  * @brief Perform uniform-nonuniform sampling of elements depending on the
  * template parameter NonUniform and return the sampled indices.
@@ -1442,13 +1488,13 @@ inline void safe_divide(T& a, U b) {
  * should be put. Enough memory space should be allocated in advance.
  */
 template <
-    bool NonUniform, bool Replace, typename ProbsType, typename PickedType,
-    int StackSize>
-inline int64_t LaborPick(
+    bool NonUniform, bool Replace, typename ProbsType, SamplerType S,
+    typename PickedType, int StackSize>
+inline std::enable_if_t<is_labor(S), int64_t> LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr) {
   fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
@@ -1472,8 +1518,8 @@ inline int64_t LaborPick(
   }
   AT_DISPATCH_INDEX_TYPES(
       args.indices.scalar_type(), "LaborPickMain", ([&] {
-        const index_t* local_indices_data =
-            args.indices.data_ptr<index_t>() + offset;
+        const auto local_indices_data =
+            reinterpret_cast<index_t*>(args.indices.data_ptr()) + offset;
         if constexpr (Replace) {
           // [Algorithm] @mfbalin
           // Use a max-heap to get rid of the big random numbers and filter the
@@ -1563,8 +1609,7 @@ inline int64_t LaborPick(
           // O(num_neighbors).
           for (uint32_t i = 0; i < fanout; ++i) {
             const auto t = local_indices_data[i];
-            auto rnd =
-                labor::uniform_random<float>(args.random_seed, t);  // r_t
+            auto rnd = args.random_seed.uniform(t);  // r_t
             if constexpr (NonUniform) {
               safe_divide(rnd, local_probs_data[i]);
             }  // r_t / \pi_t
@@ -1575,8 +1620,7 @@ inline int64_t LaborPick(
           }
           for (uint32_t i = fanout; i < num_neighbors; ++i) {
             const auto t = local_indices_data[i];
-            auto rnd =
-                labor::uniform_random<float>(args.random_seed, t);  // r_t
+            auto rnd = args.random_seed.uniform(t);  // r_t
             if constexpr (NonUniform) {
               safe_divide(rnd, local_probs_data[i]);
             }  // r_t / \pi_t

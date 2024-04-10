@@ -15,18 +15,18 @@ from . import gb_test_utils
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
     item_sampler = gb.ItemSampler(
-        gb.ItemSet(torch.arange(20), names="seed_nodes"), 4
+        gb.ItemSet(torch.arange(20), names="seeds"), 4
     )
 
     # Invoke CopyTo via class constructor.
     dp = gb.CopyTo(item_sampler, "cuda")
     for data in dp:
-        assert data.seed_nodes.device.type == "cuda"
+        assert data.seeds.device.type == "cuda"
 
     # Invoke CopyTo via functional form.
     dp = item_sampler.copy_to("cuda")
     for data in dp:
-        assert data.seed_nodes.device.type == "cuda"
+        assert data.seeds.device.type == "cuda"
 
 
 @pytest.mark.parametrize(
@@ -37,11 +37,10 @@ def test_CopyTo():
         "link_prediction",
         "edge_classification",
         "extra_attrs",
-        "other",
     ],
 )
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
-def test_CopyToWithMiniBatches(task):
+def test_CopyToWithMiniBatches_original(task):
     N = 16
     B = 2
     if task == "node_classification" or task == "extra_attrs":
@@ -62,11 +61,6 @@ def test_CopyToWithMiniBatches(task):
         itemset = gb.ItemSet(
             (torch.arange(2 * N).reshape(-1, 2), torch.arange(N)),
             names=("node_pairs", "labels"),
-        )
-    else:
-        itemset = gb.ItemSet(
-            (torch.arange(2 * N).reshape(-1, 2), torch.arange(N)),
-            names=("node_pairs", "seed_nodes"),
         )
     graph = gb_test_utils.rand_csc_graph(100, 0.15, bidirection_edge=True)
 
@@ -96,38 +90,25 @@ def test_CopyToWithMiniBatches(task):
             "sampled_subgraphs",
             "labels",
             "blocks",
+            "seeds",
         ]
     elif task == "node_inference":
         copied_attrs = [
-            "seed_nodes",
+            "seeds",
             "sampled_subgraphs",
             "blocks",
             "labels",
         ]
-    elif task == "link_prediction":
+    elif task == "link_prediction" or task == "edge_classification":
         copied_attrs = [
-            "compacted_node_pairs",
-            "node_features",
-            "edge_features",
-            "sampled_subgraphs",
-            "compacted_negative_srcs",
-            "compacted_negative_dsts",
-            "blocks",
-            "positive_node_pairs",
-            "negative_node_pairs",
-            "node_pairs_with_labels",
-        ]
-    elif task == "edge_classification":
-        copied_attrs = [
-            "compacted_node_pairs",
-            "node_features",
-            "edge_features",
-            "sampled_subgraphs",
             "labels",
+            "compacted_seeds",
+            "sampled_subgraphs",
+            "indexes",
+            "node_features",
+            "edge_features",
             "blocks",
-            "positive_node_pairs",
-            "negative_node_pairs",
-            "node_pairs_with_labels",
+            "seeds",
         ]
     elif task == "extra_attrs":
         copied_attrs = [
@@ -137,6 +118,7 @@ def test_CopyToWithMiniBatches(task):
             "labels",
             "blocks",
             "seed_nodes",
+            "seeds",
         ]
 
     def test_data_device(datapipe):
@@ -160,6 +142,130 @@ def test_CopyToWithMiniBatches(task):
                             assert var.device.type == "cuda"
                         else:
                             assert var.device.type == "cpu"
+
+    if task == "extra_attrs":
+        extra_attrs = ["seed_nodes"]
+    else:
+        extra_attrs = None
+
+    # Invoke CopyTo via class constructor.
+    test_data_device(gb.CopyTo(datapipe, "cuda", extra_attrs))
+
+    # Invoke CopyTo via functional form.
+    test_data_device(datapipe.copy_to("cuda", extra_attrs))
+
+
+@pytest.mark.parametrize(
+    "task",
+    [
+        "node_classification",
+        "node_inference",
+        "link_prediction",
+        "edge_classification",
+        "extra_attrs",
+    ],
+)
+@unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
+def test_CopyToWithMiniBatches(task):
+    N = 16
+    B = 2
+    if task == "node_classification" or task == "extra_attrs":
+        itemset = gb.ItemSet(
+            (torch.arange(N), torch.arange(N)), names=("seeds", "labels")
+        )
+    elif task == "node_inference":
+        itemset = gb.ItemSet(torch.arange(N), names="seeds")
+    elif task == "link_prediction":
+        itemset = gb.ItemSet(
+            (
+                torch.arange(2 * N).reshape(-1, 2),
+                torch.arange(N),
+            ),
+            names=("seeds", "labels"),
+        )
+    elif task == "edge_classification":
+        itemset = gb.ItemSet(
+            (torch.arange(2 * N).reshape(-1, 2), torch.arange(N)),
+            names=("seeds", "labels"),
+        )
+    graph = gb_test_utils.rand_csc_graph(100, 0.15, bidirection_edge=True)
+
+    features = {}
+    keys = [("node", None, "a"), ("node", None, "b")]
+    features[keys[0]] = gb.TorchBasedFeature(torch.randn(200, 4))
+    features[keys[1]] = gb.TorchBasedFeature(torch.randn(200, 4))
+    feature_store = gb.BasicFeatureStore(features)
+
+    datapipe = gb.ItemSampler(itemset, batch_size=B)
+    datapipe = gb.NeighborSampler(
+        datapipe,
+        graph,
+        fanouts=[torch.LongTensor([2]) for _ in range(2)],
+    )
+    if task != "node_inference":
+        datapipe = gb.FeatureFetcher(
+            datapipe,
+            feature_store,
+            ["a"],
+        )
+
+    if task == "node_classification":
+        copied_attrs = [
+            "node_features",
+            "edge_features",
+            "sampled_subgraphs",
+            "labels",
+            "blocks",
+            "seeds",
+        ]
+    elif task == "node_inference":
+        copied_attrs = [
+            "seeds",
+            "sampled_subgraphs",
+            "blocks",
+            "labels",
+        ]
+    elif task == "link_prediction" or task == "edge_classification":
+        copied_attrs = [
+            "labels",
+            "compacted_seeds",
+            "sampled_subgraphs",
+            "indexes",
+            "node_features",
+            "edge_features",
+            "blocks",
+            "seeds",
+        ]
+    elif task == "extra_attrs":
+        copied_attrs = [
+            "node_features",
+            "edge_features",
+            "sampled_subgraphs",
+            "labels",
+            "blocks",
+            "seed_nodes",
+            "seeds",
+        ]
+
+    def test_data_device(datapipe):
+        for data in datapipe:
+            print(data)
+            for attr in dir(data):
+                var = getattr(data, attr)
+                if isinstance(var, Mapping):
+                    var = var[next(iter(var))]
+                elif isinstance(var, Iterable):
+                    var = next(iter(var))
+                if (
+                    not callable(var)
+                    and not attr.startswith("__")
+                    and hasattr(var, "device")
+                    and var is not None
+                ):
+                    if attr in copied_attrs:
+                        assert var.device.type == "cuda", attr
+                    else:
+                        assert var.device.type == "cpu", attr
 
     if task == "extra_attrs":
         extra_attrs = ["seed_nodes"]

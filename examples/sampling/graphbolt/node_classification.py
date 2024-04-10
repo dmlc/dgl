@@ -101,7 +101,7 @@ def create_dataloader(
     # ensures that the rest of the operations run on the GPU.
     ############################################################################
     if args.storage_device != "cpu":
-        datapipe = datapipe.copy_to(device=device, extra_attrs=["seed_nodes"])
+        datapipe = datapipe.copy_to(device=device, extra_attrs=["seeds"])
 
     ############################################################################
     # [Step-3]:
@@ -218,7 +218,7 @@ class SAGE(nn.Module):
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
-                y[data.seed_nodes[0] : data.seed_nodes[-1] + 1] = hidden_x.to(
+                y[data.seeds[0] : data.seeds[-1] + 1] = hidden_x.to(
                     buffer_device
                 )
             if not is_last_layer:

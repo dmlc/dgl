@@ -70,6 +70,37 @@ def minibatcher_default(batch, names):
         else:
             init_data = {name: item for item, name in zip(batch, names)}
     minibatch = MiniBatch()
+    # TODO(#7254): Hacks for original `seed_nodes` and `node_pairs`, which need
+    # to be cleaned up later.
+    if "node_pairs" in names:
+        pos_seeds = init_data["node_pairs"]
+        # Build negative graph.
+        if "negative_srcs" in names and "negative_dsts" in names:
+            neg_srcs = init_data["negative_srcs"]
+            neg_dsts = init_data["negative_dsts"]
+            (
+                init_data["seeds"],
+                init_data["labels"],
+                init_data["indexes"],
+            ) = _construct_seeds(
+                pos_seeds, neg_srcs=neg_srcs, neg_dsts=neg_dsts
+            )
+        elif "negative_srcs" in names:
+            neg_srcs = init_data["negative_srcs"]
+            (
+                init_data["seeds"],
+                init_data["labels"],
+                init_data["indexes"],
+            ) = _construct_seeds(pos_seeds, neg_srcs=neg_srcs)
+        elif "negative_dsts" in names:
+            neg_dsts = init_data["negative_dsts"]
+            (
+                init_data["seeds"],
+                init_data["labels"],
+                init_data["indexes"],
+            ) = _construct_seeds(pos_seeds, neg_dsts=neg_dsts)
+        else:
+            init_data["seeds"] = pos_seeds
     for name, item in init_data.items():
         if not hasattr(minibatch, name):
             dgl_warning(
@@ -77,13 +108,12 @@ def minibatcher_default(batch, names):
                 "`MiniBatch`. You probably need to provide a customized "
                 "`MiniBatcher`."
             )
-        if name == "node_pairs":
-            # `node_pairs` is passed as a tensor in shape of `(N, 2)` and
-            # should be converted to a tuple of `(src, dst)`.
-            if isinstance(item, Mapping):
-                item = {key: (item[key][:, 0], item[key][:, 1]) for key in item}
-            else:
-                item = (item[:, 0], item[:, 1])
+        # TODO(#7254): Hacks for original `seed_nodes` and `node_pairs`, which
+        # need to be cleaned up later.
+        if name == "seed_nodes":
+            name = "seeds"
+        if name in ("node_pairs", "negative_srcs", "negative_dsts"):
+            continue
         setattr(minibatch, name, item)
     return minibatch
 
@@ -917,3 +947,78 @@ class ItemSampler4(DataLoader2):
         self._shuffle = shuffle
 
     def __iter__(self): ...
+def _construct_seeds(pos_seeds, neg_srcs=None, neg_dsts=None):
+    # For homogeneous graph.
+    if isinstance(pos_seeds, torch.Tensor):
+        negative_ratio = neg_srcs.size(1) if neg_srcs else neg_dsts.size(1)
+        neg_srcs = (
+            neg_srcs
+            if neg_srcs is not None
+            else pos_seeds[:, 0].repeat_interleave(negative_ratio)
+        ).view(-1)
+        neg_dsts = (
+            neg_dsts
+            if neg_dsts is not None
+            else pos_seeds[:, 1].repeat_interleave(negative_ratio)
+        ).view(-1)
+        neg_seeds = torch.cat((neg_srcs, neg_dsts)).view(2, -1).T
+        seeds = torch.cat((pos_seeds, neg_seeds))
+        pos_seeds_num = pos_seeds.size(0)
+        labels = torch.empty(seeds.size(0), device=pos_seeds.device)
+        labels[:pos_seeds_num] = 1
+        labels[pos_seeds_num:] = 0
+        pos_indexes = torch.arange(
+            0,
+            pos_seeds_num,
+            device=pos_seeds.device,
+        )
+        neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
+        indexes = torch.cat((pos_indexes, neg_indexes))
+    # For heterogeneous graph.
+    else:
+        negative_ratio = (
+            list(neg_srcs.values())[0].size(1)
+            if neg_srcs
+            else list(neg_dsts.values())[0].size(1)
+        )
+        seeds = {}
+        labels = {}
+        indexes = {}
+        for etype in pos_seeds:
+            neg_src = (
+                neg_srcs[etype]
+                if neg_srcs is not None
+                else pos_seeds[etype][:, 0].repeat_interleave(negative_ratio)
+            ).view(-1)
+            neg_dst = (
+                neg_dsts[etype]
+                if neg_dsts is not None
+                else pos_seeds[etype][:, 1].repeat_interleave(negative_ratio)
+            ).view(-1)
+            seeds[etype] = torch.cat(
+                (
+                    pos_seeds[etype],
+                    torch.cat(
+                        (
+                            neg_src,
+                            neg_dst,
+                        )
+                    )
+                    .view(2, -1)
+                    .T,
+                )
+            )
+            pos_seeds_num = pos_seeds[etype].size(0)
+            labels[etype] = torch.empty(
+                seeds[etype].size(0), device=pos_seeds[etype].device
+            )
+            labels[etype][:pos_seeds_num] = 1
+            labels[etype][pos_seeds_num:] = 0
+            pos_indexes = torch.arange(
+                0,
+                pos_seeds_num,
+                device=pos_seeds[etype].device,
+            )
+            neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
+            indexes[etype] = torch.cat((pos_indexes, neg_indexes))
+    return seeds, labels, indexes

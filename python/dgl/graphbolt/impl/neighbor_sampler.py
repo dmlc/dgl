@@ -46,44 +46,37 @@ class FetchInsubgraphData(Mapper):
 
     def _fetch_per_layer_impl(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
-            index = minibatch._seed_nodes
-            if isinstance(index, dict):
-                for idx in index.values():
+            seeds = minibatch._seed_nodes
+            is_hetero = isinstance(seeds, dict)
+            if is_hetero:
+                for idx in seeds.values():
                     idx.record_stream(torch.cuda.current_stream())
-                index = self.graph._convert_to_homogeneous_nodes(index)
+                (
+                    seeds,
+                    seed_offsets,
+                ) = self.graph._convert_to_homogeneous_nodes(seeds)
             else:
-                index.record_stream(torch.cuda.current_stream())
+                seeds.record_stream(torch.cuda.current_stream())
+                seed_offsets = None
 
             def record_stream(tensor):
                 if stream is not None and tensor.is_cuda:
                     tensor.record_stream(stream)
                 return tensor
 
-            if self.graph.node_type_offset is None:
-                # sorting not needed.
-                minibatch._subgraph_seed_nodes = None
-            else:
-                index, original_positions = index.sort()
-                if (original_positions.diff() == 1).all().item():
-                    # already sorted.
-                    minibatch._subgraph_seed_nodes = None
-                else:
-                    minibatch._subgraph_seed_nodes = record_stream(
-                        original_positions.sort()[1]
-                    )
             index_select_csc_with_indptr = partial(
                 torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
             )
 
             indptr, indices = index_select_csc_with_indptr(
-                self.graph.indices, index, None
+                self.graph.indices, seeds, None
             )
             record_stream(indptr)
             record_stream(indices)
             output_size = len(indices)
             if self.graph.type_per_edge is not None:
                 _, type_per_edge = index_select_csc_with_indptr(
-                    self.graph.type_per_edge, index, output_size
+                    self.graph.type_per_edge, seeds, output_size
                 )
                 record_stream(type_per_edge)
             else:
@@ -94,21 +87,15 @@ class FetchInsubgraphData(Mapper):
                 )
                 if probs_or_mask is not None:
                     _, probs_or_mask = index_select_csc_with_indptr(
-                        probs_or_mask, index, output_size
+                        probs_or_mask, seeds, output_size
                     )
                     record_stream(probs_or_mask)
             else:
                 probs_or_mask = None
-            if self.graph.node_type_offset is not None:
-                node_type_offset = torch.searchsorted(
-                    index, self.graph.node_type_offset
-                )
-            else:
-                node_type_offset = None
             subgraph = fused_csc_sampling_graph(
                 indptr,
                 indices,
-                node_type_offset=node_type_offset,
+                node_type_offset=self.graph.node_type_offset,
                 type_per_edge=type_per_edge,
                 node_type_to_id=self.graph.node_type_to_id,
                 edge_type_to_id=self.graph.edge_type_to_id,
@@ -116,7 +103,8 @@ class FetchInsubgraphData(Mapper):
             if self.prob_name is not None and probs_or_mask is not None:
                 subgraph.edge_attributes = {self.prob_name: probs_or_mask}
 
-            minibatch.sampled_subgraphs.insert(0, subgraph)
+            subgraph._indptr_node_type_offset_list = seed_offsets
+            minibatch._sliced_sampling_graph = subgraph
 
             if self.stream is not None:
                 minibatch.wait = torch.cuda.current_stream().record_event().wait
@@ -145,17 +133,21 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
         self.prob_name = sample_per_layer_obj.prob_name
 
     def _sample_per_layer_from_fetched_subgraph(self, minibatch):
-        subgraph = minibatch.sampled_subgraphs[0]
-
+        subgraph = minibatch._sliced_sampling_graph
+        delattr(minibatch, "_sliced_sampling_graph")
+        kwargs = {
+            key[1:]: getattr(minibatch, key)
+            for key in ["_random_seed", "_seed2_contribution"]
+            if hasattr(minibatch, key)
+        }
         sampled_subgraph = getattr(subgraph, self.sampler_name)(
-            minibatch._subgraph_seed_nodes,
+            None,
             self.fanout,
             self.replace,
             self.prob_name,
+            **kwargs,
         )
-        delattr(minibatch, "_subgraph_seed_nodes")
-        sampled_subgraph.original_column_node_ids = minibatch._seed_nodes
-        minibatch.sampled_subgraphs[0] = sampled_subgraph
+        minibatch.sampled_subgraphs.insert(0, sampled_subgraph)
 
         return minibatch
 
@@ -172,8 +164,17 @@ class SamplePerLayer(MiniBatchTransformer):
         self.prob_name = prob_name
 
     def _sample_per_layer(self, minibatch):
+        kwargs = {
+            key[1:]: getattr(minibatch, key)
+            for key in ["_random_seed", "_seed2_contribution"]
+            if hasattr(minibatch, key)
+        }
         subgraph = self.sampler(
-            minibatch._seed_nodes, self.fanout, self.replace, self.prob_name
+            minibatch._seed_nodes,
+            self.fanout,
+            self.replace,
+            self.prob_name,
+            **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, subgraph)
         return minibatch
@@ -230,8 +231,132 @@ class FetcherAndSampler(MiniBatchTransformer):
         super().__init__(datapipe)
 
 
+class NeighborSamplerImpl(SubgraphSampler):
+    # pylint: disable=abstract-method
+    """Base class for NeighborSamplers."""
+
+    # pylint: disable=useless-super-delegation
+    def __init__(
+        self,
+        datapipe,
+        graph,
+        fanouts,
+        replace,
+        prob_name,
+        deduplicate,
+        sampler,
+        layer_dependency=None,
+        batch_dependency=None,
+    ):
+        if sampler.__name__ == "sample_layer_neighbors":
+            self._init_seed(batch_dependency)
+        super().__init__(
+            datapipe,
+            graph,
+            fanouts,
+            replace,
+            prob_name,
+            deduplicate,
+            sampler,
+            layer_dependency,
+        )
+
+    def _init_seed(self, batch_dependency):
+        self.rng = torch.random.manual_seed(
+            torch.randint(0, int(1e18), size=tuple())
+        )
+        self.cnt = [-1, int(batch_dependency)]
+        self.random_seed = torch.empty(
+            2 if self.cnt[1] > 1 else 1, dtype=torch.int64
+        )
+        self.random_seed.random_(generator=self.rng)
+
+    def _set_seed(self, minibatch):
+        self.cnt[0] += 1
+        if self.cnt[1] > 0 and self.cnt[0] % self.cnt[1] == 0:
+            self.random_seed[0] = self.random_seed[-1]
+            self.random_seed[-1:].random_(generator=self.rng)
+        minibatch._random_seed = self.random_seed.clone()
+        minibatch._seed2_contribution = (
+            0.0
+            if self.cnt[1] <= 1
+            else (self.cnt[0] % self.cnt[1]) / self.cnt[1]
+        )
+        minibatch._iter = self.cnt[0]
+        return minibatch
+
+    @staticmethod
+    def _increment_seed(minibatch):
+        minibatch._random_seed = 1 + minibatch._random_seed
+        return minibatch
+
+    @staticmethod
+    def _delattr_dependency(minibatch):
+        delattr(minibatch, "_random_seed")
+        delattr(minibatch, "_seed2_contribution")
+        return minibatch
+
+    @staticmethod
+    def _prepare(node_type_to_id, minibatch):
+        seeds = minibatch._seed_nodes
+        # Enrich seeds with all node types.
+        if isinstance(seeds, dict):
+            ntypes = list(node_type_to_id.keys())
+            # Loop over different seeds to extract the device they are on.
+            device = None
+            dtype = None
+            for _, seed in seeds.items():
+                device = seed.device
+                dtype = seed.dtype
+                break
+            default_tensor = torch.tensor([], dtype=dtype, device=device)
+            seeds = {
+                ntype: seeds.get(ntype, default_tensor) for ntype in ntypes
+            }
+        minibatch._seed_nodes = seeds
+        minibatch.sampled_subgraphs = []
+        return minibatch
+
+    @staticmethod
+    def _set_input_nodes(minibatch):
+        minibatch.input_nodes = minibatch._seed_nodes
+        return minibatch
+
+    # pylint: disable=arguments-differ
+    def sampling_stages(
+        self,
+        datapipe,
+        graph,
+        fanouts,
+        replace,
+        prob_name,
+        deduplicate,
+        sampler,
+        layer_dependency,
+    ):
+        datapipe = datapipe.transform(
+            partial(self._prepare, graph.node_type_to_id)
+        )
+        is_labor = sampler.__name__ == "sample_layer_neighbors"
+        if is_labor:
+            datapipe = datapipe.transform(self._set_seed)
+        for fanout in reversed(fanouts):
+            # Convert fanout to tensor.
+            if not isinstance(fanout, torch.Tensor):
+                fanout = torch.LongTensor([int(fanout)])
+            datapipe = datapipe.sample_per_layer(
+                sampler, fanout, replace, prob_name
+            )
+            datapipe = datapipe.compact_per_layer(deduplicate)
+            if is_labor and not layer_dependency:
+                datapipe = datapipe.transform(self._increment_seed)
+        if is_labor:
+            datapipe = datapipe.transform(self._delattr_dependency)
+        return datapipe.transform(self._set_input_nodes)
+
+
 @functional_datapipe("sample_neighbor")
-class NeighborSampler(SubgraphSampler):
+class NeighborSampler(NeighborSamplerImpl):
     # pylint: disable=abstract-method
     """Sample neighbor edges from a graph and return a subgraph.
 
@@ -323,61 +448,20 @@ class NeighborSampler(SubgraphSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
-        sampler=None,
     ):
-        if sampler is None:
-            sampler = graph.sample_neighbors
         super().__init__(
-            datapipe, graph, fanouts, replace, prob_name, deduplicate, sampler
+            datapipe,
+            graph,
+            fanouts,
+            replace,
+            prob_name,
+            deduplicate,
+            graph.sample_neighbors,
         )
-
-    @staticmethod
-    def _prepare(node_type_to_id, minibatch):
-        seeds = minibatch._seed_nodes
-        # Enrich seeds with all node types.
-        if isinstance(seeds, dict):
-            ntypes = list(node_type_to_id.keys())
-            # Loop over different seeds to extract the device they are on.
-            device = None
-            dtype = None
-            for _, seed in seeds.items():
-                device = seed.device
-                dtype = seed.dtype
-                break
-            default_tensor = torch.tensor([], dtype=dtype, device=device)
-            seeds = {
-                ntype: seeds.get(ntype, default_tensor) for ntype in ntypes
-            }
-        minibatch._seed_nodes = seeds
-        minibatch.sampled_subgraphs = []
-        return minibatch
-
-    @staticmethod
-    def _set_input_nodes(minibatch):
-        minibatch.input_nodes = minibatch._seed_nodes
-        return minibatch
-
-    # pylint: disable=arguments-differ
-    def sampling_stages(
-        self, datapipe, graph, fanouts, replace, prob_name, deduplicate, sampler
-    ):
-        datapipe = datapipe.transform(
-            partial(self._prepare, graph.node_type_to_id)
-        )
-        for fanout in reversed(fanouts):
-            # Convert fanout to tensor.
-            if not isinstance(fanout, torch.Tensor):
-                fanout = torch.LongTensor([int(fanout)])
-            datapipe = datapipe.sample_per_layer(
-                sampler, fanout, replace, prob_name
-            )
-            datapipe = datapipe.compact_per_layer(deduplicate)
-
-        return datapipe.transform(self._set_input_nodes)
 
 
 @functional_datapipe("sample_layer_neighbor")
-class LayerNeighborSampler(NeighborSampler):
+class LayerNeighborSampler(NeighborSamplerImpl):
     # pylint: disable=abstract-method
     """Sample layer neighbor edges from a graph and return a subgraph.
 
@@ -386,7 +470,7 @@ class LayerNeighborSampler(NeighborSampler):
     Sampler that builds computational dependency of node representations via
     labor sampling for multilayer GNN from the NeurIPS 2023 paper
     `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
-    <https://arxiv.org/abs/2210.13339>`__
+    <https://proceedings.neurips.cc/paper_files/paper/2023/file/51f9036d5e7ae822da8f6d4adda1fb39-Paper-Conference.pdf>`__
 
     Layer-Neighbor sampler is responsible for sampling a subgraph from given
     data. It returns an induced subgraph along with compacted information. In
@@ -429,6 +513,19 @@ class LayerNeighborSampler(NeighborSampler):
         Boolean indicating whether seeds between hops will be deduplicated.
         If True, the same elements in seeds will be deleted to only one.
         Otherwise, the same elements will be remained.
+    layer_dependency: bool
+        Boolean indicating whether different layers should use the same random
+        variates. Results in a reduction in the number of nodes sampled and
+        turns LayerNeighborSampler into a subgraph sampling method. Later layers
+        will be guaranteed to sample overlapping neighbors as the previous
+        layers.
+    batch_dependency: int
+        Specifies whether consecutive minibatches should use similar random
+        variates. Results in a higher temporal access locality of sampled
+        nodes and edges. Setting it to :math:`\\kappa` slows down the change in
+        the random variates proportional to :math:`\\frac{1}{\\kappa}`. Implements
+        the dependent minibatching approach in `arXiv:2310.12403
+        <https://arxiv.org/abs/2310.12403>`__.
 
     Examples
     -------
@@ -481,6 +578,8 @@ class LayerNeighborSampler(NeighborSampler):
         replace=False,
         prob_name=None,
         deduplicate=True,
+        layer_dependency=False,
+        batch_dependency=1,
     ):
         super().__init__(
             datapipe,
@@ -490,4 +589,6 @@ class LayerNeighborSampler(NeighborSampler):
             prob_name,
             deduplicate,
             graph.sample_layer_neighbors,
+            layer_dependency,
+            batch_dependency,
         )

@@ -117,7 +117,7 @@ def create_dataloader(
     # Move the mini-batch to the appropriate device.
     # `device`:
     #   The device to move the mini-batch to.
-    datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+    datapipe = datapipe.copy_to(device, extra_attrs=["seeds"])
 
     # Sample neighbors for each seed node in the mini-batch.
     # `graph`:

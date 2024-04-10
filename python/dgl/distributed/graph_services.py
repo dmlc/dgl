@@ -130,13 +130,10 @@ def _sample_neighbors_graphbolt(
     nodes = nodes.to(dtype=g.indices.dtype)
 
     # 2. Perform sampling.
-    # [Rui][TODO] `prob` and `replace` are not tested yet. Skip for now.
+    # [Rui][TODO] `prob` is not tested yet. Skip for now.
     assert (
         prob is None
     ), "DistGraphBolt does not support sampling with probability."
-    assert (
-        not replace
-    ), "DistGraphBolt does not support sampling with replacement."
 
     # Sanity checks.
     assert isinstance(
@@ -148,7 +145,9 @@ def _sample_neighbors_graphbolt(
     assert isinstance(fanout, torch.Tensor), "Expect a tensor of fanout."
 
     return_eids = g.edge_attributes is not None and EID in g.edge_attributes
-    subgraph = g._sample_neighbors(nodes, fanout, return_eids=return_eids)
+    subgraph = g._sample_neighbors(
+        nodes, None, fanout, replace=replace, return_eids=return_eids
+    )
 
     # 3. Map local node IDs to global node IDs.
     local_src = subgraph.indices
