@@ -1,6 +1,6 @@
 """Utility functions for external use."""
 
-from typing import Dict, Tuple, Union
+from typing import Dict, Union
 
 import torch
 
