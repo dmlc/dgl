@@ -533,10 +533,14 @@ def test_sampled_subgraph_to_device():
         original_edge_ids=original_edge_ids,
     )
     edges_to_exclude = {
-        "A:relation:B": (
-            src_to_exclude,
-            dst_to_exclude,
+        "A:relation:B": torch.cat(
+            (
+                src_to_exclude,
+                dst_to_exclude,
+            )
         )
+        .view(2, -1)
+        .T
     }
     graph = subgraph.exclude_edges(edges_to_exclude)
 
