@@ -415,7 +415,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  private:
   template <bool Temporal, typename NumPickFn, typename PickFn>
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
-      const torch::Tensor& seeds, 
+      const torch::Tensor& seeds,
       torch::optional<std::vector<int64_t>> seed_offsets,
       const std::vector<int64_t>& fanouts, bool return_eids,
       NumPickFn num_pick_fn, PickFn pick_fn) const;
@@ -500,8 +500,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  * @param offset The starting edge ID for the connected neighbors of the given
  * node.
  * @param num_neighbors The number of neighbors of this node.
- *
- * @return The pick number of the given node.
+ * @param num_picked_ptr The pointer of the tensor which stores the pick
+ * numbers.
  */
 template <typename PickedNumType>
 void NumPick(
@@ -522,7 +522,6 @@ void NumPickByEtype(
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
     int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_offset,
-    const std::vector<int64_t>& etype_id_to_dst_ntype_id,
     const std::vector<int64_t>& etype_id_to_num_picked_offset);
 
 int64_t TemporalNumPickByEtype(
@@ -616,8 +615,14 @@ int64_t TemporalPick(
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- * @param picked_data_ptr The destination address where the picked neighbors
+ * @param picked_data_ptr The pointer of the tensor where the picked neighbors
  * should be put. Enough memory space should be allocated in advance.
+ * @param seed_offset The offset(index) of the seed among the group of seeds
+ * which share the same node type.
+ * @param subgraph_indptr_ptr The pointer of the tensor which stores the indptr
+ * of the sampled subgraph.
+ * @param etype_id_to_num_picked_offset A vector storing the mappings from each
+ * etype_id to the offset of its pick numbers in the tensor.
  */
 template <SamplerType S, typename PickedType>
 int64_t PickByEtype(
@@ -627,7 +632,6 @@ int64_t PickByEtype(
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
     PickedType* picked_data_ptr, int64_t seed_offset,
     PickedType* subgraph_indptr_ptr,
-    const std::vector<int64_t>& etype_id_to_dst_ntype_id,
     const std::vector<int64_t>& etype_id_to_num_picked_offset);
 
 template <typename PickedType>
