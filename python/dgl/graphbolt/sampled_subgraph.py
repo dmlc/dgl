@@ -115,9 +115,7 @@ class SampledSubgraph:
     def exclude_edges(
         self,
         edges: Union[
-            Dict[str, Tuple[torch.Tensor, torch.Tensor]],
             Dict[str, torch.Tensor],
-            Tuple[torch.Tensor, torch.Tensor],
             torch.Tensor,
         ],
         assume_num_node_within_int32: bool = True,
@@ -133,10 +131,9 @@ class SampledSubgraph:
         ----------
         self : SampledSubgraph
             The sampled subgraph.
-        edges : Union[Tuple[torch.Tensor, torch.Tensor],
-                Dict[str, Tuple[torch.Tensor, torch.Tensor]]]
+        edges : Union[torch.Tensor, Dict[str, torch.Tensor]]
             Edges to exclude. If sampled subgraph is homogeneous, then `edges`
-            should be a pair of tensors representing the edges to exclude. If
+            should be a N*2 tensors representing the edges to exclude. If
             sampled subgraph is heterogeneous, then `edges` should be a
             dictionary of edge types and the corresponding edges to exclude.
         assume_num_node_within_int32: bool
@@ -165,8 +162,7 @@ class SampledSubgraph:
         ...     original_row_node_ids=original_row_node_ids,
         ...     original_edge_ids=original_edge_ids
         ... )
-        >>> edges_to_exclude = {"A:relation:B": (torch.tensor([14, 15]),
-        ...     torch.tensor([11, 12]))}
+        >>> edges_to_exclude = {"A:relation:B": torch.tensor([[14, 11], [15, 12]])}
         >>> result = subgraph.exclude_edges(edges_to_exclude)
         >>> print(result.sampled_csc)
         {'A:relation:B': CSCFormatBase(indptr=tensor([0, 1, 1, 1]),
@@ -183,9 +179,9 @@ class SampledSubgraph:
         assert (
             assume_num_node_within_int32
         ), "Values > int32 are not supported yet."
-        assert (
-            isinstance(self.sampled_csc, (CSCFormatBase, tuple))
-        ) == isinstance(edges, (tuple, torch.Tensor)), (
+        assert (isinstance(self.sampled_csc, CSCFormatBase)) == isinstance(
+            edges, torch.Tensor
+        ), (
             "The sampled subgraph and the edges to exclude should be both "
             "homogeneous or both heterogeneous."
         )
@@ -202,14 +198,9 @@ class SampledSubgraph:
                 self.original_row_node_ids,
                 self.original_column_node_ids,
             )
-            if isinstance(edges, torch.Tensor):
-                index = _exclude_homo_edges_2(
-                    reverse_edges, edges, assume_num_node_within_int32
-                )
-            else:
-                index = _exclude_homo_edges(
-                    reverse_edges, edges, assume_num_node_within_int32
-                )
+            index = _exclude_homo_edges(
+                reverse_edges, edges, assume_num_node_within_int32
+            )
             return calling_class(*_slice_subgraph(self, index))
         else:
             index = {}
@@ -234,18 +225,11 @@ class SampledSubgraph:
                     original_row_node_ids,
                     original_column_node_ids,
                 )
-                if isinstance(edges[etype], torch.Tensor):
-                    index[etype] = _exclude_homo_edges_2(
-                        reverse_edges,
-                        edges[etype],
-                        assume_num_node_within_int32,
-                    )
-                else:
-                    index[etype] = _exclude_homo_edges(
-                        reverse_edges,
-                        edges[etype],
-                        assume_num_node_within_int32,
-                    )
+                index[etype] = _exclude_homo_edges(
+                    reverse_edges,
+                    edges[etype],
+                    assume_num_node_within_int32,
+                )
             return calling_class(*_slice_subgraph(self, index))
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
@@ -286,26 +270,6 @@ def _relabel_two_arrays(lhs_array, rhs_array):
 
 
 def _exclude_homo_edges(
-    edges: Tuple[torch.Tensor, torch.Tensor],
-    edges_to_exclude: Tuple[torch.Tensor, torch.Tensor],
-    assume_num_node_within_int32: bool,
-):
-    """Return the indices of edges to be included."""
-    if assume_num_node_within_int32:
-        val = edges[0].long() << 32 | edges[1].long()
-        val_to_exclude = (
-            edges_to_exclude[0].long() << 32 | edges_to_exclude[1].long()
-        )
-    else:
-        # TODO: Add support for value > int32.
-        raise NotImplementedError(
-            "Values out of range int32 are not supported yet"
-        )
-    mask = ~isin(val, val_to_exclude)
-    return torch.nonzero(mask, as_tuple=True)[0]
-
-
-def _exclude_homo_edges_2(
     edges: Tuple[torch.Tensor, torch.Tensor],
     edges_to_exclude: torch.Tensor,
     assume_num_node_within_int32: bool,
