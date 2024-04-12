@@ -132,7 +132,7 @@ class ShapeNetDataset(Dataset):
                     [t.split("\n")[0].split(" ") for t in f.readlines()]
                 ).astype(np.float)
             data_list.append(data[:, 0 : self.dim])
-            label_list.append(data[:, 6].astype(np.int))
+            label_list.append(data[:, 6].astype(int))
             category_list.append(shapenet.synset_dict[fn.split("/")[-2]])
         self.data = data_list
         self.label = label_list
@@ -157,5 +157,5 @@ class ShapeNetDataset(Dataset):
         if self.mode == "train":
             x = self.translate(x, size=self.dim)
         x = x.astype(np.float)
-        y = y.astype(np.int)
+        y = y.astype(int)
         return x, y, cat
