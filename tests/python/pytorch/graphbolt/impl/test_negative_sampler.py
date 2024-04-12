@@ -13,7 +13,7 @@ def test_NegativeSampler_invoke():
     # Instantiate graph and required datapipes.
     num_seeds = 30
     item_set = gb.ItemSet(
-        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
+        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="seeds"
     )
     batch_size = 10
     item_sampler = gb.ItemSampler(item_set, batch_size=batch_size).copy_to(
@@ -74,94 +74,6 @@ def test_UniformNegativeSampler_invoke():
         negative_ratio,
     )
     _verify(negative_sampler)
-
-
-def test_UniformNegativeSampler_node_pairs_invoke():
-    # Instantiate graph and required datapipes.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05, bidirection_edge=True).to(
-        F.ctx()
-    )
-    num_seeds = 30
-    item_set = gb.ItemSet(
-        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
-    )
-    batch_size = 10
-    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size).copy_to(
-        F.ctx()
-    )
-    negative_ratio = 2
-
-    # Verify iteration over UniformNegativeSampler.
-    def _verify(negative_sampler):
-        for data in negative_sampler:
-            # Assertation
-            seeds_len = batch_size + batch_size * negative_ratio
-            assert data.seeds.size(0) == seeds_len
-            assert data.labels.size(0) == seeds_len
-            assert data.indexes.size(0) == seeds_len
-
-    # Invoke UniformNegativeSampler via class constructor.
-    negative_sampler = gb.UniformNegativeSampler(
-        item_sampler,
-        graph,
-        negative_ratio,
-    )
-    _verify(negative_sampler)
-
-    # Invoke UniformNegativeSampler via functional form.
-    negative_sampler = item_sampler.sample_uniform_negative(
-        graph,
-        negative_ratio,
-    )
-    _verify(negative_sampler)
-
-
-@pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
-def test_Uniform_NegativeSampler_node_pairs(negative_ratio):
-    # Construct FusedCSCSamplingGraph.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05, bidirection_edge=True).to(
-        F.ctx()
-    )
-    num_seeds = 30
-    item_set = gb.ItemSet(
-        torch.arange(0, num_seeds * 2).reshape(-1, 2), names="node_pairs"
-    )
-    batch_size = 10
-    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size).copy_to(
-        F.ctx()
-    )
-    # Construct NegativeSampler.
-    negative_sampler = gb.UniformNegativeSampler(
-        item_sampler,
-        graph,
-        negative_ratio,
-    )
-    # Perform Negative sampling.
-    for data in negative_sampler:
-        expected_labels = torch.empty(
-            batch_size * (negative_ratio + 1), device=F.ctx()
-        )
-        expected_labels[:batch_size] = 1
-        expected_labels[batch_size:] = 0
-        expected_indexes = torch.arange(batch_size, device=F.ctx())
-        expected_indexes = torch.cat(
-            (
-                expected_indexes,
-                expected_indexes.repeat_interleave(negative_ratio),
-            )
-        )
-        expected_neg_src = data.seeds[:batch_size][:, 0].repeat_interleave(
-            negative_ratio
-        )
-        # Assertation
-        assert data.negative_srcs is None
-        assert data.negative_dsts is None
-        assert data.labels is not None
-        assert data.indexes is not None
-        assert data.seeds.size(0) == batch_size * (negative_ratio + 1)
-        assert torch.equal(data.labels, expected_labels)
-        assert torch.equal(data.indexes, expected_indexes)
-        assert torch.equal(data.seeds[batch_size:][:, 0], expected_neg_src)
 
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
@@ -305,26 +217,6 @@ def get_hetero_graph():
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
     )
-
-
-def test_NegativeSampler_Hetero_node_pairs_Data():
-    graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict(
-        {
-            "n1:e1:n2": gb.ItemSet(
-                torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T,
-                names="node_pairs",
-            ),
-            "n2:e2:n1": gb.ItemSet(
-                torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T,
-                names="node_pairs",
-            ),
-        }
-    )
-
-    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
-    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
-    assert len(list(negative_dp)) == 5
 
 
 def test_NegativeSampler_Hetero_Data():
