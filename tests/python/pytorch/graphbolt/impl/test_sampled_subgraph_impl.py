@@ -57,7 +57,7 @@ def test_exclude_edges_homo_deduplicated(reverse_row, reverse_column):
         original_row_node_ids,
         original_edge_ids,
     )
-    edges_to_exclude = (src_to_exclude, dst_to_exclude)
+    edges_to_exclude = torch.cat((src_to_exclude, dst_to_exclude)).view(2, -1).T
     result = subgraph.exclude_edges(edges_to_exclude)
     expected_csc_formats = gb.CSCFormatBase(
         indptr=torch.tensor([0, 0, 1, 2, 2, 2]), indices=torch.tensor([0, 3])
@@ -107,7 +107,7 @@ def test_exclude_edges_homo_duplicated(reverse_row, reverse_column):
         original_row_node_ids,
         original_edge_ids,
     )
-    edges_to_exclude = (src_to_exclude, dst_to_exclude)
+    edges_to_exclude = torch.cat((src_to_exclude, dst_to_exclude)).view(2, -1).T
     result = subgraph.exclude_edges(edges_to_exclude)
     expected_csc_formats = gb.CSCFormatBase(
         indptr=torch.tensor([0, 0, 1, 1, 1, 3]), indices=torch.tensor([0, 2, 2])
@@ -163,10 +163,14 @@ def test_exclude_edges_hetero_deduplicated(reverse_row, reverse_column):
     )
 
     edges_to_exclude = {
-        "A:relation:B": (
-            src_to_exclude,
-            dst_to_exclude,
+        "A:relation:B": torch.cat(
+            (
+                src_to_exclude,
+                dst_to_exclude,
+            )
         )
+        .view(2, -1)
+        .T
     }
     result = subgraph.exclude_edges(edges_to_exclude)
     expected_csc_formats = {
@@ -231,10 +235,14 @@ def test_exclude_edges_hetero_duplicated(reverse_row, reverse_column):
     )
 
     edges_to_exclude = {
-        "A:relation:B": (
-            src_to_exclude,
-            dst_to_exclude,
+        "A:relation:B": torch.cat(
+            (
+                src_to_exclude,
+                dst_to_exclude,
+            )
         )
+        .view(2, -1)
+        .T
     }
     result = subgraph.exclude_edges(edges_to_exclude)
     expected_csc_formats = {
@@ -525,10 +533,14 @@ def test_sampled_subgraph_to_device():
         original_edge_ids=original_edge_ids,
     )
     edges_to_exclude = {
-        "A:relation:B": (
-            src_to_exclude,
-            dst_to_exclude,
+        "A:relation:B": torch.cat(
+            (
+                src_to_exclude,
+                dst_to_exclude,
+            )
         )
+        .view(2, -1)
+        .T
     }
     graph = subgraph.exclude_edges(edges_to_exclude)
 

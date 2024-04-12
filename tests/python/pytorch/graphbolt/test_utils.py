@@ -12,45 +12,8 @@ import torch
 
 
 def test_add_reverse_edges_homo():
-    edges = (torch.tensor([0, 1, 2, 3]), torch.tensor([4, 5, 6, 7]))
-    combined_edges = gb.add_reverse_edges(edges)
-    assert torch.equal(
-        combined_edges[0], torch.tensor([0, 1, 2, 3, 4, 5, 6, 7])
-    )
-    assert torch.equal(
-        combined_edges[1], torch.tensor([4, 5, 6, 7, 0, 1, 2, 3])
-    )
-
-
-def test_add_reverse_edges_hetero():
-    # reverse_etype doesn't exist in original etypes.
-    edges = {"n1:e1:n2": (torch.tensor([0, 1, 2]), torch.tensor([4, 5, 6]))}
-    reverse_etype_mapping = {"n1:e1:n2": "n2:e2:n1"}
-    combined_edges = gb.add_reverse_edges(edges, reverse_etype_mapping)
-    assert torch.equal(combined_edges["n1:e1:n2"][0], torch.tensor([0, 1, 2]))
-    assert torch.equal(combined_edges["n1:e1:n2"][1], torch.tensor([4, 5, 6]))
-    assert torch.equal(combined_edges["n2:e2:n1"][0], torch.tensor([4, 5, 6]))
-    assert torch.equal(combined_edges["n2:e2:n1"][1], torch.tensor([0, 1, 2]))
-    # reverse_etype exists in original etypes.
-    edges = {
-        "n1:e1:n2": (torch.tensor([0, 1, 2]), torch.tensor([4, 5, 6])),
-        "n2:e2:n1": (torch.tensor([7, 8, 9]), torch.tensor([10, 11, 12])),
-    }
-    reverse_etype_mapping = {"n1:e1:n2": "n2:e2:n1"}
-    combined_edges = gb.add_reverse_edges(edges, reverse_etype_mapping)
-    assert torch.equal(combined_edges["n1:e1:n2"][0], torch.tensor([0, 1, 2]))
-    assert torch.equal(combined_edges["n1:e1:n2"][1], torch.tensor([4, 5, 6]))
-    assert torch.equal(
-        combined_edges["n2:e2:n1"][0], torch.tensor([7, 8, 9, 4, 5, 6])
-    )
-    assert torch.equal(
-        combined_edges["n2:e2:n1"][1], torch.tensor([10, 11, 12, 0, 1, 2])
-    )
-
-
-def test_add_reverse_edges_2_homo():
     edges = torch.tensor([[0, 1, 2, 3], [4, 5, 6, 7]]).T
-    combined_edges = gb.add_reverse_edges_2(edges)
+    combined_edges = gb.add_reverse_edges(edges)
     assert torch.equal(
         combined_edges,
         torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7], [4, 5, 6, 7, 0, 1, 2, 3]]).T,
@@ -63,14 +26,14 @@ def test_add_reverse_edges_2_homo():
             "Only tensor with shape N*2 is supported now, but got torch.Size([4])."
         ),
     ):
-        gb.add_reverse_edges_2(edges)
+        gb.add_reverse_edges(edges)
 
 
-def test_add_reverse_edges_2_hetero():
+def test_add_reverse_edges_hetero():
     # reverse_etype doesn't exist in original etypes.
     edges = {"n1:e1:n2": torch.tensor([[0, 1, 2], [4, 5, 6]]).T}
     reverse_etype_mapping = {"n1:e1:n2": "n2:e2:n1"}
-    combined_edges = gb.add_reverse_edges_2(edges, reverse_etype_mapping)
+    combined_edges = gb.add_reverse_edges(edges, reverse_etype_mapping)
     assert torch.equal(
         combined_edges["n1:e1:n2"], torch.tensor([[0, 1, 2], [4, 5, 6]]).T
     )
@@ -83,7 +46,7 @@ def test_add_reverse_edges_2_hetero():
         "n2:e2:n1": torch.tensor([[7, 8, 9], [10, 11, 12]]).T,
     }
     reverse_etype_mapping = {"n1:e1:n2": "n2:e2:n1"}
-    combined_edges = gb.add_reverse_edges_2(edges, reverse_etype_mapping)
+    combined_edges = gb.add_reverse_edges(edges, reverse_etype_mapping)
     assert torch.equal(
         combined_edges["n1:e1:n2"], torch.tensor([[0, 1, 2], [4, 5, 6]]).T
     )
@@ -102,7 +65,7 @@ def test_add_reverse_edges_2_hetero():
             "Only tensor with shape N*2 is supported now, but got torch.Size([3])."
         ),
     ):
-        gb.add_reverse_edges_2(edges, reverse_etype_mapping)
+        gb.add_reverse_edges(edges, reverse_etype_mapping)
 
 
 @unittest.skipIf(
