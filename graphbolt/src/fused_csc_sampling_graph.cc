@@ -18,6 +18,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "./expand_indptr.h"
 #include "./macro.h"
 #include "./random.h"
 #include "./shared_memory_helper.h"
@@ -359,13 +360,18 @@ auto GetNumPickFn(
   // If fanouts.size() > 1, returns the total number of all edge types of the
   // given node.
   return [&fanouts, replace, &probs_or_mask, &type_per_edge](
-             int64_t seed_offset, int64_t offset, int64_t num_neighbors) {
+             int64_t offset, int64_t num_neighbors, auto num_picked_ptr,
+             int64_t seed_offset,
+             const std::vector<int64_t>& etype_id_to_dst_ntype_id,
+             const std::vector<int64_t>& etype_id_to_num_picked_offset) {
     if (fanouts.size() > 1) {
-      return NumPickByEtype(
-          fanouts, replace, type_per_edge.value(), probs_or_mask, offset,
-          num_neighbors);
+      NumPickByEtype(
+        fanouts, replace, type_per_edge.value(), probs_or_mask,
+        offset, num_neighbors, num_picked_ptr, seed_offset,
+        etype_id_to_dst_ntype_id, etype_id_to_num_picked_offset);
     } else {
-      return NumPick(fanouts[0], replace, probs_or_mask, offset, num_neighbors);
+      NumPick(fanouts[0], replace, probs_or_mask, offset,
+        num_neighbors, num_picked_ptr + seed_offset);
     }
   };
 }
@@ -425,19 +431,23 @@ auto GetPickFn(
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
   return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
-             int64_t seed_offset, int64_t offset, int64_t num_neighbors,
-             auto picked_data_ptr) {
+             int64_t offset, int64_t num_neighbors, auto picked_data_ptr,
+             int64_t seed_offset, auto subgraph_indptr_ptr,
+             const std::vector<int64_t>& etype_id_to_dst_ntype_id,
+             const std::vector<int64_t>& etype_id_to_num_picked_offset) {
     // If fanouts.size() > 1, perform sampling for each edge type of each
     // node; otherwise just sample once for each node with no regard of edge
     // types.
     if (fanouts.size() > 1) {
       return PickByEtype(
           offset, num_neighbors, fanouts, replace, options,
-          type_per_edge.value(), probs_or_mask, args, picked_data_ptr);
+          type_per_edge.value(), probs_or_mask, args, picked_data_ptr,
+          seed_offset, subgraph_indptr_ptr,
+          etype_id_to_dst_ntype_id, etype_id_to_num_picked_offset);
     } else {
       int64_t num_sampled = Pick(
           offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
-          args, picked_data_ptr);
+          args, picked_data_ptr + subgraph_indptr_ptr[seed_offset]);
       if (type_per_edge) {
         std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
       }
@@ -481,15 +491,15 @@ auto GetTemporalPickFn(
       };
 }
 
-template <typename NumPickFn, typename PickFn>
+template <bool Temporal, typename NumPickFn, typename PickFn>
 c10::intrusive_ptr<FusedSampledSubgraph>
 FusedCSCSamplingGraph::SampleNeighborsImpl(
-    const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
-    PickFn pick_fn) const {
-  const int64_t num_nodes = nodes.size(0);
+    const torch::Tensor& seeds, 
+    torch::optional<std::vector<int64_t>> seed_offsets,
+    const std::vector<int64_t>& fanouts, bool return_eids,
+    NumPickFn num_pick_fn, PickFn pick_fn) const {
+  const int64_t num_seeds = seeds.size(0);
   const auto indptr_options = indptr_.options();
-  torch::Tensor num_picked_neighbors_per_node =
-      torch::empty({num_nodes + 1}, indptr_options);
 
   // Calculate GrainSize for parallel_for.
   // Set the default grain size to 64.
@@ -498,36 +508,77 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   torch::Tensor subgraph_indptr;
   torch::Tensor subgraph_indices;
   torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
+  torch::optional<torch::Tensor> edge_offsets = torch::nullopt;
+
+  const int64_t num_etypes =
+    (edge_type_to_id_.has_value() && fanouts.size() > 1) ? edge_type_to_id_->size() : 1;
+  std::vector<int64_t> etype_id_to_dst_ntype_id(num_etypes);
+  std::vector<int64_t> etype_id_to_num_picked_offset(num_etypes + 1);
+  etype_id_to_num_picked_offset[0] = 0;
+  if (fanouts.size() > 1 && !Temporal) {
+    TORCH_CHECK(seed_offsets.has_value(), "`seed_offsets` is needed in hetero sampling.")
+    for (auto& etype_and_id : edge_type_to_id_.value()) {
+      auto etype = etype_and_id.key();
+      auto id = etype_and_id.value();
+      auto dst_type = utils::parse_dst_ntype_from_etype(etype);
+      auto ntype_id = node_type_to_id_->at(dst_type);
+      etype_id_to_dst_ntype_id[id] = ntype_id;
+      etype_id_to_num_picked_offset[id + 1] = seed_offsets->at(ntype_id + 1) - seed_offsets->at(ntype_id);
+    }
+    for (int64_t i = 1; i <= num_etypes; ++i) {
+      etype_id_to_num_picked_offset[i] += etype_id_to_num_picked_offset[i - 1];
+    }
+  } else {
+    etype_id_to_dst_ntype_id[0] = 0;
+    etype_id_to_num_picked_offset[1] = num_seeds;
+  }
+  const int64_t num_rows = (Temporal || fanouts.size() == 1) ? num_seeds : etype_id_to_num_picked_offset[num_etypes];
+  torch::Tensor num_picked_neighbors_per_node =
+      torch::zeros({num_rows + 1}, indptr_options);
 
   AT_DISPATCH_INDEX_TYPES(
       indptr_.scalar_type(), "SampleNeighborsImplWrappedWithIndptr", ([&] {
         using indptr_t = index_t;
         AT_DISPATCH_INDEX_TYPES(
-            nodes.scalar_type(), "SampleNeighborsImplWrappedWithNodes", ([&] {
-              using nodes_t = index_t;
+            seeds.scalar_type(), "SampleNeighborsImplWrappedWithSeeds", ([&] {
+              using seeds_t = index_t;
               const auto indptr_data = indptr_.data_ptr<indptr_t>();
               auto num_picked_neighbors_data_ptr =
                   num_picked_neighbors_per_node.data_ptr<indptr_t>();
               num_picked_neighbors_data_ptr[0] = 0;
-              const auto nodes_data_ptr = nodes.data_ptr<nodes_t>();
+              const auto seeds_data_ptr = seeds.data_ptr<seeds_t>();
 
               // Step 1. Calculate pick number of each node.
               torch::parallel_for(
-                  0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
+                  0, num_seeds, grain_size, [&](int64_t begin, int64_t end) {
                     for (int64_t i = begin; i < end; ++i) {
-                      const auto nid = nodes_data_ptr[i];
+                      const auto nid = seeds_data_ptr[i];
                       TORCH_CHECK(
                           nid >= 0 && nid < NumNodes(),
                           "The seed nodes' IDs should fall within the range of "
-                          "the "
-                          "graph's node IDs.");
+                          "the graph's node IDs.");
                       const auto offset = indptr_data[nid];
                       const auto num_neighbors = indptr_data[nid + 1] - offset;
+                      if constexpr (!Temporal) {
+                        const auto seed_type_id = (seed_offsets.has_value() && fanouts.size() > 1)
+                          ? std::upper_bound(
+                              seed_offsets->begin(), seed_offsets->end(), i) - seed_offsets->begin() - 1
+                          : 0;
+                        const auto seed_offset = (seed_offsets.has_value() && fanouts.size() > 1)
+                          ? i - seed_offsets->at(seed_type_id)
+                          : i;
 
-                      num_picked_neighbors_data_ptr[i + 1] =
-                          num_neighbors == 0
-                              ? 0
-                              : num_pick_fn(i, offset, num_neighbors);
+                        num_pick_fn(offset, num_neighbors,
+                            num_picked_neighbors_data_ptr + 1,
+                            seed_offset,
+                            etype_id_to_dst_ntype_id,
+                            etype_id_to_num_picked_offset);
+                      } else {
+                        num_picked_neighbors_data_ptr[i + 1] =
+                            num_neighbors == 0
+                                ? 0
+                                : num_pick_fn(i, offset, num_neighbors);
+                      }
                     }
                   });
 
@@ -535,10 +586,29 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
               // each node. It's also the indptr of the generated subgraph.
               subgraph_indptr = num_picked_neighbors_per_node.cumsum(
                   0, indptr_.scalar_type());
+              auto subgraph_indptr_data_ptr =
+                  subgraph_indptr.data_ptr<indptr_t>();
+
+              // When doing non-temporal hetero sampling, we generate an
+              // edge_offsets tensor.
+              if (type_per_edge_.has_value() && fanouts.size() > 1 && !Temporal) {
+                edge_offsets = torch::empty(num_etypes + 1, indptr_options);
+                AT_DISPATCH_INTEGRAL_TYPES(
+                    edge_offsets.value().scalar_type(),
+                    "CalculateEdgeOffsets", ([&] {
+                      auto edge_offsets_data_ptr =
+                          edge_offsets.value()
+                              .data_ptr<scalar_t>();
+                      edge_offsets_data_ptr[0] = 0;
+                      for (auto i = 0; i < num_etypes; ++i) {
+                        edge_offsets_data_ptr[i + 1] = subgraph_indptr_data_ptr[etype_id_to_num_picked_offset[i + 1]];
+                      }
+                    }));
+              }
 
               // Step 3. Allocate the tensor for picked neighbors.
               const auto total_length =
-                  subgraph_indptr.data_ptr<indptr_t>()[num_nodes];
+                  subgraph_indptr.data_ptr<indptr_t>()[num_rows];
               picked_eids = torch::empty({total_length}, indptr_options);
               subgraph_indices =
                   torch::empty({total_length}, indices_.options());
@@ -547,60 +617,119 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                     {total_length}, type_per_edge_.value().options());
               }
 
-              // Step 4. Pick neighbors for each node.
               auto picked_eids_data_ptr = picked_eids.data_ptr<indptr_t>();
-              auto subgraph_indptr_data_ptr =
-                  subgraph_indptr.data_ptr<indptr_t>();
               torch::parallel_for(
-                  0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
+                  0, num_seeds, grain_size, [&](int64_t begin, int64_t end) {
                     for (int64_t i = begin; i < end; ++i) {
-                      const auto nid = nodes_data_ptr[i];
+                      const auto nid = seeds_data_ptr[i];
                       const auto offset = indptr_data[nid];
                       const auto num_neighbors = indptr_data[nid + 1] - offset;
-                      const auto picked_number =
-                          num_picked_neighbors_data_ptr[i + 1];
-                      const auto picked_offset = subgraph_indptr_data_ptr[i];
-                      if (picked_number > 0) {
-                        auto actual_picked_count = pick_fn(
-                            i, offset, num_neighbors,
-                            picked_eids_data_ptr + picked_offset);
-                        TORCH_CHECK(
-                            actual_picked_count == picked_number,
-                            "Actual picked count doesn't match the calculated "
-                            "pick "
-                            "number.");
+                      int64_t picked_number = 0;
+                      if constexpr (Temporal) {
+                        // Step 4a. Pick neighbors for each node.
+                        picked_number =
+                            num_picked_neighbors_data_ptr[i + 1];
+                        const auto picked_offset = subgraph_indptr_data_ptr[i];
+                        if (picked_number > 0) {
+                          auto actual_picked_count = pick_fn(
+                              i, offset, num_neighbors,
+                              picked_eids_data_ptr + picked_offset);
+                          TORCH_CHECK(
+                              actual_picked_count == picked_number,
+                              "Actual picked count doesn't match the calculated "
+                              "pick number.");
 
-                        // Step 5. Calculate other attributes and return the
-                        // subgraph.
-                        AT_DISPATCH_INDEX_TYPES(
-                            subgraph_indices.scalar_type(),
-                            "IndexSelectSubgraphIndices", ([&] {
-                              auto subgraph_indices_data_ptr =
-                                  subgraph_indices.data_ptr<index_t>();
-                              auto indices_data_ptr =
-                                  indices_.data_ptr<index_t>();
-                              for (auto i = picked_offset;
-                                   i < picked_offset + picked_number; ++i) {
-                                subgraph_indices_data_ptr[i] =
-                                    indices_data_ptr[picked_eids_data_ptr[i]];
-                              }
-                            }));
-                        if (type_per_edge_.has_value()) {
-                          AT_DISPATCH_INTEGRAL_TYPES(
-                              subgraph_type_per_edge.value().scalar_type(),
-                              "IndexSelectTypePerEdge", ([&] {
-                                auto subgraph_type_per_edge_data_ptr =
-                                    subgraph_type_per_edge.value()
-                                        .data_ptr<scalar_t>();
-                                auto type_per_edge_data_ptr =
-                                    type_per_edge_.value().data_ptr<scalar_t>();
+                          // Step 5a. Calculate other attributes and return the
+                          // subgraph.
+                          AT_DISPATCH_INDEX_TYPES(
+                              subgraph_indices.scalar_type(),
+                              "IndexSelectSubgraphIndices", ([&] {
+                                auto subgraph_indices_data_ptr =
+                                    subgraph_indices.data_ptr<index_t>();
+                                auto indices_data_ptr =
+                                    indices_.data_ptr<index_t>();
                                 for (auto i = picked_offset;
-                                     i < picked_offset + picked_number; ++i) {
-                                  subgraph_type_per_edge_data_ptr[i] =
-                                      type_per_edge_data_ptr
-                                          [picked_eids_data_ptr[i]];
+                                      i < picked_offset + picked_number; ++i) {
+                                  subgraph_indices_data_ptr[i] =
+                                      indices_data_ptr[picked_eids_data_ptr[i]];
                                 }
                               }));
+                          if (type_per_edge_.has_value()) {
+                            AT_DISPATCH_INTEGRAL_TYPES(
+                                subgraph_type_per_edge.value().scalar_type(),
+                                "IndexSelectTypePerEdge", ([&] {
+                                  auto subgraph_type_per_edge_data_ptr =
+                                      subgraph_type_per_edge.value()
+                                          .data_ptr<scalar_t>();
+                                  auto type_per_edge_data_ptr =
+                                      type_per_edge_.value().data_ptr<scalar_t>();
+                                  for (auto i = picked_offset;
+                                        i < picked_offset + picked_number; ++i) {
+                                    subgraph_type_per_edge_data_ptr[i] =
+                                        type_per_edge_data_ptr
+                                            [picked_eids_data_ptr[i]];
+                                  }
+                                }));
+                          }
+                        }
+                      } else {
+                        // Step 4b. Pick neighbors for each node.
+                        const auto seed_type_id = (seed_offsets.has_value() && fanouts.size() > 1)
+                          ? std::upper_bound(
+                              seed_offsets->begin(), seed_offsets->end(), i) - seed_offsets->begin() - 1
+                          : 0;
+                        const auto seed_offset = (seed_offsets.has_value() && fanouts.size() > 1)
+                          ? i - seed_offsets->at(seed_type_id)
+                          : i;
+                        
+                        picked_number = pick_fn(
+                            offset, num_neighbors,
+                            picked_eids_data_ptr,
+                            seed_offset,
+                            subgraph_indptr_data_ptr,
+                            etype_id_to_dst_ntype_id,
+                            etype_id_to_num_picked_offset);
+
+                        // Step 5b. Calculate other attributes and return the
+                        // subgraph.
+                        if (picked_number > 0) {
+                          AT_DISPATCH_INDEX_TYPES(
+                              subgraph_indices.scalar_type(),
+                              "IndexSelectSubgraphIndices", ([&] {
+                                auto subgraph_indices_data_ptr =
+                                    subgraph_indices.data_ptr<index_t>();
+                                auto indices_data_ptr =
+                                    indices_.data_ptr<index_t>();
+                                for (auto i = 0; i < num_etypes; ++i) {
+                                  if (etype_id_to_dst_ntype_id[i] != seed_type_id)
+                                    continue;
+                                  auto indptr_offset = etype_id_to_num_picked_offset[i] + seed_offset;
+                                  const auto picked_begin = subgraph_indptr_data_ptr[indptr_offset];
+                                  const auto picked_end = subgraph_indptr_data_ptr[indptr_offset + 1];
+                                  for (auto j = picked_begin; j < picked_end; ++j)
+                                    subgraph_indices_data_ptr[j] =
+                                        indices_data_ptr[picked_eids_data_ptr[j]];
+                                }
+                              }));
+                          
+                          if (fanouts.size() == 1 && type_per_edge_.has_value()) {
+                            // Under this situation, hetero graph was sampled
+                            // as a homo graph. For now we still generate
+                            // type_per_edge tensor for this condition.
+                            AT_DISPATCH_INTEGRAL_TYPES(
+                                subgraph_type_per_edge.value().scalar_type(),
+                                "IndexSelectSubgraphIndices", ([&] {
+                                  auto subgraph_type_per_edge_data_ptr =
+                                      subgraph_type_per_edge.value().data_ptr<scalar_t>();
+                                  auto type_per_edge_data_ptr =
+                                      type_per_edge_.value().data_ptr<scalar_t>();
+                                  const auto picked_offset = subgraph_indptr_data_ptr[seed_offset];
+                                  for (auto j = picked_offset;
+                                      j < picked_offset + picked_number; ++j)
+                                    subgraph_type_per_edge_data_ptr[j] =
+                                        type_per_edge_data_ptr[picked_eids_data_ptr[j]];
+                                }));
+                          }
                         }
                       }
                     }
@@ -612,8 +741,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 
   return c10::make_intrusive<FusedSampledSubgraph>(
-      subgraph_indptr, subgraph_indices, nodes, torch::nullopt,
-      subgraph_reverse_edge_ids, subgraph_type_per_edge);
+      subgraph_indptr, subgraph_indices, seeds, torch::nullopt,
+      subgraph_reverse_edge_ids, subgraph_type_per_edge, edge_offsets);
 }
 
 c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
@@ -668,8 +797,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
           indices_,
           {random_seed.value(), static_cast<float>(seed2_contribution)},
           NumNodes()};
-      return SampleNeighborsImpl(
-          seeds.value(), return_eids,
+      return SampleNeighborsImpl<false>(
+          seeds.value(), seed_offsets, fanouts, return_eids,
           GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
           GetPickFn(
               fanouts, replace, indptr_.options(), type_per_edge_,
@@ -687,8 +816,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
               NumNodes()};
         }
       }();
-      return SampleNeighborsImpl(
-          seeds.value(), return_eids,
+      return SampleNeighborsImpl<false>(
+          seeds.value(), seed_offsets, fanouts, return_eids,
           GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
           GetPickFn(
               fanouts, replace, indptr_.options(), type_per_edge_,
@@ -696,8 +825,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     }
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
-    return SampleNeighborsImpl(
-        seeds.value(), return_eids,
+    return SampleNeighborsImpl<false>(
+        seeds.value(), seed_offsets, fanouts, return_eids,
         GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
         GetPickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
@@ -733,8 +862,8 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
     const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
     SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
-    return SampleNeighborsImpl(
-        input_nodes, return_eids,
+    return SampleNeighborsImpl<true>(
+        input_nodes, torch::nullopt, fanouts, return_eids,
         GetTemporalNumPickFn(
             input_nodes_timestamp, this->indices_, fanouts, replace,
             type_per_edge_, probs_or_mask, node_timestamp, edge_timestamp),
@@ -744,8 +873,8 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
             edge_timestamp, args));
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
-    return SampleNeighborsImpl(
-        input_nodes, return_eids,
+    return SampleNeighborsImpl<true>(
+        input_nodes, torch::nullopt, fanouts, return_eids,
         GetTemporalNumPickFn(
             input_nodes_timestamp, this->indices_, fanouts, replace,
             type_per_edge_, probs_or_mask, node_timestamp, edge_timestamp),
@@ -805,10 +934,11 @@ void FusedCSCSamplingGraph::HoldSharedMemoryObject(
   tensor_data_shm_ = std::move(tensor_data_shm);
 }
 
-int64_t NumPick(
+template <typename PickedNumType>
+void NumPick(
     int64_t fanout, bool replace,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors) {
+    int64_t num_neighbors, PickedNumType* picked_num_ptr) {
   int64_t num_valid_neighbors = num_neighbors;
   if (probs_or_mask.has_value()) {
     // Subtract the count of zeros in probs_or_mask.
@@ -820,8 +950,11 @@ int64_t NumPick(
               0);
         }));
   }
-  if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
-  return replace ? fanout : std::min(fanout, num_valid_neighbors);
+  if (num_valid_neighbors == 0 || fanout == -1) {
+    *picked_num_ptr = num_valid_neighbors;
+  } else {
+    *picked_num_ptr = replace ? fanout : std::min(fanout, num_valid_neighbors);
+  }
 }
 
 torch::Tensor TemporalMask(
@@ -920,14 +1053,16 @@ int64_t TemporalNumPick(
   return replace ? fanout : std::min(fanout, num_valid_neighbors);
 }
 
-int64_t NumPickByEtype(
+template <typename PickedNumType>
+void NumPickByEtype(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors) {
+    int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_offset,
+    const std::vector<int64_t>& etype_id_to_dst_ntype_id,
+    const std::vector<int64_t>& etype_id_to_num_picked_offset) {
   int64_t etype_begin = offset;
   const int64_t end = offset + num_neighbors;
-  int64_t total_count = 0;
   AT_DISPATCH_INTEGRAL_TYPES(
       type_per_edge.scalar_type(), "NumPickFnByEtype", ([&] {
         const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
@@ -941,13 +1076,13 @@ int64_t NumPickByEtype(
               etype);
           int64_t etype_end = etype_end_it - type_per_edge_data;
           // Do sampling for one etype.
-          total_count += NumPick(
+          NumPick(
               fanouts[etype], replace, probs_or_mask, etype_begin,
-              etype_end - etype_begin);
+              etype_end - etype_begin,
+              num_picked_ptr + etype_id_to_num_picked_offset[etype] + seed_offset);
           etype_begin = etype_end;
         }
       }));
-  return total_count;
 }
 
 int64_t TemporalNumPickByEtype(
@@ -1259,6 +1394,7 @@ int64_t Pick(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr) {
+  if (fanout == 0 || num_neighbors == 0) return 0;
   if (probs_or_mask.has_value()) {
     return NonUniformPick(
         offset, num_neighbors, fanout, replace, options, probs_or_mask.value(),
@@ -1324,10 +1460,13 @@ int64_t PickByEtype(
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
-    PickedType* picked_data_ptr) {
+    PickedType* picked_data_ptr, int64_t seed_offset,
+    PickedType* subgraph_indptr_ptr,
+    const std::vector<int64_t>& etype_id_to_dst_ntype_id,
+    const std::vector<int64_t>& etype_id_to_num_picked_offset) {
   int64_t etype_begin = offset;
   int64_t etype_end = offset;
-  int64_t pick_offset = 0;
+  int64_t picked_total_count = 0;
   AT_DISPATCH_INTEGRAL_TYPES(
       type_per_edge.scalar_type(), "PickByEtype", ([&] {
         const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
@@ -1346,13 +1485,18 @@ int64_t PickByEtype(
           if (fanout != 0) {
             int64_t picked_count = Pick(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
-                probs_or_mask, args, picked_data_ptr + pick_offset);
-            pick_offset += picked_count;
+                probs_or_mask, args, picked_data_ptr + subgraph_indptr_ptr[etype_id_to_num_picked_offset[etype] + seed_offset]);
+            TORCH_CHECK(
+                subgraph_indptr_ptr[etype_id_to_num_picked_offset[etype] + seed_offset + 1]
+                - subgraph_indptr_ptr[etype_id_to_num_picked_offset[etype] + seed_offset] == picked_count,
+                "Actual picked count doesn't match the calculated "
+                "pick number.");
+            picked_total_count += picked_count;
           }
           etype_begin = etype_end;
         }
       }));
-  return pick_offset;
+  return picked_total_count;
 }
 
 template <SamplerType S, typename PickedType>
@@ -1403,7 +1547,7 @@ std::enable_if_t<is_labor(S), int64_t> Pick(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
     PickedType* picked_data_ptr) {
-  if (fanout == 0) return 0;
+  if (fanout == 0 || num_neighbors == 0) return 0;
   if (probs_or_mask.has_value()) {
     if (fanout < 0) {
       return NonUniformPick(

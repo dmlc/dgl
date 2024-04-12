@@ -413,10 +413,12 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm);
 
  private:
-  template <typename NumPickFn, typename PickFn>
+  template <bool Temporal, typename NumPickFn, typename PickFn>
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
-      const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
-      PickFn pick_fn) const;
+      const torch::Tensor& seeds, 
+      torch::optional<std::vector<int64_t>> seed_offsets,
+      const std::vector<int64_t>& fanouts, bool return_eids,
+      NumPickFn num_pick_fn, PickFn pick_fn) const;
 
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
@@ -501,10 +503,11 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  *
  * @return The pick number of the given node.
  */
-int64_t NumPick(
+template <typename PickedNumType>
+void NumPick(
     int64_t fanout, bool replace,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors);
+    int64_t num_neighbors, PickedNumType* num_picked_ptr);
 
 int64_t TemporalNumPick(
     torch::Tensor seed_timestamp, torch::Tensor csc_indics, int64_t fanout,
@@ -513,11 +516,14 @@ int64_t TemporalNumPick(
     const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
     int64_t offset, int64_t num_neighbors);
 
-int64_t NumPickByEtype(
+template <typename PickedNumType>
+void NumPickByEtype(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors);
+    int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_offset,
+    const std::vector<int64_t>& etype_id_to_dst_ntype_id,
+    const std::vector<int64_t>& etype_id_to_num_picked_offset);
 
 int64_t TemporalNumPickByEtype(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices,
@@ -619,7 +625,10 @@ int64_t PickByEtype(
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
-    PickedType* picked_data_ptr);
+    PickedType* picked_data_ptr, int64_t seed_offset,
+    PickedType* subgraph_indptr_ptr,
+    const std::vector<int64_t>& etype_id_to_dst_ntype_id,
+    const std::vector<int64_t>& etype_id_to_num_picked_offset);
 
 template <typename PickedType>
 int64_t TemporalPickByEtype(

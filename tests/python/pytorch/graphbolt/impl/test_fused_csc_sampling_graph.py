@@ -2222,7 +2222,10 @@ def test_sample_neighbors_hetero_pick_number(
     )
 
     # Generate subgraph via sample neighbors.
-    nodes = torch.LongTensor([0, 1])
+    nodes = {
+        "N0": torch.LongTensor([0]).to(F.ctx()),
+        "N1": torch.LongTensor([1]).to(F.ctx()),
+    }
 
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
 
