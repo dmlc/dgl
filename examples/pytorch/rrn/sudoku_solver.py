@@ -13,7 +13,7 @@ def solve_sudoku(puzzle):
     :param puzzle: an array-like data with shape [9, 9], blank positions are filled with 0
     :return: a [9, 9] shaped numpy array
     """
-    puzzle = np.array(puzzle, dtype=np.long).reshape([-1])
+    puzzle = np.array(puzzle, dtype=int).reshape([-1])
     model_path = "ckpt"
     if not os.path.exists(model_path):
         os.mkdir(model_path)
