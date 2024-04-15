@@ -66,15 +66,14 @@ def test_disk_based_feature():
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
         with pytest.raises(AssertionError):
-            assert (not np.isfortran(a_T)), (
-                "DiskBasedFeature only supports C_CONTIGUOUS array."
-            )
+            assert not np.isfortran(
+                a_T
+            ), "DiskBasedFeature only supports C_CONTIGUOUS array."
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None
         feature_a = feature_b = None
-
 
 
 @unittest.skipIf(
