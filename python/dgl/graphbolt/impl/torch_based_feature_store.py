@@ -431,4 +431,3 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         return ret.format(
             Classname=self.__class__.__name__, features=features_str
         )
-    
