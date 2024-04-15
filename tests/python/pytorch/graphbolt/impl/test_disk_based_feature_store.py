@@ -65,7 +65,7 @@ def test_disk_based_feature():
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
-        with pytest.aises(AssertionError):
+        with pytest.raises(AssertionError):
             assert (not np.isfortran(a_T)), (
                 "DiskBasedFeature only supports C_CONTIGUOUS array."
             )

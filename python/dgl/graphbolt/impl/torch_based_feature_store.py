@@ -264,7 +264,7 @@ class DiskBasedFeature(Feature):
         assert (not np.isfortran(loaded_array)), (
             "DiskBasedFeature only supports C_CONTIGUOUS array."
         )
-        self._tensor = torch.from_numpy(loaded_array).contiguous()
+        self._tensor = torch.from_numpy(loaded_array)
 
         self._metadata = metadata
         self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
