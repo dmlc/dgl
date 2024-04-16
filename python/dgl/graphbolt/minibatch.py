@@ -562,29 +562,7 @@ class MiniBatch:
         def apply_to(x, device):
             return recursive_apply(x, lambda x: _to(x, device))
 
-        if self.seed_nodes is not None and self.compacted_node_pairs is None:
-            # Node related tasks.
-            transfer_attrs = [
-                "labels",
-                "sampled_subgraphs",
-                "node_features",
-                "edge_features",
-            ]
-            if self.labels is None:
-                # Layerwise inference
-                transfer_attrs.append("seed_nodes")
-        elif self.seed_nodes is None and self.compacted_node_pairs is not None:
-            # Link/edge related tasks.
-            transfer_attrs = [
-                "labels",
-                "compacted_node_pairs",
-                "compacted_negative_srcs",
-                "compacted_negative_dsts",
-                "sampled_subgraphs",
-                "node_features",
-                "edge_features",
-            ]
-        elif self.seeds is not None:
+        if self.seeds is not None:
             # Node/link/edge related tasks.
             transfer_attrs = [
                 "labels",
