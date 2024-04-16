@@ -650,7 +650,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                       const auto offset = indptr_data[nid];
                       const auto num_neighbors = indptr_data[nid + 1] - offset;
                       int64_t picked_number = 0;
-                      index_t picked_offset = 0;
+                      indptr_t picked_offset = 0;
                       if constexpr (Temporal) {
                         // Step 4a. Pick neighbors for each node.
                         picked_number = num_picked_neighbors_data_ptr[i + 1];
@@ -698,7 +698,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                 }));
                           }
                         }
-                      } else {
+                      }
+                      if constexpr (!Temporal) {
                         // Step 4b. Pick neighbors for each node.
                         const auto seed_type_id =
                             (seed_offsets.has_value() && fanouts.size() > 1)
