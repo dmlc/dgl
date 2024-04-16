@@ -141,19 +141,18 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
               int64_t aligned_offset = offset & (long)~(kDiskAlignmentSize - 1);
               disk_offsets[thread_id * group_size_ + group_id] =
                 offset - aligned_offset;
-              
-              if(aligned_offset_cache.find(aligned_offset) != aligned_offset_cache.end()){
-                //aligned_offset_cache.find(aligned_offset) != aligned_offset_cache.end()
-                group_id_cache[group_id] = aligned_offset_cache[aligned_offset];
-              }
-              else{
-                int64_t read_size;
-                if (disk_offsets[thread_id * group_size_ + group_id] + feature_size_ >
-                    kDiskAlignmentSize) {
+              int64_t read_size;
+              if (disk_offsets[thread_id * group_size_ + group_id] + feature_size_ >
+                      kDiskAlignmentSize) {
                   read_size = aligned_length + kDiskAlignmentSize;
                 } else {
                   read_size = aligned_length;
                 }
+              if(read_size == aligned_length && aligned_offset_cache.find(aligned_offset) != aligned_offset_cache.end()){
+                //aligned_offset_cache.find(aligned_offset) != aligned_offset_cache.end()
+                group_id_cache[group_id] = aligned_offset_cache[aligned_offset];
+              }
+              else{
                 struct io_uring_sqe *submit_queue =
                     io_uring_get_sqe(&io_uring_queue_[thread_id]);
                     io_uring_prep_read(
@@ -198,7 +197,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                     //group_id_cache.find(batch_id) != group_id_cache.end()
                     if(group_id_cache.find(batch_id) != group_id_cache.end())
                     { 
-                        cout<<"group_id_cache:"<<group_id_cache[batch_id]<<endl;
+                        //cout<<"group_id_cache:"<<group_id_cache[batch_id]<<endl;
                         memcpy(
                         result_buffer + feature_size_ * (batch_start + batch_id),
                         read_buffer +
@@ -211,7 +210,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                         feature_size_);
                     }
                     else{
-                      cout<<batch_id<<endl;
+                      //cout<<batch_id<<endl;
                       memcpy(
                         result_buffer + feature_size_ * (batch_start + batch_id),
                         read_buffer +
