@@ -668,7 +668,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                           // subgraph.
                           AT_DISPATCH_INDEX_TYPES(
                               subgraph_indices.scalar_type(),
-                              "IndexSelectSubgraphIndices", ([&picked_number] {
+                              "IndexSelectSubgraphIndices", ([&] {
                                 auto subgraph_indices_data_ptr =
                                     subgraph_indices.data_ptr<index_t>();
                                 auto indices_data_ptr =
@@ -761,7 +761,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                   auto type_per_edge_data_ptr =
                                       type_per_edge_.value()
                                           .data_ptr<scalar_t>();
-                                  const auto picked_offset =
+                                  picked_offset =
                                       subgraph_indptr_data_ptr[seed_offset];
                                   for (auto j = picked_offset;
                                        j < picked_offset + picked_number; ++j)
