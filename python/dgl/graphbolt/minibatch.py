@@ -562,27 +562,14 @@ class MiniBatch:
         def apply_to(x, device):
             return recursive_apply(x, lambda x: _to(x, device))
 
-        if self.seeds is not None:
-            # Node/link/edge related tasks.
-            transfer_attrs = [
-                "labels",
-                "sampled_subgraphs",
-                "node_features",
-                "edge_features",
-                "compacted_seeds",
-                "indexes",
-                "seeds",
-            ]
-        else:
-            # Otherwise copy all the attributes to the device.
-            transfer_attrs = get_attributes(self)
+        transfer_attrs = get_attributes(self)
 
         for attr in transfer_attrs:
             # Only copy member variables.
             try:
-                # For read-only attributes such as blocks and
-                # node_pairs_with_labels, setattr will throw an AttributeError.
-                # We catch these exceptions and skip those attributes.
+                # For read-only attributes such as blocks , setattr will throw
+                # an AttributeError. We catch these exceptions and skip those
+                # attributes.
                 setattr(self, attr, apply_to(getattr(self, attr), device))
             except AttributeError:
                 continue

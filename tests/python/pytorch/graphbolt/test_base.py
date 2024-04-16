@@ -83,47 +83,20 @@ def test_CopyToWithMiniBatches(task):
             ["a"],
         )
 
-    if task == "node_classification":
-        copied_attrs = [
-            "node_features",
-            "edge_features",
-            "sampled_subgraphs",
-            "labels",
-            "blocks",
-            "seeds",
-        ]
-    elif task == "node_inference":
-        copied_attrs = [
-            "seeds",
-            "sampled_subgraphs",
-            "blocks",
-            "labels",
-        ]
-    elif task == "link_prediction" or task == "edge_classification":
-        copied_attrs = [
-            "labels",
-            "compacted_seeds",
-            "sampled_subgraphs",
-            "indexes",
-            "node_features",
-            "edge_features",
-            "blocks",
-            "seeds",
-        ]
-    elif task == "extra_attrs":
-        copied_attrs = [
-            "node_features",
-            "edge_features",
-            "sampled_subgraphs",
-            "labels",
-            "blocks",
-            "seed_nodes",
-            "seeds",
-        ]
+    copied_attrs = [
+        "labels",
+        "compacted_seeds",
+        "sampled_subgraphs",
+        "indexes",
+        "node_features",
+        "edge_features",
+        "blocks",
+        "seeds",
+        "input_nodes",
+    ]
 
     def test_data_device(datapipe):
         for data in datapipe:
-            print(data)
             for attr in dir(data):
                 var = getattr(data, attr)
                 if isinstance(var, Mapping):
