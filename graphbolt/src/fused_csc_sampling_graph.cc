@@ -730,7 +730,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                   if (etype_id_to_dst_ntype_id[i] !=
                                       seed_type_id)
                                     continue;
-                                  auto indptr_offset =
+                                  const auto indptr_offset =
                                       etype_id_to_num_picked_offset[i] +
                                       seed_offset;
                                   const auto picked_begin =
