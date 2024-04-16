@@ -651,55 +651,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                       const auto num_neighbors = indptr_data[nid + 1] - offset;
                       int64_t picked_number = 0;
                       indptr_t picked_offset = 0;
-                      if constexpr (Temporal) {
+                      if constexpr (!Temporal) {
                         // Step 4a. Pick neighbors for each node.
-                        picked_number = num_picked_neighbors_data_ptr[i + 1];
-                        picked_offset = subgraph_indptr_data_ptr[i];
-                        if (picked_number > 0) {
-                          auto actual_picked_count = pick_fn(
-                              i, offset, num_neighbors,
-                              picked_eids_data_ptr + picked_offset);
-                          TORCH_CHECK(
-                              actual_picked_count == picked_number,
-                              "Actual picked count doesn't match the "
-                              "calculated pick number.");
-
-                          // Step 5a. Calculate other attributes and return the
-                          // subgraph.
-                          AT_DISPATCH_INDEX_TYPES(
-                              subgraph_indices.scalar_type(),
-                              "IndexSelectSubgraphIndices", ([&] {
-                                auto subgraph_indices_data_ptr =
-                                    subgraph_indices.data_ptr<index_t>();
-                                auto indices_data_ptr =
-                                    indices_.data_ptr<index_t>();
-                                for (auto i = picked_offset;
-                                     i < picked_offset + picked_number; ++i) {
-                                  subgraph_indices_data_ptr[i] =
-                                      indices_data_ptr[picked_eids_data_ptr[i]];
-                                }
-                              }));
-                          if (type_per_edge_.has_value()) {
-                            AT_DISPATCH_INTEGRAL_TYPES(
-                                subgraph_type_per_edge.value().scalar_type(),
-                                "IndexSelectTypePerEdge", ([&] {
-                                  auto subgraph_type_per_edge_data_ptr =
-                                      subgraph_type_per_edge.value()
-                                          .data_ptr<scalar_t>();
-                                  auto type_per_edge_data_ptr =
-                                      type_per_edge_.value()
-                                          .data_ptr<scalar_t>();
-                                  for (auto i = picked_offset;
-                                       i < picked_offset + picked_number; ++i) {
-                                    subgraph_type_per_edge_data_ptr[i] =
-                                        type_per_edge_data_ptr
-                                            [picked_eids_data_ptr[i]];
-                                  }
-                                }));
-                          }
-                        }
-                      } else {
-                        // Step 4b. Pick neighbors for each node.
                         const auto seed_type_id =
                             (seed_offsets.has_value() && fanouts.size() > 1)
                                 ? std::upper_bound(
@@ -717,16 +670,12 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                             seed_offset, subgraph_indptr_data_ptr,
                             etype_id_to_num_picked_offset);
 
-                        // Step 5b. Calculate other attributes and return the
+                        // Step 5a. Calculate other attributes and return the
                         // subgraph.
                         if (picked_number > 0) {
                           AT_DISPATCH_INDEX_TYPES(
                               subgraph_indices.scalar_type(),
-                              "IndexSelectSubgraphIndices",
-                              ([this, &subgraph_indices, &picked_eids_data_ptr,
-                                &num_etypes, &etype_id_to_dst_ntype_id,
-                                &seed_type_id, &etype_id_to_num_picked_offset,
-                                &seed_offset, &subgraph_indptr_data_ptr] {
+                              "IndexSelectSubgraphIndices", ([&] {
                                 auto subgraph_indices_data_ptr =
                                     subgraph_indices.data_ptr<index_t>();
                                 auto indices_data_ptr =
@@ -772,6 +721,53 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                     subgraph_type_per_edge_data_ptr[j] =
                                         type_per_edge_data_ptr
                                             [picked_eids_data_ptr[j]];
+                                }));
+                          }
+                        }
+                      } else {
+                        // Step 4b. Pick neighbors for each node.
+                        picked_number = num_picked_neighbors_data_ptr[i + 1];
+                        picked_offset = subgraph_indptr_data_ptr[i];
+                        if (picked_number > 0) {
+                          auto actual_picked_count = pick_fn(
+                              i, offset, num_neighbors,
+                              picked_eids_data_ptr + picked_offset);
+                          TORCH_CHECK(
+                              actual_picked_count == picked_number,
+                              "Actual picked count doesn't match the "
+                              "calculated pick number.");
+
+                          // Step 5b. Calculate other attributes and return the
+                          // subgraph.
+                          AT_DISPATCH_INDEX_TYPES(
+                              subgraph_indices.scalar_type(),
+                              "IndexSelectSubgraphIndices", ([&] {
+                                auto subgraph_indices_data_ptr =
+                                    subgraph_indices.data_ptr<index_t>();
+                                auto indices_data_ptr =
+                                    indices_.data_ptr<index_t>();
+                                for (auto i = picked_offset;
+                                     i < picked_offset + picked_number; ++i) {
+                                  subgraph_indices_data_ptr[i] =
+                                      indices_data_ptr[picked_eids_data_ptr[i]];
+                                }
+                              }));
+                          if (type_per_edge_.has_value()) {
+                            AT_DISPATCH_INTEGRAL_TYPES(
+                                subgraph_type_per_edge.value().scalar_type(),
+                                "IndexSelectTypePerEdge", ([&] {
+                                  auto subgraph_type_per_edge_data_ptr =
+                                      subgraph_type_per_edge.value()
+                                          .data_ptr<scalar_t>();
+                                  auto type_per_edge_data_ptr =
+                                      type_per_edge_.value()
+                                          .data_ptr<scalar_t>();
+                                  for (auto i = picked_offset;
+                                       i < picked_offset + picked_number; ++i) {
+                                    subgraph_type_per_edge_data_ptr[i] =
+                                        type_per_edge_data_ptr
+                                            [picked_eids_data_ptr[i]];
+                                  }
                                 }));
                           }
                         }
