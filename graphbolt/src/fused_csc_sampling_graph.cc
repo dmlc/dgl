@@ -651,16 +651,18 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                       const auto num_neighbors = indptr_data[nid + 1] - offset;
                       int64_t picked_number = 0;
                       indptr_t picked_offset = 0;
+                      int64_t seed_type_id = 0;
+                      int64_t seed_offset = 0;
                       if constexpr (!Temporal) {
                         // Step 4a. Pick neighbors for each node.
-                        const auto seed_type_id =
+                        seed_type_id =
                             (seed_offsets.has_value() && fanouts.size() > 1)
                                 ? std::upper_bound(
                                       seed_offsets->begin(),
                                       seed_offsets->end(), i) -
                                       seed_offsets->begin() - 1
                                 : 0;
-                        const auto seed_offset =
+                        seed_offset =
                             (seed_offsets.has_value() && fanouts.size() > 1)
                                 ? i - seed_offsets->at(seed_type_id)
                                 : i;
@@ -724,7 +726,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                 }));
                           }
                         }
-                      } else {
+                      }
+                      if constexpr (Temporal) {
                         // Step 4b. Pick neighbors for each node.
                         picked_number = num_picked_neighbors_data_ptr[i + 1];
                         picked_offset = subgraph_indptr_data_ptr[i];
