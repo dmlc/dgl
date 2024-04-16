@@ -196,7 +196,8 @@ cusparseStatus_t Xcsrmm2<double>(
 template <typename DType, typename IdType>
 void CusparseCsrmm2(
     const DGLContext& ctx, const CSRMatrix& csr, const DType* B_data,
-    const DType* A_data, DType* C_data, int x_length) {
+    const DType* A_data, DType* C_data, int x_length,
+    bool use_deterministic_alg_only = false) {
   // We use csrmm2 to perform following operation:
   // C = A x B, where A is a sparse matrix in csr format, B is the dense matrix
   // for node feature tensor. However, since cusparse only supports
@@ -244,13 +245,15 @@ void CusparseCsrmm2(
   auto transA = CUSPARSE_OPERATION_NON_TRANSPOSE;
   auto transB = CUSPARSE_OPERATION_NON_TRANSPOSE;
   size_t workspace_size;
+  cusparseSpMMAlg_t spmm_alg = use_deterministic_alg_only ?
+      CUSPARSE_SPMM_CSR_ALG3 : CUSPARSE_SPMM_CSR_ALG2;
   CUSPARSE_CALL(cusparseSpMM_bufferSize(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPMM_CSR_ALG2, &workspace_size));
+      matC, dtype, spmm_alg, &workspace_size));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
   CUSPARSE_CALL(cusparseSpMM(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPMM_CSR_ALG2, workspace));
+      matC, dtype, spmm_alg, workspace));
   device->FreeWorkspace(ctx, workspace);
 
   CUSPARSE_CALL(cusparseDestroySpMat(matA));
@@ -284,7 +287,8 @@ template <typename DType, typename IdType>
 void CusparseCsrmm2Hetero(
     const DGLContext& ctx, const CSRMatrix& csr, const DType* B_data,
     const DType* A_data, DType* C_data, int64_t x_length,
-    cudaStream_t strm_id) {
+    cudaStream_t strm_id,
+    bool use_deterministic_alg_only = false) {
   // We use csrmm2 to perform following operation:
   // C = A x B, where A is a sparse matrix in csr format, B is the dense matrix
   // for node feature tensor. However, since cusparse only supports
@@ -335,13 +339,15 @@ void CusparseCsrmm2Hetero(
   auto transA = CUSPARSE_OPERATION_NON_TRANSPOSE;
   auto transB = CUSPARSE_OPERATION_NON_TRANSPOSE;
   size_t workspace_size;
+  cusparseSpMMAlg_t spmm_alg = use_deterministic_alg_only ?
+      CUSPARSE_SPMM_CSR_ALG3 : CUSPARSE_SPMM_CSR_ALG2;
   CUSPARSE_CALL(cusparseSpMM_bufferSize(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPMM_CSR_ALG2, &workspace_size));
+      matC, dtype, spmm_alg, &workspace_size));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
   CUSPARSE_CALL(cusparseSpMM(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPMM_CSR_ALG2, workspace));
+      matC, dtype, spmm_alg, workspace));
   device->FreeWorkspace(ctx, workspace);
 
   CUSPARSE_CALL(cusparseDestroySpMat(matA));

@@ -3,6 +3,7 @@
  * @file array/cuda/spmm.cu
  * @brief SPMM C APIs and definitions.
  */
+#include <cstdlib>
 #include <dgl/array.h>
 
 #include "../../runtime/cuda/cuda_common.h"
@@ -35,6 +36,9 @@ void SpMMCsrHetero(
   bool use_efeat = op != "copy_lhs";
   auto device = runtime::DeviceAPI::Get(vec_csr[0].indptr->ctx);
   std::vector<DType*> trans_out((*vec_out).size(), NULL);
+  bool use_deterministic_alg_only = false;
+  if (NULL != std::getenv("USE_DETERMINISTIC_ALG"))
+      use_deterministic_alg_only = true;
 
   bool use_legacy_cusparsemm =
       (CUDART_VERSION < 11000) && (reduce == "sum") &&
@@ -128,7 +132,7 @@ void SpMMCsrHetero(
                          : static_cast<DType*>((*vec_out)[dst_id]->data);
         CusparseCsrmm2Hetero<DType, IdType>(
             csr.indptr->ctx, csr, static_cast<DType*>(vec_ufeat[src_id]->data),
-            nullptr, out, x_length, stream);
+            nullptr, out, x_length, stream, use_deterministic_alg_only);
       } else if (
           op == "mul" && is_scalar_efeat &&
           cusparse_available<DType, IdType>(more_nnz)) {  // cusparse
@@ -140,7 +144,8 @@ void SpMMCsrHetero(
             static_cast<DType*>(efeat->data),
             // TODO(Israt): Change (*vec_out) to trans_out to support CUDA
             // version < 11
-            static_cast<DType*>((*vec_out)[dst_id]->data), x_length, stream);
+            static_cast<DType*>((*vec_out)[dst_id]->data), x_length, stream,
+	    use_deterministic_alg_only);
       } else {  // general kernel
         NDArray ufeat =
             (vec_ufeat.size() == 0) ? NullArray() : vec_ufeat[src_id];
