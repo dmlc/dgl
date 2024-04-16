@@ -698,8 +698,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                 }));
                           }
                         }
-                      }
-                      if constexpr (!Temporal) {
+                      } else {
                         // Step 4b. Pick neighbors for each node.
                         const auto seed_type_id =
                             (seed_offsets.has_value() && fanouts.size() > 1)
@@ -723,7 +722,11 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                         if (picked_number > 0) {
                           AT_DISPATCH_INDEX_TYPES(
                               subgraph_indices.scalar_type(),
-                              "IndexSelectSubgraphIndices", ([&] {
+                              "IndexSelectSubgraphIndices",
+                              ([this, &subgraph_indices, &picked_eids_data_ptr,
+                                &num_etypes, &etype_id_to_dst_ntype_id,
+                                &seed_type_id, &etype_id_to_num_picked_offset,
+                                &seed_offset, &subgraph_indptr_data_ptr] {
                                 auto subgraph_indices_data_ptr =
                                     subgraph_indices.data_ptr<index_t>();
                                 auto indices_data_ptr =
