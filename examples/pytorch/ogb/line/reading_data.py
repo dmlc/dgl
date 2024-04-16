@@ -209,13 +209,13 @@ class LineDataset:
             node_degree = self.G.out_degrees(self.valid_nodes).numpy()
             node_degree = np.power(node_degree, 0.75)
             node_degree /= np.sum(node_degree)
-            node_degree = np.array(node_degree * 1e8, dtype=np.int)
+            node_degree = np.array(node_degree * 1e8, dtype=int)
             self.neg_table = []
 
             for idx, node in enumerate(self.valid_nodes):
                 self.neg_table += [node] * node_degree[idx]
             self.neg_table_size = len(self.neg_table)
-            self.neg_table = np.array(self.neg_table, dtype=np.long)
+            self.neg_table = np.array(self.neg_table, dtype=int)
             del node_degree
 
     def create_sampler(self, i):

@@ -61,38 +61,26 @@ class UniformNegativeSampler(NegativeSampler):
         super().__init__(datapipe, negative_ratio)
         self.graph = graph
 
-    def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
-        if use_seeds:
-            assert node_pairs.ndim == 2 and node_pairs.shape[1] == 2, (
-                "Only tensor with shape N*2 is supported for negative"
-                + f" sampling, but got {node_pairs.shape}."
-            )
-            # Sample negative edges, and concatenate positive edges with them.
-            seeds = self.graph.sample_negative_edges_uniform_2(
-                etype,
-                node_pairs,
-                self.negative_ratio,
-            )
-            # Construct indexes for all node pairs.
-            num_pos_node_pairs = node_pairs.shape[0]
-            negative_ratio = self.negative_ratio
-            pos_indexes = torch.arange(
-                0,
-                num_pos_node_pairs,
-                device=seeds.device,
-            )
-            neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
-            indexes = torch.cat((pos_indexes, neg_indexes))
-            # Construct labels for all node pairs.
-            pos_num = node_pairs.shape[0]
-            neg_num = seeds.shape[0] - pos_num
-            labels = torch.empty(pos_num + neg_num, device=seeds.device)
-            labels[:pos_num] = 1
-            labels[pos_num:] = 0
-            return seeds, labels, indexes
-        else:
-            return self.graph.sample_negative_edges_uniform(
-                etype,
-                node_pairs,
-                self.negative_ratio,
-            )
+    def _sample_with_etype(self, seeds, etype=None):
+        assert seeds.ndim == 2 and seeds.shape[1] == 2, (
+            "Only tensor with shape N*2 is supported for negative"
+            + f" sampling, but got {seeds.shape}."
+        )
+        # Sample negative edges, and concatenate positive edges with them.
+        all_seeds = self.graph.sample_negative_edges_uniform(
+            etype,
+            seeds,
+            self.negative_ratio,
+        )
+        # Construct indexes for all node pairs.
+        pos_num = seeds.shape[0]
+        negative_ratio = self.negative_ratio
+        pos_indexes = torch.arange(0, pos_num, device=all_seeds.device)
+        neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
+        indexes = torch.cat((pos_indexes, neg_indexes))
+        # Construct labels for all node pairs.
+        neg_num = all_seeds.shape[0] - pos_num
+        labels = torch.empty(pos_num + neg_num, device=all_seeds.device)
+        labels[:pos_num] = 1
+        labels[pos_num:] = 0
+        return all_seeds, labels, indexes
