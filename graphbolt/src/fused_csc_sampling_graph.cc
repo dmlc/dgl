@@ -667,7 +667,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                           // subgraph.
                           AT_DISPATCH_INDEX_TYPES(
                               subgraph_indices.scalar_type(),
-                              "IndexSelectSubgraphIndices", ([&] {
+                              "IndexSelectSubgraphIndicesFused", ([&] {
                                 auto subgraph_indices_data_ptr =
                                     subgraph_indices.data_ptr<index_t>();
                                 auto indices_data_ptr =
@@ -681,7 +681,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                           if (type_per_edge_.has_value()) {
                             AT_DISPATCH_INTEGRAL_TYPES(
                                 subgraph_type_per_edge.value().scalar_type(),
-                                "IndexSelectTypePerEdge", ([&] {
+                                "IndexSelectTypePerEdgeFused", ([&] {
                                   auto subgraph_type_per_edge_data_ptr =
                                       subgraph_type_per_edge.value()
                                           .data_ptr<scalar_t>();
@@ -753,7 +753,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                             // type_per_edge tensor for this condition.
                             AT_DISPATCH_INTEGRAL_TYPES(
                                 subgraph_type_per_edge.value().scalar_type(),
-                                "IndexSelectSubgraphIndices", ([&] {
+                                "IndexSelectTypePerEdge", ([&] {
                                   auto subgraph_type_per_edge_data_ptr =
                                       subgraph_type_per_edge.value()
                                           .data_ptr<scalar_t>();
