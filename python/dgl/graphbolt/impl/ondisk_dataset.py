@@ -636,28 +636,28 @@ class OnDiskDataset(Dataset):
             train_set:
               - type: paper # could be omitted for homogeneous graph.
                 data: # multiple data sources could be specified.
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy # Can be numpy or torch.
                     in_memory: true # If not specified, default to true.
-                    path: set/paper-train-node_pairs.npy
+                    path: set/paper-train-seeds.npy
                   - name: labels
                     format: numpy
                     path: set/paper-train-labels.npy
             validation_set:
               - type: paper
                 data:
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy
-                    path: set/paper-validation-node_pairs.npy
+                    path: set/paper-validation-seeds.npy
                   - name: labels
                     format: numpy
                     path: set/paper-validation-labels.npy
             test_set:
               - type: paper
                 data:
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy
-                    path: set/paper-test-node_pairs.npy
+                    path: set/paper-test-seeds.npy
                   - name: labels
                     format: numpy
                     path: set/paper-test-labels.npy

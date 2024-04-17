@@ -58,4 +58,4 @@ Summary
 ### Link Prediction
 | Dataset       | Best MRR
 | ------------- | -------
-| FB15k-237     | ~0.2439
+| FB15k-237     | ~0.2397
