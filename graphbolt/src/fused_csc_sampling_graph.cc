@@ -728,8 +728,9 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                         }
                       } else {
                         // Step 4b. Pick neighbors for each node.
-                        picked_number = num_picked_neighbors_data_ptr[i + 1];
-                        picked_offset = subgraph_indptr_data_ptr[i];
+                        const auto picked_number =
+                            num_picked_neighbors_data_ptr[i + 1];
+                        const auto picked_offset = subgraph_indptr_data_ptr[i];
                         if (picked_number > 0) {
                           auto actual_picked_count = pick_fn(
                               i, offset, num_neighbors,
