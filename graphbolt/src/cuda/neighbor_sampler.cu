@@ -9,6 +9,7 @@
 #include <graphbolt/continuous_seed.h>
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/cuda_sampling_ops.h>
+#include <thrust/copy.h>
 #include <thrust/gather.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
@@ -189,6 +190,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
     bool return_eids, torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask,
+    torch::optional<torch::Tensor> node_type_offset,
     torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id,
     torch::optional<torch::Dict<std::string, int64_t>> edge_type_to_id,
     torch::optional<torch::Tensor> random_seed_tensor,
@@ -531,12 +533,33 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     // Here, we check what are the dst node types for the given seeds so that
     // we can compute the output indptr space later.
     std::vector<int64_t> etype_id_to_dst_ntype_id(num_etypes);
+    // Here, we check what are the src node types for the given seeds so that
+    // we can subtract source node offset from indices later.
+    auto etype_id_to_src_ntype_id = torch::empty(
+        2 * num_etypes,
+        c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
+    auto etype_id_to_src_ntype_id_ptr =
+        etype_id_to_src_ntype_id.data_ptr<int64_t>();
     for (auto& etype_and_id : edge_type_to_id.value()) {
       auto etype = etype_and_id.key();
       auto id = etype_and_id.value();
-      auto dst_type = utils::parse_dst_ntype_from_etype(etype);
+      auto [src_type, dst_type] = utils::parse_src_dst_ntype_from_etype(etype);
       etype_id_to_dst_ntype_id[id] = node_type_to_id->at(dst_type);
+      etype_id_to_src_ntype_id_ptr[2 * id] =
+          etype_id_to_src_ntype_id_ptr[2 * id + 1] =
+              node_type_to_id->at(src_type);
     }
+    auto indices_offsets_dev = torch::empty(
+        etype_id_to_src_ntype_id.size(0),
+        output_indices.options().dtype(torch::kLong));
+    AT_DISPATCH_INDEX_TYPES(
+        node_type_offset->scalar_type(), "SampleNeighborsNodeTypeOffset", ([&] {
+          THRUST_CALL(
+              gather, etype_id_to_src_ntype_id_ptr,
+              etype_id_to_src_ntype_id_ptr + etype_id_to_src_ntype_id.size(0),
+              node_type_offset->data_ptr<index_t>(),
+              indices_offsets_dev.data_ptr<int64_t>());
+        }));
     // For each edge type, we compute the start and end offsets to index into
     // indptr to form the final output_indptr.
     auto indptr_offsets = torch::empty(
@@ -571,29 +594,59 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         num_etypes * 2, c10::TensorOptions()
                             .dtype(output_indptr.scalar_type())
                             .pinned_memory(true));
+    auto edge_offsets_dev =
+        torch::empty(num_etypes * 2, output_indptr.options());
     at::cuda::CUDAEvent edge_offsets_event;
     AT_DISPATCH_INDEX_TYPES(
         indptr.scalar_type(), "SampleNeighborsEdgeOffsets", ([&] {
+          auto edge_offsets_pinned_dev_pair =
+              thrust::make_transform_output_iterator(
+                  thrust::make_zip_iterator(
+                      edge_offsets->data_ptr<index_t>(),
+                      edge_offsets_dev.data_ptr<index_t>()),
+                  [=] __device__(index_t x) {
+                    return thrust::make_tuple(x, x);
+                  });
           THRUST_CALL(
               gather, indptr_offsets_ptr,
               indptr_offsets_ptr + indptr_offsets.size(0),
-              output_indptr.data_ptr<index_t>(),
-              edge_offsets->data_ptr<index_t>());
+              output_indptr.data_ptr<index_t>(), edge_offsets_pinned_dev_pair);
         }));
     edge_offsets_event.record();
+    auto indices_offset_subtract = ExpandIndptrImpl(
+        edge_offsets_dev, indices.scalar_type(), indices_offsets_dev,
+        output_indices.size(0));
     // The output_indices is permuted here.
     std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
         output_in_degree, sliced_output_indptr, output_indices, permutation,
         num_rows - 1, output_indices.size(0));
+    output_indices -= indices_offset_subtract;
+    auto output_indptr_offsets = torch::empty(
+        num_etypes * 2,
+        c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
+    auto output_indptr_offsets_ptr = output_indptr_offsets.data_ptr<int64_t>();
     std::vector<torch::Tensor> indptr_list;
     for (int i = 0; i < num_etypes; i++) {
       indptr_list.push_back(output_indptr.slice(
-          0, indptr_offsets_ptr[2 * i],
-          indptr_offsets_ptr[2 * i + 1] + (i == num_etypes - 1)));
+          0, indptr_offsets_ptr[2 * i], indptr_offsets_ptr[2 * i + 1] + 1));
+      output_indptr_offsets_ptr[2 * i] =
+          i == 0 ? 0 : output_indptr_offsets_ptr[2 * i - 1];
+      output_indptr_offsets_ptr[2 * i + 1] =
+          output_indptr_offsets_ptr[2 * i] + indptr_list.back().size(0);
     }
+    auto output_indptr_offsets_dev = torch::empty(
+        output_indptr_offsets.size(0),
+        output_indptr.options().dtype(torch::kLong));
+    THRUST_CALL(
+        copy_n, output_indptr_offsets_ptr, output_indptr_offsets.size(0),
+        output_indptr_offsets_dev.data_ptr<int64_t>());
     // We form the final output indptr by concatenating pieces for different
     // edge types.
     output_indptr = torch::cat(indptr_list);
+    auto indptr_offset_subtract = ExpandIndptrImpl(
+        output_indptr_offsets_dev, indptr.scalar_type(), edge_offsets_dev,
+        output_indptr.size(0));
+    output_indptr -= indptr_offset_subtract;
     edge_offsets_event.synchronize();
     // We read the edge_offsets here, they are in pairs but we don't need it to
     // be in pairs. So we remove the duplicate information from it and turn it

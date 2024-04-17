@@ -575,15 +575,14 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     edge_offsets.append(
                         edge_offsets[-1]
                         + seed_offsets[ntype_id + 1]
-                        - seed_offsets[ntype_id]
+                        - seed_offsets[ntype_id] + 1
                     )
                 for etype, etype_id in self.edge_type_to_id.items():
                     src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
                     ntype_id = self.node_type_to_id[dst_ntype]
-                    sub_indptr_ = indptr[
-                        edge_offsets[etype_id] : edge_offsets[etype_id + 1] + 1
+                    sub_indptr[etype] = indptr[
+                        edge_offsets[etype_id] : edge_offsets[etype_id + 1]
                     ]
-                    sub_indptr[etype] = sub_indptr_ - sub_indptr_[0]
                     sub_indices[etype] = indices[
                         etype_offsets[etype_id] : etype_offsets[etype_id + 1]
                     ]
@@ -593,8 +592,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
                                 etype_id + 1
                             ]
                         ]
-                    src_ntype_id = self.node_type_to_id[src_ntype]
-                    sub_indices[etype] -= offset[src_ntype_id]
 
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
