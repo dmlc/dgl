@@ -24,27 +24,6 @@ class MiniBatch:
     representation of input and output data across different stages, ensuring
     consistency and ease of use throughout the loading process."""
 
-    seed_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Representation of seed nodes used for sampling in the graph.
-    - If `seed_nodes` is a tensor: It indicates the graph is homogeneous.
-    - If `seed_nodes` is a dictionary: The keys should be node type and the
-      value should be corresponding heterogeneous node ids.
-    """
-
-    node_pairs: Union[
-        Tuple[torch.Tensor, torch.Tensor],
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-    ] = None
-    """
-    Representation of seed node pairs utilized in link prediction tasks.
-    - If `node_pairs` is a tuple: It indicates a homogeneous graph where each
-      tuple contains two tensors representing source-destination node pairs.
-    - If `node_pairs` is a dictionary: The keys should be edge type, and the
-      value should be a tuple of tensors representing node pairs of the given
-      type.
-    """
-
     labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Labels associated with seed nodes / node pairs in the graph.
@@ -93,26 +72,6 @@ class MiniBatch:
       key, indexes are consecutive integers starting from zero.
     """
 
-    negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Representation of negative samples for the head nodes in the link
-    prediction task.
-    - If `negative_srcs` is a tensor: It indicates a homogeneous graph.
-    - If `negative_srcs` is a dictionary: The key should be edge type, and the
-      value should correspond to the negative samples for head nodes of the
-      given type.
-    """
-
-    negative_dsts: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Representation of negative samples for the tail nodes in the link
-    prediction task.
-    - If `negative_dsts` is a tensor: It indicates a homogeneous graph.
-    - If `negative_dsts` is a dictionary: The key should be edge type, and the
-      value should correspond to the negative samples for head nodes of the
-      given type.
-    """
-
     sampled_subgraphs: List[SampledSubgraph] = None
     """A list of 'SampledSubgraph's, each one corresponding to one layer,
     representing a subset of a larger graph structure.
@@ -147,33 +106,12 @@ class MiniBatch:
       string of format 'str:str:str'.
     """
 
-    compacted_node_pairs: Union[
-        Tuple[torch.Tensor, torch.Tensor],
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-    ] = None
-    """
-    Representation of compacted node pairs corresponding to 'node_pairs', where
-    all node ids inside are compacted.
-    """
-
     compacted_seeds: Union[
         torch.Tensor,
         Dict[str, torch.Tensor],
     ] = None
     """
     Representation of compacted seeds corresponding to 'seeds', where
-    all node ids inside are compacted.
-    """
-
-    compacted_negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Representation of compacted nodes corresponding to 'negative_srcs', where
-    all node ids inside are compacted.
-    """
-
-    compacted_negative_dsts: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Representation of compacted nodes corresponding to 'negative_dsts', where
     all node ids inside are compacted.
     """
 
@@ -332,163 +270,6 @@ class MiniBatch:
                 if subgraph.original_edge_ids is not None:
                     block.edata[dgl.EID] = subgraph.original_edge_ids
         return blocks
-
-    @property
-    def positive_node_pairs(self):
-        """`positive_node_pairs` is a representation of positive graphs used for
-        evaluating or computing loss in link prediction tasks.
-        - If `positive_node_pairs` is a tuple: It indicates a homogeneous graph
-        containing two tensors representing source-destination node pairs.
-        - If `positive_node_pairs` is a dictionary: The keys should be edge type,
-        and the value should be a tuple of tensors representing node pairs of the
-        given type.
-        """
-        return self.compacted_node_pairs
-
-    @property
-    def negative_node_pairs(self):
-        """`negative_node_pairs` is a representation of negative graphs used for
-        evaluating or computing loss in link prediction tasks.
-        - If `negative_node_pairs` is a tuple: It indicates a homogeneous graph
-        containing two tensors representing source-destination node pairs.
-        - If `negative_node_pairs` is a dictionary: The keys should be edge type,
-        and the value should be a tuple of tensors representing node pairs of the
-        given type.
-        """
-        # Build negative graph.
-        if (
-            self.compacted_negative_srcs is not None
-            and self.compacted_negative_dsts is not None
-        ):
-            # For homogeneous graph.
-            if isinstance(self.compacted_negative_srcs, torch.Tensor):
-                negative_node_pairs = (
-                    self.compacted_negative_srcs,
-                    self.compacted_negative_dsts,
-                )
-            # For heterogeneous graph.
-            else:
-                negative_node_pairs = {
-                    etype: (
-                        neg_src,
-                        self.compacted_negative_dsts[etype],
-                    )
-                    for etype, neg_src in self.compacted_negative_srcs.items()
-                }
-        elif (
-            self.compacted_negative_srcs is not None
-            and self.compacted_node_pairs is not None
-        ):
-            # For homogeneous graph.
-            if isinstance(self.compacted_negative_srcs, torch.Tensor):
-                negative_ratio = self.compacted_negative_srcs.size(1)
-                negative_node_pairs = (
-                    self.compacted_negative_srcs,
-                    self.compacted_node_pairs[1]
-                    .repeat_interleave(negative_ratio)
-                    .view(-1, negative_ratio),
-                )
-            # For heterogeneous graph.
-            else:
-                negative_ratio = list(self.compacted_negative_srcs.values())[
-                    0
-                ].size(1)
-                negative_node_pairs = {
-                    etype: (
-                        neg_src,
-                        self.compacted_node_pairs[etype][1]
-                        .repeat_interleave(negative_ratio)
-                        .view(-1, negative_ratio),
-                    )
-                    for etype, neg_src in self.compacted_negative_srcs.items()
-                }
-        elif (
-            self.compacted_negative_dsts is not None
-            and self.compacted_node_pairs is not None
-        ):
-            # For homogeneous graph.
-            if isinstance(self.compacted_negative_dsts, torch.Tensor):
-                negative_ratio = self.compacted_negative_dsts.size(1)
-                negative_node_pairs = (
-                    self.compacted_node_pairs[0]
-                    .repeat_interleave(negative_ratio)
-                    .view(-1, negative_ratio),
-                    self.compacted_negative_dsts,
-                )
-            # For heterogeneous graph.
-            else:
-                negative_ratio = list(self.compacted_negative_dsts.values())[
-                    0
-                ].size(1)
-                negative_node_pairs = {
-                    etype: (
-                        self.compacted_node_pairs[etype][0]
-                        .repeat_interleave(negative_ratio)
-                        .view(-1, negative_ratio),
-                        neg_dst,
-                    )
-                    for etype, neg_dst in self.compacted_negative_dsts.items()
-                }
-        else:
-            negative_node_pairs = None
-        return negative_node_pairs
-
-    @property
-    def node_pairs_with_labels(self):
-        """Get a node pair tensor and a label tensor from MiniBatch. They are
-        used for evaluating or computing loss. For homogeneous graph, it will
-        return `(node_pairs, labels)` as result; for heterogeneous graph, the
-        `node_pairs` and `labels` will both be a dict with etype as the key.
-        - If it's a link prediction task, `node_pairs` will contain both
-        negative and positive node pairs and `labels` will consist of 0 and 1,
-        indicating whether the corresponding node pair is negative or positive.
-        - If it's an edge classification task, this function will directly
-        return `compacted_node_pairs` for each etype and the corresponding
-        `labels`.
-        - Otherwise it will return None.
-        """
-        if self.labels is None:
-            # Link prediction.
-            positive_node_pairs = self.positive_node_pairs
-            negative_node_pairs = self.negative_node_pairs
-            if positive_node_pairs is None or negative_node_pairs is None:
-                return None
-            if isinstance(positive_node_pairs, Dict):
-                # Heterogeneous graph.
-                node_pairs_by_etype = {}
-                labels_by_etype = {}
-                for etype in positive_node_pairs:
-                    pos_src, pos_dst = positive_node_pairs[etype]
-                    neg_src, neg_dst = negative_node_pairs[etype]
-                    neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
-                    node_pairs_by_etype[etype] = (
-                        torch.cat((pos_src, neg_src), dim=0),
-                        torch.cat((pos_dst, neg_dst), dim=0),
-                    )
-                    pos_label = torch.ones_like(pos_src)
-                    neg_label = torch.zeros_like(neg_src)
-                    labels_by_etype[etype] = torch.cat(
-                        [pos_label, neg_label], dim=0
-                    )
-                return (node_pairs_by_etype, labels_by_etype)
-            else:
-                # Homogeneous graph.
-                pos_src, pos_dst = positive_node_pairs
-                neg_src, neg_dst = negative_node_pairs
-                neg_src, neg_dst = neg_src.view(-1), neg_dst.view(-1)
-                node_pairs = (
-                    torch.cat((pos_src, neg_src), dim=0),
-                    torch.cat((pos_dst, neg_dst), dim=0),
-                )
-                pos_label = torch.ones_like(pos_src)
-                neg_label = torch.zeros_like(neg_src)
-                labels = torch.cat([pos_label, neg_label], dim=0)
-                return (node_pairs, labels.float())
-        elif self.compacted_node_pairs is not None:
-            # Edge classification.
-            return (self.compacted_node_pairs, self.labels)
-        else:
-            return None
 
     def to_pyg_data(self):
         """Construct a PyG Data from `MiniBatch`. This function only supports
