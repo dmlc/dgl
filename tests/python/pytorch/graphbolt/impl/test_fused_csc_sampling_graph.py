@@ -2219,7 +2219,7 @@ def test_sample_neighbors_hetero_pick_number(
         type_per_edge=type_per_edge,
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
-    )
+    ).to(F.ctx())
 
     # Generate subgraph via sample neighbors.
     nodes = {
