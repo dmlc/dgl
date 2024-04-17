@@ -45,11 +45,9 @@ class NegativeSampler(MiniBatchTransformer):
         Parameters
         ----------
         minibatch : MiniBatch
-            An instance of 'MiniBatch' class requires the 'node_pairs' field.
-            This function is responsible for generating negative edges
-            corresponding to the positive edges defined by the 'node_pairs'. In
-            cases where negative edges already exist, this function will
-            overwrite them.
+            An instance of 'MiniBatch' class requires the 'seeds' field. This
+            function is responsible for generating negative edges corresponding
+            to the positive edges defined by the 'seeds'.
 
         Returns
         -------
@@ -57,52 +55,36 @@ class NegativeSampler(MiniBatchTransformer):
             An instance of 'MiniBatch' encompasses both positive and negative
             samples.
         """
-        if minibatch.seeds is None:
-            node_pairs = minibatch.node_pairs
-            assert node_pairs is not None
-            if isinstance(node_pairs, Mapping):
-                minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
-                for etype, pos_pairs in node_pairs.items():
-                    self._collate(
-                        minibatch,
-                        self._sample_with_etype(pos_pairs, etype),
-                        etype,
-                    )
-            else:
-                self._collate(minibatch, self._sample_with_etype(node_pairs))
-        else:
-            seeds = minibatch.seeds
-            if isinstance(seeds, Mapping):
-                if minibatch.indexes is None:
-                    minibatch.indexes = {}
-                if minibatch.labels is None:
-                    minibatch.labels = {}
-                for etype, pos_pairs in seeds.items():
-                    (
-                        minibatch.seeds[etype],
-                        minibatch.labels[etype],
-                        minibatch.indexes[etype],
-                    ) = self._sample_with_etype(
-                        pos_pairs, etype, use_seeds=True
-                    )
-            else:
+        seeds = minibatch.seeds
+        if isinstance(seeds, Mapping):
+            if minibatch.indexes is None:
+                minibatch.indexes = {}
+            if minibatch.labels is None:
+                minibatch.labels = {}
+            for etype, pos_pairs in seeds.items():
                 (
-                    minibatch.seeds,
-                    minibatch.labels,
-                    minibatch.indexes,
-                ) = self._sample_with_etype(seeds, use_seeds=True)
+                    minibatch.seeds[etype],
+                    minibatch.labels[etype],
+                    minibatch.indexes[etype],
+                ) = self._sample_with_etype(pos_pairs, etype)
+        else:
+            (
+                minibatch.seeds,
+                minibatch.labels,
+                minibatch.indexes,
+            ) = self._sample_with_etype(seeds)
         return minibatch
 
-    def _sample_with_etype(self, node_pairs, etype=None, use_seeds=False):
+    def _sample_with_etype(self, seeds, etype=None):
         """Generate negative pairs for a given etype form positive pairs
-        for a given etype. If `node_pairs` is a 2D tensor, which represents
+        for a given etype. If `seeds` is a 2D tensor, which represents
         `seeds` is used in minibatch, corresponding labels and indexes will be
         constructed.
 
         Parameters
         ----------
-        node_pairs : Tuple[Tensor, Tensor]
-            A tuple of tensors that represent source-destination node pairs of
+        seeds : Tensor, Tensor
+            A N*2 tensors that represent source-destination node pairs of
             positive edges, where positive means the edge must exist in the
             graph.
         etype : str
@@ -110,40 +92,13 @@ class NegativeSampler(MiniBatchTransformer):
 
         Returns
         -------
-        Tuple[Tensor, Tensor] or Tensor
-            A collection of negative node pairs.
-        Tensor or None
+        Tensor
+            A collection of postive and negative node pairs.
+        Tensor
             Corresponding labels. If label is True, corresponding edge is
             positive. If label is False, corresponding edge is negative.
-        Tensor or None
+        Tensor
             Corresponding indexes, indicates to which query an edge belongs.
 
         """
         raise NotImplementedError
-
-    def _collate(self, minibatch, neg_pairs, etype=None):
-        """Collates positive and negative samples into minibatch.
-
-        Parameters
-        ----------
-        minibatch : MiniBatch
-            The input minibatch, which contains positive node pairs, will be
-            filled with negative information in this function.
-        neg_pairs : Tuple[Tensor, Tensor]
-            A tuple of tensors represents source-destination node pairs of
-            negative edges, where negative means the edge may not exist in
-            the graph.
-        etype : str
-            Canonical edge type.
-        """
-        neg_src, neg_dst = neg_pairs
-        if neg_src is not None:
-            neg_src = neg_src.view(-1, self.negative_ratio)
-        if neg_dst is not None:
-            neg_dst = neg_dst.view(-1, self.negative_ratio)
-        if etype is not None:
-            minibatch.negative_srcs[etype] = neg_src
-            minibatch.negative_dsts[etype] = neg_dst
-        else:
-            minibatch.negative_srcs = neg_src
-            minibatch.negative_dsts = neg_dst

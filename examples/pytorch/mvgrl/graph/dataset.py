@@ -68,7 +68,7 @@ def process(dataset):
                             for attr in re.split("[,\s]+", line.strip("\s\n"))
                             if attr
                         ],
-                        dtype=np.float,
+                        dtype=float,
                     )
                 )
     else:
@@ -130,7 +130,7 @@ def process(dataset):
                 f[graph.degree[u[0]]] = 1.0
                 if "label" in u[1]:
                     f = np.concatenate(
-                        (np.array(u[1]["label"], dtype=np.float), f)
+                        (np.array(u[1]["label"], dtype=float), f)
                     )
                 graph.nodes[u[0]]["feat"] = f
     return graphs, pprs

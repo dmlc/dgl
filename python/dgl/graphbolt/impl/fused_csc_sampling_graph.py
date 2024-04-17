@@ -1048,60 +1048,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ):
         """
         Sample negative edges by randomly choosing negative source-destination
-        pairs according to a uniform distribution. For each edge ``(u, v)``,
-        it is supposed to generate `negative_ratio` pairs of negative edges
-        ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
-        the graph. As ``u`` is exactly same as the corresponding positive edges,
-        it returns None for negative sources.
-
-        Parameters
-        ----------
-        edge_type: str
-            The type of edges in the provided node_pairs. Any negative edges
-            sampled will also have the same type. If set to None, it will be
-            considered as a homogeneous graph.
-        node_pairs : Tuple[Tensor, Tensor]
-            A tuple of two 1D tensors that represent the source and destination
-            of positive edges, with 'positive' indicating that these edges are
-            present in the graph. It's important to note that within the
-            context of a heterogeneous graph, the ids in these tensors signify
-            heterogeneous ids.
-        negative_ratio: int
-            The ratio of the number of negative samples to positive samples.
-
-        Returns
-        -------
-        Tuple[Tensor, Tensor]
-            A tuple consisting of two 1D tensors represents the source and
-            destination of negative edges. In the context of a heterogeneous
-            graph, both the input nodes and the selected nodes are represented
-            by heterogeneous IDs, and the formed edges are of the input type
-            `edge_type`. Note that negative refers to false negatives, which
-            means the edge could be present or not present in the graph.
-        """
-        if edge_type:
-            _, _, dst_ntype = etype_str_to_tuple(edge_type)
-            max_node_id = self.num_nodes[dst_ntype]
-        else:
-            max_node_id = self.total_num_nodes
-        pos_src, _ = node_pairs
-        num_negative = pos_src.size(0) * negative_ratio
-        return (
-            None,
-            torch.randint(
-                0,
-                max_node_id,
-                (num_negative,),
-                dtype=pos_src.dtype,
-                device=pos_src.device,
-            ),
-        )
-
-    def sample_negative_edges_uniform_2(
-        self, edge_type, node_pairs, negative_ratio
-    ):
-        """
-        Sample negative edges by randomly choosing negative source-destination
         edges according to a uniform distribution. For each edge ``(u, v)``,
         it is supposed to generate `negative_ratio` pairs of negative edges
         ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
