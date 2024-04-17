@@ -651,6 +651,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                       const auto num_neighbors = indptr_data[nid + 1] - offset;
                       int64_t seed_type_id = 0;
                       int64_t seed_offset = 0;
+                      int64_t picked_total_number = 0;
                       int64_t picked_number = 0;
                       indptr_t picked_offset = 0;
                       if constexpr (!Temporal) {
@@ -667,14 +668,14 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                 ? i - seed_offsets->at(seed_type_id)
                                 : i;
 
-                        picked_number = pick_fn(
+                        picked_total_number = pick_fn(
                             offset, num_neighbors, picked_eids_data_ptr,
                             seed_offset, subgraph_indptr_data_ptr,
                             etype_id_to_num_picked_offset);
 
                         // Step 5a. Calculate other attributes and return the
                         // subgraph.
-                        if (picked_number > 0) {
+                        if (picked_total_number > 0) {
                           AT_DISPATCH_INDEX_TYPES(
                               subgraph_indices.scalar_type(),
                               "IndexSelectSubgraphIndices", ([&] {
@@ -716,10 +717,11 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                   auto type_per_edge_data_ptr =
                                       type_per_edge_.value()
                                           .data_ptr<scalar_t>();
-                                  picked_offset =
+                                  const auto picked_offset =
                                       subgraph_indptr_data_ptr[seed_offset];
                                   for (auto j = picked_offset;
-                                       j < picked_offset + picked_number; ++j)
+                                       j < picked_offset + picked_total_number;
+                                       ++j)
                                     subgraph_type_per_edge_data_ptr[j] =
                                         type_per_edge_data_ptr
                                             [picked_eids_data_ptr[j]];
@@ -728,9 +730,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                         }
                       } else {
                         // Step 4b. Pick neighbors for each node.
-                        const auto picked_number =
-                            num_picked_neighbors_data_ptr[i + 1];
-                        const auto picked_offset = subgraph_indptr_data_ptr[i];
+                        picked_number = num_picked_neighbors_data_ptr[i + 1];
+                        picked_offset = subgraph_indptr_data_ptr[i];
                         if (picked_number > 0) {
                           auto actual_picked_count = pick_fn(
                               i, offset, num_neighbors,
