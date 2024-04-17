@@ -575,7 +575,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     edge_offsets.append(
                         edge_offsets[-1]
                         + seed_offsets[ntype_id + 1]
-                        - seed_offsets[ntype_id] + 1
+                        - seed_offsets[ntype_id]
+                        + 1
                     )
                 for etype, etype_id in self.edge_type_to_id.items():
                     src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
