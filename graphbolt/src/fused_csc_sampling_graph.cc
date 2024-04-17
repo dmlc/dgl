@@ -649,10 +649,10 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                       const auto nid = seeds_data_ptr[i];
                       const auto offset = indptr_data[nid];
                       const auto num_neighbors = indptr_data[nid + 1] - offset;
-                      int64_t picked_number = 0;
-                      indptr_t picked_offset = 0;
                       int64_t seed_type_id = 0;
                       int64_t seed_offset = 0;
+                      int64_t picked_number = 0;
+                      indptr_t picked_offset = 0;
                       if constexpr (!Temporal) {
                         // Step 4a. Pick neighbors for each node.
                         seed_type_id =
@@ -726,8 +726,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                 }));
                           }
                         }
-                      }
-                      if constexpr (Temporal) {
+                      } else {
                         // Step 4b. Pick neighbors for each node.
                         picked_number = num_picked_neighbors_data_ptr[i + 1];
                         picked_offset = subgraph_indptr_data_ptr[i];
@@ -744,7 +743,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                           // subgraph.
                           AT_DISPATCH_INDEX_TYPES(
                               subgraph_indices.scalar_type(),
-                              "IndexSelectSubgraphIndices", ([&] {
+                              "IndexSelectSubgraphIndicesTemporal", ([&] {
                                 auto subgraph_indices_data_ptr =
                                     subgraph_indices.data_ptr<index_t>();
                                 auto indices_data_ptr =
@@ -758,7 +757,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                           if (type_per_edge_.has_value()) {
                             AT_DISPATCH_INTEGRAL_TYPES(
                                 subgraph_type_per_edge.value().scalar_type(),
-                                "IndexSelectTypePerEdge", ([&] {
+                                "IndexSelectTypePerEdgeTemporal", ([&] {
                                   auto subgraph_type_per_edge_data_ptr =
                                       subgraph_type_per_edge.value()
                                           .data_ptr<scalar_t>();
