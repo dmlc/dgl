@@ -47,19 +47,20 @@ namespace {
 
 /** @brief Call cuBLAS geam API for transpose operation for float and double. */
 template <typename DType>
-cublasStatus_t Xgeam(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const DType* alpha, const DType* A, int lda,
-    const DType* beta, const DType* B, int ldb, DType* C, int ldc) {
+cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
+                     cublasOperation_t transb, int m, int n, const DType* alpha,
+                     const DType* A, int lda, const DType* beta, const DType* B,
+                     int ldb, DType* C, int ldc) {
   LOG(FATAL) << "Not supported dtype";
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 
 template <>
-cublasStatus_t Xgeam<__half>(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const __half* alpha, const __half* A, int lda,
-    const __half* beta, const __half* B, int ldb, __half* C, int ldc) {
+cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
+                             cublasOperation_t transb, int m, int n,
+                             const __half* alpha, const __half* A, int lda,
+                             const __half* beta, const __half* B, int ldb,
+                             __half* C, int ldc) {
   // TODO(ndickson): There is no cublasHgeam, so a different
   // implementation would be required.
   LOG(FATAL) << "Xgeam does not support dtype half (FP16)";
@@ -81,21 +82,23 @@ cublasStatus_t Xgeam<__nv_bfloat16>(
 #endif  // BF16_ENABLED
 
 template <>
-cublasStatus_t Xgeam<float>(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const float* alpha, const float* A, int lda,
-    const float* beta, const float* B, int ldb, float* C, int ldc) {
-  return cublasSgeam(
-      handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
+cublasStatus_t Xgeam<float>(cublasHandle_t handle, cublasOperation_t transa,
+                            cublasOperation_t transb, int m, int n,
+                            const float* alpha, const float* A, int lda,
+                            const float* beta, const float* B, int ldb,
+                            float* C, int ldc) {
+  return cublasSgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb,
+                     C, ldc);
 }
 
 template <>
-cublasStatus_t Xgeam<double>(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const double* alpha, const double* A, int lda,
-    const double* beta, const double* B, int ldb, double* C, int ldc) {
-  return cublasDgeam(
-      handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
+cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
+                             cublasOperation_t transb, int m, int n,
+                             const double* alpha, const double* A, int lda,
+                             const double* beta, const double* B, int ldb,
+                             double* C, int ldc) {
+  return cublasDgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb,
+                     C, ldc);
 }
 
 /**
@@ -103,8 +106,8 @@ cublasStatus_t Xgeam<double>(
  * @note not efficient but it's not a bottleneck, used for float16 dtype.
  */
 template <typename DType>
-__global__ void _TransposeKernel(
-    const DType* __restrict__ in, DType* __restrict__ out, int n, int m) {
+__global__ void _TransposeKernel(const DType* __restrict__ in,
+                                 DType* __restrict__ out, int n, int m) {
   int i = blockIdx.x;
   for (int j = threadIdx.x; j < m; j += blockDim.x)
     out[i * m + j] = in[j * n + i];
@@ -123,9 +126,9 @@ void _Transpose(const DType* in, DType* out, int row, int col) {
   if (!thr_entry->cublas_handle)
     CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
   CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
-  CUBLAS_CALL(Xgeam<DType>(
-      thr_entry->cublas_handle, CUBLAS_OP_T, CUBLAS_OP_N, row, col, &alpha, in,
-      col, &beta, nullptr, row, out, row));
+  CUBLAS_CALL(Xgeam<DType>(thr_entry->cublas_handle, CUBLAS_OP_T, CUBLAS_OP_N,
+                           row, col, &alpha, in, col, &beta, nullptr, row, out,
+                           row));
 }
 
 /**
@@ -146,8 +149,8 @@ void _Transpose<__half>(const __half* in, __half* out, int row, int col) {
  * @note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
  */
 template <>
-void _Transpose<__nv_bfloat16>(
-    const __nv_bfloat16* in, __nv_bfloat16* out, int row, int col) {
+void _Transpose<__nv_bfloat16>(const __nv_bfloat16* in, __nv_bfloat16* out,
+                               int row, int col) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   int nt = FindNumThreads(row);
   int nb = col;
@@ -157,26 +160,28 @@ void _Transpose<__nv_bfloat16>(
 
 #if CUDART_VERSION < 11000
 template <typename DType>
-cusparseStatus_t Xcsrmm2(
-    cusparseHandle_t handle, cusparseOperation_t transA,
-    cusparseOperation_t transB, int m, int n, int k, int nnz,
-    const DType* alpha, const cusparseMatDescr_t descrA, const DType* csrValA,
-    const int* csrRowPtrA, const int* csrColIndA, const DType* B, int ldb,
-    const DType* beta, DType* C, int ldc) {
+cusparseStatus_t Xcsrmm2(cusparseHandle_t handle, cusparseOperation_t transA,
+                         cusparseOperation_t transB, int m, int n, int k,
+                         int nnz, const DType* alpha,
+                         const cusparseMatDescr_t descrA, const DType* csrValA,
+                         const int* csrRowPtrA, const int* csrColIndA,
+                         const DType* B, int ldb, const DType* beta, DType* C,
+                         int ldc) {
   LOG(INFO) << "Not supported dtype";
   return CUSPARSE_STATUS_EXECUTION_FAILED;
 }
 
 template <>
-cusparseStatus_t Xcsrmm2<float>(
-    cusparseHandle_t handle, cusparseOperation_t transA,
-    cusparseOperation_t transB, int m, int n, int k, int nnz,
-    const float* alpha, const cusparseMatDescr_t descrA, const float* csrValA,
-    const int* csrRowPtrA, const int* csrColIndA, const float* B, int ldb,
-    const float* beta, float* C, int ldc) {
-  return cusparseScsrmm2(
-      handle, transA, transB, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA,
-      csrColIndA, B, ldb, beta, C, ldc);
+cusparseStatus_t Xcsrmm2<float>(cusparseHandle_t handle,
+                                cusparseOperation_t transA,
+                                cusparseOperation_t transB, int m, int n, int k,
+                                int nnz, const float* alpha,
+                                const cusparseMatDescr_t descrA,
+                                const float* csrValA, const int* csrRowPtrA,
+                                const int* csrColIndA, const float* B, int ldb,
+                                const float* beta, float* C, int ldc) {
+  return cusparseScsrmm2(handle, transA, transB, m, n, k, nnz, alpha, descrA,
+                         csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
 }
 
 template <>
@@ -186,18 +191,16 @@ cusparseStatus_t Xcsrmm2<double>(
     const double* alpha, const cusparseMatDescr_t descrA, const double* csrValA,
     const int* csrRowPtrA, const int* csrColIndA, const double* B, int ldb,
     const double* beta, double* C, int ldc) {
-  return cusparseDcsrmm2(
-      handle, transA, transB, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA,
-      csrColIndA, B, ldb, beta, C, ldc);
+  return cusparseDcsrmm2(handle, transA, transB, m, n, k, nnz, alpha, descrA,
+                         csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
 }
 #endif
 
 /** Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
-void CusparseCsrmm2(
-    const DGLContext& ctx, const CSRMatrix& csr, const DType* B_data,
-    const DType* A_data, DType* C_data, int x_length,
-    bool use_deterministic_alg_only = false) {
+void CusparseCsrmm2(const DGLContext& ctx, const CSRMatrix& csr,
+                    const DType* B_data, const DType* A_data, DType* C_data,
+                    int x_length, bool use_deterministic_alg_only = false) {
   // We use csrmm2 to perform following operation:
   // C = A x B, where A is a sparse matrix in csr format, B is the dense matrix
   // for node feature tensor. However, since cusparse only supports
@@ -237,23 +240,24 @@ void CusparseCsrmm2(
       static_cast<IdType*>(csr.indices->data),
       const_cast<DType*>(valptr ? valptr : A_data), idtype, idtype,
       CUSPARSE_INDEX_BASE_ZERO, dtype));
-  CUSPARSE_CALL(cusparseCreateDnMat(
-      &matB, k, n, n, const_cast<DType*>(B_data), dtype, CUSPARSE_ORDER_ROW));
+  CUSPARSE_CALL(cusparseCreateDnMat(&matB, k, n, n, const_cast<DType*>(B_data),
+                                    dtype, CUSPARSE_ORDER_ROW));
   CUSPARSE_CALL(
       cusparseCreateDnMat(&matC, m, n, n, C_data, dtype, CUSPARSE_ORDER_ROW));
 
   auto transA = CUSPARSE_OPERATION_NON_TRANSPOSE;
   auto transB = CUSPARSE_OPERATION_NON_TRANSPOSE;
   size_t workspace_size;
-  cusparseSpMMAlg_t spmm_alg = use_deterministic_alg_only ?
-      CUSPARSE_SPMM_CSR_ALG3 : CUSPARSE_SPMM_CSR_ALG2;
-  CUSPARSE_CALL(cusparseSpMM_bufferSize(
-      thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, spmm_alg, &workspace_size));
+  cusparseSpMMAlg_t spmm_alg = use_deterministic_alg_only
+                                   ? CUSPARSE_SPMM_CSR_ALG3
+                                   : CUSPARSE_SPMM_CSR_ALG2;
+  CUSPARSE_CALL(cusparseSpMM_bufferSize(thr_entry->cusparse_handle, transA,
+                                        transB, &alpha, matA, matB, &beta, matC,
+                                        dtype, spmm_alg, &workspace_size));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUSPARSE_CALL(cusparseSpMM(
-      thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, spmm_alg, workspace));
+  CUSPARSE_CALL(cusparseSpMM(thr_entry->cusparse_handle, transA, transB, &alpha,
+                             matA, matB, &beta, matC, dtype, spmm_alg,
+                             workspace));
   device->FreeWorkspace(ctx, workspace);
 
   CUSPARSE_CALL(cusparseDestroySpMat(matA));
@@ -284,11 +288,10 @@ void CusparseCsrmm2(
 
 /** Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
-void CusparseCsrmm2Hetero(
-    const DGLContext& ctx, const CSRMatrix& csr, const DType* B_data,
-    const DType* A_data, DType* C_data, int64_t x_length,
-    cudaStream_t strm_id,
-    bool use_deterministic_alg_only = false) {
+void CusparseCsrmm2Hetero(const DGLContext& ctx, const CSRMatrix& csr,
+                          const DType* B_data, const DType* A_data,
+                          DType* C_data, int64_t x_length, cudaStream_t strm_id,
+                          bool use_deterministic_alg_only = false) {
   // We use csrmm2 to perform following operation:
   // C = A x B, where A is a sparse matrix in csr format, B is the dense matrix
   // for node feature tensor. However, since cusparse only supports
@@ -331,23 +334,24 @@ void CusparseCsrmm2Hetero(
       static_cast<IdType*>(csr.indices->data),
       const_cast<DType*>(valptr ? valptr : A_data), idtype, idtype,
       CUSPARSE_INDEX_BASE_ZERO, dtype));
-  CUSPARSE_CALL(cusparseCreateDnMat(
-      &matB, k, n, n, const_cast<DType*>(B_data), dtype, CUSPARSE_ORDER_ROW));
+  CUSPARSE_CALL(cusparseCreateDnMat(&matB, k, n, n, const_cast<DType*>(B_data),
+                                    dtype, CUSPARSE_ORDER_ROW));
   CUSPARSE_CALL(
       cusparseCreateDnMat(&matC, m, n, n, C_data, dtype, CUSPARSE_ORDER_ROW));
 
   auto transA = CUSPARSE_OPERATION_NON_TRANSPOSE;
   auto transB = CUSPARSE_OPERATION_NON_TRANSPOSE;
   size_t workspace_size;
-  cusparseSpMMAlg_t spmm_alg = use_deterministic_alg_only ?
-      CUSPARSE_SPMM_CSR_ALG3 : CUSPARSE_SPMM_CSR_ALG2;
-  CUSPARSE_CALL(cusparseSpMM_bufferSize(
-      thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, spmm_alg, &workspace_size));
+  cusparseSpMMAlg_t spmm_alg = use_deterministic_alg_only
+                                   ? CUSPARSE_SPMM_CSR_ALG3
+                                   : CUSPARSE_SPMM_CSR_ALG2;
+  CUSPARSE_CALL(cusparseSpMM_bufferSize(thr_entry->cusparse_handle, transA,
+                                        transB, &alpha, matA, matB, &beta, matC,
+                                        dtype, spmm_alg, &workspace_size));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUSPARSE_CALL(cusparseSpMM(
-      thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, spmm_alg, workspace));
+  CUSPARSE_CALL(cusparseSpMM(thr_entry->cusparse_handle, transA, transB, &alpha,
+                             matA, matB, &beta, matC, dtype, spmm_alg,
+                             workspace));
   device->FreeWorkspace(ctx, workspace);
 
   CUSPARSE_CALL(cusparseDestroySpMat(matA));
@@ -406,9 +410,8 @@ namespace cuda {
  * positions in feature dimension. To avoid possible data hazards, it uses
  * atomic operators for reduction.
  */
-template <
-    typename Idx, typename DType, typename BinaryOp, typename ReduceOp,
-    bool UseBcast = false, bool UseIdx = false>
+template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp,
+          bool UseBcast = false, bool UseIdx = false>
 __global__ void SpMMCooKernel(
     const DType* __restrict__ ufeat, const DType* __restrict__ efeat,
     DType* __restrict__ out, Idx* __restrict__ arg_u, Idx* __restrict__ arg_e,
@@ -449,9 +452,8 @@ __global__ void SpMMCooKernel(
  *       on the x-axis are responsible for the computation on different
  * positions in feature dimension.
  */
-template <
-    typename Idx, typename DType, typename BinaryOp, typename ReduceOp,
-    bool UseBcast = false, bool UseIdx = false>
+template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp,
+          bool UseBcast = false, bool UseIdx = false>
 __global__ void ArgSpMMCooKernel(
     const DType* __restrict__ ufeat, const DType* __restrict__ efeat,
     DType* __restrict__ out, Idx* __restrict__ arg_u, Idx* __restrict__ arg_e,
@@ -492,9 +494,8 @@ __global__ void ArgSpMMCooKernel(
  *       Threadblocks on the x-axis are responsible for the computation on
  *       different positions in feature dimension.
  */
-template <
-    typename Idx, typename DType, typename BinaryOp, typename ReduceOp,
-    bool UseBcast = false, bool UseIdx = false>
+template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp,
+          bool UseBcast = false, bool UseIdx = false>
 __global__ void SpMMCsrKernel(
     const DType* __restrict__ ufeat, const DType* __restrict__ efeat,
     DType* __restrict__ out, Idx* __restrict__ arg_u, Idx* __restrict__ arg_e,
@@ -548,9 +549,8 @@ __global__ void SpMMCsrKernel(
  *       Threadblocks on the x-axis are responsible for the computation on
  *       different positions in feature dimension.
  */
-template <
-    typename Idx, typename DType, typename BinaryOp, typename ReduceOp,
-    bool UseBcast = false, bool UseIdx = false>
+template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp,
+          bool UseBcast = false, bool UseIdx = false>
 __global__ void SpMMCmpCsrHeteroKernel(
     const DType* __restrict__ ufeat, const DType* __restrict__ efeat,
     DType* __restrict__ out, Idx* __restrict__ arg_u, Idx* __restrict__ arg_e,
@@ -568,8 +568,8 @@ __global__ void SpMMCmpCsrHeteroKernel(
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
       using accum_type = typename accum_dtype<DType>::type;
-      accum_type local_accum = static_cast<accum_type>(
-          out[ty * out_len + tx]);  // ReduceOp::zero();
+      accum_type local_accum =
+          static_cast<accum_type>(out[ty * out_len + tx]);  // ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -581,8 +581,8 @@ __global__ void SpMMCmpCsrHeteroKernel(
         const DType* eoff =
             BinaryOp::use_rhs ? (efeat + eid * efeat_len) : nullptr;
         DType tmp_out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
-        ReduceOp::Call(
-            &local_accum, &local_argu, &local_arge, tmp_out, cid, eid);
+        ReduceOp::Call(&local_accum, &local_argu, &local_arge, tmp_out, cid,
+                       eid);
       }
       // Update output only when max/min values are different that original
       // output
@@ -621,12 +621,11 @@ __global__ void SpMMCmpCsrHeteroKernel(
  * reducer.
  */
 template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp>
-void SpMMCoo(
-    const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
-    NDArray out, NDArray argu, NDArray arge) {
+void SpMMCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
+             NDArray efeat, NDArray out, NDArray argu, NDArray arge) {
   /**
    * TODO(Xin): Disable half precision for SpMMCoo due to the round-off error.
-   * We should use fp32 for the accumulation but it's hard to modify the 
+   * We should use fp32 for the accumulation but it's hard to modify the
    * current implementation.
    */
 #if BF16_ENABLED
@@ -653,8 +652,8 @@ void SpMMCoo(
   int64_t out_size = out.NumElements();
   const int nt = FindNumThreads(out_size);
   const int nb = (out_size + nt - 1) / nt;
-  CUDA_KERNEL_CALL(
-      _FillKernel, nb, nt, 0, stream, out_data, out_size, ReduceOp::zero());
+  CUDA_KERNEL_CALL(_FillKernel, nb, nt, 0, stream, out_data, out_size,
+                   ReduceOp::zero());
 
   const int ntx = FindNumThreads(len);
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
@@ -697,9 +696,8 @@ void SpMMCoo(
  * reducer.
  */
 template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp>
-void SpMMCsr(
-    const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
-    NDArray out, NDArray argu, NDArray arge) {
+void SpMMCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
+             NDArray efeat, NDArray out, NDArray argu, NDArray arge) {
   const Idx* indptr = csr.indptr.Ptr<Idx>();
   const Idx* indices = csr.indices.Ptr<Idx>();
   const Idx* edge_map = csr.data.Ptr<Idx>();
@@ -757,10 +755,10 @@ void SpMMCsr(
  * @param etype Edge type
  */
 template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp>
-void SpMMCmpCsrHetero(
-    const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
-    NDArray out, NDArray argu, NDArray arge, NDArray argu_ntype,
-    NDArray arge_etype, const int src_type, const int etype) {
+void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr,
+                      NDArray ufeat, NDArray efeat, NDArray out, NDArray argu,
+                      NDArray arge, NDArray argu_ntype, NDArray arge_etype,
+                      const int src_type, const int etype) {
   const Idx* indptr = csr.indptr.Ptr<Idx>();
   const Idx* indices = csr.indices.Ptr<Idx>();
   const Idx* edge_map = csr.data.Ptr<Idx>();
@@ -784,14 +782,14 @@ void SpMMCmpCsrHetero(
 
   BCAST_IDX_CTX_SWITCH(
       bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off,
-      {CUDA_KERNEL_CALL(
-          (SpMMCmpCsrHeteroKernel<
-              Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
-          nblks, nthrs, 0, stream, ufeat_data, efeat_data, out_data, argu_data,
-          arge_data, static_cast<Idx*>(argu_ntype->data),
-          static_cast<Idx*>(arge_etype->data), indptr, indices, edge_map,
-          csr.num_rows, csr.num_cols, ubcast_off, ebcast_off, lhs_len, rhs_len,
-          len, src_type, etype)});
+      {CUDA_KERNEL_CALL((SpMMCmpCsrHeteroKernel<Idx, DType, BinaryOp, ReduceOp,
+                                                UseBcast, UseIdx>),
+                        nblks, nthrs, 0, stream, ufeat_data, efeat_data,
+                        out_data, argu_data, arge_data,
+                        static_cast<Idx*>(argu_ntype->data),
+                        static_cast<Idx*>(arge_etype->data), indptr, indices,
+                        edge_map, csr.num_rows, csr.num_cols, ubcast_off,
+                        ebcast_off, lhs_len, rhs_len, len, src_type, etype)});
 }
 
 }  // namespace cuda
