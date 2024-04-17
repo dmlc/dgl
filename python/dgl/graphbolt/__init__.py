@@ -10,6 +10,7 @@ from .._ffi import libinfo
 def load_graphbolt():
     """Load Graphbolt C++ library"""
     vers = torch.__version__.split("+", maxsplit=1)[0]
+    vers = ".".join(vers.split(".")[:3])
 
     if sys.platform.startswith("linux"):
         basename = f"libgraphbolt_pytorch_{vers}.so"
