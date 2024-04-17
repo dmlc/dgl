@@ -1014,7 +1014,7 @@ class BuiltinDataset(OnDiskDataset):
     ]
     _all_datasets = _datasets + _large_datasets
 
-    def __init__(self, name: str, root: str = "/opt/dlami/nvme") -> OnDiskDataset:
+    def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
         # For user using DGL 2.2 or later version, we prefer them to use
         # datasets with `seeds` suffix. This hack should be removed, when the
         # datasets with `seeds` suffix have covered previous ones.
