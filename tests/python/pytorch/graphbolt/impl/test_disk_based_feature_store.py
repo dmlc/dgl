@@ -64,30 +64,20 @@ def test_disk_based_feature():
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
+        # Test loading a Fortran contiguous ndarray.
+        a_T = np.asfortranarray(a)
+        path_a_T = test_dir + "a_T.npy"
+        np.save(path_a_T, a_T)
+        with pytest.raises(
+            AssertionError,
+            match="DiskBasedFeature only supports C_CONTIGUOUS array.",
+        ):
+            gb.DiskBasedFeature(path=path_a_T, metadata=metadata)
+
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None
         feature_a = feature_b = None
-
-        # Test loaded tensors' contiguity from C/Fortran contiguous ndarray.
-        contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="C")
-        non_contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="F")
-        assert contiguous_numpy.flags["C_CONTIGUOUS"]
-        assert non_contiguous_numpy.flags["F_CONTIGUOUS"]
-
-        path_contiguous = os.path.join(test_dir, "contiguous_numpy.npy")
-        path_non_contiguous = os.path.join(test_dir, "non_contiguous_numpy.npy")
-        np.save(path_contiguous, contiguous_numpy)
-        np.save(path_non_contiguous, non_contiguous_numpy)
-
-        feature_c = gb.DiskBasedFeature(path=path_contiguous, metadata=metadata)
-        feature_n = gb.DiskBasedFeature(path=path_non_contiguous)
-
-        assert feature_c._tensor.is_contiguous()
-        assert feature_n._tensor.is_contiguous()
-
-        contiguous_numpy = non_contiguous_numpy = None
-        feature_c = feature_n = None
 
 
 @unittest.skipIf(
