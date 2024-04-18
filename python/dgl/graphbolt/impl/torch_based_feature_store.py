@@ -260,7 +260,7 @@ class DiskBasedFeature(Feature):
     def __init__(self, path: str, metadata: Dict = None):
         super().__init__()
         mmap_mode = "r+"
-        loaded_array = np.load(path, mmap_mode=mmap_mode)
+        ondisk_data = np.load(path, mmap_mode=mmap_mode)
         assert loaded_array.flags[
             "C_CONTIGUOUS"
         ], "DiskBasedFeature only supports C_CONTIGUOUS array."
