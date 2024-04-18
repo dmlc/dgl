@@ -549,7 +549,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           etype_id_to_src_ntype_id_ptr[2 * id + 1] =
               node_type_to_id->at(src_type);
     }
-    auto indices_offsets_dev = torch::empty(
+    auto indices_offsets_device = torch::empty(
         etype_id_to_src_ntype_id.size(0),
         output_indices.options().dtype(torch::kLong));
     AT_DISPATCH_INDEX_TYPES(
@@ -558,7 +558,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               gather, etype_id_to_src_ntype_id_ptr,
               etype_id_to_src_ntype_id_ptr + etype_id_to_src_ntype_id.size(0),
               node_type_offset->data_ptr<index_t>(),
-              indices_offsets_dev.data_ptr<int64_t>());
+              indices_offsets_device.data_ptr<int64_t>());
         }));
     // For each edge type, we compute the start and end offsets to index into
     // indptr to form the final output_indptr.
@@ -594,27 +594,28 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
         num_etypes * 2, c10::TensorOptions()
                             .dtype(output_indptr.scalar_type())
                             .pinned_memory(true));
-    auto edge_offsets_dev =
+    auto edge_offsets_device =
         torch::empty(num_etypes * 2, output_indptr.options());
     at::cuda::CUDAEvent edge_offsets_event;
     AT_DISPATCH_INDEX_TYPES(
         indptr.scalar_type(), "SampleNeighborsEdgeOffsets", ([&] {
-          auto edge_offsets_pinned_dev_pair =
+          auto edge_offsets_pinned_device_pair =
               thrust::make_transform_output_iterator(
                   thrust::make_zip_iterator(
                       edge_offsets->data_ptr<index_t>(),
-                      edge_offsets_dev.data_ptr<index_t>()),
+                      edge_offsets_device.data_ptr<index_t>()),
                   [=] __device__(index_t x) {
                     return thrust::make_tuple(x, x);
                   });
           THRUST_CALL(
               gather, indptr_offsets_ptr,
               indptr_offsets_ptr + indptr_offsets.size(0),
-              output_indptr.data_ptr<index_t>(), edge_offsets_pinned_dev_pair);
+              output_indptr.data_ptr<index_t>(),
+              edge_offsets_pinned_device_pair);
         }));
     edge_offsets_event.record();
     auto indices_offset_subtract = ExpandIndptrImpl(
-        edge_offsets_dev, indices.scalar_type(), indices_offsets_dev,
+        edge_offsets_device, indices.scalar_type(), indices_offsets_device,
         output_indices.size(0));
     // The output_indices is permuted here.
     std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
@@ -634,17 +635,17 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       output_indptr_offsets_ptr[2 * i + 1] =
           output_indptr_offsets_ptr[2 * i] + indptr_list.back().size(0);
     }
-    auto output_indptr_offsets_dev = torch::empty(
+    auto output_indptr_offsets_device = torch::empty(
         output_indptr_offsets.size(0),
         output_indptr.options().dtype(torch::kLong));
     THRUST_CALL(
         copy_n, output_indptr_offsets_ptr, output_indptr_offsets.size(0),
-        output_indptr_offsets_dev.data_ptr<int64_t>());
+        output_indptr_offsets_device.data_ptr<int64_t>());
     // We form the final output indptr by concatenating pieces for different
     // edge types.
     output_indptr = torch::cat(indptr_list);
     auto indptr_offset_subtract = ExpandIndptrImpl(
-        output_indptr_offsets_dev, indptr.scalar_type(), edge_offsets_dev,
+        output_indptr_offsets_device, indptr.scalar_type(), edge_offsets_device,
         output_indptr.size(0));
     output_indptr -= indptr_offset_subtract;
     edge_offsets_event.synchronize();
