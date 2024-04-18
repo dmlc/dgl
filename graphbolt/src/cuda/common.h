@@ -7,6 +7,8 @@
 #ifndef GRAPHBOLT_CUDA_COMMON_H_
 #define GRAPHBOLT_CUDA_COMMON_H_
 
+#include <thrust/execution_policy.h>
+
 #include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
