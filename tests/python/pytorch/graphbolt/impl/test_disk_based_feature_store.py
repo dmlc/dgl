@@ -68,7 +68,10 @@ def test_disk_based_feature():
         a_T = np.asfortranarray(a)
         path_a_T = test_dir + "a_T.npy"
         np.save(path_a_T, a_T)
-        with pytest.raises(AssertionError,match="DiskBasedFeature only supports C_CONTIGUOUS array."):
+        with pytest.raises(
+            AssertionError,
+            match="DiskBasedFeature only supports C_CONTIGUOUS array.",
+        ):
             gb.DiskBasedFeature(path=path_a_T, metadata=metadata)
 
         # For windows, the file is locked by the numpy.load. We need to delete
