@@ -250,7 +250,9 @@ class DiskBasedFeature(Feature):
     >>> import torch
     >>> from dgl import graphbolt as gb
     >>> torch_feat = torch.arange(10).reshape(2, -1)
-    >>> feature = gb.DiskBasedFeature(torch_feat)
+    >>> pth = "path/to/feat.npy"
+    >>> np.save(pth,torch_feat)
+    >>> feature = gb.DiskBasedFeature(pth)
     >>> feature.read(torch.tensor([0]))
     tensor([[0, 1, 2, 3, 4]])
     >>> feature.size()
