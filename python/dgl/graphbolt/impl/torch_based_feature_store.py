@@ -398,8 +398,8 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                 )
             elif spec.format == "numpy":
                 mmap_mode = "r+" if not spec.in_memory else None
-                features[key] = DiskBasedFeature(
-                    spec.path,
+                features[key] = TorchBasedFeature(
+                    torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
                     metadata=metadata,
                 )
             else:
