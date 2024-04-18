@@ -64,6 +64,7 @@ def test_disk_based_feature():
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
+        # Test loading a Fortran contiguous ndarray.
         a_T = np.asfortranarray(a)
         path_a_T = test_dir + "a_T.npy"
         np.save(path_a_T, a_T)
