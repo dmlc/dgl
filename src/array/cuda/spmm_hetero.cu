@@ -90,23 +90,27 @@ void SpMMCsrHetero(
     for (dgl_type_t etype = 0; etype < ufeat_ntids.size(); ++etype) {
       DType* out_off = (*vec_out)[out_ntids[etype]].Ptr<DType>();
       if (reduce == "max")
-        _Fill(out_off, vec_csr[etype].num_rows * dim,
-              cuda::reduce::Max<IdType, DType>::zero());
+        _Fill(
+            out_off, vec_csr[etype].num_rows * dim,
+            cuda::reduce::Max<IdType, DType>::zero());
       else  // min
-        _Fill(out_off, vec_csr[etype].num_rows * dim,
-              cuda::reduce::Min<IdType, DType>::zero());
+        _Fill(
+            out_off, vec_csr[etype].num_rows * dim,
+            cuda::reduce::Min<IdType, DType>::zero());
       const dgl_type_t dst_id = out_ntids[etype];
       if (!updated[dst_id]) {
         updated[dst_id] = true;
         if (op == "copy_lhs") {
           IdType* argu_ntype = (*out_aux)[2][dst_id].Ptr<IdType>();
-          _Fill(argu_ntype, vec_csr[etype].num_rows * dim,
-                static_cast<IdType>(-1));
+          _Fill(
+              argu_ntype, vec_csr[etype].num_rows * dim,
+              static_cast<IdType>(-1));
         }
         if (op == "copy_rhs") {
           IdType* arge_etype = (*out_aux)[3][dst_id].Ptr<IdType>();
-          _Fill(arge_etype, vec_csr[etype].num_rows * dim,
-                static_cast<IdType>(-1));
+          _Fill(
+              arge_etype, vec_csr[etype].num_rows * dim,
+              static_cast<IdType>(-1));
         }
       }
     }
@@ -130,8 +134,9 @@ void SpMMCsrHetero(
         CusparseCsrmm2Hetero<DType, IdType>(
             csr.indptr->ctx, csr, static_cast<DType*>(vec_ufeat[src_id]->data),
             nullptr, out, x_length, stream, use_deterministic_alg_only);
-      } else if (op == "mul" && is_scalar_efeat &&
-                 cusparse_available<DType, IdType>(more_nnz)) {  // cusparse
+      } else if (
+          op == "mul" && is_scalar_efeat &&
+          cusparse_available<DType, IdType>(more_nnz)) {  // cusparse
         NDArray efeat = vec_efeat[etype];
         if (!IsNullArray(csr.data)) efeat = IndexSelect(efeat, csr.data);
         CusparseCsrmm2Hetero<DType, IdType>(
@@ -158,8 +163,8 @@ void SpMMCsrHetero(
             (vec_ufeat.size() == 0) ? NullArray() : vec_ufeat[src_id];
         NDArray efeat =
             (vec_efeat.size() == 0) ? NullArray() : vec_efeat[etype];
-        cuda::SpMMCmpCsrHetero<IdType, DType, Op,
-                               cuda::reduce::Max<IdType, DType>>(
+        cuda::SpMMCmpCsrHetero<
+            IdType, DType, Op, cuda::reduce::Max<IdType, DType>>(
             bcast, csr, ufeat, efeat, (*vec_out)[dst_id], (*out_aux)[0][dst_id],
             (*out_aux)[1][dst_id], (*out_aux)[2][dst_id], (*out_aux)[3][dst_id],
             src_id, etype);
@@ -170,8 +175,8 @@ void SpMMCsrHetero(
             (vec_ufeat.size() == 0) ? NullArray() : vec_ufeat[src_id];
         NDArray efeat =
             (vec_efeat.size() == 0) ? NullArray() : vec_efeat[etype];
-        cuda::SpMMCmpCsrHetero<IdType, DType, Op,
-                               cuda::reduce::Min<IdType, DType>>(
+        cuda::SpMMCmpCsrHetero<
+            IdType, DType, Op, cuda::reduce::Min<IdType, DType>>(
             bcast, csr, ufeat, efeat, (*vec_out)[dst_id], (*out_aux)[0][dst_id],
             (*out_aux)[1][dst_id], (*out_aux)[2][dst_id], (*out_aux)[3][dst_id],
             src_id, etype);
