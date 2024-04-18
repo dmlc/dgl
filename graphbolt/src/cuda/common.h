@@ -7,13 +7,12 @@
 #ifndef GRAPHBOLT_CUDA_COMMON_H_
 #define GRAPHBOLT_CUDA_COMMON_H_
 
-#include <thrust/execution_policy.h>
-
 #include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAStream.h>
 #include <cuda_runtime.h>
+#include <thrust/execution_policy.h>
 #include <torch/script.h>
 
 #include <memory>
