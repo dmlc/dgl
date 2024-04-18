@@ -261,10 +261,10 @@ class DiskBasedFeature(Feature):
         super().__init__()
         mmap_mode = "r+"
         ondisk_data = np.load(path, mmap_mode=mmap_mode)
-        assert loaded_array.flags[
+        assert ondisk_data.flags[
             "C_CONTIGUOUS"
         ], "DiskBasedFeature only supports C_CONTIGUOUS array."
-        self._tensor = torch.from_numpy(loaded_array)
+        self._tensor = torch.from_numpy(ondisk_data)
 
         self._metadata = metadata
         self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(

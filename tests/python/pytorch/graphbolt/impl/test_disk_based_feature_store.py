@@ -26,7 +26,6 @@ def test_disk_based_feature():
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 3], [4, 5, 6]])
         b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
-        a_T = np.asfortranarray(a)
         metadata = {"max_value": 3}
         path_a = to_on_disk_numpy(test_dir, "a", a)
         path_b = to_on_disk_numpy(test_dir, "b", b)
@@ -65,10 +64,11 @@ def test_disk_based_feature():
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
+        a_T = np.asfortranarray(a)
+        path_a_T = test_dir + "a_T.npy"
+        np.save(path_a_T, a_T)
         with pytest.raises(AssertionError):
-            assert not np.isfortran(
-                a_T
-            ), "DiskBasedFeature only supports C_CONTIGUOUS array."
+            gb.DiskBasedFeature(path=path_a_T, metadata=metadata)
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
