@@ -308,17 +308,7 @@ class MiniBatch:
             ), "`to_pyg_data` only supports single feature homogeneous graph."
             node_features = next(iter(self.node_features.values()))
 
-        if self.seed_nodes is not None:
-            if isinstance(self.seed_nodes, Dict):
-                batch_size = len(next(iter(self.seed_nodes.values())))
-            else:
-                batch_size = len(self.seed_nodes)
-        elif self.node_pairs is not None:
-            if isinstance(self.node_pairs, Dict):
-                batch_size = len(next(iter(self.node_pairs.values()))[0])
-            else:
-                batch_size = len(self.node_pairs[0])
-        elif self.seeds is not None:
+        if self.seeds is not None:
             if isinstance(self.seeds, Dict):
                 batch_size = len(next(iter(self.seeds.values())))
             else:
