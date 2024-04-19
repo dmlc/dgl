@@ -68,6 +68,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     bool return_eids,
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
     torch::optional<torch::Tensor> probs_or_mask = torch::nullopt,
+    torch::optional<torch::Tensor> node_type_offset = torch::nullopt,
     torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id =
         torch::nullopt,
     torch::optional<torch::Dict<std::string, int64_t>> edge_type_to_id =

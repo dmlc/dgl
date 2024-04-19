@@ -250,7 +250,9 @@ class DiskBasedFeature(Feature):
     >>> import torch
     >>> from dgl import graphbolt as gb
     >>> torch_feat = torch.arange(10).reshape(2, -1)
-    >>> feature = gb.DiskBasedFeature(torch_feat)
+    >>> pth = "path/to/feat.npy"
+    >>> np.save(pth,torch_feat)
+    >>> feature = gb.DiskBasedFeature(pth)
     >>> feature.read(torch.tensor([0]))
     tensor([[0, 1, 2, 3, 4]])
     >>> feature.size()
@@ -260,9 +262,11 @@ class DiskBasedFeature(Feature):
     def __init__(self, path: str, metadata: Dict = None):
         super().__init__()
         mmap_mode = "r+"
-        self._tensor = torch.from_numpy(
-            np.load(path, mmap_mode=mmap_mode)
-        ).contiguous()
+        ondisk_data = np.load(path, mmap_mode=mmap_mode)
+        assert ondisk_data.flags[
+            "C_CONTIGUOUS"
+        ], "DiskBasedFeature only supports C_CONTIGUOUS array."
+        self._tensor = torch.from_numpy(ondisk_data)
 
         self._metadata = metadata
         self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(

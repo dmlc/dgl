@@ -274,8 +274,8 @@ UniqueAndCompactBatched(
       return it->second;
     } else {
       int major;
-      CUDA_DRIVER_CHECK(cuDeviceGetAttribute(
-          &major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, dev_id));
+      CUDA_RUNTIME_CHECK(cudaDeviceGetAttribute(
+          &major, cudaDevAttrComputeCapabilityMajor, dev_id));
       return compute_capability_cache[dev_id] = major;
     }
   }();
