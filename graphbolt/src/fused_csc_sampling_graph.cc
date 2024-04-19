@@ -531,7 +531,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
     for (auto& etype_and_id : edge_type_to_id_.value()) {
       auto etype = etype_and_id.key();
       auto id = etype_and_id.value();
-      auto dst_type = utils::parse_dst_ntype_from_etype(etype);
+      auto [src_type, dst_type] = utils::parse_src_dst_ntype_from_etype(etype);
       auto ntype_id = node_type_to_id_->at(dst_type);
       etype_id_to_dst_ntype_id[id] = ntype_id;
       etype_id_to_num_picked_offset[id + 1] =
