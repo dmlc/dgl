@@ -1269,7 +1269,7 @@ def in_subgraph(g, nodes):
         return InSubgraphRequest(node_ids)
 
     def local_access(local_g, partition_book, local_nids, local_ntypes):
-        assert (local_ntypes is None, "local_ntypes should be None.")
+        assert local_ntypes is None, "local_ntypes should be None."
         return _in_subgraph(local_g, partition_book, local_nids)
 
     return _distributed_access(g, nodes, None, issue_remote_req, local_access)
