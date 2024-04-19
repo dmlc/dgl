@@ -734,7 +734,10 @@ def _distributed_access(g, nodes, ntypes, issue_remote_req, local_access):
     local_nids = None
     for pid in range(partition_book.num_partitions()):
         node_id = F.boolean_mask(nodes, partition_id == pid)
-        part_ntypes = F.boolean_mask(ntypes, partition_id == pid)
+        if ntypes is not None:
+            part_ntypes = F.boolean_mask(ntypes, partition_id == pid)
+        else:
+            part_ntypes = None
         # We optimize the sampling on a local partition if the server and the client
         # run on the same machine. With a good partitioning, most of the seed nodes
         # should reside in the local partition. If the server and the client
@@ -919,7 +922,6 @@ def sample_etype_neighbors(
         fanout = F.tensor(fanout_array, dtype=F.int64)
 
     gpb = g.get_partition_book()
-    ntype_offsets = None
     if isinstance(nodes, dict):
         homo_nids = []
         ntype_list = []
@@ -1264,10 +1266,10 @@ def in_subgraph(g, nodes):
     def issue_remote_req(node_ids):
         return InSubgraphRequest(node_ids)
 
-    def local_access(local_g, partition_book, local_nids):
+    def local_access(local_g, partition_book, local_nids, local_ntypes):
         return _in_subgraph(local_g, partition_book, local_nids)
 
-    return _distributed_access(g, nodes, issue_remote_req, local_access)
+    return _distributed_access(g, nodes, None, issue_remote_req, local_access)
 
 
 def _distributed_get_node_property(g, n, issue_remote_req, local_access):
