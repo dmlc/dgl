@@ -9,7 +9,7 @@ import dgl
 from dgl.utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
-from .internal import get_attributes
+from .internal import get_attributes, get_nonproperty_attributes
 from .sampled_subgraph import SampledSubgraph
 
 __all__ = ["MiniBatch"]
@@ -562,7 +562,7 @@ class MiniBatch:
         def apply_to(x, device):
             return recursive_apply(x, lambda x: _to(x, device))
 
-        transfer_attrs = get_attributes(self)
+        transfer_attrs = get_nonproperty_attributes(self)
 
         for attr in transfer_attrs:
             # Only copy member variables.
