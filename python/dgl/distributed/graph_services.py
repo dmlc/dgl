@@ -275,6 +275,8 @@ def _sample_etype_neighbors_dgl(
     and edge IDs.
     """
     assert etype_offset is not None, "The etype offset is not provided."
+    if seed_ntypes is not None:
+        seed_ntypes = None
 
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
@@ -1267,6 +1269,7 @@ def in_subgraph(g, nodes):
         return InSubgraphRequest(node_ids)
 
     def local_access(local_g, partition_book, local_nids, local_ntypes):
+        assert (local_ntypes is None, "local_ntypes should be None.")
         return _in_subgraph(local_g, partition_book, local_nids)
 
     return _distributed_access(g, nodes, None, issue_remote_req, local_access)
