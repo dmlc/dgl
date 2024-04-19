@@ -135,6 +135,7 @@ def get_attributes(_obj) -> list:
         attribute
         for attribute in dir(_obj)
         if not attribute.startswith("__")
+        and not isinstance(getattr(type(_obj), attribute), property)
         and not callable(getattr(_obj, attribute))
     ]
     return attributes
