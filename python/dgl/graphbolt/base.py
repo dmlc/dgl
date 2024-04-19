@@ -241,31 +241,16 @@ class CopyTo(IterDataPipe):
         The DataPipe.
     device : torch.device
         The PyTorch CUDA device.
-    extra_attrs: List[string]
-        The extra attributes of the data in the DataPipe you want to be carried
-        to the specific device. The attributes specified in the ``extra_attrs``
-        will be transferred regardless of the task inferred. It could also be
-        applied to classes other than :class:`~dgl.graphbolt.MiniBatch`.
     """
 
-    def __init__(self, datapipe, device, extra_attrs=None):
+    def __init__(self, datapipe, device):
         super().__init__()
         self.datapipe = datapipe
         self.device = device
-        self.extra_attrs = extra_attrs
 
     def __iter__(self):
         for data in self.datapipe:
             data = recursive_apply(data, apply_to, self.device)
-            if self.extra_attrs is not None:
-                for attr in self.extra_attrs:
-                    setattr(
-                        data,
-                        attr,
-                        recursive_apply(
-                            getattr(data, attr), apply_to, self.device
-                        ),
-                    )
             yield data
 
 
