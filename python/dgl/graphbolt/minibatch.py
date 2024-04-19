@@ -556,17 +556,17 @@ class MiniBatch:
     def to(self, device: torch.device):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
 
-        def _to(x, device):
+        def _to(x):
             return x.to(device) if hasattr(x, "to") else x
 
-        def apply_to(x, device):
-            return recursive_apply(x, lambda x: _to(x, device))
+        def apply_to(x):
+            return recursive_apply(x, _to)
 
         transfer_attrs = get_nonproperty_attributes(self)
 
         for attr in transfer_attrs:
             # Only copy member variables.
-            setattr(self, attr, apply_to(getattr(self, attr), device))
+            setattr(self, attr, apply_to(getattr(self, attr)))
 
         return self
 
