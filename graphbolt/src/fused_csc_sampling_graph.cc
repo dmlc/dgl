@@ -553,6 +553,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                : etype_id_to_num_picked_offset[num_etypes];
   torch::Tensor num_picked_neighbors_per_node =
       torch::zeros({num_rows + 1}, indptr_options);
+  torch::Tensor original_column_ids;
 
   AT_DISPATCH_INDEX_TYPES(
       indptr_.scalar_type(), "SampleNeighborsImplWrappedWithIndptr", ([&] {
@@ -561,7 +562,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
             seeds.scalar_type(), "SampleNeighborsImplWrappedWithSeeds", ([&] {
               using seeds_t = index_t;
               const auto indptr_data = indptr_.data_ptr<indptr_t>();
-              auto num_picked_neighbors_data_ptr =
+              const auto num_picked_neighbors_data_ptr =
                   num_picked_neighbors_per_node.data_ptr<indptr_t>();
               num_picked_neighbors_data_ptr[0] = 0;
               const auto seeds_data_ptr = seeds.data_ptr<seeds_t>();
@@ -609,7 +610,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
               // When doing non-temporal hetero sampling, we generate an
               // edge_offsets tensor.
               if (type_per_edge_.has_value() && fanouts.size() > 1) {
-                edge_offsets = torch::empty(num_etypes + 1, indptr_options);
+                edge_offsets = torch::empty({num_etypes + 1}, indptr_options);
                 AT_DISPATCH_INTEGRAL_TYPES(
                     edge_offsets.value().scalar_type(), "CalculateEdgeOffsets",
                     ([&] {
@@ -629,7 +630,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
               picked_eids = torch::empty({total_length}, indptr_options);
               subgraph_indices =
                   torch::empty({total_length}, indices_.options());
-              if (type_per_edge_.has_value()) {
+              if (fanouts.size() == 1 && type_per_edge_.has_value()) {
                 subgraph_type_per_edge = torch::empty(
                     {total_length}, type_per_edge_.value().options());
               }
@@ -686,6 +687,21 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                               }
                             }));
 
+                        // Calculate original_column_ids.
+                        if (fanouts.size() > 1) {
+                          original_column_ids =
+                              torch::zeros({num_rows}, indices_.options());
+                          const auto original_column_ids_data_ptr =
+                              original_column_ids.data_ptr<seeds_t>();
+                          for (auto i = 0; i < num_etypes; ++i) {
+                            if (etype_id_to_dst_ntype_id[i] != seed_type_id)
+                              continue;
+                            const auto indptr_offset =
+                                etype_id_to_num_picked_offset[i] + seed_offset;
+                            original_column_ids_data_ptr[indptr_offset] = nid;
+                          }
+                        }
+
                         if (fanouts.size() == 1 && type_per_edge_.has_value()) {
                           // Under this situation, hetero graph was sampled
                           // as a homo graph. For now we still generate
@@ -717,7 +733,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 
   return c10::make_intrusive<FusedSampledSubgraph>(
-      subgraph_indptr, subgraph_indices, seeds, torch::nullopt,
+      subgraph_indptr, subgraph_indices,
+      fanouts.size() > 1 ? original_column_ids : seeds, torch::nullopt,
       subgraph_reverse_edge_ids, subgraph_type_per_edge, edge_offsets);
 }
 
