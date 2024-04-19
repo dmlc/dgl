@@ -559,14 +559,11 @@ class MiniBatch:
         def _to(x):
             return x.to(device) if hasattr(x, "to") else x
 
-        def apply_to(x):
-            return recursive_apply(x, _to)
-
         transfer_attrs = get_nonproperty_attributes(self)
 
         for attr in transfer_attrs:
             # Only copy member variables.
-            setattr(self, attr, apply_to(getattr(self, attr)))
+            setattr(self, attr, recursive_apply(getattr(self, attr), _to))
 
         return self
 
