@@ -1,5 +1,6 @@
 #!/usr/bin/env groovy
 
+
 // CI tests are executed within Docker containers as the 'root' user. However,
 // communications between Jenkins nodes are done with the 'ubuntu' user(login
 // via root is disallowed on AWS EC2 instances). Therefore, we need to change
