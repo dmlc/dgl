@@ -1,6 +1,7 @@
 import os
 import re
 import unittest
+from collections import defaultdict
 from sys import platform
 
 import backend as F
@@ -47,7 +48,7 @@ def test_ItemSampler_minibatcher():
 
     # Default minibatcher is used if not specified.
     # `MiniBatch` is returned if expected names are specified.
-    item_set = gb.ItemSet(torch.arange(0, 10), names="seed_nodes")
+    item_set = gb.ItemSet(torch.arange(0, 10), names="seeds")
     item_sampler = gb.ItemSampler(item_set, batch_size=4)
     minibatch = next(iter(item_sampler))
     assert isinstance(minibatch, gb.MiniBatch)
@@ -78,7 +79,7 @@ def test_ItemSet_Iterable_Only(batch_size, shuffle, drop_last):
             return iter(torch.arange(0, num_ids))
 
     seed_nodes = gb.ItemSet(InvalidLength())
-    item_set = gb.ItemSet(seed_nodes, names="seed_nodes")
+    item_set = gb.ItemSet(seed_nodes, names="seeds")
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -106,7 +107,7 @@ def test_ItemSet_Iterable_Only(batch_size, shuffle, drop_last):
 def test_ItemSet_integer(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 103
-    item_set = gb.ItemSet(num_ids, names="seed_nodes")
+    item_set = gb.ItemSet(num_ids, names="seeds")
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -135,7 +136,7 @@ def test_ItemSet_seed_nodes(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 103
     seed_nodes = torch.arange(0, num_ids)
-    item_set = gb.ItemSet(seed_nodes, names="seed_nodes")
+    item_set = gb.ItemSet(seed_nodes, names="seeds")
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -165,7 +166,7 @@ def test_ItemSet_seed_nodes_labels(batch_size, shuffle, drop_last):
     num_ids = 103
     seed_nodes = torch.arange(0, num_ids)
     labels = torch.arange(0, num_ids)
-    item_set = gb.ItemSet((seed_nodes, labels), names=("seed_nodes", "labels"))
+    item_set = gb.ItemSet((seed_nodes, labels), names=("seeds", "labels"))
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -249,7 +250,7 @@ def test_ItemSet_node_pairs(batch_size, shuffle, drop_last):
     # Node pairs.
     num_ids = 103
     node_pairs = torch.arange(0, 2 * num_ids).reshape(-1, 2)
-    item_set = gb.ItemSet(node_pairs, names="node_pairs")
+    item_set = gb.ItemSet(node_pairs, names="seeds")
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -289,7 +290,7 @@ def test_ItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
     num_ids = 103
     node_pairs = torch.arange(0, 2 * num_ids).reshape(-1, 2)
     labels = node_pairs[:, 0]
-    item_set = gb.ItemSet((node_pairs, labels), names=("node_pairs", "labels"))
+    item_set = gb.ItemSet((node_pairs, labels), names=("seeds", "labels"))
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -333,16 +334,26 @@ def test_ItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSet_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
+def test_ItemSet_node_pairs_labels_indexes(batch_size, shuffle, drop_last):
     # Node pairs and negative destinations.
     num_ids = 103
     num_negs = 2
     node_pairs = torch.arange(0, 2 * num_ids).reshape(-1, 2)
-    neg_dsts = torch.arange(
-        2 * num_ids, 2 * num_ids + num_ids * num_negs
-    ).reshape(-1, num_negs)
+    neg_srcs = node_pairs[:, 0].repeat_interleave(num_negs)
+    neg_dsts = torch.arange(2 * num_ids, 2 * num_ids + num_ids * num_negs)
+    neg_node_pairs = torch.cat((neg_srcs, neg_dsts)).reshape(2, -1).T
+    labels = torch.empty(num_ids * 3)
+    labels[:num_ids] = 1
+    labels[num_ids:] = 0
+    indexes = torch.cat(
+        (
+            torch.arange(0, num_ids),
+            torch.arange(0, num_ids).repeat_interleave(num_negs),
+        )
+    )
+    node_pairs = torch.cat((node_pairs, neg_node_pairs))
     item_set = gb.ItemSet(
-        (node_pairs, neg_dsts), names=("node_pairs", "negative_dsts")
+        (node_pairs, labels, indexes), names=("seeds", "labels", "indexes")
     )
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
@@ -350,6 +361,8 @@ def test_ItemSet_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
     src_ids = []
     dst_ids = []
     negs_ids = []
+    final_labels = []
+    final_indexes = []
     for i, minibatch in enumerate(item_sampler):
         assert minibatch.seeds is not None
         assert isinstance(minibatch.seeds, torch.Tensor)
@@ -358,46 +371,43 @@ def test_ItemSet_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
         src, dst = minibatch.seeds.T
         negs_src = src[~minibatch.labels.to(bool)]
         negs_dst = dst[~minibatch.labels.to(bool)]
-        is_last = (i + 1) * batch_size >= num_ids
-        if not is_last or num_ids % batch_size == 0:
+        is_last = (i + 1) * batch_size >= num_ids * 3
+        if not is_last or num_ids * 3 % batch_size == 0:
             expected_batch_size = batch_size
         else:
             if not drop_last:
-                expected_batch_size = num_ids % batch_size
+                expected_batch_size = num_ids * 3 % batch_size
             else:
                 assert False
-        assert len(src) == expected_batch_size * 3
-        assert len(dst) == expected_batch_size * 3
+        assert len(src) == expected_batch_size
+        assert len(dst) == expected_batch_size
         assert negs_src.dim() == 1
         assert negs_dst.dim() == 1
-        assert len(negs_src) == expected_batch_size * 2
-        assert len(negs_dst) == expected_batch_size * 2
-        expected_indexes = torch.arange(expected_batch_size)
-        expected_indexes = torch.cat(
-            (expected_indexes, expected_indexes.repeat_interleave(2))
-        )
-        assert torch.equal(minibatch.indexes, expected_indexes)
-        # Verify node pairs and negative destinations.
-        assert torch.equal(
-            src[minibatch.labels.to(bool)] + 1, dst[minibatch.labels.to(bool)]
-        )
         assert torch.equal((negs_dst - 2 * num_ids) // 2 * 2, negs_src)
         # Archive batch.
         src_ids.append(src)
         dst_ids.append(dst)
         negs_ids.append(negs_dst)
+        final_labels.append(minibatch.labels)
+        final_indexes.append(minibatch.indexes)
     src_ids = torch.cat(src_ids)
     dst_ids = torch.cat(dst_ids)
     negs_ids = torch.cat(negs_ids)
+    final_labels = torch.cat(final_labels)
+    final_indexes = torch.cat(final_indexes)
     assert torch.all(src_ids[:-1] <= src_ids[1:]) is not shuffle
     assert torch.all(dst_ids[:-1] <= dst_ids[1:]) is not shuffle
     assert torch.all(negs_ids[:-1] <= negs_ids[1:]) is not shuffle
+    assert torch.all(final_labels[:-1] >= final_labels[1:]) is not shuffle
+    if not drop_last:
+        assert final_labels.sum() == num_ids
+        assert torch.equal(final_indexes, indexes) is not shuffle
 
 
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSet_seeds(batch_size, shuffle, drop_last):
+def test_ItemSet_hyperlink(batch_size, shuffle, drop_last):
     # Node pairs.
     num_ids = 103
     seeds = torch.arange(0, 3 * num_ids).reshape(-1, 3)
@@ -477,7 +487,7 @@ def test_ItemSet_seeds_labels(batch_size, shuffle, drop_last):
 def test_append_with_other_datapipes():
     num_ids = 100
     batch_size = 4
-    item_set = gb.ItemSet(torch.arange(0, num_ids), names="seed_nodes")
+    item_set = gb.ItemSet(torch.arange(0, num_ids), names="seeds")
     data_pipe = gb.ItemSampler(item_set, batch_size)
     # torchdata.datapipes.iter.Enumerator
     data_pipe = data_pipe.enumerate()
@@ -500,8 +510,8 @@ def test_ItemSetDict_iterable_only(batch_size, shuffle, drop_last):
 
     num_ids = 205
     ids = {
-        "user": gb.ItemSet(IterableOnly(0, 99), names="seed_nodes"),
-        "item": gb.ItemSet(IterableOnly(99, num_ids), names="seed_nodes"),
+        "user": gb.ItemSet(IterableOnly(0, 99), names="seeds"),
+        "item": gb.ItemSet(IterableOnly(99, num_ids), names="seeds"),
     }
     chained_ids = []
     for key, value in ids.items():
@@ -539,8 +549,8 @@ def test_ItemSetDict_seed_nodes(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 205
     ids = {
-        "user": gb.ItemSet(torch.arange(0, 99), names="seed_nodes"),
-        "item": gb.ItemSet(torch.arange(99, num_ids), names="seed_nodes"),
+        "user": gb.ItemSet(torch.arange(0, 99), names="seeds"),
+        "item": gb.ItemSet(torch.arange(99, num_ids), names="seeds"),
     }
     chained_ids = []
     for key, value in ids.items():
@@ -580,11 +590,11 @@ def test_ItemSetDict_seed_nodes_labels(batch_size, shuffle, drop_last):
     ids = {
         "user": gb.ItemSet(
             (torch.arange(0, 99), torch.arange(0, 99)),
-            names=("seed_nodes", "labels"),
+            names=("seeds", "labels"),
         ),
         "item": gb.ItemSet(
             (torch.arange(99, num_ids), torch.arange(99, num_ids)),
-            names=("seed_nodes", "labels"),
+            names=("seeds", "labels"),
         ),
     }
     chained_ids = []
@@ -638,8 +648,8 @@ def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
     node_pairs_like = torch.arange(0, num_ids * 2).reshape(-1, 2)
     node_pairs_follow = torch.arange(num_ids * 2, num_ids * 4).reshape(-1, 2)
     node_pairs_dict = {
-        "user:like:item": gb.ItemSet(node_pairs_like, names="node_pairs"),
-        "user:follow:user": gb.ItemSet(node_pairs_follow, names="node_pairs"),
+        "user:like:item": gb.ItemSet(node_pairs_like, names="seeds"),
+        "user:follow:user": gb.ItemSet(node_pairs_follow, names="seeds"),
     }
     item_set = gb.ItemSetDict(node_pairs_dict)
     item_sampler = gb.ItemSampler(
@@ -691,11 +701,11 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
     node_pairs_dict = {
         "user:like:item": gb.ItemSet(
             (node_pairs_like, node_pairs_like[:, 0]),
-            names=("node_pairs", "labels"),
+            names=("seeds", "labels"),
         ),
         "user:follow:user": gb.ItemSet(
             (node_pairs_follow, node_pairs_follow[:, 0]),
-            names=("node_pairs", "labels"),
+            names=("seeds", "labels"),
         ),
     }
     item_set = gb.ItemSetDict(node_pairs_dict)
@@ -709,7 +719,6 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
         assert isinstance(minibatch, gb.MiniBatch)
         assert minibatch.seeds is not None
         assert minibatch.labels is not None
-        assert minibatch.negative_dsts is None
         is_last = (i + 1) * batch_size >= total_ids
         if not is_last or total_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -749,27 +758,64 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
+def test_ItemSetDict_node_pairs_labels_indexes(batch_size, shuffle, drop_last):
     # Head, tail and negative tails.
     num_ids = 103
-    total_ids = 2 * num_ids
+    total_ids = 6 * num_ids
     num_negs = 2
-    node_paris_like = torch.arange(0, num_ids * 2).reshape(-1, 2)
+    node_pairs_like = torch.arange(0, num_ids * 2).reshape(-1, 2)
     node_pairs_follow = torch.arange(num_ids * 2, num_ids * 4).reshape(-1, 2)
-    neg_dsts_like = torch.arange(
-        num_ids * 4, num_ids * 4 + num_ids * num_negs
-    ).reshape(-1, num_negs)
+    neg_dsts_like = torch.arange(num_ids * 4, num_ids * 4 + num_ids * num_negs)
+    neg_node_pairs_like = (
+        torch.cat(
+            (node_pairs_like[:, 0].repeat_interleave(num_negs), neg_dsts_like)
+        )
+        .view(2, -1)
+        .T
+    )
+    all_node_pairs_like = torch.cat((node_pairs_like, neg_node_pairs_like))
+    labels_like = torch.empty(num_ids * 3)
+    labels_like[:num_ids] = 1
+    labels_like[num_ids:] = 0
+    indexes_like = torch.cat(
+        (
+            torch.arange(0, num_ids),
+            torch.arange(0, num_ids).repeat_interleave(num_negs),
+        )
+    )
     neg_dsts_follow = torch.arange(
         num_ids * 4 + num_ids * num_negs, num_ids * 4 + num_ids * num_negs * 2
-    ).reshape(-1, num_negs)
+    )
+    neg_node_pairs_follow = (
+        torch.cat(
+            (
+                node_pairs_follow[:, 0].repeat_interleave(num_negs),
+                neg_dsts_follow,
+            )
+        )
+        .view(2, -1)
+        .T
+    )
+    all_node_pairs_follow = torch.cat(
+        (node_pairs_follow, neg_node_pairs_follow)
+    )
+    labels_follow = torch.empty(num_ids * 3)
+    labels_follow[:num_ids] = 1
+    labels_follow[num_ids:] = 0
+    indexes_follow = torch.cat(
+        (
+            torch.arange(0, num_ids),
+            torch.arange(0, num_ids).repeat_interleave(num_negs),
+        )
+    )
     data_dict = {
         "user:like:item": gb.ItemSet(
-            (node_paris_like, neg_dsts_like),
-            names=("node_pairs", "negative_dsts"),
+            (all_node_pairs_like, labels_like, indexes_like),
+            names=("seeds", "labels", "indexes"),
         ),
         "user:follow:user": gb.ItemSet(
-            (node_pairs_follow, neg_dsts_follow),
-            names=("node_pairs", "negative_dsts"),
+            (all_node_pairs_follow, labels_follow, indexes_follow),
+            names=("seeds", "labels", "indexes"),
         ),
     }
     item_set = gb.ItemSetDict(data_dict)
@@ -779,11 +825,13 @@ def test_ItemSetDict_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
     src_ids = []
     dst_ids = []
     negs_ids = []
+    final_labels = defaultdict(list)
+    final_indexes = defaultdict(list)
     for i, minibatch in enumerate(item_sampler):
         assert isinstance(minibatch, gb.MiniBatch)
         assert minibatch.seeds is not None
         assert minibatch.labels is not None
-        assert minibatch.negative_dsts is None
+        assert minibatch.indexes is not None
         is_last = (i + 1) * batch_size >= total_ids
         if not is_last or total_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -800,24 +848,23 @@ def test_ItemSetDict_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
             assert isinstance(seeds, torch.Tensor)
             src_etype = seeds[:, 0]
             dst_etype = seeds[:, 1]
-            src.append(src_etype[minibatch.labels[etype].to(bool)])
-            dst.append(dst_etype[minibatch.labels[etype].to(bool)])
+            src.append(src_etype)
+            dst.append(dst_etype)
             negs_src.append(src_etype[~minibatch.labels[etype].to(bool)])
             negs_dst.append(dst_etype[~minibatch.labels[etype].to(bool)])
+            final_labels[etype].append(minibatch.labels[etype])
+            final_indexes[etype].append(minibatch.indexes[etype])
         src = torch.cat(src)
         dst = torch.cat(dst)
         negs_src = torch.cat(negs_src)
         negs_dst = torch.cat(negs_dst)
         assert len(src) == expected_batch_size
         assert len(dst) == expected_batch_size
-        assert len(negs_src) == expected_batch_size * 2
-        assert len(negs_dst) == expected_batch_size * 2
         src_ids.append(src)
         dst_ids.append(dst)
         negs_ids.append(negs_dst)
         assert negs_src.dim() == 1
         assert negs_dst.dim() == 1
-        assert torch.equal(src + 1, dst)
         assert torch.equal(negs_src, (negs_dst - num_ids * 4) // 2 * 2)
     src_ids = torch.cat(src_ids)
     dst_ids = torch.cat(dst_ids)
@@ -825,12 +872,24 @@ def test_ItemSetDict_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
     assert torch.all(src_ids[:-1] <= src_ids[1:]) is not shuffle
     assert torch.all(dst_ids[:-1] <= dst_ids[1:]) is not shuffle
     assert torch.all(negs_ids <= negs_ids) is not shuffle
+    for etype in data_dict.keys():
+        final_labels_etype = torch.cat(final_labels[etype])
+        final_indexes_etype = torch.cat(final_indexes[etype])
+        assert (
+            torch.all(final_labels_etype[:-1] >= final_labels_etype[1:])
+            is not shuffle
+        )
+        if not drop_last:
+            assert final_labels_etype.sum() == num_ids
+            assert (
+                torch.equal(final_indexes_etype, indexes_follow) is not shuffle
+            )
 
 
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_seeds(batch_size, shuffle, drop_last):
+def test_ItemSetDict_hyperlink(batch_size, shuffle, drop_last):
     # Node pairs.
     num_ids = 103
     total_pairs = 2 * num_ids
@@ -876,7 +935,7 @@ def test_ItemSetDict_seeds(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_seeds_labels(batch_size, shuffle, drop_last):
+def test_ItemSetDict_hyperlink_labels(batch_size, shuffle, drop_last):
     # Node pairs and labels
     num_ids = 103
     total_ids = 2 * num_ids
