@@ -242,7 +242,7 @@ def layerwise_infer(
         job="infer",
     )
     pred = model.inference(graph, features, dataloader, args.storage_device)
-    pred = pred[test_set._items[0]]
+    pred = pred[test_set._items[0].long()]
     label = test_set._items[1].to(pred.device)
 
     return MF.accuracy(
