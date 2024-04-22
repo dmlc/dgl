@@ -602,7 +602,7 @@ FusedCSCSamplingGraph::SampleNeighborsImplWithSeedOffsets(
                                 : i;
                         num_pick_fn(
                             offset, num_neighbors,
-                            num_picked_neighbors_data_ptr, seed_offset,
+                            num_picked_neighbors_data_ptr + 1, seed_offset,
                             etype_id_to_num_picked_offset);
                       } else {
                         num_pick_fn(
@@ -667,7 +667,7 @@ FusedCSCSamplingGraph::SampleNeighborsImplWithSeedOffsets(
                       edge_offsets_data_ptr[0] = 0;
                       for (auto i = 0; i < num_etypes; ++i) {
                         edge_offsets_data_ptr[i + 1] = subgraph_indptr_data_ptr
-                            [etype_id_to_num_picked_offset[i + 1]];
+                            [etype_id_to_num_picked_offset[i + 1] - 1];
                       }
                     }));
               }
@@ -748,10 +748,18 @@ FusedCSCSamplingGraph::SampleNeighborsImplWithSeedOffsets(
                                      ++j) {
                                   subgraph_indices_data_ptr[j] =
                                       indices_data_ptr[picked_eids_data_ptr[j]];
-                                  if (with_seed_offsets)
-                                    subgraph_indices_data_ptr[j] -=
-                                        seed_offsets->at(
-                                            etype_id_to_src_ntype_id[i]);
+                                  if (with_seed_offsets && fanouts.size() > 1 &&
+                                      node_type_offset_.has_value())
+                                    AT_DISPATCH_INDEX_TYPES(
+                                        node_type_offset_.value().scalar_type(),
+                                        "SubstractNodeTypeOffset", ([&] {
+                                          auto node_type_offset_data =
+                                              node_type_offset_.value()
+                                                  .data_ptr<index_t>();
+                                          subgraph_indices_data_ptr[j] -=
+                                              node_type_offset_data
+                                                  [etype_id_to_src_ntype_id[i]];
+                                        }));
                                 }
                               }
                             }));
@@ -790,6 +798,9 @@ FusedCSCSamplingGraph::SampleNeighborsImplWithSeedOffsets(
   if (with_seed_offsets && fanouts.size() > 1) {
     subgraph_indptr -= subgraph_indptr_substract;
   }
+
+  std::cerr << subgraph_indptr << std::endl;
+  std::cerr << subgraph_indices << std::endl;
 
   return c10::make_intrusive<FusedSampledSubgraph>(
       subgraph_indptr, subgraph_indices, seeds, torch::nullopt,
@@ -1274,11 +1285,11 @@ void NumPickByEtype(
             // The pick numbers aren't stored continuously, but separately for
             // each different etype.
             const auto offset =
-                etype_id_to_num_picked_offset[etype] + seed_offset + 1;
+                etype_id_to_num_picked_offset[etype] + seed_offset;
             NumPick(
                 fanouts[etype], replace, probs_or_mask, etype_begin,
                 etype_end - etype_begin, num_picked_ptr + offset);
-            num_picked_ptr[etype_id_to_num_picked_offset[etype]] -=
+            num_picked_ptr[etype_id_to_num_picked_offset[etype] - 1] -=
                 num_picked_ptr[offset];
           } else {
             PickedNumType picked_count = 0;
