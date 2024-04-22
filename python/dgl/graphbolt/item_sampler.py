@@ -26,6 +26,7 @@ __all__ = [
     "minibatcher_default",
     "ItemSampler2",
     "ItemSampler3",
+    "Customized_Batcher",
 ]
 
 
@@ -191,7 +192,7 @@ class ItemShufflerAndBatcher:
             # For item set that's initialized with integer or single tensor,
             # `buffer` is a tensor.
             # return torch.index_select(buffer, dim=0, index=indices)
-            return buffer[indices] # test for original impl.
+            return buffer[indices]  # test for original impl.
         elif isinstance(buffer, list) and isinstance(buffer[0], DGLGraph):
             # For item set that's initialized with a list of
             # DGLGraphs, `buffer` is a list of DGLGraphs.
@@ -829,6 +830,59 @@ def _get_numworkers_and_workerid():
     return num_workers, worker_id
 
 
+from torch.utils.data.sampler import Sampler
+
+
+class Customized_Batcher(Sampler):
+    r"""Experimental.
+    Samples a mini-batch of indices.
+    """
+
+    def __init__(
+        self, num_items: int, batch_size: int, shuffle: bool, drop_last: bool
+    ) -> None:
+        if (
+            not isinstance(batch_size, int)
+            or isinstance(batch_size, bool)
+            or batch_size <= 0
+        ):
+            raise ValueError(
+                "batch_size should be a positive integer value, "
+                "but got batch_size={}".format(batch_size)
+            )
+        if not isinstance(drop_last, bool):
+            raise ValueError(
+                "drop_last should be a boolean value, but got "
+                "drop_last={}".format(drop_last)
+            )
+        self.num_items = num_items
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.drop_last = drop_last
+
+    def __iter__(self) -> Iterator:
+        # According to the test result, under single-processing, using torch tensor as indices is much faster than using list (if dataset is tensor).
+        if self.shuffle:
+            # indices = torch.randperm(self.num_items).tolist()
+            indices = torch.randperm(self.num_items)
+        else:
+            # indices = list(range(self.num_items))
+            indices = torch.arange(self.num_items)
+
+        for i in range(self.batch_size, self.num_items, self.batch_size):
+            # yield indices[i: min(i + self.batch_size, self.num_items)]
+            yield indices[i - self.batch_size : i]
+
+        # if not self.drop_last:
+        #     yield indices[i:]
+
+    def __len__(self) -> int:
+        if self.drop_last:
+            return self.num_items // self.batch_size  # type: ignore[arg-type]
+        else:
+            return (self.num_items + self.batch_size - 1) // self.batch_size  # type: ignore[arg-type]
+
+
 class ItemSampler3(Mapper):
     """Experimental. Subclasses IterDataPipe."""
 
@@ -848,9 +902,12 @@ class ItemSampler3(Mapper):
         self._shuffle = shuffle
         self._data_loader = DataLoader(
             dataset=self._item_set,
-            batch_size=self._batch_size,
-            shuffle=self._shuffle,
-            drop_last=self._drop_last,
+            batch_sampler=Customized_Batcher(
+                num_items=len(item_set),
+                batch_size=batch_size,
+                shuffle=shuffle,
+                drop_last=drop_last,
+            ),
             collate_fn=self._collate,
         )
         super().__init__(
@@ -896,10 +953,13 @@ class ItemSampler2(DataLoader):
         self._shuffle = shuffle
         super().__init__(
             dataset=self._item_set,
-            batch_size=self._batch_size,
-            shuffle=self._shuffle,
+            batch_sampler=Customized_Batcher(
+                num_items=len(item_set),
+                batch_size=batch_size,
+                shuffle=shuffle,
+                drop_last=drop_last,
+            ),
             collate_fn=self._collate_fn,
-            drop_last=self._drop_last,
         )
 
     @staticmethod

@@ -1132,22 +1132,43 @@ from torchdata.datapipes.iter import IterableWrapper
 
 
 def test_ItemSampler2():
-    item_set_versions = [gb.ItemSet, gb.ItemSet3]
-    # item_set_versions = [gb.ItemSet3]
-    dl_versions = [DataLoader, gb.ItemSampler, gb.ItemSampler2, gb.ItemSampler3]
-    for item_set in item_set_versions:
+    num_items = 1000
+    # item_set_versions = [gb.ItemSet, gb.ItemSet3]
+    item_set_versions = [gb.ItemSet3]
+    # dl_versions = [DataLoader, gb.ItemSampler, gb.ItemSampler2, gb.ItemSampler3]
+    dl_versions = [DataLoader, gb.ItemSampler]
+    for shuffle in [True, False]:
         print(" ")
-        it = item_set(torch.arange(100000), names="seed_nodes")
-        for dl in dl_versions:
-            for shuffle in [False]:
-                item_sampler = dl(it, batch_size=32, shuffle=shuffle)
-                t0 = time()
-                for _ in item_sampler:
-                    pass
-                t1 = time()
-                print(
-                    f"{it.__class__.__name__} | {item_sampler.__class__.__name__} | {shuffle} | {(t1-t0).__round__(6)}"
-                )
+        for item_set in item_set_versions:
+            print(" ")
+            it = item_set(torch.arange(num_items), names="seeds")
+            for batch_size in [1, 4, 16, 64, 256, 1024]:
+                print(" ")
+                for dl in dl_versions:
+                    for num_workers in [0, 4]:
+                        if dl is DataLoader:
+                            batcher = gb.Customized_Batcher(
+                                num_items=num_items,
+                                batch_size=batch_size,
+                                shuffle=shuffle,
+                                drop_last=False,
+                            )
+                            item_sampler = dl(
+                                it,
+                                batch_sampler=batcher,
+                                num_workers=num_workers,
+                            )
+                        else:
+                            item_sampler = dl(
+                                it, batch_size=batch_size, shuffle=shuffle
+                            )
+                        t0 = time()
+                        for _ in item_sampler:
+                            pass
+                        t1 = time()
+                        print(
+                            f"{it.__class__.__name__} | {item_sampler.__class__.__name__} | batch_size: {batch_size} | shuffle:  {shuffle} | num_workers: {num_workers} | time: {(t1-t0).__round__(6)}"
+                        )
 
     assert 0
 
@@ -1186,6 +1207,13 @@ def test_diff_dataloader():
     # assert 0
 
 
+def test_cumstomized_batcher():
+    bcr = gb.Customized_Batcher(10, 3, True, False)
+    for x in bcr:
+        print(x)
+
+
 test_ItemSampler2()
 # test_ItemSampler3()
 # test_diff_dataloader()
+# test_cumstomized_batcher()

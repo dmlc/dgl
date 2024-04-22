@@ -499,7 +499,10 @@ class ItemSet3(Dataset):
         #     return self._items[0][indices]
         # else:
         #     return tuple(item[indices] for item in self._items)
-        return tuple(item[indices] for item in self._items) # Always return tuple.
+        return tuple(item[indices] for item in self._items)
+        """ Always return tuple to avoid File "/home/ubuntu/miniconda3/envs/dgl/lib/python3.8/site-packages/torch/utils/data/_utils/collate.py", line 163, in collate_tensor_fn
+    return torch.stack(batch, 0, out=out)
+TypeError: stack(): argument 'tensors' (position 1) must be tuple of Tensors, not Tensor"""
 
     @property
     def names(self) -> Tuple[str]:
