@@ -95,13 +95,12 @@ def create_dataloader(
     # self.copy_to()
     # [Input]:
     # 'device': The device to copy the data to.
-    # 'extra_attrs': The extra attributes to copy.
     # [Output]:
     # A CopyTo object to copy the data to the specified device. Copying here
     # ensures that the rest of the operations run on the GPU.
     ############################################################################
     if args.storage_device != "cpu":
-        datapipe = datapipe.copy_to(device=device, extra_attrs=["seeds"])
+        datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
     # [Step-3]:

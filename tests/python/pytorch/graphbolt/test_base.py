@@ -42,7 +42,7 @@ def test_CopyTo():
 def test_CopyToWithMiniBatches(task):
     N = 16
     B = 2
-    if task == "node_classification" or task == "extra_attrs":
+    if task == "node_classification":
         itemset = gb.ItemSet(
             (torch.arange(N), torch.arange(N)), names=("seeds", "labels")
         )
