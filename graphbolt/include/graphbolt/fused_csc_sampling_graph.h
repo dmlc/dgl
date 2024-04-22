@@ -414,14 +414,14 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
 
  private:
   template <typename NumPickFn, typename PickFn>
-  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
+  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImplWithSeedOffsets(
       const torch::Tensor& seeds,
       torch::optional<std::vector<int64_t>> seed_offsets,
       const std::vector<int64_t>& fanouts, bool return_eids,
       NumPickFn num_pick_fn, PickFn pick_fn) const;
 
   template <typename NumPickFn, typename PickFn>
-  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsTemporalImpl(
+  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
       PickFn pick_fn) const;
 
@@ -523,7 +523,7 @@ int64_t TemporalNumPick(
 
 template <typename PickedNumType>
 void NumPickByEtype(
-    const std::vector<int64_t>& fanouts, bool replace,
+    bool with_seed_offsets, const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
     int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_offset,
@@ -631,9 +631,9 @@ int64_t TemporalPick(
  */
 template <SamplerType S, typename PickedType>
 int64_t PickByEtype(
-    int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
-    bool replace, const torch::TensorOptions& options,
-    const torch::Tensor& type_per_edge,
+    bool with_seed_offsets, int64_t offset, int64_t num_neighbors,
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::TensorOptions& options, const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
     PickedType* picked_data_ptr, int64_t seed_offset,
     PickedType* subgraph_indptr_ptr,
