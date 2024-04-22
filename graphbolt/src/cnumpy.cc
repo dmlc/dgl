@@ -8,10 +8,10 @@
 
 #include <torch/torch.h>
 
+#include <chrono>
 #include <cstring>
 #include <regex>
 #include <stdexcept>
-#include <chrono>
 #include <unordered_map>
 namespace graphbolt {
 namespace storage {
@@ -101,19 +101,17 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   // The minimum page size to contain one feature.
   static int64_t aligned_length =
       (feature_size_ + kDiskAlignmentSize) & (long)~(kDiskAlignmentSize - 1);
-  //cout<<"addr_aligned_length:"<<&aligned_length<<endl;
   int64_t num_index = index.numel();
 
   char *read_buffer = (char *)aligned_alloc(
       kDiskAlignmentSize,
       (aligned_length + kDiskAlignmentSize) * group_size_ * num_thread_);
-    char *result_buffer =
+  char *result_buffer =
       (char *)aligned_alloc(kDiskAlignmentSize, feature_size_ * num_index);
-    //cout<<"addr_result_buffer:"<<&result_buffer<<endl;
   auto index_data = index.data_ptr<int64_t>();
 
   // Record the inside offsets of feteched features.
-  int64_t disk_offsets[group_size_ * num_thread_];
+  int64_t residual[group_size_ * num_thread_];
   // Indicator for index error.
   std::atomic<bool> error_flag{};
   TORCH_CHECK(
@@ -124,109 +122,77 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
       0, num_index, group_size_, [&](int64_t begin, int64_t end) {
         auto thread_id = torch::get_thread_num();
         if (!error_flag.load()) {
-          for (int64_t batch_start = begin; batch_start < end; batch_start += group_size_) {
-            int64_t batch_end = std::min(group_size_ , end - batch_start);
-            unordered_map<int64_t,int64_t> aligned_offset_cache;
-            unordered_map<int64_t,int64_t> group_id_cache;
-            int64_t request_num = 0;
-            //put min(group_size_ , end - batch_start) I/O requests into io_uring_sqe.
-            for(int64_t i = 0; i < batch_end ; i++){
-              int64_t group_id = i;//group_id:0 to group_size.
-              int64_t feature_id = index_data[batch_start + i];// Feature id.
+          for (int64_t batch_start = begin; batch_start < end;
+               batch_start += group_size_) {
+            int64_t batch_end = std::min(group_size_, end - batch_start);
+            // put min(group_size_ , end - batch_start) I/O requests into
+            // io_uring_sqe.
+            for (int64_t i = 0; i < batch_end; i++) {
+              int64_t group_id = i;  // group_id:0 to group_size.
+              int64_t feature_id = index_data[batch_start + i];  // Feature id.
               if (feature_id >= feature_dim_[0]) {
                 error_flag.store(true);
                 break;
               }
               int64_t offset = feature_id * feature_size_ + prefix_len_;
               int64_t aligned_offset = offset & (long)~(kDiskAlignmentSize - 1);
-              disk_offsets[thread_id * group_size_ + group_id] =
-                offset - aligned_offset;
+              residual[thread_id * group_size_ + group_id] =
+                  offset - aligned_offset;
               int64_t read_size;
-              if (disk_offsets[thread_id * group_size_ + group_id] + feature_size_ >
-                      kDiskAlignmentSize) {
-                  read_size = aligned_length + kDiskAlignmentSize;
-                } else {
-                  read_size = aligned_length;
-                }
-              if(read_size == aligned_length && aligned_offset_cache.find(aligned_offset) != aligned_offset_cache.end()){
-                //aligned_offset_cache.find(aligned_offset) != aligned_offset_cache.end()
-                group_id_cache[group_id] = aligned_offset_cache[aligned_offset];
+              if (residual[thread_id * group_size_ + group_id] + feature_size_ >
+                  kDiskAlignmentSize) {
+                read_size = aligned_length + kDiskAlignmentSize;
+              } else {
+                read_size = aligned_length;
               }
-              else{
-                struct io_uring_sqe *submit_queue =
-                    io_uring_get_sqe(&io_uring_queue_[thread_id]);
-                    io_uring_prep_read(
-                    submit_queue, file_description_,
+              struct io_uring_sqe *submit_queue =
+                  io_uring_get_sqe(&io_uring_queue_[thread_id]);
+              io_uring_prep_read(
+                  submit_queue, file_description_,
+                  read_buffer +
+                      ((aligned_length + kDiskAlignmentSize) * group_size_ *
+                       thread_id) +
+                      ((aligned_length + kDiskAlignmentSize) * group_id),
+                  read_size, aligned_offset);
+            }
+
+            if (!error_flag.load()) {
+              io_uring_submit(&io_uring_queue_[thread_id]);
+              //  Wait for completion of I/O requests.
+              int64_t num_finish = 0;
+              // Wait until all the disk blocks are loaded in current group.
+              while (num_finish < batch_end) {
+                struct io_uring_cqe *complete_queue;
+                if (io_uring_wait_cqe(
+                        &io_uring_queue_[thread_id], &complete_queue) < 0) {
+                  perror("io_uring_wait_cqe");
+                  abort();
+                }
+                struct io_uring_cqe *complete_queues[group_size_];
+                int cqe_count = io_uring_peek_batch_cqe(
+                    &io_uring_queue_[thread_id], complete_queues, group_size_);
+                if (cqe_count == -1) {
+                  perror("io_uring_peek_batch error\n");
+                  abort();
+                }
+                // Move the head pointer of completion queue.
+                io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
+                num_finish += cqe_count;
+              }
+              for (int64_t batch_id = 0; batch_id < batch_end; batch_id++) {
+                memcpy(
+                    result_buffer + feature_size_ * (batch_start + batch_id),
                     read_buffer +
                         ((aligned_length + kDiskAlignmentSize) * group_size_ *
-                        thread_id) +
-                        ((aligned_length + kDiskAlignmentSize) * group_id),
-                    read_size, aligned_offset);
-                aligned_offset_cache[aligned_offset] = group_id;
-                request_num++;
-                }
+                         thread_id) +
+                        ((aligned_length + kDiskAlignmentSize) * batch_id +
+                         residual[thread_id * group_size_ + (batch_id)]),
+                    feature_size_);
               }
-
-            //cout<<thread_id<<"  batch_start:  "<<batch_start<<endl;
-            if (!error_flag.load()) {
-                io_uring_submit(&io_uring_queue_[thread_id]);
-                //  Wait for completion of I/O requests.
-                int64_t num_finish = 0;
-                // Wait until all the disk blocks are loaded in current group.
-                while (num_finish < request_num) {
-                  struct io_uring_cqe *complete_queue;
-                  if (io_uring_wait_cqe(
-                          &io_uring_queue_[thread_id], &complete_queue) < 0) {
-                    perror("io_uring_wait_cqe");
-                    abort();
-                  }
-                  struct io_uring_cqe *complete_queues[group_size_];
-                  int cqe_count = io_uring_peek_batch_cqe(
-                      &io_uring_queue_[thread_id], complete_queues,
-                      group_size_);
-                  if (cqe_count == -1) {
-                    perror("io_uring_peek_batch error\n");
-                    abort();
-                  }
-                  // Move the head pointer of completion queue.
-                  io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
-                  num_finish += cqe_count;
-                  // std::cout<<num_finish<<" "<<batch_size<<std::endl;
-                }
-                for (int64_t batch_id = 0;batch_id < batch_end;batch_id++) {
-                    //group_id_cache.find(batch_id) != group_id_cache.end()
-                    if(group_id_cache.find(batch_id) != group_id_cache.end())
-                    { 
-                        //cout<<"group_id_cache:"<<group_id_cache[batch_id]<<endl;
-                        memcpy(
-                        result_buffer + feature_size_ * (batch_start + batch_id),
-                        read_buffer +
-                          ((aligned_length + kDiskAlignmentSize) * group_size_ *
-                              thread_id) +
-                              ((aligned_length + kDiskAlignmentSize) *  
-                          group_id_cache[batch_id]
-                          +
-                          disk_offsets[thread_id * group_size_ + (batch_id)]),
-                        feature_size_);
-                    }
-                    else{
-                      //cout<<batch_id<<endl;
-                      memcpy(
-                        result_buffer + feature_size_ * (batch_start + batch_id),
-                        read_buffer +
-                            ((aligned_length + kDiskAlignmentSize) * group_size_ *
-                            thread_id) +
-                            ((aligned_length + kDiskAlignmentSize) * batch_id +
-                            disk_offsets[thread_id * group_size_ + (batch_id)]),
-                        feature_size_);
-                    }
-                }
-              }
-              //cout<<thread_id<<"  end  "<<batch_end<<" " <<end<<endl;
             }
           }
         }
-      );
+      });
   auto result = torch::empty({0});
   if (!error_flag.load()) {
     auto options = torch::TensorOptions()
