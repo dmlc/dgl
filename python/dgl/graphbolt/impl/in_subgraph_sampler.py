@@ -34,7 +34,7 @@ class InSubgraphSampler(SubgraphSampler):
     >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12, 14])
     >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 5, 1, 2, 0, 3, 5, 1, 4])
     >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
-    >>> item_set = gb.ItemSet(len(indptr) - 1, names="seed_nodes")
+    >>> item_set = gb.ItemSet(len(indptr) - 1, names="seeds")
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=2)
     >>> insubgraph_sampler = gb.InSubgraphSampler(item_sampler, graph)
     >>> for _, data in enumerate(insubgraph_sampler):
