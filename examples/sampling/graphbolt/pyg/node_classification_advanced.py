@@ -179,14 +179,14 @@ def create_dataloader(
     )
     # Copy the data to the specified device.
     if args.graph_device != "cpu":
-        datapipe = datapipe.copy_to(device=device, extra_attrs=["seeds"])
+        datapipe = datapipe.copy_to(device=device)
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
         graph, fanout if job != "infer" else [-1]
     )
     # Copy the data to the specified device.
     if args.feature_device != "cpu":
-        datapipe = datapipe.copy_to(device=device, extra_attrs=["input_nodes"])
+        datapipe = datapipe.copy_to(device=device)
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     # Copy the data to the specified device.

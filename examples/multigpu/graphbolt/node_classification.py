@@ -133,7 +133,7 @@ def create_dataloader(
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
     if args.storage_device != "cpu":
-        datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+        datapipe = datapipe.copy_to(device)
     datapipe = datapipe.sample_neighbor(graph, args.fanout)
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     if args.storage_device == "cpu":
