@@ -568,6 +568,10 @@ class LayerNeighborSampler(NeighborSamplerImpl):
     )]
     >>> next(iter(subgraph_sampler)).compacted_seeds
     tensor([[0, 1], [0, 2], [0, 3]])
+    >>> next(iter(subgraph_sampler)).labels
+    tensor([1., 0., 0.])
+    >>> next(iter(subgraph_sampler)).indexes
+    tensor([0, 0, 0])
     """
 
     def __init__(
