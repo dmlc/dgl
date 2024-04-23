@@ -108,6 +108,10 @@ class TemporalNeighborSampler(SubgraphSampler):
                 )
                 for ntype in ntypes
             }
+            seeds_timestamp = {
+                ntype: seeds_timestamp.get(ntype, torch.LongTensor([]))
+                for ntype in ntypes
+            }
         for hop in range(num_layers):
             subgraph = self.sampler(
                 seeds,
