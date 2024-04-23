@@ -117,7 +117,7 @@ class HeteroSAGE(nn.Module):
                 H_node_dict = {
                     ntype: F.relu(H) for ntype, H in H_node_dict.items()
                 }
-        return H_node_dict
+        return H_node_dict[target_type]
 
 
 def create_dataloader(args, graph, features, itemset, is_train=True):
@@ -212,7 +212,6 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 def train(args, model, graph, features, train_set):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(args, graph, features, train_set)
-    seed_lookup = SeedLookup(target_type)
 
     for epoch in range(args.epochs):
         model.train()
