@@ -1,9 +1,6 @@
 """
-This script trains and tests a GraphSAGE model for link prediction on
-large graphs using graphbolt dataloader.
-
-Paper: [Inductive Representation Learning on Large Graphs]
-(https://arxiv.org/abs/1706.02216)
+This script trains and tests a Heterogeneous GraphSAGE model for link
+prediction with temporal information using graphbolt dataloader.
 
 Unlike previous dgl examples, we've utilized the newly defined dataloader
 from GraphBolt. This example will help you grasp how to build an end-to-end
@@ -13,14 +10,6 @@ While node classification predicts labels for nodes based on their
 local neighborhoods, link prediction assesses the likelihood of an edge
 existing between two nodes, necessitating different sampling strategies
 that account for pairs of nodes and their joint neighborhoods.
-
-TODO: Add the link_prediction.py example to core/graphsage.
-Before reading this example, please familiar yourself with graphsage link
-prediction by reading the example in the
-`examples/core/graphsage/link_prediction.py`
-
-If you want to train graphsage on a large graph in a distributed fashion, read
-the example in the `examples/distributed/graphsage/`.
 
 This flowchart describes the main functional sequence of the provided example.
 main
@@ -42,6 +31,7 @@ main
 └───> Test set evaluation
 """
 import argparse
+import os
 import time
 from functools import partial
 
@@ -51,24 +41,39 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
-from torchmetrics.retrieval import RetrievalMRR
+from dgl.data.utils import download, extract_archive
 
 
 TIMESTAMP_FEATURE_NAME = "__timestamp__"
 node_feature_keys = {
-    "Product": ["categoryId", "pricelog2"],
-    "Query": [
-        "DAY(timestamp)",
-        "DAYOFWEEK(timestamp)",
-        "MONTH(timestamp)",
-        "TIMESTAMP(timestamp)",
-        "YEAR(timestamp)",
-        "categoryId",
-        "duration",
-    ],
+    "Product": ["categoryId"],
+    "Query": ["categoryId"],
 }
 
-target_type = "Query:Click:Product"
+target_type = ("Query", "Click", "Product")
+all_connected_types = [
+    target_type,
+    ("Product", "reverse_Click", "Query"),
+    ("Product", "reverse_QueryResult", "Query"),
+    ("Query", "QueryResult", "Product"),
+]
+
+
+class CategoricalEncoder(nn.Module):
+    def __init__(
+        self,
+        num_categories,
+        out_size,
+    ):
+        super().__init__()
+        self.embed = nn.Embedding(num_categories, out_size)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.xavier_uniform_(self.embed.weight)
+
+    def forward(self, input_feat: torch.Tensor):
+        return self.embed(input_feat.view(-1))
 
 
 class HeteroSAGE(nn.Module):
@@ -78,11 +83,12 @@ class HeteroSAGE(nn.Module):
         self.layers.append(
             dglnn.HeteroGraphConv(
                 {
-                    target_type: dglnn.SAGEConv(
+                    etype: dglnn.SAGEConv(
                         in_size,
                         hidden_size,
                         "mean",
                     )
+                    for etype in all_connected_types
                 },
                 aggregate="sum",
             )
@@ -90,11 +96,12 @@ class HeteroSAGE(nn.Module):
         self.layers.append(
             dglnn.HeteroGraphConv(
                 {
-                    target_type: dglnn.SAGEConv(
+                    etype: dglnn.SAGEConv(
                         hidden_size,
                         hidden_size,
                         "mean",
                     )
+                    for etype in all_connected_types
                 },
                 aggregate="sum",
             )
@@ -117,7 +124,7 @@ class HeteroSAGE(nn.Module):
                 H_node_dict = {
                     ntype: F.relu(H) for ntype, H in H_node_dict.items()
                 }
-        return H_node_dict[target_type]
+        return H_node_dict
 
 
 def create_dataloader(args, graph, features, itemset, is_train=True):
@@ -209,7 +216,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     return dataloader
 
 
-def train(args, model, graph, features, train_set):
+def train(args, model, graph, features, train_set, encoders):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(args, graph, features, train_set)
 
@@ -219,28 +226,36 @@ def train(args, model, graph, features, train_set):
         start_epoch_time = time.time()
         for step, data in tqdm.tqdm(enumerate(dataloader)):
             # Get node pairs with labels for loss calculation.
-            compacted_seeds = data.compacted_seeds.T
+            compacted_seeds = data.compacted_seeds[
+                gb.etype_tuple_to_str(target_type)
+            ].T
             labels = data.labels
 
             node_feature = {}
             for ntype, keys in node_feature_keys.items():
-                for key in keys:
-                    node_feature[(ntype, key)] = data.node_features[
-                        (ntype, key)
-                    ]
+                ntype, feat = ntype, keys[0]
+                node_feature[ntype] = data.node_features[
+                    (ntype, feat)
+                ].squeeze()
 
             blocks = data.blocks
 
             # Get the embeddings of the input nodes.
-            seed_embeds = model(blocks, node_feature)
-            compacted_seeds = data.compacted_seeds[target_type]
+            H_node_dict = {
+                ntype: encoders[ntype](feat)
+                for ntype, feat in node_feature.items()
+            }
+            seed_embeds = model(blocks, H_node_dict)
+            src_type, _, dst_type = target_type
             logits = model.predictor(
-                seed_embeds[compacted_seeds[0]]
-                * seed_embeds[compacted_seeds[1]]
+                seed_embeds[src_type][compacted_seeds[0]]
+                * seed_embeds[dst_type][compacted_seeds[1]]
             ).squeeze()
 
             # Compute loss.
-            loss = F.binary_cross_entropy_with_logits(logits, labels)
+            loss = F.binary_cross_entropy_with_logits(
+                logits, labels[gb.etype_tuple_to_str(target_type)].float()
+            )
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -260,11 +275,11 @@ def train(args, model, graph, features, train_set):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="OGBL-Citation2 (GraphBolt)")
+    parser = argparse.ArgumentParser(description="diginetica-r2ne (GraphBolt)")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=0.0005)
     parser.add_argument("--neg-ratio", type=int, default=1)
-    parser.add_argument("--train-batch-size", type=int, default=8)
+    parser.add_argument("--train-batch-size", type=int, default=1024)
     parser.add_argument("--eval-batch-size", type=int, default=1024)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument(
@@ -287,43 +302,58 @@ def parse_args():
     )
     parser.add_argument(
         "--mode",
-        default="cpu-cpu",
-        choices=["cpu-cpu", "cpu-cuda", "pinned-cuda", "cuda-cuda"],
+        default="cpu-cuda",
+        choices=["cpu-cpu", "cpu-cuda"],
         help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     return parser.parse_args()
 
 
+def download_datasets(name, root="datasets"):
+    url = "https://dgl-data.s3-accelerate.amazonaws.com/dataset/"
+    dataset_dir = os.path.join(root, name)
+    if not os.path.exists(dataset_dir):
+        url += name + ".zip"
+        os.makedirs(root, exist_ok=True)
+        zip_file_path = os.path.join(root, name + ".zip")
+        download(url, path=zip_file_path)
+        extract_archive(zip_file_path, root, overwrite=True)
+        os.remove(zip_file_path)
+    return dataset_dir
+
+
 def main(args):
     if not torch.cuda.is_available():
-        args.mode = "cpu-cpu"
+        args.mode = "cpu-gpu"
     print(f"Training in {args.mode} mode.")
     args.storage_device, args.device = args.mode.split("-")
     args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data")
-    dataset = gb.BuiltinDataset("diginetica-r2ne").load()
+    dataset_path = download_datasets("diginetica-r2ne")
+    dataset = gb.OnDiskDataset(dataset_path).load()
 
     # Move the dataset to the selected storage.
-    if args.storage_device == "pinned":
-        graph = dataset.graph.pin_memory_()
-        features = dataset.feature.pin_memory_()
-    else:
-        graph = dataset.graph.to(args.storage_device)
-        features = dataset.feature.to(args.storage_device)
+    graph = dataset.graph.to(args.storage_device)
+    features = dataset.feature.to(args.storage_device)
 
     train_set = dataset.tasks[0].train_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
+    in_size = 128
     hidden_channels = 256
     args.device = torch.device(args.device)
-    model = HeteroSAGE(128, hidden_channels).to(args.device)
+    model = HeteroSAGE(in_size, hidden_channels).to(args.device)
+    encoders = {
+        "Query": CategoricalEncoder(1102, in_size).to(args.device),
+        "Product": CategoricalEncoder(1218, in_size).to(args.device),
+    }
 
     # Model training.
     print("Training...")
-    train(args, model, graph, features, train_set)
+    train(args, model, graph, features, train_set, encoders)
 
 
 if __name__ == "__main__":
