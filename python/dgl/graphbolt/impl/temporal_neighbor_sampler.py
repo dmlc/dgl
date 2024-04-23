@@ -95,16 +95,17 @@ class TemporalNeighborSampler(SubgraphSampler):
         ), "seeds_timestamp must be provided for temporal neighbor sampling."
         subgraphs = []
         num_layers = len(self.fanouts)
-        # Enrich seeds with all node types.
+        # Enrich seeds with all node types. Ensure that the dtype and device
+        # remain consistent with those of the existing seeds.
         if isinstance(seeds, dict):
-            (dtype, device,) = (
-                list(seeds.values())[0].dtype,
-                list(seeds.values())[0].device,
-            )
+            first_val = next(iter(seeds.items()))[1]
             ntypes = list(self.graph.node_type_to_id.keys())
             seeds = {
                 ntype: seeds.get(
-                    ntype, torch.tensor([], dtype=dtype, device=device)
+                    ntype,
+                    torch.tensor(
+                        [], dtype=first_val.dtype, device=first_val.device
+                    ),
                 )
                 for ntype in ntypes
             }
