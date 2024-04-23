@@ -97,13 +97,15 @@ class TemporalNeighborSampler(SubgraphSampler):
         num_layers = len(self.fanouts)
         # Enrich seeds with all node types.
         if isinstance(seeds, dict):
+            (dtype, device,) = (
+                list(seeds.values())[0].dtype,
+                list(seeds.values())[0].device,
+            )
             ntypes = list(self.graph.node_type_to_id.keys())
             seeds = {
-                ntype: seeds.get(ntype, torch.LongTensor([]))
-                for ntype in ntypes
-            }
-            seeds_timestamp = {
-                ntype: seeds_timestamp.get(ntype, torch.LongTensor([]))
+                ntype: seeds.get(
+                    ntype, torch.tensor([], dtype=dtype, device=device)
+                )
                 for ntype in ntypes
             }
         for hop in range(num_layers):
