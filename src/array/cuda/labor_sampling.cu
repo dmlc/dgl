@@ -40,9 +40,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "../../array/cuda/atomic.cuh"
 #include "../../array/cuda/utils.h"
-#include "../../graph/transform/cuda/cuda_map_edges.cuh"
 #include "../../random/continuous_seed.h"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./functor.cuh"

@@ -15,7 +15,7 @@ from . import gb_test_utils
 def test_DataLoader():
     N = 40
     B = 4
-    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
+    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seeds")
     graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]
@@ -62,7 +62,7 @@ def test_gpu_sampling_DataLoader(
     N = 40
     B = 4
     num_layers = 2
-    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
+    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seeds")
     graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
@@ -77,7 +77,7 @@ def test_gpu_sampling_DataLoader(
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     datapipe = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
-    datapipe = datapipe.copy_to(F.ctx(), extra_attrs=["seed_nodes"])
+    datapipe = datapipe.copy_to(F.ctx())
     datapipe = getattr(dgl.graphbolt, sampler_name)(
         datapipe,
         graph,

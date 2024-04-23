@@ -70,10 +70,22 @@ def test_disk_based_feature():
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
+<<<<<<< HEAD
         with pytest.raises(AssertionError):
             assert not np.isfortran(
                 a_T
             ), "DiskBasedFeature only supports C_CONTIGUOUS array."
+=======
+        # Test loading a Fortran contiguous ndarray.
+        a_T = np.asfortranarray(a)
+        path_a_T = test_dir + "a_T.npy"
+        np.save(path_a_T, a_T)
+        with pytest.raises(
+            AssertionError,
+            match="DiskBasedFeature only supports C_CONTIGUOUS array.",
+        ):
+            gb.DiskBasedFeature(path=path_a_T, metadata=metadata)
+>>>>>>> c997434cdb97d386ba2ac1dfa0226e98df20c92d
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.

@@ -161,8 +161,9 @@ def is_authorized(name) {
     'hutiechuan', 'pyynb',
     // Friends:
     'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
+    'TristonC', 'mfbalin',
     'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
-    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit', 'mfbalin',
+    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
     // Emeritus:
     'VoVAllen',
   ]
