@@ -283,6 +283,13 @@ def parse_args():
     parser.add_argument("--eval-batch-size", type=int, default=1024)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument(
+        "--dataset",
+        default=0,
+        default="diginetica-r2ne",
+        choices=["diginetica-r2ne"],
+        help="Dataset.",
+    )
+    parser.add_argument(
         "--early-stop",
         type=int,
         default=0,
@@ -325,14 +332,14 @@ def download_datasets(name, root="datasets"):
 
 def main(args):
     if not torch.cuda.is_available():
-        args.mode = "cpu-gpu"
+        args.mode = "cpu-cpu"
     print(f"Training in {args.mode} mode.")
     args.storage_device, args.device = args.mode.split("-")
     args.device = torch.device(args.device)
 
     # Load and preprocess dataset.
     print("Loading data")
-    dataset_path = download_datasets("diginetica-r2ne")
+    dataset_path = download_datasets(args.dataset)
     dataset = gb.OnDiskDataset(dataset_path).load()
 
     # Move the dataset to the selected storage.
