@@ -614,8 +614,6 @@ FusedCSCSamplingGraph::SampleNeighborsImplWithSeedOffsets(
                   });
 
               if (with_seed_offsets && fanouts.size() > 1) {
-                std::cerr << num_picked_neighbors_per_node << std::endl
-                          << "----\n";
                 torch::Tensor num_picked_offset_tensor =
                     torch::zeros({num_etypes + 1}, indptr_options);
                 torch::Tensor substract_offset =
@@ -639,10 +637,6 @@ FusedCSCSamplingGraph::SampleNeighborsImplWithSeedOffsets(
                 subgraph_indptr_substract = ops::ExpandIndptr(
                     num_picked_offset_tensor, indptr_.scalar_type(),
                     substract_offset);
-                std::cerr << num_picked_offset_tensor << std::endl;
-                std::cerr << num_picked_neighbors_per_node << std::endl;
-                std::cerr << substract_offset << std::endl;
-                std::cerr << subgraph_indptr_substract << std::endl;
               }
 
               // Step 2. Calculate prefix sum to get total length and offsets of
@@ -651,8 +645,6 @@ FusedCSCSamplingGraph::SampleNeighborsImplWithSeedOffsets(
                   0, indptr_.scalar_type());
               auto subgraph_indptr_data_ptr =
                   subgraph_indptr.data_ptr<indptr_t>();
-
-              std::cerr << subgraph_indptr << std::endl;
 
               // When doing non-temporal hetero sampling, we generate an
               // edge_offsets tensor.
@@ -798,9 +790,6 @@ FusedCSCSamplingGraph::SampleNeighborsImplWithSeedOffsets(
   if (with_seed_offsets && fanouts.size() > 1) {
     subgraph_indptr -= subgraph_indptr_substract;
   }
-
-  std::cerr << subgraph_indptr << std::endl;
-  std::cerr << subgraph_indices << std::endl;
 
   return c10::make_intrusive<FusedSampledSubgraph>(
       subgraph_indptr, subgraph_indices, seeds, torch::nullopt,
