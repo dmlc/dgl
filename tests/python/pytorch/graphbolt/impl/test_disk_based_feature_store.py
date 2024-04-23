@@ -45,7 +45,7 @@ def test_disk_based_feature():
             feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
         )
 
-        #test when the index tensor is large.
+        # test when the index tensor is large.
         torch_based_feature_a = gb.TorchBasedFeature(a)
         ind_a = torch.randint(low=0, high=2, size=(1, 2049))[0]
         assert torch.equal(
@@ -70,12 +70,6 @@ def test_disk_based_feature():
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
-<<<<<<< HEAD
-        with pytest.raises(AssertionError):
-            assert not np.isfortran(
-                a_T
-            ), "DiskBasedFeature only supports C_CONTIGUOUS array."
-=======
         # Test loading a Fortran contiguous ndarray.
         a_T = np.asfortranarray(a)
         path_a_T = test_dir + "a_T.npy"
@@ -85,7 +79,6 @@ def test_disk_based_feature():
             match="DiskBasedFeature only supports C_CONTIGUOUS array.",
         ):
             gb.DiskBasedFeature(path=path_a_T, metadata=metadata)
->>>>>>> c997434cdb97d386ba2ac1dfa0226e98df20c92d
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.

@@ -122,7 +122,8 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
           for (int64_t batch_start = begin; batch_start < end;
                batch_start += group_size_) {
             int64_t batch_end = std::min(group_size_, end - batch_start);
-            // put min(group_size_ , end - batch_start) I/O requests into io_uring_sqe.
+            // put min(group_size_ , end - batch_start) I/O requests into
+            // io_uring_sqe.
             for (int64_t i = 0; i < batch_end; i++) {
               int64_t group_id = i;  // group_id:0 to group_size.
               int64_t feature_id = index_data[batch_start + i];  // Feature id.
