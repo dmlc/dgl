@@ -563,11 +563,10 @@ def test_dgl_link_predication_homo():
     check_dgl_blocks_homo(minibatch, dgl_blocks)
 
 
-@pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
-def test_dgl_link_predication_hetero(mode):
+def test_dgl_link_predication_hetero():
     # Arrange
     minibatch = create_hetero_minibatch()
-    minibatch.compacted_node_pairs = {
+    minibatch.compacted_seeds = {
         relation: (torch.tensor([[1, 1, 2, 0, 1, 2], [1, 0, 1, 1, 0, 0]]).T,),
         reverse_relation: (
             torch.tensor([[0, 1, 1, 2, 0, 2], [1, 0, 1, 1, 0, 0]]).T,
