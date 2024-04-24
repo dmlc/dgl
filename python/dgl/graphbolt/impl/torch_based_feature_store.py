@@ -292,6 +292,7 @@ class DiskBasedFeature(Feature):
             return self._tensor
         elif platform.system() == "Linux":
             try:
+                torch.set_num_threads(2)
                 return self._ondisk_npy_array.index_select(ids.cpu()).to(
                     ids.device
                 )
@@ -399,11 +400,18 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                mmap_mode = "r+" if not spec.in_memory else None
+                #if spec.in_memory:
+                mmap_mode = "r+"
                 features[key] = TorchBasedFeature(
                     torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
                     metadata=metadata,
                 )
+                # else:
+                #     mmap_mode = "r+"
+                #     features[key] = DiskBasedFeature(
+                #         spec.path,
+                #         metadata=metadata,
+                #     )
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")
         super().__init__(features)

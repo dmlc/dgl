@@ -764,7 +764,9 @@ class OnDiskDataset(Dataset):
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
+        print("g")
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
+        print("t")
         self._tasks = self._init_tasks(self._meta.tasks, tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
         self._loaded = True
@@ -1014,7 +1016,9 @@ class BuiltinDataset(OnDiskDataset):
     ]
     _all_datasets = _datasets + _large_datasets
 
-    def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
+    def __init__(
+        self, name: str, root: str = "/opt/dlami/nvme"
+    ) -> OnDiskDataset:
         # For user using DGL 2.2 or later version, we prefer them to use
         # datasets with `seeds` suffix. This hack should be removed, when the
         # datasets with `seeds` suffix have covered previous ones.
