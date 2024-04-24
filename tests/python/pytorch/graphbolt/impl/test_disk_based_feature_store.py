@@ -26,8 +26,6 @@ def test_disk_based_feature():
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 3], [4, 5, 6]])
         b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
-        print(b.shape)
-        a_T = np.asfortranarray(a)
         metadata = {"max_value": 3}
         path_a = to_on_disk_numpy(test_dir, "a", a)
         path_b = to_on_disk_numpy(test_dir, "b", b)
@@ -40,20 +38,29 @@ def test_disk_based_feature():
             feature_a.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
         )
 
-        # Test read the feature with ids.
         assert torch.equal(
             feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
         )
 
+        # Test read the feature with ids.
+        assert torch.equal(
+            feature_a.read(torch.tensor([0])),
+            torch.tensor([[1, 2, 3]]),
+        )
+        assert torch.equal(
+            feature_b.read(torch.tensor([1])),
+            torch.tensor([[[4, 5], [6, 7]]]),
+        )
+
         # test when the index tensor is large.
         torch_based_feature_a = gb.TorchBasedFeature(a)
-        ind_a = torch.randint(low=0, high=2, size=(1, 2049))[0]
+        ind_a = torch.randint(low=0, high=2, size=(1, 4097))[0]
         assert torch.equal(
             feature_a.read(ind_a),
             torch_based_feature_a.read(ind_a),
         )
         torch_based_feature_b = gb.TorchBasedFeature(b)
-        ind_b = torch.randint(low=0, high=2, size=(1, 2049))[0]
+        ind_b = torch.randint(low=0, high=2, size=(1, 4097))[0]
         assert torch.equal(
             feature_b.read(ind_b),
             torch_based_feature_b.read(ind_b),

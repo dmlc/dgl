@@ -8,7 +8,6 @@
 
 #include <torch/torch.h>
 
-#include <chrono>
 #include <cstring>
 #include <regex>
 #include <stdexcept>
