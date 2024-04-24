@@ -548,7 +548,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
     }
   } else {
     etype_id_to_dst_ntype_id[0] = 0;
-    etype_id_to_num_picked_offset[1] = num_seeds;
+    etype_id_to_num_picked_offset[1] = num_seeds + 1;
   }
   // `num_rows` indicates the length of `num_picked_neighbors_per_node`, which
   // is used for storing pick numbers. In non-temporal hetero sampling, it
