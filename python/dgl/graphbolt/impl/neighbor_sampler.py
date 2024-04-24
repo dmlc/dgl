@@ -407,8 +407,8 @@ class NeighborSampler(NeighborSamplerImpl):
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
     >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
-    >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
-    >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
+    >>> seeds = torch.LongTensor([[0, 1], [1, 2]])
+    >>> item_set = gb.ItemSet(seeds, names="seeds")
     >>> datapipe = gb.ItemSampler(item_set, batch_size=1)
     >>> datapipe = datapipe.sample_uniform_negative(graph, 2)
     >>> datapipe = datapipe.sample_neighbor(graph, [5, 10, 15])
@@ -534,8 +534,8 @@ class LayerNeighborSampler(NeighborSamplerImpl):
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
     >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
-    >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
-    >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
+    >>> seeds = torch.LongTensor([[0, 1], [1, 2]])
+    >>> item_set = gb.ItemSet(seeds, names="seeds")
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=1,)
     >>> neg_sampler = gb.UniformNegativeSampler(item_sampler, graph, 2)
     >>> fanouts = [torch.LongTensor([5]),
@@ -566,8 +566,12 @@ class LayerNeighborSampler(NeighborSamplerImpl):
         original_edge_ids=None,
         original_column_node_ids=tensor([0, 1, 5, 2]),
     )]
-    >>> next(iter(subgraph_sampler)).compacted_node_pairs
-    (tensor([0]), tensor([1]))
+    >>> next(iter(subgraph_sampler)).compacted_seeds
+    tensor([[0, 1], [0, 2], [0, 3]])
+    >>> next(iter(subgraph_sampler)).labels
+    tensor([1., 0., 0.])
+    >>> next(iter(subgraph_sampler)).indexes
+    tensor([0, 0, 0])
     """
 
     def __init__(
