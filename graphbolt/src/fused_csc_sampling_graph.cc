@@ -559,7 +559,6 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                : etype_id_to_num_picked_offset[num_etypes];
   torch::Tensor num_picked_neighbors_per_node =
       torch::zeros({num_rows}, indptr_options);
-  torch::Tensor original_column_ids;
 
   AT_DISPATCH_INDEX_TYPES(
       indptr_.scalar_type(), "SampleNeighborsImplWrappedWithIndptr", ([&] {
@@ -700,7 +699,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                             offset, num_neighbors, picked_eids_data_ptr,
                             seed_offset, subgraph_indptr_data_ptr,
                             etype_id_to_num_picked_offset);
-                      } else {
+                      } else if (num_picked_neighbors_data_ptr[i + 1] > 0) {
                         picked_number = pick_fn(
                             offset, num_neighbors,
                             picked_eids_data_ptr + subgraph_indptr_data_ptr[i],
@@ -1133,7 +1132,7 @@ void NumPick(
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
     int64_t num_neighbors, PickedNumType* picked_num_ptr) {
   int64_t num_valid_neighbors = num_neighbors;
-  if (probs_or_mask.has_value()) {
+  if (probs_or_mask.has_value() && num_neighbors > 0) {
     // Subtract the count of zeros in probs_or_mask.
     AT_DISPATCH_ALL_TYPES(
         probs_or_mask.value().scalar_type(), "CountZero", ([&] {
