@@ -120,6 +120,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
         if (!error_flag.load()) {
           int64_t batch_offset = begin;
           for (int64_t i = begin; i < end; ++i) {
+            int64_t group_id = i - begin;
             int64_t feature_id = index_data[i];  // Feature id.
             if (feature_id >= feature_dim_[0]) {
               error_flag.store(true);
@@ -129,14 +130,12 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
             int64_t offset = feature_id * feature_size_ + prefix_len_;
             int64_t aligned_offset = offset & (long)~(kDiskAlignmentSize - 1);
             // put offset of the feature into array.
-            residual[thread_id * group_size_ + ((i - begin) % group_size_)] =
+            residual[thread_id * group_size_ + (group_id % group_size_)] =
                 offset - aligned_offset;
             // If the tail of the feature extends into another block, read an
             // additional block.
             int64_t read_size;
-            if (residual
-                        [thread_id * group_size_ +
-                         ((i - begin) % group_size_)] +
+            if (residual[thread_id * group_size_ + (group_id % group_size_)] +
                     feature_size_ >
                 kDiskAlignmentSize) {
               read_size = aligned_length + kDiskAlignmentSize;
@@ -152,16 +151,16 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                     ((aligned_length + kDiskAlignmentSize) * group_size_ *
                      thread_id) +
                     ((aligned_length + kDiskAlignmentSize) *
-                     ((i - begin) % group_size_)),
+                     (group_id % group_size_)),
                 read_size, aligned_offset);
 
-            if ((((i - begin) + 1) % group_size_ == 0) || i == end - 1) {
+            if (((group_id + 1) % group_size_ == 0) || i == end - 1) {
               if (!error_flag.load()) {
                 io_uring_submit(&io_uring_queue_[thread_id]);
                 //  Wait for completion of I/O requests.
                 int64_t num_finish = 0;
                 // Wait until all the disk blocks are loaded in current group.
-                while (num_finish < ((i - begin) % group_size_ + 1)) {
+                while (num_finish < (group_id % group_size_ + 1)) {
                   struct io_uring_cqe *complete_queue;
                   if (io_uring_wait_cqe(
                           &io_uring_queue_[thread_id], &complete_queue) < 0) {
