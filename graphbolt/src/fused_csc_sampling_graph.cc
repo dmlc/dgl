@@ -1199,11 +1199,16 @@ std::pair<bool, std::vector<int64_t>> FastTemporalPick(
       continue;
     }
     if (node_timestamp.has_value()) {
-      int64_t neighbor_id =
-          utils::GetValueByIndex<int64_t>(csc_indices, edge_id);
-      if (utils::GetValueByIndex<int64_t>(
-              node_timestamp.value(), neighbor_id) >= timestamp)
-        continue;
+      bool flag = true;
+      AT_DISPATCH_INDEX_TYPES(
+          csc_indices.scalar_type(), "CheckNodeTimeStamp", ([&] {
+            int64_t neighbor_id =
+                utils::GetValueByIndex<index_t>(csc_indices, edge_id);
+            if (utils::GetValueByIndex<int64_t>(
+                    node_timestamp.value(), neighbor_id) >= timestamp)
+              flag = false;
+          }));
+      if (!flag) continue;
     }
     if (edge_timestamp.has_value() &&
         utils::GetValueByIndex<int64_t>(edge_timestamp.value(), edge_id) >=
