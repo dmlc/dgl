@@ -668,7 +668,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
               picked_eids = torch::empty({total_length}, indptr_options);
               subgraph_indices =
                   torch::empty({total_length}, indices_.options());
-              if (fanouts.size() == 1 && type_per_edge_.has_value()) {
+              if ((fanouts.size() == 1 || !with_seed_offsets) &&
+                  type_per_edge_.has_value()) {
                 subgraph_type_per_edge = torch::empty(
                     {total_length}, type_per_edge_.value().options());
               }
