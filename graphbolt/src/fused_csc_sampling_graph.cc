@@ -587,7 +587,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 
                       if (with_seed_offsets) {
                         const auto seed_type_id =
-                            (seed_offsets.has_value() && fanouts.size() > 1)
+                            (fanouts.size() > 1)
                                 ? std::upper_bound(
                                       seed_offsets->begin(),
                                       seed_offsets->end(), i) -
@@ -597,7 +597,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                         // seed within the group of seeds which have the same
                         // node type.
                         const auto seed_offset =
-                            (seed_offsets.has_value() && fanouts.size() > 1)
+                            (fanouts.size() > 1)
                                 ? i - seed_offsets->at(seed_type_id)
                                 : i;
                         num_pick_fn(
@@ -724,14 +724,14 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                   subgraph_indices.data_ptr<index_t>();
                               auto indices_data_ptr =
                                   indices_.data_ptr<index_t>();
-                              for (auto e = 0; e < num_etypes; ++e) {
-                                if (etype_id_to_dst_ntype_id[e] != seed_type_id)
+                              for (auto i = 0; i < num_etypes; ++i) {
+                                if (etype_id_to_dst_ntype_id[i] != seed_type_id)
                                   continue;
                                 const auto indptr_offset =
                                     with_seed_offsets
-                                        ? etype_id_to_num_picked_offset[e] +
+                                        ? etype_id_to_num_picked_offset[i] +
                                               seed_offset
-                                        : i;
+                                        : seed_offset;
                                 const auto picked_begin =
                                     subgraph_indptr_data_ptr[indptr_offset];
                                 const auto picked_end =
@@ -750,7 +750,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                                   .data_ptr<index_t>();
                                           subgraph_indices_data_ptr[j] -=
                                               node_type_offset_data
-                                                  [etype_id_to_src_ntype_id[e]];
+                                                  [etype_id_to_src_ntype_id[i]];
                                         }));
                                 }
                               }
@@ -758,9 +758,9 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 
                         if ((!with_seed_offsets || fanouts.size() == 1) &&
                             type_per_edge_.has_value()) {
-                          // Under this situation, hetero graph was sampled
-                          // as a homo graph. For now we still generate
-                          // type_per_edge tensor for this condition.
+                          // When hetero graph is sampled as a homo graph, we
+                          // still generate type_per_edge tensor for this
+                          // situation.
                           AT_DISPATCH_INTEGRAL_TYPES(
                               subgraph_type_per_edge.value().scalar_type(),
                               "IndexSelectTypePerEdge", ([&] {
