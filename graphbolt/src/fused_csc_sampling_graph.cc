@@ -587,12 +587,11 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 
                       if (with_seed_offsets) {
                         const auto seed_type_id =
-                            (fanouts.size() > 1)
-                                ? std::upper_bound(
-                                      seed_offsets->begin(),
-                                      seed_offsets->end(), i) -
-                                      seed_offsets->begin() - 1
-                                : 0;
+                            (fanouts.size() > 1) ? std::upper_bound(
+                                                       seed_offsets->begin(),
+                                                       seed_offsets->end(), i) -
+                                                       seed_offsets->begin() - 1
+                                                 : 0;
                         // `seed_offset` indicates the index of the current
                         // seed within the group of seeds which have the same
                         // node type.
