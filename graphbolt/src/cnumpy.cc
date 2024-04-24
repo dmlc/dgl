@@ -130,10 +130,14 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                 error_flag.store(true);
                 break;
               }
+              // calculate offset of the feature.
               int64_t offset = feature_id * feature_size_ + prefix_len_;
               int64_t aligned_offset = offset & (long)~(kDiskAlignmentSize - 1);
+              // put offset of the feature into array.
               residual[thread_id * group_size_ + group_id] =
                   offset - aligned_offset;
+              // If the tail of the feature extends into another block, read an
+              // additional block.
               int64_t read_size;
               if (residual[thread_id * group_size_ + group_id] + feature_size_ >
                   kDiskAlignmentSize) {
@@ -141,6 +145,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
               } else {
                 read_size = aligned_length;
               }
+              // Put requests into io_uring queue.
               struct io_uring_sqe *submit_queue =
                   io_uring_get_sqe(&io_uring_queue_[thread_id]);
               io_uring_prep_read(
@@ -175,6 +180,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                 io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
                 num_finish += cqe_count;
               }
+              // copy results into result_buffer.
               for (int64_t batch_id = 0; batch_id < batch_end; batch_id++) {
                 memcpy(
                     result_buffer + feature_size_ * (batch_start + batch_id),
