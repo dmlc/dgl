@@ -498,6 +498,7 @@ def train(
         shuffle=True,
         num_workers=num_workers,
     )
+
     # Typically, the best Validation performance is obtained after
     # the 1st or 2nd epoch. This is why the max epoch is set to 3.
     for epoch in range(num_epochs):
@@ -506,10 +507,10 @@ def train(
         model.train()
 
         total_loss = 0
+
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch + 1:02d}"):
             # Convert MiniBatch to DGL Blocks and move them to the target
             # device.
-            print("dd")
             blocks = [block.to(device) for block in data.blocks]
 
             # Fetch the number of seed nodes in the batch.
@@ -529,6 +530,7 @@ def train(
             loss = F.nll_loss(y_hat, data.labels[category].long())
             loss.backward()
             optimizer.step()
+
             total_loss += loss.item() * num_seeds
 
         t1 = time.time()
@@ -536,16 +538,16 @@ def train(
 
         # Evaluate the model on the val/test set.
 
-        # print("Evaluating the model on the validation set.")
-        # valid_acc = evaluate(
-        #     name, g, model, node_embed, device, valid_set, features, num_workers
-        # )
-        # print("Finish evaluating on validation set.")
+        print("Evaluating the model on the validation set.")
+        valid_acc = evaluate(
+            name, g, model, node_embed, device, valid_set, features, num_workers
+        )
+        print("Finish evaluating on validation set.")
 
         print(
             f"Epoch: {epoch + 1:02d}, "
             f"Loss: {loss:.4f}, "
-            # f"Valid accuracy: {100 * valid_acc:.2f}%, "
+            f"Valid accuracy: {100 * valid_acc:.2f}%, "
             f"Time {t1 - t0:.4f}"
         )
 
@@ -564,11 +566,11 @@ def main(args):
         test_set,
         num_classes,
     ) = load_dataset(args.dataset)
-    print("aa")
+
     # Move the dataset to the pinned memory to enable GPU access.
     if device == torch.device("cuda"):
         g.pin_memory_()
-        #features.pin_memory_()
+        features.pin_memory_()
 
     feat_size = features.size("node", "paper", "feat")[0]
 
@@ -583,7 +585,7 @@ def main(args):
             "Number of embedding parameters: "
             f"{sum(p.numel() for p in embed_layer.parameters())}"
         )
-    print("bb")
+
     # Initialize the entity classification model.
     model = EntityClassify(g, feat_size, num_classes).to(device)
 
@@ -654,7 +656,7 @@ if __name__ == "__main__":
         choices=["ogbn-mag", "ogb-lsc-mag240m"],
         help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m",
     )
-    parser.add_argument("--num_epochs", type=int, default=4)
+    parser.add_argument("--num_epochs", type=int, default=3)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--num_gpus", type=int, default=1)
 
