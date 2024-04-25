@@ -121,6 +121,7 @@ class SubgraphSampler(MiniBatchTransformer):
             nodes_timestamp = None
             if use_timestamp:
                 nodes_timestamp = defaultdict(list)
+            is_hyperlink = False
             for etype, typed_seeds in seeds.items():
                 # When typed_seeds is a one-dimensional tensor, it represents
                 # seed nodes, which does not need to do unique and compact.
@@ -131,11 +132,14 @@ class SubgraphSampler(MiniBatchTransformer):
                         else None
                     )
                     return seeds, nodes_timestamp, None
-                assert typed_seeds.ndim == 2 and typed_seeds.shape[1] == 2, (
-                    "Only tensor with shape 1*N and N*2 is "
+                assert typed_seeds.ndim == 2, (
+                    "Only tensor with shape 1*N and N*M is "
                     + f"supported now, but got {typed_seeds.shape}."
                 )
-                ntypes = etype[:].split(":")[::2]
+                ntypes = etype.split(":")
+                is_hyperlink = len(ntypes) == typed_seeds.shape[1]
+                if not is_hyperlink:
+                    ntypes = ntypes[::2]
                 if use_timestamp:
                     negative_ratio = (
                         typed_seeds.shape[0]
@@ -165,10 +169,15 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted_seeds = {}
             # Map back in same order as collect.
             for etype, typed_seeds in seeds.items():
-                src_type, _, dst_type = etype_str_to_tuple(etype)
-                src = compacted[src_type].pop(0)
-                dst = compacted[dst_type].pop(0)
-                compacted_seeds[etype] = torch.cat((src, dst)).view(2, -1).T
+                ntypes = etype.split(":")
+                if not is_hyperlink:
+                    ntypes = ntypes[::2]
+                compacted_seed = []
+                for ntype in ntypes:
+                    compacted_seed.append(compacted[ntype].pop(0))
+                compacted_seeds[etype] = (
+                    torch.cat(compacted_seed).view(len(ntypes), -1).T
+                )
         else:
             # When seeds is a one-dimensional tensor, it represents seed nodes,
             # which does not need to do unique and compact.
@@ -193,7 +202,9 @@ class SubgraphSampler(MiniBatchTransformer):
                 seeds_timestamp = torch.cat(
                     (minibatch.timestamp, neg_timestamp)
                 )
-                nodes_timestamp = [seeds_timestamp for _ in range(seeds.ndim)]
+                nodes_timestamp = [
+                    seeds_timestamp for _ in range(seeds.shape[1])
+                ]
             # Unique and compact the collected nodes.
             if use_timestamp:
                 (
@@ -206,6 +217,11 @@ class SubgraphSampler(MiniBatchTransformer):
                 nodes_timestamp = None
             # Map back in same order as collect.
             compacted_seeds = compacted[0].view(seeds.shape)
+            print(
+                unique_seeds,
+                nodes_timestamp,
+                compacted_seeds,
+            )
         return (
             unique_seeds,
             nodes_timestamp,
