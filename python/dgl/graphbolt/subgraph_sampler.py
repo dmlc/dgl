@@ -6,7 +6,6 @@ from typing import Dict
 import torch
 from torch.utils.data import functional_datapipe
 
-from .base import etype_str_to_tuple
 from .internal import compact_temporal_nodes, unique_and_compact
 from .minibatch_transformer import MiniBatchTransformer
 
