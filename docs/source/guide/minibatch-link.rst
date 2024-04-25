@@ -53,8 +53,8 @@ proportional to a power of degrees.
             self.weights = node_degrees ** 0.75
             self.k = k
     
-        def _sample_with_etype(node_pairs, etype=None):
-            src, _ = node_pairs
+        def _sample_with_etype(self, seeds, etype=None):
+            src, _ = seeds.T
             src = src.repeat_interleave(self.k)
             dst = self.weights.multinomial(len(src), replacement=True)
             return src, dst
@@ -95,7 +95,7 @@ Define a GraphSAGE model for minibatch training
 
 When a negative sampler is provided, the data loader will generate positive and
 negative node pairs for each minibatch besides the *Message Flow Graphs* (MFGs).
-Use `node_pairs_with_labels` to get compact node pairs with corresponding
+Use `compacted_seeds` and `labels` to get compact node pairs and corresponding
 labels.
 
 
@@ -116,7 +116,8 @@ above.
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
             # Unpack MiniBatch.
-            compacted_pairs, labels = data.node_pairs_with_labels
+            compacted_seeds = data.compacted_seeds.T
+            labels = data.labels
             node_feature = data.node_features["feat"]
             # Convert sampled subgraphs to DGL blocks.
             blocks = data.blocks
@@ -124,7 +125,7 @@ above.
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)
             logits = model.predictor(
-                y[compacted_pairs[0]] * y[compacted_pairs[1]]
+                y[compacted_seeds[0]] * y[compacted_seeds[1]]
             ).squeeze()
 
             # Compute loss.
@@ -217,8 +218,8 @@ If you want to give your own negative sampling function, just inherit from the
             }
             self.k = k
     
-        def _sample_with_etype(node_pairs, etype):
-            src, _ = node_pairs
+        def _sample_with_etype(self, seeds, etype):
+            src, _ = seeds.T
             src = src.repeat_interleave(self.k)
             dst = self.weights[etype].multinomial(len(src), replacement=True)
             return src, dst
@@ -241,7 +242,8 @@ loss on specific edge type.
         start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
             # Unpack MiniBatch.
-            compacted_pairs, labels = data.node_pairs_with_labels
+            compacted_seeds = data.compacted_seeds
+            labels = data.labels
             node_features = {
                 ntype: data.node_features[(ntype, "feat")]
                 for ntype in data.blocks[0].srctypes
@@ -251,8 +253,8 @@ loss on specific edge type.
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)
             logits = model.predictor(
-                y[category][compacted_pairs[category][0]]
-                * y[category][compacted_pairs[category][1]]
+                y[category][compacted_pairs[category][:, 0]]
+                * y[category][compacted_pairs[category][:, 1]]
             ).squeeze()
 
             # Compute loss.
