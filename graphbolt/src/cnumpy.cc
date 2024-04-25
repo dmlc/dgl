@@ -98,7 +98,7 @@ torch::Tensor OnDiskNpyArray::IndexSelect(torch::Tensor index) {
   return torch::empty({0});
 #endif  // __linux__
 #else
-TORCH_CHECK(false, "DiskBasedFeature is not available now.");
+  TORCH_CHECK(false, "DiskBasedFeature is not available now.");
 #endif  // HAVE_LIBRARY_LIBURING
 }
 
@@ -227,6 +227,6 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   return result;
 }
 #endif  // __linux__
-#endif  //HAVE_LIBRARY_LIBURING
+#endif  // HAVE_LIBRARY_LIBURING
 }  // namespace storage
 }  // namespace graphbolt
