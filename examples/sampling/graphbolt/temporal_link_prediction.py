@@ -284,7 +284,6 @@ def parse_args():
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument(
         "--dataset",
-        default=0,
         default="diginetica-r2ne",
         choices=["diginetica-r2ne"],
         help="Dataset.",
