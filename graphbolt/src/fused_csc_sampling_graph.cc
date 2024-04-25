@@ -1246,7 +1246,7 @@ void NumPickByEtype(
     bool with_seed_offsets, const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_offset,
+    int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_index,
     const std::vector<int64_t>& etype_id_to_num_picked_offset) {
   int64_t etype_begin = offset;
   const int64_t end = offset + num_neighbors;
@@ -1268,7 +1268,7 @@ void NumPickByEtype(
             // The pick numbers aren't stored continuously, but separately for
             // each different etype.
             const auto offset =
-                etype_id_to_num_picked_offset[etype] + seed_offset;
+                etype_id_to_num_picked_offset[etype] + seed_index;
             NumPick(
                 fanouts[etype], replace, probs_or_mask, etype_begin,
                 etype_end - etype_begin, num_picked_ptr + offset);
@@ -1288,7 +1288,7 @@ void NumPickByEtype(
         }
       }));
   if (!with_seed_offsets) {
-    *num_picked_ptr = total_count;
+    num_picked_ptr[seed_index] = total_count;
   }
 }
 
@@ -1708,7 +1708,8 @@ int64_t PickByEtype(
               picked_count = Pick(
                   etype_begin, etype_end - etype_begin, fanout, replace,
                   options, probs_or_mask, args,
-                  picked_data_ptr + picked_total_count);
+                  picked_data_ptr + subgraph_indptr_ptr[seed_index] +
+                      picked_total_count);
             }
             picked_total_count += picked_count;
           }
