@@ -11,8 +11,8 @@
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAStream.h>
-#include <cuda.h>
 #include <cuda_runtime.h>
+#include <thrust/execution_policy.h>
 #include <torch/script.h>
 
 #include <memory>
@@ -89,19 +89,13 @@ inline bool is_zero<dim3>(dim3 size) {
   return size.x == 0 || size.y == 0 || size.z == 0;
 }
 
-#define CUDA_DRIVER_CHECK(EXPR)                       \
-  do {                                                \
-    CUresult __err = EXPR;                            \
-    if (__err != CUDA_SUCCESS) {                      \
-      const char* err_str;                            \
-      CUresult get_error_str_err C10_UNUSED =         \
-          cuGetErrorString(__err, &err_str);          \
-      if (get_error_str_err != CUDA_SUCCESS) {        \
-        AT_ERROR("CUDA driver error: unknown error"); \
-      } else {                                        \
-        AT_ERROR("CUDA driver error: ", err_str);     \
-      }                                               \
-    }                                                 \
+#define CUDA_RUNTIME_CHECK(EXPR)                           \
+  do {                                                     \
+    cudaError_t __err = EXPR;                              \
+    if (__err != cudaSuccess) {                            \
+      auto get_error_str_err = cudaGetErrorString(__err);  \
+      AT_ERROR("CUDA runtime error: ", get_error_str_err); \
+    }                                                      \
   } while (0)
 
 #define CUDA_CALL(func) C10_CUDA_CHECK((func))

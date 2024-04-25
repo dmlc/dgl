@@ -30,9 +30,9 @@ edges(namely, node pairs) in the training set instead of the nodes.
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     g = gb.SamplingGraph()
-    node_paris = torch.arange(0, 1000).reshape(-1, 2)
+    seeds = torch.arange(0, 1000).reshape(-1, 2)
     labels = torch.randint(0, 2, (5,))
-    train_set = gb.ItemSet((node_pairs, labels), names=("node_pairs", "labels"))
+    train_set = gb.ItemSet((seeds, labels), names=("seeds", "labels"))
     datapipe = gb.ItemSampler(train_set, batch_size=128, shuffle=True)
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
     # Or equivalently:
@@ -83,9 +83,9 @@ You can use :func:`~dgl.graphbolt.exclude_seed_edges` alongside with
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     g = gb.SamplingGraph()
-    node_paris = torch.arange(0, 1000).reshape(-1, 2)
+    seeds = torch.arange(0, 1000).reshape(-1, 2)
     labels = torch.randint(0, 2, (5,))
-    train_set = gb.ItemSet((node_pairs, labels), names=("node_pairs", "labels"))
+    train_set = gb.ItemSet((seeds, labels), names=("seeds", "labels"))
     datapipe = gb.ItemSampler(train_set, batch_size=128, shuffle=True)
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
     exclude_seed_edges = partial(gb.exclude_seed_edges, include_reverse_edges=True)
@@ -138,9 +138,9 @@ concatenating the incident node features and projecting it with a dense layer.
             super().__init__()
             self.W = nn.Linear(2 * in_features, num_classes)
     
-        def forward(self, node_pairs, x):
-            src_x = x[node_pairs[0]]
-            dst_x = x[node_pairs[1]]
+        def forward(self, seeds, x):
+            src_x = x[seeds[:, 0]]
+            dst_x = x[seeds[:, 1]]
             data = torch.cat([src_x, dst_x], 1)
             return self.W(data)
 
@@ -157,9 +157,9 @@ loader, as well as the input node features as follows:
                 in_features, hidden_features, out_features)
             self.predictor = ScorePredictor(num_classes, out_features)
 
-        def forward(self, blocks, x, node_pairs):
+        def forward(self, blocks, x, seeds):
             x = self.gcn(blocks, x)
-            return self.predictor(node_pairs, x)
+            return self.predictor(seeds, x)
 
 DGL ensures that that the nodes in the edge subgraph are the same as the
 output nodes of the last MFG in the generated list of MFGs.
@@ -182,7 +182,7 @@ their incident node representations.
     for data in dataloader:
         blocks = data.blocks
         x = data.edge_features("feat")
-        y_hat = model(data.blocks, x, data.positive_node_pairs)
+        y_hat = model(data.blocks, x, data.compacted_seeds)
         loss = F.cross_entropy(data.labels, y_hat)
         opt.zero_grad()
         loss.backward()
@@ -226,10 +226,10 @@ over the edge types.
             super().__init__()
             self.W = nn.Linear(2 * in_features, num_classes)
     
-        def forward(self, node_pairs, x):
+        def forward(self, seeds, x):
             scores = {}
-            for etype in node_pairs.keys():
-                src, dst = node_pairs[etype]
+            for etype in seeds.keys():
+                src, dst = seeds[etype].T
                 data = torch.cat([x[etype][src], x[etype][dst]], 1)
                 scores[etype] = self.W(data)
             return scores
@@ -242,9 +242,9 @@ over the edge types.
                 in_features, hidden_features, out_features, etypes)
             self.pred = ScorePredictor(num_classes, out_features)
 
-        def forward(self, node_pairs, blocks, x):
+        def forward(self, seeds, blocks, x):
             x = self.rgcn(blocks, x)
-            return self.pred(node_pairs, x)
+            return self.pred(seeds, x)
 
 Data loader definition is almost identical to that of homogeneous graph. The
 only difference is that the train_set is now an instance of
@@ -256,17 +256,17 @@ only difference is that the train_set is now an instance of
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     g = gb.SamplingGraph()
-    node_pairs = torch.arange(0, 1000).reshape(-1, 2)
+    seeds = torch.arange(0, 1000).reshape(-1, 2)
     labels = torch.randint(0, 3, (1000,))
-    node_pairs_labels = {
+    seeds_labels = {
         "user:like:item": gb.ItemSet(
-            (node_pairs, labels), names=("node_pairs", "labels")
+            (seeds, labels), names=("seeds", "labels")
         ),
         "user:follow:user": gb.ItemSet(
-            (node_pairs, labels), names=("node_pairs", "labels")
+            (seeds, labels), names=("seeds", "labels")
         ),
     }
-    train_set = gb.ItemSetDict(node_pairs_labels)
+    train_set = gb.ItemSetDict(seeds_labels)
     datapipe = gb.ItemSampler(train_set, batch_size=128, shuffle=True)
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
     datapipe = datapipe.fetch_feature(
@@ -316,7 +316,7 @@ dictionaries of node types and predictions here.
     for data in dataloader:
         blocks = data.blocks
         x = data.edge_features(("user:like:item", "feat"))
-        y_hat = model(data.blocks, x, data.positive_node_pairs)
+        y_hat = model(data.blocks, x, data.compacted_seeds)
         loss = F.cross_entropy(data.labels, y_hat)
         opt.zero_grad()
         loss.backward()

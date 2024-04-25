@@ -47,7 +47,7 @@ def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
         items = torch.arange(3)
     else:
         items = torch.tensor([2, 0, 1])
-    names = "seed_nodes"
+    names = "seeds"
     itemset = gb.ItemSet(items, names=names)
     graph = get_hetero_graph().to(F.ctx())
     if hetero:
@@ -94,9 +94,7 @@ def test_labor_dependent_minibatching(layer_dependency, overlap_graph_fetch):
     ).to(F.ctx())
     torch.random.set_rng_state(torch.manual_seed(123).get_state())
     batch_dependency = 100
-    itemset = gb.ItemSet(
-        torch.zeros(batch_dependency + 1).int(), names="seed_nodes"
-    )
+    itemset = gb.ItemSet(torch.zeros(batch_dependency + 1).int(), names="seeds")
     datapipe = gb.ItemSampler(itemset, batch_size=1).copy_to(F.ctx())
     fanouts = [5, 5]
     datapipe = datapipe.sample_layer_neighbor(
