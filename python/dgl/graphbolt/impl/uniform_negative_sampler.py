@@ -36,20 +36,20 @@ class UniformNegativeSampler(NegativeSampler):
     >>> indptr = torch.LongTensor([0, 1, 2, 3, 4])
     >>> indices = torch.LongTensor([1, 2, 3, 0])
     >>> graph = gb.fused_csc_sampling_graph(indptr, indices)
-    >>> node_pairs = torch.tensor([[0, 1], [1, 2], [2, 3], [3, 0]])
-    >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
+    >>> seeds = torch.tensor([[0, 1], [1, 2], [2, 3], [3, 0]])
+    >>> item_set = gb.ItemSet(seeds, names="seeds")
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4,)
     >>> neg_sampler = gb.UniformNegativeSampler(
     ...     item_sampler, graph, 2)
     >>> for minibatch in neg_sampler:
-    ...       print(minibatch.negative_srcs)
-    ...       print(minibatch.negative_dsts)
-    None
-    tensor([[2, 1],
-        [2, 1],
-        [3, 2],
-        [1, 3]])
+    ...       print(minibatch.seeds)
+    ...       print(minibatch.labels)
+    ...       print(minibatch.indexes)
+    tensor([[0, 1], [1, 2], [2, 3], [3, 0], [0, 1], [0, 3], [1, 1], [1, 2],
+        [2, 1], [2, 0], [3, 0], [3, 2]])
+    tensor([1., 1., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0.])
+    tensor([0, 1, 2, 3, 0, 0, 1, 1, 2, 2, 3, 3])
     """
 
     def __init__(

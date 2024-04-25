@@ -166,16 +166,15 @@ UniqueAndCompactBatchedHashMapBased(
             pointers_and_offsets.data_ptr<int64_t>() + 3 * num_batches;
         for (std::size_t i = 0; i < num_batches; i++) {
           pointers_ptr[2 * i] = unique_dst_ids.at(i).data_ptr<index_t>();
-          offsets_ptr[2 * i + 1] = unique_dst_ids[i].size(0);
+          offsets_ptr[2 * i] = unique_dst_ids[i].size(0);
           pointers_ptr[2 * i + 1] = src_ids.at(i).data_ptr<index_t>();
-          offsets_ptr[2 * i + 2] = src_ids[i].size(0);
+          offsets_ptr[2 * i + 1] = src_ids[i].size(0);
           pointers_ptr[2 * num_batches + i] = dst_ids.at(i).data_ptr<index_t>();
-          offsets_ptr[2 * num_batches + i + 1] = dst_ids[i].size(0);
+          offsets_ptr[2 * num_batches + i] = dst_ids[i].size(0);
         }
         // Finish computing the offsets by taking a cumulative sum.
-        offsets_ptr[0] = 0;
-        std::partial_sum(
-            offsets_ptr, offsets_ptr + 3 * num_batches + 1, offsets_ptr);
+        std::exclusive_scan(
+            offsets_ptr, offsets_ptr + 3 * num_batches + 1, offsets_ptr, 0ll);
         // Device version of the tensors defined above. We store the information
         // initially on the CPU, which are later copied to the device.
         auto pointers_and_offsets_dev = torch::empty(

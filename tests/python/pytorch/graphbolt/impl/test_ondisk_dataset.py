@@ -96,7 +96,7 @@ def test_OnDiskDataset_multiple_tasks():
                 train_set:
                   - type: null
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: true
                         path: {train_ids_path}
@@ -112,7 +112,7 @@ def test_OnDiskDataset_multiple_tasks():
                 train_set:
                   - type: null
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: true
                         path: {train_ids_path}
@@ -140,7 +140,7 @@ def test_OnDiskDataset_multiple_tasks():
             for i, (id, label, _) in enumerate(train_set):
                 assert id == train_ids[i]
                 assert label == train_labels[i]
-            assert train_set.names == ("seed_nodes", "labels", None)
+            assert train_set.names == ("seeds", "labels", None)
             train_set = None
         dataset = None
 
@@ -162,7 +162,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_names():
                 train_set:
                   - type: null
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: true
                         path: {train_ids_path}
@@ -183,7 +183,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_names():
         for i, (id, label, _) in enumerate(train_set):
             assert id == train_ids[i]
             assert label == train_labels[i]
-        assert train_set.names == ("seed_nodes", "labels", None)
+        assert train_set.names == ("seeds", "labels", None)
         train_set = None
 
 
@@ -204,7 +204,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_names():
                 train_set:
                   - type: "author:writes:paper"
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: true
                         path: {train_ids_path}
@@ -228,7 +228,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_names():
             id, label, _ = item["author:writes:paper"]
             assert id == train_ids[i]
             assert label == train_labels[i]
-        assert train_set.names == ("seed_nodes", "labels", None)
+        assert train_set.names == ("seeds", "labels", None)
         train_set = None
 
 
@@ -267,7 +267,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
                 train_set:
                   - type: null
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: true
                         path: {train_ids_path}
@@ -277,7 +277,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
                         path: {train_labels_path}
                 validation_set:
                   - data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: true
                         path: {validation_ids_path}
@@ -288,7 +288,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
                 test_set:
                   - type: null
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: true
                         path: {test_ids_path}
@@ -311,7 +311,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         for i, (id, label) in enumerate(train_set):
             assert id == train_ids[i]
             assert label == train_labels[i]
-        assert train_set.names == ("seed_nodes", "labels")
+        assert train_set.names == ("seeds", "labels")
         train_set = None
 
         # Verify validation set.
@@ -321,7 +321,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         for i, (id, label) in enumerate(validation_set):
             assert id == validation_ids[i]
             assert label == validation_labels[i]
-        assert validation_set.names == ("seed_nodes", "labels")
+        assert validation_set.names == ("seeds", "labels")
         validation_set = None
 
         # Verify test set.
@@ -331,7 +331,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         for i, (id, label) in enumerate(test_set):
             assert id == test_ids[i]
             assert label == test_labels[i]
-        assert test_set.names == ("seed_nodes", "labels")
+        assert test_set.names == ("seeds", "labels")
         test_set = None
         dataset = None
 
@@ -355,25 +355,23 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
 def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels():
     """Test TVTSet which returns ItemSet with node pairs and labels."""
     with tempfile.TemporaryDirectory() as test_dir:
-        train_node_pairs = np.arange(2000).reshape(1000, 2)
-        train_node_pairs_path = os.path.join(test_dir, "train_node_pairs.npy")
-        np.save(train_node_pairs_path, train_node_pairs)
+        train_seeds = np.arange(2000).reshape(1000, 2)
+        train_seeds_path = os.path.join(test_dir, "train_seeds.npy")
+        np.save(train_seeds_path, train_seeds)
         train_labels = np.random.randint(0, 10, size=1000)
         train_labels_path = os.path.join(test_dir, "train_labels.npy")
         np.save(train_labels_path, train_labels)
 
-        validation_node_pairs = np.arange(2000, 4000).reshape(1000, 2)
-        validation_node_pairs_path = os.path.join(
-            test_dir, "validation_node_pairs.npy"
-        )
-        np.save(validation_node_pairs_path, validation_node_pairs)
+        validation_seeds = np.arange(2000, 4000).reshape(1000, 2)
+        validation_seeds_path = os.path.join(test_dir, "validation_seeds.npy")
+        np.save(validation_seeds_path, validation_seeds)
         validation_labels = np.random.randint(0, 10, size=1000)
         validation_labels_path = os.path.join(test_dir, "validation_labels.npy")
         np.save(validation_labels_path, validation_labels)
 
-        test_node_pairs = np.arange(4000, 6000).reshape(1000, 2)
-        test_node_pairs_path = os.path.join(test_dir, "test_node_pairs.npy")
-        np.save(test_node_pairs_path, test_node_pairs)
+        test_seeds = np.arange(4000, 6000).reshape(1000, 2)
+        test_seeds_path = os.path.join(test_dir, "test_seeds.npy")
+        np.save(test_seeds_path, test_seeds)
         test_labels = np.random.randint(0, 10, size=1000)
         test_labels_path = os.path.join(test_dir, "test_labels.npy")
         np.save(test_labels_path, test_labels)
@@ -384,20 +382,20 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels():
                 train_set:
                   - type: null
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {train_node_pairs_path}
+                        path: {train_seeds_path}
                       - name: labels
                         format: numpy
                         in_memory: true
                         path: {train_labels_path}
                 validation_set:
                   - data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {validation_node_pairs_path}
+                        path: {validation_seeds_path}
                       - name: labels
                         format: numpy
                         in_memory: true
@@ -405,10 +403,10 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels():
                 test_set:
                   - type: null
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {test_node_pairs_path}
+                        path: {test_seeds_path}
                       - name: labels
                         format: numpy
                         in_memory: true
@@ -421,10 +419,10 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels():
         assert len(train_set) == 1000
         assert isinstance(train_set, gb.ItemSet)
         for i, (node_pair, label) in enumerate(train_set):
-            assert node_pair[0] == train_node_pairs[i][0]
-            assert node_pair[1] == train_node_pairs[i][1]
+            assert node_pair[0] == train_seeds[i][0]
+            assert node_pair[1] == train_seeds[i][1]
             assert label == train_labels[i]
-        assert train_set.names == ("node_pairs", "labels")
+        assert train_set.names == ("seeds", "labels")
         train_set = None
 
         # Verify validation set.
@@ -432,10 +430,10 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels():
         assert len(validation_set) == 1000
         assert isinstance(validation_set, gb.ItemSet)
         for i, (node_pair, label) in enumerate(validation_set):
-            assert node_pair[0] == validation_node_pairs[i][0]
-            assert node_pair[1] == validation_node_pairs[i][1]
+            assert node_pair[0] == validation_seeds[i][0]
+            assert node_pair[1] == validation_seeds[i][1]
             assert label == validation_labels[i]
-        assert validation_set.names == ("node_pairs", "labels")
+        assert validation_set.names == ("seeds", "labels")
         validation_set = None
 
         # Verify test set.
@@ -443,43 +441,69 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels():
         assert len(test_set) == 1000
         assert isinstance(test_set, gb.ItemSet)
         for i, (node_pair, label) in enumerate(test_set):
-            assert node_pair[0] == test_node_pairs[i][0]
-            assert node_pair[1] == test_node_pairs[i][1]
+            assert node_pair[0] == test_seeds[i][0]
+            assert node_pair[1] == test_seeds[i][1]
             assert label == test_labels[i]
-        assert test_set.names == ("node_pairs", "labels")
+        assert test_set.names == ("seeds", "labels")
         test_set = None
         dataset = None
 
 
-def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_negs():
+def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels_indexes():
     """Test TVTSet which returns ItemSet with node pairs and negative ones."""
     with tempfile.TemporaryDirectory() as test_dir:
-        train_node_pairs = np.arange(2000).reshape(1000, 2)
-        train_node_pairs_path = os.path.join(test_dir, "train_node_pairs.npy")
-        np.save(train_node_pairs_path, train_node_pairs)
-        train_neg_dst = np.random.choice(1000 * 10, size=1000 * 10).reshape(
-            1000, 10
+        train_seeds = np.arange(2000).reshape(1000, 2)
+        train_neg_dst = np.random.choice(1000 * 10, size=1000 * 10)
+        train_neg_src = train_seeds[:, 0].repeat(10)
+        train_neg_seeds = (
+            np.concatenate((train_neg_dst, train_neg_src)).reshape(2, -1).T
         )
-        train_neg_dst_path = os.path.join(test_dir, "train_neg_dst.npy")
-        np.save(train_neg_dst_path, train_neg_dst)
+        train_seeds = np.concatenate((train_seeds, train_neg_seeds))
+        train_seeds_path = os.path.join(test_dir, "train_seeds.npy")
+        np.save(train_seeds_path, train_seeds)
 
-        validation_node_pairs = np.arange(2000, 4000).reshape(1000, 2)
-        validation_node_pairs_path = os.path.join(
-            test_dir, "validation_node_pairs.npy"
-        )
-        np.save(validation_node_pairs_path, validation_node_pairs)
-        validation_neg_dst = train_neg_dst + 1
-        validation_neg_dst_path = os.path.join(
-            test_dir, "validation_neg_dst.npy"
-        )
-        np.save(validation_neg_dst_path, validation_neg_dst)
+        train_labels = torch.empty(1000 * 11)
+        train_labels[:1000] = 1
+        train_labels[1000:] = 0
+        train_labels_path = os.path.join(test_dir, "train_labels.pt")
+        torch.save(train_labels, train_labels_path)
 
-        test_node_pairs = np.arange(4000, 6000).reshape(1000, 2)
-        test_node_pairs_path = os.path.join(test_dir, "test_node_pairs.npy")
-        np.save(test_node_pairs_path, test_node_pairs)
-        test_neg_dst = train_neg_dst + 2
-        test_neg_dst_path = os.path.join(test_dir, "test_neg_dst.npy")
-        np.save(test_neg_dst_path, test_neg_dst)
+        train_indexes = torch.arange(0, 1000)
+        train_indexes = np.concatenate(
+            (train_indexes, train_indexes.repeat_interleave(10))
+        )
+        train_indexes_path = os.path.join(test_dir, "train_indexes.pt")
+        torch.save(train_indexes, train_indexes_path)
+
+        validation_seeds = np.arange(2000, 4000).reshape(1000, 2)
+        validation_neg_seeds = train_neg_seeds + 1
+        validation_seeds = np.concatenate(
+            (validation_seeds, validation_neg_seeds)
+        )
+        validation_seeds_path = os.path.join(test_dir, "validation_seeds.npy")
+        np.save(validation_seeds_path, validation_seeds)
+        validation_labels = train_labels
+        validation_labels_path = os.path.join(test_dir, "validation_labels.pt")
+        torch.save(validation_labels, validation_labels_path)
+
+        validation_indexes = train_indexes
+        validation_indexes_path = os.path.join(
+            test_dir, "validation_indexes.pt"
+        )
+        torch.save(validation_indexes, validation_indexes_path)
+
+        test_seeds = np.arange(4000, 6000).reshape(1000, 2)
+        test_neg_seeds = train_neg_seeds + 2
+        test_seeds = np.concatenate((test_seeds, test_neg_seeds))
+        test_seeds_path = os.path.join(test_dir, "test_seeds.npy")
+        np.save(test_seeds_path, test_seeds)
+        test_labels = train_labels
+        test_labels_path = os.path.join(test_dir, "test_labels.pt")
+        torch.save(test_labels, test_labels_path)
+
+        test_indexes = train_indexes
+        test_indexes_path = os.path.join(test_dir, "test_indexes.pt")
+        torch.save(test_indexes, test_indexes_path)
 
         yaml_content = f"""
             tasks:
@@ -487,69 +511,83 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_negs():
                 train_set:
                   - type: null
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {train_node_pairs_path}
-                      - name: negative_dsts
-                        format: numpy
+                        path: {train_seeds_path}
+                      - name: labels
+                        format: torch
                         in_memory: true
-                        path: {train_neg_dst_path}
+                        path: {train_labels_path}
+                      - name: indexes
+                        format: torch
+                        in_memory: true
+                        path: {train_indexes_path}
                 validation_set:
                   - data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {validation_node_pairs_path}
-                      - name: negative_dsts
-                        format: numpy
+                        path: {validation_seeds_path}
+                      - name: labels
+                        format: torch
                         in_memory: true
-                        path: {validation_neg_dst_path}
+                        path: {validation_labels_path}
+                      - name: indexes
+                        format: torch
+                        in_memory: true
+                        path: {validation_indexes_path}
                 test_set:
                   - type: null
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {test_node_pairs_path}
-                      - name: negative_dsts
-                        format: numpy
+                        path: {test_seeds_path}
+                      - name: labels
+                        format: torch
                         in_memory: true
-                        path: {test_neg_dst_path}
+                        path: {test_labels_path}
+                      - name: indexes
+                        format: torch
+                        in_memory: true
+                        path: {test_indexes_path}
         """
         dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
 
         # Verify train set.
         train_set = dataset.tasks[0].train_set
-        assert len(train_set) == 1000
+        assert len(train_set) == 1000 * 11
         assert isinstance(train_set, gb.ItemSet)
-        for i, (node_pair, negs) in enumerate(train_set):
-            assert node_pair[0] == train_node_pairs[i][0]
-            assert node_pair[1] == train_node_pairs[i][1]
-            assert torch.equal(negs, torch.from_numpy(train_neg_dst[i]))
-        assert train_set.names == ("node_pairs", "negative_dsts")
+        for i, (node_pair, label, index) in enumerate(train_set):
+            assert node_pair[0] == train_seeds[i][0]
+            assert node_pair[1] == train_seeds[i][1]
+            assert label == train_labels[i]
+            assert index == train_indexes[i]
+        assert train_set.names == ("seeds", "labels", "indexes")
         train_set = None
 
         # Verify validation set.
         validation_set = dataset.tasks[0].validation_set
-        assert len(validation_set) == 1000
+        assert len(validation_set) == 1000 * 11
         assert isinstance(validation_set, gb.ItemSet)
-        for i, (node_pair, negs) in enumerate(validation_set):
-            assert node_pair[0] == validation_node_pairs[i][0]
-            assert node_pair[1] == validation_node_pairs[i][1]
-            assert torch.equal(negs, torch.from_numpy(validation_neg_dst[i]))
-        assert validation_set.names == ("node_pairs", "negative_dsts")
+        for i, (node_pair, label, index) in enumerate(validation_set):
+            assert node_pair[0] == validation_seeds[i][0]
+            assert node_pair[1] == validation_seeds[i][1]
+            assert label == validation_labels[i]
+            assert index == validation_indexes[i]
+        assert validation_set.names == ("seeds", "labels", "indexes")
         validation_set = None
 
         # Verify test set.
         test_set = dataset.tasks[0].test_set
-        assert len(test_set) == 1000
+        assert len(test_set) == 1000 * 11
         assert isinstance(test_set, gb.ItemSet)
-        for i, (node_pair, negs) in enumerate(test_set):
-            assert node_pair[0] == test_node_pairs[i][0]
-            assert node_pair[1] == test_node_pairs[i][1]
-            assert torch.equal(negs, torch.from_numpy(test_neg_dst[i]))
-        assert test_set.names == ("node_pairs", "negative_dsts")
+        for i, (node_pair, label, index) in enumerate(test_set):
+            assert node_pair[0] == test_seeds[i][0]
+            assert label == test_labels[i]
+            assert index == test_indexes[i]
+        assert test_set.names == ("seeds", "labels", "indexes")
         test_set = None
         dataset = None
 
@@ -581,36 +619,36 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
                 train_set:
                   - type: paper
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: true
                         path: {train_path}
                   - type: author
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         path: {train_path}
                 validation_set:
                   - type: paper
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         path: {validation_path}
                   - type: author
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         path: {validation_path}
                 test_set:
                   - type: paper
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         in_memory: false
                         path: {test_path}
                   - type: author
                     data:
-                      - name: seed_nodes
+                      - name: seeds
                         format: numpy
                         path: {test_path}
         """
@@ -628,7 +666,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
             id, label = item[key]
             assert id == train_ids[i % 1000]
             assert label == train_labels[i % 1000]
-        assert train_set.names == ("seed_nodes",)
+        assert train_set.names == ("seeds",)
         train_set = None
 
         # Verify validation set.
@@ -643,7 +681,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
             id, label = item[key]
             assert id == validation_ids[i % 1000]
             assert label == validation_labels[i % 1000]
-        assert validation_set.names == ("seed_nodes",)
+        assert validation_set.names == ("seeds",)
         validation_set = None
 
         # Verify test set.
@@ -658,7 +696,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
             id, label = item[key]
             assert id == test_ids[i % 1000]
             assert label == test_labels[i % 1000]
-        assert test_set.names == ("seed_nodes",)
+        assert test_set.names == ("seeds",)
         test_set = None
         dataset = None
 
@@ -666,25 +704,23 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
 def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
     """Test TVTSet which returns ItemSetDict with node pairs and labels."""
     with tempfile.TemporaryDirectory() as test_dir:
-        train_node_pairs = np.arange(2000).reshape(1000, 2)
-        train_node_pairs_path = os.path.join(test_dir, "train_node_pairs.npy")
-        np.save(train_node_pairs_path, train_node_pairs)
+        train_seeds = np.arange(2000).reshape(1000, 2)
+        train_seeds_path = os.path.join(test_dir, "train_seeds.npy")
+        np.save(train_seeds_path, train_seeds)
         train_labels = np.random.randint(0, 10, size=1000)
         train_labels_path = os.path.join(test_dir, "train_labels.npy")
         np.save(train_labels_path, train_labels)
 
-        validation_node_pairs = np.arange(2000, 4000).reshape(1000, 2)
-        validation_node_pairs_path = os.path.join(
-            test_dir, "validation_node_pairs.npy"
-        )
-        np.save(validation_node_pairs_path, validation_node_pairs)
+        validation_seeds = np.arange(2000, 4000).reshape(1000, 2)
+        validation_seeds_path = os.path.join(test_dir, "validation_seeds.npy")
+        np.save(validation_seeds_path, validation_seeds)
         validation_labels = np.random.randint(0, 10, size=1000)
         validation_labels_path = os.path.join(test_dir, "validation_labels.npy")
         np.save(validation_labels_path, validation_labels)
 
-        test_node_pairs = np.arange(4000, 6000).reshape(1000, 2)
-        test_node_pairs_path = os.path.join(test_dir, "test_node_pairs.npy")
-        np.save(test_node_pairs_path, test_node_pairs)
+        test_seeds = np.arange(4000, 6000).reshape(1000, 2)
+        test_seeds_path = os.path.join(test_dir, "test_seeds.npy")
+        np.save(test_seeds_path, test_seeds)
         test_labels = np.random.randint(0, 10, size=1000)
         test_labels_path = os.path.join(test_dir, "test_labels.npy")
         np.save(test_labels_path, test_labels)
@@ -695,56 +731,56 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
                 train_set:
                   - type: paper:cites:paper
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {train_node_pairs_path}
+                        path: {train_seeds_path}
                       - name: labels
                         format: numpy
                         in_memory: true
                         path: {train_labels_path}
                   - type: author:writes:paper
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
-                        path: {train_node_pairs_path}
+                        path: {train_seeds_path}
                       - name: labels
                         format: numpy
                         path: {train_labels_path}
                 validation_set:
                   - type: paper:cites:paper
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
-                        path: {validation_node_pairs_path}
+                        path: {validation_seeds_path}
                       - name: labels
                         format: numpy
                         path: {validation_labels_path}
                   - type: author:writes:paper
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
-                        path: {validation_node_pairs_path}
+                        path: {validation_seeds_path}
                       - name: labels
                         format: numpy
                         path: {validation_labels_path}
                 test_set:
                   - type: paper:cites:paper
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {test_node_pairs_path}
+                        path: {test_seeds_path}
                       - name: labels
                         format: numpy
                         in_memory: true
                         path: {test_labels_path}
                   - type: author:writes:paper
                     data:
-                      - name: node_pairs
+                      - name: seeds
                         format: numpy
                         in_memory: true
-                        path: {test_node_pairs_path}
+                        path: {test_seeds_path}
                       - name: labels
                         format: numpy
                         in_memory: true
@@ -762,10 +798,10 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
             key = list(item.keys())[0]
             assert key in ["paper:cites:paper", "author:writes:paper"]
             node_pair, label = item[key]
-            assert node_pair[0] == train_node_pairs[i % 1000][0]
-            assert node_pair[1] == train_node_pairs[i % 1000][1]
+            assert node_pair[0] == train_seeds[i % 1000][0]
+            assert node_pair[1] == train_seeds[i % 1000][1]
             assert label == train_labels[i % 1000]
-        assert train_set.names == ("node_pairs", "labels")
+        assert train_set.names == ("seeds", "labels")
         train_set = None
 
         # Verify validation set.
@@ -778,10 +814,10 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
             key = list(item.keys())[0]
             assert key in ["paper:cites:paper", "author:writes:paper"]
             node_pair, label = item[key]
-            assert node_pair[0] == validation_node_pairs[i % 1000][0]
-            assert node_pair[1] == validation_node_pairs[i % 1000][1]
+            assert node_pair[0] == validation_seeds[i % 1000][0]
+            assert node_pair[1] == validation_seeds[i % 1000][1]
             assert label == validation_labels[i % 1000]
-        assert validation_set.names == ("node_pairs", "labels")
+        assert validation_set.names == ("seeds", "labels")
         validation_set = None
 
         # Verify test set.
@@ -794,10 +830,10 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
             key = list(item.keys())[0]
             assert key in ["paper:cites:paper", "author:writes:paper"]
             node_pair, label = item[key]
-            assert node_pair[0] == test_node_pairs[i % 1000][0]
-            assert node_pair[1] == test_node_pairs[i % 1000][1]
+            assert node_pair[0] == test_seeds[i % 1000][0]
+            assert node_pair[1] == test_seeds[i % 1000][1]
             assert label == test_labels[i % 1000]
-        assert test_set.names == ("node_pairs", "labels")
+        assert test_set.names == ("seeds", "labels")
         test_set = None
         dataset = None
 
@@ -1294,21 +1330,21 @@ def test_OnDiskDataset_preprocess_homogeneous_hardcode(
             f"    train_set:\n"
             f"      - type: null\n"
             f"        data:\n"
-            f"          - name: node_pairs\n"
+            f"          - name: seeds\n"
             f"            format: numpy\n"
             f"            in_memory: true\n"
             f"            path: {train_path}\n"
             f"    validation_set:\n"
             f"      - type: null\n"
             f"        data:\n"
-            f"          - name: node_pairs\n"
+            f"          - name: seeds\n"
             f"            format: numpy\n"
             f"            in_memory: true\n"
             f"            path: {valid_path}\n"
             f"    test_set:\n"
             f"      - type: null\n"
             f"        data:\n"
-            f"          - name: node_pairs\n"
+            f"          - name: seeds\n"
             f"            format: numpy\n"
             f"            in_memory: true\n"
             f"            path: {test_path}\n"
@@ -2856,22 +2892,22 @@ def test_OnDiskDataset_auto_force_preprocess(capsys):
 def test_OnDiskTask_repr_homogeneous():
     item_set = gb.ItemSet(
         (torch.arange(0, 5), torch.arange(5, 10)),
-        names=("seed_nodes", "labels"),
+        names=("seeds", "labels"),
     )
     metadata = {"name": "node_classification"}
     task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
     expected_str = (
         "OnDiskTask(validation_set=ItemSet(\n"
         "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
-        "               names=('seed_nodes', 'labels'),\n"
+        "               names=('seeds', 'labels'),\n"
         "           ),\n"
         "           train_set=ItemSet(\n"
         "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
-        "               names=('seed_nodes', 'labels'),\n"
+        "               names=('seeds', 'labels'),\n"
         "           ),\n"
         "           test_set=ItemSet(\n"
         "               items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
-        "               names=('seed_nodes', 'labels'),\n"
+        "               names=('seeds', 'labels'),\n"
         "           ),\n"
         "           metadata={'name': 'node_classification'},)"
     )
@@ -2908,8 +2944,8 @@ def test_OnDiskDataset_not_include_eids():
 def test_OnDiskTask_repr_heterogeneous():
     item_set = gb.ItemSetDict(
         {
-            "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
-            "item": gb.ItemSet(torch.arange(5, 10), names="seed_nodes"),
+            "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seeds"),
         }
     )
     metadata = {"name": "node_classification"}
@@ -2918,32 +2954,32 @@ def test_OnDiskTask_repr_heterogeneous():
         "OnDiskTask(validation_set=ItemSetDict(\n"
         "               itemsets={'user': ItemSet(\n"
         "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
-        "                            names=('seed_nodes',),\n"
+        "                            names=('seeds',),\n"
         "                        ), 'item': ItemSet(\n"
         "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
-        "                            names=('seed_nodes',),\n"
+        "                            names=('seeds',),\n"
         "                        )},\n"
-        "               names=('seed_nodes',),\n"
+        "               names=('seeds',),\n"
         "           ),\n"
         "           train_set=ItemSetDict(\n"
         "               itemsets={'user': ItemSet(\n"
         "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
-        "                            names=('seed_nodes',),\n"
+        "                            names=('seeds',),\n"
         "                        ), 'item': ItemSet(\n"
         "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
-        "                            names=('seed_nodes',),\n"
+        "                            names=('seeds',),\n"
         "                        )},\n"
-        "               names=('seed_nodes',),\n"
+        "               names=('seeds',),\n"
         "           ),\n"
         "           test_set=ItemSetDict(\n"
         "               itemsets={'user': ItemSet(\n"
         "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
-        "                            names=('seed_nodes',),\n"
+        "                            names=('seeds',),\n"
         "                        ), 'item': ItemSet(\n"
         "                            items=(tensor([5, 6, 7, 8, 9]),),\n"
-        "                            names=('seed_nodes',),\n"
+        "                            names=('seeds',),\n"
         "                        )},\n"
-        "               names=('seed_nodes',),\n"
+        "               names=('seeds',),\n"
         "           ),\n"
         "           metadata={'name': 'node_classification'},)"
     )

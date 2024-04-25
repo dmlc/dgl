@@ -79,11 +79,11 @@ can be used on heterogeneous graphs:
         {
             "user": gb.ItemSet(
                 (torch.arange(0, 5), torch.arange(5, 10)),
-                names=("seed_nodes", "labels"),
+                names=("seeds", "labels"),
             ),
             "item": gb.ItemSet(
                 (torch.arange(5, 10), torch.arange(10, 15)),
-                names=("seed_nodes", "labels"),
+                names=("seeds", "labels"),
             ),
         }
     )

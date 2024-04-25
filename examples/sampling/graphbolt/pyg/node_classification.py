@@ -122,7 +122,7 @@ def create_dataloader(
         graph, fanout if job != "infer" else [-1]
     )
     # Copy the data to the specified device.
-    datapipe = datapipe.copy_to(device=device, extra_attrs=["input_nodes"])
+    datapipe = datapipe.copy_to(device=device)
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
     # Create and return a DataLoader to handle data loading.

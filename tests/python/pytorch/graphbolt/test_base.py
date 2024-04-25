@@ -36,14 +36,13 @@ def test_CopyTo():
         "node_inference",
         "link_prediction",
         "edge_classification",
-        "extra_attrs",
     ],
 )
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyToWithMiniBatches(task):
     N = 16
     B = 2
-    if task == "node_classification" or task == "extra_attrs":
+    if task == "node_classification":
         itemset = gb.ItemSet(
             (torch.arange(N), torch.arange(N)), names=("seeds", "labels")
         )
@@ -114,16 +113,11 @@ def test_CopyToWithMiniBatches(task):
                     else:
                         assert var.device.type == "cpu", attr
 
-    if task == "extra_attrs":
-        extra_attrs = ["seed_nodes"]
-    else:
-        extra_attrs = None
-
     # Invoke CopyTo via class constructor.
-    test_data_device(gb.CopyTo(datapipe, "cuda", extra_attrs))
+    test_data_device(gb.CopyTo(datapipe, "cuda"))
 
     # Invoke CopyTo via functional form.
-    test_data_device(datapipe.copy_to("cuda", extra_attrs))
+    test_data_device(datapipe.copy_to("cuda"))
 
 
 def test_etype_tuple_to_str():

@@ -27,14 +27,17 @@ inline bool is_accessible_from_gpu(torch::Tensor tensor) {
 }
 
 /**
- * @brief Parses the destination node type from a given edge type triple
- * seperated with ":".
+ * @brief Parses the source and destination node type from a given edge type
+ * triple seperated with ":".
  */
-inline std::string parse_dst_ntype_from_etype(std::string etype) {
+inline std::pair<std::string, std::string> parse_src_dst_ntype_from_etype(
+    std::string etype) {
   auto first_seperator_it = std::find(etype.begin(), etype.end(), ':');
   auto second_seperator_pos =
       std::find(first_seperator_it + 1, etype.end(), ':') - etype.begin();
-  return etype.substr(second_seperator_pos + 1);
+  return {
+      etype.substr(0, first_seperator_it - etype.begin()),
+      etype.substr(second_seperator_pos + 1)};
 }
 
 /**

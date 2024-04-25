@@ -5,6 +5,8 @@
  */
 #include <dgl/array.h>
 
+#include <cstdlib>
+
 #include "../../runtime/cuda/cuda_common.h"
 #include "./functor.cuh"
 #include "./ge_spmm.cuh"
@@ -28,6 +30,9 @@ void SpMMCsr(
     std::vector<NDArray> out_aux) {
   bool is_scalar_efeat = efeat.NumElements() == csr.indices->shape[0];
   bool use_efeat = op != "copy_lhs";
+  bool use_deterministic_alg_only = false;
+  if (NULL != std::getenv("USE_DETERMINISTIC_ALG"))
+    use_deterministic_alg_only = true;
 
   if (reduce == "sum") {
     bool more_nnz = (csr.indices->shape[0] > csr.num_rows * csr.num_cols);
@@ -37,7 +42,7 @@ void SpMMCsr(
       for (int i = 1; i < ufeat->ndim; ++i) x_length *= ufeat->shape[i];
       CusparseCsrmm2<DType, IdType>(
           ufeat->ctx, csr, static_cast<DType*>(ufeat->data), nullptr,
-          static_cast<DType*>(out->data), x_length);
+          static_cast<DType*>(out->data), x_length, use_deterministic_alg_only);
     } else if (
         op == "mul" && is_scalar_efeat &&
         cusparse_available<DType, IdType>(more_nnz)) {
@@ -50,7 +55,7 @@ void SpMMCsr(
       CusparseCsrmm2<DType, IdType>(
           ufeat->ctx, csr, static_cast<DType*>(ufeat->data),
           static_cast<DType*>(efeat->data), static_cast<DType*>(out->data),
-          x_length);
+          x_length, use_deterministic_alg_only);
     } else {  // general kernel
       SWITCH_OP(op, Op, {
         cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(

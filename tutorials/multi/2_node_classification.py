@@ -108,7 +108,7 @@ def create_dataloader(
         shuffle=is_train,
         drop_uneven_inputs=is_train,
     )
-    datapipe = datapipe.copy_to(device, extra_attrs=["seed_nodes"])
+    datapipe = datapipe.copy_to(device)
     # Now that we have moved to device, sample_neighbor and fetch_feature steps
     # will be executed on GPUs.
     datapipe = datapipe.sample_neighbor(graph, [10, 10, 10])

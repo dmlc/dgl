@@ -50,7 +50,7 @@ def minibatcher_default(batch, names):
         return batch
     if len(names) == 1:
         # Handle the case of single item: batch = tensor([0, 1, 2, 3]), names =
-        # ("seed_nodes",) as `zip(batch, names)` will iterate over the tensor
+        # ("seeds",) as `zip(batch, names)` will iterate over the tensor
         # instead of the batch.
         init_data = {names[0]: batch}
     else:
@@ -313,68 +313,61 @@ class ItemSampler(IterDataPipe):
 
     >>> import torch
     >>> from dgl import graphbolt as gb
-    >>> item_set = gb.ItemSet(torch.arange(0, 10), names="seed_nodes")
+    >>> item_set = gb.ItemSet(torch.arange(0, 10), names="seeds")
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=tensor([0, 1, 2, 3]), node_pairs=None, labels=None,
-        negative_srcs=None, negative_dsts=None, sampled_subgraphs=None,
-        input_nodes=None, node_features=None, edge_features=None,
-        compacted_node_pairs=None, compacted_negative_srcs=None,
-        compacted_negative_dsts=None)
+    MiniBatch(seeds=tensor([0, 1, 2, 3]), sampled_subgraphs=None,
+        node_features=None, labels=None, input_nodes=None,
+        indexes=None, edge_features=None, compacted_seeds=None,
+        blocks=None,)
 
     2. Node pairs.
 
     >>> item_set = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2),
-    ...     names="node_pairs")
+    ...     names="seeds")
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
-        labels=None, negative_srcs=None, negative_dsts=None,
-        sampled_subgraphs=None, input_nodes=None, node_features=None,
-        edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds=tensor([[0, 1], [2, 3], [4, 5], [6, 7]]),
+        sampled_subgraphs=None, node_features=None, labels=None,
+        input_nodes=None, indexes=None, edge_features=None,
+        compacted_seeds=None, blocks=None,)
 
     3. Node pairs and labels.
 
     >>> item_set = gb.ItemSet(
     ...     (torch.arange(0, 20).reshape(-1, 2), torch.arange(10, 20)),
-    ...     names=("node_pairs", "labels")
+    ...     names=("seeds", "labels")
     ... )
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
-        labels=tensor([10, 11, 12, 13]), negative_srcs=None,
-        negative_dsts=None, sampled_subgraphs=None, input_nodes=None,
-        node_features=None, edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds=tensor([[0, 1], [2, 3], [4, 5], [6, 7]]),
+        sampled_subgraphs=None, node_features=None,
+        labels=tensor([10, 11, 12, 13]), input_nodes=None,
+        indexes=None, edge_features=None, compacted_seeds=None,
+        blocks=None,)
 
-    4. Node pairs and negative destinations.
+    4. Node pairs, labels and indexes.
 
-    >>> node_pairs = torch.arange(0, 20).reshape(-1, 2)
-    >>> negative_dsts = torch.arange(10, 30).reshape(-1, 2)
-    >>> item_set = gb.ItemSet((node_pairs, negative_dsts), names=("node_pairs",
-    ...     "negative_dsts"))
+    >>> seeds = torch.arange(0, 20).reshape(-1, 2)
+    >>> labels = torch.tensor([1, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+    >>> indexes = torch.tensor([0, 1, 0, 0, 0, 0, 1, 1, 1, 1])
+    >>> item_set = gb.ItemSet((seeds, labels, indexes), names=("seeds",
+    ...     "labels", "indexes"))
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
-        labels=None, negative_srcs=None,
-        negative_dsts=tensor([[10, 11],
-        [12, 13],
-        [14, 15],
-        [16, 17]]), sampled_subgraphs=None, input_nodes=None,
-        node_features=None, edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds=tensor([[0, 1], [2, 3], [4, 5], [6, 7]]),
+        sampled_subgraphs=None, node_features=None,
+        labels=tensor([1, 1, 0, 0]), input_nodes=None,
+        indexes=tensor([0, 1, 0, 0]), edge_features=None,
+        compacted_seeds=None, blocks=None,)
 
     5. DGLGraphs.
 
@@ -404,85 +397,74 @@ class ItemSampler(IterDataPipe):
     7. Heterogeneous node IDs.
 
     >>> ids = {
-    ...     "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
-    ...     "item": gb.ItemSet(torch.arange(0, 6), names="seed_nodes"),
+    ...     "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
+    ...     "item": gb.ItemSet(torch.arange(0, 6), names="seeds"),
     ... }
     >>> item_set = gb.ItemSetDict(ids)
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes={'user': tensor([0, 1, 2, 3])}, node_pairs=None,
-    labels=None, negative_srcs=None, negative_dsts=None, sampled_subgraphs=None,
-    input_nodes=None, node_features=None, edge_features=None,
-    compacted_node_pairs=None, compacted_negative_srcs=None,
-    compacted_negative_dsts=None)
+    MiniBatch(seeds={'user': tensor([0, 1, 2, 3])}, sampled_subgraphs=None,
+        node_features=None, labels=None, input_nodes=None, indexes=None,
+        edge_features=None, compacted_seeds=None, blocks=None,)
 
     8. Heterogeneous node pairs.
 
-    >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
-    >>> node_pairs_follow = torch.arange(10, 20).reshape(-1, 2)
+    >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
+    >>> seeds_follow = torch.arange(10, 20).reshape(-1, 2)
     >>> item_set = gb.ItemSetDict({
     ...     "user:like:item": gb.ItemSet(
-    ...         node_pairs_like, names="node_pairs"),
+    ...         seeds_like, names="seeds"),
     ...     "user:follow:user": gb.ItemSet(
-    ...         node_pairs_follow, names="node_pairs"),
+    ...         seeds_follow, names="seeds"),
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs={'user:like:item':
-            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
-        labels=None, negative_srcs=None, negative_dsts=None,
-        sampled_subgraphs=None, input_nodes=None, node_features=None,
-        edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds={'user:like:item':
+        tensor([[0, 1], [2, 3], [4, 5], [6, 7]])}, sampled_subgraphs=None,
+        node_features=None, labels=None, input_nodes=None, indexes=None,
+        edge_features=None, compacted_seeds=None, blocks=None,)
 
     9. Heterogeneous node pairs and labels.
 
-    >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
-    >>> labels_like = torch.arange(0, 10)
-    >>> node_pairs_follow = torch.arange(10, 20).reshape(-1, 2)
-    >>> labels_follow = torch.arange(10, 20)
+    >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
+    >>> labels_like = torch.arange(0, 5)
+    >>> seeds_follow = torch.arange(10, 20).reshape(-1, 2)
+    >>> labels_follow = torch.arange(5, 10)
     >>> item_set = gb.ItemSetDict({
-    ...     "user:like:item": gb.ItemSet((node_pairs_like, labels_like),
-    ...         names=("node_pairs", "labels")),
-    ...     "user:follow:user": gb.ItemSet((node_pairs_follow, labels_follow),
-    ...         names=("node_pairs", "labels")),
+    ...     "user:like:item": gb.ItemSet((seeds_like, labels_like),
+    ...         names=("seeds", "labels")),
+    ...     "user:follow:user": gb.ItemSet((seeds_follow, labels_follow),
+    ...         names=("seeds", "labels")),
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs={'user:like:item':
-            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
-        labels={'user:like:item': tensor([0, 1, 2, 3])},
-        negative_srcs=None, negative_dsts=None, sampled_subgraphs=None,
-        input_nodes=None, node_features=None, edge_features=None,
-        compacted_node_pairs=None, compacted_negative_srcs=None,
-        compacted_negative_dsts=None)
+    MiniBatch(seeds={'user:like:item':
+        tensor([[0, 1], [2, 3], [4, 5], [6, 7]])}, sampled_subgraphs=None,
+        node_features=None, labels={'user:like:item': tensor([0, 1, 2, 3])},
+        input_nodes=None, indexes=None, edge_features=None,
+        compacted_seeds=None, blocks=None,)
 
-    10. Heterogeneous node pairs and negative destinations.
+    10. Heterogeneous node pairs, labels and indexes.
 
-    >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
-    >>> negative_dsts_like = torch.arange(10, 20).reshape(-1, 2)
-    >>> node_pairs_follow = torch.arange(20, 30).reshape(-1, 2)
-    >>> negative_dsts_follow = torch.arange(30, 40).reshape(-1, 2)
+    >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
+    >>> labels_like = torch.tensor([1, 1, 0, 0, 0])
+    >>> indexes_like = torch.tensor([0, 1, 0, 0, 1])
+    >>> seeds_follow = torch.arange(20, 30).reshape(-1, 2)
+    >>> labels_follow = torch.tensor([1, 1, 0, 0, 0])
+    >>> indexes_follow = torch.tensor([0, 1, 0, 0, 1])
     >>> item_set = gb.ItemSetDict({
-    ...     "user:like:item": gb.ItemSet((node_pairs_like, negative_dsts_like),
-    ...         names=("node_pairs", "negative_dsts")),
-    ...     "user:follow:user": gb.ItemSet((node_pairs_follow,
-    ...         negative_dsts_follow), names=("node_pairs", "negative_dsts")),
+    ...     "user:like:item": gb.ItemSet((seeds_like, labels_like,
+    ...         indexes_like), names=("seeds", "labels", "indexes")),
+    ...     "user:follow:user": gb.ItemSet((seeds_follow,labels_follow,
+    ...         indexes_follow), names=("seeds", "labels", "indexes")),
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs={'user:like:item':
-            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
-        labels=None, negative_srcs=None,
-        negative_dsts={'user:like:item': tensor([[10, 11],
-        [12, 13],
-        [14, 15],
-        [16, 17]])}, sampled_subgraphs=None, input_nodes=None,
-        node_features=None, edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds={'user:like:item':
+        tensor([[0, 1], [2, 3], [4, 5], [6, 7]])}, sampled_subgraphs=None,
+        node_features=None, labels={'user:like:item': tensor([1, 1, 0, 0])},
+        input_nodes=None, indexes={'user:like:item': tensor([0, 1, 0, 0])},
+        edge_features=None, compacted_seeds=None, blocks=None,)
     """
 
     def __init__(
