@@ -201,9 +201,8 @@ such as ``num_classes`` and all these fields will be passed to the
 
         The ``name`` field is used to specify the name of the data. It is mandatory
         and used to specify the data fields of ``MiniBatch`` for sampling. It can
-        be either ``seed_nodes``, ``labels``, ``node_pairs``, ``negative_srcs`` or 
-        ``negative_dsts``. If any other name is used, it will be added into the
-        ``MiniBatch`` data fields.
+        be either ``seeds``, ``labels`` or ``indexes``. If any other name is used,
+        it will be added into the ``MiniBatch`` data fields.
     - ``format``: ``string``
 
         The ``format`` field is used to specify the format of the data. It can be

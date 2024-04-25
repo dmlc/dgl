@@ -1161,7 +1161,7 @@ def test_DistributedItemSampler(
 ):
     nprocs = 4
     batch_size = 4
-    item_set = gb.ItemSet(torch.arange(0, num_ids), names="seed_nodes")
+    item_set = gb.ItemSet(torch.arange(0, num_ids), names="seeds")
 
     # On Windows, if the process group initialization file already exists,
     # the program may hang. So we need to delete it if it exists.
