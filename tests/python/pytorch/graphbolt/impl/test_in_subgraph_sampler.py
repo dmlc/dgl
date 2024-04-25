@@ -81,7 +81,7 @@ def test_InSubgraphSampler_homo():
     graph = gb.fused_csc_sampling_graph(indptr, indices).to(F.ctx())
 
     seed_nodes = torch.LongTensor([0, 5, 3])
-    item_set = gb.ItemSet(seed_nodes, names="seed_nodes")
+    item_set = gb.ItemSet(seed_nodes, names="seeds")
     batch_size = 1
     item_sampler = gb.ItemSampler(item_set, batch_size=batch_size).copy_to(
         F.ctx()
@@ -162,8 +162,8 @@ def test_InSubgraphSampler_hetero():
 
     item_set = gb.ItemSetDict(
         {
-            "N0": gb.ItemSet(torch.LongTensor([1, 0, 2]), names="seed_nodes"),
-            "N1": gb.ItemSet(torch.LongTensor([0, 2, 1]), names="seed_nodes"),
+            "N0": gb.ItemSet(torch.LongTensor([1, 0, 2]), names="seeds"),
+            "N1": gb.ItemSet(torch.LongTensor([0, 2, 1]), names="seeds"),
         }
     )
     batch_size = 2
