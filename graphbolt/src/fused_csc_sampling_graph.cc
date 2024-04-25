@@ -519,7 +519,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   // In temporal sampling, this will not be used for now since the logic hasn't
   // been adopted for temporal sampling.
   const int64_t num_etypes =
-      (edge_type_to_id_.has_value() && hetero_with_seeds_offsets)
+      (edge_type_to_id_.has_value() && hetero_with_seed_offsets)
           ? edge_type_to_id_->size()
           : 1;
   std::vector<int64_t> etype_id_to_src_ntype_id(num_etypes);
@@ -532,7 +532,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   // number tensor.
   std::vector<int64_t> etype_id_to_num_picked_offset(num_etypes + 1);
   etype_id_to_num_picked_offset[0] = 0;
-  if (hetero_with_seeds_offsets) {
+  if (hetero_with_seed_offsets) {
     for (auto& etype_and_id : edge_type_to_id_.value()) {
       auto etype = etype_and_id.key();
       auto id = etype_and_id.value();
@@ -693,7 +693,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                           offset, num_neighbors, picked_eids_data_ptr,
                           seed_index, subgraph_indptr_data_ptr,
                           etype_id_to_num_picked_offset);
-                      if (num_picked_neighbors_data_ptr[i + 1] > 0) {
+                      if (!hetero_with_seed_offsets) {
                         TORCH_CHECK(
                             num_picked_neighbors_data_ptr[i + 1] ==
                                 picked_number,
