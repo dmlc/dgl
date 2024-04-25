@@ -80,32 +80,21 @@ class HeteroSAGE(nn.Module):
     def __init__(self, in_size, hidden_size):
         super().__init__()
         self.layers = nn.ModuleList()
-        self.layers.append(
-            dglnn.HeteroGraphConv(
-                {
-                    etype: dglnn.SAGEConv(
-                        in_size,
-                        hidden_size,
-                        "mean",
-                    )
-                    for etype in all_connected_types
-                },
-                aggregate="sum",
+        sizes = [in_size, hidden_size]
+        for size in sizes:
+            self.layers.append(
+                dglnn.HeteroGraphConv(
+                    {
+                        etype: dglnn.SAGEConv(
+                            size,
+                            hidden_size,
+                            "mean",
+                        )
+                        for etype in all_connected_types
+                    },
+                    aggregate="sum",
+                )
             )
-        )
-        self.layers.append(
-            dglnn.HeteroGraphConv(
-                {
-                    etype: dglnn.SAGEConv(
-                        hidden_size,
-                        hidden_size,
-                        "mean",
-                    )
-                    for etype in all_connected_types
-                },
-                aggregate="sum",
-            )
-        )
         self.hidden_size = hidden_size
         self.predictor = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
