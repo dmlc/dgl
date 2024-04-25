@@ -416,7 +416,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   template <typename NumPickFn, typename PickFn>
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& seeds,
-      torch::optional<std::vector<int64_t>> seed_offsets,
+      torch::optional<std::vector<int64_t>>& seed_offsets,
       const std::vector<int64_t>& fanouts, bool return_eids,
       NumPickFn num_pick_fn, PickFn pick_fn) const;
 
@@ -526,7 +526,7 @@ void NumPickByEtype(
     bool with_seed_offsets, const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_offset,
+    int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_index,
     const std::vector<int64_t>& etype_id_to_num_picked_offset);
 
 int64_t TemporalNumPickByEtype(
