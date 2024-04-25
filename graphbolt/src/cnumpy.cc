@@ -21,6 +21,7 @@ OnDiskNpyArray::OnDiskNpyArray(
     std::string filename, torch::ScalarType dtype, torch::Tensor shape)
     : filename_(filename), dtype_(dtype) {
 #ifdef __linux__
+#ifdef HAVE_LIBRARY_LIBURING
   ParseNumpyHeader(shape);
   file_description_ = open(filename.c_str(), O_RDONLY | O_DIRECT);
   if (file_description_ == -1) {
@@ -36,6 +37,7 @@ OnDiskNpyArray::OnDiskNpyArray(
     io_uring_queue_init(group_size_, &io_uring_queue_[t], 0);
   }
 #endif  // __linux__
+#endif  // HAVE_LIBRARY_LIBURING
 }
 
 c10::intrusive_ptr<OnDiskNpyArray> OnDiskNpyArray::Create(
@@ -45,16 +47,19 @@ c10::intrusive_ptr<OnDiskNpyArray> OnDiskNpyArray::Create(
 
 OnDiskNpyArray::~OnDiskNpyArray() {
 #ifdef __linux__
+#ifdef HAVE_LIBRARY_LIBURING
   // IO queue exit.
   for (int64_t t = 0; t < num_thread_; t++) {
     io_uring_queue_exit(&io_uring_queue_[t]);
   }
   close(file_description_);
 #endif  // __linux__
+#endif  // HAVE_LIBRARY_LIBURING
 }
 
 void OnDiskNpyArray::ParseNumpyHeader(torch::Tensor shape) {
 #ifdef __linux__
+#ifdef HAVE_LIBRARY_LIBURING
   // Parse numpy file header to get basic info of feature.
   size_t word_size = c10::elementSize(dtype_);
   int64_t num_dim = shape.numel();
@@ -81,18 +86,24 @@ void OnDiskNpyArray::ParseNumpyHeader(torch::Tensor shape) {
   // add one for new-line character.
   prefix_len_ = header.size() + 1;
 #endif  // __linux__
+#endif  // HAVE_LIBRARY_LIBURING
 }
 
 torch::Tensor OnDiskNpyArray::IndexSelect(torch::Tensor index) {
+#ifdef HAVE_LIBRARY_LIBURING
 #ifdef __linux__
   return IndexSelectIOUring(index);
 #else
   TORCH_CHECK(false, "OnDiskNpyArray is not supported on non-Linux systems.");
   return torch::empty({0});
 #endif  // __linux__
+#else
+TORCH_CHECK(false, "DiskBasedFeature is not available now.");
+#endif  // HAVE_LIBRARY_LIBURING
 }
 
 #ifdef __linux__
+#ifdef HAVE_LIBRARY_LIBURING
 torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   index = index.to(torch::kLong);
   // The minimum page size to contain one feature.
@@ -216,6 +227,6 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   return result;
 }
 #endif  // __linux__
-
+#endif  //HAVE_LIBRARY_LIBURING
 }  // namespace storage
 }  // namespace graphbolt

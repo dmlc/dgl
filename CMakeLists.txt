@@ -31,6 +31,7 @@ dgl_option(EXTERNAL_NANOFLANN_PATH "Path to use external nanoflann" OFF)
 dgl_option(EXTERNAL_METIS_PATH "Path to external metis" OFF)
 dgl_option(EXTERNAL_METIS_LIB_PATH "Path to external metis library" OFF)
 dgl_option(EXTERNAL_GKLIB_PATH "Path to external gklib" OFF)
+dgl_option(EXTERNAL_LIBURING_PATH "Path to external liburing" OFF)
 
 # Options for building DGL features: "none," "dev," "dogfood," "release," and
 # "all."
@@ -105,6 +106,9 @@ dgl_feature_option(
     "Build cpp unittest executables"
     "dev"
 )
+
+
+
 
 if (EXTERNAL_DLPACK_PATH OR EXTERNAL_DMLC_PATH OR EXTERNAL_NANOFLANN_PATH OR EXTERNAL_NANOFLANN_PATH OR EXTERNAL_METIS_PATH OR EXTERNAL_GKLIB_PATH)
   message(STATUS "Using at least one external library")
@@ -349,23 +353,26 @@ endif(EXTERNAL_PHMAP_PATH)
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-  include(ExternalProject)
-  set(LIBURING_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/liburing)
-  ExternalProject_Add(
-    liburing
-    SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=/
-    BUILD_COMMAND bash -c "make -j 4"
-    BUILD_IN_SOURCE ON
-    INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
-    BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/lib/liburing.a
-    BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/include
-    DOWNLOAD_EXTRACT_TIMESTAMP true
-  )
-  set(LIBURING_INCLUDE ${LIBURING_INSTALL_DIR}/include)
-  set(LIBURING ${LIBURING_INSTALL_DIR}/lib/liburing.a)
-endif()
+if(EXTERNAL_LIBURING_PATH)
+add_definitions(-DHAVE_LIBRARY_LIBURING)
+  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    include(ExternalProject)
+    set(LIBURING_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/liburing)
+    ExternalProject_Add(
+      liburing
+      SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=/
+      BUILD_COMMAND bash -c "make -j 4"
+      BUILD_IN_SOURCE ON
+      INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
+      BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/lib/liburing.a
+      BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/include
+      DOWNLOAD_EXTRACT_TIMESTAMP true
+    )
+    set(LIBURING_INCLUDE ${LIBURING_INSTALL_DIR}/include)
+    set(LIBURING ${LIBURING_INSTALL_DIR}/lib/liburing.a)
+  endif()
+endif(EXTERNAL_LIBURING_PATH)
 
 if(EXTERNAL_NANOFLANN_PATH)
   include_directories(SYSTEM ${EXTERNAL_NANOFLANN_PATH})
@@ -588,7 +595,9 @@ if(BUILD_GRAPHBOLT)
   if(USE_CUDA)
     add_dependencies(graphbolt gpu_cache)
   endif(USE_CUDA)
-  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    add_dependencies(graphbolt liburing)
-  endif()
+  if(EXTERNAL_LIBURING_PATH)
+    if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+      add_dependencies(graphbolt liburing)
+    endif()
+  endif(EXTERNAL_LIBURING_PATH)
 endif(BUILD_GRAPHBOLT)
