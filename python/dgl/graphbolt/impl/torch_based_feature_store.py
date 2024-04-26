@@ -295,7 +295,7 @@ class DiskBasedFeature(Feature):
                 return self._ondisk_npy_array.index_select(ids.cpu()).to(
                     ids.device
                 )
-            except RuntimeError as e:
+            except RuntimeError:
                 raise indexError
         else:
             return index_select(self._tensor, ids)
