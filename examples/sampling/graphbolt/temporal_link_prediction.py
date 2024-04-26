@@ -116,22 +116,6 @@ class HeteroSAGE(nn.Module):
 
 
 def create_dataloader(args, graph, features, itemset, is_train=True):
-    ############################################################################
-    # [Input]:
-    # 'itemset': The current dataset.
-    # 'args.batch_size': Specify the number of samples to be processed together,
-    # referred to as a 'mini-batch'. (The term 'mini-batch' is used here to
-    # indicate a subset of the entire dataset that is processed together. This
-    # is in contrast to processing the entire dataset, known as a 'full batch'.)
-    # 'is_train': Determining if data should be shuffled. (Shuffling is
-    # generally used only in training to improve model generalization. It's
-    # not used in validation and testing as the focus there is to evaluate
-    # performance rather than to learn from the data.)
-    # [Output]:
-    # An ItemSampler object for handling mini-batch sampling.
-    # [Role]:
-    # Initialize the ItemSampler to sample mini-batche from the dataset.
-    ############################################################################
     datapipe = gb.ItemSampler(
         itemset,
         batch_size=args.train_batch_size if is_train else args.eval_batch_size,
@@ -158,38 +142,13 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
         edge_timestamp_attr_name=TIMESTAMP_FEATURE_NAME,
     )
 
-    ############################################################################
-    # [Input]:
-    # 'features': The node features.
-    # 'node_feature_keys': The node feature keys (list) to be fetched.
-    # [Output]:
-    # A FeatureFetcher object to fetch node features.
-    # [Role]:
-    # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs.
-    ############################################################################
     datapipe = datapipe.fetch_feature(
         features, node_feature_keys=NODE_FEATURE_KEYS
     )
 
-    ############################################################################
-    # [Input]:
-    # 'device': The device to copy the data to.
-    # [Output]:
-    # A CopyTo object to copy the data to the specified device.
-    ############################################################################
     if args.storage_device == "cpu":
         datapipe = datapipe.copy_to(device=args.device)
 
-    ############################################################################
-    # [Input]:
-    # 'datapipe': The datapipe object to be used for data loading.
-    # 'args.num_workers': The number of processes to be used for data loading.
-    # [Output]:
-    # A DataLoader object to handle data loading.
-    # [Role]:
-    # Initialize a multi-process dataloader to load the data in parallel.
-    ############################################################################
     dataloader = gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
