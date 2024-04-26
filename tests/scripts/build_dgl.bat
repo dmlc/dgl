@@ -1,6 +1,8 @@
 @ECHO OFF
 SETLOCAL EnableDelayedExpansion
 
+ECHO "Current user: %USERNAME%"
+
 CALL "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
 CALL mkvirtualenv --system-site-packages %BUILD_TAG%
 DEL /S /Q build
