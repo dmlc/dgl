@@ -76,11 +76,11 @@ include_directories(BEFORE ${BOLT_DIR}
                            "../third_party/pcg/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-  if(EXTERNAL_LIBURING_PATH)
+  if(USE_LIBURING)
     target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE "../third_party/liburing/src/include")
     get_filename_component(PARENT_DIR "${CMAKE_SOURCE_DIR}" DIRECTORY)
     target_link_libraries(${LIB_GRAPHBOLT_NAME} ${PARENT_DIR}/build/third_party/liburing/lib/liburing.a)
-  endif(EXTERNAL_LIBURING_PATH)
+  endif(USE_LIBURING)
 endif()
 
 if(USE_CUDA)

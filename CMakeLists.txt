@@ -20,6 +20,7 @@ dgl_option(BUILD_TYPE "Type of the build: dev, dogfood or release" "dev")
 message(STATUS "Build for ${BUILD_TYPE}")
 
 dgl_option(USE_CUDA "Build with CUDA" OFF)
+dgl_option(USE_LIBURING "Build with liburing" ON)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter for building sub-components" python3)
 
 # Conda build related options.
@@ -31,7 +32,6 @@ dgl_option(EXTERNAL_NANOFLANN_PATH "Path to use external nanoflann" OFF)
 dgl_option(EXTERNAL_METIS_PATH "Path to external metis" OFF)
 dgl_option(EXTERNAL_METIS_LIB_PATH "Path to external metis library" OFF)
 dgl_option(EXTERNAL_GKLIB_PATH "Path to external gklib" OFF)
-dgl_option(EXTERNAL_LIBURING_PATH "Path to external liburing" OFF)
 
 # Options for building DGL features: "none," "dev," "dogfood," "release," and
 # "all."
@@ -106,7 +106,6 @@ dgl_feature_option(
     "Build cpp unittest executables"
     "dev"
 )
-
 
 
 
@@ -353,9 +352,9 @@ endif(EXTERNAL_PHMAP_PATH)
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
-if(EXTERNAL_LIBURING_PATH)
-add_definitions(-DHAVE_LIBRARY_LIBURING)
+if(USE_LIBURING)
   if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    add_definitions(-DHAVE_LIBRARY_LIBURING)
     include(ExternalProject)
     set(LIBURING_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/liburing)
     ExternalProject_Add(
@@ -372,7 +371,7 @@ add_definitions(-DHAVE_LIBRARY_LIBURING)
     set(LIBURING_INCLUDE ${LIBURING_INSTALL_DIR}/include)
     set(LIBURING ${LIBURING_INSTALL_DIR}/lib/liburing.a)
   endif()
-endif(EXTERNAL_LIBURING_PATH)
+endif(USE_LIBURING)
 
 if(EXTERNAL_NANOFLANN_PATH)
   include_directories(SYSTEM ${EXTERNAL_NANOFLANN_PATH})
@@ -595,9 +594,9 @@ if(BUILD_GRAPHBOLT)
   if(USE_CUDA)
     add_dependencies(graphbolt gpu_cache)
   endif(USE_CUDA)
-  if(EXTERNAL_LIBURING_PATH)
+  if(USE_LIBURING)
     if(CMAKE_SYSTEM_NAME MATCHES "Linux")
       add_dependencies(graphbolt liburing)
     endif()
-  endif(EXTERNAL_LIBURING_PATH)
+  endif(USE_LIBURING)
 endif(BUILD_GRAPHBOLT)
