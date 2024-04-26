@@ -20,6 +20,10 @@ static constexpr int kDiskAlignmentSize = 4096;
 OnDiskNpyArray::OnDiskNpyArray(
     std::string filename, torch::ScalarType dtype, torch::Tensor shape)
     : filename_(filename), dtype_(dtype) {
+#ifndef __linux__
+  throw std::runtime_error(
+      "OnDiskNpyArray is not supported on non-Linux systems.");
+#endif
 #ifdef HAVE_LIBRARY_LIBURING
   ParseNumpyHeader(shape);
   file_description_ = open(filename.c_str(), O_RDONLY | O_DIRECT);
@@ -35,6 +39,8 @@ OnDiskNpyArray::OnDiskNpyArray(
   for (int64_t t = 0; t < num_thread_; t++) {
     io_uring_queue_init(group_size_, &io_uring_queue_[t], 0);
   }
+#else
+  throw std::runtime_error("DiskBasedFeature is not available now.");
 #endif  // HAVE_LIBRARY_LIBURING
 }
 
@@ -84,14 +90,11 @@ void OnDiskNpyArray::ParseNumpyHeader(torch::Tensor shape) {
 }
 
 torch::Tensor OnDiskNpyArray::IndexSelect(torch::Tensor index) {
-#ifndef __linux__
-  TORCH_CHECK(false, "OnDiskNpyArray is not supported on non-Linux systems.");
-  return torch::empty({0});
-#endif  // __linux__
 #ifdef HAVE_LIBRARY_LIBURING
   return IndexSelectIOUring(index);
 #else
-  TORCH_CHECK(false, "DiskBasedFeature is not available now.");
+  TORCH_CHECK(false, "OnDiskNpyArray is not supported on non-Linux systems.");
+  return torch::empty({0});
 #endif  // HAVE_LIBRARY_LIBURING
 }
 

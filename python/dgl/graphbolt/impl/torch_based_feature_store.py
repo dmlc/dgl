@@ -296,8 +296,7 @@ class DiskBasedFeature(Feature):
                     ids.device
                 )
             except RuntimeError as e:
-                print(str(e))
-                raise RuntimeError
+                raise indexError
         else:
             return index_select(self._tensor, ids)
 
