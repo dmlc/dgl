@@ -75,8 +75,5 @@ def load_partition_meta(meta_file):
             raise DGLError(
                 f"num_parts[{part_meta.num_parts}] should be greater than 0."
             )
-        if part_meta.algo_name not in ["random", "metis"]:
-            raise DGLError(
-                f"algo_name[{part_meta.num_parts}] is not supported."
-            )
+
         return part_meta
