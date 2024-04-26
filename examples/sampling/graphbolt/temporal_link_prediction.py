@@ -2,14 +2,14 @@
 This script trains and tests a Heterogeneous GraphSAGE model for link
 prediction with temporal information using graphbolt dataloader.
 
-Unlike previous dgl examples, we've utilized the newly defined dataloader
-from GraphBolt. This example will help you grasp how to build an end-to-end
-training pipeline using GraphBolt.
-
 While node classification predicts labels for nodes based on their
 local neighborhoods, link prediction assesses the likelihood of an edge
 existing between two nodes, necessitating different sampling strategies
 that account for pairs of nodes and their joint neighborhoods.
+
+An additional temporal attribute is provided in both graph and TVT sets,
+ensuring that during sampling, only neighbors whose timestamps are earlier
+than the seed timestamp will be sampled.
 
 This flowchart describes the main functional sequence of the provided example.
 main
@@ -45,14 +45,14 @@ from dgl.data.utils import download, extract_archive
 
 
 TIMESTAMP_FEATURE_NAME = "__timestamp__"
-node_feature_keys = {
+NODE_FEATURE_KEYS = {
     "Product": ["categoryId"],
     "Query": ["categoryId"],
 }
 
-target_type = ("Query", "Click", "Product")
-all_connected_types = [
-    target_type,
+TARGET_TYPE = ("Query", "Click", "Product")
+ALL_TYPES = [
+    TARGET_TYPE,
     ("Product", "reverse_Click", "Query"),
     ("Product", "reverse_QueryResult", "Query"),
     ("Query", "QueryResult", "Product"),
@@ -90,12 +90,11 @@ class HeteroSAGE(nn.Module):
                             hidden_size,
                             "mean",
                         )
-                        for etype in all_connected_types
+                        for etype in ALL_TYPES
                     },
                     aggregate="sum",
                 )
             )
-        self.hidden_size = hidden_size
         self.predictor = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
@@ -117,13 +116,6 @@ class HeteroSAGE(nn.Module):
 
 
 def create_dataloader(args, graph, features, itemset, is_train=True):
-    """Get a GraphBolt version of a dataloader for link prediction tasks. This
-    function demonstrates how to utilize functional forms of datapipes in
-    GraphBolt. Alternatively, you can create a datapipe using its class
-    constructor. For a more detailed tutorial, please read the examples in
-    `dgl/notebooks/graphbolt/walkthrough.ipynb`.
-    """
-
     ############################################################################
     # [Input]:
     # 'itemset': The current dataset.
@@ -155,7 +147,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Output]:
     # A NeighborSampler object to sample neighbors.
     # [Role]:
-    # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
+    # Initialize a neighbor sampler for sampling the neighborhoods of nodes with
+    # considering of temporal information. Only neighbors that is earlier than
+    # the seed will be sampled.
     ############################################################################
     datapipe = datapipe.temporal_sample_neighbor(
         graph,
@@ -175,7 +169,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # subgraphs.
     ############################################################################
     datapipe = datapipe.fetch_feature(
-        features, node_feature_keys=node_feature_keys
+        features, node_feature_keys=NODE_FEATURE_KEYS
     )
 
     ############################################################################
@@ -216,12 +210,12 @@ def train(args, model, graph, features, train_set, encoders):
         for step, data in tqdm.tqdm(enumerate(dataloader)):
             # Get node pairs with labels for loss calculation.
             compacted_seeds = data.compacted_seeds[
-                gb.etype_tuple_to_str(target_type)
+                gb.etype_tuple_to_str(TARGET_TYPE)
             ].T
             labels = data.labels
 
             node_feature = {}
-            for ntype, keys in node_feature_keys.items():
+            for ntype, keys in NODE_FEATURE_KEYS.items():
                 ntype, feat = ntype, keys[0]
                 node_feature[ntype] = data.node_features[
                     (ntype, feat)
@@ -230,20 +224,20 @@ def train(args, model, graph, features, train_set, encoders):
             blocks = data.blocks
 
             # Get the embeddings of the input nodes.
-            H_node_dict = {
+            X_node_dict = {
                 ntype: encoders[ntype](feat)
                 for ntype, feat in node_feature.items()
             }
-            seed_embeds = model(blocks, H_node_dict)
-            src_type, _, dst_type = target_type
+            X_node_dict = model(blocks, X_node_dict)
+            src_type, _, dst_type = TARGET_TYPE
             logits = model.predictor(
-                seed_embeds[src_type][compacted_seeds[0]]
-                * seed_embeds[dst_type][compacted_seeds[1]]
+                X_node_dict[src_type][compacted_seeds[0]]
+                * X_node_dict[dst_type][compacted_seeds[1]]
             ).squeeze()
 
             # Compute loss.
             loss = F.binary_cross_entropy_with_logits(
-                logits, labels[gb.etype_tuple_to_str(target_type)].float()
+                logits, labels[gb.etype_tuple_to_str(TARGET_TYPE)].float()
             )
             optimizer.zero_grad()
             loss.backward()
@@ -327,6 +321,7 @@ def main(args):
 
     # Load and preprocess dataset.
     print("Loading data")
+    # TODO: Add the datasets to built-in.
     dataset_path = download_datasets(args.dataset)
     dataset = gb.OnDiskDataset(dataset_path).load()
 
@@ -339,11 +334,17 @@ def main(args):
 
     in_size = 128
     hidden_channels = 256
+    query_size = features.metadata("node", "Query", "categoryId")[
+        "num_categories"
+    ]
+    product_size = features.metadata("node", "Product", "categoryId")[
+        "num_categories"
+    ]
     args.device = torch.device(args.device)
     model = HeteroSAGE(in_size, hidden_channels).to(args.device)
     encoders = {
-        "Query": CategoricalEncoder(1102, in_size).to(args.device),
-        "Product": CategoricalEncoder(1218, in_size).to(args.device),
+        "Query": CategoricalEncoder(query_size, in_size).to(args.device),
+        "Product": CategoricalEncoder(product_size, in_size).to(args.device),
     }
 
     # Model training.
