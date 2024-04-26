@@ -734,19 +734,18 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                                   subgraph_indices_data_ptr[j] =
                                       indices_data_ptr[picked_eids_data_ptr[j]];
                                   if (hetero_with_seed_offsets &&
-                                      node_type_offset_.has_value())
+                                      node_type_offset_.has_value()) {
                                     // Substract the node type offset from
-                                    // subgraph indices.
-                                    AT_DISPATCH_INDEX_TYPES(
-                                        node_type_offset_.value().scalar_type(),
-                                        "SubstractNodeTypeOffset", ([&] {
-                                          auto node_type_offset_data =
-                                              node_type_offset_.value()
-                                                  .data_ptr<index_t>();
-                                          subgraph_indices_data_ptr[j] -=
-                                              node_type_offset_data
-                                                  [etype_id_to_src_ntype_id[i]];
-                                        }));
+                                    // subgraph indices. Assuming
+                                    // node_type_offset has the same dtype as
+                                    // indices.
+                                    auto node_type_offset_data =
+                                        node_type_offset_.value()
+                                            .data_ptr<index_t>();
+                                    subgraph_indices_data_ptr[j] -=
+                                        node_type_offset_data
+                                            [etype_id_to_src_ntype_id[i]];
+                                  }
                                 }
                               }
                             }));
