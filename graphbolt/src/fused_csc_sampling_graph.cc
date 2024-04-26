@@ -524,14 +524,13 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
           : 1;
   std::vector<int64_t> etype_id_to_src_ntype_id(num_etypes);
   std::vector<int64_t> etype_id_to_dst_ntype_id(num_etypes);
-  torch::Tensor subgraph_indptr_substract;
+  torch::optional<torch::Tensor> subgraph_indptr_substract = torch::nullopt;
   // The pick numbers are stored in a single tensor by the order of etype. Each
   // etype corresponds to a group of seeds whose ntype are the same as the
   // dst_type. `etype_id_to_num_picked_offset` indicates the beginning offset
   // where each etype's corresponding seeds' pick numbers are stored in the pick
   // number tensor.
   std::vector<int64_t> etype_id_to_num_picked_offset(num_etypes + 1);
-  etype_id_to_num_picked_offset[0] = 0;
   if (hetero_with_seed_offsets) {
     for (auto& etype_and_id : edge_type_to_id_.value()) {
       auto etype = etype_and_id.key();
@@ -544,9 +543,10 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
           seed_offsets->at(dst_ntype_id + 1) - seed_offsets->at(dst_ntype_id) +
           1;
     }
-    for (int64_t i = 1; i <= num_etypes; ++i) {
-      etype_id_to_num_picked_offset[i] += etype_id_to_num_picked_offset[i - 1];
-    }
+    std::partial_sum(
+        etype_id_to_num_picked_offset.begin(),
+        etype_id_to_num_picked_offset.end(),
+        etype_id_to_num_picked_offset.begin());
   } else {
     etype_id_to_dst_ntype_id[0] = 0;
     etype_id_to_num_picked_offset[1] = num_seeds + 1;
@@ -555,11 +555,9 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   // is used for storing pick numbers. In non-temporal hetero sampling, it
   // equals to sum_{etype} #seeds with ntype=dst_type(etype). In homo sampling,
   // it equals to `num_seeds`.
-  const int64_t num_rows = (fanouts.size() == 1 || !with_seed_offsets)
-                               ? num_seeds + 1
-                               : etype_id_to_num_picked_offset[num_etypes];
+  const int64_t num_rows = etype_id_to_num_picked_offset[num_etypes];
   torch::Tensor num_picked_neighbors_per_node =
-      torch::zeros({num_rows}, indptr_options);
+      torch::empty({num_rows}, indptr_options);
 
   AT_DISPATCH_INDEX_TYPES(
       indptr_.scalar_type(), "SampleNeighborsImplWrappedWithIndptr", ([&] {
@@ -572,6 +570,14 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                   num_picked_neighbors_per_node.data_ptr<indptr_t>();
               num_picked_neighbors_data_ptr[0] = 0;
               const auto seeds_data_ptr = seeds.data_ptr<seeds_t>();
+
+              // Initialize the empty spots in `num_picked_neighbors_per_node`.
+              if (hetero_with_seed_offsets) {
+                for (auto i = 0; i < num_etypes; ++i) {
+                  num_picked_neighbors_data_ptr
+                      [etype_id_to_num_picked_offset[i]] = 0;
+                }
+              }
 
               // Step 1. Calculate pick number of each node.
               torch::parallel_for(
@@ -642,7 +648,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
 
               // When doing non-temporal hetero sampling, we generate an
               // edge_offsets tensor.
-              if (type_per_edge_.has_value() && hetero_with_seed_offsets) {
+              if (hetero_with_seed_offsets) {
                 edge_offsets = torch::empty({num_etypes + 1}, indptr_options);
                 AT_DISPATCH_INTEGRAL_TYPES(
                     edge_offsets.value().scalar_type(), "CalculateEdgeOffsets",
@@ -776,8 +782,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 
-  if (hetero_with_seed_offsets) {
-    subgraph_indptr -= subgraph_indptr_substract;
+  if (subgraph_indptr_substract.has_value()) {
+    subgraph_indptr -= subgraph_indptr_substract.value();
   }
 
   return c10::make_intrusive<FusedSampledSubgraph>(
