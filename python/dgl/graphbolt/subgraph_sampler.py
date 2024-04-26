@@ -6,6 +6,7 @@ from typing import Dict
 import torch
 from torch.utils.data import functional_datapipe
 
+from .base import seed_type_str_to_ntypes
 from .internal import compact_temporal_nodes, unique_and_compact
 from .minibatch_transformer import MiniBatchTransformer
 
@@ -121,7 +122,7 @@ class SubgraphSampler(MiniBatchTransformer):
             if use_timestamp:
                 nodes_timestamp = defaultdict(list)
             is_hyperlink = False
-            for etype, typed_seeds in seeds.items():
+            for type, typed_seeds in seeds.items():
                 # When typed_seeds is a one-dimensional tensor, it represents
                 # seed nodes, which does not need to do unique and compact.
                 if typed_seeds.ndim == 1:
@@ -135,25 +136,20 @@ class SubgraphSampler(MiniBatchTransformer):
                     "Only tensor with shape 1*N and N*M is "
                     + f"supported now, but got {typed_seeds.shape}."
                 )
-                ntypes = etype.split(":")
-                is_hyperlink = len(ntypes) == typed_seeds.shape[1]
-                if not is_hyperlink:
-                    ntypes = ntypes[::2]
+                ntypes = seed_type_str_to_ntypes(type, typed_seeds.shape[1])
                 if use_timestamp:
                     negative_ratio = (
                         typed_seeds.shape[0]
-                        // minibatch.timestamp[etype].shape[0]
+                        // minibatch.timestamp[type].shape[0]
                         - 1
                     )
-                    neg_timestamp = minibatch.timestamp[
-                        etype
-                    ].repeat_interleave(negative_ratio)
+                    neg_timestamp = minibatch.timestamp[type].repeat_interleave(
+                        negative_ratio
+                    )
                 for i, ntype in enumerate(ntypes):
                     nodes[ntype].append(typed_seeds[:, i])
                     if use_timestamp:
-                        nodes_timestamp[ntype].append(
-                            minibatch.timestamp[etype]
-                        )
+                        nodes_timestamp[ntype].append(minibatch.timestamp[type])
                         nodes_timestamp[ntype].append(neg_timestamp)
             # Unique and compact the collected nodes.
             if use_timestamp:
@@ -167,14 +163,12 @@ class SubgraphSampler(MiniBatchTransformer):
                 nodes_timestamp = None
             compacted_seeds = {}
             # Map back in same order as collect.
-            for etype, typed_seeds in seeds.items():
-                ntypes = etype.split(":")
-                if not is_hyperlink:
-                    ntypes = ntypes[::2]
+            for type, typed_seeds in seeds.items():
+                ntypes = seed_type_str_to_ntypes(type, typed_seeds.shape[1])
                 compacted_seed = []
                 for ntype in ntypes:
                     compacted_seed.append(compacted[ntype].pop(0))
-                compacted_seeds[etype] = (
+                compacted_seeds[type] = (
                     torch.cat(compacted_seed).view(len(ntypes), -1).T
                 )
         else:
@@ -216,11 +210,6 @@ class SubgraphSampler(MiniBatchTransformer):
                 nodes_timestamp = None
             # Map back in same order as collect.
             compacted_seeds = compacted[0].view(seeds.shape)
-            print(
-                unique_seeds,
-                nodes_timestamp,
-                compacted_seeds,
-            )
         return (
             unique_seeds,
             nodes_timestamp,

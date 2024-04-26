@@ -25,6 +25,7 @@ __all__ = [
     "expand_indptr",
     "CSCFormatBase",
     "seed",
+    "seed_type_str_to_ntypes",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
@@ -183,6 +184,37 @@ def etype_str_to_tuple(c_etype):
         f"But got {c_etype}."
     )
     return ret
+
+
+def seed_type_str_to_ntypes(seed_type, seed_size):
+    """Convert seeds type to node types from string to list.
+
+    Examples
+    --------
+    1. node pairs
+
+    >>> seed_type = "user:like:item"
+    >>> seed_size = 2
+    >>> node_type = seed_type_str_to_ntypes(seed_type, seed_size)
+    >>> print(node_type)
+    ["user", "item"]
+
+    2. hyperlink
+
+    >>> seed_type = "user:item:user"
+    >>> seed_size = 3
+    >>> node_type = seed_type_str_to_ntypes(seed_type, seed_size)
+    >>> print(node_type)
+    ["user", "item", "user"]
+    """
+    assert isinstance(
+        seed_type, str
+    ), f"Passed-in seed type should be string, but got {type(seed_type)}"
+    ntypes = seed_type.split(CANONICAL_ETYPE_DELIMITER)
+    is_hyperlink = len(ntypes) == seed_size
+    if not is_hyperlink:
+        ntypes = ntypes[::2]
+    return ntypes
 
 
 def apply_to(x, device):
