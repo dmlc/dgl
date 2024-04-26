@@ -201,11 +201,11 @@ def seed_type_str_to_ntypes(seed_type, seed_size):
 
     2. hyperlink
 
-    >>> seed_type = "user:item:user"
+    >>> seed_type = "query:user:item"
     >>> seed_size = 3
     >>> node_type = seed_type_str_to_ntypes(seed_type, seed_size)
     >>> print(node_type)
-    ["user", "item", "user"]
+    ["query", "user", "item"]
     """
     assert isinstance(
         seed_type, str

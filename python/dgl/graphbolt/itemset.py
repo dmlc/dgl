@@ -338,19 +338,19 @@ class ItemSetDict:
     >>> second_seeds = torch.arange(0, 2).reshape(-1, 1)
     >>> second_labels = torch.tensor([1, 0])
     >>> item_set = gb.ItemSetDict({
-    ...     "user:item:user": gb.ItemSet(
+    ...     "query:user:item": gb.ItemSet(
     ...         (first_seeds, first_labels),
     ...         names=("seeds", "labels")),
     ...     "user": gb.ItemSet(
     ...         (second_seeds, second_labels),
     ...         names=("seeds", "labels"))})
     >>> list(item_set)
-    [{'user:item:user': (tensor([0, 1, 2]), tensor(1))},
-     {'user:item:user': (tensor([3, 4, 5]), tensor(0))},
+    [{'query:user:item': (tensor([0, 1, 2]), tensor(1))},
+     {'query:user:item': (tensor([3, 4, 5]), tensor(0))},
      {'user': (tensor([0]), tensor(1))},
      {'user': (tensor([1]), tensor(0))}]
     >>> item_set[:]
-    {'user:item:user': (tensor([[0, 1, 2], [3, 4, 5]]),
+    {'query:user:item': (tensor([[0, 1, 2], [3, 4, 5]]),
                         tensor([1, 0])),
      'user': (tensor([[0], [1]]),tensor([1, 0]))}
     >>> item_set.names

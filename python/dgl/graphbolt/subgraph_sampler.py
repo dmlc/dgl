@@ -93,7 +93,8 @@ class SubgraphSampler(MiniBatchTransformer):
         """Preprocess `seeds` in a minibatch to construct `unique_seeds`,
         `node_timestamp` and `compacted_seeds` for further sampling. It
         optionally incorporates timestamps for temporal graphs, organizing and
-        compacting seeds based on their types and timestamps.
+        compacting seeds based on their types and timestamps. In heterogeneous
+        graph, `seeds` with same node type will be unqiued together.
 
         Parameters
         ----------
