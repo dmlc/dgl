@@ -390,13 +390,14 @@ else(EXTERNAL_METIS_PATH)
   target_include_directories(dgl PRIVATE "third_party/METIS/include")
   # Compile METIS
   if(NOT MSVC)
-    set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/METIS/GKlib")
+    set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/GKlib")
     include(${GKLIB_PATH}/GKlibSystem.cmake)
     include_directories(${GKLIB_PATH})
+    add_library(GKlib ${GKlib_sources})
     include_directories("third_party/METIS/include/")
     add_subdirectory("third_party/METIS/libmetis/")
-    list(APPEND DGL_LINKER_LIBS metis)
-    endif(NOT MSVC)
+    list(APPEND DGL_LINKER_LIBS metis GKlib)
+  endif(NOT MSVC)
 endif(EXTERNAL_METIS_PATH)
 
 
