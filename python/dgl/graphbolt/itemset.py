@@ -110,6 +110,21 @@ class ItemSet:
      tensor([1, 1, 0, 0, 0]))
     >>> item_set.names
     ('seeds', 'labels')
+
+    6. Tuple of iterables with different shape: hyperlink and labels.
+
+    >>> seeds = torch.arange(0, 10).reshape(-1, 5)
+    >>> labels = torch.tensor([1, 0])
+    >>> item_set = gb.ItemSet(
+    ...     (seeds, labels), names=("seeds", "lables"))
+    >>> list(item_set)
+    [(tensor([0, 1, 2, 3, 4]), tensor([1])),
+     (tensor([5, 6, 7, 8, 9]), tensor([0]))]
+    >>> item_set[:]
+    (tensor([[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]),
+     tensor([1, 0]))
+    >>> item_set.names
+    ('seeds', 'labels')
     """
 
     def __init__(
@@ -313,6 +328,31 @@ class ItemSetDict:
                         tensor([1, 0])),
      'user:follow:user': (tensor([[0, 1], [2, 3], [4, 5]]),
                           tensor([1, 1, 0]))}
+    >>> item_set.names
+    ('seeds', 'labels')
+
+    4. Tuple of iterables with different shape: hyperlink and labels.
+
+    >>> first_seeds = torch.arange(0, 6).reshape(-1, 3)
+    >>> first_labels = torch.tensor([1, 0])
+    >>> second_seeds = torch.arange(0, 2).reshape(-1, 1)
+    >>> second_labels = torch.tensor([1, 0])
+    >>> item_set = gb.ItemSetDict({
+    ...     "query:user:item": gb.ItemSet(
+    ...         (first_seeds, first_labels),
+    ...         names=("seeds", "labels")),
+    ...     "user": gb.ItemSet(
+    ...         (second_seeds, second_labels),
+    ...         names=("seeds", "labels"))})
+    >>> list(item_set)
+    [{'query:user:item': (tensor([0, 1, 2]), tensor(1))},
+     {'query:user:item': (tensor([3, 4, 5]), tensor(0))},
+     {'user': (tensor([0]), tensor(1))},
+     {'user': (tensor([1]), tensor(0))}]
+    >>> item_set[:]
+    {'query:user:item': (tensor([[0, 1, 2], [3, 4, 5]]),
+                        tensor([1, 0])),
+     'user': (tensor([[0], [1]]),tensor([1, 0]))}
     >>> item_set.names
     ('seeds', 'labels')
     """
