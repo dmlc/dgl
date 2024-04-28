@@ -23,7 +23,7 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 
 ### A GPU-ready graph library
 
-DGL provides a powerful graph object that can reside on either CPU or GPU. It bundles structural data as well as features for better control. We provide a variety of functions for computing with graph objects including efficient and customizable message passing primitives for Graph Neural Networks.
+DGLxxx provides a powerful graph object that can reside on either CPU or GPU. It bundles structural data as well as features for better control. We provide a variety of functions for computing with graph objects including efficient and customizable message passing primitives for Graph Neural Networks.
 
 ### A versatile tool for GNN researchers and practitioners
 
