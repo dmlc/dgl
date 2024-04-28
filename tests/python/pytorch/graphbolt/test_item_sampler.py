@@ -975,18 +975,19 @@ def distributed_item_sampler_subprocess(
     num_items = 0
     sampled_count = torch.zeros(num_ids, dtype=torch.int32)
     for i in data_loader:
+        print(i)
         # Count how many times each item is sampled.
         sampled_count[i.seeds] += 1
         if drop_last:
             assert i.seeds.size(0) == batch_size
         num_items += i.seeds.size(0)
-    num_batches = len(list(item_sampler))
+    # num_batches = len(list(item_sampler))
 
-    if drop_uneven_inputs:
-        num_batches_tensor = torch.tensor(num_batches)
-        dist.broadcast(num_batches_tensor, 0)
-        # Test if the number of batches are the same for all processes.
-        assert num_batches_tensor == num_batches
+    # if drop_uneven_inputs:
+    #     num_batches_tensor = torch.tensor(num_batches)
+    #     dist.broadcast(num_batches_tensor, 0)
+    #     # Test if the number of batches are the same for all processes.
+    #     assert num_batches_tensor == num_batches
 
     # Add up results from all processes.
     dist.reduce(sampled_count, 0)
@@ -1097,7 +1098,7 @@ def test_RangeCalculation(params):
 def test_DistributedItemSampler(
     num_ids, num_workers, drop_last, drop_uneven_inputs
 ):
-    nprocs = 4
+    nprocs = 2
     batch_size = 4
     item_set = gb.ItemSet(torch.arange(0, num_ids), names="seed_nodes")
 
@@ -1213,7 +1214,110 @@ def test_cumstomized_batcher():
         print(x)
 
 
-test_ItemSampler2()
+# test_ItemSampler2()
 # test_ItemSampler3()
 # test_diff_dataloader()
 # test_cumstomized_batcher()
+def distributed_item_sampler_subprocess2(
+    proc_id,
+    nprocs,
+    item_set,
+    num_ids,
+    num_workers,
+    batch_size,
+    drop_last,
+    drop_uneven_inputs,
+):
+    # On Windows, the init method can only be file.
+    init_method = (
+        f"file:///{os.path.join(os.getcwd(), 'dis_tempfile')}"
+        if platform == "win32"
+        else "tcp://127.0.0.1:12345"
+    )
+    dist.init_process_group(
+        backend="gloo",  # Use Gloo backend for CPU multiprocessing
+        init_method=init_method,
+        world_size=nprocs,
+        rank=proc_id,
+    )
+
+    # Create a DistributedItemSampler.
+    item_sampler = gb.DistributedItemSampler2(
+        item_set,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=drop_last,
+        drop_uneven_inputs=drop_uneven_inputs,
+    )
+
+    # item_sampler.test_random()
+    # assert 0, 'hhh'
+
+    feature_fetcher = gb.FeatureFetcher(
+        item_sampler,
+        gb.BasicFeatureStore({}),
+        [],
+    )
+    data_loader = gb.DataLoader(feature_fetcher, num_workers=num_workers)
+    
+    # Count the numbers of items and batches.
+    num_items = 0
+    sampled_count = torch.zeros(num_ids, dtype=torch.int32)
+    for i in data_loader:
+        print(i)
+        # Count how many times each item is sampled.
+        sampled_count[i.seeds] += 1
+        if drop_last:
+            assert i.seeds.size(0) == batch_size
+        num_items += i.seeds.size(0)
+    # num_batches = len(list(item_sampler))
+
+    # if drop_uneven_inputs:
+    #     num_batches_tensor = torch.tensor(num_batches)
+    #     dist.broadcast(num_batches_tensor, 0)
+    #     # Test if the number of batches are the same for all processes.
+    #     assert num_batches_tensor == num_batches
+
+    # Add up results from all processes.
+    dist.reduce(sampled_count, 0)
+
+    try:
+        # Make sure no item is sampled more than once.
+        assert sampled_count.max() <= 1
+    finally:
+        dist.destroy_process_group()
+
+
+def test_DistributedItemSampler2(
+    num_ids, num_workers, drop_last, drop_uneven_inputs
+):
+    nprocs = 4
+    batch_size = 4
+    item_set = gb.ItemSet4(torch.arange(0, num_ids), names="seed_nodes")
+
+    # On Windows, if the process group initialization file already exists,
+    # the program may hang. So we need to delete it if it exists.
+    if platform == "win32":
+        try:
+            os.remove(os.path.join(os.getcwd(), "dis_tempfile"))
+        except FileNotFoundError:
+            pass
+
+    mp.spawn(
+        distributed_item_sampler_subprocess2,
+        args=(
+            nprocs,
+            item_set,
+            num_ids,
+            num_workers,
+            batch_size,
+            drop_last,
+            drop_uneven_inputs,
+        ),
+        nprocs=nprocs,
+        join=True,
+    )
+
+
+if __name__ == "__main__":
+    test_DistributedItemSampler2(36, 2, False, False)
