@@ -952,6 +952,9 @@ class ItemSampler4(IterDataPipe):
 
 
 class DistributedItemSampler4(ItemSampler4):
+    """Experimental. Try to implement based on the current 
+    DistributedItemSampler."""
+
     def __init__(
         self,
         item_set: Union[ItemSet4, ItemSetDict4],
