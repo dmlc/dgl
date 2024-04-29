@@ -18,6 +18,7 @@ namespace graphbolt {
 namespace sampling {
 
 enum SamplerType { NEIGHBOR, LABOR, LABOR_DEPENDENT };
+enum TemporalOption { NOT_TEMPORAL, TEMPORAL };
 
 constexpr bool is_labor(SamplerType S) {
   return S == SamplerType::LABOR || S == SamplerType::LABOR_DEPENDENT;
@@ -413,17 +414,12 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm);
 
  private:
-  template <typename NumPickFn, typename PickFn>
+  template <TemporalOption Temporal, typename NumPickFn, typename PickFn>
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& seeds,
       torch::optional<std::vector<int64_t>>& seed_offsets,
       const std::vector<int64_t>& fanouts, bool return_eids,
       NumPickFn num_pick_fn, PickFn pick_fn) const;
-
-  template <typename NumPickFn, typename PickFn>
-  c10::intrusive_ptr<FusedSampledSubgraph> TemporalSampleNeighborsImpl(
-      const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
-      PickFn pick_fn) const;
 
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
