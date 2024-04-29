@@ -927,16 +927,18 @@ class ItemSampler4(IterDataPipe):
             self._drop_last,
             self._drop_uneven_inputs,
         )
-        g = torch.Generator()
-        g.manual_seed(self._seed + self._epoch)
-        indices = torch.randperm(total, generator=g)
-        buffer = self._item_set[
-            indices[start_offset : start_offset + assigned_count]
-        ]
+        if self.shuffle:
+            g = torch.Generator()
+            g.manual_seed(self._seed + self._epoch)
+            indices = torch.randperm(total, generator=g)
+            buffer = self._item_set[
+                indices[start_offset : start_offset + assigned_count]
+            ]
+        else:
+            buffer = self._item_set[
+                start_offset : start_offset + assigned_count
+            ]
         offsets = self._calculate_offsets(buffer)
-        # print(
-        #     f"\nworld_size: {self._world_size}, rank: {self._rank}, num_workers: {num_workers}, worker_id: {worker_id},\nstart_offset: {start_offset}, assigned_count: {assigned_count}, output_count: {output_count}\nbuffer: {buffer}\n"
-        # )
         for i in range(0, assigned_count, self._batch_size):
             if output_count <= 0:
                 break
@@ -952,7 +954,7 @@ class ItemSampler4(IterDataPipe):
 
 
 class DistributedItemSampler4(ItemSampler4):
-    """Experimental. Try to implement based on the current 
+    """Experimental. Try to implement based on the current
     DistributedItemSampler."""
 
     def __init__(
