@@ -9,10 +9,10 @@
 #include <stdlib.h>
 #include <torch/script.h>
 
-#ifdef __linux__
+#ifdef HAVE_LIBRARY_LIBURING
 #include <liburing.h>
 #include <unistd.h>
-#endif
+#endif  // HAVE_LIBRARY_LIBURING
 
 #include <cassert>
 #include <cstdio>
@@ -60,7 +60,7 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    */
   torch::Tensor IndexSelect(torch::Tensor index);
 
-#ifdef __linux__
+#ifdef HAVE_LIBRARY_LIBURING
   /**
    * @brief Index-select operation on an on-disk numpy array using IO Uring for
    * asynchronous I/O.
@@ -76,8 +76,7 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    * @throws std::runtime_error If index is out of range.
    */
   torch::Tensor IndexSelectIOUring(torch::Tensor index);
-#endif  // __linux__
-
+#endif  // HAVE_LIBRARY_LIBURING
  private:
   std::string filename_;              // Path to numpy file.
   int file_description_;              // File description.
@@ -88,9 +87,9 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   int num_thread_;                    // Default thread number.
   int64_t group_size_ = 512;          // Default group size.
 
-#ifdef __linux__
+#ifdef HAVE_LIBRARY_LIBURING
   io_uring* io_uring_queue_;  // io_uring queue.
-#endif
+#endif                        // HAVE_LIBRARY_LIBURING
 };
 
 }  // namespace storage
