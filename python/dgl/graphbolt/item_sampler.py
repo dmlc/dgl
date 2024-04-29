@@ -15,7 +15,7 @@ from ..base import dgl_warning
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
 from .internal import calculate_range
-from .itemset import ItemSet, ItemSetDict
+from .itemset import ItemSet, ItemSet4, ItemSetDict, ItemSetDict4
 from .minibatch import MiniBatch
 
 __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
@@ -833,3 +833,146 @@ def _construct_seeds(pos_seeds, neg_srcs=None, neg_dsts=None):
             neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
             indexes[etype] = torch.cat((pos_indexes, neg_indexes))
     return seeds, labels, indexes
+
+
+class ItemSampler4(IterDataPipe):
+    """Experimental. Try to implement based on the current ItemSampler."""
+
+    def __init__(
+        self,
+        item_set: Union[ItemSet4, ItemSetDict4],
+        batch_size: int,
+        minibatcher: Optional[Callable] = minibatcher_default,
+        drop_last: Optional[bool] = False,
+        shuffle: Optional[bool] = False,
+        seed: Optional[int] = 0,
+    ) -> None:
+        super().__init__()
+        self._names = item_set.names
+        self._item_set = item_set
+        self._batch_size = batch_size
+        self._minibatcher = minibatcher
+        self._drop_last = drop_last
+        self._shuffle = shuffle
+        self._distributed = False
+        self._drop_uneven_inputs = False
+        self._world_size = None
+        self._rank = None
+        self._seed = seed
+        self._epoch = 0
+
+    def _collate_batch(self, buffer, indices, offsets=None):
+        """Collate a batch from the buffer. For internal use only."""
+        if isinstance(buffer, torch.Tensor):
+            # For item set that's initialized with integer or single tensor,
+            # `buffer` is a tensor.
+            return torch.index_select(buffer, dim=0, index=indices)
+        elif isinstance(buffer, list) and isinstance(buffer[0], DGLGraph):
+            # For item set that's initialized with a list of
+            # DGLGraphs, `buffer` is a list of DGLGraphs.
+            return dgl_batch([buffer[idx] for idx in indices])
+        elif isinstance(buffer, tuple):
+            # For item set that's initialized with a tuple of items,
+            # `buffer` is a tuple of tensors.
+            return tuple(item[indices] for item in buffer)
+        elif isinstance(buffer, Mapping):
+            # For item set that's initialized with a dict of items,
+            # `buffer` is a dict of tensors/lists/tuples.
+            keys = list(buffer.keys())
+            key_indices = torch.searchsorted(offsets, indices, right=True) - 1
+            batch = {}
+            for j, key in enumerate(keys):
+                mask = (key_indices == j).nonzero().squeeze(1)
+                if len(mask) == 0:
+                    continue
+                batch[key] = self._collate_batch(
+                    buffer[key], indices[mask] - offsets[j]
+                )
+            return batch
+        raise TypeError(f"Unsupported buffer type {type(buffer).__name__}.")
+
+    def _calculate_offsets(self, buffer):
+        """Calculate offsets for each item in buffer. For internal use only."""
+        if not isinstance(buffer, Mapping):
+            return None
+        offsets = [0]
+        for value in buffer.values():
+            if isinstance(value, torch.Tensor):
+                offsets.append(offsets[-1] + len(value))
+            elif isinstance(value, tuple):
+                offsets.append(offsets[-1] + len(value[0]))
+            else:
+                raise TypeError(
+                    f"Unsupported buffer type {type(value).__name__}."
+                )
+        return torch.tensor(offsets)
+
+    def __iter__(self) -> Iterator:
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
+            num_workers = worker_info.num_workers
+            worker_id = worker_info.id
+        else:
+            num_workers = 1
+            worker_id = 0
+        total = len(self._item_set)
+        start_offset, assigned_count, output_count = calculate_range(
+            self._distributed,
+            total,
+            self._world_size,
+            self._rank,
+            num_workers,
+            worker_id,
+            self._batch_size,
+            self._drop_last,
+            self._drop_uneven_inputs,
+        )
+        g = torch.Generator()
+        g.manual_seed(self._seed + self._epoch)
+        indices = torch.randperm(total, generator=g)
+        buffer = self._item_set[
+            indices[start_offset : start_offset + assigned_count]
+        ]
+        offsets = self._calculate_offsets(buffer)
+        # print(
+        #     f"\nworld_size: {self._world_size}, rank: {self._rank}, num_workers: {num_workers}, worker_id: {worker_id},\nstart_offset: {start_offset}, assigned_count: {assigned_count}, output_count: {output_count}\nbuffer: {buffer}\n"
+        # )
+        for i in range(0, assigned_count, self._batch_size):
+            if output_count <= 0:
+                break
+            batch_indices = torch.arange(
+                i, i + min(self._batch_size, output_count)
+            )
+            output_count -= self._batch_size
+            yield minibatcher_default(
+                self._collate_batch(buffer, batch_indices, offsets), self._names
+            )
+
+        self._epoch += 1
+
+
+class DistributedItemSampler4(ItemSampler4):
+    def __init__(
+        self,
+        item_set: Union[ItemSet4, ItemSetDict4],
+        batch_size: int,
+        minibatcher: Optional[Callable] = minibatcher_default,
+        drop_last: Optional[bool] = False,
+        shuffle: Optional[bool] = False,
+        drop_uneven_inputs: Optional[bool] = False,
+    ) -> None:
+        super().__init__(
+            item_set,
+            batch_size,
+            minibatcher,
+            drop_last,
+            shuffle,
+        )
+        self._distributed = True
+        self._drop_uneven_inputs = drop_uneven_inputs
+        if not dist.is_available():
+            raise RuntimeError(
+                "Distributed item sampler requires distributed package."
+            )
+        self._world_size = dist.get_world_size()
+        self._rank = dist.get_rank()
