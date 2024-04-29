@@ -492,7 +492,7 @@ auto GetTemporalPickFn(
       };
 }
 
-template <bool Temporal, typename NumPickFn, typename PickFn>
+template <TemporalOption Temporal, typename NumPickFn, typename PickFn>
 c10::intrusive_ptr<FusedSampledSubgraph>
 FusedCSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& seeds,
@@ -512,8 +512,8 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   torch::optional<torch::Tensor> edge_offsets = torch::nullopt;
 
   bool with_seed_offsets = seed_offsets.has_value();
-  bool hetero_with_seed_offsets =
-      with_seed_offsets && fanouts.size() > 1 && !Temporal;
+  bool hetero_with_seed_offsets = with_seed_offsets && fanouts.size() > 1 &&
+                                  Temporal == TemporalOption::NOT_TEMPORAL;
 
   // Get the number of edge types. If it's homo or if the size of fanouts is 1
   // (hetero graph but sampled as a homo graph), set num_etypes as 1.
@@ -592,7 +592,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                       const auto offset = indptr_data[nid];
                       const auto num_neighbors = indptr_data[nid + 1] - offset;
 
-                      if constexpr (Temporal) {
+                      if constexpr (Temporal == TemporalOption::TEMPORAL) {
                         num_picked_neighbors_data_ptr[i + 1] =
                             num_neighbors == 0
                                 ? 0
@@ -703,7 +703,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
                               : i;
 
                       // Step 4. Pick neighbors for each node.
-                      if constexpr (Temporal) {
+                      if constexpr (Temporal == TemporalOption::TEMPORAL) {
                         picked_number = num_picked_neighbors_data_ptr[i + 1];
                         auto picked_offset = subgraph_indptr_data_ptr[i];
                         if (picked_number > 0) {
@@ -867,7 +867,7 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
           indices_,
           {random_seed.value(), static_cast<float>(seed2_contribution)},
           NumNodes()};
-      return SampleNeighborsImpl<false>(
+      return SampleNeighborsImpl<TemporalOption::NOT_TEMPORAL>(
           seeds.value(), seed_offsets, fanouts, return_eids,
           GetNumPickFn(
               fanouts, replace, type_per_edge_, probs_or_mask,
@@ -888,7 +888,7 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
               NumNodes()};
         }
       }();
-      return SampleNeighborsImpl<false>(
+      return SampleNeighborsImpl<TemporalOption::NOT_TEMPORAL>(
           seeds.value(), seed_offsets, fanouts, return_eids,
           GetNumPickFn(
               fanouts, replace, type_per_edge_, probs_or_mask,
@@ -899,7 +899,7 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     }
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
-    return SampleNeighborsImpl<false>(
+    return SampleNeighborsImpl<TemporalOption::NOT_TEMPORAL>(
         seeds.value(), seed_offsets, fanouts, return_eids,
         GetNumPickFn(
             fanouts, replace, type_per_edge_, probs_or_mask, with_seed_offsets),
@@ -938,7 +938,7 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
     const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
     SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
-    return SampleNeighborsImpl<true>(
+    return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
         input_nodes, seed_offsets, fanouts, return_eids,
         GetTemporalNumPickFn(
             input_nodes_timestamp, this->indices_, fanouts, replace,
@@ -949,7 +949,7 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
             edge_timestamp, args));
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
-    return SampleNeighborsImpl<true>(
+    return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
         input_nodes, seed_offsets, fanouts, return_eids,
         GetTemporalNumPickFn(
             input_nodes_timestamp, this->indices_, fanouts, replace,
