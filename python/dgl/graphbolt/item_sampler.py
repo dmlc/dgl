@@ -952,7 +952,7 @@ class ItemSampler4(IterDataPipe):
                 i, i + min(self._batch_size, output_count)
             )
             output_count -= self._batch_size
-            yield minibatcher_default(
+            yield self._minibatcher(
                 self._collate_batch(buffer, batch_indices, offsets), self._names
             )
 
