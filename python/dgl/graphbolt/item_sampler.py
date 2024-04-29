@@ -18,7 +18,13 @@ from .internal import calculate_range
 from .itemset import ItemSet, ItemSet4, ItemSetDict, ItemSetDict4
 from .minibatch import MiniBatch
 
-__all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
+__all__ = [
+    "ItemSampler",
+    "DistributedItemSampler",
+    "minibatcher_default",
+    "ItemSampler4",
+    "DistributedItemSampler4",
+]
 
 
 def minibatcher_default(batch, names):
