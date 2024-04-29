@@ -933,7 +933,7 @@ class ItemSampler4(IterDataPipe):
             self._drop_last,
             self._drop_uneven_inputs,
         )
-        if self.shuffle:
+        if self._shuffle:
             g = torch.Generator()
             g.manual_seed(self._seed + self._epoch)
             indices = torch.randperm(total, generator=g)
