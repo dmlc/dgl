@@ -106,7 +106,7 @@ and combined as well.
                         hidden_x = self.dropout(hidden_x)
                     # By design, our output nodes are contiguous.
                     y[
-                        data.seed_nodes[0] : data.seed_nodes[-1] + 1
+                        data.seeds[0] : data.seeds[-1] + 1
                     ] = hidden_x.to(device)
                 feature = y
 

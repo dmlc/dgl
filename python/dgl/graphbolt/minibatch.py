@@ -26,11 +26,11 @@ class MiniBatch:
 
     labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Labels associated with seed nodes / node pairs in the graph.
+    Labels associated with seeds in the graph.
     - If `labels` is a tensor: It indicates the graph is homogeneous. The value
-      should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
+      should be corresponding labels to given 'seeds'.
     - If `labels` is a dictionary: The keys should be node or edge type and the
-      value should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
+      value should be corresponding labels to given 'seeds'.
     """
 
     seeds: Union[
@@ -61,15 +61,14 @@ class MiniBatch:
 
     indexes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Indexes associated with seed nodes / node pairs in the graph, which
-    indicates to which query a seed node / node pair belongs.
+    Indexes associated with seeds in the graph, which
+    indicates to which query a seeds belongs.
     - If `indexes` is a tensor: It indicates the graph is homogeneous. The
-      value should be corresponding query to given 'seed_nodes' or
-      'node_pairs'.
-    - If `indexes` is a dictionary: It indicates the graph is
-      heterogeneous. The keys should be node or edge type and the value should
-      be corresponding query to given 'seed_nodes' or 'node_pairs'. For each
-      key, indexes are consecutive integers starting from zero.
+      value should be corresponding query to given 'seeds'.
+    - If `indexes` is a dictionary: It indicates the graph is heterogeneous.
+      The keys should be node or edge type and the value should be
+      corresponding query to given 'seeds'. For each key, indexes are
+      consecutive integers starting from zero.
     """
 
     sampled_subgraphs: List[SampledSubgraph] = None

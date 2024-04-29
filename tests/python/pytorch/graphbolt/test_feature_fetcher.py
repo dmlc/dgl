@@ -25,7 +25,7 @@ def test_FeatureFetcher_invoke():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    itemset = gb.ItemSet(torch.arange(10), names="seeds")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -58,7 +58,7 @@ def test_FeatureFetcher_homo():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    itemset = gb.ItemSet(torch.arange(10), names="seeds")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -104,7 +104,7 @@ def test_FeatureFetcher_with_edges_homo():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    itemset = gb.ItemSet(torch.arange(10), names="seeds")
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
     fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, ["a"], ["b"])
@@ -152,8 +152,8 @@ def test_FeatureFetcher_hetero():
 
     itemset = gb.ItemSetDict(
         {
-            "n1": gb.ItemSet(torch.LongTensor([0, 1]), names="seed_nodes"),
-            "n2": gb.ItemSet(torch.LongTensor([0, 1, 2]), names="seed_nodes"),
+            "n1": gb.ItemSet(torch.LongTensor([0, 1]), names="seeds"),
+            "n2": gb.ItemSet(torch.LongTensor([0, 1, 2]), names="seeds"),
         }
     )
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
@@ -215,7 +215,7 @@ def test_FeatureFetcher_with_edges_hetero():
 
     itemset = gb.ItemSetDict(
         {
-            "n1": gb.ItemSet(torch.randint(0, 20, (10,)), names="seed_nodes"),
+            "n1": gb.ItemSet(torch.randint(0, 20, (10,)), names="seeds"),
         }
     )
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
