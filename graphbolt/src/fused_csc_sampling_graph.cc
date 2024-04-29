@@ -908,14 +908,37 @@ int64_t TemporalNumPick(
     const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
     int64_t offset, int64_t num_neighbors) {
   constexpr int64_t kFastPathThreshold = 1000;
-  if (num_neighbors > kFastPathThreshold && !probs_or_mask.has_value()) {
+  if (num_neighbors > kFastPathThreshold && !probs_or_mask.has_value() && fanout != -1) {
     // TODO: Currently we use the fast path both in TemporalNumPick and
     // TemporalPick. We may only sample once in TemporalNumPick and use the
     // sampled edges in TemporalPick to avoid sampling twice.
-    auto [success, sampled_edges] = FastTemporalPick(
-        seed_timestamp, csc_indics, fanout, replace, node_timestamp,
-        edge_timestamp, seed_offset, offset, num_neighbors);
-    if (success) return sampled_edges.size();
+    int64_t sampled_count = 0;
+    auto timestamp = utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset);
+    for (int64_t edge_id = offset; edge_id < offset + num_neighbors && sampled_count < fanout; edge_id++) {
+      if (replace && sampled_count > 0) {
+        sampled_count = fanout;
+        break;
+      }
+      if (node_timestamp.has_value()) {
+        bool flag = true;
+        AT_DISPATCH_INDEX_TYPES(
+            csc_indics.scalar_type(), "CheckNodeTimeStamp", ([&] {
+              int64_t neighbor_id =
+                  utils::GetValueByIndex<index_t>(csc_indics, edge_id);
+              if (utils::GetValueByIndex<int64_t>(
+                      node_timestamp.value(), neighbor_id) >= timestamp)
+                flag = false;
+            }));
+        if (!flag) continue;
+      }
+      if (edge_timestamp.has_value() &&
+          utils::GetValueByIndex<int64_t>(edge_timestamp.value(), edge_id) >=
+              timestamp) {
+        continue;
+      }
+      sampled_count++;
+    }
+    return sampled_count;
   }
   auto mask = TemporalMask(
       utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset), csc_indics,
