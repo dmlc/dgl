@@ -1185,3 +1185,120 @@ def test_DistributedItemSampler(
         nprocs=nprocs,
         join=True,
     )
+
+
+def distributed_item_sampler_subprocess4(
+    proc_id,
+    nprocs,
+    item_set,
+    num_ids,
+    num_workers,
+    batch_size,
+    drop_last,
+    drop_uneven_inputs,
+):
+    # On Windows, the init method can only be file.
+    init_method = (
+        f"file:///{os.path.join(os.getcwd(), 'dis_tempfile')}"
+        if platform == "win32"
+        else "tcp://127.0.0.1:12345"
+    )
+    dist.init_process_group(
+        backend="gloo",  # Use Gloo backend for CPU multiprocessing
+        init_method=init_method,
+        world_size=nprocs,
+        rank=proc_id,
+    )
+
+    # Create a DistributedItemSampler4.
+    item_sampler = gb.DistributedItemSampler4(
+        item_set,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=drop_last,
+        drop_uneven_inputs=drop_uneven_inputs,
+    )
+    feature_fetcher = gb.FeatureFetcher(
+        item_sampler,
+        gb.BasicFeatureStore({}),
+        [],
+    )
+    data_loader = gb.DataLoader(feature_fetcher, num_workers=num_workers)
+
+    # Count the numbers of items and batches.
+    num_items = 0
+    sampled_count = torch.zeros(num_ids, dtype=torch.int32)
+    for i in data_loader:
+        # Count how many times each item is sampled.
+        sampled_count[i.seeds] += 1
+        if drop_last:
+            assert i.seeds.size(0) == batch_size
+        num_items += i.seeds.size(0)
+    num_batches = len(list(item_sampler))
+
+    if drop_uneven_inputs:
+        num_batches_tensor = torch.tensor(num_batches)
+        dist.broadcast(num_batches_tensor, 0)
+        # Test if the number of batches are the same for all processes.
+        assert num_batches_tensor == num_batches
+
+    # Add up results from all processes.
+    dist.reduce(sampled_count, 0)
+
+    try:
+        # Make sure no item is sampled more than once.
+        assert sampled_count.max() <= 1
+    finally:
+        dist.destroy_process_group()
+
+
+
+@unittest.skipIf(F._default_context_str != "cpu", reason="GPU not required.")
+@pytest.mark.parametrize("num_ids", [24, 30, 32, 34, 36])
+@pytest.mark.parametrize("num_workers", [0, 2])
+@pytest.mark.parametrize("drop_last", [False, True])
+@pytest.mark.parametrize("drop_uneven_inputs", [False, True])
+def test_DistributedItemSampler4(
+    num_ids, num_workers, drop_last, drop_uneven_inputs
+):
+    nprocs = 4
+    batch_size = 4
+    item_set = gb.ItemSet4(torch.arange(0, num_ids), names="seeds")
+
+    # On Windows, if the process group initialization file already exists,
+    # the program may hang. So we need to delete it if it exists.
+    if platform == "win32":
+        try:
+            os.remove(os.path.join(os.getcwd(), "dis_tempfile"))
+        except FileNotFoundError:
+            pass
+
+    torch.manual_seed(1234)
+    mp.spawn(
+        distributed_item_sampler_subprocess4,
+        args=(
+            nprocs,
+            item_set,
+            num_ids,
+            num_workers,
+            batch_size,
+            drop_last,
+            drop_uneven_inputs,
+        ),
+        nprocs=nprocs,
+        join=True,
+    )
+
+
+def test_RandomSeedSingleton():
+    random_seed_singleton = gb.RandomSeedSingleton()
+    random_seed = random_seed_singleton.seed
+    print(random_seed)
+    random_seed_singleton2 = gb.RandomSeedSingleton()
+    random_seed2 = random_seed_singleton2.seed
+    print(random_seed2)
+    assert 0
+
+
+if __name__ == "__main__":
+    test_DistributedItemSampler4(24, 2, False, False)
