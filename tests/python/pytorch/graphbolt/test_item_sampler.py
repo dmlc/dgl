@@ -1252,7 +1252,6 @@ def distributed_item_sampler_subprocess4(
         dist.destroy_process_group()
 
 
-
 @unittest.skipIf(F._default_context_str != "cpu", reason="GPU not required.")
 @pytest.mark.parametrize("num_ids", [24, 30, 32, 34, 36])
 @pytest.mark.parametrize("num_workers", [0, 2])
@@ -1273,7 +1272,6 @@ def test_DistributedItemSampler4(
         except FileNotFoundError:
             pass
 
-    torch.manual_seed(1234)
     mp.spawn(
         distributed_item_sampler_subprocess4,
         args=(
@@ -1288,17 +1286,3 @@ def test_DistributedItemSampler4(
         nprocs=nprocs,
         join=True,
     )
-
-
-def test_RandomSeedSingleton():
-    random_seed_singleton = gb.RandomSeedSingleton()
-    random_seed = random_seed_singleton.seed
-    print(random_seed)
-    random_seed_singleton2 = gb.RandomSeedSingleton()
-    random_seed2 = random_seed_singleton2.seed
-    print(random_seed2)
-    assert 0
-
-
-if __name__ == "__main__":
-    test_DistributedItemSampler4(24, 2, False, False)
