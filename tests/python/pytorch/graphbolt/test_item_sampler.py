@@ -4,8 +4,6 @@ import unittest
 from collections import defaultdict
 from sys import platform
 
-import backend as F
-
 import dgl
 import pytest
 import torch
@@ -1151,7 +1149,7 @@ def test_RangeCalculation(params):
     assert key == answer
 
 
-@unittest.skipIf(F._default_context_str != "cpu", reason="GPU not required.")
+@unittest.skipIf(os.getenv("DGLTESTDEV", "cpu") != "cpu", reason="GPU not required.")
 @pytest.mark.parametrize("num_ids", [24, 30, 32, 34, 36])
 @pytest.mark.parametrize("num_workers", [0, 2])
 @pytest.mark.parametrize("drop_last", [False, True])
@@ -1252,7 +1250,7 @@ def distributed_item_sampler_subprocess4(
         dist.destroy_process_group()
 
 
-@unittest.skipIf(F._default_context_str != "cpu", reason="GPU not required.")
+@unittest.skipIf(os.getenv("DGLTESTDEV", "cpu") != "cpu", reason="GPU not required.")
 @pytest.mark.parametrize("num_ids", [24, 30, 32, 34, 36])
 @pytest.mark.parametrize("num_workers", [0, 2])
 @pytest.mark.parametrize("drop_last", [False, True])
