@@ -851,7 +851,6 @@ class ItemSampler4(IterDataPipe):
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
-        seed: Optional[int] = 0,
     ) -> None:
         super().__init__()
         self._names = item_set.names
@@ -864,7 +863,7 @@ class ItemSampler4(IterDataPipe):
         self._drop_uneven_inputs = False
         self._world_size = None
         self._rank = None
-        self._seed = seed
+        self._seed = np.random.randint(0, np.iinfo(np.int32).max)
         self._epoch = 0
 
     def _collate_batch(self, buffer, indices, offsets=None):
@@ -987,3 +986,17 @@ class DistributedItemSampler4(ItemSampler4):
             )
         self._world_size = dist.get_world_size()
         self._rank = dist.get_rank()
+
+        device = (
+            torch.cuda.current_device()
+            if torch.cuda.is_available() and dist.get_backend() == "nccl"
+            else "cpu"
+        )
+        if self._rank == 0:
+            seed = np.random.randint(0, np.iinfo(np.int32).max)
+            seed_tensor = torch.tensor(seed, dtype=torch.int32, device=device)
+        else:
+            seed_tensor = torch.empty([], dtype=torch.int32, device=device)
+        dist.barrier()
+        dist.broadcast(seed_tensor, src=0)
+        self._seed = seed_tensor.item()
