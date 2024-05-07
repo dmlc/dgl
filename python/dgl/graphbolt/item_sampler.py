@@ -997,6 +997,5 @@ class DistributedItemSampler4(ItemSampler4):
             seed_tensor = torch.tensor(seed, dtype=torch.int32, device=device)
         else:
             seed_tensor = torch.empty([], dtype=torch.int32, device=device)
-        dist.barrier()
         dist.broadcast(seed_tensor, src=0)
         self._seed = seed_tensor.item()
