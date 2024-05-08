@@ -1,11 +1,12 @@
 """GraphBolt Itemset."""
 
 import textwrap
-from typing import Dict, Iterable, Iterator, Tuple, Union
+from typing import Dict, Iterable, Iterator, Mapping, Tuple, Union
 
 import torch
+from torch.utils.data import Dataset
 
-__all__ = ["ItemSet", "ItemSetDict"]
+__all__ = ["ItemSet", "ItemSetDict", "ItemSet4", "ItemSetDict4"]
 
 
 def is_scalar(x):
@@ -438,6 +439,191 @@ class ItemSetDict:
         ).strip()
 
         return ret.format(
+            Classname=self.__class__.__name__,
+            itemsets=itemsets_str,
+            names=self._names,
+        )
+
+
+class ItemSet4(Dataset):
+    r"""Class for iterating over tensor-like data.
+    Experimental. Implemented only __getitem__() accepting slice and list.
+    """
+
+    def __init__(
+        self,
+        items: Union[torch.Tensor, Mapping, Tuple[Mapping]],
+        names: Union[str, Tuple[str]] = None,
+    ):
+        if is_scalar(items):
+            self._length = int(items)
+            self._items = items
+        elif isinstance(items, tuple):
+            self._length = len(items[0])
+            if any(self._length != len(item) for item in items):
+                raise ValueError("Size mismatch between items.")
+            self._items = items
+        else:
+            self._length = len(items)
+            self._items = (items,)
+        if names is not None:
+            num_items = (
+                len(self._items) if isinstance(self._items, tuple) else 1
+            )
+            if isinstance(names, tuple):
+                self._names = names
+            else:
+                self._names = (names,)
+            assert num_items == len(self._names), (
+                f"Number of items ({num_items}) and "
+                f"names ({len(self._names)}) don't match."
+            )
+        else:
+            self._names = None
+
+    def __len__(self) -> int:
+        return self._length
+
+    def __getitem__(self, index: Union[int, slice, Iterable[int]]):
+        if is_scalar(self._items):
+            if isinstance(index, slice):
+                start, stop, step = index.indices(int(self._items))
+                dtype = getattr(self._items, "dtype", torch.int64)
+                return torch.arange(start, stop, step, dtype=dtype)
+            elif isinstance(index, int):
+                if index < 0:
+                    index += int(self._items)
+                if index < 0 or index >= int(self._items):
+                    raise IndexError(
+                        f"{type(self).__name__} index out of range."
+                    )
+                return torch.tensor(index, dtype=self._items.dtype)
+            elif isinstance(index, Iterable):
+                dtype = getattr(self._items, "dtype", torch.int64)
+                return torch.tensor(index, dtype=dtype)
+            else:
+                raise TypeError(
+                    f"{type(self).__name__} indices must be int, slice, or "
+                    f"iterable of int, but got {type(index)}."
+                )
+        elif len(self._items) == 1:
+            return self._items[0][index]
+        else:
+            return tuple(item[index] for item in self._items)
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
+
+    def __repr__(self) -> str:
+        _repr = (
+            f"{self.__class__.__name__}(\n"
+            f"    items={self._items},\n"
+            f"    names={self._names},\n"
+            f")"
+        )
+        return _repr
+
+
+class ItemSetDict4(Dataset):
+    r"""Experimental."""
+
+    def __init__(self, itemsets: Dict[str, ItemSet4]) -> None:
+        super().__init__()
+        self._itemsets = itemsets
+        self._names = next(iter(itemsets.values())).names
+        if any(self._names != itemset.names for itemset in itemsets.values()):
+            raise ValueError("All itemsets must have the same names.")
+        offset = [0] + [len(itemset) for itemset in self._itemsets.values()]
+        self._offsets = torch.tensor(offset).cumsum(0)
+        self._length = int(self._offsets[-1])
+        self._keys = list(self._itemsets.keys())
+
+    def __len__(self) -> int:
+        return self._length
+
+    def __getitem__(self, index: Union[int, slice, Iterable[int]]):
+        if isinstance(index, int):
+            if index < 0:
+                index += self._length
+            if index < 0 or index >= self._length:
+                raise IndexError(f"{type(self).__name__} index out of range.")
+            offset_idx = torch.searchsorted(self._offsets, index, right=True)
+            offset_idx -= 1
+            index -= self._offsets[offset_idx]
+            key = self._keys[offset_idx]
+            return {key: self._itemsets[key][index]}
+        elif isinstance(index, slice):
+            start, stop, step = index.indices(self._length)
+            # print(f"slice: {slice}, start, stop, step: {(start, stop, step)}")
+            # print(f"res list: {list(range(start, stop, step))}")
+            if step != 1:
+                return self.__getitem__(list(range(start, stop, step)))
+            assert start < stop, "Start must be smaller than stop."
+            data = {}
+            offset_idx_start = max(
+                1, torch.searchsorted(self._offsets, start, right=False)
+            )
+            for offset_idx in range(offset_idx_start, len(self._offsets)):
+                key = self._keys[offset_idx - 1]
+                data[key] = self._itemsets[key][
+                    max(0, start - self._offsets[offset_idx - 1]) : stop
+                    - self._offsets[offset_idx - 1]
+                ]
+                if stop <= self._offsets[offset_idx]:
+                    break
+            return data
+        elif isinstance(index, Iterable):
+            data = {key: [] for key in self._keys}
+            for idx in index:
+                if idx < 0:
+                    idx += self._length
+                if idx < 0 or idx >= self._length:
+                    raise IndexError(
+                        f"{type(self).__name__} index out of range."
+                    )
+                offset_idx = torch.searchsorted(self._offsets, idx, right=True)
+                offset_idx -= 1
+                idx -= self._offsets[offset_idx]
+                key = self._keys[offset_idx]
+                data[key].append(int(idx))
+            for key in self._keys:
+                indices = data[key]
+                if len(indices) == 0:
+                    del data[key]
+                    continue
+                item_set = self._itemsets[key]
+                try:
+                    value = item_set[indices]
+                except TypeError:
+                    # In case the itemset doesn't support list indexing.
+                    value = tuple(item_set[idx] for idx in indices)
+                finally:
+                    data[key] = value
+            return data
+        else:
+            raise TypeError(
+                f"{type(self).__name__} indices must be int, slice, or "
+                f"iterable of int, but got {type(index)}."
+            )
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
+
+    def __repr__(self) -> str:
+        _repr = (
+            "{Classname}(\n"
+            "    itemsets={itemsets},\n"
+            "    names={names},\n"
+            ")"
+        )
+        itemsets_str = textwrap.indent(
+            repr(self._itemsets), " " * len("    itemsets=")
+        ).strip()
+        return _repr.format(
             Classname=self.__class__.__name__,
             itemsets=itemsets_str,
             names=self._names,

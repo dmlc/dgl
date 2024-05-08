@@ -615,3 +615,33 @@ def test_ItemSetDict_repr():
         ")"
     )
     assert str(item_set) == expected_str, item_set
+
+
+def test_ItemSetDict4_indexing_with_list_of_integers():
+    """Test indexing a ItemSetdict4 with iterable of integers."""
+    item_set = gb.ItemSetDict4(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seeds"),
+        }
+    )
+    indexing_res = item_set[1, 2, 3, 9, 8, 5]
+    assert torch.equal(indexing_res["user"], torch.tensor([1, 2, 3]))
+    assert torch.equal(indexing_res["item"], torch.tensor([9, 8, 5]))
+
+
+def test_ItemSetDict4_slicing_with_step_not_equal_to_1():
+    """Test indexing a ItemSetdict4 with slice whose step is other than 1."""
+    item_set = gb.ItemSetDict4(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seeds"),
+        }
+    )
+    res = item_set[::2]
+    assert torch.equal(res["user"], torch.tensor([0, 2, 4]))
+    assert torch.equal(res["item"], torch.tensor([6, 8]))
+
+    res1 = item_set[::-2]
+    assert torch.equal(res1["user"], torch.tensor([3, 1]))
+    assert torch.equal(res1["item"], torch.tensor([9, 7, 5]))
