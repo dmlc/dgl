@@ -7,6 +7,8 @@ import torch
 from torch.torch_version import TorchVersion
 
 if TorchVersion(torch.__version__) >= "2.3.0":
+    # [TODO][https://github.com/dmlc/dgl/issues/7387] Remove or refine below
+    # check.
     # Due to https://github.com/dmlc/dgl/issues/7380, we need to check if dill
     # is available before using it.
     torch.utils.data.datapipes.utils.common.DILL_AVAILABLE = (
