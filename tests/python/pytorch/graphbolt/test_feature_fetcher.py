@@ -160,8 +160,10 @@ def test_FeatureFetcher_hetero():
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
+    # "n3" is not in the sampled input nodes.
+    node_feature_keys = {"n1": ["a"], "n2": ["a"], "n3": ["a"]}
     fetcher_dp = gb.FeatureFetcher(
-        sampler_dp, feature_store, {"n1": ["a"], "n2": ["a"]}
+        sampler_dp, feature_store, node_feature_keys=node_feature_keys
     )
 
     assert len(list(fetcher_dp)) == 3

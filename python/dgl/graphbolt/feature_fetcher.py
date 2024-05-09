@@ -89,7 +89,7 @@ class FeatureFetcher(MiniBatchTransformer):
         if self.node_feature_keys and input_nodes is not None:
             if is_heterogeneous:
                 for type_name, feature_names in self.node_feature_keys.items():
-                    nodes = input_nodes[type_name]
+                    nodes = input_nodes.get(type_name, None)
                     if nodes is None:
                         continue
                     if nodes.is_cuda:
