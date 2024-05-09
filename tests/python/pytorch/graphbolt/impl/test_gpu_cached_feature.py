@@ -94,3 +94,7 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
         feat_store_a.read(),
         torch.tensor([[2, 0, 1], [3, 5, 2]], dtype=dtype).to("cuda"),
     )
+
+    # Test with different dimensionality
+    feat_store_a.update(b)
+    assert torch.equal(feat_store_a.read(), b.to("cuda"))
