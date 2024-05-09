@@ -36,6 +36,9 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
         [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype, pin_memory=True
     )
 
+    cache_size_a *= a[:1].nbytes
+    cache_size_b *= b[:1].nbytes
+
     feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), cache_size_a)
     feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), cache_size_b)
 
