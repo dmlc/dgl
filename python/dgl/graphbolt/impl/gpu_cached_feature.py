@@ -17,11 +17,11 @@ def nbytes(tensor):
     return tensor.numel() * tensor.element_size()
 
 
-def num_cache_items(bytes, single_item):
+def num_cache_items(cache_capacity_in_bytes, single_item):
     """Returns the number of rows to be cached."""
     item_bytes = nbytes(single_item)
     # Round up so that we never get a size of 0, unless bytes is 0.
-    return (bytes + item_bytes - 1) // item_bytes
+    return (cache_capacity_in_bytes + item_bytes - 1) // item_bytes
 
 
 class GPUCachedFeature(Feature):
