@@ -57,7 +57,9 @@ class GPUCachedFeature(Feature):
         self.max_cache_size_in_bytes = max_cache_size_in_bytes
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
-        cache_size = max_cache_size_in_bytes // nbytes(feat0)
+        cache_size = (max_cache_size_in_bytes + nbytes(feat0) - 1) // nbytes(
+            feat0
+        )
         self._feature = GPUCache((cache_size,) + feat0.shape[1:], feat0.dtype)
 
     def read(self, ids: torch.Tensor = None):
@@ -113,7 +115,9 @@ class GPUCachedFeature(Feature):
             feat0 = value[:1]
             self._fallback_feature.update(value)
             cache_size = min(
-                self.max_cache_size_in_bytes // nbytes(feat0), value.shape[0]
+                (self.max_cache_size_in_bytes + nbytes(feat0) - 1)
+                // nbytes(feat0),
+                value.shape[0],
             )
             self._feature = None  # Destroy the existing cache first.
             self._feature = GPUCache(
