@@ -13,6 +13,7 @@ if TorchVersion(torch.__version__) >= "2.3.0":
         torch.utils._import_utils.dill_available()
     )
 
+# pylint: disable=wrong-import-position
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
