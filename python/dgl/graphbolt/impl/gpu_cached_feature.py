@@ -9,7 +9,11 @@ __all__ = ["GPUCachedFeature"]
 
 
 def nbytes(tensor):
-    """Returns the number of bytes to store the given tensor."""
+    """Returns the number of bytes to store the given tensor.
+
+    Needs to be defined only for torch versions less than 2.1. In torch >= 2.1,
+    we can simply use "tensor.nbytes".
+    """
     return tensor.numel() * tensor.element_size()
 
 
