@@ -17,6 +17,13 @@ def nbytes(tensor):
     return tensor.numel() * tensor.element_size()
 
 
+def num_cache_items(bytes, single_item):
+    """Returns the number of rows to be cached."""
+    item_bytes = nbytes(single_item)
+    # Round up so that we never get a size of 0, unless bytes is 0.
+    return (bytes + item_bytes - 1) // item_bytes
+
+
 class GPUCachedFeature(Feature):
     r"""GPU cached feature wrapping a fallback feature.
 
@@ -61,9 +68,7 @@ class GPUCachedFeature(Feature):
         self.max_cache_size_in_bytes = max_cache_size_in_bytes
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
-        cache_size = (max_cache_size_in_bytes + nbytes(feat0) - 1) // nbytes(
-            feat0
-        )
+        cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
         self._feature = GPUCache((cache_size,) + feat0.shape[1:], feat0.dtype)
 
     def read(self, ids: torch.Tensor = None):
@@ -119,8 +124,7 @@ class GPUCachedFeature(Feature):
             feat0 = value[:1]
             self._fallback_feature.update(value)
             cache_size = min(
-                (self.max_cache_size_in_bytes + nbytes(feat0) - 1)
-                // nbytes(feat0),
+                num_cache_items(self.max_cache_size_in_bytes, feat0),
                 value.shape[0],
             )
             self._feature = None  # Destroy the existing cache first.
