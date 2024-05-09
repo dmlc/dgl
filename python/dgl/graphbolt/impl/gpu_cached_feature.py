@@ -104,12 +104,19 @@ class GPUCachedFeature(Feature):
             updated.
         """
         if ids is None:
+            new_feat0 = value[0]
+            old_feat0 = self._fallback_feature.read(torch.tensor([0]))
             self._fallback_feature.update(value)
-            size = min(self.cache_size, value.shape[0])
-            self._feature.replace(
-                torch.arange(0, size, device="cuda"),
-                value[:size].to("cuda"),
-            )
+            if new_feat0.dtype != old_feat0.dtype or new_feat0.shape != old_feat0.shape:
+                self.cache_size = self.cache_size * old_feat0.nbytes // new_feat0.nbytes
+                self._feature = None
+                self._feature = GPUCache((self.cache_size,) + new_feat0.shape[1:], new_feat0.dtype)
+            else:
+                size = min(self.cache_size, value.shape[0])
+                self._feature.replace(
+                    torch.arange(0, size, device="cuda"),
+                    value[:size].to("cuda"),
+                )
         else:
             self._fallback_feature.update(value, ids)
             self._feature.replace(ids, value)
