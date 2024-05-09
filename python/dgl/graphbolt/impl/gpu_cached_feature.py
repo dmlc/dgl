@@ -9,6 +9,7 @@ __all__ = ["GPUCachedFeature"]
 
 
 def nbytes(tensor):
+    """Returns the number of bytes to store the given tensor."""
     return tensor.numel() * tensor.element_size()
 
 
