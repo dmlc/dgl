@@ -97,13 +97,13 @@ class FeatureFetcher(MiniBatchTransformer):
                         node_features[
                             (type_name, feature_name)
                         ] = record_stream(
-                                self.feature_store.read(
-                                    "node",
-                                    type_name,
-                                    feature_name,
-                                    nodes,
-                                )
+                            self.feature_store.read(
+                                "node",
+                                type_name,
+                                feature_name,
+                                nodes,
                             )
+                        )
             else:
                 if input_nodes.is_cuda:
                     input_nodes.record_stream(torch.cuda.current_stream())
@@ -144,10 +144,10 @@ class FeatureFetcher(MiniBatchTransformer):
                             edge_features[i][
                                 (type_name, feature_name)
                             ] = record_stream(
-                                    self.feature_store.read(
-                                        "edge", type_name, feature_name, edges
-                                    )
+                                self.feature_store.read(
+                                    "edge", type_name, feature_name, edges
                                 )
+                            )
                 else:
                     if original_edge_ids.is_cuda:
                         original_edge_ids.record_stream(
