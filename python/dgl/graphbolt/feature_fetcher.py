@@ -88,21 +88,20 @@ class FeatureFetcher(MiniBatchTransformer):
 
         if self.node_feature_keys and input_nodes is not None:
             if is_heterogeneous:
-                for type_name, feature_names in self.node_feature_keys.items():
-                    nodes = input_nodes.get(type_name, None)
-                    if nodes is None:
+                for type_name, nodes in input_nodes.items():
+                    if type_name not in self.node_feature_keys or nodes is None:
                         continue
                     if nodes.is_cuda:
                         nodes.record_stream(torch.cuda.current_stream())
-                    for feature_name in feature_names:
-                        node_features[
-                            (type_name, feature_name)
-                        ] = record_stream(
-                            self.feature_store.read(
-                                "node",
-                                type_name,
-                                feature_name,
-                                nodes,
+                    for feature_name in self.node_feature_keys[type_name]:
+                        node_features[(type_name, feature_name)] = (
+                            record_stream(
+                                self.feature_store.read(
+                                    "node",
+                                    type_name,
+                                    feature_name,
+                                    nodes,
+                                )
                             )
                         )
             else:
@@ -126,26 +125,27 @@ class FeatureFetcher(MiniBatchTransformer):
                 if is_heterogeneous:
                     # Convert edge type to string.
                     original_edge_ids = {
-                        etype_tuple_to_str(key)
-                        if isinstance(key, tuple)
-                        else key: value
+                        (
+                            etype_tuple_to_str(key)
+                            if isinstance(key, tuple)
+                            else key
+                        ): value
                         for key, value in original_edge_ids.items()
                     }
-                    for (
-                        type_name,
-                        feature_names,
-                    ) in self.edge_feature_keys.items():
-                        edges = original_edge_ids.get(type_name, None)
-                        if edges is None:
+                    for type_name, edges in original_edge_ids.items():
+                        if (
+                            type_name not in self.edge_feature_keys
+                            or edges is None
+                        ):
                             continue
                         if edges.is_cuda:
                             edges.record_stream(torch.cuda.current_stream())
-                        for feature_name in feature_names:
-                            edge_features[i][
-                                (type_name, feature_name)
-                            ] = record_stream(
-                                self.feature_store.read(
-                                    "edge", type_name, feature_name, edges
+                        for feature_name in self.edge_feature_keys[type_name]:
+                            edge_features[i][(type_name, feature_name)] = (
+                                record_stream(
+                                    self.feature_store.read(
+                                        "edge", type_name, feature_name, edges
+                                    )
                                 )
                             )
                 else:
