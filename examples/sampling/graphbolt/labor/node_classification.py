@@ -165,7 +165,7 @@ class SAGELightning(LightningModule):
         loss = self.loss_fn(batch_pred, batch_labels.to(label_dtype))
         self.train_acc(batch_pred, batch_labels.int())
         self.log(
-            "train_acc",
+            "acc/train",
             self.train_acc,
             prog_bar=True,
             on_step=True,
@@ -173,7 +173,7 @@ class SAGELightning(LightningModule):
             batch_size=batch_labels.shape[0],
         )
         self.log(
-            "train_loss",
+            "loss/train",
             loss,
             on_step=True,
             on_epoch=True,
@@ -181,7 +181,7 @@ class SAGELightning(LightningModule):
         )
         t = time.time()
         self.log(
-            "iter_time",
+            "time/iter",
             t - self.pt,
             prog_bar=True,
             on_step=True,
@@ -193,7 +193,7 @@ class SAGELightning(LightningModule):
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
         self.log(
-            "forward_backward_time",
+            "time/forward_backward",
             time.time() - self.st,
             prog_bar=True,
             on_step=True,
@@ -208,7 +208,7 @@ class SAGELightning(LightningModule):
         loss = self.loss_fn(batch_pred, batch_labels.to(label_dtype))
         self.val_acc(batch_pred, batch_labels.int())
         self.log(
-            "val_acc",
+            "acc/val",
             self.val_acc,
             prog_bar=True,
             on_step=False,
@@ -217,7 +217,7 @@ class SAGELightning(LightningModule):
             batch_size=batch_labels.shape[0],
         )
         self.log(
-            "val_loss",
+            "loss/val",
             loss,
             on_step=False,
             on_epoch=True,
@@ -283,16 +283,17 @@ class DataModule(LightningDataModule):
         # Copy the data to the specified device.
         if args.graph_device != "cpu":
             datapipe = datapipe.copy_to(device=self.device)
+        sample_mode = args.sample_mode if job == "train" else "sample_neighbor"
         # Sample neighbors for each node in the mini-batch.
         kwargs = (
             {
                 "layer_dependency": args.layer_dependency,
                 "batch_dependency": args.batch_dependency,
             }
-            if args.sample_mode == "sample_layer_neighbor"
+            if sample_mode == "sample_layer_neighbor"
             else {}
         )
-        datapipe = getattr(datapipe, args.sample_mode)(
+        datapipe = getattr(datapipe, sample_mode)(
             self.graph, self.fanout if job != "infer" else [-1], **kwargs
         )
         # Copy the data to the specified device.
@@ -319,7 +320,7 @@ class DataModule(LightningDataModule):
         return self.create_dataloader(self.validation_set, "evaluate")
 
     @torch.no_grad()
-    def layerwise_infer(self, model):
+    def layerwise_infer(self, model, logger):
         model.eval()
         dataloader = self.create_dataloader(
             itemset=self.all_nodes_set,
@@ -329,6 +330,7 @@ class DataModule(LightningDataModule):
             self.graph, self.features, dataloader, self.feature_device
         )
 
+        metrics = {}
         for itemset, split_name in zip(
             [
                 self.train_set,
@@ -341,14 +343,8 @@ class DataModule(LightningDataModule):
             f1score = model.f1score_class().to(pred.device)
             acc = f1score(pred[nid.to(pred.device)], labels.to(pred.device))
             print(f"{split_name} accuracy: {acc.item()}")
-            model.log(
-                "final_{}_acc".format(split_name),
-                acc,
-                on_step=False,
-                on_epoch=True,
-                sync_dist=True,
-                batch_size=labels.shape[0],
-            )
+            metrics["acc/final_{}".format(split_name)] = acc
+        logger.log_metrics(metrics=metrics, step=0)
 
 
 class CacheMissRateReporterCallback(Callback):
@@ -476,12 +472,12 @@ if __name__ == "__main__":
     callbacks = []
     if not args.disable_checkpoint:
         callbacks.append(
-            ModelCheckpoint(monitor="val_acc", save_top_k=1, mode="max")
+            ModelCheckpoint(monitor="acc/val", save_top_k=1, mode="max")
         )
     callbacks.append(CacheMissRateReporterCallback())
     callbacks.append(
         EarlyStopping(
-            monitor="val_acc",
+            monitor="acc/val",
             mode="max",
             patience=args.early_stopping_patience,
         )
@@ -525,4 +521,4 @@ if __name__ == "__main__":
             hparams_file=os.path.join(logdir, "hparams.yaml"),
         ).to(args.device)
 
-        datamodule.layerwise_infer(model)
+        datamodule.layerwise_infer(model, logger)
