@@ -5,6 +5,10 @@ import time
 
 import dgl.graphbolt as gb
 import torch
+
+# Needed until https://github.com/pytorch/pytorch/issues/121197 is resolved to
+# use the `--torch-compile` cmdline option reliably.
+import torch._inductor.codecache
 import torch.nn as nn
 import torch.nn.functional as F
 
