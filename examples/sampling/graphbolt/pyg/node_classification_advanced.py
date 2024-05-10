@@ -381,7 +381,7 @@ def parse_args():
 
 def main():
     if not torch.cuda.is_available():
-        args.mode = "cpu-cpu"
+        args.mode = "cpu-cpu-cpu"
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
 
