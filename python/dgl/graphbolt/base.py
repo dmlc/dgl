@@ -324,6 +324,7 @@ class Bufferer(IterDataPipe):
         self.buffer = deque(maxlen=buffer_size)
 
     def reset(self):
+        """Resets the state of the datapipe."""
         self.buffer.clear()
 
 
