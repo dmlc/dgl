@@ -38,45 +38,19 @@ def convert_to_pyg(h, subgraph):
     return (h, h[:dst_size]), edge_index, (h.size(0), dst_size)
 
 
-class SAGELightning(LightningModule):
-    def __init__(
-        self,
-        in_feats,
-        n_hidden,
-        n_classes,
-        lr,
-        multilabel,
-    ):
-        super().__init__()
-        self.save_hyperparameters()
+class GraphSAGE(torch.nn.Module):
+    def __init__(self, in_size, hidden_size, out_size):
+        super(GraphSAGE, self).__init__()
         self.layers = torch.nn.ModuleList()
-        self.layers.append(SAGEConv(in_feats, n_hidden))
-        self.layers.append(SAGEConv(n_hidden, n_hidden))
-        self.layers.append(SAGEConv(n_hidden, n_classes))
-        self.hidden_size = n_hidden
-        self.out_size = n_classes
-        self.lr = lr
-        self.f1score_class = lambda: (
-            MulticlassF1Score if not multilabel else MultilabelF1Score
-        )(n_classes, average="micro")
-        self.train_acc = self.f1score_class()
-        self.val_acc = self.f1score_class()
-        self.loss_fn = (
-            nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
-        )
-        self.multilabel = multilabel
-        self.pt = 0
+        self.layers.append(SAGEConv(in_size, hidden_size))
+        self.layers.append(SAGEConv(hidden_size, hidden_size))
+        self.layers.append(SAGEConv(hidden_size, out_size))
+        self.hidden_size = hidden_size
+        self.out_size = out_size
 
     def forward(self, subgraphs, x):
         h = x
         for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
-            #####################################################################
-            # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
-            #
-            #   PyG layers have two modes, bipartite and normal. We slice the
-            #   given features to get src and dst features to use the PyG layers
-            #   in the more efficient bipartite mode.
-            #####################################################################
             h, edge_index, size = convert_to_pyg(h, subgraph)
             h = layer(h, edge_index, size=size)
             if i != len(subgraphs) - 1:
@@ -114,6 +88,45 @@ class SAGELightning(LightningModule):
                 features.update("node", None, "feat", y)
 
         return y
+
+
+class SAGELightning(LightningModule):
+    def __init__(
+        self,
+        in_feats,
+        n_hidden,
+        n_classes,
+        lr,
+        multilabel,
+        torch_compile,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.module = GraphSAGE(in_feats, n_hidden, n_classes)
+        if torch_compile:
+            torch._dynamo.config.cache_size_limit = 32
+            self.module = torch.compile(
+                self.module, fullgraph=True, dynamic=True
+            )
+        self.lr = lr
+        self.f1score_class = lambda: (
+            MulticlassF1Score if not multilabel else MultilabelF1Score
+        )(n_classes, average="micro")
+        self.train_acc = self.f1score_class()
+        self.val_acc = self.f1score_class()
+        self.loss_fn = (
+            nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
+        )
+        self.multilabel = multilabel
+        self.pt = 0
+
+    def forward(self, subgraphs, x):
+        return self.module(subgraphs, x)
+
+    def inference(self, graph, features, dataloader, storage_device):
+        return self.module.inference(
+            graph, features, dataloader, storage_device
+        )
 
     def training_step(self, minibatch, batch_idx):
         batch_inputs = minibatch.node_features["feat"]
@@ -401,10 +414,8 @@ if __name__ == "__main__":
         datamodule.n_classes,
         args.lr,
         datamodule.multilabel,
+        args.torch_compile,
     )
-    if args.torch_compile:
-        torch._dynamo.config.cache_size_limit = 32
-        model = torch.compile(model, fullgraph=False, dynamic=True)
 
     # Train
     callbacks = []
