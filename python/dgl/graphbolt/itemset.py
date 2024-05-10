@@ -22,7 +22,7 @@ class ItemSet:
     iterable), meaning that each item must have implemented `__getitem__` which
     supports fetching a data for a given index, and `__len__` which is expected
     to return the size of the item.
-    
+
 
     Parameters
     ----------
