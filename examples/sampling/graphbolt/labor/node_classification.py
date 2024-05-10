@@ -128,6 +128,28 @@ class SAGELightning(LightningModule):
             graph, features, dataloader, storage_device
         )
 
+    def log_node_and_edge_counts(self, subgraphs):
+        node_counts = [sg.original_row_node_ids.size(0) for sg in subgraphs] + [
+            subgraphs[-1].original_column_node_ids.size(0)
+        ]
+        edge_counts = [sg.sampled_csc.indices.size(0) for sg in subgraphs]
+        for i, c in enumerate(node_counts):
+            self.log(
+                f"num_nodes/{i}",
+                float(c),
+                prog_bar=True,
+                on_step=True,
+                on_epoch=False,
+            )
+            if i < len(edge_counts):
+                self.log(
+                    f"num_edges/{i}",
+                    float(edge_counts[i]),
+                    prog_bar=True,
+                    on_step=True,
+                    on_epoch=False,
+                )
+
     def training_step(self, minibatch, batch_idx):
         batch_inputs = minibatch.node_features["feat"]
         batch_labels = minibatch.labels
@@ -159,6 +181,7 @@ class SAGELightning(LightningModule):
             on_step=True,
             on_epoch=False,
         )
+        self.log_node_and_edge_counts(minibatch.sampled_subgraphs)
         self.pt = t
         return loss
 
@@ -195,6 +218,7 @@ class SAGELightning(LightningModule):
             sync_dist=True,
             batch_size=batch_labels.shape[0],
         )
+        self.log_node_and_edge_counts(minibatch.sampled_subgraphs)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
