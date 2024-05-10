@@ -1,0 +1,528 @@
+import argparse
+import glob
+import os
+import time
+
+import dgl.graphbolt as gb
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from load_dataset import load_dataset
+from pytorch_lightning import LightningDataModule, LightningModule, Trainer
+from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
+
+from torch_geometric.nn import SAGEConv
+
+from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
+from tqdm import tqdm
+
+
+def convert_to_pyg(h, subgraph):
+    #####################################################################
+    # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
+    #
+    #   We convert the provided sampled edges in CSC format from GraphBolt and
+    #   convert to COO via using gb.expand_indptr.
+    #####################################################################
+    src = subgraph.sampled_csc.indices
+    dst = gb.expand_indptr(
+        subgraph.sampled_csc.indptr,
+        dtype=src.dtype,
+        output_size=src.size(0),
+    )
+    edge_index = torch.stack([src, dst], dim=0).long()
+    dst_size = subgraph.sampled_csc.indptr.size(0) - 1
+    # h and h[:dst_size] correspond to source and destination features resp.
+    return (h, h[:dst_size]), edge_index, (h.size(0), dst_size)
+
+
+class GraphSAGE(torch.nn.Module):
+    #####################################################################
+    # (HIGHLIGHT) Define the GraphSAGE model architecture.
+    #
+    # - This class inherits from `torch.nn.Module`.
+    # - Two convolutional layers are created using the SAGEConv class from PyG.
+    # - 'in_size', 'hidden_size', 'out_size' are the sizes of
+    #   the input, hidden, and output features, respectively.
+    # - The forward method defines the computation performed at every call.
+    #####################################################################
+    def __init__(self, in_size, hidden_size, out_size):
+        super(GraphSAGE, self).__init__()
+        self.layers = torch.nn.ModuleList()
+        self.layers.append(SAGEConv(in_size, hidden_size))
+        self.layers.append(SAGEConv(hidden_size, hidden_size))
+        self.layers.append(SAGEConv(hidden_size, out_size))
+        self.hidden_size = hidden_size
+        self.out_size = out_size
+
+    def forward(self, subgraphs, x):
+        h = x
+        for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
+            #####################################################################
+            # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
+            #
+            #   PyG layers have two modes, bipartite and normal. We slice the
+            #   given features to get src and dst features to use the PyG layers
+            #   in the more efficient bipartite mode.
+            #####################################################################
+            h, edge_index, size = convert_to_pyg(h, subgraph)
+            h = layer(h, edge_index, size=size)
+            if i != len(subgraphs) - 1:
+                h = F.relu(h)
+        return h
+
+    def inference(self, graph, features, dataloader, storage_device):
+        """Conduct layer-wise inference to get all the node embeddings."""
+        pin_memory = storage_device == "pinned"
+        buffer_device = torch.device("cpu" if pin_memory else storage_device)
+
+        for layer_idx, layer in enumerate(self.layers):
+            is_last_layer = layer_idx == len(self.layers) - 1
+
+            y = torch.empty(
+                graph.total_num_nodes,
+                self.out_size if is_last_layer else self.hidden_size,
+                dtype=torch.float32,
+                device=buffer_device,
+                pin_memory=pin_memory,
+            )
+            for data in tqdm(dataloader, "Inferencing"):
+                # len(data.sampled_subgraphs) = 1
+                h, edge_index, size = convert_to_pyg(
+                    data.node_features["feat"], data.sampled_subgraphs[0]
+                )
+                hidden_x = layer(h, edge_index, size=size)
+                if not is_last_layer:
+                    hidden_x = F.relu(hidden_x)
+                # By design, our output nodes are contiguous.
+                y[data.seeds[0] : data.seeds[-1] + 1] = hidden_x.to(
+                    buffer_device
+                )
+            if not is_last_layer:
+                features.update("node", None, "feat", y)
+
+        return y
+
+
+class SAGELightning(LightningModule):
+    def __init__(
+        self,
+        in_feats,
+        n_hidden,
+        n_classes,
+        lr,
+        multilabel,
+        torch_compile,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.module = GraphSAGE(in_feats, n_hidden, n_classes)
+        if torch_compile:
+            torch._dynamo.config.cache_size_limit = 32
+            self.module = torch.compile(
+                self.module, fullgraph=True, dynamic=True
+            )
+        self.lr = lr
+        self.f1score_class = lambda: (
+            MulticlassF1Score if not multilabel else MultilabelF1Score
+        )(n_classes, average="micro")
+        self.train_acc = self.f1score_class()
+        self.val_acc = self.f1score_class()
+        self.num_steps = 0
+        self.loss_fn = (
+            nn.CrossEntropyLoss() if not multilabel else nn.BCEWithLogitsLoss()
+        )
+        self.pt = 0
+
+    def training_step(self, minibatch, batch_idx):
+        self.num_steps += 1
+        batch_inputs = minibatch.node_features["feat"]
+        batch_labels = minibatch.labels
+        self.st = time.time()
+        batch_pred = self.module(minibatch.sampled_subgraphs, batch_inputs)
+        loss = self.loss_fn(batch_pred, batch_labels)
+        self.train_acc(batch_pred, batch_labels.int())
+        self.log(
+            "train_acc",
+            self.train_acc,
+            prog_bar=True,
+            on_step=True,
+            on_epoch=True,
+            batch_size=batch_labels.shape[0],
+        )
+        self.log(
+            "train_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            batch_size=batch_labels.shape[0],
+        )
+        t = time.time()
+        self.log(
+            "iter_time",
+            t - self.pt,
+            prog_bar=True,
+            on_step=True,
+            on_epoch=False,
+        )
+        self.pt = t
+        return loss
+
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        self.log(
+            "forward_backward_time",
+            time.time() - self.st,
+            prog_bar=True,
+            on_step=True,
+            on_epoch=False,
+        )
+
+    def validation_step(self, minibatch, batch_idx, dataloader_idx=0):
+        batch_inputs = minibatch.node_features["feat"]
+        batch_labels = minibatch.labels
+        batch_pred = self.module(minibatch.sampled_subgraphs, batch_inputs)
+        loss = self.loss_fn(batch_pred, batch_labels)
+        self.val_acc(batch_pred, batch_labels.int())
+        self.log(
+            "val_acc",
+            self.val_acc,
+            prog_bar=True,
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+            batch_size=batch_labels.shape[0],
+        )
+        self.log(
+            "val_loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+            batch_size=batch_labels.shape[0],
+        )
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
+
+
+def create_dataloader(
+    graph, features, itemset, batch_size, fanout, device, job
+):
+    #####################################################################
+    # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
+    #
+    # - 'ItemSampler' samples mini-batches of node IDs from the dataset.
+    # - 'CopyTo' copies the fetched data to the specified device.
+    # - 'sample_neighbor' performs neighbor sampling on the graph.
+    # - 'FeatureFetcher' fetches node features based on the sampled subgraph.
+
+    #####################################################################
+    # Create a datapipe for mini-batch sampling with a specific neighbor fanout.
+    # Here, [10, 10, 10] specifies the number of neighbors sampled for each node at each layer.
+    # We're using `sample_neighbor` for consistency with DGL's sampling API.
+    # Note: GraphBolt offers additional sampling methods, such as `sample_layer_neighbor`,
+    # which could provide further optimization and efficiency for GNN training.
+    # Users are encouraged to explore these advanced features for potentially improved performance.
+
+    # Initialize an ItemSampler to sample mini-batches from the dataset.
+    datapipe = gb.ItemSampler(
+        itemset,
+        batch_size=batch_size,
+        shuffle=(job == "train"),
+        drop_last=(job == "train"),
+    )
+    # Copy the data to the specified device.
+    if args.graph_device != "cpu":
+        datapipe = datapipe.copy_to(device=device)
+    # Sample neighbors for each node in the mini-batch.
+    kwargs = (
+        {
+            "layer_dependency": args.layer_dependency,
+            "batch_dependency": args.batch_dependency,
+        }
+        if args.sample_mode == "sample_layer_neighbor"
+        else {}
+    )
+    datapipe = getattr(datapipe, args.sample_mode)(
+        graph, fanout if job != "infer" else [-1], **kwargs
+    )
+    # Copy the data to the specified device.
+    if args.feature_device != "cpu":
+        datapipe = datapipe.copy_to(device=device)
+    # Fetch node features for the sampled subgraph.
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    # Copy the data to the specified device.
+    if args.feature_device == "cpu":
+        datapipe = datapipe.copy_to(device=device)
+    # Create and return a DataLoader to handle data loading.
+    return gb.DataLoader(
+        datapipe,
+        num_workers=args.num_workers,
+        overlap_graph_fetch=args.overlap_graph_fetch,
+        overlap_feature_fetch=False,
+    )
+
+
+class DataModule(LightningDataModule):
+    def __init__(self, args):
+        super().__init__()
+
+        dataset, multilabel = load_dataset(args.dataset)
+
+        # Move the dataset to the selected storage.
+        graph = (
+            dataset.graph.to("pinned")  # pin_memory_
+            if args.graph_device == "pinned"
+            else dataset.graph.to(args.graph_device)
+        )
+        features = (
+            dataset.feature.to("pinned")  # pin_memory_
+            if args.feature_device == "pinned"
+            else dataset.feature.to(args.feature_device)
+        )
+
+        self.train_set = dataset.tasks[0].train_set
+        self.validation_set = dataset.tasks[0].validation_set
+        self.test_set = dataset.tasks[0].test_set
+        self.all_nodes_set = dataset.all_nodes_set
+        self.fanout = list(map(int, args.fanout.split(",")))
+
+        num_classes = dataset.tasks[0].metadata["num_classes"]
+
+        if args.gpu_cache_size > 0 and args.feature_device != "cuda":
+            features._features[("node", None, "feat")] = gb.GPUCachedFeature(
+                features._features[("node", None, "feat")],
+                args.gpu_cache_size,
+            )
+
+        self.graph = graph
+        self.features = features
+        self.feature_device = args.feature_device
+        self.batch_size = args.batch_size
+        self.num_workers = args.num_workers
+        self.in_feats = features.size("node", None, "feat")[0]
+        self.n_classes = num_classes
+        self.multilabel = multilabel
+        self.device = args.device
+
+    def train_dataloader(self):
+        return create_dataloader(
+            graph=self.graph,
+            features=self.features,
+            itemset=self.train_set,
+            batch_size=self.batch_size,
+            fanout=self.fanout,
+            device=self.device,
+            job="train",
+        )
+
+    def val_dataloader(self):
+        return create_dataloader(
+            graph=self.graph,
+            features=self.features,
+            itemset=self.validation_set,
+            batch_size=self.batch_size,
+            fanout=self.fanout,
+            device=self.device,
+            job="evaluate",
+        )
+
+    @torch.no_grad()
+    def layerwise_infer(self, model):
+        model.eval()
+        dataloader = create_dataloader(
+            graph=self.graph,
+            features=self.features,
+            itemset=self.all_nodes_set,
+            batch_size=4 * self.batch_size,
+            fanout=[-1],
+            device=self.device,
+            job="infer",
+        )
+        return model.inference(
+            self.graph, self.features, dataloader, self.feature_device
+        )
+
+
+class CacheMissRateReporterCallback(Callback):
+    def report_cache_miss_rate(self, trainer):
+        feature = trainer.datamodule.features._features[("node", None, "feat")]
+        if isinstance(feature, gb.GPUCachedFeature):
+            trainer.strategy.model.log(
+                "cache_miss",
+                feature._feature.miss_rate,
+                prog_bar=True,
+                on_step=True,
+                on_epoch=False,
+            )
+
+    def on_train_batch_end(
+        self, trainer, datamodule, outputs, batch, batch_idx
+    ):
+        self.report_cache_miss_rate(trainer)
+
+    def on_validation_batch_end(
+        self, trainer, datamodule, outputs, batch, batch_idx
+    ):
+        self.report_cache_miss_rate(trainer)
+
+
+if __name__ == "__main__":
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument(
+        "--mode",
+        default="pinned-pinned-cuda",
+        choices=[
+            "cpu-cpu-cpu",
+            "cpu-cpu-cuda",
+            "cpu-pinned-cuda",
+            "pinned-pinned-cuda",
+            "cuda-pinned-cuda",
+            "cuda-cuda-cuda",
+        ],
+        help="Graph storage - feature storage - Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
+    )
+    argparser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-products",
+        choices=[
+            "ogbn-arxiv",
+            "ogbn-products",
+            "ogbn-papers100M",
+            "reddit",
+            "yelp",
+            "flickr",
+        ],
+    )
+    argparser.add_argument("--num-epochs", type=int, default=-1)
+    argparser.add_argument("--num-steps", type=int, default=-1)
+    argparser.add_argument("--min-steps", type=int, default=0)
+    argparser.add_argument("--num-hidden", type=int, default=256)
+    argparser.add_argument("--num-layers", type=int, default=3)
+    argparser.add_argument("--fanout", type=str, default="10,10,10")
+    argparser.add_argument("--batch-size", type=int, default=1024)
+    argparser.add_argument("--lr", type=float, default=0.001)
+    argparser.add_argument(
+        "--num-workers",
+        type=int,
+        default=0,
+        help="Number of sampling processes. Use 0 for no extra process.",
+    )
+    argparser.add_argument(
+        "--sample-mode",
+        default="sample_layer_neighbor",
+        choices=["sample_neighbor", "sample_layer_neighbor"],
+        help="The sampling function when doing layerwise sampling.",
+    )
+    argparser.add_argument(
+        "--overlap-graph-fetch",
+        action="store_true",
+        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
+        "If True, the data loader will overlap the UVA graph fetching operations"
+        "with the rest of operations by using an alternative CUDA stream. Disabled"
+        "by default.",
+    )
+    argparser.add_argument(
+        "--torch-compile",
+        action="store_true",
+        help="Uses torch.compile() on the trained GNN model. Requires "
+        "torch>=2.2.0 to enable this option.",
+    )
+    argparser.add_argument("--layer-dependency", action="store_true")
+    argparser.add_argument("--batch-dependency", type=int, default=1)
+    argparser.add_argument("--logdir", type=str, default="tb_logs")
+    argparser.add_argument(
+        "--gpu-cache-size",
+        type=int,
+        default=0,
+        help="The capacity of the GPU cache in bytes.",
+    )
+    argparser.add_argument("--early-stopping-patience", type=int, default=10)
+    argparser.add_argument("--disable-checkpoint", action="store_true")
+    argparser.add_argument("--precision", type=str, default="high")
+    args = argparser.parse_args()
+
+    torch.set_float32_matmul_precision(args.precision)
+
+    if not torch.cuda.is_available():
+        args.mode = "cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.graph_device, args.feature_device, args.device = args.mode.split("-")
+
+    datamodule = DataModule(args)
+    model = SAGELightning(
+        datamodule.in_feats,
+        args.num_hidden,
+        datamodule.n_classes,
+        args.lr,
+        datamodule.multilabel,
+        args.torch_compile,
+    )
+
+    # Train
+    callbacks = []
+    if not args.disable_checkpoint:
+        callbacks.append(
+            ModelCheckpoint(monitor="val_acc", save_top_k=1, mode="max")
+        )
+    callbacks.append(CacheMissRateReporterCallback())
+    callbacks.append(
+        EarlyStopping(
+            monitor="val_acc",
+            mode="max",
+            patience=args.early_stopping_patience,
+        )
+    )
+    subdir = "{}_{}_{}_{}_{}".format(
+        args.dataset,
+        {"sample_layer_neighbor": "labor", "sample_neighbor": "neighbor"}[
+            args.sample_mode
+        ],
+        0,
+        args.layer_dependency,
+        args.batch_dependency,
+    )
+    logger = TensorBoardLogger(args.logdir, name=subdir)
+    trainer = Trainer(
+        accelerator="gpu" if args.device == "cuda" else "cpu",
+        devices="auto",
+        max_epochs=args.num_epochs,
+        max_steps=args.num_steps,
+        min_steps=args.min_steps,
+        callbacks=callbacks,
+        logger=logger,
+    )
+    trainer.fit(model, datamodule=datamodule)
+
+    # Test
+    if not args.disable_checkpoint:
+        logdir = os.path.join(args.logdir, subdir)
+        dirs = glob.glob("./{}/*".format(logdir))
+        version = max([int(os.path.split(x)[-1].split("_")[-1]) for x in dirs])
+        logdir = "./{}/version_{}".format(logdir, version)
+        print("Evaluating model in", logdir)
+        ckpt = glob.glob(os.path.join(logdir, "checkpoints", "*"))[0]
+
+        model = SAGELightning.load_from_checkpoint(
+            checkpoint_path=ckpt,
+            hparams_file=os.path.join(logdir, "hparams.yaml"),
+        ).to(args.device)
+    with torch.no_grad():
+        pred = datamodule.layerwise_infer(model.module)
+        for itemset, split_name in zip(
+            [
+                datamodule.train_set,
+                datamodule.validation_set,
+                datamodule.test_set,
+            ],
+            ["Train", "Validation", "Test"],
+        ):
+            nid, labels = itemset[:]
+            f1score = model.f1score_class().to(pred.device)
+            acc = f1score(pred[nid.to(pred.device)], labels.to(pred.device))
+            print(f"{split_name} accuracy: {acc.item()}")
