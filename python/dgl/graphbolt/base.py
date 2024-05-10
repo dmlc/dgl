@@ -313,6 +313,19 @@ class Bufferer(IterDataPipe):
         while len(self.buffer) > 0:
             yield self.buffer.popleft()
 
+    def __getstate__(self):
+        state = (self.datapipe, self.buffer.maxlen)
+        if IterDataPipe.getstate_hook is not None:
+            return IterDataPipe.getstate_hook(state)
+        return state
+
+    def __setstate__(self, state):
+        self.datapipe, buffer_size = state
+        self.buffer = deque(maxlen=buffer_size)
+
+    def reset(self):
+        self.buffer.clear()
+
 
 @functional_datapipe("wait")
 class Waiter(IterDataPipe):
