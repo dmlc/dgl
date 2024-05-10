@@ -39,12 +39,13 @@ def convert_to_pyg(h, subgraph):
 
 
 class GraphSAGE(torch.nn.Module):
-    def __init__(self, in_size, hidden_size, out_size):
+    def __init__(self, in_size, hidden_size, out_size, n_layers, dropout):
         super(GraphSAGE, self).__init__()
         self.layers = torch.nn.ModuleList()
-        self.layers.append(SAGEConv(in_size, hidden_size))
-        self.layers.append(SAGEConv(hidden_size, hidden_size))
-        self.layers.append(SAGEConv(hidden_size, out_size))
+        sizes = [in_size] + [hidden_size] * (n_layers - 1) + [out_size]
+        for i in range(n_layers):
+            self.layers.append(SAGEConv(sizes[i], sizes[i + 1]))
+        self.dropout = nn.Dropout(dropout)
         self.hidden_size = hidden_size
         self.out_size = out_size
 
@@ -55,6 +56,7 @@ class GraphSAGE(torch.nn.Module):
             h = layer(h, edge_index, size=size)
             if i != len(subgraphs) - 1:
                 h = F.relu(h)
+                h = self.dropout(h)
         return h
 
     def inference(self, graph, features, dataloader, storage_device):
@@ -96,13 +98,17 @@ class SAGELightning(LightningModule):
         in_feats,
         n_hidden,
         n_classes,
+        n_layers,
         lr,
+        dropout,
         multilabel,
         torch_compile,
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.module = GraphSAGE(in_feats, n_hidden, n_classes)
+        self.module = GraphSAGE(
+            in_feats, n_hidden, n_classes, n_layers, dropout
+        )
         if torch_compile:
             torch._dynamo.config.cache_size_limit = 32
             self.module = torch.compile(
@@ -319,9 +325,30 @@ class DataModule(LightningDataModule):
             itemset=self.all_nodes_set,
             job="infer",
         )
-        return model.inference(
+        pred = model.inference(
             self.graph, self.features, dataloader, self.feature_device
         )
+
+        for itemset, split_name in zip(
+            [
+                self.train_set,
+                self.validation_set,
+                self.test_set,
+            ],
+            ["train", "val", "test"],
+        ):
+            nid, labels = itemset[:]
+            f1score = model.f1score_class().to(pred.device)
+            acc = f1score(pred[nid.to(pred.device)], labels.to(pred.device))
+            print(f"{split_name} accuracy: {acc.item()}")
+            model.log(
+                "final_{}_acc".format(split_name),
+                acc,
+                on_step=False,
+                on_epoch=True,
+                sync_dist=True,
+                batch_size=labels.shape[0],
+            )
 
 
 class CacheMissRateReporterCallback(Callback):
@@ -384,6 +411,7 @@ if __name__ == "__main__":
     argparser.add_argument("--fanout", type=str, default="10,10,10")
     argparser.add_argument("--batch-size", type=int, default=1024)
     argparser.add_argument("--lr", type=float, default=0.001)
+    argparser.add_argument("--dropout", type=float, default=0.5)
     argparser.add_argument(
         "--num-workers",
         type=int,
@@ -437,7 +465,9 @@ if __name__ == "__main__":
         datamodule.in_feats,
         args.num_hidden,
         datamodule.n_classes,
+        args.num_layers,
         args.lr,
+        args.dropout,
         datamodule.multilabel,
         args.torch_compile,
     )
@@ -494,17 +524,5 @@ if __name__ == "__main__":
             checkpoint_path=ckpt,
             hparams_file=os.path.join(logdir, "hparams.yaml"),
         ).to(args.device)
-    with torch.no_grad():
-        pred = datamodule.layerwise_infer(model)
-        for itemset, split_name in zip(
-            [
-                datamodule.train_set,
-                datamodule.validation_set,
-                datamodule.test_set,
-            ],
-            ["Train", "Validation", "Test"],
-        ):
-            nid, labels = itemset[:]
-            f1score = model.f1score_class().to(pred.device)
-            acc = f1score(pred[nid.to(pred.device)], labels.to(pred.device))
-            print(f"{split_name} accuracy: {acc.item()}")
+
+        datamodule.layerwise_infer(model)
