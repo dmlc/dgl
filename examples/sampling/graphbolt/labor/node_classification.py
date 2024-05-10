@@ -59,6 +59,7 @@ class SAGELightning(LightningModule):
         self.f1score_class = lambda: (
             MulticlassF1Score if not multilabel else MultilabelF1Score
         )(n_classes, average="micro")
+        self.multilabel = multilabel
         self.train_acc = self.f1score_class()
         self.val_acc = self.f1score_class()
         self.loss_fn = (
@@ -119,7 +120,8 @@ class SAGELightning(LightningModule):
         batch_labels = minibatch.labels
         self.st = time.time()
         batch_pred = self(minibatch.sampled_subgraphs, batch_inputs)
-        loss = self.loss_fn(batch_pred, batch_labels)
+        label_dtype = batch_pred.dtype if self.multilabel else None
+        loss = self.loss_fn(batch_pred, batch_labels.to(label_dtype))
         self.train_acc(batch_pred, batch_labels.int())
         self.log(
             "train_acc",
@@ -160,7 +162,8 @@ class SAGELightning(LightningModule):
         batch_inputs = minibatch.node_features["feat"]
         batch_labels = minibatch.labels
         batch_pred = self(minibatch.sampled_subgraphs, batch_inputs)
-        loss = self.loss_fn(batch_pred, batch_labels)
+        label_dtype = batch_pred.dtype if self.multilabel else None
+        loss = self.loss_fn(batch_pred, batch_labels.to(label_dtype))
         self.val_acc(batch_pred, batch_labels.int())
         self.log(
             "val_acc",
@@ -209,12 +212,11 @@ class DataModule(LightningDataModule):
         self.all_nodes_set = dataset.all_nodes_set
         self.fanout = list(map(int, args.fanout.split(",")))
 
-        num_classes = dataset.tasks[0].metadata["num_classes"]
-
-        if args.gpu_cache_size > 0 and args.feature_device != "cuda":
+        if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
+            feature = features._features[("node", None, "feat")]
             features._features[("node", None, "feat")] = gb.GPUCachedFeature(
-                features._features[("node", None, "feat")],
-                args.gpu_cache_size,
+                feature,
+                args.num_gpu_cached_features * feature._tensor[:1].nbytes,
             )
 
         self.graph = graph
@@ -223,7 +225,7 @@ class DataModule(LightningDataModule):
         self.batch_size = args.batch_size
         self.num_workers = args.num_workers
         self.in_feats = features.size("node", None, "feat")[0]
-        self.n_classes = num_classes
+        self.n_classes = dataset.tasks[0].metadata["num_classes"]
         self.multilabel = multilabel
         self.device = args.device
     
@@ -374,10 +376,10 @@ if __name__ == "__main__":
     argparser.add_argument("--batch-dependency", type=int, default=1)
     argparser.add_argument("--logdir", type=str, default="tb_logs")
     argparser.add_argument(
-        "--gpu-cache-size",
+        "--num-gpu-cached-features",
         type=int,
         default=0,
-        help="The capacity of the GPU cache in bytes.",
+        help="The capacity of the GPU cache, the number of features to store.",
     )
     argparser.add_argument("--early-stopping-patience", type=int, default=10)
     argparser.add_argument("--disable-checkpoint", action="store_true")

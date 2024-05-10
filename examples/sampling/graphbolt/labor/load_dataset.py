@@ -24,11 +24,12 @@ def load_dgl(name):
     new_feature = gb.TorchBasedFeatureStore([])
     new_feature._features = dataset.feature._features
     dataset._feature = new_feature
-    return dataset
+    multilabel = name in ["yelp"]
+    return dataset, multilabel
 
 
 def load_dataset(dataset_name):
-    multilabel = dataset_name in ["yelp"]
+    multilabel = False
     if dataset_name in [
         "reddit",
         "cora",
@@ -37,9 +38,7 @@ def load_dataset(dataset_name):
         "yelp",
         "flickr",
     ]:
-        dataset = load_dgl(dataset_name)
-        # if multilabel:
-        #     g.ndata["labels"] = g.ndata["labels"].to(dtype=th.float32)
+        dataset, multilabel = load_dgl(dataset_name)
     elif dataset_name in [
         "ogbn-products",
         "ogbn-arxiv",
