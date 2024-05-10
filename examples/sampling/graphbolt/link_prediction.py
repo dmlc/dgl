@@ -328,8 +328,6 @@ def train(args, model, graph, features, train_set):
 
             total_loss += loss.item()
             if step + 1 == args.early_stop:
-                # Early stopping requires a new dataloader to reset its state.
-                dataloader = create_dataloader(args, graph, features, train_set)
                 break
 
         end_epoch_time = time.time()

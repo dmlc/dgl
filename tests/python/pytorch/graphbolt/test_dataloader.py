@@ -111,3 +111,9 @@ def test_gpu_sampling_DataLoader(
     )
     assert len(bufferers) == bufferer_awaiter_cnt
     assert len(list(dataloader)) == N // B
+
+    for i, _ in enumerate(dataloader):
+        if i >= 1:
+            break
+
+    assert len(list(dataloader)) == N // B
