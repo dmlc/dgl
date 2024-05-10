@@ -396,6 +396,7 @@ if __name__ == "__main__":
         help="The capacity of the GPU cache, the number of features to store.",
     )
     argparser.add_argument("--early-stopping-patience", type=int, default=10)
+    argparser.add_argument("--disable-logging", action="store_true")
     argparser.add_argument("--disable-checkpoint", action="store_true")
     argparser.add_argument("--precision", type=str, default="high")
     args = argparser.parse_args()
@@ -440,7 +441,11 @@ if __name__ == "__main__":
         args.layer_dependency,
         args.batch_dependency,
     )
-    logger = TensorBoardLogger(args.logdir, name=subdir)
+    logger = (
+        None
+        if args.disable_logging
+        else TensorBoardLogger(args.logdir, name=subdir)
+    )
     trainer = Trainer(
         accelerator="gpu" if args.device == "cuda" else "cpu",
         devices=1,
