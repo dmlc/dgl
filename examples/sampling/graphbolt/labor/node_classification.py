@@ -59,12 +59,12 @@ class SAGELightning(LightningModule):
         self.f1score_class = lambda: (
             MulticlassF1Score if not multilabel else MultilabelF1Score
         )(n_classes, average="micro")
-        self.multilabel = multilabel
         self.train_acc = self.f1score_class()
         self.val_acc = self.f1score_class()
         self.loss_fn = (
-            nn.CrossEntropyLoss() if not multilabel else nn.BCEWithLogitsLoss()
+            nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
         )
+        self.multilabel = multilabel
         self.pt = 0
     
     def forward(self, subgraphs, x):
