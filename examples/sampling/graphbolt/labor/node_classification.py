@@ -267,7 +267,6 @@ class DataModule(LightningDataModule):
             datapipe,
             num_workers=args.num_workers,
             overlap_graph_fetch=args.overlap_graph_fetch,
-            overlap_feature_fetch=False,
         )
 
     def train_dataloader(self):
