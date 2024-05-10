@@ -18,24 +18,29 @@ def is_scalar(x):
 class ItemSet:
     r"""A wrapper of sequential data or tuple of sequential data.
 
-    All itemsets that represent an sequence of items should subclass it. Such
-    form of itemset is particularly useful when items come from a stream. This
-    class requires each input itemset to be sequential (and iterable, off
-    course).
+    This class requires each input item to be sequential (and, of course,
+    iterable), meaning that each item must have implemented `__getitem__` which
+    supports fetching a data for a given index, and `__len__` which is expected
+    to return the size of the item.
+    
 
     Parameters
     ----------
-    items: Union[int, Sequence, Tuple[Sequence]]
-        The items to be iterated over. If it is a single integer, a `range()`
-        object will be created and iterated over. If it's multi-dimensional
-        iterable such as `torch.Tensor`, it will be iterated over the first
-        dimension. If it is a tuple, each item in the tuple is an iterable of
-        items.
+    items: Union[int, torch.Tensor, Sequence, Tuple[Sequence]]
+        The sequential items.
+        - If it is a single scalar (an integer or a tensor that holds a single
+          value), the item would be considered as a range_tensor created by
+          `torch.arange`.
+        - If it is a multi-dimensional sequence such as `torch.Tensor`, the
+          indexing will be performed along the first dimension.
+        - If it is a tuple, each item in the tuple must be a sequence.
+
     names: Union[str, Tuple[str]], optional
-        The names of the items. If it is a tuple, each name corresponds to an
-        item in the tuple. The naming is arbitrary, but in general practice,
-        the names should be chosen from ['labels', 'seeds', 'indexes'] to align
-        with the attributes of class `dgl.graphbolt.MiniBatch`.
+        The names of the items. If it is a tuple, each name must corresponds to
+        an item in the `items` parameter. The naming is arbitrary, but in
+        general practice, the names should be chosen from ['labels', 'seeds',
+        'indexes'] to align with the attributes of class
+        `dgl.graphbolt.MiniBatch`.
 
     Examples
     --------
