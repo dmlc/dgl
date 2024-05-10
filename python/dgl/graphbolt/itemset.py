@@ -166,12 +166,12 @@ class ItemSet:
         if is_scalar(self._items):
             dtype = getattr(self._items, "dtype", torch.int64)
             if isinstance(index, slice):
-                start, stop, step = index.indices(int(self._items))
+                start, stop, step = index.indices(self._length)
                 return torch.arange(start, stop, step, dtype=dtype)
             elif isinstance(index, int):
                 if index < 0:
-                    index += int(self._items)
-                if index < 0 or index >= int(self._items):
+                    index += self._length
+                if index < 0 or index >= self._length:
                     raise IndexError(
                         f"{type(self).__name__} index out of range."
                     )
@@ -326,9 +326,6 @@ class ItemSetDict:
         self._offsets = torch.tensor(offset).cumsum(0)
         self._length = int(self._offsets[-1])
         self._keys = list(self._itemsets.keys())
-
-    def __len__(self) -> int:
-        return sum(len(itemset) for itemset in self._itemsets.values())
 
     def __len__(self) -> int:
         return self._length
