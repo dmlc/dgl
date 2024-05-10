@@ -74,7 +74,7 @@ class ItemSet:
     >>> item_set.names
     ('seeds',)
 
-    3. Single iterable: seed nodes.
+    3. Single sequence: seed nodes.
 
     >>> node_ids = torch.arange(0, 5)
     >>> item_set = gb.ItemSet(node_ids, names="seeds")
@@ -85,7 +85,7 @@ class ItemSet:
     >>> item_set.names
     ('seeds',)
 
-    4. Tuple of iterables with same shape: seed nodes and labels.
+    4. Tuple of sequences with same shape: seed nodes and labels.
 
     >>> node_ids = torch.arange(0, 5)
     >>> labels = torch.arange(5, 10)
@@ -99,7 +99,7 @@ class ItemSet:
     >>> item_set.names
     ('seeds', 'labels')
 
-    5. Tuple of iterables with different shape: seeds and labels.
+    5. Tuple of sequences with different shape: seeds and labels.
 
     >>> seeds = torch.arange(0, 10).reshape(-1, 2)
     >>> labels = torch.tensor([1, 1, 0, 0, 0])
@@ -117,7 +117,7 @@ class ItemSet:
     >>> item_set.names
     ('seeds', 'labels')
 
-    6. Tuple of iterables with different shape: hyperlink and labels.
+    6. Tuple of sequences with different shape: hyperlink and labels.
 
     >>> seeds = torch.arange(0, 10).reshape(-1, 5)
     >>> labels = torch.tensor([1, 0])
@@ -216,8 +216,8 @@ class ItemSet:
 class ItemSetDict:
     r"""Dictionary wrapper of **ItemSet**.
 
-    Each item is retrieved by iterating over each itemset and returned with
-    corresponding key as a dict.
+    This class is useful to assemble existing itemsets with different tags, for
+    example, seed_nodes of different node types in a graph.
 
     Parameters
     ----------
@@ -228,7 +228,7 @@ class ItemSetDict:
     >>> import torch
     >>> from dgl import graphbolt as gb
 
-    1. Single iterable: seed nodes.
+    1. Each itemset is a single sequence: seed nodes.
 
     >>> node_ids_user = torch.arange(0, 5)
     >>> node_ids_item = torch.arange(5, 10)
@@ -245,7 +245,8 @@ class ItemSetDict:
     >>> item_set.names
     ('seeds',)
 
-    2. Tuple of iterables with same shape: seed nodes and labels.
+    2. Each itemset is a tuple of sequences with same shape: seed nodes and
+    labels.
 
     >>> node_ids_user = torch.arange(0, 2)
     >>> labels_user = torch.arange(0, 2)
@@ -268,7 +269,8 @@ class ItemSetDict:
     >>> item_set.names
     ('seeds', 'labels')
 
-    3. Tuple of iterables with different shape: seeds and labels.
+    3. Each itemset is a tuple of sequences with different shape: seeds and
+    labels.
 
     >>> seeds_like = torch.arange(0, 4).reshape(-1, 2)
     >>> labels_like = torch.tensor([1, 0])
@@ -295,7 +297,8 @@ class ItemSetDict:
     >>> item_set.names
     ('seeds', 'labels')
 
-    4. Tuple of iterables with different shape: hyperlink and labels.
+    4. Each itemset is a tuple of sequences with different shape: hyperlink and
+    labels.
 
     >>> first_seeds = torch.arange(0, 6).reshape(-1, 3)
     >>> first_labels = torch.tensor([1, 0])
