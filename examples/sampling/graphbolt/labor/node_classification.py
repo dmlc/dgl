@@ -38,25 +38,34 @@ def convert_to_pyg(h, subgraph):
     return (h, h[:dst_size]), edge_index, (h.size(0), dst_size)
 
 
-class GraphSAGE(torch.nn.Module):
-    #####################################################################
-    # (HIGHLIGHT) Define the GraphSAGE model architecture.
-    #
-    # - This class inherits from `torch.nn.Module`.
-    # - Two convolutional layers are created using the SAGEConv class from PyG.
-    # - 'in_size', 'hidden_size', 'out_size' are the sizes of
-    #   the input, hidden, and output features, respectively.
-    # - The forward method defines the computation performed at every call.
-    #####################################################################
-    def __init__(self, in_size, hidden_size, out_size):
-        super(GraphSAGE, self).__init__()
+class SAGELightning(LightningModule):
+    def __init__(
+        self,
+        in_feats,
+        n_hidden,
+        n_classes,
+        lr,
+        multilabel,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
         self.layers = torch.nn.ModuleList()
-        self.layers.append(SAGEConv(in_size, hidden_size))
-        self.layers.append(SAGEConv(hidden_size, hidden_size))
-        self.layers.append(SAGEConv(hidden_size, out_size))
-        self.hidden_size = hidden_size
-        self.out_size = out_size
-
+        self.layers.append(SAGEConv(in_feats, n_hidden))
+        self.layers.append(SAGEConv(n_hidden, n_hidden))
+        self.layers.append(SAGEConv(n_hidden, n_classes))
+        self.hidden_size = n_hidden
+        self.out_size = n_classes
+        self.lr = lr
+        self.f1score_class = lambda: (
+            MulticlassF1Score if not multilabel else MultilabelF1Score
+        )(n_classes, average="micro")
+        self.train_acc = self.f1score_class()
+        self.val_acc = self.f1score_class()
+        self.loss_fn = (
+            nn.CrossEntropyLoss() if not multilabel else nn.BCEWithLogitsLoss()
+        )
+        self.pt = 0
+    
     def forward(self, subgraphs, x):
         h = x
         for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
@@ -105,43 +114,11 @@ class GraphSAGE(torch.nn.Module):
 
         return y
 
-
-class SAGELightning(LightningModule):
-    def __init__(
-        self,
-        in_feats,
-        n_hidden,
-        n_classes,
-        lr,
-        multilabel,
-        torch_compile,
-    ):
-        super().__init__()
-        self.save_hyperparameters()
-        self.module = GraphSAGE(in_feats, n_hidden, n_classes)
-        if torch_compile:
-            torch._dynamo.config.cache_size_limit = 32
-            self.module = torch.compile(
-                self.module, fullgraph=True, dynamic=True
-            )
-        self.lr = lr
-        self.f1score_class = lambda: (
-            MulticlassF1Score if not multilabel else MultilabelF1Score
-        )(n_classes, average="micro")
-        self.train_acc = self.f1score_class()
-        self.val_acc = self.f1score_class()
-        self.num_steps = 0
-        self.loss_fn = (
-            nn.CrossEntropyLoss() if not multilabel else nn.BCEWithLogitsLoss()
-        )
-        self.pt = 0
-
     def training_step(self, minibatch, batch_idx):
-        self.num_steps += 1
         batch_inputs = minibatch.node_features["feat"]
         batch_labels = minibatch.labels
         self.st = time.time()
-        batch_pred = self.module(minibatch.sampled_subgraphs, batch_inputs)
+        batch_pred = self(minibatch.sampled_subgraphs, batch_inputs)
         loss = self.loss_fn(batch_pred, batch_labels)
         self.train_acc(batch_pred, batch_labels.int())
         self.log(
@@ -182,7 +159,7 @@ class SAGELightning(LightningModule):
     def validation_step(self, minibatch, batch_idx, dataloader_idx=0):
         batch_inputs = minibatch.node_features["feat"]
         batch_labels = minibatch.labels
-        batch_pred = self.module(minibatch.sampled_subgraphs, batch_inputs)
+        batch_pred = self(minibatch.sampled_subgraphs, batch_inputs)
         loss = self.loss_fn(batch_pred, batch_labels)
         self.val_acc(batch_pred, batch_labels.int())
         self.log(
@@ -208,64 +185,6 @@ class SAGELightning(LightningModule):
         return optimizer
 
 
-def create_dataloader(
-    graph, features, itemset, batch_size, fanout, device, job
-):
-    #####################################################################
-    # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
-    #
-    # - 'ItemSampler' samples mini-batches of node IDs from the dataset.
-    # - 'CopyTo' copies the fetched data to the specified device.
-    # - 'sample_neighbor' performs neighbor sampling on the graph.
-    # - 'FeatureFetcher' fetches node features based on the sampled subgraph.
-
-    #####################################################################
-    # Create a datapipe for mini-batch sampling with a specific neighbor fanout.
-    # Here, [10, 10, 10] specifies the number of neighbors sampled for each node at each layer.
-    # We're using `sample_neighbor` for consistency with DGL's sampling API.
-    # Note: GraphBolt offers additional sampling methods, such as `sample_layer_neighbor`,
-    # which could provide further optimization and efficiency for GNN training.
-    # Users are encouraged to explore these advanced features for potentially improved performance.
-
-    # Initialize an ItemSampler to sample mini-batches from the dataset.
-    datapipe = gb.ItemSampler(
-        itemset,
-        batch_size=batch_size,
-        shuffle=(job == "train"),
-        drop_last=(job == "train"),
-    )
-    # Copy the data to the specified device.
-    if args.graph_device != "cpu":
-        datapipe = datapipe.copy_to(device=device)
-    # Sample neighbors for each node in the mini-batch.
-    kwargs = (
-        {
-            "layer_dependency": args.layer_dependency,
-            "batch_dependency": args.batch_dependency,
-        }
-        if args.sample_mode == "sample_layer_neighbor"
-        else {}
-    )
-    datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1], **kwargs
-    )
-    # Copy the data to the specified device.
-    if args.feature_device != "cpu":
-        datapipe = datapipe.copy_to(device=device)
-    # Fetch node features for the sampled subgraph.
-    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
-    # Copy the data to the specified device.
-    if args.feature_device == "cpu":
-        datapipe = datapipe.copy_to(device=device)
-    # Create and return a DataLoader to handle data loading.
-    return gb.DataLoader(
-        datapipe,
-        num_workers=args.num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
-        overlap_feature_fetch=False,
-    )
-
-
 class DataModule(LightningDataModule):
     def __init__(self, args):
         super().__init__()
@@ -274,12 +193,12 @@ class DataModule(LightningDataModule):
 
         # Move the dataset to the selected storage.
         graph = (
-            dataset.graph.to("pinned")  # pin_memory_
+            dataset.graph.pin_memory_()
             if args.graph_device == "pinned"
             else dataset.graph.to(args.graph_device)
         )
         features = (
-            dataset.feature.to("pinned")  # pin_memory_
+            dataset.feature.pin_memory_()
             if args.feature_device == "pinned"
             else dataset.feature.to(args.feature_device)
         )
@@ -307,39 +226,57 @@ class DataModule(LightningDataModule):
         self.n_classes = num_classes
         self.multilabel = multilabel
         self.device = args.device
+    
+    def create_dataloader(self, itemset, job):
+        # Initialize an ItemSampler to sample mini-batches from the dataset.
+        datapipe = gb.ItemSampler(
+            itemset,
+            batch_size=self.batch_size * (1 if job != "infer" else 4),
+            shuffle=(job == "train"),
+            drop_last=(job == "train"),
+        )
+        # Copy the data to the specified device.
+        if args.graph_device != "cpu":
+            datapipe = datapipe.copy_to(device=self.device)
+        # Sample neighbors for each node in the mini-batch.
+        kwargs = (
+            {
+                "layer_dependency": args.layer_dependency,
+                "batch_dependency": args.batch_dependency,
+            }
+            if args.sample_mode == "sample_layer_neighbor"
+            else {}
+        )
+        datapipe = getattr(datapipe, args.sample_mode)(
+            self.graph, self.fanout if job != "infer" else [-1], **kwargs
+        )
+        # Copy the data to the specified device.
+        if args.feature_device != "cpu":
+            datapipe = datapipe.copy_to(device=self.device)
+        # Fetch node features for the sampled subgraph.
+        datapipe = datapipe.fetch_feature(self.features, node_feature_keys=["feat"])
+        # Copy the data to the specified device.
+        if args.feature_device == "cpu":
+            datapipe = datapipe.copy_to(device=self.device)
+        # Create and return a DataLoader to handle data loading.
+        return gb.DataLoader(
+            datapipe,
+            num_workers=args.num_workers,
+            overlap_graph_fetch=args.overlap_graph_fetch,
+            overlap_feature_fetch=False,
+        )
 
     def train_dataloader(self):
-        return create_dataloader(
-            graph=self.graph,
-            features=self.features,
-            itemset=self.train_set,
-            batch_size=self.batch_size,
-            fanout=self.fanout,
-            device=self.device,
-            job="train",
-        )
+        return self.create_dataloader(self.train_set, "train")
 
     def val_dataloader(self):
-        return create_dataloader(
-            graph=self.graph,
-            features=self.features,
-            itemset=self.validation_set,
-            batch_size=self.batch_size,
-            fanout=self.fanout,
-            device=self.device,
-            job="evaluate",
-        )
+        return self.create_dataloader(self.validation_set, "evaluate")
 
     @torch.no_grad()
     def layerwise_infer(self, model):
         model.eval()
-        dataloader = create_dataloader(
-            graph=self.graph,
-            features=self.features,
+        dataloader = self.create_dataloader(
             itemset=self.all_nodes_set,
-            batch_size=4 * self.batch_size,
-            fanout=[-1],
-            device=self.device,
             job="infer",
         )
         return model.inference(
@@ -461,8 +398,12 @@ if __name__ == "__main__":
         datamodule.n_classes,
         args.lr,
         datamodule.multilabel,
-        args.torch_compile,
     )
+    if args.torch_compile:
+        torch._dynamo.config.cache_size_limit = 32
+        model = torch.compile(
+            model, fullgraph=False, dynamic=True
+        )
 
     # Train
     callbacks = []
@@ -490,7 +431,7 @@ if __name__ == "__main__":
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(
         accelerator="gpu" if args.device == "cuda" else "cpu",
-        devices="auto",
+        devices=1,
         max_epochs=args.num_epochs,
         max_steps=args.num_steps,
         min_steps=args.min_steps,
@@ -513,7 +454,7 @@ if __name__ == "__main__":
             hparams_file=os.path.join(logdir, "hparams.yaml"),
         ).to(args.device)
     with torch.no_grad():
-        pred = datamodule.layerwise_infer(model.module)
+        pred = datamodule.layerwise_infer(model)
         for itemset, split_name in zip(
             [
                 datamodule.train_set,

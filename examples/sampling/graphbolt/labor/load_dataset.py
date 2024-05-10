@@ -20,7 +20,11 @@ def load_dgl(name):
         "flickr": FlickrDataset,
     }
 
-    return gb.LegacyDataset(d[name]())
+    dataset = gb.LegacyDataset(d[name]())
+    new_feature = gb.TorchBasedFeatureStore([])
+    new_feature._features = dataset.feature._features
+    dataset._feature = new_feature
+    return dataset
 
 
 def load_dataset(dataset_name):
