@@ -66,7 +66,7 @@ class SAGELightning(LightningModule):
         )
         self.multilabel = multilabel
         self.pt = 0
-    
+
     def forward(self, subgraphs, x):
         h = x
         for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
@@ -228,7 +228,7 @@ class DataModule(LightningDataModule):
         self.n_classes = dataset.tasks[0].metadata["num_classes"]
         self.multilabel = multilabel
         self.device = args.device
-    
+
     def create_dataloader(self, itemset, job):
         # Initialize an ItemSampler to sample mini-batches from the dataset.
         datapipe = gb.ItemSampler(
@@ -256,7 +256,9 @@ class DataModule(LightningDataModule):
         if args.feature_device != "cpu":
             datapipe = datapipe.copy_to(device=self.device)
         # Fetch node features for the sampled subgraph.
-        datapipe = datapipe.fetch_feature(self.features, node_feature_keys=["feat"])
+        datapipe = datapipe.fetch_feature(
+            self.features, node_feature_keys=["feat"]
+        )
         # Copy the data to the specified device.
         if args.feature_device == "cpu":
             datapipe = datapipe.copy_to(device=self.device)
@@ -403,9 +405,7 @@ if __name__ == "__main__":
     )
     if args.torch_compile:
         torch._dynamo.config.cache_size_limit = 32
-        model = torch.compile(
-            model, fullgraph=False, dynamic=True
-        )
+        model = torch.compile(model, fullgraph=False, dynamic=True)
 
     # Train
     callbacks = []
