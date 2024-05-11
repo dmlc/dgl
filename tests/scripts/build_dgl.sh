@@ -21,7 +21,7 @@ if [ "$1" != "cugraph" ]; then
     # pytorch against all the supported cugraph versions is not supported
     # See issue: https://github.com/rapidsai/cudf/issues/8510
     #CMAKE_VARS="$CMAKE_VARS -DTORCH_PYTHON_INTERPS=/opt/conda/envs/pytorch-ci/bin/python"
-    pass
+    echo "Skip"
 else
     # Disable sparse build as cugraph docker image lacks cuDNN.
     CMAKE_VARS="$CMAKE_VARS -DBUILD_TORCH=OFF -DBUILD_SPARSE=OFF"
