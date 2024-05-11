@@ -8,18 +8,9 @@ from .gpu_cache import GPUCache
 __all__ = ["GPUCachedFeature"]
 
 
-def nbytes(tensor):
-    """Returns the number of bytes to store the given tensor.
-
-    Needs to be defined only for torch versions less than 2.1. In torch >= 2.1,
-    we can simply use "tensor.nbytes".
-    """
-    return tensor.numel() * tensor.element_size()
-
-
 def num_cache_items(cache_capacity_in_bytes, single_item):
     """Returns the number of rows to be cached."""
-    item_bytes = nbytes(single_item)
+    item_bytes = single_item.nbytes
     # Round up so that we never get a size of 0, unless bytes is 0.
     return (cache_capacity_in_bytes + item_bytes - 1) // item_bytes
 
