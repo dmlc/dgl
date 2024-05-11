@@ -10,8 +10,10 @@ fi
 if [[ $1 != "cpu" ]]; then
     CMAKE_VARS="$CMAKE_VARS -DUSE_CUDA=ON"
     if [[ $1 == "gpu" ]]; then
+        # CI is now running on g4dn instance.
         # Avoid error: Unknown CUDA Architecture Name 9.0a in CUDA_SELECT_NVCC_ARCH_FLAGS
         export TORCH_CUDA_ARCH_LIST=7.5
+        CMAKE_VARS="$CMAKE_VARS -DCUDA_ARCH_NAME=Turing"
     fi
 fi
 
