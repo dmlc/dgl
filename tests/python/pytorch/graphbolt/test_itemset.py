@@ -72,6 +72,22 @@ def test_ItemSet_length():
         assert i == item1.item()
         assert i + 5 == item2.item()
 
+    class InvalidLength:
+        def __iter__(self):
+            return iter([0, 1, 2])
+
+    # Single iterable with invalid length.
+    with pytest.raises(
+        TypeError, match="object of type 'InvalidLength' has no len()"
+    ):
+        item_set = gb.ItemSet(InvalidLength())
+
+    # Tuple of iterables with invalid length.
+    with pytest.raises(
+        TypeError, match="object of type 'InvalidLength' has no len()"
+    ):
+        item_set = gb.ItemSet((InvalidLength(), InvalidLength()))
+
 
 def test_ItemSet_seed_nodes():
     # Node IDs with tensor.
@@ -285,6 +301,36 @@ def test_ItemSetDict_length():
         }
     )
     assert len(item_set) == node_pairs_like.size(0) + node_pairs_follow.size(0)
+
+    class InvalidLength:
+        def __iter__(self):
+            return iter([0, 1, 2])
+
+    # Single iterable with invalid length.
+    with pytest.raises(
+        TypeError, match="object of type 'InvalidLength' has no len()"
+    ):
+        item_set = gb.ItemSetDict(
+            {
+                "user": gb.ItemSet(InvalidLength()),
+                "item": gb.ItemSet(InvalidLength()),
+            }
+        )
+
+    # Tuple of iterables with invalid length.
+    with pytest.raises(
+        TypeError, match="object of type 'InvalidLength' has no len()"
+    ):
+        item_set = gb.ItemSetDict(
+            {
+                "user:like:item": gb.ItemSet(
+                    (InvalidLength(), InvalidLength())
+                ),
+                "user:follow:user": gb.ItemSet(
+                    (InvalidLength(), InvalidLength())
+                ),
+            }
+        )
 
 
 def test_ItemSetDict_iteration_seed_nodes():
