@@ -8,7 +8,7 @@ if [ $# -ne 1 ]; then
 fi
 
 if [[ $1 != "cpu" ]]; then
-    CMAKE_VARS="$CMAKE_VARS -DUSE_CUDA=ON -DCUDA_ARCH_NAME=Auto"
+    CMAKE_VARS="$CMAKE_VARS -DUSE_CUDA=ON -DCUDA_ARCH_NAME=Turing"
 fi
 
 # This is a semicolon-separated list of Python interpreters containing PyTorch.
