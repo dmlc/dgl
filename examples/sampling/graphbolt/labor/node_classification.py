@@ -13,11 +13,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from load_dataset import load_dataset
-
-from nasc_conv import NASCConv
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
+
+from sage_conv import SAGEConv
 
 from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
 from tqdm import tqdm
@@ -48,7 +48,7 @@ class GraphSAGE(torch.nn.Module):
         self.layers = torch.nn.ModuleList()
         sizes = [in_size] + [hidden_size] * n_layers
         for i in range(n_layers):
-            self.layers.append(NASCConv(sizes[i], sizes[i + 1]))
+            self.layers.append(SAGEConv(sizes[i], sizes[i + 1]))
         self.linear = nn.Linear(hidden_size, out_size)
         self.dropout = nn.Dropout(dropout)
         self.hidden_size = hidden_size
@@ -59,6 +59,7 @@ class GraphSAGE(torch.nn.Module):
         for layer, subgraph in zip(self.layers, subgraphs):
             h, edge_index, size = convert_to_pyg(h, subgraph)
             h = layer(h, edge_index, size=size)
+            h = F.gelu(h)
             h = self.dropout(h)
         return self.linear(h)
 
@@ -85,6 +86,8 @@ class GraphSAGE(torch.nn.Module):
                 hidden_x = layer(h, edge_index, size=size)
                 if is_last_layer:
                     hidden_x = self.linear(hidden_x)
+                else:
+                    hidden_x = F.gelu(hidden_x)
                 # By design, our output nodes are contiguous.
                 y[data.seeds[0] : data.seeds[-1] + 1] = hidden_x.to(
                     buffer_device
@@ -406,7 +409,6 @@ if __name__ == "__main__":
     argparser.add_argument("--num-steps", type=int, default=-1)
     argparser.add_argument("--min-steps", type=int, default=0)
     argparser.add_argument("--num-hidden", type=int, default=256)
-    argparser.add_argument("--num-layers", type=int, default=3)
     argparser.add_argument("--fanout", type=str, default="10,10,10")
     argparser.add_argument("--batch-size", type=int, default=1024)
     argparser.add_argument("--lr", type=float, default=0.001)
@@ -459,12 +461,14 @@ if __name__ == "__main__":
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
 
+    num_layers = len(args.fanout.split(","))
+
     datamodule = DataModule(args)
     model = SAGELightning(
         datamodule.in_feats,
         args.num_hidden,
         datamodule.n_classes,
-        args.num_layers,
+        num_layers,
         args.lr,
         args.dropout,
         datamodule.multilabel,

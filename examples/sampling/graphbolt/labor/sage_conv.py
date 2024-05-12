@@ -2,7 +2,7 @@ from typing import List, Optional, Tuple, Union
 
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import GELU, Identity
+from torch.nn import Identity
 
 from torch_geometric.nn.aggr import Aggregation, MultiAggregation
 from torch_geometric.nn.conv import MessagePassing
@@ -11,7 +11,7 @@ from torch_geometric.typing import Adj, OptPairTensor, Size, SparseTensor
 from torch_geometric.utils import spmm
 
 
-class NASCConv(MessagePassing):
+class SAGEConv(MessagePassing):
     r"""A variant of the GraphSAGE operator from the `"Inductive Representation
     Learning on Large Graphs" <https://arxiv.org/abs/1706.02216>`_ paper.
 
@@ -44,8 +44,6 @@ class NASCConv(MessagePassing):
             (default: :obj:`True`)
         bias (bool, optional): If set to :obj:`False`, the layer will not learn
             an additive bias. (default: :obj:`True`)
-        nasc (bool, optional): If set to :obj:`True`, the layer will use NASC
-            style skip connections. (default: :obj:`True`)
         **kwargs (optional): Additional arguments of
             :class:`torch_geometric.nn.conv.MessagePassing`.
 
@@ -66,13 +64,11 @@ class NASCConv(MessagePassing):
         aggr: Optional[Union[str, List[str], Aggregation]] = "mean",
         project: bool = True,
         bias: bool = True,
-        nasc: bool = True,
         **kwargs,
     ):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.project = project
-        self.nasc = nasc
 
         if isinstance(in_channels, int):
             in_channels = (in_channels, in_channels)
@@ -83,20 +79,6 @@ class NASCConv(MessagePassing):
             kwargs["aggr_kwargs"].setdefault("out_channels", in_channels[0])
 
         super().__init__(aggr, **kwargs)
-
-        self.activation = GELU() if nasc else Identity()
-
-        if self.nasc:
-            self.skip_l = (
-                Linear(in_channels[0], out_channels)
-                if in_channels[0] != out_channels
-                else Identity()
-            )
-            self.skip_r = (
-                Linear(in_channels[1], out_channels)
-                if in_channels[1] != out_channels
-                else Identity()
-            )
 
         if self.project:
             if in_channels[0] <= 0:
@@ -125,11 +107,6 @@ class NASCConv(MessagePassing):
             self.lin.reset_parameters()
         self.lin_l.reset_parameters()
         self.lin_r.reset_parameters()
-        if self.nasc:
-            if hasattr(self.skip_l, "reset_parameters"):
-                self.skip_l.reset_parameters()
-            if hasattr(self.skip_r, "reset_parameters"):
-                self.skip_r.reset_parameters()
 
     def forward(
         self,
@@ -151,16 +128,6 @@ class NASCConv(MessagePassing):
         x_r = x[1]
         if x_r is not None:
             out = out + self.lin_r(x_r)
-
-        out = self.activation(out)
-
-        if hasattr(self, "nasc_r"):
-            # Res-GCN
-            out = out + self.nasc_r(x_r)
-
-        if hasattr(self, "nasc_l"):
-            # NASC
-            out = out + self.nasc_l(AX)
 
         return out
 
