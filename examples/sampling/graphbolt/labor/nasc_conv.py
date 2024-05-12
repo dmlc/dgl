@@ -38,15 +38,10 @@ class NASCConv(MessagePassing):
             Any aggregation of :obj:`torch_geometric.nn.aggr` can be used,
             *e.g.*, :obj:`"mean"`, :obj:`"max"`, or :obj:`"lstm"`.
             (default: :obj:`"mean"`)
-        normalize (bool, optional): If set to :obj:`True`, output features
-            will be :math:`\ell_2`-normalized, *i.e.*,
-            :math:`\frac{\mathbf{x}^{\prime}_i}
-            {\| \mathbf{x}^{\prime}_i \|_2}`.
-            (default: :obj:`False`)
         project (bool, optional): If set to :obj:`True`, the layer will apply a
             linear transformation followed by an activation function before
             aggregation (as described in Eq. (3) of the paper).
-            (default: :obj:`False`)
+            (default: :obj:`True`)
         bias (bool, optional): If set to :obj:`False`, the layer will not learn
             an additive bias. (default: :obj:`True`)
         nasc (bool, optional): If set to :obj:`True`, the layer will use NASC
@@ -69,15 +64,13 @@ class NASCConv(MessagePassing):
         in_channels: Union[int, Tuple[int, int]],
         out_channels: int,
         aggr: Optional[Union[str, List[str], Aggregation]] = "mean",
-        normalize: bool = False,
-        project: bool = False,
+        project: bool = True,
         bias: bool = True,
         nasc: bool = True,
         **kwargs,
     ):
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.normalize = normalize
         self.project = project
         self.nasc = nasc
 
@@ -158,9 +151,6 @@ class NASCConv(MessagePassing):
         x_r = x[1]
         if x_r is not None:
             out = out + self.lin_r(x_r)
-
-        if self.normalize:
-            out = F.normalize(out, p=2.0, dim=-1)
 
         out = self.activation(out)
 
