@@ -84,6 +84,7 @@ class NASCConv(MessagePassing):
         self.normalize = normalize
         self.root_weight = root_weight
         self.project = project
+        self.nasc = nasc
 
         if isinstance(in_channels, int):
             in_channels = (in_channels, in_channels)
@@ -97,7 +98,7 @@ class NASCConv(MessagePassing):
 
         self.activation = GELU() if nasc else Identity()
 
-        if nasc:
+        if self.nasc:
             self.skip_l = (
                 Linear(in_channels[0], out_channels)
                 if in_channels[0] != out_channels
@@ -138,6 +139,9 @@ class NASCConv(MessagePassing):
         self.lin_l.reset_parameters()
         if self.root_weight:
             self.lin_r.reset_parameters()
+        if self.nasc:
+            self.skip_l.reset_parameters()
+            self.skip_r.reset_parameters()
 
     def forward(
         self,
