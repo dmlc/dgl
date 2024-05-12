@@ -13,11 +13,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from load_dataset import load_dataset
+
+from nasc_conv import NASCConv
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
-
-from torch_geometric.nn import SAGEConv
 
 from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
 from tqdm import tqdm
@@ -44,24 +44,23 @@ def convert_to_pyg(h, subgraph):
 
 class GraphSAGE(torch.nn.Module):
     def __init__(self, in_size, hidden_size, out_size, n_layers, dropout):
-        super(GraphSAGE, self).__init__()
+        super().__init__()
         self.layers = torch.nn.ModuleList()
-        sizes = [in_size] + [hidden_size] * (n_layers - 1) + [out_size]
+        sizes = [in_size] + [hidden_size] * n_layers
         for i in range(n_layers):
-            self.layers.append(SAGEConv(sizes[i], sizes[i + 1]))
+            self.layers.append(NASCConv(sizes[i], sizes[i + 1]))
+        self.linear = nn.Linear(hidden_size, out_size)
         self.dropout = nn.Dropout(dropout)
         self.hidden_size = hidden_size
         self.out_size = out_size
 
     def forward(self, subgraphs, x):
         h = x
-        for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
+        for layer, subgraph in zip(self.layers, subgraphs):
             h, edge_index, size = convert_to_pyg(h, subgraph)
             h = layer(h, edge_index, size=size)
-            if i != len(subgraphs) - 1:
-                h = F.relu(h)
-                h = self.dropout(h)
-        return h
+            h = self.dropout(h)
+        return self.linear(h)
 
     def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
@@ -84,8 +83,8 @@ class GraphSAGE(torch.nn.Module):
                     data.node_features["feat"], data.sampled_subgraphs[0]
                 )
                 hidden_x = layer(h, edge_index, size=size)
-                if not is_last_layer:
-                    hidden_x = F.relu(hidden_x)
+                if is_last_layer:
+                    hidden_x = self.linear(hidden_x)
                 # By design, our output nodes are contiguous.
                 y[data.seeds[0] : data.seeds[-1] + 1] = hidden_x.to(
                     buffer_device
@@ -120,7 +119,7 @@ class SAGELightning(LightningModule):
             )
         self.lr = lr
         self.f1score_class = lambda: (
-            MulticlassF1Score if not multilabel else MultilabelF1Score
+            MultilabelF1Score if multilabel else MulticlassF1Score
         )(n_classes, average="micro")
         self.train_acc = self.f1score_class()
         self.val_acc = self.f1score_class()
@@ -456,7 +455,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision(args.precision)
 
     if not torch.cuda.is_available():
-        args.mode = "cpu-cpu"
+        args.mode = "cpu-cpu-cpu"
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
 
