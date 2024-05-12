@@ -140,8 +140,10 @@ class NASCConv(MessagePassing):
         if self.root_weight:
             self.lin_r.reset_parameters()
         if self.nasc:
-            self.skip_l.reset_parameters()
-            self.skip_r.reset_parameters()
+            if hasattr(self.skip_l, "reset_parameters"):
+                self.skip_l.reset_parameters()
+            if hasattr(self.skip_r, "reset_parameters"):
+                self.skip_r.reset_parameters()
 
     def forward(
         self,
