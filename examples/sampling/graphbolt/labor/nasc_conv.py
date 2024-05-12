@@ -43,9 +43,6 @@ class NASCConv(MessagePassing):
             :math:`\frac{\mathbf{x}^{\prime}_i}
             {\| \mathbf{x}^{\prime}_i \|_2}`.
             (default: :obj:`False`)
-        root_weight (bool, optional): If set to :obj:`False`, the layer will
-            not add transformed root node features to the output.
-            (default: :obj:`True`)
         project (bool, optional): If set to :obj:`True`, the layer will apply a
             linear transformation followed by an activation function before
             aggregation (as described in Eq. (3) of the paper).
@@ -73,7 +70,6 @@ class NASCConv(MessagePassing):
         out_channels: int,
         aggr: Optional[Union[str, List[str], Aggregation]] = "mean",
         normalize: bool = False,
-        root_weight: bool = True,
         project: bool = False,
         bias: bool = True,
         nasc: bool = True,
@@ -82,7 +78,6 @@ class NASCConv(MessagePassing):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.normalize = normalize
-        self.root_weight = root_weight
         self.project = project
         self.nasc = nasc
 
@@ -127,8 +122,7 @@ class NASCConv(MessagePassing):
             aggr_out_channels = in_channels[0]
 
         self.lin_l = Linear(aggr_out_channels, out_channels, bias=bias)
-        if self.root_weight:
-            self.lin_r = Linear(in_channels[1], out_channels, bias=False)
+        self.lin_r = Linear(in_channels[1], out_channels, bias=False)
 
         self.reset_parameters()
 
@@ -137,8 +131,7 @@ class NASCConv(MessagePassing):
         if self.project:
             self.lin.reset_parameters()
         self.lin_l.reset_parameters()
-        if self.root_weight:
-            self.lin_r.reset_parameters()
+        self.lin_r.reset_parameters()
         if self.nasc:
             if hasattr(self.skip_l, "reset_parameters"):
                 self.skip_l.reset_parameters()
@@ -163,7 +156,7 @@ class NASCConv(MessagePassing):
         out = self.lin_l(AX)
 
         x_r = x[1]
-        if self.root_weight and x_r is not None:
+        if x_r is not None:
             out = out + self.lin_r(x_r)
 
         if self.normalize:
