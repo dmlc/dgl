@@ -156,7 +156,7 @@ class NASCConv(MessagePassing):
             x = (x, x)
 
         if self.project and hasattr(self, "lin"):
-            x = (self.lin(x[0]).gelu(), x[1])
+            x = (F.gelu(self.lin(x[0])), x[1])
 
         # propagate_type: (x: OptPairTensor)
         AX = self.propagate(edge_index, x=x, size=size)
