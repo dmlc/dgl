@@ -84,10 +84,9 @@ class GraphSAGE(torch.nn.Module):
                     data.node_features["feat"], data.sampled_subgraphs[0]
                 )
                 hidden_x = layer(h, edge_index, size=size)
+                hidden_x = F.gelu(hidden_x)
                 if is_last_layer:
                     hidden_x = self.linear(hidden_x)
-                else:
-                    hidden_x = F.gelu(hidden_x)
                 # By design, our output nodes are contiguous.
                 y[data.seeds[0] : data.seeds[-1] + 1] = hidden_x.to(
                     buffer_device
