@@ -368,6 +368,17 @@ def test_ItemSetDict_iteration_seed_nodes():
     assert len(list(partial_data.keys())) == 2
     assert torch.equal(partial_data["user"], user_ids[3:-1:2])
     assert torch.equal(partial_data["item"], item_ids[0:3:2])
+    # Indexing with an iterable of int.
+    partial_data = item_set[torch.tensor([1, 0, 4])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], torch.tensor([1, 0, 4]))
+    partial_data = item_set[torch.tensor([9, 8, 5])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], torch.tensor([9, 8, 5]))
+    partial_data = item_set[torch.tensor([8, 1, 0, 9, 7, 5])]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], torch.tensor([1, 0]))
+    assert torch.equal(partial_data["item"], torch.tensor([8, 9, 7, 5]))
 
     # Exception cases.
     with pytest.raises(
