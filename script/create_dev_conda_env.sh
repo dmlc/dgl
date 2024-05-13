@@ -1,7 +1,7 @@
 #!/bin/bash
 
-readonly CUDA_VERSIONS="11.7,11.8,12.1"
-readonly TORCH_VERSION="2.0.0"
+readonly CUDA_VERSIONS="11.8,12.1"
+readonly TORCH_VERSION="2.1.0"
 readonly PYTHON_VERSION="3.10"
 
 usage() {
@@ -9,9 +9,9 @@ cat << EOF
 usage: bash $0 OPTIONS
 examples:
   bash $0 -c
-  bash $0 -g 11.7
-  bash $0 -g 11.7 -p 3.10
-  bash $0 -g 11.7 -p 3.10 -t 2.0.0
+  bash $0 -g 12.1
+  bash $0 -g 12.1 -p 3.10
+  bash $0 -g 12.1 -p 3.10 -t 2.1.0
   bash $0 -c -n dgl-dev-cpu
 
 Create a developement environment for DGL developers.
