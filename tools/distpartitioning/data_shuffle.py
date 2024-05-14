@@ -475,8 +475,9 @@ def exchange_feature(
     logging.debug(f"Rank: {rank} {featdata_key.shape=}")
     if featdata_key is not None:
         feat_dims_dtype = list(featdata_key.shape)
-        assert len(featdata_key.shape) == 2 or len(featdata_key.shape) == 1, \
-                f"We expect 1D or 2D tensors for features, got shape {featdata_key.shape}"
+        assert (
+            len(featdata_key.shape) == 2 or len(featdata_key.shape) == 1
+        ), f"We expect 1D or 2D tensors for features, got shape {featdata_key.shape}"
         # When a feature is 2-dim, the shape should match the feature dimension.
         if len(featdata_key.shape) == 2:
             feature_dimension = feat_dims_dtype[1]
@@ -502,8 +503,9 @@ def exchange_feature(
             assert len(all_dims_dtype) % world_size == 0
             dim_len = int(len(all_dims_dtype) / world_size)
             rank0_shape = list(np.zeros((dim_len - 1), dtype=np.int32))
-            assert len(rank0_shape) == 2 or len(rank0_shape) == 1, \
-                f"We expect 1D or 2D tensors for features, got shape {rank0_shape}"
+            assert (
+                len(rank0_shape) == 2 or len(rank0_shape) == 1
+            ), f"We expect 1D or 2D tensors for features, got shape {rank0_shape}"
             # When a feature is 2-dim, the shape[1] (number of columns) should match the feature dimension.
             if len(rank0_shape) == 2:
                 rank0_shape[1] = feature_dimension
