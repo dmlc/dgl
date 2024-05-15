@@ -362,6 +362,7 @@ class ItemSetDict:
                     break
             return data
         elif isinstance(index, Iterable):
+            # TODO[Mingbang]: Might have performance issue. Tests needed.
             data = {key: [] for key in self._keys}
             for idx in index:
                 if idx < 0:
