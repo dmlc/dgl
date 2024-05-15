@@ -230,6 +230,7 @@ class SAGELightning(LightningModule):
             batch_size=batch_labels.shape[0],
         )
         self.log_node_and_edge_counts(minibatch.sampled_subgraphs)
+        return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
