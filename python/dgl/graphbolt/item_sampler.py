@@ -110,160 +110,6 @@ def minibatcher_default(batch, names):
     return minibatch
 
 
-class ItemShufflerAndBatcher:
-    """A shuffler to shuffle items and create batches.
-
-    This class is used internally by :class:`ItemSampler` to shuffle items and
-    create batches. It is not supposed to be used directly. The intention of
-    this class is to avoid time-consuming iteration over :class:`ItemSet`. As
-    an optimization, it slices from the :class:`ItemSet` via indexing first,
-    then shuffle and create batches.
-
-    Parameters
-    ----------
-    item_set : ItemSet
-        Data to be iterated.
-    shuffle : bool
-        Option to shuffle before batching.
-    batch_size : int
-        The size of each batch.
-    drop_last : bool
-        Option to drop the last batch if it's not full.
-    buffer_size : int
-        The size of the buffer to store items sliced from the :class:`ItemSet`
-        or :class:`ItemSetDict`.
-    distributed : bool
-        Option to apply on :class:`DistributedItemSampler`.
-    drop_uneven_inputs : bool
-        Option to make sure the numbers of batches for each replica are the
-        same. Applies only when `distributed` is True.
-    world_size : int
-        The number of model replicas that will be created during Distributed
-        Data Parallel (DDP) training. It should be the same as the real world
-        size, otherwise it could cause errors. Applies only when `distributed`
-        is True.
-    rank : int
-        The rank of the current replica. Applies only when `distributed` is
-        True.
-    rng : np.random.Generator
-        The random number generator to use for shuffling.
-    """
-
-    def __init__(
-        self,
-        item_set: ItemSet,
-        shuffle: bool,
-        batch_size: int,
-        drop_last: bool,
-        buffer_size: int,
-        distributed: Optional[bool] = False,
-        drop_uneven_inputs: Optional[bool] = False,
-        world_size: Optional[int] = 1,
-        rank: Optional[int] = 0,
-        rng: Optional[np.random.Generator] = None,
-    ):
-        self._item_set = item_set
-        self._shuffle = shuffle
-        self._batch_size = batch_size
-        self._drop_last = drop_last
-        self._buffer_size = buffer_size
-        # Round up the buffer size to the nearest multiple of batch size.
-        self._buffer_size = (
-            (self._buffer_size + batch_size - 1) // batch_size * batch_size
-        )
-        self._distributed = distributed
-        self._drop_uneven_inputs = drop_uneven_inputs
-        self._num_replicas = world_size
-        self._rank = rank
-        self._rng = rng
-
-    def _collate_batch(self, buffer, indices, offsets=None):
-        """Collate a batch from the buffer. For internal use only."""
-        if isinstance(buffer, torch.Tensor):
-            # For item set that's initialized with integer or single tensor,
-            # `buffer` is a tensor.
-            return torch.index_select(buffer, dim=0, index=indices)
-        elif isinstance(buffer, list) and isinstance(buffer[0], DGLGraph):
-            # For item set that's initialized with a list of
-            # DGLGraphs, `buffer` is a list of DGLGraphs.
-            return dgl_batch([buffer[idx] for idx in indices])
-        elif isinstance(buffer, tuple):
-            # For item set that's initialized with a tuple of items,
-            # `buffer` is a tuple of tensors.
-            return tuple(item[indices] for item in buffer)
-        elif isinstance(buffer, Mapping):
-            # For item set that's initialized with a dict of items,
-            # `buffer` is a dict of tensors/lists/tuples.
-            keys = list(buffer.keys())
-            key_indices = torch.searchsorted(offsets, indices, right=True) - 1
-            batch = {}
-            for j, key in enumerate(keys):
-                mask = (key_indices == j).nonzero().squeeze(1)
-                if len(mask) == 0:
-                    continue
-                batch[key] = self._collate_batch(
-                    buffer[key], indices[mask] - offsets[j]
-                )
-            return batch
-        raise TypeError(f"Unsupported buffer type {type(buffer).__name__}.")
-
-    def _calculate_offsets(self, buffer):
-        """Calculate offsets for each item in buffer. For internal use only."""
-        if not isinstance(buffer, Mapping):
-            return None
-        offsets = [0]
-        for value in buffer.values():
-            if isinstance(value, torch.Tensor):
-                offsets.append(offsets[-1] + len(value))
-            elif isinstance(value, tuple):
-                offsets.append(offsets[-1] + len(value[0]))
-            else:
-                raise TypeError(
-                    f"Unsupported buffer type {type(value).__name__}."
-                )
-        return torch.tensor(offsets)
-
-    def __iter__(self):
-        worker_info = torch.utils.data.get_worker_info()
-        if worker_info is not None:
-            num_workers = worker_info.num_workers
-            worker_id = worker_info.id
-        else:
-            num_workers = 1
-            worker_id = 0
-        buffer = None
-        total = len(self._item_set)
-        start_offset, assigned_count, output_count = calculate_range(
-            self._distributed,
-            total,
-            self._num_replicas,
-            self._rank,
-            num_workers,
-            worker_id,
-            self._batch_size,
-            self._drop_last,
-            self._drop_uneven_inputs,
-        )
-        start = 0
-        while start < assigned_count:
-            end = min(start + self._buffer_size, assigned_count)
-            buffer = self._item_set[start_offset + start : start_offset + end]
-            indices = torch.arange(end - start)
-            if self._shuffle:
-                self._rng.shuffle(indices.numpy())
-            offsets = self._calculate_offsets(buffer)
-            for i in range(0, len(indices), self._batch_size):
-                if output_count <= 0:
-                    break
-                batch_indices = indices[
-                    i : i + min(self._batch_size, output_count)
-                ]
-                output_count -= self._batch_size
-                yield self._collate_batch(buffer, batch_indices, offsets)
-            buffer = None
-            start = end
-
-
 class ItemSampler(IterDataPipe):
     """A sampler to iterate over input items and create subsets.
 
@@ -474,34 +320,10 @@ class ItemSampler(IterDataPipe):
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
-        # [TODO][Rui] For now, it's a temporary knob to disable indexing. In
-        # the future, we will enable indexing for all the item sets.
-        use_indexing: Optional[bool] = True,
-        buffer_size: Optional[int] = -1,
     ) -> None:
         super().__init__()
+        self._item_set = item_set
         self._names = item_set.names
-        # Check if the item set supports indexing.
-        indexable = True
-        try:
-            item_set[0]
-        except TypeError:
-            indexable = False
-        self._use_indexing = use_indexing and indexable
-        self._item_set = (
-            item_set if self._use_indexing else IterableWrapper(item_set)
-        )
-        if buffer_size == -1:
-            if indexable:
-                # Set the buffer size to the total number of items in the item
-                # set if indexing is supported and the buffer size is not
-                # specified.
-                buffer_size = len(self._item_set)
-            else:
-                # Set the buffer size to 10 * batch size if indexing is not
-                # supported and the buffer size is not specified.
-                buffer_size = 10 * batch_size
-        self._buffer_size = buffer_size
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
@@ -510,68 +332,60 @@ class ItemSampler(IterDataPipe):
         self._drop_uneven_inputs = False
         self._world_size = None
         self._rank = None
-        self._rng = np.random.default_rng()
-
-    def _organize_items(self, data_pipe) -> None:
-        # Shuffle before batch.
-        if self._shuffle:
-            data_pipe = data_pipe.shuffle(buffer_size=self._buffer_size)
-
-        # Batch.
-        data_pipe = data_pipe.batch(
-            batch_size=self._batch_size,
-            drop_last=self._drop_last,
-        )
-
-        return data_pipe
-
-    @staticmethod
-    def _collate(batch):
-        """Collate items into a batch. For internal use only."""
-        data = next(iter(batch))
-        if isinstance(data, DGLGraph):
-            return dgl_batch(batch)
-        elif isinstance(data, Mapping):
-            assert len(data) == 1, "Only one type of data is allowed."
-            # Collect all the keys.
-            keys = {key for item in batch for key in item.keys()}
-            # Collate each key.
-            return {
-                key: default_collate(
-                    [item[key] for item in batch if key in item]
-                )
-                for key in keys
-            }
-        return default_collate(batch)
+        self._seed = np.random.randint(0, np.iinfo(np.int32).max)
+        self._epoch = 0
 
     def __iter__(self) -> Iterator:
-        if self._use_indexing:
-            seed = self._rng.integers(0, np.iinfo(np.int32).max)
-            data_pipe = IterableWrapper(
-                ItemShufflerAndBatcher(
-                    self._item_set,
-                    self._shuffle,
-                    self._batch_size,
-                    self._drop_last,
-                    self._buffer_size,
-                    distributed=self._distributed,
-                    drop_uneven_inputs=self._drop_uneven_inputs,
-                    world_size=self._world_size,
-                    rank=self._rank,
-                    rng=np.random.default_rng(seed),
-                )
-            )
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
+            num_workers = worker_info.num_workers
+            worker_id = worker_info.id
         else:
-            # Organize items.
-            data_pipe = self._organize_items(self._item_set)
+            num_workers = 1
+            worker_id = 0
+        total = len(self._item_set)
+        start_offset, assigned_count, output_count = calculate_range(
+            self._distributed,
+            total,
+            self._world_size,
+            self._rank,
+            num_workers,
+            worker_id,
+            self._batch_size,
+            self._drop_last,
+            self._drop_uneven_inputs,
+        )
+        if self._shuffle:
+            g = torch.Generator()
+            g.manual_seed(self._seed + self._epoch)
+            indices = torch.randperm(total, generator=g)
+            # buffer = self._item_set[
+            #     indices[start_offset : start_offset + assigned_count]
+            # ]
+            indices = indices[start_offset : start_offset + assigned_count]
+        else:
+            # buffer = self._item_set[
+            #     start_offset : start_offset + assigned_count
+            # ]
+            indices = torch.arange(start_offset, start_offset + assigned_count)
+        for i in range(0, assigned_count, self._batch_size):
+            if output_count <= 0:
+                break
+            # batch_indices = torch.arange(
+            #     i, i + min(self._batch_size, output_count),
+            # )
+            batch = self._item_set[
+                indices[i : i + min(self._batch_size, output_count)]
+            ]
+            output_count -= self._batch_size
+            # print(buffer)
+            # print(batch_indices)
+            # yield self._minibatcher(
+            #     buffer[batch_indices], self._names,
+            # )
+            yield self._minibatcher(batch, self._names)
 
-            # Collate.
-            data_pipe = data_pipe.collate(collate_fn=self._collate)
-
-        # Map to minibatch.
-        data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
-
-        return iter(data_pipe)
+        self._epoch += 1
 
 
 class DistributedItemSampler(ItemSampler):
@@ -737,7 +551,6 @@ class DistributedItemSampler(ItemSampler):
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
         drop_uneven_inputs: Optional[bool] = False,
-        buffer_size: Optional[int] = -1,
     ) -> None:
         super().__init__(
             item_set,
@@ -745,8 +558,6 @@ class DistributedItemSampler(ItemSampler):
             minibatcher,
             drop_last,
             shuffle,
-            use_indexing=True,
-            buffer_size=buffer_size,
         )
         self._distributed = True
         self._drop_uneven_inputs = drop_uneven_inputs
@@ -756,6 +567,18 @@ class DistributedItemSampler(ItemSampler):
             )
         self._world_size = dist.get_world_size()
         self._rank = dist.get_rank()
+        device = (
+            torch.cuda.current_device()
+            if torch.cuda.is_available() and dist.get_backend() == "nccl"
+            else "cpu"
+        )
+        if self._rank == 0:
+            seed = np.random.randint(0, np.iinfo(np.int32).max)
+            seed_tensor = torch.tensor(seed, dtype=torch.int32, device=device)
+        else:
+            seed_tensor = torch.empty([], dtype=torch.int32, device=device)
+        dist.broadcast(seed_tensor, src=0)
+        self._seed = seed_tensor.item()
 
 
 def _construct_seeds(pos_seeds, neg_srcs=None, neg_dsts=None):
