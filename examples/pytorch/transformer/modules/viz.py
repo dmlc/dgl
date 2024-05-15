@@ -174,10 +174,12 @@ from matplotlib.patches import ConnectionStyle, FancyArrowPatch
 
 "The following function was modified from the source code of networkx"
 
+
 def is_string_like(obj):  # from John Hunter, types-free version
     """Check if obj is string."""
-    
+
     return isinstance(obj, str)
+
 
 def draw_networkx_edges(
     G,
