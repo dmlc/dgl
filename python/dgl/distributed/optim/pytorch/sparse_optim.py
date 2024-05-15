@@ -256,7 +256,14 @@ class DistSparseGradOptimizer(abc.ABC):
         of the embeddings involved in a mini-batch to DGL's servers and update the embeddings.
         """
         with th.no_grad():
-            device = (
+            # [Rui]
+            # As `gloo` supports CPU tensors only while `nccl` supports GPU
+            # tensors only, we firstly create tensors on the corresponding
+            # devices and then copy the data to target device if needed.
+            # Please note that the target device can be different from the
+            # preferred device.
+            target_device = None
+            preferred_device = (
                 th.device(f"cuda:{self._rank}")
                 if th.distributed.get_backend() == "nccl"
                 else th.device("cpu")
@@ -283,10 +290,15 @@ class DistSparseGradOptimizer(abc.ABC):
                 # Note: we cannot skip the gradient exchange and update steps as other
                 # working processes may send gradient update requests corresponding
                 # to certain embedding to this process.
+                #
+                # [WARNING][TODO][Rui]
+                # For empty idx and grad, we blindly create data on the
+                # preferred device, which may not be the device where the
+                # embedding is stored.
                 idics = (
                     th.cat(idics, dim=0)
                     if len(idics) != 0
-                    else th.zeros((0,), dtype=th.long, device=th.device("cpu"))
+                    else th.zeros((0,), dtype=th.int64, device=preferred_device)
                 )
                 grads = (
                     th.cat(grads, dim=0)
@@ -294,10 +306,10 @@ class DistSparseGradOptimizer(abc.ABC):
                     else th.zeros(
                         (0, emb.embedding_dim),
                         dtype=th.float32,
-                        device=th.device("cpu"),
+                        device=preferred_device,
                     )
                 )
-                device = grads.device
+                target_device = grads.device
 
                 # will send grad to each corresponding trainer
                 if self._world_size > 1:
@@ -317,7 +329,7 @@ class DistSparseGradOptimizer(abc.ABC):
                                 th.tensor(
                                     [idx_i.shape[0]],
                                     dtype=th.int64,
-                                    device=device,
+                                    device=preferred_device,
                                 )
                             )
                             idics_list.append(idx_i)
@@ -334,7 +346,7 @@ class DistSparseGradOptimizer(abc.ABC):
                                     th.tensor(
                                         [idx_j.shape[0]],
                                         dtype=th.int64,
-                                        device=device,
+                                        device=preferred_device,
                                     )
                                 )
                                 idics_list.append(idx_j)
@@ -349,7 +361,9 @@ class DistSparseGradOptimizer(abc.ABC):
                     # sync information here
                     gather_list = list(
                         th.empty(
-                            [self._world_size], dtype=th.int64, device=device
+                            [self._world_size],
+                            dtype=th.int64,
+                            device=preferred_device,
                         ).chunk(self._world_size)
                     )
                     alltoall(
@@ -357,11 +371,12 @@ class DistSparseGradOptimizer(abc.ABC):
                         self._world_size,
                         gather_list,
                         idx_split_size,
-                        device,
                     )
                     idx_gather_list = [
                         th.empty(
-                            (int(num_emb),), dtype=idics.dtype, device=device
+                            (int(num_emb),),
+                            dtype=idics.dtype,
+                            device=preferred_device,
                         )
                         for num_emb in gather_list
                     ]
@@ -370,14 +385,13 @@ class DistSparseGradOptimizer(abc.ABC):
                         self._world_size,
                         idx_gather_list,
                         idics_list,
-                        device,
                     )
                     local_indics[name] = idx_gather_list
                     grad_gather_list = [
                         th.empty(
                             (int(num_emb), grads.shape[1]),
                             dtype=grads.dtype,
-                            device=device,
+                            device=preferred_device,
                         )
                         for num_emb in gather_list
                     ]
@@ -386,7 +400,6 @@ class DistSparseGradOptimizer(abc.ABC):
                         self._world_size,
                         grad_gather_list,
                         grad_list,
-                        device,
                     )
                     local_grads[name] = grad_gather_list
                 else:
@@ -405,8 +418,8 @@ class DistSparseGradOptimizer(abc.ABC):
                 idx = th.cat(local_indics[name], dim=0)
                 grad = th.cat(local_grads[name], dim=0)
                 self.update(
-                    idx.to(device, non_blocking=True),
-                    grad.to(device, non_blocking=True),
+                    idx.to(target_device, non_blocking=True),
+                    grad.to(target_device, non_blocking=True),
                     emb,
                 )
 
