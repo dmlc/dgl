@@ -447,7 +447,7 @@ if __name__ == "__main__":
         default=0,
         help="The capacity of the GPU cache, the number of features to store.",
     )
-    argparser.add_argument("--early-stopping-patience", type=int, default=10)
+    argparser.add_argument("--early-stopping-patience", type=int, default=25)
     argparser.add_argument("--disable-logging", action="store_true")
     argparser.add_argument("--disable-checkpoint", action="store_true")
     argparser.add_argument("--precision", type=str, default="high")
