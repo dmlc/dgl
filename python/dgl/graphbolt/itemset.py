@@ -346,7 +346,7 @@ class ItemSetDict:
         elif isinstance(index, slice):
             start, stop, step = index.indices(self._length)
             if step != 1:
-                return self.__getitem__(list(range(start, stop, step)))
+                return self.__getitem__(torch.arange(start, stop, step))
             assert start < stop, "Start must be smaller than stop."
             data = {}
             offset_idx_start = max(
