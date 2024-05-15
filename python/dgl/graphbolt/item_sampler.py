@@ -107,11 +107,10 @@ def minibatcher_default(batch, names):
 
 
 class ItemSampler(IterDataPipe):
-    """A sampler to iterate over input items and create subsets.
+    """A sampler to iterate over input items and create minibatches.
 
     Input items could be node IDs, node pairs with or without labels, node
-    pairs with negative sources/destinations, DGLGraphs and heterogeneous
-    counterparts.
+    pairs with negative sources/destinations.
 
     Note: This class `ItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
@@ -211,21 +210,7 @@ class ItemSampler(IterDataPipe):
         indexes=tensor([0, 1, 0, 0]), edge_features=None,
         compacted_seeds=None, blocks=None,)
 
-    5. DGLGraphs.
-
-    >>> import dgl
-    >>> graphs = [ dgl.rand_graph(10, 20) for _ in range(5) ]
-    >>> item_set = gb.ItemSet(graphs)
-    >>> item_sampler = gb.ItemSampler(item_set, 3)
-    >>> list(item_sampler)
-    [Graph(num_nodes=30, num_edges=60,
-      ndata_schemes={}
-      edata_schemes={}),
-     Graph(num_nodes=20, num_edges=40,
-      ndata_schemes={}
-      edata_schemes={})]
-
-    6. Further process batches with other datapipes such as
+    5. Further process batches with other datapipes such as
     :class:`torchdata.datapipes.iter.Mapper`.
 
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
@@ -236,7 +221,7 @@ class ItemSampler(IterDataPipe):
     >>> list(data_pipe)
     [tensor([1, 2, 3, 4]), tensor([5, 6, 7, 8]), tensor([ 9, 10])]
 
-    7. Heterogeneous node IDs.
+    6. Heterogeneous node IDs.
 
     >>> ids = {
     ...     "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
@@ -249,7 +234,7 @@ class ItemSampler(IterDataPipe):
         node_features=None, labels=None, input_nodes=None, indexes=None,
         edge_features=None, compacted_seeds=None, blocks=None,)
 
-    8. Heterogeneous node pairs.
+    7. Heterogeneous node pairs.
 
     >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
     >>> seeds_follow = torch.arange(10, 20).reshape(-1, 2)
@@ -266,7 +251,7 @@ class ItemSampler(IterDataPipe):
         node_features=None, labels=None, input_nodes=None, indexes=None,
         edge_features=None, compacted_seeds=None, blocks=None,)
 
-    9. Heterogeneous node pairs and labels.
+    8. Heterogeneous node pairs and labels.
 
     >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
     >>> labels_like = torch.arange(0, 5)
@@ -286,7 +271,7 @@ class ItemSampler(IterDataPipe):
         input_nodes=None, indexes=None, edge_features=None,
         compacted_seeds=None, blocks=None,)
 
-    10. Heterogeneous node pairs, labels and indexes.
+    9. Heterogeneous node pairs, labels and indexes.
 
     >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
     >>> labels_like = torch.tensor([1, 1, 0, 0, 0])
