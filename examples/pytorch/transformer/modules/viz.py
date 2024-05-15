@@ -171,36 +171,39 @@ def graph_att_head(M, N, weight, ax, title):
     )
 
 
-import networkx as nx
 from matplotlib.patches import ConnectionStyle, FancyArrowPatch
-from networkx.utils import is_string_like
 
 "The following function was modified from the source code of networkx"
 
-
-def draw_networkx_edges(
-    G,
-    pos,
-    edgelist=None,
-    width=1.0,
-    edge_color="k",
-    style="solid",
-    alpha=1.0,
-    arrowstyle="-|>",
-    arrowsize=10,
-    edge_cmap=None,
-    edge_vmin=None,
-    edge_vmax=None,
-    ax=None,
-    arrows=True,
-    label=None,
-    node_size=300,
-    nodelist=None,
-    node_shape="o",
-    connectionstyle="arc3",
-    **kwds
-):
-    """Draw the edges of the graph G.
+def is_string_like(obj):  # from John Hunter, types-free version
+     """Check if obj is string.
+    
+     return isinstance(obj, str)
+ 
+ 
+ def draw_networkx_edges(
+     G,
+     pos,
+     edgelist=None,
+     width=1.0,
+     edge_color="k",
+     style="solid",
+     alpha=1.0,
+     arrowstyle="-|>",
+     arrowsize=10,
+     edge_cmap=None,
+     edge_vmin=None,
+     edge_vmax=None,
+     ax=None,
+     arrows=True,
+     label=None,
+     node_size=300,
+     nodelist=None,
+     node_shape="o",
+     connectionstyle="arc3",
+     **kwds
+ ):
+     """Draw the edges of the graph G.
 
     This draws only the edges of the graph G.
 
