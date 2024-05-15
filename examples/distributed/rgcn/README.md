@@ -123,26 +123,26 @@ The command below launches 4 training processes on each machine as we'd like to 
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
---workspace ~/workspace/dgl/examples/pytorch/rgcn/experimental/ \
+--workspace ~/workspace/dgl/examples/distributed/rgcn/ \
 --num_trainers 4 \
 --num_servers 2 \
 --num_samplers 0 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --num_gpus 4"
+"python3 node_classification.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --num_gpus 4"
 ```
 
 If we want to train RGCN with `GraphBolt`, we need to append `--use_graphbolt`.
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
---workspace ~/workspace/dgl/examples/pytorch/rgcn/experimental/ \
+--workspace ~/workspace/dgl/examples/distributed/rgcn/ \
 --num_trainers 4 \
 --num_servers 2 \
 --num_samplers 0 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --num_gpus 4 --use_graphbolt"
+"python3 node_classification.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --num_gpus 4 --use_graphbolt"
 ```
 
 **Note:** if you are using conda or other virtual environments on the remote machines, you need to replace `python3` in the command string (i.e. the last argument) with the path to the Python interpreter in that environment.
