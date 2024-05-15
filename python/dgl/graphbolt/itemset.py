@@ -362,33 +362,19 @@ class ItemSetDict:
                     break
             return data
         elif isinstance(index, Iterable):
-            # TODO[Mingbang]: Might have performance issue. Tests needed.
-            data = {key: [] for key in self._keys}
-            for idx in index:
-                if idx < 0:
-                    idx += self._length
-                if idx < 0 or idx >= self._length:
-                    raise IndexError(
-                        f"{type(self).__name__} index out of range."
-                    )
-                offset_idx = torch.searchsorted(self._offsets, idx, right=True)
-                offset_idx -= 1
-                idx -= self._offsets[offset_idx]
-                key = self._keys[offset_idx]
-                data[key].append(int(idx))
-            for key in self._keys:
-                indices = data[key]
-                if len(indices) == 0:
-                    del data[key]
+            index = torch.tensor(index).squeeze()
+            assert torch.all((index >= 0) & (index < self._length))
+            key_indices = (
+                torch.searchsorted(self._offsets, index, right=True) - 1
+            )
+            data = {}
+            for key_id, key in enumerate(self._keys):
+                mask = (key_indices == key_id).nonzero().squeeze(1)
+                if len(mask) == 0:
                     continue
-                item_set = self._itemsets[key]
-                try:
-                    value = item_set[indices]
-                except TypeError:
-                    # In case the itemset doesn't support list indexing.
-                    value = tuple(item_set[idx] for idx in indices)
-                finally:
-                    data[key] = value
+                data[key] = self._itemsets[key][
+                    index[mask] - self._offsets[key_id]
+                ]
             return data
         else:
             raise TypeError(
