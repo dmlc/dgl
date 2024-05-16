@@ -369,7 +369,9 @@ class NeighborSampler(NeighborSamplerImpl):
     link prediction, the process needs another pre-peocess operation. That is,
     gathering unique nodes from the given node pairs, encompassing both
     positive and negative node pairs, and employs these nodes as the seed nodes
-    for subsequent steps.
+    for subsequent steps. When the graph is hetero, sampled subgraphs in
+    minibatch will contain every edge type even though it is empty after
+    sampling.
 
     Parameters
     ----------
@@ -479,7 +481,9 @@ class LayerNeighborSampler(NeighborSamplerImpl):
     link prediction, the process needs another pre-process operation. That is,
     gathering unique nodes from the given node pairs, encompassing both
     positive and negative node pairs, and employs these nodes as the seed nodes
-    for subsequent steps.
+    for subsequent steps. When the graph is hetero, sampled subgraphs in
+    minibatch will contain every edge type even though it is empty after
+    sampling.
 
     Implements the approach described in Appendix A.3 of the paper. Similar to
     dgl.dataloading.LaborSampler but this uses sequential poisson sampling
