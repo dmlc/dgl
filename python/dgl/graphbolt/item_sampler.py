@@ -585,7 +585,7 @@ class DistributedItemSampler(ItemSampler):
             )
         self._world_size = dist.get_world_size()
         self._rank = dist.get_rank()
-        if self._world_size > 0:
+        if self._world_size > 1:
             self._align_seeds()
 
     def _align_seeds(self, src: int = 0):
