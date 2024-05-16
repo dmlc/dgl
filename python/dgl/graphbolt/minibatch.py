@@ -192,10 +192,15 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
+                node_types = []
+                sampled_csc = {}
                 for v in subgraph.sampled_csc.values():
                     cast_to_minimum_dtype(v)
-                sampled_csc = {
-                    etype_str_to_tuple(etype): (
+                for etype, v in subgraph.sampled_csc.items():
+                    etype_tuple = etype_str_to_tuple(etype)
+                    node_types.append(etype_tuple[0])
+                    node_types.append(etype_tuple[2])
+                    sampled_csc[etype_tuple] = (
                         "csc",
                         (
                             v.indptr,
@@ -208,16 +213,21 @@ class MiniBatch:
                             ),
                         ),
                     )
-                    for etype, v in subgraph.sampled_csc.items()
-                    if len(v.indices) > 0
-                }
                 num_src_nodes = {
-                    ntype: nodes.size(0)
-                    for ntype, nodes in original_row_node_ids.items()
+                    ntype: (
+                        original_row_node_ids[ntype].size(0)
+                        if original_row_node_ids.get(ntype) is not None
+                        else 0
+                    )
+                    for ntype in set(node_types)
                 }
                 num_dst_nodes = {
-                    ntype: nodes.size(0)
-                    for ntype, nodes in original_column_node_ids.items()
+                    ntype: (
+                        original_column_node_ids[ntype].size(0)
+                        if original_column_node_ids.get(ntype) is not None
+                        else 0
+                    )
+                    for ntype in set(node_types)
                 }
             else:
                 sampled_csc = cast_to_minimum_dtype(subgraph.sampled_csc)
