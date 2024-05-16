@@ -585,17 +585,21 @@ class DistributedItemSampler(ItemSampler):
             )
         self._world_size = dist.get_world_size()
         self._rank = dist.get_rank()
+        if self._world_size > 0:
+            self._align_seeds()
+
+    def _align_seeds(self, src: int = 0):
         device = (
             torch.cuda.current_device()
             if torch.cuda.is_available() and dist.get_backend() == "nccl"
             else "cpu"
         )
-        if self._rank == 0:
+        if self._rank == src:
             seed = np.random.randint(0, np.iinfo(np.int32).max)
             seed_tensor = torch.tensor(seed, dtype=torch.int32, device=device)
         else:
             seed_tensor = torch.empty([], dtype=torch.int32, device=device)
-        dist.broadcast(seed_tensor, src=0)
+        dist.broadcast(seed_tensor, src=src)
         self._seed = seed_tensor.item()
 
 
