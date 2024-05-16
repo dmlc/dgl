@@ -1,4 +1,5 @@
 """GPU cached feature for GraphBolt."""
+
 import torch
 
 from ..feature_store import Feature
