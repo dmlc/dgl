@@ -209,6 +209,7 @@ class MiniBatch:
                         ),
                     )
                     for etype, v in subgraph.sampled_csc.items()
+                    if len(v.indices) > 0
                 }
                 num_src_nodes = {
                     ntype: nodes.size(0)
