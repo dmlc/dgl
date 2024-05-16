@@ -336,6 +336,76 @@ def test_get_dgl_blocks_hetero():
     assert result == expect_result
 
 
+def test_get_dgl_blocks_hetero_empty_edges():
+    csc_formats = [
+        {
+            relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0, 1, 2, 3]),
+                indices=torch.tensor([0, 1, 1]),
+            ),
+            reverse_relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0, 0, 0, 1, 2]),
+                indices=torch.tensor([1, 0]),
+            ),
+        },
+        {
+            relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0, 1, 2]), indices=torch.tensor([1, 0])
+            ),
+            reverse_relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0]), indices=torch.tensor([])
+            ),
+        },
+    ]
+    original_column_node_ids = [
+        {"B": torch.tensor([10, 11, 12]), "A": torch.tensor([5, 7, 9, 11])},
+        {"B": torch.tensor([10, 11])},
+    ]
+    original_row_node_ids = [
+        {
+            "A": torch.tensor([5, 7, 9, 11]),
+            "B": torch.tensor([10, 11, 12]),
+        },
+        {
+            "A": torch.tensor([5, 7]),
+            "B": torch.tensor([10, 11]),
+        },
+    ]
+    original_edge_ids = [
+        {
+            relation: torch.tensor([19, 20, 21]),
+            reverse_relation: torch.tensor([23, 26]),
+        },
+        {relation: torch.tensor([10, 12])},
+    ]
+    subgraphs = []
+    for i in range(2):
+        subgraphs.append(
+            gb.SampledSubgraphImpl(
+                sampled_csc=csc_formats[i],
+                original_column_node_ids=original_column_node_ids[i],
+                original_row_node_ids=original_row_node_ids[i],
+                original_edge_ids=original_edge_ids[i],
+            )
+        )
+    # Test minibatch with all attributes.
+    minibatch = gb.MiniBatch(
+        sampled_subgraphs=subgraphs,
+    )
+    dgl_blocks = minibatch.blocks
+    expect_result = str(
+        """[Block(num_src_nodes={'A': 4, 'B': 3},
+      num_dst_nodes={'A': 4, 'B': 3},
+      num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
+      metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]), Block(num_src_nodes={'A': 2, 'B': 2},
+      num_dst_nodes={'B': 2},
+      num_edges={('A', 'r', 'B'): 2},
+      metagraph=[('A', 'B', 'r')])]"""
+    )
+    result = str(dgl_blocks)
+    assert result == expect_result
+
+
 def create_homo_minibatch():
     csc_formats = [
         gb.CSCFormatBase(
