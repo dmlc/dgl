@@ -314,6 +314,9 @@ class ItemSampler(IterDataPipe):
         self._world_size = None
         self._rank = None
         self._seed = np.random.randint(0, np.iinfo(np.int32).max)
+        # The attribute `self._epoch` is added to make shuffling work properly
+        # across multiple epochs. Otherwise, the same ordering will always be
+        # used in every epoch.
         self._epoch = 0
 
     def _collate_batch(self, buffer, indices, offsets=None):
