@@ -362,7 +362,8 @@ class ItemSetDict:
                     break
             return data
         elif isinstance(index, Iterable):
-            index = torch.tensor(index)
+            if not isinstance(index, torch.Tensor):
+                index = torch.tensor(index)
             assert torch.all((index >= 0) & (index < self._length))
             key_indices = (
                 torch.searchsorted(self._offsets, index, right=True) - 1
