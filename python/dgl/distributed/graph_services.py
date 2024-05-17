@@ -1,4 +1,5 @@
 """A set of graph services of getting subgraphs from DistGraph"""
+
 import os
 from collections import namedtuple
 
@@ -15,6 +16,7 @@ from ..sampling import (
 )
 from ..subgraph import in_subgraph as local_in_subgraph
 from ..utils import toindex
+from .constants import DGL2GB_EID, GB_DST_ID
 from .rpc import (
     recv_responses,
     register_service,
@@ -322,9 +324,18 @@ def _find_edges(local_g, partition_book, seed_edges):
     and destination node ID array ``s`` and ``d`` in the local partition.
     """
     local_eids = partition_book.eid2localeid(seed_edges, partition_book.partid)
-    local_eids = F.astype(local_eids, local_g.idtype)
-    local_src, local_dst = local_g.find_edges(local_eids)
-    global_nid_mapping = local_g.ndata[NID]
+    if isinstance(local_g, gb.FusedCSCSamplingGraph):
+        # When converting from DGLGraph to FusedCSCSamplingGraph, the edge IDs
+        # are re-ordered. In order to find the correct node pairs, we need to
+        # map the DGL edge IDs back to GraphBolt edge IDs.
+        local_eids = local_g.edge_attributes[DGL2GB_EID][local_eids]
+        local_src = local_g.indices[local_eids]
+        local_dst = local_g.edge_attributes[GB_DST_ID][local_eids]
+        global_nid_mapping = local_g.node_attributes[NID]
+    else:
+        local_eids = F.astype(local_eids, local_g.idtype)
+        local_src, local_dst = local_g.find_edges(local_eids)
+        global_nid_mapping = local_g.ndata[NID]
     global_src = global_nid_mapping[local_src]
     global_dst = global_nid_mapping[local_dst]
     return global_src, global_dst
@@ -915,9 +926,11 @@ def sample_etype_neighbors(
             _prob = [
                 # NOTE (BarclayII)
                 # Currently DistGraph.edges[] does not accept canonical etype.
-                g.edges[etype].data[prob].kvstore_key
-                if prob in g.edges[etype].data
-                else ""
+                (
+                    g.edges[etype].data[prob].kvstore_key
+                    if prob in g.edges[etype].data
+                    else ""
+                )
                 for etype in g.canonical_etypes
             ]
         else:
@@ -939,9 +952,11 @@ def sample_etype_neighbors(
             _prob = None
         else:
             _prob = [
-                g.edges[etype].data[prob].local_partition
-                if prob in g.edges[etype].data
-                else None
+                (
+                    g.edges[etype].data[prob].local_partition
+                    if prob in g.edges[etype].data
+                    else None
+                )
                 for etype in g.canonical_etypes
             ]
         return _sample_etype_neighbors(

@@ -1188,3 +1188,104 @@ def test_partition_graph_graphbolt_hetero(
             for edge_type, type_id in new_g.edge_type_to_id.items():
                 assert g.get_etype_id(_etype_str_to_tuple(edge_type)) == type_id
             assert new_g.node_type_offset is None
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_partition_graph_graphbolt_homo_find_edges(
+    part_method,
+    num_parts,
+):
+    reset_envs()
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    with tempfile.TemporaryDirectory() as test_dir:
+        g = create_random_graph(1000)
+        g.ndata["feat"] = th.rand(g.num_nodes(), 5)
+        graph_name = "test"
+        orig_nids, orig_eids = partition_graph(
+            g,
+            graph_name,
+            num_parts,
+            test_dir,
+            part_method=part_method,
+            graph_formats=["coo"],
+            return_mapping=True,
+            use_graphbolt=True,
+            store_eids=True,
+            store_inner_node=True,
+            store_inner_edge=True,
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        for part_id in range(num_parts):
+            local_g, node_feats, _, gpb, _, _, _ = load_partition(
+                part_config, part_id, load_feats=True, use_graphbolt=True
+            )
+            inner_global_eids = gpb.partid2eids(part_id)
+            global_src, global_dst = dgl.distributed.graph_services._find_edges(
+                local_g, gpb, inner_global_eids
+            )
+            orig_global_src = orig_nids[global_src]
+            orig_global_dst = orig_nids[global_dst]
+            assert th.all(g.has_edges_between(orig_global_src, orig_global_dst))
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_partition_graph_graphbolt_hetero_find_edges(
+    part_method,
+    num_parts,
+):
+    reset_envs()
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    with tempfile.TemporaryDirectory() as test_dir:
+        hg = create_random_hetero()
+        graph_name = "test"
+        orig_nids, orig_eids = partition_graph(
+            hg,
+            graph_name,
+            num_parts,
+            test_dir,
+            part_method=part_method,
+            graph_formats=["coo"],
+            return_mapping=True,
+            use_graphbolt=True,
+            store_eids=True,
+            store_inner_node=True,
+            store_inner_edge=True,
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        for part_id in range(num_parts):
+            local_g, node_feats, _, gpb, _, _, _ = load_partition(
+                part_config, part_id, load_feats=True, use_graphbolt=True
+            )
+            inner_global_eids = gpb.partid2eids(part_id)
+            global_src, global_dst = dgl.distributed.graph_services._find_edges(
+                local_g, gpb, inner_global_eids
+            )
+            _, per_ntype_nids_src = gpb.map_to_per_ntype(global_src)
+            _, per_ntype_nids_dst = gpb.map_to_per_ntype(global_dst)
+            etype_ids, _ = gpb.map_to_per_etype(inner_global_eids)
+            for src_ntype, etype, dst_ntype in hg.canonical_etypes:
+                etype_id = hg.get_etype_id((src_ntype, etype, dst_ntype))
+                current_etype_indices = th.nonzero(
+                    etype_ids == etype_id, as_tuple=False
+                ).squeeze()
+                current_per_ntype_nids_src = per_ntype_nids_src[
+                    current_etype_indices
+                ]
+                current_per_ntype_nids_dst = per_ntype_nids_dst[
+                    current_etype_indices
+                ]
+                current_orig_global_src = orig_nids[src_ntype][
+                    current_per_ntype_nids_src
+                ]
+                current_orig_global_dst = orig_nids[dst_ntype][
+                    current_per_ntype_nids_dst
+                ]
+                assert th.all(
+                    hg.has_edges_between(
+                        current_orig_global_src,
+                        current_orig_global_dst,
+                        etype=(src_ntype, etype, dst_ntype),
+                    )
+                )
