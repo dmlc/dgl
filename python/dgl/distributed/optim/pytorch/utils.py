@@ -62,7 +62,7 @@ def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     th.distributed.barrier()
 
 
-def alltoall(rank, world_size, output_tensor_list, input_tensor_list, device):
+def alltoall(rank, world_size, output_tensor_list, input_tensor_list):
     """Each process scatters list of input tensors to all processes in a cluster
     and return gathered list of tensors in output list. The tensors should have the same shape.
 
@@ -76,13 +76,8 @@ def alltoall(rank, world_size, output_tensor_list, input_tensor_list, device):
         The received tensors
     input_tensor_list : List of tensor
         The tensors to exchange
-    device: th.device
-        Device of the tensors
     """
     if th.distributed.get_backend() == "nccl":
-        input_tensor_list = [
-            tensor.to(th.device(device)) for tensor in input_tensor_list
-        ]
         th.distributed.all_to_all(output_tensor_list, input_tensor_list)
     else:
         alltoall_cpu(
@@ -93,7 +88,7 @@ def alltoall(rank, world_size, output_tensor_list, input_tensor_list, device):
         )
 
 
-def alltoallv(rank, world_size, output_tensor_list, input_tensor_list, device):
+def alltoallv(rank, world_size, output_tensor_list, input_tensor_list):
     """Each process scatters list of input tensors to all processes in a cluster
     and return gathered list of tensors in output list.
 
@@ -107,13 +102,8 @@ def alltoallv(rank, world_size, output_tensor_list, input_tensor_list, device):
         The received tensors
     input_tensor_list : List of tensor
         The tensors to exchange
-    device: th.device
-        Device of the tensors
     """
     if th.distributed.get_backend() == "nccl":
-        input_tensor_list = [
-            tensor.to(th.device(device)) for tensor in input_tensor_list
-        ]
         th.distributed.all_to_all(output_tensor_list, input_tensor_list)
     else:
         alltoallv_cpu(
