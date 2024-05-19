@@ -18,9 +18,8 @@ def to_on_disk_numpy(test_dir, name, t):
 
 
 @unittest.skipIf(
-    sys.platform.startswith("win"),
-    reason="Tests for disk dataset can only deployed on Linux,"
-    "because the io_uring is only supportted by Linux kernel.",
+    True,
+    reason="DiskBasedFeature is not available now.",
 )
 def test_disk_based_feature():
     with tempfile.TemporaryDirectory() as test_dir:
@@ -85,6 +84,10 @@ def test_disk_based_feature():
     reason="Tests for disk dataset can only deployed on Linux,"
     "because the io_uring is only supportted by Linux kernel.",
 )
+@unittest.skipIf(
+    True,
+    reason="DiskBasedFeature is not available now.",
+)
 @pytest.mark.parametrize(
     "dtype",
     [
@@ -128,6 +131,10 @@ def test_more_disk_based_feature(dtype, idtype, shape, index):
     sys.platform.startswith("win"),
     reason="Tests for large disk dataset can only deployed on Linux,"
     "because the io_uring is only supportted by Linux kernel.",
+)
+@unittest.skipIf(
+    True,
+    reason="DiskBasedFeature is not available now.",
 )
 def test_disk_based_feature_repr():
     with tempfile.TemporaryDirectory() as test_dir:

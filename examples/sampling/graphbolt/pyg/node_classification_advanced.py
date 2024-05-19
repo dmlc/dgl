@@ -351,6 +351,12 @@ def parse_args():
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     parser.add_argument(
+        "--gpu-cache-size",
+        type=int,
+        default=0,
+        help="The capacity of the GPU cache in bytes.",
+    )
+    parser.add_argument(
         "--sample-mode",
         default="sample_neighbor",
         choices=["sample_neighbor", "sample_layer_neighbor"],
@@ -375,7 +381,7 @@ def parse_args():
 
 def main():
     if not torch.cuda.is_available():
-        args.mode = "cpu-cpu"
+        args.mode = "cpu-cpu-cpu"
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
 
@@ -402,6 +408,12 @@ def main():
     args.fanout = list(map(int, args.fanout.split(",")))
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
+
+    if args.gpu_cache_size > 0 and args.feature_device != "cuda":
+        features._features[("node", None, "feat")] = gb.GPUCachedFeature(
+            features._features[("node", None, "feat")],
+            args.gpu_cache_size,
+        )
 
     train_dataloader, valid_dataloader = (
         create_dataloader(

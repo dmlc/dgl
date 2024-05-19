@@ -25,14 +25,14 @@ def test_ItemSet_names():
     # Integer-initiated ItemSet with excessive names.
     with pytest.raises(
         AssertionError,
-        match=re.escape("Number of items (1) and names (2) must match."),
+        match=re.escape("Number of items (1) and names (2) don't match."),
     ):
         _ = gb.ItemSet(5, names=("seeds", "labels"))
 
     # ItemSet with mismatched items and names.
     with pytest.raises(
         AssertionError,
-        match=re.escape("Number of items (1) and names (2) must match."),
+        match=re.escape("Number of items (1) and names (2) don't match."),
     ):
         _ = gb.ItemSet(torch.arange(0, 5), names=("seeds", "labels"))
 
@@ -77,31 +77,16 @@ def test_ItemSet_length():
             return iter([0, 1, 2])
 
     # Single iterable with invalid length.
-    item_set = gb.ItemSet(InvalidLength())
     with pytest.raises(
-        TypeError, match="ItemSet instance doesn't have valid length."
+        TypeError, match="object of type 'InvalidLength' has no len()"
     ):
-        _ = len(item_set)
-    with pytest.raises(
-        TypeError, match="ItemSet instance doesn't support indexing."
-    ):
-        _ = item_set[0]
-    for i, item in enumerate(item_set):
-        assert i == item
+        item_set = gb.ItemSet(InvalidLength())
 
     # Tuple of iterables with invalid length.
-    item_set = gb.ItemSet((InvalidLength(), InvalidLength()))
     with pytest.raises(
-        TypeError, match="ItemSet instance doesn't have valid length."
+        TypeError, match="object of type 'InvalidLength' has no len()"
     ):
-        _ = len(item_set)
-    with pytest.raises(
-        TypeError, match="ItemSet instance doesn't support indexing."
-    ):
-        _ = item_set[0]
-    for i, (item1, item2) in enumerate(item_set):
-        assert i == item1
-        assert i == item2
+        item_set = gb.ItemSet((InvalidLength(), InvalidLength()))
 
 
 def test_ItemSet_seed_nodes():
@@ -113,7 +98,7 @@ def test_ItemSet_seed_nodes():
         assert i == item.item()
         assert i == item_set[i]
     # Indexing with a slice.
-    assert torch.equal(item_set[:], torch.arange(0, 5))
+    assert torch.equal(item_set[::2], torch.tensor([0, 2, 4]))
     # Indexing with an Iterable.
     assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
 
@@ -125,7 +110,8 @@ def test_ItemSet_seed_nodes():
         assert i == item.item()
         assert i == item_set[i]
     # Indexing with a slice.
-    assert torch.equal(item_set[:], torch.arange(0, 5))
+    assert torch.equal(item_set[::2], torch.tensor([0, 2, 4]))
+    assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
     # Indexing with an integer.
     assert item_set[0] == 0
     assert item_set[-1] == 4
@@ -134,11 +120,12 @@ def test_ItemSet_seed_nodes():
         _ = item_set[5]
     with pytest.raises(IndexError, match="ItemSet index out of range."):
         _ = item_set[-10]
-    # Indexing with tensor.
+    # Indexing with invalid input type.
     with pytest.raises(
-        TypeError, match="ItemSet indices must be integer or slice."
+        TypeError,
+        match="ItemSet indices must be int, slice, or iterable of int, not <class 'float'>.",
     ):
-        _ = item_set[torch.arange(3)]
+        _ = item_set[1.5]
 
 
 def test_ItemSet_seed_nodes_labels():
@@ -320,36 +307,30 @@ def test_ItemSetDict_length():
             return iter([0, 1, 2])
 
     # Single iterable with invalid length.
-    item_set = gb.ItemSetDict(
-        {
-            "user": gb.ItemSet(InvalidLength()),
-            "item": gb.ItemSet(InvalidLength()),
-        }
-    )
     with pytest.raises(
-        TypeError, match="ItemSet instance doesn't have valid length."
+        TypeError, match="object of type 'InvalidLength' has no len()"
     ):
-        _ = len(item_set)
-    with pytest.raises(
-        TypeError, match="ItemSetDict instance doesn't support indexing."
-    ):
-        _ = item_set[0]
+        item_set = gb.ItemSetDict(
+            {
+                "user": gb.ItemSet(InvalidLength()),
+                "item": gb.ItemSet(InvalidLength()),
+            }
+        )
 
     # Tuple of iterables with invalid length.
-    item_set = gb.ItemSetDict(
-        {
-            "user:like:item": gb.ItemSet((InvalidLength(), InvalidLength())),
-            "user:follow:user": gb.ItemSet((InvalidLength(), InvalidLength())),
-        }
-    )
     with pytest.raises(
-        TypeError, match="ItemSet instance doesn't have valid length."
+        TypeError, match="object of type 'InvalidLength' has no len()"
     ):
-        _ = len(item_set)
-    with pytest.raises(
-        TypeError, match="ItemSetDict instance doesn't support indexing."
-    ):
-        _ = item_set[0]
+        item_set = gb.ItemSetDict(
+            {
+                "user:like:item": gb.ItemSet(
+                    (InvalidLength(), InvalidLength())
+                ),
+                "user:follow:user": gb.ItemSet(
+                    (InvalidLength(), InvalidLength())
+                ),
+            }
+        )
 
 
 def test_ItemSetDict_iteration_seed_nodes():
@@ -383,14 +364,23 @@ def test_ItemSetDict_iteration_seed_nodes():
     partial_data = item_set[7:]
     assert len(list(partial_data.keys())) == 1
     assert torch.equal(partial_data["item"], item_ids[2:])
-    partial_data = item_set[3:7]
+    partial_data = item_set[3:8:2]
     assert len(list(partial_data.keys())) == 2
-    assert torch.equal(partial_data["user"], user_ids[3:5])
-    assert torch.equal(partial_data["item"], item_ids[:2])
+    assert torch.equal(partial_data["user"], user_ids[3:-1:2])
+    assert torch.equal(partial_data["item"], item_ids[0:3:2])
+    # Indexing with an iterable of int.
+    partial_data = item_set[torch.tensor([1, 0, 4])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], torch.tensor([1, 0, 4]))
+    partial_data = item_set[torch.tensor([9, 8, 5])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], torch.tensor([9, 8, 5]))
+    partial_data = item_set[torch.tensor([8, 1, 0, 9, 7, 5])]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], torch.tensor([1, 0]))
+    assert torch.equal(partial_data["item"], torch.tensor([8, 9, 7, 5]))
 
     # Exception cases.
-    with pytest.raises(AssertionError, match="Step must be 1."):
-        _ = item_set[::2]
     with pytest.raises(
         AssertionError, match="Start must be smaller than stop."
     ):
@@ -404,9 +394,10 @@ def test_ItemSetDict_iteration_seed_nodes():
     with pytest.raises(IndexError, match="ItemSetDict index out of range."):
         _ = item_set[-20]
     with pytest.raises(
-        TypeError, match="ItemSetDict indices must be int or slice."
+        TypeError,
+        match="ItemSetDict indices must be int, slice, or iterable of int, not <class 'float'>.",
     ):
-        _ = item_set[torch.arange(3)]
+        _ = item_set[1.5]
 
 
 def test_ItemSetDict_iteration_seed_nodes_labels():
