@@ -1348,9 +1348,7 @@ static torch::Tensor NonUniformPickOp(
               auto j = RandomEngine::ThreadLocal()->RandInt(i, num_neighbors);
               std::swap(positive_probs_indices_ptr[i], positive_probs_indices_ptr[j]);
             }
-            for (int64_t i = 0; i < fanout; ++i) {
-              ret_ptr[i] = positive_probs_indices_ptr[i];
-            }
+            std::memcpy(ret_ptr, positive_probs_indices_ptr, fanout * sizeof(int64_t));
           } else if (fanout < 64) {
             auto begin = ret_ptr;
             auto end = ret_ptr + fanout;
