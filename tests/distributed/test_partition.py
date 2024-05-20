@@ -1227,8 +1227,8 @@ def test_partition_graph_graphbolt_homo_find_edges(
                 with pytest.raises(
                     ValueError,
                     match="The edge attributes DGL2GB_EID and GB_DST_ID are "
-                        "not found. Please make sure `coo` format is available"
-                        " when generating partitions in GraphBolt format.",
+                    "not found. Please make sure `coo` format is available"
+                    " when generating partitions in GraphBolt format.",
                 ):
                     dgl.distributed.graph_services._find_edges(
                         local_g, gpb, inner_global_eids
@@ -1278,8 +1278,8 @@ def test_partition_graph_graphbolt_hetero_find_edges(
                 with pytest.raises(
                     ValueError,
                     match="The edge attributes DGL2GB_EID and GB_DST_ID are "
-                        "not found. Please make sure `coo` format is available"
-                        " when generating partitions in GraphBolt format.",
+                    "not found. Please make sure `coo` format is available"
+                    " when generating partitions in GraphBolt format.",
                 ):
                     dgl.distributed.graph_services._find_edges(
                         local_g, gpb, inner_global_eids
