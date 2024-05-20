@@ -328,6 +328,15 @@ def _find_edges(local_g, partition_book, seed_edges):
         # When converting from DGLGraph to FusedCSCSamplingGraph, the edge IDs
         # are re-ordered. In order to find the correct node pairs, we need to
         # map the DGL edge IDs back to GraphBolt edge IDs.
+        if (
+            DGL2GB_EID not in local_g.edge_attributes
+            or GB_DST_ID not in local_g.edge_attributes
+        ):
+            raise ValueError(
+                "The edge attributes DGL2GB_EID and GB_DST_ID are not found. "
+                "Please make sure `coo` format is available when generating "
+                "partitions in GraphBolt format."
+            )
         local_eids = local_g.edge_attributes[DGL2GB_EID][local_eids]
         local_src = local_g.indices[local_eids]
         local_dst = local_g.edge_attributes[GB_DST_ID][local_eids]

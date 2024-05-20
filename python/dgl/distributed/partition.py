@@ -1337,6 +1337,7 @@ def partition_graph(
     )
 
     if use_graphbolt:
+        kwargs["graph_formats"] = graph_formats
         dgl_partition_to_graphbolt(
             part_config,
             **kwargs,
@@ -1382,6 +1383,7 @@ def dgl_partition_to_graphbolt(
     store_eids=False,
     store_inner_node=False,
     store_inner_edge=False,
+    graph_formats=None,
 ):
     """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
 
@@ -1402,6 +1404,13 @@ def dgl_partition_to_graphbolt(
         Whether to store inner node mask in the new graph. Default: False.
     store_inner_edge : bool, optional
         Whether to store inner edge mask in the new graph. Default: False.
+    graph_formats : str or list[str], optional
+        Save partitions in specified formats. It could be any combination of
+        `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
+        it is not necessary to specify this argument. It's mainly for
+        specifying `coo` format to save edge ID mapping and destination node
+        IDs. If not specified, whether to save `coo` format is determined by
+        the availability of the format in DGL partitions. Default: None.
     """
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
@@ -1497,8 +1506,13 @@ def dgl_partition_to_graphbolt(
         # What's more, in order to find the dst nodes efficiently, we save
         # dst nodes directly in the edge attributes.
         #
-        # So we require additional O(2 * E) space in total.
-        if "coo" in graph.formats()["created"]:
+        # So we require additional `(2 * E) * dtype` space in total.
+        if graph_formats is not None and isinstance(graph_formats, str):
+            graph_formats = [graph_formats]
+        save_coo = (
+            graph_formats is None and "coo" in graph.formats()["created"]
+        ) or (graph_formats is not None and "coo" in graph_formats)
+        if save_coo:
             edge_attributes[DGL2GB_EID] = torch.argsort(edge_ids)
             edge_attributes[GB_DST_ID] = gb.expand_indptr(
                 indptr, dtype=indices.dtype
