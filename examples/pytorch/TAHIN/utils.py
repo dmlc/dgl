@@ -1,9 +1,4 @@
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    log_loss,
-    roc_auc_score,
-)
+from sklearn.metrics import accuracy_score,f1_score,log_loss,roc_auc_score
 
 
 def evaluate_auc(pred, label):
@@ -23,7 +18,7 @@ def evaluate_f1_score(pred, label):
     res = []
     for _value in pred:
         res.append(1 if _value >= 0.5 else 0)
-        
+
     return f1_score(y_pred=res, y_true=label)
 
 
