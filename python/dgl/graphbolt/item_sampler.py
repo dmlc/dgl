@@ -129,6 +129,9 @@ class ItemSampler(IterDataPipe):
         Option to drop the last batch if it's not full.
     shuffle : bool
         Option to shuffle before sample.
+    seed: int
+        The seed for reproducible stochastic shuffling. If None, a random seed
+        will be generated.
 
     Examples
     --------
@@ -443,6 +446,9 @@ class DistributedItemSampler(ItemSampler):
         https://pytorch.org/tutorials/advanced/generic_join.html. However, this
         option can be used if the Join Context Manager is not helpful for any
         reason.
+    seed: int
+        The seed for reproducible stochastic shuffling. If None, a random seed
+        will be generated.
 
     Examples
     --------
