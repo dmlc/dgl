@@ -1534,6 +1534,8 @@ def dgl_partition_to_graphbolt(
             NTYPE: len(ntypes),
             EID: part_meta["num_edges"],
             ETYPE: len(etypes),
+            DGL2GB_EID: part_meta["num_edges"],
+            GB_DST_ID: part_meta["num_nodes"],
         }
         for attributes in [node_attributes, edge_attributes]:
             for key in attributes:
