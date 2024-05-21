@@ -10,7 +10,6 @@ def evaluate_acc(pred, label):
     res = []
     for _value in pred:
         res.append(1 if _value >= 0.5 else 0)
-
     return accuracy_score(y_pred=res, y_true=label)
 
 
@@ -18,7 +17,6 @@ def evaluate_f1_score(pred, label):
     res = []
     for _value in pred:
         res.append(1 if _value >= 0.5 else 0)
-
     return f1_score(y_pred=res, y_true=label)
 
 
