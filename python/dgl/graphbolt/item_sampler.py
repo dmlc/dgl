@@ -588,14 +588,30 @@ class DistributedItemSampler(ItemSampler):
         if self._world_size > 1:
             self._align_seeds()
 
-    def _align_seeds(self, src: int = 0):
+    def _align_seeds(
+        self, src: Optional[int] = 0, seed: Optional[int] = None
+    ) -> None:
+        """Aligns seeds across distributed processes.
+
+        This method synchronizes seeds across distributed processes, ensuring
+        consistent randomness.
+
+        Parameters
+        ----------
+        src: int, optional
+            The source process rank. Defaults to 0.
+        seed: int, optional
+            The seed value to synchronize. If None, a random seed will be
+            generated. Defaults to None.
+        """
         device = (
             torch.cuda.current_device()
             if torch.cuda.is_available() and dist.get_backend() == "nccl"
             else "cpu"
         )
-        if self._rank == src:
+        if seed is None:
             seed = np.random.randint(0, np.iinfo(np.int32).max)
+        if self._rank == src:
             seed_tensor = torch.tensor(seed, dtype=torch.int32, device=device)
         else:
             seed_tensor = torch.empty([], dtype=torch.int32, device=device)
