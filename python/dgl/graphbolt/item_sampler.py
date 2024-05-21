@@ -283,6 +283,7 @@ class ItemSampler(IterDataPipe):
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
+        seed: Optional[int] = None,
     ) -> None:
         super().__init__()
         self._item_set = item_set
@@ -295,7 +296,12 @@ class ItemSampler(IterDataPipe):
         self._drop_uneven_inputs = False
         self._world_size = None
         self._rank = None
-        self._seed = np.random.randint(0, np.iinfo(np.int32).max)
+        # For the sake of reproducibility, the seed should be allowed to be
+        # manually set by the user.
+        if seed is None:
+            self._seed = np.random.randint(0, np.iinfo(np.int32).max)
+        else:
+            self._seed = seed
         # The attribute `self._epoch` is added to make shuffling work properly
         # across multiple epochs. Otherwise, the same ordering will always be
         # used in every epoch.
@@ -541,6 +547,7 @@ class DistributedItemSampler(ItemSampler):
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
         drop_uneven_inputs: Optional[bool] = False,
+        seed: Optional[int] = None,
     ) -> None:
         super().__init__(
             item_set,
@@ -548,6 +555,7 @@ class DistributedItemSampler(ItemSampler):
             minibatcher,
             drop_last,
             shuffle,
+            seed,
         )
         self._distributed = True
         self._drop_uneven_inputs = drop_uneven_inputs
@@ -558,7 +566,9 @@ class DistributedItemSampler(ItemSampler):
         self._world_size = dist.get_world_size()
         self._rank = dist.get_rank()
         if self._world_size > 1:
-            self._align_seeds()
+            # For the sake of reproducibility, the seed should be allowed to be
+            # manually set by the user.
+            self._align_seeds(src=0, seed=seed)
 
     def _align_seeds(
         self, src: Optional[int] = 0, seed: Optional[int] = None
