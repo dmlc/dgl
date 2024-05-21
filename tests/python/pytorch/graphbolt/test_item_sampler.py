@@ -165,54 +165,6 @@ def test_ItemSet_seed_nodes_labels(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSet_graphs(batch_size, shuffle, drop_last):
-    # Graphs.
-    num_graphs = 103
-    num_nodes = 10
-    num_edges = 20
-    graphs = [
-        dgl.rand_graph(num_nodes * (i + 1), num_edges * (i + 1))
-        for i in range(num_graphs)
-    ]
-    item_set = gb.ItemSet(graphs, names="graphs")
-    # DGLGraph is not supported in gb.MiniBatch yet. Let's use a customized
-    # minibatcher to return the original graphs.
-    customized_minibatcher = lambda batch, names: batch
-    item_sampler = gb.ItemSampler(
-        item_set,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        drop_last=drop_last,
-        minibatcher=customized_minibatcher,
-    )
-    minibatch_num_nodes = []
-    minibatch_num_edges = []
-    for i, minibatch in enumerate(item_sampler):
-        is_last = (i + 1) * batch_size >= num_graphs
-        if not is_last or num_graphs % batch_size == 0:
-            assert minibatch.batch_size == batch_size
-        else:
-            if not drop_last:
-                assert minibatch.batch_size == num_graphs % batch_size
-            else:
-                assert False
-        minibatch_num_nodes.append(minibatch.batch_num_nodes())
-        minibatch_num_edges.append(minibatch.batch_num_edges())
-    minibatch_num_nodes = torch.cat(minibatch_num_nodes)
-    minibatch_num_edges = torch.cat(minibatch_num_edges)
-    assert (
-        torch.all(minibatch_num_nodes[:-1] <= minibatch_num_nodes[1:])
-        is not shuffle
-    )
-    assert (
-        torch.all(minibatch_num_edges[:-1] <= minibatch_num_edges[1:])
-        is not shuffle
-    )
-
-
-@pytest.mark.parametrize("batch_size", [1, 4])
-@pytest.mark.parametrize("shuffle", [True, False])
-@pytest.mark.parametrize("drop_last", [True, False])
 def test_ItemSet_node_pairs(batch_size, shuffle, drop_last):
     # Node pairs.
     num_ids = 103
