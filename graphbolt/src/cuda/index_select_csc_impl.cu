@@ -1,17 +1,18 @@
 /**
- *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   All rights reserved.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
  *
  * @file cuda/index_select_csc_impl.cu
  * @brief Index select csc operator implementation on CUDA.
@@ -50,7 +51,8 @@ struct AlignmentFunc {
         // A single cache line has num_elements items, we add num_elements - 1
         // to ensure there is enough slack to move forward or backward by
         // num_elements - 1 items if the performed access is not aligned.
-        (indptr_t)(in_degree[perm ? perm[row % num_nodes] : row] + num_elements - 1));
+        (indptr_t)(in_degree[perm ? perm[row % num_nodes] : row] +
+                   num_elements - 1));
   }
 };
 
@@ -69,10 +71,10 @@ __global__ void _CopyIndicesAlignedKernel(
     const auto row_pos = perm ? perm[permuted_row_pos] : permuted_row_pos;
     const auto out_row = output_indptr[row_pos];
     const auto d = output_indptr[row_pos + 1] - out_row;
-    const int offset =
-        ((size_t)(indices + indptr[row_pos] - output_indptr_aligned[permuted_row_pos]) %
-         GPU_CACHE_LINE_SIZE) /
-        sizeof(indices_t);
+    const int offset = ((size_t)(indices + indptr[row_pos] -
+                                 output_indptr_aligned[permuted_row_pos]) %
+                        GPU_CACHE_LINE_SIZE) /
+                       sizeof(indices_t);
     const auto rofs = idx - output_indptr_aligned[permuted_row_pos] - offset;
     if (rofs >= 0 && rofs < d) {
       const auto in_idx = indptr[row_pos] + rofs;
