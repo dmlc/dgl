@@ -129,24 +129,6 @@ class ItemSampler(IterDataPipe):
         Option to drop the last batch if it's not full.
     shuffle : bool
         Option to shuffle before sample.
-    use_indexing : bool
-        Option to use indexing to slice items from the item set. This is an
-        optimization to avoid time-consuming iteration over the item set. If
-        the item set does not support indexing, this option will be disabled
-        automatically. If the item set supports indexing but the user wants to
-        disable it, this option can be set to False. By default, it is set to
-        True.
-    buffer_size : int
-        The size of the buffer to store items sliced from the :class:`ItemSet`
-        or :class:`ItemSetDict`. By default, it is set to -1, which means the
-        buffer size will be set as the total number of items in the item set if
-        indexing is supported. If indexing is not supported, it is set to 10 *
-        batch size. If the item set is too large, it is recommended to set a
-        smaller buffer size to avoid out of memory error. As items are shuffled
-        within each buffer, a smaller buffer size may incur less randomness and
-        such less randomness can further affect the training performance such as
-        convergence speed and accuracy. Therefore, it is recommended to set a
-        larger buffer size if possible.
 
     Examples
     --------
@@ -455,16 +437,6 @@ class DistributedItemSampler(ItemSampler):
         https://pytorch.org/tutorials/advanced/generic_join.html. However, this
         option can be used if the Join Context Manager is not helpful for any
         reason.
-    buffer_size : int
-        The size of the buffer to store items sliced from the :class:`ItemSet`
-        or :class:`ItemSetDict`. By default, it is set to -1, which means the
-        buffer size will be set as the total number of items in the item set.
-        If the item set is too large, it is recommended to set a smaller buffer
-        size to avoid out of memory error. As items are shuffled within each
-        buffer, a smaller buffer size may incur less randomness and such less
-        randomness can further affect the training performance such as
-        convergence speed and accuracy. Therefore, it is recommended to set a
-        larger buffer size if possible.
 
     Examples
     --------
