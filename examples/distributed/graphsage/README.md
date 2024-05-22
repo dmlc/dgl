@@ -139,6 +139,19 @@ python3 ~/workspace/dgl/tools/launch.py \
 "python3 node_classification.py --graph_name ogbn-products --ip_config ip_config.txt --num_epochs 30 --batch_size 1000 --num_gpus 4"
 ```
 
+Unsupervised training(train with link prediction dataloader).
+
+```
+python3 ~/workspace/dgl/tools/launch.py \
+--workspace ~/workspace/dgl/examples/distributed/graphsage/ \
+--num_trainers 1 \
+--num_samplers 0 \
+--num_servers 1 \
+--part_config data/ogbn-products.json \
+--ip_config ip_config.txt \
+"python3 node_classification_unsupervised.py --graph_name ogbn-products --ip_config ip_config.txt --num_epochs 30 --batch_size 1000 --remove_edge"
+```
+
 ### Running with GraphBolt
 
 In order to run with `GraphBolt`, we need to partition graph into `GraphBolt` data formats.Please note that both `DGL` and `GraphBolt` partitions are saved together.
