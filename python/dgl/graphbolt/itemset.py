@@ -208,14 +208,15 @@ class ItemSet:
 
 
 class HeteroItemSet:
-    r"""Dictionary wrapper of **ItemSet**.
+    r"""A collection of itemsets, each associated with a unique type.
 
-    This class aims to assemble existing itemsets with different tags, for
+    This class aims to assemble existing itemsets with different types, for
     example, seed_nodes of different node types in a graph.
 
     Parameters
     ----------
     itemsets: Dict[str, ItemSet]
+        A dictionary whose keys are types and values are ItemSet instances.
 
     Examples
     --------
