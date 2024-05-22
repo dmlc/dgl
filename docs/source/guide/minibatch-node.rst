@@ -200,7 +200,7 @@ For example, one can still use the provided
 :class:`~dgl.graphbolt.NeighborSampler` class and
 :class:`~dgl.graphbolt.DataLoader` class for
 stochastic training. The only difference is that the itemset is now an
-instance of :class:`~dgl.graphbolt.ItemSetDict` which is a dictionary
+instance of :class:`~dgl.graphbolt.HeteroItemSet` which is a dictionary
 of node types to node IDs.
 
 .. code:: python
