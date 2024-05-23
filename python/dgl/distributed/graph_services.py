@@ -1,4 +1,5 @@
 """A set of graph services of getting subgraphs from DistGraph"""
+
 import os
 from collections import namedtuple
 
@@ -82,7 +83,14 @@ class FindEdgeResponse(Response):
 
 
 def _sample_neighbors_graphbolt(
-    g, gpb, nodes, fanout, edge_dir="in", prob=None, replace=False
+    g,
+    gpb,
+    nodes,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    exclude_edges=None,
+    replace=False,
 ):
     """Sample from local partition via graphbolt.
 
@@ -105,6 +113,8 @@ def _sample_neighbors_graphbolt(
         Determines whether to sample inbound or outbound edges.
     prob : tensor, optional
         The probability associated with each neighboring edge of a node.
+    exclude_edges : tensor, optional
+        The edges to exclude when sampling.
     replace : bool, optional
         If True, sample with replacement.
 
@@ -122,6 +132,7 @@ def _sample_neighbors_graphbolt(
     assert (
         edge_dir == "in"
     ), f"GraphBolt only supports inbound edge sampling but got {edge_dir}."
+    assert exclude_edges is None, "GraphBolt does not support excluding edges."
 
     # 1. Map global node IDs to local node IDs.
     nodes = gpb.nid2localnid(nodes, gpb.partid)
@@ -176,6 +187,7 @@ def _sample_neighbors_dgl(
     fan_out,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
 ):
     """Sample from local partition.
@@ -192,9 +204,10 @@ def _sample_neighbors_dgl(
         local_g,
         local_ids,
         fan_out,
-        edge_dir,
-        prob,
-        replace,
+        edge_dir=edge_dir,
+        prob=prob,
+        exclude_edges=exclude_edges,
+        replace=replace,
         _dist_training=True,
     )
     global_nid_mapping = local_g.ndata[NID]
@@ -398,12 +411,14 @@ class SamplingRequest(Request):
         fan_out,
         edge_dir="in",
         prob=None,
+        exclude_edges=None,
         replace=False,
         use_graphbolt=False,
     ):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
+        self.exclude_edges = exclude_edges
         self.replace = replace
         self.fan_out = fan_out
         self.use_graphbolt = use_graphbolt
@@ -413,6 +428,7 @@ class SamplingRequest(Request):
             self.seed_nodes,
             self.edge_dir,
             self.prob,
+            self.exclude_edges,
             self.replace,
             self.fan_out,
             self.use_graphbolt,
@@ -423,6 +439,7 @@ class SamplingRequest(Request):
             self.seed_nodes,
             self.edge_dir,
             self.prob,
+            self.exclude_edges,
             self.replace,
             self.fan_out,
             self.use_graphbolt,
@@ -444,6 +461,7 @@ class SamplingRequest(Request):
             self.fan_out,
             edge_dir=self.edge_dir,
             prob=prob,
+            exclude_edges=self.exclude_edges,
             replace=self.replace,
         )
         return SubgraphResponse(
@@ -913,11 +931,13 @@ def sample_etype_neighbors(
         if prob is not None:
             # See NOTE 1
             _prob = [
-                # NOTE (BarclayII)
-                # Currently DistGraph.edges[] does not accept canonical etype.
-                g.edges[etype].data[prob].kvstore_key
-                if prob in g.edges[etype].data
-                else ""
+                (
+                    # NOTE (BarclayII)
+                    # Currently DistGraph.edges[] does not accept canonical etype.
+                    g.edges[etype].data[prob].kvstore_key
+                    if prob in g.edges[etype].data
+                    else ""
+                )
                 for etype in g.canonical_etypes
             ]
         else:
@@ -939,9 +959,11 @@ def sample_etype_neighbors(
             _prob = None
         else:
             _prob = [
-                g.edges[etype].data[prob].local_partition
-                if prob in g.edges[etype].data
-                else None
+                (
+                    g.edges[etype].data[prob].local_partition
+                    if prob in g.edges[etype].data
+                    else None
+                )
                 for etype in g.canonical_etypes
             ]
         return _sample_etype_neighbors(
@@ -970,6 +992,7 @@ def sample_neighbors(
     fanout,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
     use_graphbolt=False,
 ):
@@ -1008,6 +1031,12 @@ def sample_neighbors(
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
+    exclude_edges: tensor or dict, optional
+        Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+        This argument can take a single ID tensor or a dictionary of edge types
+        and ID tensors. If a single tensor is given, the graph must only have
+        one type of nodes.
     replace : bool, optional
         If True, sample with replacement.
 
@@ -1052,6 +1081,7 @@ def sample_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
+            exclude_edges=exclude_edges,
             replace=replace,
             use_graphbolt=use_graphbolt,
         )
@@ -1067,6 +1097,7 @@ def sample_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
+            exclude_edges=exclude_edges,
             replace=replace,
         )
 
