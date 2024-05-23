@@ -10,7 +10,7 @@ import numpy as np
 
 from .. import backend as F, graphbolt as gb, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
-from ..base import ALL, DGLError, EID, ETYPE, is_all, NID
+from ..base import ALL, dgl_warning, DGLError, EID, ETYPE, is_all, NID
 from ..convert import graph as dgl_graph, heterograph as dgl_heterograph
 from ..frame import infer_scheme
 
@@ -1422,6 +1422,10 @@ class DistGraph:
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
         if len(self.etypes) > 1:
+            if exclude_edges is not None:
+                dgl_warning(
+                    "exclude_edges is not supported for a graph with multiple edge types."
+                )
             frontier = graph_services.sample_etype_neighbors(
                 self,
                 seed_nodes,
@@ -1438,6 +1442,7 @@ class DistGraph:
                 fanout,
                 replace=replace,
                 prob=prob,
+                exclude_edges=exclude_edges,
                 use_graphbolt=self._use_graphbolt,
             )
         return frontier
