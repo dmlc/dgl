@@ -323,15 +323,17 @@ class ItemSampler(IterDataPipe):
         elif isinstance(buffer, Mapping):
             # For item set that's initialized with a dict of items,
             # `buffer` is a dict of tensors/lists/tuples.
-            keys = list(buffer.keys())
-            key_indices = torch.searchsorted(offsets, indices, right=True) - 1
+            sorted_indices, ind = indices.sort()
+            indices_offsets = torch.searchsorted(sorted_indices, offsets)
             batch = {}
-            for j, key in enumerate(keys):
-                mask = (key_indices == j).nonzero().squeeze(1)
-                if len(mask) == 0:
+            for key_id, key in enumerate(buffer.keys()):
+                if indices_offsets[key_id] == indices_offsets[key_id + 1]:
                     continue
+                current_indices, _ = ind[
+                    indices_offsets[key_id] : indices_offsets[key_id + 1]
+                ].sort()
                 batch[key] = self._collate_batch(
-                    buffer[key], indices[mask] - offsets[j]
+                    buffer[key], indices[current_indices] - offsets[key_id]
                 )
             return batch
         raise TypeError(f"Unsupported buffer type {type(buffer).__name__}.")
