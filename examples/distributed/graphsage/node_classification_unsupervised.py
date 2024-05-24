@@ -269,7 +269,9 @@ def run(args, device, data):
                         elif exclude == "reverse_id":
                             assert not th.any(th.isin(current_eids, seed_eids))
                         else:
-                            raise ValueError(f"Unsupported exclude type: {exclude}")
+                            raise ValueError(
+                                f"Unsupported exclude type: {exclude}"
+                            )
                 tic_step = time.time()
                 sample_t.append(tic_step - start)
 

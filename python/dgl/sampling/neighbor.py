@@ -159,6 +159,10 @@ def sample_etype_neighbors(
     As a result, users should avoid performing in-place operations
     on the node features of the new graph to avoid feature corruption.
     """
+    if exclude_edges is not None:
+        raise DGLError(
+            "exclude_edges is not supported for sample_etype_neighbors"
+        )
     if g.device != F.cpu():
         raise DGLError("The graph should be in cpu.")
     # (BarclayII) because the homogenized graph no longer contains the *name* of edge

@@ -956,7 +956,7 @@ def sample_etype_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
-            exclude_edges=None,
+            exclude_edges=exclude_edges,
             replace=replace,
             etype_sorted=etype_sorted,
             use_graphbolt=use_graphbolt,
@@ -984,7 +984,7 @@ def sample_etype_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
-            exclude_edges=None,
+            exclude_edges=exclude_edges,
             replace=replace,
             etype_offset=etype_offset,
             etype_sorted=etype_sorted,
@@ -1092,7 +1092,7 @@ def sample_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
-            exclude_edges=None,
+            exclude_edges=exclude_edges,
             replace=replace,
             use_graphbolt=use_graphbolt,
         )
@@ -1108,7 +1108,7 @@ def sample_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
-            exclude_edges=None,
+            exclude_edges=exclude_edges,
             replace=replace,
         )
 
