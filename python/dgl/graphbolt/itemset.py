@@ -5,7 +5,7 @@ from typing import Dict, Iterable, Tuple, Union
 
 import torch
 
-__all__ = ["ItemSet", "ItemSetDict"]
+__all__ = ["ItemSet", "HeteroItemSet"]
 
 
 def is_scalar(x):
@@ -207,15 +207,16 @@ class ItemSet:
         return ret
 
 
-class ItemSetDict:
-    r"""Dictionary wrapper of **ItemSet**.
+class HeteroItemSet:
+    r"""A collection of itemsets, each associated with a unique type.
 
-    This class aims to assemble existing itemsets with different tags, for
+    This class aims to assemble existing itemsets with different types, for
     example, seed_nodes of different node types in a graph.
 
     Parameters
     ----------
     itemsets: Dict[str, ItemSet]
+        A dictionary whose keys are types and values are ItemSet instances.
 
     Examples
     --------
@@ -226,7 +227,7 @@ class ItemSetDict:
 
     >>> node_ids_user = torch.arange(0, 5)
     >>> node_ids_item = torch.arange(5, 10)
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user": gb.ItemSet(node_ids_user, names="seeds"),
     ...     "item": gb.ItemSet(node_ids_item, names="seeds")})
     >>> list(item_set)
@@ -246,7 +247,7 @@ class ItemSetDict:
     >>> labels_user = torch.arange(0, 2)
     >>> node_ids_item = torch.arange(2, 5)
     >>> labels_item = torch.arange(2, 5)
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user": gb.ItemSet(
     ...         (node_ids_user, labels_user),
     ...         names=("seeds", "labels")),
@@ -270,7 +271,7 @@ class ItemSetDict:
     >>> labels_like = torch.tensor([1, 0])
     >>> seeds_follow = torch.arange(0, 6).reshape(-1, 2)
     >>> labels_follow = torch.tensor([1, 1, 0])
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user:like:item": gb.ItemSet(
     ...         (seeds_like, labels_like),
     ...         names=("seeds", "labels")),
@@ -298,7 +299,7 @@ class ItemSetDict:
     >>> first_labels = torch.tensor([1, 0])
     >>> second_seeds = torch.arange(0, 2).reshape(-1, 1)
     >>> second_labels = torch.tensor([1, 0])
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "query:user:item": gb.ItemSet(
     ...         (first_seeds, first_labels),
     ...         names=("seeds", "labels")),

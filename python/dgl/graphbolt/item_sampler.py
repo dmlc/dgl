@@ -11,7 +11,7 @@ from torchdata.datapipes.iter import IterDataPipe
 from ..base import dgl_warning
 
 from .internal import calculate_range
-from .itemset import ItemSet, ItemSetDict
+from .itemset import HeteroItemSet, ItemSet
 from .minibatch import MiniBatch
 
 __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
@@ -119,7 +119,7 @@ class ItemSampler(IterDataPipe):
 
     Parameters
     ----------
-    item_set : Union[ItemSet, ItemSetDict]
+    item_set : Union[ItemSet, HeteroItemSet]
         Data to be sampled.
     batch_size : int
         The size of each batch.
@@ -212,7 +212,7 @@ class ItemSampler(IterDataPipe):
     ...     "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
     ...     "item": gb.ItemSet(torch.arange(0, 6), names="seeds"),
     ... }
-    >>> item_set = gb.ItemSetDict(ids)
+    >>> item_set = gb.HeteroItemSet(ids)
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
     MiniBatch(seeds={'user': tensor([0, 1, 2, 3])}, sampled_subgraphs=None,
@@ -223,7 +223,7 @@ class ItemSampler(IterDataPipe):
 
     >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
     >>> seeds_follow = torch.arange(10, 20).reshape(-1, 2)
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user:like:item": gb.ItemSet(
     ...         seeds_like, names="seeds"),
     ...     "user:follow:user": gb.ItemSet(
@@ -242,7 +242,7 @@ class ItemSampler(IterDataPipe):
     >>> labels_like = torch.arange(0, 5)
     >>> seeds_follow = torch.arange(10, 20).reshape(-1, 2)
     >>> labels_follow = torch.arange(5, 10)
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user:like:item": gb.ItemSet((seeds_like, labels_like),
     ...         names=("seeds", "labels")),
     ...     "user:follow:user": gb.ItemSet((seeds_follow, labels_follow),
@@ -264,7 +264,7 @@ class ItemSampler(IterDataPipe):
     >>> seeds_follow = torch.arange(20, 30).reshape(-1, 2)
     >>> labels_follow = torch.tensor([1, 1, 0, 0, 0])
     >>> indexes_follow = torch.tensor([0, 1, 0, 0, 1])
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user:like:item": gb.ItemSet((seeds_like, labels_like,
     ...         indexes_like), names=("seeds", "labels", "indexes")),
     ...     "user:follow:user": gb.ItemSet((seeds_follow,labels_follow,
@@ -281,7 +281,7 @@ class ItemSampler(IterDataPipe):
 
     def __init__(
         self,
-        item_set: Union[ItemSet, ItemSetDict],
+        item_set: Union[ItemSet, HeteroItemSet],
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
@@ -418,7 +418,7 @@ class DistributedItemSampler(ItemSampler):
 
     Parameters
     ----------
-    item_set : Union[ItemSet, ItemSetDict]
+    item_set : Union[ItemSet, HeteroItemSet]
         Data to be sampled.
     batch_size : int
         The size of each batch.
@@ -547,7 +547,7 @@ class DistributedItemSampler(ItemSampler):
 
     def __init__(
         self,
-        item_set: Union[ItemSet, ItemSetDict],
+        item_set: Union[ItemSet, HeteroItemSet],
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
