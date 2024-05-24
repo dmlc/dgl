@@ -365,18 +365,23 @@ class HeteroItemSet:
         elif isinstance(index, Iterable):
             if not isinstance(index, torch.Tensor):
                 index = torch.tensor(index)
-            assert torch.all((index >= 0) & (index < self._length))
-            key_indices = (
-                torch.searchsorted(self._offsets, index, right=True) - 1
-            )
+            sorted_index, indices = index.sort()
+            assert sorted_index[0] >= 0 and sorted_index[-1] < self._length
+            index_offsets = torch.searchsorted(sorted_index, self._offsets)
+            # print(f"{index = }\n{sorted_index = }\n{indices = },\n{inv_p = }\n{self._offsets = }\n{index_offsets = }\n{num_per_key = }")
+            # assert 0
             data = {}
             for key_id, key in enumerate(self._keys):
-                mask = (key_indices == key_id).nonzero().squeeze(1)
-                if len(mask) == 0:
+                if index_offsets[key_id] == index_offsets[key_id+1]:
                     continue
-                data[key] = self._itemsets[key][
-                    index[mask] - self._offsets[key_id]
-                ]
+                current_indices, _ = indices[index_offsets[key_id]: index_offsets[key_id+1]].sort()
+                data[key] = self._itemsets[key][index[current_indices] - self._offsets[key_id]]
+                # mask = (key_indices == key_id).nonzero().squeeze(1)
+                # if len(mask) == 0:
+                #     continue
+                # data[key] = self._itemsets[key][
+                #     index[mask] - self._offsets[key_id]
+                # ]
             return data
         else:
             raise TypeError(
