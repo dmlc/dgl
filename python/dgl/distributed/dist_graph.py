@@ -10,7 +10,7 @@ import numpy as np
 
 from .. import backend as F, graphbolt as gb, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
-from ..base import ALL, dgl_warning, DGLError, EID, ETYPE, is_all, NID
+from ..base import ALL, DGLError, EID, ETYPE, is_all, NID
 from ..convert import graph as dgl_graph, heterograph as dgl_heterograph
 from ..frame import infer_scheme
 
