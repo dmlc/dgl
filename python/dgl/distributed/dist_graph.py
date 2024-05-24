@@ -16,6 +16,7 @@ from ..frame import infer_scheme
 
 from ..heterograph import DGLGraph
 from ..ndarray import exist_shared_mem_array
+from ..sampling.utils import EidExcluder
 from ..transforms import compact_graphs
 from . import graph_services, role, rpc
 from .dist_tensor import DistTensor
@@ -1422,10 +1423,6 @@ class DistGraph:
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
         if len(self.etypes) > 1:
-            if exclude_edges is not None:
-                dgl_warning(
-                    "exclude_edges is not supported for a graph with multiple edge types."
-                )
             frontier = graph_services.sample_etype_neighbors(
                 self,
                 seed_nodes,
@@ -1433,6 +1430,7 @@ class DistGraph:
                 replace=replace,
                 etype_sorted=etype_sorted,
                 prob=prob,
+                exclude_edges=None,
                 use_graphbolt=self._use_graphbolt,
             )
         else:
@@ -1442,9 +1440,18 @@ class DistGraph:
                 fanout,
                 replace=replace,
                 prob=prob,
-                exclude_edges=exclude_edges,
+                exclude_edges=None,
                 use_graphbolt=self._use_graphbolt,
             )
+        # [TODO][Rui]
+        # For now, exclude_edges is applied after sampling. Namely, we first sample
+        # the neighbors and then exclude the edges before returning frontier. This
+        # is probably not efficient. We could try to exclude the edges during
+        # sampling. Or we pass exclude_edges IDs to local and remote sampling
+        # functions and let them handle the exclusion.
+        if exclude_edges is not None:
+            eid_excluder = EidExcluder(exclude_edges)
+            frontier = eid_excluder(frontier)
         return frontier
 
     def _get_ndata_names(self, ntype=None):

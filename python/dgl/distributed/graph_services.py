@@ -257,6 +257,7 @@ def _sample_etype_neighbors_dgl(
     fan_out,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
     etype_offset=None,
     etype_sorted=False,
@@ -278,9 +279,10 @@ def _sample_etype_neighbors_dgl(
         local_ids,
         etype_offset,
         fan_out,
-        edge_dir,
-        prob,
-        replace,
+        edge_dir=edge_dir,
+        prob=prob,
+        exclude_edges=exclude_edges,
+        replace=replace,
         etype_sorted=etype_sorted,
         _dist_training=True,
     )
@@ -481,6 +483,7 @@ class SamplingRequestEtype(Request):
         fan_out,
         edge_dir="in",
         prob=None,
+        exclude_edges=None,
         replace=False,
         etype_sorted=True,
         use_graphbolt=False,
@@ -488,6 +491,7 @@ class SamplingRequestEtype(Request):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
+        self.exclude_edges = exclude_edges
         self.replace = replace
         self.fan_out = fan_out
         self.etype_sorted = etype_sorted
@@ -498,6 +502,7 @@ class SamplingRequestEtype(Request):
             self.seed_nodes,
             self.edge_dir,
             self.prob,
+            self.exclude_edges,
             self.replace,
             self.fan_out,
             self.etype_sorted,
@@ -509,6 +514,7 @@ class SamplingRequestEtype(Request):
             self.seed_nodes,
             self.edge_dir,
             self.prob,
+            self.exclude_edges,
             self.replace,
             self.fan_out,
             self.etype_sorted,
@@ -536,6 +542,7 @@ class SamplingRequestEtype(Request):
             self.fan_out,
             edge_dir=self.edge_dir,
             prob=probs,
+            exclude_edges=self.exclude_edges,
             replace=self.replace,
             etype_offset=etype_offset,
             etype_sorted=self.etype_sorted,
@@ -801,20 +808,19 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
         src_ntype_id = g.get_ntype_id(src_ntype)
         dst_ntype_id = g.get_ntype_id(dst_ntype)
         type_idx = etype_ids == etid
-        if F.sum(type_idx, 0) > 0:
-            data_dict[etype] = (
-                F.boolean_mask(src, type_idx),
-                F.boolean_mask(dst, type_idx),
-            )
-            if "DGL_DIST_DEBUG" in os.environ:
-                assert torch.all(
-                    src_ntype_id == src_ntype_ids[type_idx]
-                ), "source ntype is is not expected."
-                assert torch.all(
-                    dst_ntype_id == dst_ntype_ids[type_idx]
-                ), "destination ntype is is not expected."
-            if type_wise_eids is not None:
-                edge_ids[etype] = F.boolean_mask(type_wise_eids, type_idx)
+        data_dict[etype] = (
+            F.boolean_mask(src, type_idx),
+            F.boolean_mask(dst, type_idx),
+        )
+        if "DGL_DIST_DEBUG" in os.environ:
+            assert torch.all(
+                src_ntype_id == src_ntype_ids[type_idx]
+            ), "source ntype is is not expected."
+            assert torch.all(
+                dst_ntype_id == dst_ntype_ids[type_idx]
+            ), "destination ntype is is not expected."
+        if type_wise_eids is not None:
+            edge_ids[etype] = F.boolean_mask(type_wise_eids, type_idx)
     hg = heterograph(
         data_dict,
         {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
@@ -832,6 +838,7 @@ def sample_etype_neighbors(
     fanout,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
     etype_sorted=True,
     use_graphbolt=False,
@@ -879,6 +886,8 @@ def sample_etype_neighbors(
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
+    exclude_edges : tensor, optional
+        The edges to exclude when sampling.
     replace : bool, optional
         If True, sample with replacement.
 
@@ -947,6 +956,7 @@ def sample_etype_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
+            exclude_edges=None,
             replace=replace,
             etype_sorted=etype_sorted,
             use_graphbolt=use_graphbolt,
@@ -974,6 +984,7 @@ def sample_etype_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
+            exclude_edges=None,
             replace=replace,
             etype_offset=etype_offset,
             etype_sorted=etype_sorted,
@@ -1081,7 +1092,7 @@ def sample_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
-            exclude_edges=exclude_edges,
+            exclude_edges=None,
             replace=replace,
             use_graphbolt=use_graphbolt,
         )
@@ -1097,7 +1108,7 @@ def sample_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
-            exclude_edges=exclude_edges,
+            exclude_edges=None,
             replace=replace,
         )
 
