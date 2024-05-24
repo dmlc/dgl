@@ -257,6 +257,21 @@ def run(args, device, data):
             for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(
                 dataloader
             ):
+                if args.debug:
+                    # Verify exclude_edges functionality.
+                    for block in blocks:
+                        current_eids = block.edata[dgl.EID]
+                        seed_eids = pos_graph.edata[dgl.EID]
+                        if exclude is None:
+                            assert th.any(th.isin(current_eids, seed_eids))
+                        elif exclude == "self":
+                            assert not th.any(th.isin(current_eids, seed_eids))
+                        elif exclude == "reverse_id":
+                            assert not th.any(th.isin(current_eids, seed_eids))
+                        else:
+                            raise ValueError(
+                                f"Unsupported exclude type: {exclude}"
+                            )
                 tic_step = time.time()
                 sample_t.append(tic_step - start)
 
@@ -448,6 +463,12 @@ if __name__ == "__main__":
         default=False,
         action="store_true",
         help="whether to remove edges during sampling",
+    )
+    parser.add_argument(
+        "--debug",
+        default=False,
+        action="store_true",
+        help="whether to verify functionality of remove edges",
     )
     args = parser.parse_args()
     print(args)

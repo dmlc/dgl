@@ -1,5 +1,6 @@
 """Distributed dataloaders.
 """
+
 import inspect
 from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Mapping
@@ -83,6 +84,8 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     if exclude_mode is None:
         return None
     elif exclude_mode == "self":
+        if isinstance(eids, Mapping):
+            eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
         return eids
     elif exclude_mode == "reverse_id":
         return _find_exclude_eids_with_reverse_id(

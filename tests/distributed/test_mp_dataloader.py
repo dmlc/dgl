@@ -526,6 +526,7 @@ def start_edge_dataloader(
     groundtruth_g,
     exclude,
     reverse_eids,
+    reverse_etypes,
 ):
     dgl.distributed.initialize(ip_config)
     gpb = None
@@ -540,7 +541,9 @@ def start_edge_dataloader(
     if len(dist_graph.etypes) == 1:
         train_eid = th.arange(num_edges_to_sample)
     else:
-        train_eid = {dist_graph.etypes[0]: th.arange(num_edges_to_sample)}
+        train_eid = {
+            dist_graph.canonical_etypes[0]: th.arange(num_edges_to_sample)
+        }
 
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(part_config, i)
@@ -561,6 +564,7 @@ def start_edge_dataloader(
             num_workers=num_workers,
             exclude=exclude,
             reverse_eids=reverse_eids,
+            reverse_etypes=reverse_etypes,
         )
 
         for epoch in range(2):
@@ -584,21 +588,50 @@ def start_edge_dataloader(
                             pos_pair_graph.nodes[dst_type].data[dgl.NID]
                         )
                     )
-                    # Verify the exclude functionality.
-                    current_eids = block.edges[etype].data[dgl.EID]
-                    seed_eids = pos_pair_graph.edges[etype].data[dgl.EID]
-                    if exclude is None:
-                        assert th.any(th.isin(current_eids, seed_eids))
-                    elif exclude == "self":
-                        assert not th.any(th.isin(current_eids, seed_eids))
-                    elif exclude == "reverse_id":
-                        src, dst = groundtruth_g.find_edges(seed_eids)
-                        reverse_seed_eids = groundtruth_g.edge_ids(dst, src)
-                        assert not th.any(
-                            th.isin(current_eids, reverse_seed_eids)
-                        )
-                    else:
-                        raise ValueError(f"Unsupported exclude type: {exclude}")
+                # Verify the exclude functionality.
+                for (
+                    src_type,
+                    etype,
+                    dst_type,
+                ) in pos_pair_graph.canonical_etypes:
+                    for block in blocks:
+                        if (
+                            src_type,
+                            etype,
+                            dst_type,
+                        ) not in block.canonical_etypes:
+                            continue
+                        current_eids = block.edges[etype].data[dgl.EID]
+                        seed_eids = pos_pair_graph.edges[etype].data[dgl.EID]
+                        if exclude is None:
+                            assert th.any(th.isin(current_eids, seed_eids))
+                        elif exclude == "self":
+                            assert not th.any(th.isin(current_eids, seed_eids))
+                        elif exclude == "reverse_id":
+                            src, dst = groundtruth_g.find_edges(seed_eids)
+                            reverse_seed_eids = groundtruth_g.edge_ids(dst, src)
+                            assert not th.any(
+                                th.isin(current_eids, reverse_seed_eids)
+                            )
+                            assert not th.any(th.isin(current_eids, seed_eids))
+                        elif exclude == "reverse_types":
+                            assert not th.any(th.isin(current_eids, seed_eids))
+                            reverse_etype = reverse_etypes[
+                                (src_type, etype, dst_type)
+                            ]
+                            if reverse_etype in block.canonical_etypes:
+                                assert not th.any(
+                                    th.isin(
+                                        block.edges[reverse_etype].data[
+                                            dgl.EID
+                                        ],
+                                        seed_eids,
+                                    )
+                                )
+                        else:
+                            raise ValueError(
+                                f"Unsupported exclude type: {exclude}"
+                            )
     del dataloader
     dgl.distributed.exit_client()
 
@@ -612,6 +645,7 @@ def check_dataloader(
     return_eids=False,
     exclude=None,
     reverse_eids=None,
+    reverse_etypes=None,
 ):
     with tempfile.TemporaryDirectory() as test_dir:
         ip_config = "ip_config.txt"
@@ -689,6 +723,7 @@ def check_dataloader(
                     g,
                     exclude,
                     reverse_eids,
+                    reverse_etypes,
                 ),
             )
             p.start()
@@ -715,6 +750,9 @@ def create_random_hetero():
             random_state=100,
         )
         edges[etype] = (arr.row, arr.col)
+    # Add reverse edges.
+    src, dst = edges[("n1", "r1", "n2")]
+    edges[("n2", "r21", "n1")] = (dst, src)
     g = dgl.heterograph(edges, num_nodes)
     g.nodes["n1"].data["feat"] = F.unsqueeze(F.arange(0, g.num_nodes("n1")), 1)
     g.edges["r1"].data["feat"] = F.unsqueeze(F.arange(0, g.num_edges("r1")), 1)
@@ -805,12 +843,13 @@ def test_dataloader_heterograph(
 
 @pytest.mark.parametrize("num_workers", [0, 1])
 @pytest.mark.parametrize("use_graphbolt", [False])
-@pytest.mark.parametrize("exclude", [None])
+@pytest.mark.parametrize("exclude", [None, "self", "reverse_types"])
 def test_dataloader_heterograph_exclude(num_workers, use_graphbolt, exclude):
     num_server = 1
     dataloader_type = "edge"
     reset_envs()
     g = create_random_hetero()
+    reverse_etypes = {("n1", "r1", "n2"): ("n2", "r21", "n1")}
     check_dataloader(
         g,
         num_server,
@@ -818,6 +857,7 @@ def test_dataloader_heterograph_exclude(num_workers, use_graphbolt, exclude):
         dataloader_type,
         use_graphbolt=use_graphbolt,
         exclude=exclude,
+        reverse_etypes=reverse_etypes,
     )
 
 
