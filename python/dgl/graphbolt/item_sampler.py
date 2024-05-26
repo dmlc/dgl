@@ -310,7 +310,8 @@ class ItemSampler(IterDataPipe):
         # used in every epoch.
         self._epoch = 0
 
-    def _collate_batch(self, buffer, indices, offsets=None):
+    @classmethod
+    def _collate_batch(cls, buffer, indices, offsets=None):
         """Collate a batch from the buffer. For internal use only."""
         if isinstance(buffer, torch.Tensor):
             # For item set that's initialized with integer or single tensor,
@@ -332,7 +333,7 @@ class ItemSampler(IterDataPipe):
                 current_indices, _ = ind[
                     indices_offsets[key_id] : indices_offsets[key_id + 1]
                 ].sort()
-                batch[key] = self._collate_batch(
+                batch[key] = cls._collate_batch(
                     buffer[key], indices[current_indices] - offsets[key_id]
                 )
             return batch
