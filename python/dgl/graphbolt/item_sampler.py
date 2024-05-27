@@ -310,8 +310,7 @@ class ItemSampler(IterDataPipe):
         # used in every epoch.
         self._epoch = 0
 
-    @classmethod
-    def _collate_batch(cls, buffer, indices, offsets=None):
+    def _collate_batch(self, buffer, indices, offsets=None):
         """Collate a batch from the buffer. For internal use only."""
         if isinstance(buffer, torch.Tensor):
             # For item set that's initialized with integer or single tensor,
@@ -324,18 +323,15 @@ class ItemSampler(IterDataPipe):
         elif isinstance(buffer, Mapping):
             # For item set that's initialized with a dict of items,
             # `buffer` is a dict of tensors/lists/tuples.
-            # sorted_indices, ind = indices.sort()
-            indices_offsets = torch.searchsorted(indices, offsets)
+            keys = list(buffer.keys())
+            key_indices = torch.searchsorted(offsets, indices, right=True) - 1
             batch = {}
-            for key_id, key in enumerate(buffer.keys()):
-                if indices_offsets[key_id] == indices_offsets[key_id + 1]:
+            for j, key in enumerate(keys):
+                mask = (key_indices == j).nonzero().squeeze(1)
+                if len(mask) == 0:
                     continue
-                # current_indices, _ = ind[
-                #     indices_offsets[key_id] : indices_offsets[key_id + 1]
-                # ].sort()
-                current_indices = indices[indices_offsets[key_id] : indices_offsets[key_id + 1]] - offsets[key_id]
-                batch[key] = cls._collate_batch(
-                    buffer[key], current_indices,
+                batch[key] = self._collate_batch(
+                    buffer[key], indices[mask] - offsets[j]
                 )
             return batch
         raise TypeError(f"Unsupported buffer type {type(buffer).__name__}.")
