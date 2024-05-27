@@ -376,23 +376,25 @@ class ItemSampler(IterDataPipe):
             g = torch.Generator()
             g.manual_seed(self._seed + self._epoch)
             _permutation = torch.randperm(total, generator=g)
-            buffer = self._item_set[
-                _permutation[start_offset : start_offset + assigned_count]
-            ]
+            # buffer = self._item_set[
+            #     _permutation[start_offset : start_offset + assigned_count]
+            # ]
         else:
-            buffer = self._item_set[
-                start_offset : start_offset + assigned_count
-            ]
-        offsets = self._calculate_offsets(buffer)
+            # buffer = self._item_set[
+            #     start_offset : start_offset + assigned_count
+            # ]
+            _permutation = torch.arange(total)
+        # offsets = self._calculate_offsets(buffer)
         for i in range(0, assigned_count, self._batch_size):
             if output_count <= 0:
                 break
-            indices = torch.arange(i, i + min(self._batch_size, output_count))
-            output_count -= self._batch_size
+            # indices = torch.arange(i, i + min(self._batch_size, output_count))
             yield self._minibatcher(
-                self._collate_batch(buffer, indices, offsets),
+                # self._collate_batch(buffer, indices, offsets),
+                self._item_set[_permutation[i: i + min(self._batch_size, output_count)]],
                 self._names,
             )
+            output_count -= self._batch_size
 
         self._epoch += 1
 
