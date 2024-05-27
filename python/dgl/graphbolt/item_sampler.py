@@ -310,48 +310,6 @@ class ItemSampler(IterDataPipe):
         # used in every epoch.
         self._epoch = 0
 
-    def _collate_batch(self, buffer, indices, offsets=None):
-        """Collate a batch from the buffer. For internal use only."""
-        if isinstance(buffer, torch.Tensor):
-            # For item set that's initialized with integer or single tensor,
-            # `buffer` is a tensor.
-            return torch.index_select(buffer, dim=0, index=indices)
-        elif isinstance(buffer, tuple):
-            # For item set that's initialized with a tuple of items,
-            # `buffer` is a tuple of tensors.
-            return tuple(item[indices] for item in buffer)
-        elif isinstance(buffer, Mapping):
-            # For item set that's initialized with a dict of items,
-            # `buffer` is a dict of tensors/lists/tuples.
-            keys = list(buffer.keys())
-            key_indices = torch.searchsorted(offsets, indices, right=True) - 1
-            batch = {}
-            for j, key in enumerate(keys):
-                mask = (key_indices == j).nonzero().squeeze(1)
-                if len(mask) == 0:
-                    continue
-                batch[key] = self._collate_batch(
-                    buffer[key], indices[mask] - offsets[j]
-                )
-            return batch
-        raise TypeError(f"Unsupported buffer type {type(buffer).__name__}.")
-
-    def _calculate_offsets(self, buffer):
-        """Calculate offsets for each item in buffer. For internal use only."""
-        if not isinstance(buffer, Mapping):
-            return None
-        offsets = [0]
-        for value in buffer.values():
-            if isinstance(value, torch.Tensor):
-                offsets.append(offsets[-1] + len(value))
-            elif isinstance(value, tuple):
-                offsets.append(offsets[-1] + len(value[0]))
-            else:
-                raise TypeError(
-                    f"Unsupported buffer type {type(value).__name__}."
-                )
-        return torch.tensor(offsets)
-
     def __iter__(self) -> Iterator:
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is not None:
@@ -375,23 +333,17 @@ class ItemSampler(IterDataPipe):
         if self._shuffle:
             g = torch.Generator()
             g.manual_seed(self._seed + self._epoch)
-            _permutation = torch.randperm(total, generator=g)
-            # buffer = self._item_set[
-            #     _permutation[start_offset : start_offset + assigned_count]
-            # ]
+            permutation = torch.randperm(total, generator=g)
         else:
-            # buffer = self._item_set[
-            #     start_offset : start_offset + assigned_count
-            # ]
-            _permutation = torch.arange(total)
-        # offsets = self._calculate_offsets(buffer)
+            permutation = torch.arange(total)
+        indices = permutation[start_offset : start_offset + assigned_count]
         for i in range(0, assigned_count, self._batch_size):
             if output_count <= 0:
                 break
-            # indices = torch.arange(i, i + min(self._batch_size, output_count))
             yield self._minibatcher(
-                # self._collate_batch(buffer, indices, offsets),
-                self._item_set[_permutation[i: i + min(self._batch_size, output_count)]],
+                self._item_set[
+                    indices[i : i + min(self._batch_size, output_count)]
+                ],
                 self._names,
             )
             output_count -= self._batch_size
