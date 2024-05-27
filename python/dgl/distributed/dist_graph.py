@@ -1274,9 +1274,6 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
-        assert (
-            self._use_graphbolt is False
-        ), "find_edges is not supported in GraphBolt."
         if etype is None:
             assert (
                 len(self.etypes) == 1

@@ -16,6 +16,7 @@ from ..sampling import (
 )
 from ..subgraph import in_subgraph as local_in_subgraph
 from ..utils import toindex
+from .constants import DGL2GB_EID, GB_DST_ID
 from .rpc import (
     recv_responses,
     register_service,
@@ -337,9 +338,27 @@ def _find_edges(local_g, partition_book, seed_edges):
     and destination node ID array ``s`` and ``d`` in the local partition.
     """
     local_eids = partition_book.eid2localeid(seed_edges, partition_book.partid)
-    local_eids = F.astype(local_eids, local_g.idtype)
-    local_src, local_dst = local_g.find_edges(local_eids)
-    global_nid_mapping = local_g.ndata[NID]
+    if isinstance(local_g, gb.FusedCSCSamplingGraph):
+        # When converting from DGLGraph to FusedCSCSamplingGraph, the edge IDs
+        # are re-ordered. In order to find the correct node pairs, we need to
+        # map the DGL edge IDs back to GraphBolt edge IDs.
+        if (
+            DGL2GB_EID not in local_g.edge_attributes
+            or GB_DST_ID not in local_g.edge_attributes
+        ):
+            raise ValueError(
+                "The edge attributes DGL2GB_EID and GB_DST_ID are not found. "
+                "Please make sure `coo` format is available when generating "
+                "partitions in GraphBolt format."
+            )
+        local_eids = local_g.edge_attributes[DGL2GB_EID][local_eids]
+        local_src = local_g.indices[local_eids]
+        local_dst = local_g.edge_attributes[GB_DST_ID][local_eids]
+        global_nid_mapping = local_g.node_attributes[NID]
+    else:
+        local_eids = F.astype(local_eids, local_g.idtype)
+        local_src, local_dst = local_g.find_edges(local_eids)
+        global_nid_mapping = local_g.ndata[NID]
     global_src = global_nid_mapping[local_src]
     global_dst = global_nid_mapping[local_dst]
     return global_src, global_dst

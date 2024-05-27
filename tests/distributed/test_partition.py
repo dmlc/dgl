@@ -1188,3 +1188,213 @@ def test_partition_graph_graphbolt_hetero(
             for edge_type, type_id in new_g.edge_type_to_id.items():
                 assert g.get_etype_id(_etype_str_to_tuple(edge_type)) == type_id
             assert new_g.node_type_offset is None
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+@pytest.mark.parametrize("graph_formats", [["csc"], ["coo"], ["coo", "csc"]])
+def test_partition_graph_graphbolt_homo_find_edges(
+    part_method,
+    num_parts,
+    graph_formats,
+):
+    reset_envs()
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    with tempfile.TemporaryDirectory() as test_dir:
+        g = create_random_graph(1000)
+        g.ndata["feat"] = th.rand(g.num_nodes(), 5)
+        graph_name = "test"
+        orig_nids, orig_eids = partition_graph(
+            g,
+            graph_name,
+            num_parts,
+            test_dir,
+            part_method=part_method,
+            graph_formats=graph_formats,
+            return_mapping=True,
+            use_graphbolt=True,
+            store_eids=True,
+            store_inner_node=True,
+            store_inner_edge=True,
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        for part_id in range(num_parts):
+            local_g, _, _, gpb, _, _, _ = load_partition(
+                part_config, part_id, load_feats=False, use_graphbolt=True
+            )
+            inner_local_eids = th.nonzero(
+                local_g.edge_attributes["inner_edge"], as_tuple=False
+            ).squeeze()
+            inner_global_eids = local_g.edge_attributes[dgl.EID][
+                inner_local_eids
+            ]
+            if "coo" not in graph_formats:
+                with pytest.raises(
+                    ValueError,
+                    match="The edge attributes DGL2GB_EID and GB_DST_ID are "
+                    "not found. Please make sure `coo` format is available"
+                    " when generating partitions in GraphBolt format.",
+                ):
+                    dgl.distributed.graph_services._find_edges(
+                        local_g, gpb, inner_global_eids
+                    )
+                continue
+            global_src, global_dst = dgl.distributed.graph_services._find_edges(
+                local_g, gpb, inner_global_eids
+            )
+            orig_global_src = orig_nids[global_src]
+            orig_global_dst = orig_nids[global_dst]
+            assert th.all(g.has_edges_between(orig_global_src, orig_global_dst))
+
+            # dtype check.
+            assert (
+                local_g.edge_attributes[dgl.distributed.DGL2GB_EID].dtype
+                == th.int32
+            )
+            assert (
+                local_g.edge_attributes[dgl.distributed.GB_DST_ID].dtype
+                == th.int32
+            )
+
+            # No need to map local node IDs.
+            inner_local_nids = th.nonzero(
+                local_g.node_attributes["inner_node"], as_tuple=False
+            ).squeeze()
+            inner_global_nids = local_g.node_attributes[dgl.NID][
+                inner_local_nids
+            ]
+            assert th.equal(
+                inner_local_nids, gpb.nid2localnid(inner_global_nids, part_id)
+            )
+
+            # Need to map local edge IDs.
+            DGL_inner_local_eids = gpb.eid2localeid(inner_global_eids, part_id)
+            GB_inner_local_eids = local_g.edge_attributes[
+                dgl.distributed.DGL2GB_EID
+            ][DGL_inner_local_eids]
+            assert th.equal(inner_local_eids, GB_inner_local_eids)
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+@pytest.mark.parametrize("graph_formats", [["csc"], ["coo"], ["coo", "csc"]])
+def test_partition_graph_graphbolt_hetero_find_edges(
+    part_method,
+    num_parts,
+    graph_formats,
+):
+    reset_envs()
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    with tempfile.TemporaryDirectory() as test_dir:
+        hg = create_random_hetero()
+        graph_name = "test"
+        orig_nids, orig_eids = partition_graph(
+            hg,
+            graph_name,
+            num_parts,
+            test_dir,
+            part_method=part_method,
+            graph_formats=graph_formats,
+            return_mapping=True,
+            use_graphbolt=True,
+            store_eids=True,
+            store_inner_node=True,
+            store_inner_edge=True,
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        for part_id in range(num_parts):
+            local_g, _, _, gpb, _, _, _ = load_partition(
+                part_config, part_id, load_feats=False, use_graphbolt=True
+            )
+            inner_local_eids = th.nonzero(
+                local_g.edge_attributes["inner_edge"], as_tuple=False
+            ).squeeze()
+            inner_global_eids = local_g.edge_attributes[dgl.EID][
+                inner_local_eids
+            ]
+            if "coo" not in graph_formats:
+                with pytest.raises(
+                    ValueError,
+                    match="The edge attributes DGL2GB_EID and GB_DST_ID are "
+                    "not found. Please make sure `coo` format is available"
+                    " when generating partitions in GraphBolt format.",
+                ):
+                    dgl.distributed.graph_services._find_edges(
+                        local_g, gpb, inner_global_eids
+                    )
+                continue
+            global_src, global_dst = dgl.distributed.graph_services._find_edges(
+                local_g, gpb, inner_global_eids
+            )
+            ntype_ids_src, per_ntype_nids_src = gpb.map_to_per_ntype(global_src)
+            ntype_ids_dst, per_ntype_nids_dst = gpb.map_to_per_ntype(global_dst)
+            etype_ids, per_etype_eids = gpb.map_to_per_etype(inner_global_eids)
+            for src_ntype, etype, dst_ntype in hg.canonical_etypes:
+                etype_id = hg.get_etype_id((src_ntype, etype, dst_ntype))
+                current_etype_indices = th.nonzero(
+                    etype_ids == etype_id, as_tuple=False
+                ).squeeze()
+                assert th.all(
+                    ntype_ids_src[current_etype_indices]
+                    == gpb.ntypes.index(src_ntype)
+                )
+                assert th.all(
+                    ntype_ids_dst[current_etype_indices]
+                    == gpb.ntypes.index(dst_ntype)
+                )
+                current_per_ntype_nids_src = per_ntype_nids_src[
+                    current_etype_indices
+                ]
+                current_per_ntype_nids_dst = per_ntype_nids_dst[
+                    current_etype_indices
+                ]
+                current_orig_global_src = orig_nids[src_ntype][
+                    current_per_ntype_nids_src
+                ]
+                current_orig_global_dst = orig_nids[dst_ntype][
+                    current_per_ntype_nids_dst
+                ]
+                assert th.all(
+                    hg.has_edges_between(
+                        current_orig_global_src,
+                        current_orig_global_dst,
+                        etype=(src_ntype, etype, dst_ntype),
+                    )
+                )
+                current_orig_global_eids = orig_eids[
+                    (src_ntype, etype, dst_ntype)
+                ][per_etype_eids[current_etype_indices]]
+                orig_src_ids, orig_dst_ids = hg.find_edges(
+                    current_orig_global_eids,
+                    etype=(src_ntype, etype, dst_ntype),
+                )
+                assert th.equal(current_orig_global_src, orig_src_ids)
+                assert th.equal(current_orig_global_dst, orig_dst_ids)
+
+            # dtype check.
+            assert (
+                local_g.edge_attributes[dgl.distributed.DGL2GB_EID].dtype
+                == th.int32
+            )
+            assert (
+                local_g.edge_attributes[dgl.distributed.GB_DST_ID].dtype
+                == th.int32
+            )
+
+            # No need to map local node IDs.
+            inner_local_nids = th.nonzero(
+                local_g.node_attributes["inner_node"], as_tuple=False
+            ).squeeze()
+            inner_global_nids = local_g.node_attributes[dgl.NID][
+                inner_local_nids
+            ]
+            assert th.equal(
+                inner_local_nids, gpb.nid2localnid(inner_global_nids, part_id)
+            )
+
+            # Need to map local edge IDs.
+            DGL_inner_local_eids = gpb.eid2localeid(inner_global_eids, part_id)
+            GB_inner_local_eids = local_g.edge_attributes[
+                dgl.distributed.DGL2GB_EID
+            ][DGL_inner_local_eids]
+            assert th.equal(inner_local_eids, GB_inner_local_eids)
