@@ -5,7 +5,7 @@ from typing import Dict, Iterable, Tuple, Union
 
 import torch
 
-__all__ = ["ItemSet", "ItemSetDict"]
+__all__ = ["ItemSet", "HeteroItemSet"]
 
 
 def is_scalar(x):
@@ -207,15 +207,16 @@ class ItemSet:
         return ret
 
 
-class ItemSetDict:
-    r"""Dictionary wrapper of **ItemSet**.
+class HeteroItemSet:
+    r"""A collection of itemsets, each associated with a unique type.
 
-    This class aims to assemble existing itemsets with different tags, for
+    This class aims to assemble existing itemsets with different types, for
     example, seed_nodes of different node types in a graph.
 
     Parameters
     ----------
     itemsets: Dict[str, ItemSet]
+        A dictionary whose keys are types and values are ItemSet instances.
 
     Examples
     --------
@@ -226,7 +227,7 @@ class ItemSetDict:
 
     >>> node_ids_user = torch.arange(0, 5)
     >>> node_ids_item = torch.arange(5, 10)
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user": gb.ItemSet(node_ids_user, names="seeds"),
     ...     "item": gb.ItemSet(node_ids_item, names="seeds")})
     >>> list(item_set)
@@ -246,7 +247,7 @@ class ItemSetDict:
     >>> labels_user = torch.arange(0, 2)
     >>> node_ids_item = torch.arange(2, 5)
     >>> labels_item = torch.arange(2, 5)
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user": gb.ItemSet(
     ...         (node_ids_user, labels_user),
     ...         names=("seeds", "labels")),
@@ -270,7 +271,7 @@ class ItemSetDict:
     >>> labels_like = torch.tensor([1, 0])
     >>> seeds_follow = torch.arange(0, 6).reshape(-1, 2)
     >>> labels_follow = torch.tensor([1, 1, 0])
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user:like:item": gb.ItemSet(
     ...         (seeds_like, labels_like),
     ...         names=("seeds", "labels")),
@@ -298,7 +299,7 @@ class ItemSetDict:
     >>> first_labels = torch.tensor([1, 0])
     >>> second_seeds = torch.arange(0, 2).reshape(-1, 1)
     >>> second_labels = torch.tensor([1, 0])
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "query:user:item": gb.ItemSet(
     ...         (first_seeds, first_labels),
     ...         names=("seeds", "labels")),
@@ -362,33 +363,20 @@ class ItemSetDict:
                     break
             return data
         elif isinstance(index, Iterable):
-            # TODO[Mingbang]: Might have performance issue. Tests needed.
-            data = {key: [] for key in self._keys}
-            for idx in index:
-                if idx < 0:
-                    idx += self._length
-                if idx < 0 or idx >= self._length:
-                    raise IndexError(
-                        f"{type(self).__name__} index out of range."
-                    )
-                offset_idx = torch.searchsorted(self._offsets, idx, right=True)
-                offset_idx -= 1
-                idx -= self._offsets[offset_idx]
-                key = self._keys[offset_idx]
-                data[key].append(int(idx))
-            for key in self._keys:
-                indices = data[key]
-                if len(indices) == 0:
-                    del data[key]
+            if not isinstance(index, torch.Tensor):
+                index = torch.tensor(index)
+            assert torch.all((index >= 0) & (index < self._length))
+            key_indices = (
+                torch.searchsorted(self._offsets, index, right=True) - 1
+            )
+            data = {}
+            for key_id, key in enumerate(self._keys):
+                mask = (key_indices == key_id).nonzero().squeeze(1)
+                if len(mask) == 0:
                     continue
-                item_set = self._itemsets[key]
-                try:
-                    value = item_set[indices]
-                except TypeError:
-                    # In case the itemset doesn't support list indexing.
-                    value = tuple(item_set[idx] for idx in indices)
-                finally:
-                    data[key] = value
+                data[key] = self._itemsets[key][
+                    index[mask] - self._offsets[key_id]
+                ]
             return data
         else:
             raise TypeError(
