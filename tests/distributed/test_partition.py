@@ -851,6 +851,50 @@ def test_dgl_partition_to_graphbolt_hetero(
                 part_config, part_id, load_feats=False, use_graphbolt=True
             )[0]
             orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
+
+            # Edges should be sorted in etype for the same dst node.
+            if debug_mode:
+                num_inner_edges = orig_g.edata["inner_edge"].sum().item()
+                assert (
+                    num_inner_edges
+                    == orig_g.edata["inner_edge"][th.arange(num_inner_edges)]
+                    .sum()
+                    .item()
+                )
+                assert (
+                    num_inner_edges
+                    == new_g.edge_attributes["inner_edge"][:num_inner_edges]
+                    .sum()
+                    .item()
+                )
+                num_inner_nodes = orig_g.ndata["inner_node"].sum().item()
+                assert (
+                    num_inner_nodes
+                    == orig_g.ndata["inner_node"][th.arange(num_inner_nodes)]
+                    .sum()
+                    .item()
+                )
+                assert (
+                    num_inner_nodes
+                    == new_g.node_attributes["inner_node"][:num_inner_nodes]
+                    .sum()
+                    .item()
+                )
+                for i in range(orig_g.num_nodes()):
+                    if orig_g.in_degrees(i) == 0:
+                        continue
+                    # Verify DGLGraph partitions.
+                    eids = orig_g.in_edges(i, form="eid")
+                    etypes = orig_g.edata[dgl.ETYPE][eids]
+                    assert th.equal(etypes, etypes.sort()[0])
+                    # Verify GraphBolt partitions.
+                    eids_start = new_g.csc_indptr[i]
+                    eids_end = new_g.csc_indptr[i + 1]
+                    etypes = new_g.edge_attributes[dgl.ETYPE][
+                        eids_start:eids_end
+                    ]
+                    assert th.equal(etypes, etypes.sort()[0])
+
             # The original graph is in int64 while the partitioned graph is in
             # int32 as dtype formatting is applied when converting to graphbolt
             # format.
