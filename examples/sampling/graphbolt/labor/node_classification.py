@@ -198,7 +198,7 @@ def layerwise_infer(
         graph=graph,
         features=features,
         itemset=all_nodes_set,
-        batch_size=4 * args.batch_size,
+        batch_size=args.batch_size,
         fanout=[-1],
         device=args.device,
         job="infer",
