@@ -839,9 +839,6 @@ def test_dataloader_homograph(
 def test_edge_dataloader_homograph(
     num_workers, use_graphbolt, exclude, negative
 ):
-    # exclude is not supported in graphbolt.
-    if use_graphbolt and (exclude is not None):
-        return
     num_server = 1
     dataloader_type = "edge"
     reset_envs()
@@ -869,6 +866,7 @@ def test_edge_dataloader_homograph(
         num_workers,
         dataloader_type,
         use_graphbolt=use_graphbolt,
+        return_eids=True,
         exclude=exclude,
         reverse_eids=reverse_eids,
         negative=negative,
@@ -902,9 +900,6 @@ def test_dataloader_heterograph(
 def test_edge_dataloader_heterograph(
     num_workers, use_graphbolt, exclude, negative
 ):
-    # exclude is not supported in graphbolt.
-    if use_graphbolt and (exclude is not None):
-        return
     num_server = 1
     dataloader_type = "edge"
     reset_envs()
@@ -916,6 +911,7 @@ def test_edge_dataloader_heterograph(
         num_workers,
         dataloader_type,
         use_graphbolt=use_graphbolt,
+        return_eids=True,
         exclude=exclude,
         reverse_etypes=reverse_etypes,
         negative=negative,
