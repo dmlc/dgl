@@ -418,15 +418,9 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges, use_graphbolt=False):
     assert np.all(F.asnumpy(feats == eids))
 
     # Test edge_subgraph
-    if use_graphbolt:
-        with pytest.raises(
-            AssertionError, match="find_edges is not supported in GraphBolt."
-        ):
-            g.edge_subgraph(eids)
-    else:
-        sg = g.edge_subgraph(eids)
-        assert sg.num_edges() == len(eids)
-        assert F.array_equal(sg.edata[dgl.EID], eids)
+    sg = g.edge_subgraph(eids)
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
     new_shape = (g.num_nodes(), 2)
@@ -835,18 +829,12 @@ def check_dist_graph_hetero(
     assert expect_except
 
     # Test edge_subgraph
-    if use_graphbolt:
-        with pytest.raises(
-            AssertionError, match="find_edges is not supported in GraphBolt."
-        ):
-            g.edge_subgraph({"r1": eids})
-    else:
-        sg = g.edge_subgraph({"r1": eids})
-        assert sg.num_edges() == len(eids)
-        assert F.array_equal(sg.edata[dgl.EID], eids)
-        sg = g.edge_subgraph({("n1", "r1", "n2"): eids})
-        assert sg.num_edges() == len(eids)
-        assert F.array_equal(sg.edata[dgl.EID], eids)
+    sg = g.edge_subgraph({"r1": eids})
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
+    sg = g.edge_subgraph({("n1", "r1", "n2"): eids})
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
     new_shape = (g.num_nodes("n1"), 2)

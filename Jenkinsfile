@@ -608,6 +608,8 @@ pipeline {
                     sh 'nvidia-smi'
                     unit_test_cugraph('pytorch', 'cugraph')
                   }
+                  // Cugraph is under refactoring. Skip the test for now.
+                  when { expression { false } }
                 }
               }
               post {

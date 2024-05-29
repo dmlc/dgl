@@ -51,7 +51,7 @@ def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
     itemset = gb.ItemSet(items, names=names)
     graph = get_hetero_graph().to(F.ctx())
     if hetero:
-        itemset = gb.ItemSetDict({"n3": itemset})
+        itemset = gb.HeteroItemSet({"n3": itemset})
     else:
         graph.type_per_edge = None
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())

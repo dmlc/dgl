@@ -82,7 +82,7 @@ An item set is an iterable collection of items.
     :template: graphbolt_classtemplate.rst
 
     ItemSet
-    ItemSetDict
+    HeteroItemSet
 
 
 ItemSampler

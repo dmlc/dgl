@@ -1,6 +1,5 @@
 import os
 
-import matplotlib as mpl
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -171,11 +170,15 @@ def graph_att_head(M, N, weight, ax, title):
     )
 
 
-import networkx as nx
 from matplotlib.patches import ConnectionStyle, FancyArrowPatch
-from networkx.utils import is_string_like
 
 "The following function was modified from the source code of networkx"
+
+
+def is_string_like(obj):  # from John Hunter, types-free version
+    """Check if obj is string."""
+
+    return isinstance(obj, str)
 
 
 def draw_networkx_edges(

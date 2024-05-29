@@ -458,10 +458,12 @@ def start_node_dataloader(
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [
-            # test dict for hetero
-            {etype: 5 for etype in dist_graph.etypes}
-            if len(dist_graph.etypes) > 1
-            else 5,
+            (
+                # test dict for hetero
+                {etype: 5 for etype in dist_graph.etypes}
+                if len(dist_graph.etypes) > 1
+                else 5
+            ),
             10,
         ]
     )  # test int for hetero
@@ -500,6 +502,7 @@ def start_node_dataloader(
                     assert np.all(F.asnumpy(has_edges))
 
                     if use_graphbolt and not return_eids:
+                        assert dgl.EID not in block.edges[c_etype].data
                         continue
                     eids = orig_eid[c_etype][block.edges[c_etype].data[dgl.EID]]
                     expected_eids = groundtruth_g.edge_ids(
@@ -522,6 +525,10 @@ def start_edge_dataloader(
     orig_nid,
     orig_eid,
     groundtruth_g,
+    exclude,
+    reverse_eids,
+    reverse_etypes,
+    negative,
 ):
     dgl.distributed.initialize(ip_config)
     gpb = None
@@ -536,13 +543,20 @@ def start_edge_dataloader(
     if len(dist_graph.etypes) == 1:
         train_eid = th.arange(num_edges_to_sample)
     else:
-        train_eid = {dist_graph.etypes[0]: th.arange(num_edges_to_sample)}
+        train_eid = {
+            dist_graph.canonical_etypes[0]: th.arange(num_edges_to_sample)
+        }
 
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(part_config, i)
 
     # Create sampler
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10])
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([5, -1])
+
+    # Negative sampler.
+    negative_sampler = None
+    if negative:
+        negative_sampler = dgl.dataloading.negative_sampler.Uniform(5)
 
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
@@ -555,12 +569,20 @@ def start_edge_dataloader(
             shuffle=True,
             drop_last=False,
             num_workers=num_workers,
+            exclude=exclude,
+            reverse_eids=reverse_eids,
+            reverse_etypes=reverse_etypes,
+            negative_sampler=negative_sampler,
         )
 
-        for epoch in range(2):
-            for idx, (input_nodes, pos_pair_graph, blocks) in zip(
+        for _ in range(2):
+            for _, minibatch in zip(
                 range(0, num_edges_to_sample, batch_size), dataloader
             ):
+                if negative:
+                    _, pos_pair_graph, neg_pair_graph, blocks = minibatch
+                else:
+                    _, pos_pair_graph, blocks = minibatch
                 block = blocks[-1]
                 for src_type, etype, dst_type in block.canonical_etypes:
                     o_src, o_dst = block.edges(etype=etype)
@@ -578,6 +600,89 @@ def start_edge_dataloader(
                             pos_pair_graph.nodes[dst_type].data[dgl.NID]
                         )
                     )
+                    if negative:
+                        assert np.all(
+                            F.asnumpy(block.dstnodes[dst_type].data[dgl.NID])
+                            == F.asnumpy(
+                                neg_pair_graph.nodes[dst_type].data[dgl.NID]
+                            )
+                        )
+                    if (
+                        dgl.EID
+                        not in block.edges[(src_type, etype, dst_type)].data
+                    ):
+                        continue
+                    sampled_eids = block.edges[
+                        (src_type, etype, dst_type)
+                    ].data[dgl.EID]
+                    sampled_orig_eids = orig_eid[(src_type, etype, dst_type)][
+                        sampled_eids
+                    ]
+                    raw_src, raw_dst = groundtruth_g.find_edges(
+                        sampled_orig_eids, etype=(src_type, etype, dst_type)
+                    )
+                    sampled_src, sampled_dst = block.edges(
+                        etype=(src_type, etype, dst_type)
+                    )
+                    sampled_orig_src = block.nodes[src_type].data[dgl.NID][
+                        sampled_src
+                    ]
+                    sampled_orig_dst = block.nodes[dst_type].data[dgl.NID][
+                        sampled_dst
+                    ]
+                    assert th.equal(
+                        raw_src, orig_nid[src_type][sampled_orig_src]
+                    )
+                    assert th.equal(
+                        raw_dst, orig_nid[dst_type][sampled_orig_dst]
+                    )
+                # Verify the exclude functionality.
+                if dgl.EID not in blocks[-1].edata.keys():
+                    continue
+                for (
+                    src_type,
+                    etype,
+                    dst_type,
+                ) in pos_pair_graph.canonical_etypes:
+                    for block in blocks:
+                        if (
+                            src_type,
+                            etype,
+                            dst_type,
+                        ) not in block.canonical_etypes:
+                            continue
+                        current_eids = block.edges[etype].data[dgl.EID]
+                        seed_eids = pos_pair_graph.edges[etype].data[dgl.EID]
+                        if exclude is None:
+                            # seed_eids are not guaranteed to be sampled.
+                            pass
+                        elif exclude == "self":
+                            assert not th.any(th.isin(current_eids, seed_eids))
+                        elif exclude == "reverse_id":
+                            src, dst = groundtruth_g.find_edges(seed_eids)
+                            reverse_seed_eids = groundtruth_g.edge_ids(dst, src)
+                            assert not th.any(
+                                th.isin(current_eids, reverse_seed_eids)
+                            )
+                            assert not th.any(th.isin(current_eids, seed_eids))
+                        elif exclude == "reverse_types":
+                            assert not th.any(th.isin(current_eids, seed_eids))
+                            reverse_etype = reverse_etypes[
+                                (src_type, etype, dst_type)
+                            ]
+                            if reverse_etype in block.canonical_etypes:
+                                assert not th.any(
+                                    th.isin(
+                                        block.edges[reverse_etype].data[
+                                            dgl.EID
+                                        ],
+                                        seed_eids,
+                                    )
+                                )
+                        else:
+                            raise ValueError(
+                                f"Unsupported exclude type: {exclude}"
+                            )
     del dataloader
     dgl.distributed.exit_client()
 
@@ -589,6 +694,10 @@ def check_dataloader(
     dataloader_type,
     use_graphbolt=False,
     return_eids=False,
+    exclude=None,
+    reverse_eids=None,
+    reverse_etypes=None,
+    negative=False,
 ):
     with tempfile.TemporaryDirectory() as test_dir:
         ip_config = "ip_config.txt"
@@ -664,6 +773,10 @@ def check_dataloader(
                     orig_nid,
                     orig_eid,
                     g,
+                    exclude,
+                    reverse_eids,
+                    reverse_etypes,
+                    negative,
                 ),
             )
             p.start()
@@ -690,6 +803,9 @@ def create_random_hetero():
             random_state=100,
         )
         edges[etype] = (arr.row, arr.col)
+    # Add reverse edges.
+    src, dst = edges[("n1", "r1", "n2")]
+    edges[("n2", "r21", "n1")] = (dst, src)
     g = dgl.heterograph(edges, num_nodes)
     g.nodes["n1"].data["feat"] = F.unsqueeze(F.arange(0, g.num_nodes("n1")), 1)
     g.edges["r1"].data["feat"] = F.unsqueeze(F.arange(0, g.num_edges("r1")), 1)
@@ -704,9 +820,6 @@ def create_random_hetero():
 def test_dataloader_homograph(
     num_server, num_workers, dataloader_type, use_graphbolt, return_eids
 ):
-    if dataloader_type == "edge" and use_graphbolt:
-        # GraphBolt does not support edge dataloader.
-        return
     reset_envs()
     g = CitationGraphDataset("cora")[0]
     check_dataloader(
@@ -719,6 +832,47 @@ def test_dataloader_homograph(
     )
 
 
+@pytest.mark.parametrize("num_workers", [0, 1])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("exclude", [None, "self", "reverse_id"])
+@pytest.mark.parametrize("negative", [False, True])
+def test_edge_dataloader_homograph(
+    num_workers, use_graphbolt, exclude, negative
+):
+    num_server = 1
+    dataloader_type = "edge"
+    reset_envs()
+    g = CitationGraphDataset("cora")[0]
+    src, dst = g.edges()
+    # Remove reverse edges.
+    visited = th.zeros_like(src, dtype=th.bool)
+    remove_mask = th.zeros_like(src, dtype=th.bool)
+    for i, (src_id, dst_id) in enumerate(zip(src, dst)):
+        if visited[i]:
+            continue
+        if g.has_edges_between(dst_id, src_id):
+            eid = g.edge_ids(dst_id, src_id)
+            visited[eid] = True
+            remove_mask[i] = True
+        visited[i] = True
+    src = src[~remove_mask]
+    dst = dst[~remove_mask]
+    g = dgl.graph((th.cat([src, dst]), th.cat([dst, src])))
+    E = len(src)
+    reverse_eids = th.cat([th.arange(E, 2 * E), th.arange(0, E)])
+    check_dataloader(
+        g,
+        num_server,
+        num_workers,
+        dataloader_type,
+        use_graphbolt=use_graphbolt,
+        return_eids=True,
+        exclude=exclude,
+        reverse_eids=reverse_eids,
+        negative=negative,
+    )
+
+
 @pytest.mark.parametrize("num_server", [1])
 @pytest.mark.parametrize("num_workers", [0, 1])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
@@ -727,9 +881,6 @@ def test_dataloader_homograph(
 def test_dataloader_heterograph(
     num_server, num_workers, dataloader_type, use_graphbolt, return_eids
 ):
-    if dataloader_type == "edge" and use_graphbolt:
-        # GraphBolt does not support edge dataloader.
-        return
     reset_envs()
     g = create_random_hetero()
     check_dataloader(
@@ -739,6 +890,31 @@ def test_dataloader_heterograph(
         dataloader_type,
         use_graphbolt=use_graphbolt,
         return_eids=return_eids,
+    )
+
+
+@pytest.mark.parametrize("num_workers", [0, 1])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
+@pytest.mark.parametrize("exclude", [None, "self", "reverse_types"])
+@pytest.mark.parametrize("negative", [False, True])
+def test_edge_dataloader_heterograph(
+    num_workers, use_graphbolt, exclude, negative
+):
+    num_server = 1
+    dataloader_type = "edge"
+    reset_envs()
+    g = create_random_hetero()
+    reverse_etypes = {("n1", "r1", "n2"): ("n2", "r21", "n1")}
+    check_dataloader(
+        g,
+        num_server,
+        num_workers,
+        dataloader_type,
+        use_graphbolt=use_graphbolt,
+        return_eids=True,
+        exclude=exclude,
+        reverse_etypes=reverse_etypes,
+        negative=negative,
     )
 
 
