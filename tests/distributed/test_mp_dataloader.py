@@ -501,7 +501,8 @@ def start_node_dataloader(
                     )
                     assert np.all(F.asnumpy(has_edges))
 
-                    if dgl.EID not in block.edges[c_etype].data:
+                    if use_graphbolt and not return_eids:
+                        assert dgl.EID not in block.edges[c_etype].data
                         continue
                     eids = orig_eid[c_etype][block.edges[c_etype].data[dgl.EID]]
                     expected_eids = groundtruth_g.edge_ids(
