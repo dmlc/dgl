@@ -528,6 +528,7 @@ def start_edge_dataloader(
     exclude,
     reverse_eids,
     reverse_etypes,
+    negative,
 ):
     dgl.distributed.initialize(ip_config)
     gpb = None
@@ -552,6 +553,11 @@ def start_edge_dataloader(
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5, -1])
 
+    # Negative sampler.
+    negative_sampler = None
+    if negative:
+        negative_sampler = dgl.dataloading.negative_sampler.Uniform(5)
+
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
@@ -566,12 +572,17 @@ def start_edge_dataloader(
             exclude=exclude,
             reverse_eids=reverse_eids,
             reverse_etypes=reverse_etypes,
+            negative_sampler=negative_sampler,
         )
 
         for _ in range(2):
-            for _, (_, pos_pair_graph, blocks) in zip(
+            for _, minibatch in zip(
                 range(0, num_edges_to_sample, batch_size), dataloader
             ):
+                if negative:
+                    _, pos_pair_graph, neg_pair_graph, blocks = minibatch
+                else:
+                    _, pos_pair_graph, blocks = minibatch
                 block = blocks[-1]
                 for src_type, etype, dst_type in block.canonical_etypes:
                     o_src, o_dst = block.edges(etype=etype)
@@ -589,6 +600,13 @@ def start_edge_dataloader(
                             pos_pair_graph.nodes[dst_type].data[dgl.NID]
                         )
                     )
+                    if negative:
+                        assert np.all(
+                            F.asnumpy(block.dstnodes[dst_type].data[dgl.NID])
+                            == F.asnumpy(
+                                neg_pair_graph.nodes[dst_type].data[dgl.NID]
+                            )
+                        )
                     if (
                         dgl.EID
                         not in block.edges[(src_type, etype, dst_type)].data
@@ -679,6 +697,7 @@ def check_dataloader(
     exclude=None,
     reverse_eids=None,
     reverse_etypes=None,
+    negative=False,
 ):
     with tempfile.TemporaryDirectory() as test_dir:
         ip_config = "ip_config.txt"
@@ -757,6 +776,7 @@ def check_dataloader(
                     exclude,
                     reverse_eids,
                     reverse_etypes,
+                    negative,
                 ),
             )
             p.start()
@@ -813,9 +833,15 @@ def test_dataloader_homograph(
 
 
 @pytest.mark.parametrize("num_workers", [0, 1])
-@pytest.mark.parametrize("use_graphbolt", [False])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("exclude", [None, "self", "reverse_id"])
-def test_dataloader_homograph_exclude(num_workers, use_graphbolt, exclude):
+@pytest.mark.parametrize("negative", [False, True])
+def test_edge_dataloader_homograph(
+    num_workers, use_graphbolt, exclude, negative
+):
+    # exclude is not supported in graphbolt.
+    if use_graphbolt and (exclude is not None):
+        return
     num_server = 1
     dataloader_type = "edge"
     reset_envs()
@@ -845,6 +871,7 @@ def test_dataloader_homograph_exclude(num_workers, use_graphbolt, exclude):
         use_graphbolt=use_graphbolt,
         exclude=exclude,
         reverse_eids=reverse_eids,
+        negative=negative,
     )
 
 
@@ -869,9 +896,15 @@ def test_dataloader_heterograph(
 
 
 @pytest.mark.parametrize("num_workers", [0, 1])
-@pytest.mark.parametrize("use_graphbolt", [False])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("exclude", [None, "self", "reverse_types"])
-def test_dataloader_heterograph_exclude(num_workers, use_graphbolt, exclude):
+@pytest.mark.parametrize("negative", [False, True])
+def test_edge_dataloader_heterograph(
+    num_workers, use_graphbolt, exclude, negative
+):
+    # exclude is not supported in graphbolt.
+    if use_graphbolt and (exclude is not None):
+        return
     num_server = 1
     dataloader_type = "edge"
     reset_envs()
@@ -885,6 +918,7 @@ def test_dataloader_heterograph_exclude(num_workers, use_graphbolt, exclude):
         use_graphbolt=use_graphbolt,
         exclude=exclude,
         reverse_etypes=reverse_etypes,
+        negative=negative,
     )
 
 
