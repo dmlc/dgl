@@ -502,6 +502,7 @@ def start_node_dataloader(
                     assert np.all(F.asnumpy(has_edges))
 
                     if use_graphbolt and not return_eids:
+                        assert dgl.EID not in block.edges[c_etype].data
                         continue
                     eids = orig_eid[c_etype][block.edges[c_etype].data[dgl.EID]]
                     expected_eids = groundtruth_g.edge_ids(
@@ -567,8 +568,8 @@ def start_edge_dataloader(
             reverse_etypes=reverse_etypes,
         )
 
-        for epoch in range(2):
-            for idx, (input_nodes, pos_pair_graph, blocks) in zip(
+        for _ in range(2):
+            for _, (_, pos_pair_graph, blocks) in zip(
                 range(0, num_edges_to_sample, batch_size), dataloader
             ):
                 block = blocks[-1]
@@ -588,7 +589,38 @@ def start_edge_dataloader(
                             pos_pair_graph.nodes[dst_type].data[dgl.NID]
                         )
                     )
+                    if (
+                        dgl.EID
+                        not in block.edges[(src_type, etype, dst_type)].data
+                    ):
+                        continue
+                    sampled_eids = block.edges[
+                        (src_type, etype, dst_type)
+                    ].data[dgl.EID]
+                    sampled_orig_eids = orig_eid[(src_type, etype, dst_type)][
+                        sampled_eids
+                    ]
+                    raw_src, raw_dst = groundtruth_g.find_edges(
+                        sampled_orig_eids, etype=(src_type, etype, dst_type)
+                    )
+                    sampled_src, sampled_dst = block.edges(
+                        etype=(src_type, etype, dst_type)
+                    )
+                    sampled_orig_src = block.nodes[src_type].data[dgl.NID][
+                        sampled_src
+                    ]
+                    sampled_orig_dst = block.nodes[dst_type].data[dgl.NID][
+                        sampled_dst
+                    ]
+                    assert th.equal(
+                        raw_src, orig_nid[src_type][sampled_orig_src]
+                    )
+                    assert th.equal(
+                        raw_dst, orig_nid[dst_type][sampled_orig_dst]
+                    )
                 # Verify the exclude functionality.
+                if dgl.EID not in blocks[-1].edata.keys():
+                    continue
                 for (
                     src_type,
                     etype,
@@ -604,7 +636,8 @@ def start_edge_dataloader(
                         current_eids = block.edges[etype].data[dgl.EID]
                         seed_eids = pos_pair_graph.edges[etype].data[dgl.EID]
                         if exclude is None:
-                            assert th.any(th.isin(current_eids, seed_eids))
+                            # seed_eids are not guaranteed to be sampled.
+                            pass
                         elif exclude == "self":
                             assert not th.any(th.isin(current_eids, seed_eids))
                         elif exclude == "reverse_id":
@@ -767,9 +800,6 @@ def create_random_hetero():
 def test_dataloader_homograph(
     num_server, num_workers, dataloader_type, use_graphbolt, return_eids
 ):
-    if dataloader_type == "edge" and use_graphbolt:
-        # GraphBolt does not support edge dataloader.
-        return
     reset_envs()
     g = CitationGraphDataset("cora")[0]
     check_dataloader(
@@ -826,9 +856,6 @@ def test_dataloader_homograph_exclude(num_workers, use_graphbolt, exclude):
 def test_dataloader_heterograph(
     num_server, num_workers, dataloader_type, use_graphbolt, return_eids
 ):
-    if dataloader_type == "edge" and use_graphbolt:
-        # GraphBolt does not support edge dataloader.
-        return
     reset_envs()
     g = create_random_hetero()
     check_dataloader(
