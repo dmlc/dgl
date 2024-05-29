@@ -135,11 +135,10 @@ def create_dataloader(
 
 
 def train(
-    train_dataloader, valid_dataloader, num_classes, model, multilabel, device
+    train_dataloader, valid_dataloader, model, multilabel, kwargs, device
 ):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
-    task = "multilabel" if multilabel else "multiclass"
 
     total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
     total_correct = 0  # Accumulator for the total number of correct predictions
@@ -158,11 +157,10 @@ def train(
             labels = minibatch.labels
             optimizer.zero_grad()
             out = model(minibatch.sampled_subgraphs, node_features)
-            loss = criterion(out, labels)
+            label_dtype = out.dtype if multilabel else None
+            loss = criterion(out, labels.to(label_dtype))
             total_loss += loss.detach()
-            total_correct += MF.accuracy(
-                out, labels, task=task, num_classes=num_classes
-            ) * labels.size(0)
+            total_correct += MF.f1_score(out, labels, **kwargs) * labels.size(0)
             total_samples += labels.size(0)
             loss.backward()
             optimizer.step()
@@ -170,7 +168,7 @@ def train(
         train_loss = total_loss / num_batches
         train_acc = total_correct / total_samples
         end = time.time()
-        val_acc = evaluate(model, valid_dataloader, num_classes, task)
+        val_acc = evaluate(model, valid_dataloader, kwargs)
         if val_acc > best_model_acc:
             best_model_acc = val_acc
             best_model = deepcopy(model.state_dict())
@@ -193,8 +191,7 @@ def layerwise_infer(
     itemsets,
     all_nodes_set,
     model,
-    num_classes,
-    multilabel,
+    kwargs,
 ):
     model.eval()
     dataloader = create_dataloader(
@@ -207,16 +204,14 @@ def layerwise_infer(
         job="infer",
     )
     pred = model.inference(graph, features, dataloader, args.feature_device)
-    task = "multilabel" if multilabel else "multiclass"
 
     metrics = {}
     for split_name, itemset in itemsets.items():
         nid, labels = itemset[:]
-        acc = MF.accuracy(
+        acc = MF.f1_score(
             pred[nid.to(pred.device)],
             labels.to(pred.device),
-            task=task,
-            num_classes=num_classes,
+            **kwargs,
         )
         metrics[split_name] = acc.item()
 
@@ -224,7 +219,7 @@ def layerwise_infer(
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, num_classes, task):
+def evaluate(model, dataloader, kwargs):
     model.eval()
     y_hats = []
     ys = []
@@ -235,12 +230,7 @@ def evaluate(model, dataloader, num_classes, task):
         y_hats.append(out)
         ys.append(labels)
 
-    return MF.accuracy(
-        torch.cat(y_hats),
-        torch.cat(ys),
-        task=task,
-        num_classes=num_classes,
-    )
+    return MF.f1_score(torch.cat(y_hats), torch.cat(ys), **kwargs)
 
 
 def parse_args():
@@ -396,12 +386,18 @@ def main():
         torch._dynamo.config.cache_size_limit = 32
         model = torch.compile(model, fullgraph=True, dynamic=True)
 
+    kwargs = {
+        "num_labels" if multilabel else "num_classes": num_classes,
+        "task": "multilabel" if multilabel else "multiclass",
+        "validate_args": False,
+    }
+
     best_model = train(
         train_dataloader,
         valid_dataloader,
-        num_classes,
         model,
         multilabel,
+        kwargs,
         args.device,
     )
     model.load_state_dict(best_model)
@@ -416,8 +412,7 @@ def main():
         itemsets,
         all_nodes_set,
         model,
-        num_classes,
-        multilabel,
+        kwargs,
     )
     print("Final accuracy values:")
     print(final_acc)
