@@ -1,7 +1,7 @@
 import argparse
-import glob
-import os
 import time
+
+from copy import deepcopy
 
 import dgl.graphbolt as gb
 import torch
@@ -11,15 +11,9 @@ import torch
 import torch._inductor.codecache
 import torch.nn as nn
 import torch.nn.functional as F
-
+import torchmetrics.functional as MF
 from load_dataset import load_dataset
-from pytorch_lightning import LightningDataModule, LightningModule, Trainer
-from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
-
 from sage_conv import SAGEConv
-
-from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
 from tqdm import tqdm
 
 
@@ -97,288 +91,203 @@ class GraphSAGE(torch.nn.Module):
         return y
 
 
-class SAGELightning(LightningModule):
-    def __init__(
-        self,
-        in_feats,
-        n_hidden,
-        n_classes,
-        n_layers,
-        lr,
-        dropout,
-        multilabel,
-        torch_compile,
-    ):
-        super().__init__()
-        self.save_hyperparameters()
-        self.module = GraphSAGE(
-            in_feats, n_hidden, n_classes, n_layers, dropout
+def create_dataloader(
+    graph, features, itemset, batch_size, fanout, device, job
+):
+
+    # Initialize an ItemSampler to sample mini-batches from the dataset.
+    datapipe = gb.ItemSampler(
+        itemset,
+        batch_size=batch_size,
+        shuffle=(job == "train"),
+        drop_last=(job == "train"),
+    )
+    # Copy the data to the specified device.
+    if args.graph_device != "cpu":
+        datapipe = datapipe.copy_to(device=device)
+    # Sample neighbors for each node in the mini-batch.
+    kwargs = (
+        {
+            "layer_dependency": args.layer_dependency,
+            "batch_dependency": args.batch_dependency,
+        }
+        if args.sample_mode == "sample_layer_neighbor"
+        else {}
+    )
+    datapipe = getattr(datapipe, args.sample_mode)(
+        graph, fanout if job != "infer" else [-1], **kwargs
+    )
+    # Copy the data to the specified device.
+    if args.feature_device != "cpu":
+        datapipe = datapipe.copy_to(device=device)
+    # Fetch node features for the sampled subgraph.
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    # Copy the data to the specified device.
+    if args.feature_device == "cpu":
+        datapipe = datapipe.copy_to(device=device)
+    # Create and return a DataLoader to handle data loading.
+    return gb.DataLoader(
+        datapipe,
+        num_workers=args.num_workers,
+        overlap_feature_fetch=args.overlap_feature_fetch,
+        overlap_graph_fetch=args.overlap_graph_fetch,
+    )
+
+
+def train(
+    train_dataloader, valid_dataloader, num_classes, model, multilabel, device
+):
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    criterion = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
+    task = "multilabel" if multilabel else "multiclass"
+
+    total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
+    total_correct = 0  # Accumulator for the total number of correct predictions
+    total_samples = 0  # Accumulator for the total number of samples processed
+    num_batches = 0  # Counter for the number of mini-batches processed
+
+    best_model = None
+    best_model_acc = 0
+    best_model_epoch = -1
+
+    for epoch in range(args.epochs):
+        model.train()  # Set the model to training mode
+        start = time.time()
+        for minibatch in tqdm(train_dataloader, "Training"):
+            node_features = minibatch.node_features["feat"]
+            labels = minibatch.labels
+            optimizer.zero_grad()
+            out = model(minibatch.sampled_subgraphs, node_features)
+            loss = criterion(out, labels)
+            total_loss += loss.detach()
+            total_correct += MF.accuracy(
+                out, labels, task=task, num_classes=num_classes
+            ) * labels.size(0)
+            total_samples += labels.size(0)
+            loss.backward()
+            optimizer.step()
+            num_batches += 1
+        train_loss = total_loss / num_batches
+        train_acc = total_correct / total_samples
+        end = time.time()
+        val_acc = evaluate(model, valid_dataloader, num_classes, task)
+        if val_acc > best_model_acc:
+            best_model_acc = val_acc
+            best_model = deepcopy(model.state_dict())
+            best_model_epoch = epoch
+        print(
+            f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
+            f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}, "
+            f"Time: {end - start}s"
         )
-        if torch_compile:
-            torch._dynamo.config.cache_size_limit = 32
-            self.module = torch.compile(
-                self.module, fullgraph=True, dynamic=True
-            )
-        self.lr = lr
-        self.f1score_class = lambda: (
-            MultilabelF1Score if multilabel else MulticlassF1Score
-        )(n_classes, average="micro")
-        self.train_acc = self.f1score_class()
-        self.val_acc = self.f1score_class()
-        self.loss_fn = (
-            nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
+        if best_model_epoch + args.early_stopping_patience < epoch:
+            break
+    return best_model
+
+
+@torch.no_grad()
+def layerwise_infer(
+    args,
+    graph,
+    features,
+    itemsets,
+    all_nodes_set,
+    model,
+    num_classes,
+    multilabel,
+):
+    model.eval()
+    dataloader = create_dataloader(
+        graph=graph,
+        features=features,
+        itemset=all_nodes_set,
+        batch_size=4 * args.batch_size,
+        fanout=[-1],
+        device=args.device,
+        job="infer",
+    )
+    pred = model.inference(graph, features, dataloader, args.feature_device)
+    task = "multilabel" if multilabel else "multiclass"
+
+    metrics = {}
+    for split_name, itemset in itemsets.items():
+        nid, labels = itemset[:]
+        acc = MF.accuracy(
+            pred[nid.to(pred.device)],
+            labels.to(pred.device),
+            task=task,
+            num_classes=num_classes,
         )
-        self.multilabel = multilabel
-        self.pt = 0
+        metrics[split_name] = acc.item()
 
-    def forward(self, subgraphs, x):
-        return self.module(subgraphs, x)
-
-    def inference(self, graph, features, dataloader, storage_device):
-        return self.module.inference(
-            graph, features, dataloader, storage_device
-        )
-
-    def log_node_and_edge_counts(self, subgraphs):
-        node_counts = [sg.original_row_node_ids.size(0) for sg in subgraphs] + [
-            subgraphs[-1].original_column_node_ids.size(0)
-        ]
-        edge_counts = [sg.sampled_csc.indices.size(0) for sg in subgraphs]
-        for i, c in enumerate(node_counts):
-            self.log(
-                f"num_nodes/{i}",
-                float(c),
-                prog_bar=True,
-                on_step=True,
-                on_epoch=False,
-            )
-            if i < len(edge_counts):
-                self.log(
-                    f"num_edges/{i}",
-                    float(edge_counts[i]),
-                    prog_bar=True,
-                    on_step=True,
-                    on_epoch=False,
-                )
-
-    def training_step(self, minibatch, batch_idx):
-        batch_inputs = minibatch.node_features["feat"]
-        batch_labels = minibatch.labels
-        self.st = time.time()
-        batch_pred = self(minibatch.sampled_subgraphs, batch_inputs)
-        label_dtype = batch_pred.dtype if self.multilabel else None
-        loss = self.loss_fn(batch_pred, batch_labels.to(label_dtype))
-        self.train_acc(batch_pred, batch_labels.int())
-        self.log(
-            "acc/train",
-            self.train_acc,
-            prog_bar=True,
-            on_step=True,
-            on_epoch=True,
-            batch_size=batch_labels.shape[0],
-        )
-        self.log(
-            "loss/train",
-            loss,
-            on_step=True,
-            on_epoch=True,
-            batch_size=batch_labels.shape[0],
-        )
-        t = time.time()
-        self.log(
-            "time/iter",
-            t - self.pt,
-            prog_bar=True,
-            on_step=True,
-            on_epoch=False,
-        )
-        self.log_node_and_edge_counts(minibatch.sampled_subgraphs)
-        self.pt = t
-        return loss
-
-    def on_train_batch_end(self, outputs, batch, batch_idx):
-        self.log(
-            "time/forward_backward",
-            time.time() - self.st,
-            prog_bar=True,
-            on_step=True,
-            on_epoch=False,
-        )
-
-    def validation_step(self, minibatch, batch_idx, dataloader_idx=0):
-        batch_inputs = minibatch.node_features["feat"]
-        batch_labels = minibatch.labels
-        batch_pred = self(minibatch.sampled_subgraphs, batch_inputs)
-        label_dtype = batch_pred.dtype if self.multilabel else None
-        loss = self.loss_fn(batch_pred, batch_labels.to(label_dtype))
-        self.val_acc(batch_pred, batch_labels.int())
-        self.log(
-            "acc/val",
-            self.val_acc,
-            prog_bar=True,
-            on_step=False,
-            on_epoch=True,
-            sync_dist=True,
-            batch_size=batch_labels.shape[0],
-        )
-        self.log(
-            "loss/val",
-            loss,
-            on_step=False,
-            on_epoch=True,
-            sync_dist=True,
-            batch_size=batch_labels.shape[0],
-        )
-        self.log_node_and_edge_counts(minibatch.sampled_subgraphs)
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
+    return metrics
 
 
-class DataModule(LightningDataModule):
-    def __init__(self, args):
-        super().__init__()
+@torch.no_grad()
+def evaluate(model, dataloader, num_classes, task):
+    model.eval()
+    y_hats = []
+    ys = []
+    for minibatch in tqdm(dataloader, "Evaluating"):
+        node_features = minibatch.node_features["feat"]
+        labels = minibatch.labels
+        out = model(minibatch.sampled_subgraphs, node_features)
+        y_hats.append(out)
+        ys.append(labels)
 
-        dataset, multilabel = load_dataset(args.dataset)
-
-        # Move the dataset to the selected storage.
-        graph = (
-            dataset.graph.pin_memory_()
-            if args.graph_device == "pinned"
-            else dataset.graph.to(args.graph_device)
-        )
-        features = (
-            dataset.feature.pin_memory_()
-            if args.feature_device == "pinned"
-            else dataset.feature.to(args.feature_device)
-        )
-
-        self.train_set = dataset.tasks[0].train_set
-        self.validation_set = dataset.tasks[0].validation_set
-        self.test_set = dataset.tasks[0].test_set
-        self.all_nodes_set = dataset.all_nodes_set
-        self.fanout = list(map(int, args.fanout.split(",")))
-
-        if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
-            feature = features._features[("node", None, "feat")]
-            features._features[("node", None, "feat")] = gb.GPUCachedFeature(
-                feature,
-                args.num_gpu_cached_features * feature._tensor[:1].nbytes,
-            )
-
-        self.graph = graph
-        self.features = features
-        self.feature_device = args.feature_device
-        self.batch_size = args.batch_size
-        self.num_workers = args.num_workers
-        self.in_feats = features.size("node", None, "feat")[0]
-        self.n_classes = dataset.tasks[0].metadata["num_classes"]
-        self.multilabel = multilabel
-        self.device = args.device
-
-    def create_dataloader(self, itemset, job):
-        # Initialize an ItemSampler to sample mini-batches from the dataset.
-        datapipe = gb.ItemSampler(
-            itemset,
-            batch_size=self.batch_size * (1 if job != "infer" else 4),
-            shuffle=(job == "train"),
-            drop_last=(job == "train"),
-        )
-        # Copy the data to the specified device.
-        if args.graph_device != "cpu":
-            datapipe = datapipe.copy_to(device=self.device)
-        sample_mode = args.sample_mode if job == "train" else "sample_neighbor"
-        # Sample neighbors for each node in the mini-batch.
-        kwargs = (
-            {
-                "layer_dependency": args.layer_dependency,
-                "batch_dependency": args.batch_dependency,
-            }
-            if sample_mode == "sample_layer_neighbor"
-            else {}
-        )
-        datapipe = getattr(datapipe, sample_mode)(
-            self.graph, self.fanout if job != "infer" else [-1], **kwargs
-        )
-        # Copy the data to the specified device.
-        if args.feature_device != "cpu":
-            datapipe = datapipe.copy_to(device=self.device)
-        # Fetch node features for the sampled subgraph.
-        datapipe = datapipe.fetch_feature(
-            self.features, node_feature_keys=["feat"]
-        )
-        # Copy the data to the specified device.
-        if args.feature_device == "cpu":
-            datapipe = datapipe.copy_to(device=self.device)
-        # Create and return a DataLoader to handle data loading.
-        return gb.DataLoader(
-            datapipe,
-            num_workers=args.num_workers,
-            overlap_graph_fetch=args.overlap_graph_fetch,
-        )
-
-    def train_dataloader(self):
-        return self.create_dataloader(self.train_set, "train")
-
-    def val_dataloader(self):
-        return self.create_dataloader(self.validation_set, "evaluate")
-
-    @torch.no_grad()
-    def layerwise_infer(self, model, logger):
-        model.eval()
-        dataloader = self.create_dataloader(
-            itemset=self.all_nodes_set,
-            job="infer",
-        )
-        pred = model.inference(
-            self.graph, self.features, dataloader, self.feature_device
-        )
-
-        metrics = {}
-        for itemset, split_name in zip(
-            [
-                self.train_set,
-                self.validation_set,
-                self.test_set,
-            ],
-            ["train", "val", "test"],
-        ):
-            nid, labels = itemset[:]
-            f1score = model.f1score_class().to(pred.device)
-            acc = f1score(pred[nid.to(pred.device)], labels.to(pred.device))
-            print(f"{split_name} accuracy: {acc.item()}")
-            metrics["acc/final_{}".format(split_name)] = acc
-        logger.log_metrics(metrics=metrics, step=0)
+    return MF.accuracy(
+        torch.cat(y_hats),
+        torch.cat(ys),
+        task=task,
+        num_classes=num_classes,
+    )
 
 
-class CacheMissRateReporterCallback(Callback):
-    def report_cache_miss_rate(self, trainer):
-        feature = trainer.datamodule.features._features[("node", None, "feat")]
-        if isinstance(feature, gb.GPUCachedFeature):
-            trainer.strategy.model.log(
-                "cache_miss",
-                feature._feature.miss_rate,
-                prog_bar=True,
-                on_step=True,
-                on_epoch=False,
-            )
-
-    def on_train_batch_end(
-        self, trainer, datamodule, outputs, batch, batch_idx
-    ):
-        self.report_cache_miss_rate(trainer)
-
-    def on_validation_batch_end(
-        self, trainer, datamodule, outputs, batch, batch_idx
-    ):
-        self.report_cache_miss_rate(trainer)
-
-
-if __name__ == "__main__":
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument(
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Which dataset are you going to use?"
+    )
+    parser.add_argument(
+        "--epochs", type=int, default=9999999, help="Number of training epochs."
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=0.001,
+        help="Learning rate for optimization.",
+    )
+    parser.add_argument("--num-hidden", type=int, default=256)
+    parser.add_argument("--dropout", type=float, default=0.5)
+    parser.add_argument(
+        "--batch-size", type=int, default=1024, help="Batch size for training."
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=0,
+        help="Number of workers for data loading.",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-products",
+        choices=[
+            "ogbn-arxiv",
+            "ogbn-products",
+            "ogbn-papers100M",
+            "reddit",
+            "yelp",
+            "flickr",
+        ],
+    )
+    parser.add_argument(
+        "--fanout",
+        type=str,
+        default="10,10,10",
+        help="Fan-out of neighbor sampling. len(fanout) determines the number of"
+        " GNN layers in your model. Default: 10,10,10",
+    )
+    parser.add_argument(
         "--mode",
         default="pinned-pinned-cuda",
         choices=[
@@ -392,140 +301,128 @@ if __name__ == "__main__":
         help="Graph storage - feature storage - Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
-    argparser.add_argument(
-        "--dataset",
-        type=str,
-        default="ogbn-products",
-        choices=[
-            "ogbn-arxiv",
-            "ogbn-products",
-            "ogbn-papers100M",
-            "reddit",
-            "yelp",
-            "flickr",
-        ],
-    )
-    argparser.add_argument("--num-epochs", type=int, default=-1)
-    argparser.add_argument("--num-steps", type=int, default=-1)
-    argparser.add_argument("--min-steps", type=int, default=0)
-    argparser.add_argument("--num-hidden", type=int, default=256)
-    argparser.add_argument("--fanout", type=str, default="10,10,10")
-    argparser.add_argument("--batch-size", type=int, default=1024)
-    argparser.add_argument("--lr", type=float, default=0.001)
-    argparser.add_argument("--dropout", type=float, default=0.5)
-    argparser.add_argument(
-        "--num-workers",
-        type=int,
-        default=0,
-        help="Number of sampling processes. Use 0 for no extra process.",
-    )
-    argparser.add_argument(
-        "--sample-mode",
-        default="sample_layer_neighbor",
-        choices=["sample_neighbor", "sample_layer_neighbor"],
-        help="The sampling function when doing layerwise sampling.",
-    )
-    argparser.add_argument(
-        "--overlap-graph-fetch",
-        action="store_true",
-        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
-        "If True, the data loader will overlap the UVA graph fetching operations"
-        "with the rest of operations by using an alternative CUDA stream. Disabled"
-        "by default.",
-    )
-    argparser.add_argument(
-        "--torch-compile",
-        action="store_true",
-        help="Uses torch.compile() on the trained GNN model. Requires "
-        "torch>=2.2.0 to enable this option.",
-    )
-    argparser.add_argument("--layer-dependency", action="store_true")
-    argparser.add_argument("--batch-dependency", type=int, default=1)
-    argparser.add_argument("--logdir", type=str, default="tb_logs")
-    argparser.add_argument(
+    parser.add_argument("--layer-dependency", action="store_true")
+    parser.add_argument("--batch-dependency", type=int, default=1)
+    parser.add_argument(
         "--num-gpu-cached-features",
         type=int,
         default=0,
         help="The capacity of the GPU cache, the number of features to store.",
     )
-    argparser.add_argument("--early-stopping-patience", type=int, default=25)
-    argparser.add_argument("--disable-logging", action="store_true")
-    argparser.add_argument("--disable-checkpoint", action="store_true")
-    argparser.add_argument("--precision", type=str, default="high")
-    args = argparser.parse_args()
+    parser.add_argument("--early-stopping-patience", type=int, default=25)
+    parser.add_argument(
+        "--sample-mode",
+        default="sample_layer_neighbor",
+        choices=["sample_neighbor", "sample_layer_neighbor"],
+        help="The sampling function when doing layerwise sampling.",
+    )
+    parser.add_argument(
+        "--torch-compile",
+        action="store_true",
+        help="Uses torch.compile() on the trained GNN model. Requires "
+        "torch>=2.2.0 to enable this option.",
+    )
+    parser.add_argument("--precision", type=str, default="high")
+    return parser.parse_args()
 
+
+def main():
     torch.set_float32_matmul_precision(args.precision)
-
     if not torch.cuda.is_available():
         args.mode = "cpu-cpu-cpu"
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
+    args.overlap_feature_fetch = args.feature_device == "pinned"
+    # For now, only sample_layer_neighbor is faster with this option
+    args.overlap_graph_fetch = (
+        args.sample_mode == "sample_layer_neighbor"
+        and args.graph_device == "pinned"
+    )
 
-    num_layers = len(args.fanout.split(","))
+    # Load and preprocess dataset.
+    print("Loading data...")
+    dataset, multilabel = load_dataset(args.dataset)
 
-    datamodule = DataModule(args)
-    model = SAGELightning(
-        datamodule.in_feats,
+    # Move the dataset to the selected storage.
+    graph = (
+        dataset.graph.pin_memory_()
+        if args.graph_device == "pinned"
+        else dataset.graph.to(args.graph_device)
+    )
+    features = (
+        dataset.feature.pin_memory_()
+        if args.feature_device == "pinned"
+        else dataset.feature.to(args.feature_device)
+    )
+
+    train_set = dataset.tasks[0].train_set
+    valid_set = dataset.tasks[0].validation_set
+    test_set = dataset.tasks[0].test_set
+    all_nodes_set = dataset.all_nodes_set
+    args.fanout = list(map(int, args.fanout.split(",")))
+
+    num_classes = dataset.tasks[0].metadata["num_classes"]
+
+    if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
+        feature = features._features[("node", None, "feat")]
+        features._features[("node", None, "feat")] = gb.GPUCachedFeature(
+            feature,
+            args.num_gpu_cached_features * feature._tensor[:1].nbytes,
+        )
+
+    train_dataloader, valid_dataloader = (
+        create_dataloader(
+            graph=graph,
+            features=features,
+            itemset=itemset,
+            batch_size=args.batch_size,
+            fanout=args.fanout,
+            device=args.device,
+            job=job,
+        )
+        for itemset, job in zip([train_set, valid_set], ["train", "evaluate"])
+    )
+
+    in_channels = features.size("node", None, "feat")[0]
+    model = GraphSAGE(
+        in_channels,
         args.num_hidden,
-        datamodule.n_classes,
-        num_layers,
-        args.lr,
+        num_classes,
+        len(args.fanout),
         args.dropout,
-        datamodule.multilabel,
-        args.torch_compile,
-    )
+    ).to(args.device)
+    assert len(args.fanout) == len(model.layers)
+    if args.torch_compile:
+        torch._dynamo.config.cache_size_limit = 32
+        model = torch.compile(model, fullgraph=True, dynamic=True)
 
-    # Train
-    callbacks = []
-    if not args.disable_checkpoint:
-        callbacks.append(
-            ModelCheckpoint(monitor="acc/val", save_top_k=1, mode="max")
-        )
-    callbacks.append(CacheMissRateReporterCallback())
-    callbacks.append(
-        EarlyStopping(
-            monitor="acc/val",
-            mode="max",
-            patience=args.early_stopping_patience,
-        )
+    best_model = train(
+        train_dataloader,
+        valid_dataloader,
+        num_classes,
+        model,
+        multilabel,
+        args.device,
     )
-    subdir = "{}_{}_{}_{}_{}".format(
-        args.dataset,
-        {"sample_layer_neighbor": "labor", "sample_neighbor": "neighbor"}[
-            args.sample_mode
-        ],
-        0,
-        args.layer_dependency,
-        args.batch_dependency,
-    )
-    logger = (
-        None
-        if args.disable_logging
-        else TensorBoardLogger(args.logdir, name=subdir)
-    )
-    trainer = Trainer(
-        accelerator="gpu" if args.device == "cuda" else "cpu",
-        devices=1,
-        max_epochs=args.num_epochs,
-        max_steps=args.num_steps,
-        min_steps=args.min_steps,
-        callbacks=callbacks,
-        logger=logger,
-    )
-    trainer.fit(model, datamodule=datamodule)
+    model.load_state_dict(best_model)
 
-    # Test
-    if not args.disable_checkpoint:
-        logdir = os.path.join(args.logdir, subdir)
-        dirs = glob.glob("./{}/*".format(logdir))
-        version = max([int(os.path.split(x)[-1].split("_")[-1]) for x in dirs])
-        logdir = "./{}/version_{}".format(logdir, version)
-        print("Evaluating model in", logdir)
-        ckpt = glob.glob(os.path.join(logdir, "checkpoints", "*"))[0]
+    # Test the model.
+    print("Testing...")
+    itemsets = {"train": train_set, "val": valid_set, "test": test_set}
+    final_acc = layerwise_infer(
+        args,
+        graph,
+        features,
+        itemsets,
+        all_nodes_set,
+        model,
+        num_classes,
+        multilabel,
+    )
+    print("Final accuracy values:")
+    print(final_acc)
 
-        model = SAGELightning.load_from_checkpoint(
-            checkpoint_path=ckpt,
-            hparams_file=os.path.join(logdir, "hparams.yaml"),
-        ).to(args.device)
 
-        datamodule.layerwise_infer(model, logger)
+if __name__ == "__main__":
+    args = parse_args()
+    main()
