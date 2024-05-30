@@ -216,19 +216,13 @@ python3 ~/workspace/dgl/tools/launch.py \
 
 #### Major used parameters
 
-2 nodes(g4dn.metal), 4 trainers, 2 servers per node. Sample on main process.
-
-2 layers.
-
-fanouts = 25, 25 for all edge types.
-
-batch_size = 1024.
-
-seed edge IDs are all edges of ("author", "writes", "paper").
-
-ratio of negative sampler = 3.
-
-exclude = "reverse_types".
+1. 2 nodes(g4dn.metal), 4 trainers, 2 servers per node. Sample on main process.
+2. 2 layers.
+3. fanouts = 25, 25 for all edge types.
+4. batch_size = 1024.
+5. seed edge IDs are all edges of ("author", "writes", "paper").
+6. ratio of negative sampler = 3.
+7. exclude = "reverse_types".
 
 #### ogbn-mag
 
