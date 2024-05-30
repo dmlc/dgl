@@ -220,7 +220,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 2. 2 layers.
 3. fanouts = 25, 25 for all edge types.
 4. batch_size = 1024.
-5. seed edge IDs are all edges of ("author", "writes", "paper").
+5. seed edge IDs are all edges of ("author", "writes", "paper"), ~7M in total.
 6. ratio of negative sampler = 3.
 7. exclude = "reverse_types".
 
