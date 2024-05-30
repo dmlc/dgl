@@ -212,6 +212,17 @@ python3 ~/workspace/dgl/tools/launch.py \
     "python3 lp_perf.py --fanout='25,25' --batch-size 1024  --n-epochs 1 --graph-name ogbn-mag --ip-config ~/workspace/ip_config.txt --num_gpus 4 --remove_edge --use_graphbolt"
 ```
 
+### Partition sizes
+
+Compared to `DGL`, `GraphBolt` partitions are reduced to **72%** for `ogbn-mag`.
+
+#### ogbn-mag
+
+| Data Formats |         File Name            | Part 0 | Part 1 |
+| ------------ | ---------------------------- | ------ | ------ |
+| DGL          | graph.dgl                    | 714MB  | 716MB  |
+| GraphBolt    | fused_csc_sampling_graph.pt  | 512MB  | 514MB  |
+
 ### Performance Comparison
 
 #### Major used parameters
@@ -225,6 +236,8 @@ python3 ~/workspace/dgl/tools/launch.py \
 7. exclude = "reverse_types".
 
 #### ogbn-mag
+
+Compared to `DGL`, sampling with `GraphBolt` is reduced to **22%** for `ogbn-mag`.
 
 | Data Formats | Mean Sampling Time Per Iteration(50 iters in total, slowest rank)(seconds) |
 | ------------ | ----------------------------------------------------------- |
