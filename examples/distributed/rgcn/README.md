@@ -174,3 +174,59 @@ As for RAM usage, the shared memory(measured by **shared** field of `free` comma
 | ------------ | --------------------------- | ------------------------- |  -----  | ---- | ----- |
 |     DGL      | Min: 48.2s, Max: 91.4s      |            42.76%         |  1.3GB  | 9.2GB| 10.4% |
 |   GraphBolt  | Min: 9.2s, Max: 11.9s       |            42.46%         |  742MB  | 5.9GB| 18.1% |
+
+
+## Demonstrate and profile sampling for Link Prediction task
+
+### DGL
+
+```
+python3 ~/workspace/dgl/tools/launch.py \
+    --workspace ~/workspace/dgl/examples/distributed/rgcn/ \
+    --num_trainers 4 \
+    --num_servers 2 \
+    --num_samplers 0 \
+    --part_config ~/data/ogbn_mag_lp/ogbn-mag.json \
+    --ip_config ~/workspace/ip_config.txt \
+    "python3 lp_perf.py --fanout='25,25' --batch-size 1024  --n-epochs 1 --graph-name ogbn-mag --ip-config ~/workspace/ip_config.txt --num_gpus 4 --remove_edge"
+```
+
+### GraphBolt
+
+In order to sample with `GraphBolt`, we need to convert partitions into `GraphBolt` formats with below command.
+
+```
+python3 -c "import dgl;dgl.distributed.dgl_partition_to_graphbolt('/home/ubuntu/workspace/data/ogbn_mag_lp/ogbn-mag.json', store_eids=True, graph_formats='coo')"
+```
+
+Then train with appended `--use_graphbolt`.
+
+```
+python3 ~/workspace/dgl/tools/launch.py \
+    --workspace ~/workspace/dgl/examples/distributed/rgcn/ \
+    --num_trainers 4 \
+    --num_servers 2 \
+    --num_samplers 0 \
+    --part_config ~/data/ogbn_mag_lp/ogbn-mag.json \
+    --ip_config ~/workspace/ip_config.txt \
+    "python3 lp_perf.py --fanout='25,25' --batch-size 1024  --n-epochs 1 --graph-name ogbn-mag --ip-config ~/workspace/ip_config.txt --num_gpus 4 --remove_edge --use_graphbolt"
+```
+
+### Performance Comparison
+
+#### Major used parameters
+
+2 nodes(g4dn.metal), 4 trainers, 2 servers per node. Sample on main process.
+2 layers.
+fanouts = 25, 25 for all edge types.
+batch_size = 1024.
+seed edge IDs are all edges of ("author", "writes", "paper").
+ratio of negative sampler = 3.
+exclude = "reverse_types".
+
+#### ogbn-mag
+
+| Data Formats | Mean Sampling Time Per Iteration(50 iters in total, slowest rank)(seconds) |
+| ------------ | ----------------------------------------------------------- |
+| DGL       | 7.49 |
+| GraphBolt | 1.63 |
