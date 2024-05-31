@@ -79,3 +79,16 @@ Training: 192it [00:03, 54.03it/s, num_nodes=191259, cache_miss=0.626]
 Evaluating: 39it [00:00, 79.49it/s, num_nodes=108720, cache_miss=0.627]
 Epoch 00, Loss: 1.1495, Approx. Train: 0.6932, Approx. Val: 0.8586, Time: 3.5540308952331543s
 ```
+
+Example run with the original GraphSAGE sampler (Neighbor Sampler), # sampled nodes 
+is 520k, more than 2x higher than Labor sampler.
+
+```bash
+python node_classification.py --num-gpu-cached-features=500000 --sample-mode=sample_neighbor
+Training in pinned-pinned-cuda mode.
+Loading data...
+The dataset is already preprocessed.
+Training: 192it [00:04, 45.60it/s, num_nodes=517522, cache_miss=0.563]
+Evaluating: 39it [00:00, 77.53it/s, num_nodes=255686, cache_miss=0.565]
+Epoch 00, Loss: 1.1152, Approx. Train: 0.7015, Approx. Val: 0.8652, Time: 4.211000919342041s
+```
