@@ -7,6 +7,10 @@ This is an official Labor sampling example to showcase the use of [https://docs.
 This sampler has 2 parameters, `layer_dependency=[False|True]` and
 `batch_dependency=k`, where k is any nonnegative integer.
 
+We use early stopping so that the final accuracy numbers are reported with a
+fairly well converged model. Additional contributions to improve the validation
+accuracy are welcome, and hence hopefully also improving the test accuracy.
+
 ### layer_dependency
 
 Enabling this parameter by the command line option `--layer-dependency` makes it so
