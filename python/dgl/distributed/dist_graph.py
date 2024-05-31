@@ -17,7 +17,6 @@ from ..frame import infer_scheme
 
 from ..heterograph import DGLGraph
 from ..ndarray import exist_shared_mem_array
-from ..sampling.utils import EidExcluder
 from ..transforms import compact_graphs
 from . import graph_services, role, rpc
 from .dist_tensor import DistTensor
