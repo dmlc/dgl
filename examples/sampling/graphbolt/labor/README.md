@@ -25,6 +25,17 @@ temporal locality. When used with a cache, the increase in the temporal locality
 can be observed by monitoring the drop in the cache miss rate with higher values
 of the batch dependency parameter, speeding up embedding transfers to the GPU.
 
+### Performance
+
+Use the `--torch-compile` option for best performance. If your GPU has spare
+memory, consider using `--mode=cuda-cuda-cuda` to move the whole dataset to the
+GPU. If not, consider using `--mode=cuda-pinned-cuda --num-gpu-cached-features=N`
+to keep the graph on the GPU and features in system RAM with `N` of the node
+features cached on the GPU. If you can not even fit the graph on the GPU, then
+consider using `--mode=pinned-pinned-cuda --num-gpu-cached-features=N`. Finally,
+you can use `--mode=cpu-pinned=cuda --num-gpu-cached-features=N` to perform the
+sampling operation on the CPU.
+
 ### Examples
 
 We use `--num-gpu-cached-features=500000` to cache the 500k of the node
