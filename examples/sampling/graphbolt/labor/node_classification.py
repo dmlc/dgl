@@ -135,7 +135,13 @@ def create_dataloader(
 
 
 def train(
-    train_dataloader, valid_dataloader, model, multilabel, kwargs, device
+    train_dataloader,
+    valid_dataloader,
+    model,
+    multilabel,
+    kwargs,
+    cache_miss_rate_fn,
+    device,
 ):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
@@ -152,7 +158,8 @@ def train(
     for epoch in range(args.epochs):
         model.train()  # Set the model to training mode
         start = time.time()
-        for minibatch in tqdm(train_dataloader, "Training"):
+        train_dataloader_tqdm = tqdm(train_dataloader, "Training")
+        for minibatch in train_dataloader_tqdm:
             node_features = minibatch.node_features["feat"]
             labels = minibatch.labels
             optimizer.zero_grad()
@@ -165,10 +172,16 @@ def train(
             loss.backward()
             optimizer.step()
             num_batches += 1
+            train_dataloader_tqdm.set_postfix(
+                {
+                    "num_nodes": node_features.size(0),
+                    "cache_miss": cache_miss_rate_fn(),
+                }
+            )
         train_loss = total_loss / num_batches
         train_acc = total_correct / total_samples
         end = time.time()
-        val_acc = evaluate(model, valid_dataloader, kwargs)
+        val_acc = evaluate(model, valid_dataloader, kwargs, cache_miss_rate_fn)
         if val_acc > best_model_acc:
             best_model_acc = val_acc
             best_model = deepcopy(model.state_dict())
@@ -219,16 +232,23 @@ def layerwise_infer(
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, kwargs):
+def evaluate(model, dataloader, kwargs, cache_miss_rate_fn):
     model.eval()
     y_hats = []
     ys = []
-    for minibatch in tqdm(dataloader, "Evaluating"):
+    val_dataloader_tqdm = tqdm(dataloader, "Evaluating")
+    for minibatch in val_dataloader_tqdm:
         node_features = minibatch.node_features["feat"]
         labels = minibatch.labels
         out = model(minibatch.sampled_subgraphs, node_features)
         y_hats.append(out)
         ys.append(labels)
+        val_dataloader_tqdm.set_postfix(
+            {
+                "num_nodes": node_features.size(0),
+                "cache_miss": cache_miss_rate_fn(),
+            }
+        )
 
     return MF.f1_score(torch.cat(y_hats), torch.cat(ys), **kwargs)
 
@@ -359,6 +379,11 @@ def main():
             feature,
             args.num_gpu_cached_features * feature._tensor[:1].nbytes,
         )
+        cache_miss_rate_fn = lambda: features._features[
+            ("node", None, "feat")
+        ]._feature.miss_rate
+    else:
+        cache_miss_rate_fn = lambda: 1
 
     train_dataloader, valid_dataloader = (
         create_dataloader(
@@ -398,6 +423,7 @@ def main():
         model,
         multilabel,
         kwargs,
+        cache_miss_rate_fn,
         args.device,
     )
     model.load_state_dict(best_model)
