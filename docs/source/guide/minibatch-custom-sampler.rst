@@ -75,7 +75,7 @@ can be used on heterogeneous graphs:
 
     import dgl.graphbolt as gb
     hg = gb.FusedCSCSamplingGraph()
-    train_set = item_set = gb.ItemSetDict(
+    train_set = item_set = gb.HeteroItemSet(
         {
             "user": gb.ItemSet(
                 (torch.arange(0, 5), torch.arange(5, 10)),

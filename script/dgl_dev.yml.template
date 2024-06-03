@@ -49,5 +49,6 @@ dependencies:
     - lintrunner
     - jupyterlab
     - ipywidgets
+    - expecttest
 variables:
   DGL_HOME: __DGL_HOME__

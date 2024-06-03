@@ -169,6 +169,31 @@ def test_etype_str_to_tuple():
         _ = gb.etype_str_to_tuple(c_etype_str)
 
 
+def test_seed_type_str_to_ntypes():
+    """Convert etype from string to tuple."""
+    # Test for node pairs.
+    seed_type_str = "user:like:item"
+    seed_size = 2
+    node_type = gb.seed_type_str_to_ntypes(seed_type_str, seed_size)
+    assert node_type == ["user", "item"]
+
+    # Test for node pairs.
+    seed_type_str = "user:item:user"
+    seed_size = 3
+    node_type = gb.seed_type_str_to_ntypes(seed_type_str, seed_size)
+    assert node_type == ["user", "item", "user"]
+
+    # Test for unexpected input: list.
+    seed_type_str = ["user", "item"]
+    with pytest.raises(
+        AssertionError,
+        match=re.escape(
+            "Passed-in seed type should be string, but got <class 'list'>"
+        ),
+    ):
+        _ = gb.seed_type_str_to_ntypes(seed_type_str, 2)
+
+
 def test_isin():
     elements = torch.tensor([2, 3, 5, 5, 20, 13, 11], device=F.ctx())
     test_elements = torch.tensor([2, 5], device=F.ctx())

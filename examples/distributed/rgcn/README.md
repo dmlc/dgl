@@ -123,26 +123,26 @@ The command below launches 4 training processes on each machine as we'd like to 
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
---workspace ~/workspace/dgl/examples/pytorch/rgcn/experimental/ \
+--workspace ~/workspace/dgl/examples/distributed/rgcn/ \
 --num_trainers 4 \
 --num_servers 2 \
 --num_samplers 0 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --num_gpus 4"
+"python3 node_classification.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --num_gpus 4"
 ```
 
 If we want to train RGCN with `GraphBolt`, we need to append `--use_graphbolt`.
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
---workspace ~/workspace/dgl/examples/pytorch/rgcn/experimental/ \
+--workspace ~/workspace/dgl/examples/distributed/rgcn/ \
 --num_trainers 4 \
 --num_servers 2 \
 --num_samplers 0 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --num_gpus 4 --use_graphbolt"
+"python3 node_classification.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --num_gpus 4 --use_graphbolt"
 ```
 
 **Note:** if you are using conda or other virtual environments on the remote machines, you need to replace `python3` in the command string (i.e. the last argument) with the path to the Python interpreter in that environment.
@@ -174,3 +174,74 @@ As for RAM usage, the shared memory(measured by **shared** field of `free` comma
 | ------------ | --------------------------- | ------------------------- |  -----  | ---- | ----- |
 |     DGL      | Min: 48.2s, Max: 91.4s      |            42.76%         |  1.3GB  | 9.2GB| 10.4% |
 |   GraphBolt  | Min: 9.2s, Max: 11.9s       |            42.46%         |  742MB  | 5.9GB| 18.1% |
+
+
+## Demonstrate and profile sampling for Link Prediction task
+
+### DGL
+
+```
+python3 ~/workspace/dgl/tools/launch.py \
+    --workspace ~/workspace/dgl/examples/distributed/rgcn/ \
+    --num_trainers 4 \
+    --num_servers 2 \
+    --num_samplers 0 \
+    --part_config ~/data/ogbn_mag_lp/ogbn-mag.json \
+    --ip_config ~/workspace/ip_config.txt \
+    "python3 lp_perf.py --fanout='25,25' --batch-size 1024  --n-epochs 1 --graph-name ogbn-mag --ip-config ~/workspace/ip_config.txt --num_gpus 4 --remove_edge"
+```
+
+### GraphBolt
+
+In order to sample with `GraphBolt`, we need to convert partitions into `GraphBolt` formats with below command.
+
+```
+python3 -c "import dgl;dgl.distributed.dgl_partition_to_graphbolt('/home/ubuntu/workspace/data/ogbn_mag_lp/ogbn-mag.json', store_eids=True, graph_formats='coo')"
+```
+
+Then train with appended `--use_graphbolt`.
+
+```
+python3 ~/workspace/dgl/tools/launch.py \
+    --workspace ~/workspace/dgl/examples/distributed/rgcn/ \
+    --num_trainers 4 \
+    --num_servers 2 \
+    --num_samplers 0 \
+    --part_config ~/data/ogbn_mag_lp/ogbn-mag.json \
+    --ip_config ~/workspace/ip_config.txt \
+    "python3 lp_perf.py --fanout='25,25' --batch-size 1024  --n-epochs 1 --graph-name ogbn-mag --ip-config ~/workspace/ip_config.txt --num_gpus 4 --remove_edge --use_graphbolt"
+```
+
+### Partition sizes
+
+Compared to `DGL`, `GraphBolt` partitions are reduced to **72%** for `ogbn-mag`.
+
+#### ogbn-mag
+
+| Data Formats |         File Name            | Part 0 | Part 1 |
+| ------------ | ---------------------------- | ------ | ------ |
+| DGL          | graph.dgl                    | 714MB  | 716MB  |
+| GraphBolt    | fused_csc_sampling_graph.pt  | 512MB  | 514MB  |
+
+### Performance Comparison
+
+#### Major used parameters
+
+1. 2 nodes(g4dn.metal), 4 trainers, 2 servers per node. Sample on main process.
+2. 2 layers.
+3. fanouts = 25, 25 for all edge types.
+4. batch_size = 1024.
+5. seed edge IDs are all edges of ("author", "writes", "paper"), ~7M in total.
+6. ratio of negative sampler = 3.
+7. exclude = "reverse_types".
+
+#### ogbn-mag
+
+Compared to `DGL`, sampling with `GraphBolt` is reduced to **15%**. As for the overhead of `exclude`, it's about **5%** in this test. This number could be higher if larger `fanout` or `batch size` is applied.
+
+The time shown below is the mean sampling time per iteration(60 iters in total, slowest rank). Unit: seconds
+
+| Data Formats | No Exclude | Exclude |
+| ------------ | ---------- | ------- |
+| DGL          |   6.50     |   6.86  |
+| GraphBolt    |   0.95     |   1.00  |

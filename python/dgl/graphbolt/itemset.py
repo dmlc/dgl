@@ -1,11 +1,11 @@
 """GraphBolt Itemset."""
 
 import textwrap
-from typing import Dict, Iterable, Iterator, Tuple, Union
+from typing import Dict, Iterable, Tuple, Union
 
 import torch
 
-__all__ = ["ItemSet", "ItemSetDict"]
+__all__ = ["ItemSet", "HeteroItemSet"]
 
 
 def is_scalar(x):
@@ -16,25 +16,25 @@ def is_scalar(x):
 
 
 class ItemSet:
-    r"""A wrapper of iterable data or tuple of iterable data.
-
-    All itemsets that represent an iterable of items should subclass it. Such
-    form of itemset is particularly useful when items come from a stream. This
-    class requires each input itemset to be iterable.
+    r"""A wrapper of a tensor or tuple of tensors.
 
     Parameters
     ----------
-    items: Union[int, Iterable, Tuple[Iterable]]
-        The items to be iterated over. If it is a single integer, a `range()`
-        object will be created and iterated over. If it's multi-dimensional
-        iterable such as `torch.Tensor`, it will be iterated over the first
-        dimension. If it is a tuple, each item in the tuple is an iterable of
-        items.
+    items: Union[int, torch.Tensor, Tuple[torch.Tensor]]
+        The tensors to be wrapped.
+        - If it is a single scalar (an integer or a tensor that holds a single
+          value), the item would be considered as a range_tensor created by
+          `torch.arange`.
+        - If it is a multi-dimensional tensor, the indexing will be performed
+          along the first dimension.
+        - If it is a tuple, each item in the tuple must be a tensor.
+
     names: Union[str, Tuple[str]], optional
-        The names of the items. If it is a tuple, each name corresponds to an
-        item in the tuple. The naming is arbitrary, but in general practice,
-        the names should be chosen from ['labels', 'seeds', 'indexes'] to align
-        with the attributes of class `dgl.graphbolt.MiniBatch`.
+        The names of the items. If it is a tuple, each name must corresponds to
+        an item in the `items` parameter. The naming is arbitrary, but in
+        general practice, the names should be chosen from ['labels', 'seeds',
+        'indexes'] to align with the attributes of class
+        `dgl.graphbolt.MiniBatch`.
 
     Examples
     --------
@@ -68,7 +68,7 @@ class ItemSet:
     >>> item_set.names
     ('seeds',)
 
-    3. Single iterable: seed nodes.
+    3. Single tensor: seed nodes.
 
     >>> node_ids = torch.arange(0, 5)
     >>> item_set = gb.ItemSet(node_ids, names="seeds")
@@ -79,7 +79,7 @@ class ItemSet:
     >>> item_set.names
     ('seeds',)
 
-    4. Tuple of iterables with same shape: seed nodes and labels.
+    4. Tuple of tensors with same shape: seed nodes and labels.
 
     >>> node_ids = torch.arange(0, 5)
     >>> labels = torch.arange(5, 10)
@@ -93,7 +93,7 @@ class ItemSet:
     >>> item_set.names
     ('seeds', 'labels')
 
-    5. Tuple of iterables with different shape: seeds and labels.
+    5. Tuple of tensors with different shape: seeds and labels.
 
     >>> seeds = torch.arange(0, 10).reshape(-1, 2)
     >>> labels = torch.tensor([1, 1, 0, 0, 0])
@@ -110,35 +110,42 @@ class ItemSet:
      tensor([1, 1, 0, 0, 0]))
     >>> item_set.names
     ('seeds', 'labels')
+
+    6. Tuple of tensors with different shape: hyperlink and labels.
+
+    >>> seeds = torch.arange(0, 10).reshape(-1, 5)
+    >>> labels = torch.tensor([1, 0])
+    >>> item_set = gb.ItemSet(
+    ...     (seeds, labels), names=("seeds", "lables"))
+    >>> list(item_set)
+    [(tensor([0, 1, 2, 3, 4]), tensor([1])),
+     (tensor([5, 6, 7, 8, 9]), tensor([0]))]
+    >>> item_set[:]
+    (tensor([[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]),
+     tensor([1, 0]))
+    >>> item_set.names
+    ('seeds', 'labels')
     """
 
     def __init__(
         self,
-        items: Union[int, torch.Tensor, Iterable, Tuple[Iterable]],
+        items: Union[int, torch.Tensor, Tuple[torch.Tensor]],
         names: Union[str, Tuple[str]] = None,
     ) -> None:
         if is_scalar(items):
             self._length = int(items)
             self._items = items
-            self._num_items = 1
         elif isinstance(items, tuple):
-            try:
-                self._length = len(items[0])
-            except TypeError:
-                self._length = None
-            if self._length is not None:
-                if any(self._length != len(item) for item in items):
-                    raise ValueError("Size mismatch between items.")
+            self._length = len(items[0])
+            if any(self._length != len(item) for item in items):
+                raise ValueError("Size mismatch between items.")
             self._items = items
-            self._num_items = len(items)
         else:
-            try:
-                self._length = len(items)
-            except TypeError:
-                self._length = None
+            self._length = len(items)
             self._items = (items,)
-            self._num_items = 1
-
+        self._num_items = (
+            len(self._items) if isinstance(self._items, tuple) else 1
+        )
         if names is not None:
             if isinstance(names, tuple):
                 self._names = names
@@ -146,65 +153,39 @@ class ItemSet:
                 self._names = (names,)
             assert self._num_items == len(self._names), (
                 f"Number of items ({self._num_items}) and "
-                f"names ({len(self._names)}) must match."
+                f"names ({len(self._names)}) don't match."
             )
         else:
             self._names = None
 
-    def __iter__(self) -> Iterator:
+    def __len__(self) -> int:
+        return self._length
+
+    def __getitem__(self, index: Union[int, slice, Iterable[int]]):
         if is_scalar(self._items):
             dtype = getattr(self._items, "dtype", torch.int64)
-            yield from torch.arange(self._items, dtype=dtype)
-            return
-
-        if self._num_items == 1:
-            yield from self._items[0]
-            return
-
-        if self._length is not None:
-            # Use for-loop to iterate over the items. It can avoid a long
-            # waiting time when the items are torch tensors. Since torch
-            # tensors need to call self.unbind(0) to slice themselves.
-            # While for-loops are slower than zip, they prevent excessive
-            # wait times during the loading phase, and the impact on overall
-            # performance during the training/testing stage is minimal.
-            # For more details, see https://github.com/dmlc/dgl/pull/6293.
-            for i in range(self._length):
-                yield tuple(item[i] for item in self._items)
-        else:
-            # If the items are not Sized, we use zip to iterate over them.
-            zip_items = zip(*self._items)
-            for item in zip_items:
-                yield tuple(item)
-
-    def __getitem__(self, idx: Union[int, slice, Iterable]) -> Tuple:
-        if self._length is None:
-            raise TypeError(
-                f"{type(self).__name__} instance doesn't support indexing."
-            )
-        if is_scalar(self._items):
-            if isinstance(idx, slice):
-                start, stop, step = idx.indices(self._length)
-                dtype = getattr(self._items, "dtype", torch.int64)
+            if isinstance(index, slice):
+                start, stop, step = index.indices(self._length)
                 return torch.arange(start, stop, step, dtype=dtype)
-            if isinstance(idx, int):
-                if idx < 0:
-                    idx += self._length
-                if idx < 0 or idx >= self._length:
+            elif isinstance(index, int):
+                if index < 0:
+                    index += self._length
+                if index < 0 or index >= self._length:
                     raise IndexError(
                         f"{type(self).__name__} index out of range."
                     )
-                return (
-                    torch.tensor(idx, dtype=self._items.dtype)
-                    if isinstance(self._items, torch.Tensor)
-                    else idx
+                return torch.tensor(index, dtype=dtype)
+            elif isinstance(index, Iterable):
+                return torch.tensor(index, dtype=dtype)
+            else:
+                raise TypeError(
+                    f"{type(self).__name__} indices must be int, slice, or "
+                    f"iterable of int, not {type(index)}."
                 )
-            raise TypeError(
-                f"{type(self).__name__} indices must be integer or slice."
-            )
-        if self._num_items == 1:
-            return self._items[0][idx]
-        return tuple(item[idx] for item in self._items)
+        elif self._num_items == 1:
+            return self._items[0][index]
+        else:
+            return tuple(item[index] for item in self._items)
 
     @property
     def names(self) -> Tuple[str]:
@@ -216,13 +197,6 @@ class ItemSet:
         """Return the number of the items."""
         return self._num_items
 
-    def __len__(self):
-        if self._length is None:
-            raise TypeError(
-                f"{type(self).__name__} instance doesn't have valid length."
-            )
-        return self._length
-
     def __repr__(self) -> str:
         ret = (
             f"{self.__class__.__name__}(\n"
@@ -230,30 +204,30 @@ class ItemSet:
             f"    names={self._names},\n"
             f")"
         )
-
         return ret
 
 
-class ItemSetDict:
-    r"""Dictionary wrapper of **ItemSet**.
+class HeteroItemSet:
+    r"""A collection of itemsets, each associated with a unique type.
 
-    Each item is retrieved by iterating over each itemset and returned with
-    corresponding key as a dict.
+    This class aims to assemble existing itemsets with different types, for
+    example, seed_nodes of different node types in a graph.
 
     Parameters
     ----------
     itemsets: Dict[str, ItemSet]
+        A dictionary whose keys are types and values are ItemSet instances.
 
     Examples
     --------
     >>> import torch
     >>> from dgl import graphbolt as gb
 
-    1. Single iterable: seed nodes.
+    1. Each itemset is a single tensor: seed nodes.
 
     >>> node_ids_user = torch.arange(0, 5)
     >>> node_ids_item = torch.arange(5, 10)
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user": gb.ItemSet(node_ids_user, names="seeds"),
     ...     "item": gb.ItemSet(node_ids_item, names="seeds")})
     >>> list(item_set)
@@ -266,13 +240,14 @@ class ItemSetDict:
     >>> item_set.names
     ('seeds',)
 
-    2. Tuple of iterables with same shape: seed nodes and labels.
+    2. Each itemset is a tuple of tensors with same shape: seed nodes and
+    labels.
 
     >>> node_ids_user = torch.arange(0, 2)
     >>> labels_user = torch.arange(0, 2)
     >>> node_ids_item = torch.arange(2, 5)
     >>> labels_item = torch.arange(2, 5)
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user": gb.ItemSet(
     ...         (node_ids_user, labels_user),
     ...         names=("seeds", "labels")),
@@ -289,13 +264,14 @@ class ItemSetDict:
     >>> item_set.names
     ('seeds', 'labels')
 
-    3. Tuple of iterables with different shape: seeds and labels.
+    3. Each itemset is a tuple of tensors with different shape: seeds and
+    labels.
 
     >>> seeds_like = torch.arange(0, 4).reshape(-1, 2)
     >>> labels_like = torch.tensor([1, 0])
     >>> seeds_follow = torch.arange(0, 6).reshape(-1, 2)
     >>> labels_follow = torch.tensor([1, 1, 0])
-    >>> item_set = gb.ItemSetDict({
+    >>> item_set = gb.HeteroItemSet({
     ...     "user:like:item": gb.ItemSet(
     ...         (seeds_like, labels_like),
     ...         names=("seeds", "labels")),
@@ -315,59 +291,70 @@ class ItemSetDict:
                           tensor([1, 1, 0]))}
     >>> item_set.names
     ('seeds', 'labels')
+
+    4. Each itemset is a tuple of tensors with different shape: hyperlink and
+    labels.
+
+    >>> first_seeds = torch.arange(0, 6).reshape(-1, 3)
+    >>> first_labels = torch.tensor([1, 0])
+    >>> second_seeds = torch.arange(0, 2).reshape(-1, 1)
+    >>> second_labels = torch.tensor([1, 0])
+    >>> item_set = gb.HeteroItemSet({
+    ...     "query:user:item": gb.ItemSet(
+    ...         (first_seeds, first_labels),
+    ...         names=("seeds", "labels")),
+    ...     "user": gb.ItemSet(
+    ...         (second_seeds, second_labels),
+    ...         names=("seeds", "labels"))})
+    >>> list(item_set)
+    [{'query:user:item': (tensor([0, 1, 2]), tensor(1))},
+     {'query:user:item': (tensor([3, 4, 5]), tensor(0))},
+     {'user': (tensor([0]), tensor(1))},
+     {'user': (tensor([1]), tensor(0))}]
+    >>> item_set[:]
+    {'query:user:item': (tensor([[0, 1, 2], [3, 4, 5]]),
+                        tensor([1, 0])),
+     'user': (tensor([[0], [1]]),tensor([1, 0]))}
+    >>> item_set.names
+    ('seeds', 'labels')
     """
 
     def __init__(self, itemsets: Dict[str, ItemSet]) -> None:
         self._itemsets = itemsets
-        self._names = itemsets[list(itemsets.keys())[0]].names
+        self._names = next(iter(itemsets.values())).names
         assert all(
             self._names == itemset.names for itemset in itemsets.values()
         ), "All itemsets must have the same names."
-        try:
-            # For indexable itemsets, we compute the offsets for each itemset
-            # in advance to speed up indexing.
-            offsets = [0] + [
-                len(itemset) for itemset in self._itemsets.values()
-            ]
-            self._offsets = torch.tensor(offsets).cumsum(0)
-        except TypeError:
-            self._offsets = None
-
-    def __iter__(self) -> Iterator:
-        for key, itemset in self._itemsets.items():
-            for item in itemset:
-                yield {key: item}
+        offset = [0] + [len(itemset) for itemset in self._itemsets.values()]
+        self._offsets = torch.tensor(offset).cumsum(0)
+        self._length = int(self._offsets[-1])
+        self._keys = list(self._itemsets.keys())
 
     def __len__(self) -> int:
-        return sum(len(itemset) for itemset in self._itemsets.values())
+        return self._length
 
-    def __getitem__(self, idx: Union[int, slice]) -> Dict[str, Tuple]:
-        if self._offsets is None:
-            raise TypeError(
-                f"{type(self).__name__} instance doesn't support indexing."
-            )
-        total_num = self._offsets[-1]
-        if isinstance(idx, int):
-            if idx < 0:
-                idx += total_num
-            if idx < 0 or idx >= total_num:
+    def __getitem__(self, index: Union[int, slice, Iterable[int]]):
+        if isinstance(index, int):
+            if index < 0:
+                index += self._length
+            if index < 0 or index >= self._length:
                 raise IndexError(f"{type(self).__name__} index out of range.")
-            offset_idx = torch.searchsorted(self._offsets, idx, right=True)
+            offset_idx = torch.searchsorted(self._offsets, index, right=True)
             offset_idx -= 1
-            idx -= self._offsets[offset_idx]
-            key = list(self._itemsets.keys())[offset_idx]
-            return {key: self._itemsets[key][idx]}
-        elif isinstance(idx, slice):
-            start, stop, step = idx.indices(total_num)
-            assert step == 1, "Step must be 1."
+            index -= self._offsets[offset_idx]
+            key = self._keys[offset_idx]
+            return {key: self._itemsets[key][index]}
+        elif isinstance(index, slice):
+            start, stop, step = index.indices(self._length)
+            if step != 1:
+                return self.__getitem__(torch.arange(start, stop, step))
             assert start < stop, "Start must be smaller than stop."
             data = {}
             offset_idx_start = max(
                 1, torch.searchsorted(self._offsets, start, right=False)
             )
-            keys = list(self._itemsets.keys())
             for offset_idx in range(offset_idx_start, len(self._offsets)):
-                key = keys[offset_idx - 1]
+                key = self._keys[offset_idx - 1]
                 data[key] = self._itemsets[key][
                     max(0, start - self._offsets[offset_idx - 1]) : stop
                     - self._offsets[offset_idx - 1]
@@ -375,9 +362,26 @@ class ItemSetDict:
                 if stop <= self._offsets[offset_idx]:
                     break
             return data
+        elif isinstance(index, Iterable):
+            if not isinstance(index, torch.Tensor):
+                index = torch.tensor(index)
+            assert torch.all((index >= 0) & (index < self._length))
+            key_indices = (
+                torch.searchsorted(self._offsets, index, right=True) - 1
+            )
+            data = {}
+            for key_id, key in enumerate(self._keys):
+                mask = (key_indices == key_id).nonzero().squeeze(1)
+                if len(mask) == 0:
+                    continue
+                data[key] = self._itemsets[key][
+                    index[mask] - self._offsets[key_id]
+                ]
+            return data
         else:
             raise TypeError(
-                f"{type(self).__name__} indices must be int or slice."
+                f"{type(self).__name__} indices must be int, slice, or "
+                f"iterable of int, not {type(index)}."
             )
 
     @property
