@@ -237,9 +237,11 @@ Compared to `DGL`, `GraphBolt` partitions are reduced to **72%** for `ogbn-mag`.
 
 #### ogbn-mag
 
-Compared to `DGL`, sampling with `GraphBolt` is reduced to **22%** for `ogbn-mag`.
+Compared to `DGL`, sampling with `GraphBolt` is reduced to **15%**. As for the overhead of `exclude`, it's about **5%** in this test. This number could be higher if larger `fanout` or `batch size` is applied.
 
-| Data Formats | Mean Sampling Time Per Iteration(50 iters in total, slowest rank)(seconds) |
-| ------------ | ----------------------------------------------------------- |
-| DGL       | 7.49 |
-| GraphBolt | 1.63 |
+The time shown below is the mean sampling time per iteration(60 iters in total, slowest rank). Unit: seconds
+
+| Data Formats | No Exclude | Exclude |
+| ------------ | ---------- | ------- |
+| DGL          |   6.50     |   6.86  |
+| GraphBolt    |   0.95     |   1.00  |
