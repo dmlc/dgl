@@ -28,14 +28,15 @@ class _LRUCache:
             self.cache[key] = value
 
 
+#implemented S3-fifo-cache in https://dl.acm.org/doi/abs/10.1145/3600006.3613147
 class _FIFOCache:
     def __init__(self, capacity: int):
         self.capacity = capacity
         self.cache = {}  
         self.freq = {}   
-        self.S = OrderedDict()
-        self.M = OrderedDict()
-        self.G = OrderedDict()
+        self.S = OrderedDict()# Small queue
+        self.M = OrderedDict()# Main queue
+        self.G = OrderedDict()# ghost queue
         self.hit = 0
         self._evict = 0
 
@@ -97,7 +98,7 @@ class _FIFOCache:
 
 
 if __name__ == '__main__':
-    cache = LRUCache(int(16777216*8/1.7))
+    cache = FIFOCache(int(16777216*4/1.7))
     hit = 0
     import time
     for line in sys.stdin:
@@ -114,7 +115,7 @@ if __name__ == '__main__':
             end_time = time.time()
             total += 1
             time1 += (end_time-st_time)
-        #print(float(hit)/total)
+        print(float(hit)/total)
     print(str(time1))
     print(float(hit)/total)
 
