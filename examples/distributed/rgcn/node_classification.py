@@ -706,6 +706,9 @@ def main(args):
     dgl.distributed.initialize(args.ip_config, use_graphbolt=args.use_graphbolt)
     if not args.standalone:
         backend = "gloo" if args.num_gpus == -1 else "nccl"
+        if args.sparse_embedding and args.dgl_sparse:
+            # `nccl` is not fully supported in DistDGL's sparse optimizer.
+            backend = "gloo"
         th.distributed.init_process_group(backend=backend)
 
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.conf_path)

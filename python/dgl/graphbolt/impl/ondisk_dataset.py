@@ -25,7 +25,7 @@ from ..internal import (
     read_data,
     read_edges,
 )
-from ..itemset import ItemSet, ItemSetDict
+from ..itemset import HeteroItemSet, ItemSet
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
     fused_csc_sampling_graph,
@@ -522,9 +522,9 @@ class OnDiskTask:
     def __init__(
         self,
         metadata: Dict,
-        train_set: Union[ItemSet, ItemSetDict],
-        validation_set: Union[ItemSet, ItemSetDict],
-        test_set: Union[ItemSet, ItemSetDict],
+        train_set: Union[ItemSet, HeteroItemSet],
+        validation_set: Union[ItemSet, HeteroItemSet],
+        test_set: Union[ItemSet, HeteroItemSet],
     ):
         """Initialize a task.
 
@@ -532,11 +532,11 @@ class OnDiskTask:
         ----------
         metadata : Dict
             Metadata.
-        train_set : Union[ItemSet, ItemSetDict]
+        train_set : Union[ItemSet, HeteroItemSet]
             Training set.
-        validation_set : Union[ItemSet, ItemSetDict]
+        validation_set : Union[ItemSet, HeteroItemSet]
             Validation set.
-        test_set : Union[ItemSet, ItemSetDict]
+        test_set : Union[ItemSet, HeteroItemSet]
             Test set.
         """
         self._metadata = metadata
@@ -550,17 +550,17 @@ class OnDiskTask:
         return self._metadata
 
     @property
-    def train_set(self) -> Union[ItemSet, ItemSetDict]:
+    def train_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the training set."""
         return self._train_set
 
     @property
-    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
+    def validation_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the validation set."""
         return self._validation_set
 
     @property
-    def test_set(self) -> Union[ItemSet, ItemSetDict]:
+    def test_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the test set."""
         return self._test_set
 
@@ -796,7 +796,7 @@ class OnDiskDataset(Dataset):
         return self._dataset_name
 
     @property
-    def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
+    def all_nodes_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the itemset containing all nodes."""
         self._check_loaded()
         return self._all_nodes_set
@@ -856,7 +856,7 @@ class OnDiskDataset(Dataset):
 
     def _init_tvt_set(
         self, tvt_set: List[OnDiskTVTSet]
-    ) -> Union[ItemSet, ItemSetDict]:
+    ) -> Union[ItemSet, HeteroItemSet]:
         """Initialize the TVT set."""
         ret = None
         if (tvt_set is None) or (len(tvt_set) == 0):
@@ -882,10 +882,10 @@ class OnDiskDataset(Dataset):
                     ),
                     names=tuple(data.name for data in tvt.data),
                 )
-            ret = ItemSetDict(itemsets)
+            ret = HeteroItemSet(itemsets)
         return ret
 
-    def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
+    def _init_all_nodes_set(self, graph) -> Union[ItemSet, HeteroItemSet]:
         if graph is None:
             dgl_warning(
                 "`all_nodes_set` is returned as None, since graph is None."
@@ -906,7 +906,7 @@ class OnDiskDataset(Dataset):
                 )
                 for node_type, num_node in num_nodes.items()
             }
-            return ItemSetDict(data)
+            return HeteroItemSet(data)
 
 
 class BuiltinDataset(OnDiskDataset):

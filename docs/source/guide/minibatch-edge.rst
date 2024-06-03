@@ -248,7 +248,7 @@ over the edge types.
 
 Data loader definition is almost identical to that of homogeneous graph. The
 only difference is that the train_set is now an instance of
-:class:`~dgl.graphbolt.ItemSetDict` instead of :class:`~dgl.graphbolt.ItemSet`.
+:class:`~dgl.graphbolt.HeteroItemSet` instead of :class:`~dgl.graphbolt.ItemSet`.
 
 .. code:: python
 
@@ -266,7 +266,7 @@ only difference is that the train_set is now an instance of
             (seeds, labels), names=("seeds", "labels")
         ),
     }
-    train_set = gb.ItemSetDict(seeds_labels)
+    train_set = gb.HeteroItemSet(seeds_labels)
     datapipe = gb.ItemSampler(train_set, batch_size=128, shuffle=True)
     datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
     datapipe = datapipe.fetch_feature(

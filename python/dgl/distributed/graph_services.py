@@ -1,4 +1,5 @@
 """A set of graph services of getting subgraphs from DistGraph"""
+
 import os
 from collections import namedtuple
 
@@ -15,6 +16,7 @@ from ..sampling import (
 )
 from ..subgraph import in_subgraph as local_in_subgraph
 from ..utils import toindex
+from .constants import DGL2GB_EID, GB_DST_ID
 from .rpc import (
     recv_responses,
     register_service,
@@ -82,7 +84,14 @@ class FindEdgeResponse(Response):
 
 
 def _sample_neighbors_graphbolt(
-    g, gpb, nodes, fanout, edge_dir="in", prob=None, replace=False
+    g,
+    gpb,
+    nodes,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    exclude_edges=None,
+    replace=False,
 ):
     """Sample from local partition via graphbolt.
 
@@ -105,6 +114,8 @@ def _sample_neighbors_graphbolt(
         Determines whether to sample inbound or outbound edges.
     prob : tensor, optional
         The probability associated with each neighboring edge of a node.
+    exclude_edges : tensor, optional
+        The edges to exclude when sampling.
     replace : bool, optional
         If True, sample with replacement.
 
@@ -122,6 +133,7 @@ def _sample_neighbors_graphbolt(
     assert (
         edge_dir == "in"
     ), f"GraphBolt only supports inbound edge sampling but got {edge_dir}."
+    assert exclude_edges is None, "GraphBolt does not support excluding edges."
 
     # 1. Map global node IDs to local node IDs.
     nodes = gpb.nid2localnid(nodes, gpb.partid)
@@ -176,6 +188,7 @@ def _sample_neighbors_dgl(
     fan_out,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
 ):
     """Sample from local partition.
@@ -192,9 +205,10 @@ def _sample_neighbors_dgl(
         local_g,
         local_ids,
         fan_out,
-        edge_dir,
-        prob,
-        replace,
+        edge_dir=edge_dir,
+        prob=prob,
+        exclude_edges=exclude_edges,
+        replace=replace,
         _dist_training=True,
     )
     global_nid_mapping = local_g.ndata[NID]
@@ -244,6 +258,7 @@ def _sample_etype_neighbors_dgl(
     fan_out,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
     etype_offset=None,
     etype_sorted=False,
@@ -265,9 +280,10 @@ def _sample_etype_neighbors_dgl(
         local_ids,
         etype_offset,
         fan_out,
-        edge_dir,
-        prob,
-        replace,
+        edge_dir=edge_dir,
+        prob=prob,
+        exclude_edges=exclude_edges,
+        replace=replace,
         etype_sorted=etype_sorted,
         _dist_training=True,
     )
@@ -322,9 +338,27 @@ def _find_edges(local_g, partition_book, seed_edges):
     and destination node ID array ``s`` and ``d`` in the local partition.
     """
     local_eids = partition_book.eid2localeid(seed_edges, partition_book.partid)
-    local_eids = F.astype(local_eids, local_g.idtype)
-    local_src, local_dst = local_g.find_edges(local_eids)
-    global_nid_mapping = local_g.ndata[NID]
+    if isinstance(local_g, gb.FusedCSCSamplingGraph):
+        # When converting from DGLGraph to FusedCSCSamplingGraph, the edge IDs
+        # are re-ordered. In order to find the correct node pairs, we need to
+        # map the DGL edge IDs back to GraphBolt edge IDs.
+        if (
+            DGL2GB_EID not in local_g.edge_attributes
+            or GB_DST_ID not in local_g.edge_attributes
+        ):
+            raise ValueError(
+                "The edge attributes DGL2GB_EID and GB_DST_ID are not found. "
+                "Please make sure `coo` format is available when generating "
+                "partitions in GraphBolt format."
+            )
+        local_eids = local_g.edge_attributes[DGL2GB_EID][local_eids]
+        local_src = local_g.indices[local_eids]
+        local_dst = local_g.edge_attributes[GB_DST_ID][local_eids]
+        global_nid_mapping = local_g.node_attributes[NID]
+    else:
+        local_eids = F.astype(local_eids, local_g.idtype)
+        local_src, local_dst = local_g.find_edges(local_eids)
+        global_nid_mapping = local_g.ndata[NID]
     global_src = global_nid_mapping[local_src]
     global_dst = global_nid_mapping[local_dst]
     return global_src, global_dst
@@ -398,12 +432,14 @@ class SamplingRequest(Request):
         fan_out,
         edge_dir="in",
         prob=None,
+        exclude_edges=None,
         replace=False,
         use_graphbolt=False,
     ):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
+        self.exclude_edges = exclude_edges
         self.replace = replace
         self.fan_out = fan_out
         self.use_graphbolt = use_graphbolt
@@ -413,6 +449,7 @@ class SamplingRequest(Request):
             self.seed_nodes,
             self.edge_dir,
             self.prob,
+            self.exclude_edges,
             self.replace,
             self.fan_out,
             self.use_graphbolt,
@@ -423,6 +460,7 @@ class SamplingRequest(Request):
             self.seed_nodes,
             self.edge_dir,
             self.prob,
+            self.exclude_edges,
             self.replace,
             self.fan_out,
             self.use_graphbolt,
@@ -444,6 +482,7 @@ class SamplingRequest(Request):
             self.fan_out,
             edge_dir=self.edge_dir,
             prob=prob,
+            exclude_edges=self.exclude_edges,
             replace=self.replace,
         )
         return SubgraphResponse(
@@ -463,6 +502,7 @@ class SamplingRequestEtype(Request):
         fan_out,
         edge_dir="in",
         prob=None,
+        exclude_edges=None,
         replace=False,
         etype_sorted=True,
         use_graphbolt=False,
@@ -470,6 +510,7 @@ class SamplingRequestEtype(Request):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
+        self.exclude_edges = exclude_edges
         self.replace = replace
         self.fan_out = fan_out
         self.etype_sorted = etype_sorted
@@ -480,6 +521,7 @@ class SamplingRequestEtype(Request):
             self.seed_nodes,
             self.edge_dir,
             self.prob,
+            self.exclude_edges,
             self.replace,
             self.fan_out,
             self.etype_sorted,
@@ -491,6 +533,7 @@ class SamplingRequestEtype(Request):
             self.seed_nodes,
             self.edge_dir,
             self.prob,
+            self.exclude_edges,
             self.replace,
             self.fan_out,
             self.etype_sorted,
@@ -518,6 +561,7 @@ class SamplingRequestEtype(Request):
             self.fan_out,
             edge_dir=self.edge_dir,
             prob=probs,
+            exclude_edges=self.exclude_edges,
             replace=self.replace,
             etype_offset=etype_offset,
             etype_sorted=self.etype_sorted,
@@ -644,7 +688,7 @@ class InSubgraphRequest(Request):
         return SubgraphResponse(global_src, global_dst, global_eids=global_eids)
 
 
-def merge_graphs(res_list, num_nodes):
+def merge_graphs(res_list, num_nodes, exclude_edges=None):
     """Merge request from multiple servers"""
     if len(res_list) > 1:
         srcs = []
@@ -665,6 +709,15 @@ def merge_graphs(res_list, num_nodes):
         dst_tensor = res_list[0].global_dst
         eid_tensor = res_list[0].global_eids
         etype_id_tensor = res_list[0].etype_ids
+    if exclude_edges is not None:
+        mask = torch.isin(
+            eid_tensor, exclude_edges, assume_unique=True, invert=True
+        )
+        src_tensor = src_tensor[mask]
+        dst_tensor = dst_tensor[mask]
+        eid_tensor = eid_tensor[mask]
+        if etype_id_tensor is not None:
+            etype_id_tensor = etype_id_tensor[mask]
     g = graph((src_tensor, dst_tensor), num_nodes=num_nodes)
     if eid_tensor is not None:
         g.edata[EID] = eid_tensor
@@ -680,7 +733,9 @@ LocalSampledGraph = namedtuple(  # pylint: disable=unexpected-keyword-arg
 )
 
 
-def _distributed_access(g, nodes, issue_remote_req, local_access):
+def _distributed_access(
+    g, nodes, issue_remote_req, local_access, exclude_edges=None
+):
     """A routine that fetches local neighborhood of nodes from the distributed graph.
 
     The local neighborhood of some nodes are stored in the local machine and the other
@@ -699,6 +754,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
         The function that issues requests to access remote data.
     local_access : callable
         The function that reads data on the local machine.
+    exclude_edges : tensor
+        The edges to exclude after sampling.
 
     Returns
     -------
@@ -740,7 +797,9 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
         results = recv_responses(msgseq2pos)
         res_list.extend(results)
 
-    sampled_graph = merge_graphs(res_list, g.num_nodes())
+    sampled_graph = merge_graphs(
+        res_list, g.num_nodes(), exclude_edges=exclude_edges
+    )
     return sampled_graph
 
 
@@ -783,20 +842,19 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
         src_ntype_id = g.get_ntype_id(src_ntype)
         dst_ntype_id = g.get_ntype_id(dst_ntype)
         type_idx = etype_ids == etid
-        if F.sum(type_idx, 0) > 0:
-            data_dict[etype] = (
-                F.boolean_mask(src, type_idx),
-                F.boolean_mask(dst, type_idx),
-            )
-            if "DGL_DIST_DEBUG" in os.environ:
-                assert torch.all(
-                    src_ntype_id == src_ntype_ids[type_idx]
-                ), "source ntype is is not expected."
-                assert torch.all(
-                    dst_ntype_id == dst_ntype_ids[type_idx]
-                ), "destination ntype is is not expected."
-            if type_wise_eids is not None:
-                edge_ids[etype] = F.boolean_mask(type_wise_eids, type_idx)
+        data_dict[etype] = (
+            F.boolean_mask(src, type_idx),
+            F.boolean_mask(dst, type_idx),
+        )
+        if "DGL_DIST_DEBUG" in os.environ:
+            assert torch.all(
+                src_ntype_id == src_ntype_ids[type_idx]
+            ), "source ntype is is not expected."
+            assert torch.all(
+                dst_ntype_id == dst_ntype_ids[type_idx]
+            ), "destination ntype is is not expected."
+        if type_wise_eids is not None:
+            edge_ids[etype] = F.boolean_mask(type_wise_eids, type_idx)
     hg = heterograph(
         data_dict,
         {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
@@ -814,6 +872,7 @@ def sample_etype_neighbors(
     fanout,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
     etype_sorted=True,
     use_graphbolt=False,
@@ -861,6 +920,8 @@ def sample_etype_neighbors(
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
+    exclude_edges : tensor, optional
+        The edges to exclude when sampling. Homogeneous edge IDs are used.
     replace : bool, optional
         If True, sample with replacement.
 
@@ -913,11 +974,13 @@ def sample_etype_neighbors(
         if prob is not None:
             # See NOTE 1
             _prob = [
-                # NOTE (BarclayII)
-                # Currently DistGraph.edges[] does not accept canonical etype.
-                g.edges[etype].data[prob].kvstore_key
-                if prob in g.edges[etype].data
-                else ""
+                (
+                    # NOTE (BarclayII)
+                    # Currently DistGraph.edges[] does not accept canonical etype.
+                    g.edges[etype].data[prob].kvstore_key
+                    if prob in g.edges[etype].data
+                    else ""
+                )
                 for etype in g.canonical_etypes
             ]
         else:
@@ -927,6 +990,7 @@ def sample_etype_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
+            exclude_edges=None,
             replace=replace,
             etype_sorted=etype_sorted,
             use_graphbolt=use_graphbolt,
@@ -939,9 +1003,11 @@ def sample_etype_neighbors(
             _prob = None
         else:
             _prob = [
-                g.edges[etype].data[prob].local_partition
-                if prob in g.edges[etype].data
-                else None
+                (
+                    g.edges[etype].data[prob].local_partition
+                    if prob in g.edges[etype].data
+                    else None
+                )
                 for etype in g.canonical_etypes
             ]
         return _sample_etype_neighbors(
@@ -952,12 +1018,15 @@ def sample_etype_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
+            exclude_edges=None,
             replace=replace,
             etype_offset=etype_offset,
             etype_sorted=etype_sorted,
         )
 
-    frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
+    frontier = _distributed_access(
+        g, nodes, issue_remote_req, local_access, exclude_edges=exclude_edges
+    )
     if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
@@ -970,6 +1039,7 @@ def sample_neighbors(
     fanout,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
     use_graphbolt=False,
 ):
@@ -1008,6 +1078,12 @@ def sample_neighbors(
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
+    exclude_edges: tensor or dict, optional
+        Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+        This argument can take a single ID tensor or a dictionary of edge types
+        and ID tensors. If a single tensor is given, the graph must only have
+        one type of nodes.
     replace : bool, optional
         If True, sample with replacement.
 
@@ -1052,6 +1128,7 @@ def sample_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
+            exclude_edges=None,
             replace=replace,
             use_graphbolt=use_graphbolt,
         )
@@ -1067,10 +1144,13 @@ def sample_neighbors(
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
+            exclude_edges=None,
             replace=replace,
         )
 
-    frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
+    frontier = _distributed_access(
+        g, nodes, issue_remote_req, local_access, exclude_edges=exclude_edges
+    )
     if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:

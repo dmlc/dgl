@@ -71,39 +71,6 @@ def test_ItemSampler_minibatcher():
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSet_Iterable_Only(batch_size, shuffle, drop_last):
-    num_ids = 103
-
-    class InvalidLength:
-        def __iter__(self):
-            return iter(torch.arange(0, num_ids))
-
-    seed_nodes = gb.ItemSet(InvalidLength())
-    item_set = gb.ItemSet(seed_nodes, names="seeds")
-    item_sampler = gb.ItemSampler(
-        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
-    )
-    minibatch_ids = []
-    for i, minibatch in enumerate(item_sampler):
-        assert isinstance(minibatch, gb.MiniBatch)
-        assert minibatch.seeds is not None
-        assert minibatch.labels is None
-        is_last = (i + 1) * batch_size >= num_ids
-        if not is_last or num_ids % batch_size == 0:
-            assert len(minibatch.seeds) == batch_size
-        else:
-            if not drop_last:
-                assert len(minibatch.seeds) == num_ids % batch_size
-            else:
-                assert False
-        minibatch_ids.append(minibatch.seeds)
-    minibatch_ids = torch.cat(minibatch_ids)
-    assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
-
-
-@pytest.mark.parametrize("batch_size", [1, 4])
-@pytest.mark.parametrize("shuffle", [True, False])
-@pytest.mark.parametrize("drop_last", [True, False])
 def test_ItemSet_integer(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 103
@@ -192,54 +159,6 @@ def test_ItemSet_seed_nodes_labels(batch_size, shuffle, drop_last):
     assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
     assert (
         torch.all(minibatch_labels[:-1] <= minibatch_labels[1:]) is not shuffle
-    )
-
-
-@pytest.mark.parametrize("batch_size", [1, 4])
-@pytest.mark.parametrize("shuffle", [True, False])
-@pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSet_graphs(batch_size, shuffle, drop_last):
-    # Graphs.
-    num_graphs = 103
-    num_nodes = 10
-    num_edges = 20
-    graphs = [
-        dgl.rand_graph(num_nodes * (i + 1), num_edges * (i + 1))
-        for i in range(num_graphs)
-    ]
-    item_set = gb.ItemSet(graphs, names="graphs")
-    # DGLGraph is not supported in gb.MiniBatch yet. Let's use a customized
-    # minibatcher to return the original graphs.
-    customized_minibatcher = lambda batch, names: batch
-    item_sampler = gb.ItemSampler(
-        item_set,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        drop_last=drop_last,
-        minibatcher=customized_minibatcher,
-    )
-    minibatch_num_nodes = []
-    minibatch_num_edges = []
-    for i, minibatch in enumerate(item_sampler):
-        is_last = (i + 1) * batch_size >= num_graphs
-        if not is_last or num_graphs % batch_size == 0:
-            assert minibatch.batch_size == batch_size
-        else:
-            if not drop_last:
-                assert minibatch.batch_size == num_graphs % batch_size
-            else:
-                assert False
-        minibatch_num_nodes.append(minibatch.batch_num_nodes())
-        minibatch_num_edges.append(minibatch.batch_num_edges())
-    minibatch_num_nodes = torch.cat(minibatch_num_nodes)
-    minibatch_num_edges = torch.cat(minibatch_num_edges)
-    assert (
-        torch.all(minibatch_num_nodes[:-1] <= minibatch_num_nodes[1:])
-        is not shuffle
-    )
-    assert (
-        torch.all(minibatch_num_edges[:-1] <= minibatch_num_edges[1:])
-        is not shuffle
     )
 
 
@@ -499,53 +418,7 @@ def test_append_with_other_datapipes():
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_iterable_only(batch_size, shuffle, drop_last):
-    class IterableOnly:
-        def __init__(self, start, stop):
-            self._start = start
-            self._stop = stop
-
-        def __iter__(self):
-            return iter(torch.arange(self._start, self._stop))
-
-    num_ids = 205
-    ids = {
-        "user": gb.ItemSet(IterableOnly(0, 99), names="seeds"),
-        "item": gb.ItemSet(IterableOnly(99, num_ids), names="seeds"),
-    }
-    chained_ids = []
-    for key, value in ids.items():
-        chained_ids += [(key, v) for v in value]
-    item_set = gb.ItemSetDict(ids)
-    item_sampler = gb.ItemSampler(
-        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
-    )
-    minibatch_ids = []
-    for i, minibatch in enumerate(item_sampler):
-        is_last = (i + 1) * batch_size >= num_ids
-        if not is_last or num_ids % batch_size == 0:
-            expected_batch_size = batch_size
-        else:
-            if not drop_last:
-                expected_batch_size = num_ids % batch_size
-            else:
-                assert False
-        assert isinstance(minibatch, gb.MiniBatch)
-        assert minibatch.seeds is not None
-        ids = []
-        for _, v in minibatch.seeds.items():
-            ids.append(v)
-        ids = torch.cat(ids)
-        assert len(ids) == expected_batch_size
-        minibatch_ids.append(ids)
-    minibatch_ids = torch.cat(minibatch_ids)
-    assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
-
-
-@pytest.mark.parametrize("batch_size", [1, 4])
-@pytest.mark.parametrize("shuffle", [True, False])
-@pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_seed_nodes(batch_size, shuffle, drop_last):
+def test_HeteroItemSet_seed_nodes(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 205
     ids = {
@@ -555,7 +428,7 @@ def test_ItemSetDict_seed_nodes(batch_size, shuffle, drop_last):
     chained_ids = []
     for key, value in ids.items():
         chained_ids += [(key, v) for v in value]
-    item_set = gb.ItemSetDict(ids)
+    item_set = gb.HeteroItemSet(ids)
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -584,7 +457,7 @@ def test_ItemSetDict_seed_nodes(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_seed_nodes_labels(batch_size, shuffle, drop_last):
+def test_HeteroItemSet_seed_nodes_labels(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 205
     ids = {
@@ -600,7 +473,7 @@ def test_ItemSetDict_seed_nodes_labels(batch_size, shuffle, drop_last):
     chained_ids = []
     for key, value in ids.items():
         chained_ids += [(key, v) for v in value]
-    item_set = gb.ItemSetDict(ids)
+    item_set = gb.HeteroItemSet(ids)
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -641,7 +514,7 @@ def test_ItemSetDict_seed_nodes_labels(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
+def test_HeteroItemSet_node_pairs(batch_size, shuffle, drop_last):
     # Node pairs.
     num_ids = 103
     total_pairs = 2 * num_ids
@@ -651,7 +524,7 @@ def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
         "user:like:item": gb.ItemSet(node_pairs_like, names="seeds"),
         "user:follow:user": gb.ItemSet(node_pairs_follow, names="seeds"),
     }
-    item_set = gb.ItemSetDict(node_pairs_dict)
+    item_set = gb.HeteroItemSet(node_pairs_dict)
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -691,7 +564,7 @@ def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
+def test_HeteroItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
     # Node pairs and labels
     num_ids = 103
     total_ids = 2 * num_ids
@@ -708,7 +581,7 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
             names=("seeds", "labels"),
         ),
     }
-    item_set = gb.ItemSetDict(node_pairs_dict)
+    item_set = gb.HeteroItemSet(node_pairs_dict)
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -758,7 +631,9 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_node_pairs_labels_indexes(batch_size, shuffle, drop_last):
+def test_HeteroItemSet_node_pairs_labels_indexes(
+    batch_size, shuffle, drop_last
+):
     # Head, tail and negative tails.
     num_ids = 103
     total_ids = 6 * num_ids
@@ -818,7 +693,7 @@ def test_ItemSetDict_node_pairs_labels_indexes(batch_size, shuffle, drop_last):
             names=("seeds", "labels", "indexes"),
         ),
     }
-    item_set = gb.ItemSetDict(data_dict)
+    item_set = gb.HeteroItemSet(data_dict)
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -889,7 +764,7 @@ def test_ItemSetDict_node_pairs_labels_indexes(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_hyperlink(batch_size, shuffle, drop_last):
+def test_HeteroItemSet_hyperlink(batch_size, shuffle, drop_last):
     # Node pairs.
     num_ids = 103
     total_pairs = 2 * num_ids
@@ -899,7 +774,7 @@ def test_ItemSetDict_hyperlink(batch_size, shuffle, drop_last):
         "user:like:item": gb.ItemSet(seeds_like, names="seeds"),
         "user:follow:user": gb.ItemSet(seeds_follow, names="seeds"),
     }
-    item_set = gb.ItemSetDict(seeds_dict)
+    item_set = gb.HeteroItemSet(seeds_dict)
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -935,7 +810,7 @@ def test_ItemSetDict_hyperlink(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_hyperlink_labels(batch_size, shuffle, drop_last):
+def test_HeteroItemSet_hyperlink_labels(batch_size, shuffle, drop_last):
     # Node pairs and labels
     num_ids = 103
     total_ids = 2 * num_ids
@@ -951,7 +826,7 @@ def test_ItemSetDict_hyperlink_labels(batch_size, shuffle, drop_last):
             names=("seeds", "labels"),
         ),
     }
-    item_set = gb.ItemSetDict(seeds_dict)
+    item_set = gb.HeteroItemSet(seeds_dict)
     item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )

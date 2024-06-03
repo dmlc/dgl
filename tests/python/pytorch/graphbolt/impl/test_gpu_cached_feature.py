@@ -36,6 +36,9 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
         [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype, pin_memory=True
     )
 
+    cache_size_a *= a[:1].element_size() * a[:1].numel()
+    cache_size_b *= b[:1].element_size() * b[:1].numel()
+
     feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), cache_size_a)
     feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), cache_size_b)
 
@@ -94,3 +97,7 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
         feat_store_a.read(),
         torch.tensor([[2, 0, 1], [3, 5, 2]], dtype=dtype).to("cuda"),
     )
+
+    # Test with different dimensionality
+    feat_store_a.update(b)
+    assert torch.equal(feat_store_a.read(), b.to("cuda"))

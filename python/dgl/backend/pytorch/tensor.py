@@ -12,8 +12,8 @@ from ... import ndarray as nd
 from ...function.base import TargetCode
 from ...utils import version
 
-if version.parse(th.__version__) < version.parse("2.0.0"):
-    raise RuntimeError("DGL requires PyTorch >= 2.0.0")
+if version.parse(th.__version__) < version.parse("2.1.0"):
+    raise RuntimeError("DGL requires PyTorch >= 2.1.0")
 
 
 def data_type_dict():
