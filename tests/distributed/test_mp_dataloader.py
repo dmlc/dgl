@@ -529,9 +529,9 @@ def start_node_dataloader(
                     ), f"{eids} != {expected_eids}"
                     # Verify the prob/mask functionality.
                     if prob_or_mask is not None:
-                        prob_data = groundtruth_g.edges[c_etype].data[prob_or_mask][
-                            eids
-                        ]
+                        prob_data = groundtruth_g.edges[c_etype].data[
+                            prob_or_mask
+                        ][eids]
                         assert th.all(prob_data > 0)
     del dataloader
     # this is needed since there's two test here in one process
@@ -673,9 +673,9 @@ def start_edge_dataloader(
                     )
                     # Verify the prob/mask functionality.
                     if prob_or_mask is not None:
-                        prob_data = groundtruth_g.edges[etype].data[prob_or_mask][
-                            sampled_orig_eids
-                        ]
+                        prob_data = groundtruth_g.edges[etype].data[
+                            prob_or_mask
+                        ][sampled_orig_eids]
                         assert th.all(prob_data > 0)
                 # Verify the exclude functionality.
                 if dgl.EID not in blocks[-1].edata.keys():
