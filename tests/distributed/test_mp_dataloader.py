@@ -21,6 +21,27 @@ from scipy import sparse as spsp
 from utils import generate_ip_config, reset_envs
 
 
+def _unique_rand_graph(num_nodes=1000, num_edges=10 * 1000):
+    edges_set = set()
+    while len(edges_set) < num_edges:
+        src = np.random.randint(0, num_nodes - 1)
+        dst = np.random.randint(0, num_nodes - 1)
+        if (
+            src != dst
+            and (src, dst) not in edges_set
+            and (dst, src) not in edges_set
+        ):
+            edges_set.add((src, dst))
+    src_list, dst_list = zip(*edges_set)
+
+    src = th.tensor(src_list, dtype=th.long)
+    dst = th.tensor(dst_list, dtype=th.long)
+    g = dgl.graph((th.cat([src, dst]), th.cat([dst, src])))
+    E = len(src)
+    reverse_eids = th.cat([th.arange(E, 2 * E), th.arange(0, E)])
+    return g, reverse_eids
+
+
 class NeighborSampler(object):
     def __init__(
         self,
@@ -889,24 +910,7 @@ def test_edge_dataloader_homograph(
     num_server = 1
     dataloader_type = "edge"
     reset_envs()
-    g = CitationGraphDataset("cora")[0]
-    src, dst = g.edges()
-    # Remove reverse edges.
-    visited = th.zeros_like(src, dtype=th.bool)
-    remove_mask = th.zeros_like(src, dtype=th.bool)
-    for i, (src_id, dst_id) in enumerate(zip(src, dst)):
-        if visited[i]:
-            continue
-        if g.has_edges_between(dst_id, src_id):
-            eid = g.edge_ids(dst_id, src_id)
-            visited[eid] = True
-            remove_mask[i] = True
-        visited[i] = True
-    src = src[~remove_mask]
-    dst = dst[~remove_mask]
-    g = dgl.graph((th.cat([src, dst]), th.cat([dst, src])))
-    E = len(src)
-    reverse_eids = th.cat([th.arange(E, 2 * E), th.arange(0, E)])
+    g, reverse_eids = _unique_rand_graph()
     check_dataloader(
         g,
         num_server,
