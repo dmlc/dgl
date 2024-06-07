@@ -5,8 +5,9 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 
-import dgl
-from dgl.utils import recursive_apply
+from ..base import EID, NID
+from ..convert import create_block
+from ..utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
 from .internal import get_attributes, get_nonproperty_attributes
@@ -247,7 +248,7 @@ class MiniBatch:
                 num_src_nodes = original_row_node_ids.size(0)
                 num_dst_nodes = original_column_node_ids.size(0)
             blocks.append(
-                dgl.create_block(
+                create_block(
                     sampled_csc,
                     num_src_nodes=num_src_nodes,
                     num_dst_nodes=num_dst_nodes,
@@ -260,7 +261,7 @@ class MiniBatch:
             for node_type, reverse_ids in self.sampled_subgraphs[
                 0
             ].original_row_node_ids.items():
-                blocks[0].srcnodes[node_type].data[dgl.NID] = reverse_ids
+                blocks[0].srcnodes[node_type].data[NID] = reverse_ids
             # Assign reverse edges ids.
             for block, subgraph in zip(blocks, self.sampled_subgraphs):
                 if subgraph.original_edge_ids:
@@ -269,16 +270,16 @@ class MiniBatch:
                         reverse_ids,
                     ) in subgraph.original_edge_ids.items():
                         block.edges[etype_str_to_tuple(edge_type)].data[
-                            dgl.EID
+                            EID
                         ] = reverse_ids
         else:
-            blocks[0].srcdata[dgl.NID] = self.sampled_subgraphs[
+            blocks[0].srcdata[NID] = self.sampled_subgraphs[
                 0
             ].original_row_node_ids
             # Assign reverse edges ids.
             for block, subgraph in zip(blocks, self.sampled_subgraphs):
                 if subgraph.original_edge_ids is not None:
-                    block.edata[dgl.EID] = subgraph.original_edge_ids
+                    block.edata[EID] = subgraph.original_edge_ids
         return blocks
 
     def to_pyg_data(self):
