@@ -5,8 +5,7 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 
-from ..base import EID, NID
-from ..convert import create_block
+from ..convert import create_block, DGLBlock, EID, NID
 from ..utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
@@ -115,6 +114,8 @@ class MiniBatch:
     all node ids inside are compacted.
     """
 
+    _blocks: List[DGLBlock] = None
+
     def __repr__(self) -> str:
         return _minibatch_str(self)
 
@@ -159,9 +160,14 @@ class MiniBatch:
 
     @property
     def blocks(self):
-        """Extracts DGL blocks from `MiniBatch` to construct a graphical
-        structure and ID mappings.
+        """DGL blocks extracted from `MiniBatch` containing graphical structures
+        and ID mappings.
         """
+        if self._blocks is None:
+            self._blocks = self.compute_blocks()
+        return self._blocks
+
+    def compute_blocks(self):
         if not self.sampled_subgraphs:
             return None
 
