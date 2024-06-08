@@ -359,7 +359,7 @@ def test_get_dgl_blocks_hetero_partial_empty_edges():
     train_set = gb.ItemSetDict(
         {"n1:e1:n2": gb.ItemSet(torch.LongTensor([[0, 1]]), names="seeds")}
     )
-    datapipe = gb.ItemSampler(train_set, batch_size=1, shuffle=True)
+    datapipe = gb.ItemSampler(train_set, batch_size=1)
     datapipe = datapipe.sample_neighbor(gb_g, fanouts=[-1, -1])
     dataloader = gb.DataLoader(datapipe)
     blocks_str = str(next(iter(dataloader)).blocks)
@@ -386,7 +386,7 @@ def test_get_dgl_blocks_hetero_empty_edges():
     train_set = gb.ItemSetDict(
         {"n1:e1:n2": gb.ItemSet(torch.LongTensor([[0, 1]]), names="seeds")}
     )
-    datapipe = gb.ItemSampler(train_set, batch_size=1, shuffle=True)
+    datapipe = gb.ItemSampler(train_set, batch_size=1)
     datapipe = datapipe.sample_neighbor(gb_g, fanouts=[-1, -1])
     dataloader = gb.DataLoader(datapipe)
     blocks_str = str(next(iter(dataloader)).blocks)
@@ -397,10 +397,20 @@ def test_get_dgl_blocks_hetero_empty_edges():
       num_dst_nodes={'n1': 1, 'n2': 1, 'n3': 0},
       num_edges={('n3', 'e1', 'n1'): 1, ('n3', 'e2', 'n2'): 1},
       metagraph=[('n3', 'n1', 'e1'), ('n3', 'n2', 'e2')])]"""
-    assert expected_str == blocks_str, print(blocks_str)
+    assert expected_str == blocks_str
 
 
-# TODO(testcase): test_get_dgl_blocks_homo_empty_edges
+def test_get_dgl_blocks_homo_empty_edges():
+    g = dgl.graph(([2, 3, 4], [3, 4, 5]))
+
+    gb_g = gb.from_dglgraph(g, is_homogeneous=True)
+    train_set = gb.ItemSet(torch.LongTensor([[0, 1]]), names="seeds")
+    datapipe = gb.ItemSampler(train_set, batch_size=1)
+    datapipe = datapipe.sample_neighbor(gb_g, fanouts=[-1, -1])
+    dataloader = gb.DataLoader(datapipe)
+    blocks_str = str(next(iter(dataloader)).blocks)
+    expected_str = "[Block(num_src_nodes=2, num_dst_nodes=2, num_edges=0), Block(num_src_nodes=2, num_dst_nodes=2, num_edges=0)]"
+    assert expected_str == blocks_str
 
 
 def create_homo_minibatch():
