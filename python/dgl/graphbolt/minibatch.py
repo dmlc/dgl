@@ -163,14 +163,17 @@ class MiniBatch:
         """DGL blocks extracted from `MiniBatch` containing graphical structures
         and ID mappings.
         """
+        if not self.sampled_subgraphs:
+            return None
+
         if self._blocks is None:
             self._blocks = self.compute_blocks()
         return self._blocks
 
     def compute_blocks(self):
-        if not self.sampled_subgraphs:
-            return None
-
+        """Extracts DGL blocks from `MiniBatch` to construct graphical
+        structures and ID mappings.
+        """
         is_heterogeneous = isinstance(
             self.sampled_subgraphs[0].sampled_csc, Dict
         )
