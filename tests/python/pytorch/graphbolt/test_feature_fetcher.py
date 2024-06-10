@@ -150,7 +150,7 @@ def test_FeatureFetcher_hetero():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n1": gb.ItemSet(torch.LongTensor([0, 1]), names="seeds"),
             "n2": gb.ItemSet(torch.LongTensor([0, 1, 2]), names="seeds"),
@@ -226,7 +226,7 @@ def test_FeatureFetcher_with_edges_hetero():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n1": gb.ItemSet(torch.randint(0, 20, (10,)), names="seeds"),
         }

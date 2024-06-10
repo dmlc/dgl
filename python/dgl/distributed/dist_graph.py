@@ -4,9 +4,10 @@ import gc
 
 import os
 from collections import namedtuple
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 
 import numpy as np
+import torch
 
 from .. import backend as F, graphbolt as gb, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
@@ -1273,9 +1274,6 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
-        assert (
-            self._use_graphbolt is False
-        ), "find_edges is not supported in GraphBolt."
         if etype is None:
             assert (
                 len(self.etypes) == 1
@@ -1421,6 +1419,14 @@ class DistGraph:
     ):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
+        if exclude_edges is not None:
+            # Convert exclude edge IDs to homogeneous edge IDs.
+            gpb = self.get_partition_book()
+            if isinstance(exclude_edges, Mapping):
+                exclude_eids = []
+                for c_etype, eids in exclude_edges.items():
+                    exclude_eids.append(gpb.map_to_homo_eid(eids, c_etype))
+                exclude_edges = torch.cat(exclude_eids)
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
                 self,
@@ -1429,6 +1435,7 @@ class DistGraph:
                 replace=replace,
                 etype_sorted=etype_sorted,
                 prob=prob,
+                exclude_edges=exclude_edges,
                 use_graphbolt=self._use_graphbolt,
             )
         else:
@@ -1438,6 +1445,7 @@ class DistGraph:
                 fanout,
                 replace=replace,
                 prob=prob,
+                exclude_edges=exclude_edges,
                 use_graphbolt=self._use_graphbolt,
             )
         return frontier

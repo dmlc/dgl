@@ -221,7 +221,7 @@ def get_hetero_graph():
 
 def test_NegativeSampler_Hetero_Data():
     graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n1:e1:n2": gb.ItemSet(
                 torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T,
