@@ -356,7 +356,7 @@ def test_get_dgl_blocks_hetero_partial_empty_edges():
 
     gb_g = gb.from_dglgraph(hg, is_homogeneous=False)
 
-    train_set = gb.ItemSetDict(
+    train_set = gb.HeteroItemSet(
         {"n1:e1:n2": gb.ItemSet(torch.LongTensor([[0, 1]]), names="seeds")}
     )
     datapipe = gb.ItemSampler(train_set, batch_size=1)
@@ -383,7 +383,7 @@ def test_get_dgl_blocks_hetero_empty_edges():
 
     gb_g = gb.from_dglgraph(hg, is_homogeneous=False)
 
-    train_set = gb.ItemSetDict(
+    train_set = gb.HeteroItemSet(
         {"n1:e1:n2": gb.ItemSet(torch.LongTensor([[0, 1]]), names="seeds")}
     )
     datapipe = gb.ItemSampler(train_set, batch_size=1)

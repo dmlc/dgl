@@ -366,6 +366,8 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
     attributes.reverse()
     # Insert key with its value into the string.
     for name in attributes:
+        if name[0] == "_":
+            continue
         val = getattr(minibatch, name)
 
         def _add_indent(_str, indent):
