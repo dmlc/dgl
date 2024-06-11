@@ -159,7 +159,7 @@ class MiniBatch:
         self.edge_features = edge_features
 
     @property
-    def blocks(self):
+    def blocks(self) -> List[DGLBlock]:
         """DGL blocks extracted from `MiniBatch` containing graphical structures
         and ID mappings.
         """
@@ -170,7 +170,7 @@ class MiniBatch:
             self._blocks = self.compute_blocks()
         return self._blocks
 
-    def compute_blocks(self):
+    def compute_blocks(self) -> List[DGLBlock]:
         """Extracts DGL blocks from `MiniBatch` to construct graphical
         structures and ID mappings.
         """

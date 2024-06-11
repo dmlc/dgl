@@ -413,6 +413,21 @@ def test_get_dgl_blocks_homo_empty_edges():
     assert expected_str == blocks_str
 
 
+def test_seeds_ntype_being_passed():
+    hg = dgl.heterograph({("n1", "e1", "n2"): ([0, 1, 2], [2, 0, 1])})
+
+    gb_g = gb.from_dglgraph(hg, is_homogeneous=False)
+    train_set = gb.HeteroItemSet(
+        {"n2": gb.ItemSet(torch.LongTensor([0, 1]), names="seeds")}
+    )
+    datapipe = gb.ItemSampler(train_set, batch_size=2)
+    datapipe = datapipe.sample_neighbor(gb_g, [-1, -1, -1])
+    dataloader = gb.DataLoader(datapipe)
+    blocks = next(iter(dataloader)).blocks
+    for block in blocks:
+        assert "n2" in block.srctypes
+
+
 def create_homo_minibatch():
     csc_formats = [
         gb.CSCFormatBase(
