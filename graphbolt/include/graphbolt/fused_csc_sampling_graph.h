@@ -24,22 +24,18 @@ constexpr bool is_labor(SamplerType S) {
   return S == SamplerType::LABOR || S == SamplerType::LABOR_DEPENDENT;
 }
 
-template <SamplerType S>
-struct SamplerArgs;
+template <SamplerType S> struct SamplerArgs;
 
-template <>
-struct SamplerArgs<SamplerType::NEIGHBOR> {};
+template <> struct SamplerArgs<SamplerType::NEIGHBOR> {};
 
-template <>
-struct SamplerArgs<SamplerType::LABOR> {
-  const torch::Tensor& indices;
+template <> struct SamplerArgs<SamplerType::LABOR> {
+  const torch::Tensor &indices;
   single_seed random_seed;
   int64_t num_nodes;
 };
 
-template <>
-struct SamplerArgs<SamplerType::LABOR_DEPENDENT> {
-  const torch::Tensor& indices;
+template <> struct SamplerArgs<SamplerType::LABOR_DEPENDENT> {
+  const torch::Tensor &indices;
   continuous_seed random_seed;
   int64_t num_nodes;
 };
@@ -60,7 +56,7 @@ struct SamplerArgs<SamplerType::LABOR_DEPENDENT> {
  * id of each edge.
  */
 class FusedCSCSamplingGraph : public torch::CustomClassHolder {
- public:
+public:
   using NodeTypeToIDMap = torch::Dict<std::string, int64_t>;
   using EdgeTypeToIDMap = torch::Dict<std::string, int64_t>;
   using NodeAttrMap = torch::Dict<std::string, torch::Tensor>;
@@ -85,13 +81,13 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    *
    */
   FusedCSCSamplingGraph(
-      const torch::Tensor& indptr, const torch::Tensor& indices,
-      const torch::optional<torch::Tensor>& node_type_offset = torch::nullopt,
-      const torch::optional<torch::Tensor>& type_per_edge = torch::nullopt,
-      const torch::optional<NodeTypeToIDMap>& node_type_to_id = torch::nullopt,
-      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id = torch::nullopt,
-      const torch::optional<NodeAttrMap>& node_attributes = torch::nullopt,
-      const torch::optional<EdgeAttrMap>& edge_attributes = torch::nullopt);
+      const torch::Tensor &indptr, const torch::Tensor &indices,
+      const torch::optional<torch::Tensor> &node_type_offset = torch::nullopt,
+      const torch::optional<torch::Tensor> &type_per_edge = torch::nullopt,
+      const torch::optional<NodeTypeToIDMap> &node_type_to_id = torch::nullopt,
+      const torch::optional<EdgeTypeToIDMap> &edge_type_to_id = torch::nullopt,
+      const torch::optional<NodeAttrMap> &node_attributes = torch::nullopt,
+      const torch::optional<EdgeAttrMap> &edge_attributes = torch::nullopt);
 
   /**
    * @brief Create a fused CSC graph from tensors of CSC format.
@@ -110,14 +106,14 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @return FusedCSCSamplingGraph
    */
-  static c10::intrusive_ptr<FusedCSCSamplingGraph> Create(
-      const torch::Tensor& indptr, const torch::Tensor& indices,
-      const torch::optional<torch::Tensor>& node_type_offset,
-      const torch::optional<torch::Tensor>& type_per_edge,
-      const torch::optional<NodeTypeToIDMap>& node_type_to_id,
-      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id,
-      const torch::optional<NodeAttrMap>& node_attributes,
-      const torch::optional<EdgeAttrMap>& edge_attributes);
+  static c10::intrusive_ptr<FusedCSCSamplingGraph>
+  Create(const torch::Tensor &indptr, const torch::Tensor &indices,
+         const torch::optional<torch::Tensor> &node_type_offset,
+         const torch::optional<torch::Tensor> &type_per_edge,
+         const torch::optional<NodeTypeToIDMap> &node_type_to_id,
+         const torch::optional<EdgeTypeToIDMap> &edge_type_to_id,
+         const torch::optional<NodeAttrMap> &node_attributes,
+         const torch::optional<EdgeAttrMap> &edge_attributes);
 
   /** @brief Get the number of nodes. */
   int64_t NumNodes() const { return indptr_.size(0) - 1; }
@@ -173,15 +169,14 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * If the input name is empty, return nullopt. Otherwise, return the node
    * attribute tensor by name.
    */
-  inline torch::optional<torch::Tensor> NodeAttribute(
-      torch::optional<std::string> name) const {
+  inline torch::optional<torch::Tensor>
+  NodeAttribute(torch::optional<std::string> name) const {
     if (!name.has_value()) {
       return torch::nullopt;
     }
-    TORCH_CHECK(
-        node_attributes_.has_value() &&
-            node_attributes_.value().contains(name.value()),
-        "Node attribute ", name.value(), " does not exist.");
+    TORCH_CHECK(node_attributes_.has_value() &&
+                    node_attributes_.value().contains(name.value()),
+                "Node attribute ", name.value(), " does not exist.");
     return torch::optional<torch::Tensor>(
         node_attributes_.value().at(name.value()));
   }
@@ -192,34 +187,33 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * If the input name is empty, return nullopt. Otherwise, return the edge
    * attribute tensor by name.
    */
-  inline torch::optional<torch::Tensor> EdgeAttribute(
-      torch::optional<std::string> name) const {
+  inline torch::optional<torch::Tensor>
+  EdgeAttribute(torch::optional<std::string> name) const {
     if (!name.has_value()) {
       return torch::nullopt;
     }
-    TORCH_CHECK(
-        edge_attributes_.has_value() &&
-            edge_attributes_.value().contains(name.value()),
-        "Edge attribute ", name.value(), " does not exist.");
+    TORCH_CHECK(edge_attributes_.has_value() &&
+                    edge_attributes_.value().contains(name.value()),
+                "Edge attribute ", name.value(), " does not exist.");
     return torch::optional<torch::Tensor>(
         edge_attributes_.value().at(name.value()));
   }
 
   /** @brief Set the csc index pointer tensor. */
-  inline void SetCSCIndptr(const torch::Tensor& indptr) { indptr_ = indptr; }
+  inline void SetCSCIndptr(const torch::Tensor &indptr) { indptr_ = indptr; }
 
   /** @brief Set the index tensor. */
-  inline void SetIndices(const torch::Tensor& indices) { indices_ = indices; }
+  inline void SetIndices(const torch::Tensor &indices) { indices_ = indices; }
 
   /** @brief Set the node type offset tensor for a heterogeneous graph. */
-  inline void SetNodeTypeOffset(
-      const torch::optional<torch::Tensor>& node_type_offset) {
+  inline void
+  SetNodeTypeOffset(const torch::optional<torch::Tensor> &node_type_offset) {
     node_type_offset_ = node_type_offset;
   }
 
   /** @brief Set the edge type tensor for a heterogeneous graph. */
-  inline void SetTypePerEdge(
-      const torch::optional<torch::Tensor>& type_per_edge) {
+  inline void
+  SetTypePerEdge(const torch::optional<torch::Tensor> &type_per_edge) {
     type_per_edge_ = type_per_edge;
   }
 
@@ -227,8 +221,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Set the node type to id map for a heterogeneous graph.
    * @note The map is a dictionary mapping node type names to type IDs.
    */
-  inline void SetNodeTypeToID(
-      const torch::optional<NodeTypeToIDMap>& node_type_to_id) {
+  inline void
+  SetNodeTypeToID(const torch::optional<NodeTypeToIDMap> &node_type_to_id) {
     node_type_to_id_ = node_type_to_id;
   }
 
@@ -236,20 +230,20 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Set the edge type to id map for a heterogeneous graph.
    * @note The map is a dictionary mapping edge type names to type IDs.
    */
-  inline void SetEdgeTypeToID(
-      const torch::optional<EdgeTypeToIDMap>& edge_type_to_id) {
+  inline void
+  SetEdgeTypeToID(const torch::optional<EdgeTypeToIDMap> &edge_type_to_id) {
     edge_type_to_id_ = edge_type_to_id;
   }
 
   /** @brief Set the node attributes dictionary. */
-  inline void SetNodeAttributes(
-      const torch::optional<EdgeAttrMap>& node_attributes) {
+  inline void
+  SetNodeAttributes(const torch::optional<EdgeAttrMap> &node_attributes) {
     node_attributes_ = node_attributes;
   }
 
   /** @brief Set the edge attributes dictionary. */
-  inline void SetEdgeAttributes(
-      const torch::optional<EdgeAttrMap>& edge_attributes) {
+  inline void
+  SetEdgeAttributes(const torch::optional<EdgeAttrMap> &edge_attributes) {
     edge_attributes_ = edge_attributes;
   }
 
@@ -263,28 +257,28 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Load graph from stream.
    * @param archive Input stream for deserializing.
    */
-  void Load(torch::serialize::InputArchive& archive);
+  void Load(torch::serialize::InputArchive &archive);
 
   /**
    * @brief Save graph to stream.
    * @param archive Output stream for serializing.
    */
-  void Save(torch::serialize::OutputArchive& archive) const;
+  void Save(torch::serialize::OutputArchive &archive) const;
 
   /**
    * @brief Pickle method for deserializing.
    * @param state The state of serialized FusedCSCSamplingGraph.
    */
   void SetState(
-      const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
-          state);
+      const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
+          &state);
 
   /**
    * @brief Pickle method for serializing.
    * @returns The state of this FusedCSCSamplingGraph.
    */
-  torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> GetState()
-      const;
+  torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
+  GetState() const;
 
   /**
    * @brief Return the subgraph induced on the inbound edges of the given nodes.
@@ -292,8 +286,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @return FusedSampledSubgraph.
    */
-  c10::intrusive_ptr<FusedSampledSubgraph> InSubgraph(
-      const torch::Tensor& nodes) const;
+  c10::intrusive_ptr<FusedSampledSubgraph>
+  InSubgraph(const torch::Tensor &nodes) const;
 
   /**
    * @brief Sample neighboring edges of the given nodes and return the induced
@@ -335,13 +329,14 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @return An intrusive pointer to a FusedSampledSubgraph object containing
    * the sampled graph's information.
    */
-  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
-      torch::optional<torch::Tensor> seeds,
-      torch::optional<std::vector<int64_t>> seed_offsets,
-      const std::vector<int64_t>& fanouts, bool replace, bool layer,
-      bool return_eids, torch::optional<torch::Tensor> probs_or_mask,
-      torch::optional<torch::Tensor> random_seed,
-      double seed2_contribution) const;
+  c10::intrusive_ptr<FusedSampledSubgraph>
+  SampleNeighbors(torch::optional<torch::Tensor> seeds,
+                  torch::optional<std::vector<int64_t>> seed_offsets,
+                  const std::vector<int64_t> &fanouts, bool replace, bool layer,
+                  bool return_eids,
+                  torch::optional<torch::Tensor> probs_or_mask,
+                  torch::optional<torch::Tensor> random_seed,
+                  double seed2_contribution) const;
 
   /**
    * @brief Sample neighboring edges of the given nodes with a temporal
@@ -373,13 +368,15 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * the sampled graph's information.
    *
    */
-  c10::intrusive_ptr<FusedSampledSubgraph> TemporalSampleNeighbors(
-      const torch::Tensor& input_nodes,
-      const torch::Tensor& input_nodes_timestamp,
-      const std::vector<int64_t>& fanouts, bool replace, bool layer,
-      bool return_eids, torch::optional<torch::Tensor> probs_or_mask,
-      torch::optional<std::string> node_timestamp_attr_name,
-      torch::optional<std::string> edge_timestamp_attr_name) const;
+  c10::intrusive_ptr<FusedSampledSubgraph>
+  TemporalSampleNeighbors(const torch::Tensor &input_nodes,
+                          const torch::Tensor &input_nodes_timestamp,
+                          const std::vector<int64_t> &fanouts, bool replace,
+                          bool layer, bool return_eids,
+                          torch::optional<torch::Tensor> probs_or_mask,
+                          torch::optional<std::string> node_timestamp_attr_name,
+                          torch::optional<std::string> edge_timestamp_attr_name,
+                          torch::optional<int64_t> time_window) const;
 
   /**
    * @brief Copy the graph to shared memory.
@@ -387,8 +384,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @return A new FusedCSCSamplingGraph object on shared memory.
    */
-  c10::intrusive_ptr<FusedCSCSamplingGraph> CopyToSharedMemory(
-      const std::string& shared_memory_name);
+  c10::intrusive_ptr<FusedCSCSamplingGraph>
+  CopyToSharedMemory(const std::string &shared_memory_name);
 
   /**
    * @brief Load the graph from shared memory.
@@ -396,8 +393,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @return A new FusedCSCSamplingGraph object on shared memory.
    */
-  static c10::intrusive_ptr<FusedCSCSamplingGraph> LoadFromSharedMemory(
-      const std::string& shared_memory_name);
+  static c10::intrusive_ptr<FusedCSCSamplingGraph>
+  LoadFromSharedMemory(const std::string &shared_memory_name);
 
   /**
    * @brief Hold the shared memory objects of the the tensor metadata and data.
@@ -410,16 +407,16 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @param tensor_metadata_shm The shared memory objects of tensor metadata.
    * @param tensor_data_shm The shared memory objects of tensor data.
    */
-  void HoldSharedMemoryObject(
-      SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm);
+  void HoldSharedMemoryObject(SharedMemoryPtr tensor_metadata_shm,
+                              SharedMemoryPtr tensor_data_shm);
 
- private:
+private:
   template <TemporalOption Temporal, typename NumPickFn, typename PickFn>
-  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
-      const torch::Tensor& seeds,
-      torch::optional<std::vector<int64_t>>& seed_offsets,
-      const std::vector<int64_t>& fanouts, bool return_eids,
-      NumPickFn num_pick_fn, PickFn pick_fn) const;
+  c10::intrusive_ptr<FusedSampledSubgraph>
+  SampleNeighborsImpl(const torch::Tensor &seeds,
+                      torch::optional<std::vector<int64_t>> &seed_offsets,
+                      const std::vector<int64_t> &fanouts, bool return_eids,
+                      NumPickFn num_pick_fn, PickFn pick_fn) const;
 
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
@@ -505,34 +502,38 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
  * numbers.
  */
 template <typename PickedNumType>
-void NumPick(
-    int64_t fanout, bool replace,
-    const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors, PickedNumType* num_picked_ptr);
+void NumPick(int64_t fanout, bool replace,
+             const torch::optional<torch::Tensor> &probs_or_mask,
+             int64_t offset, int64_t num_neighbors,
+             PickedNumType *num_picked_ptr);
 
-int64_t TemporalNumPick(
-    torch::Tensor seed_timestamp, torch::Tensor csc_indics, int64_t fanout,
-    bool replace, const torch::optional<torch::Tensor>& probs_or_mask,
-    const torch::optional<torch::Tensor>& node_timestamp,
-    const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
-    int64_t offset, int64_t num_neighbors);
+int64_t TemporalNumPick(torch::Tensor seed_timestamp, torch::Tensor csc_indics,
+                        int64_t fanout, bool replace,
+                        const torch::optional<torch::Tensor> &probs_or_mask,
+                        const torch::optional<torch::Tensor> &node_timestamp,
+                        const torch::optional<torch::Tensor> &edge_timestamp,
+                        const torch::optional<int64_t> &time_window,
+                        int64_t seed_offset, int64_t offset,
+                        int64_t num_neighbors);
 
 template <typename PickedNumType>
-void NumPickByEtype(
-    bool with_seed_offsets, const std::vector<int64_t>& fanouts, bool replace,
-    const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors, PickedNumType* num_picked_ptr, int64_t seed_index,
-    const std::vector<int64_t>& etype_id_to_num_picked_offset);
+void NumPickByEtype(bool with_seed_offsets, const std::vector<int64_t> &fanouts,
+                    bool replace, const torch::Tensor &type_per_edge,
+                    const torch::optional<torch::Tensor> &probs_or_mask,
+                    int64_t offset, int64_t num_neighbors,
+                    PickedNumType *num_picked_ptr, int64_t seed_index,
+                    const std::vector<int64_t> &etype_id_to_num_picked_offset);
 
-int64_t TemporalNumPickByEtype(
-    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
-    const std::vector<int64_t>& fanouts, bool replace,
-    const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    const torch::optional<torch::Tensor>& node_timestamp,
-    const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
-    int64_t offset, int64_t num_neighbors);
+int64_t
+TemporalNumPickByEtype(torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+                       const std::vector<int64_t> &fanouts, bool replace,
+                       const torch::Tensor &type_per_edge,
+                       const torch::optional<torch::Tensor> &probs_or_mask,
+                       const torch::optional<torch::Tensor> &node_timestamp,
+                       const torch::optional<torch::Tensor> &edge_timestamp,
+                       const torch::optional<int64_t> &time_window,
+                       int64_t seed_offset, int64_t offset,
+                       int64_t num_neighbors);
 
 /**
  * @brief Picks a specified number of neighbors for a node, starting from the
@@ -569,28 +570,29 @@ int64_t TemporalNumPickByEtype(
  * should be put. Enough memory space should be allocated in advance.
  */
 template <typename PickedType>
-int64_t Pick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
-    const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr);
+int64_t Pick(int64_t offset, int64_t num_neighbors, int64_t fanout,
+             bool replace, const torch::TensorOptions &options,
+             const torch::optional<torch::Tensor> &probs_or_mask,
+             SamplerArgs<SamplerType::NEIGHBOR> args,
+             PickedType *picked_data_ptr);
 
 template <SamplerType S, typename PickedType>
-std::enable_if_t<is_labor(S), int64_t> Pick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
-    const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
-    PickedType* picked_data_ptr);
+std::enable_if_t<is_labor(S), int64_t>
+Pick(int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+     const torch::TensorOptions &options,
+     const torch::optional<torch::Tensor> &probs_or_mask, SamplerArgs<S> args,
+     PickedType *picked_data_ptr);
 
 template <typename PickedType>
-int64_t TemporalPick(
-    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
-    int64_t seed_offset, int64_t offset, int64_t num_neighbors, int64_t fanout,
-    bool replace, const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    const torch::optional<torch::Tensor>& node_timestamp,
-    const torch::optional<torch::Tensor>& edge_timestamp,
-    PickedType* picked_data_ptr);
+int64_t TemporalPick(torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+                     int64_t seed_offset, int64_t offset, int64_t num_neighbors,
+                     int64_t fanout, bool replace,
+                     const torch::TensorOptions &options,
+                     const torch::optional<torch::Tensor> &probs_or_mask,
+                     const torch::optional<torch::Tensor> &node_timestamp,
+                     const torch::optional<torch::Tensor> &edge_timestamp,
+                     const torch::optional<int64_t> &time_window,
+                     PickedType *picked_data_ptr);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,
@@ -626,36 +628,35 @@ int64_t TemporalPick(
  * etype_id to the offset of its pick numbers in the tensor.
  */
 template <SamplerType S, typename PickedType>
-int64_t PickByEtype(
-    bool with_seed_offsets, int64_t offset, int64_t num_neighbors,
-    const std::vector<int64_t>& fanouts, bool replace,
-    const torch::TensorOptions& options, const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
-    PickedType* picked_data_ptr, int64_t seed_offset,
-    PickedType* subgraph_indptr_ptr,
-    const std::vector<int64_t>& etype_id_to_num_picked_offset);
+int64_t PickByEtype(bool with_seed_offsets, int64_t offset,
+                    int64_t num_neighbors, const std::vector<int64_t> &fanouts,
+                    bool replace, const torch::TensorOptions &options,
+                    const torch::Tensor &type_per_edge,
+                    const torch::optional<torch::Tensor> &probs_or_mask,
+                    SamplerArgs<S> args, PickedType *picked_data_ptr,
+                    int64_t seed_offset, PickedType *subgraph_indptr_ptr,
+                    const std::vector<int64_t> &etype_id_to_num_picked_offset);
 
 template <typename PickedType>
 int64_t TemporalPickByEtype(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     int64_t seed_offset, int64_t offset, int64_t num_neighbors,
-    const std::vector<int64_t>& fanouts, bool replace,
-    const torch::TensorOptions& options, const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    const torch::optional<torch::Tensor>& node_timestamp,
-    const torch::optional<torch::Tensor>& edge_timestamp,
-    PickedType* picked_data_ptr);
+    const std::vector<int64_t> &fanouts, bool replace,
+    const torch::TensorOptions &options, const torch::Tensor &type_per_edge,
+    const torch::optional<torch::Tensor> &probs_or_mask,
+    const torch::optional<torch::Tensor> &node_timestamp,
+    const torch::optional<torch::Tensor> &edge_timestamp,
+    const torch::optional<int64_t> &time_window, PickedType *picked_data_ptr);
 
-template <
-    bool NonUniform, bool Replace, typename ProbsType, SamplerType S,
-    typename PickedType, int StackSize = 1024>
-std::enable_if_t<is_labor(S), int64_t> LaborPick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout,
-    const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
-    PickedType* picked_data_ptr);
+template <bool NonUniform, bool Replace, typename ProbsType, SamplerType S,
+          typename PickedType, int StackSize = 1024>
+std::enable_if_t<is_labor(S), int64_t>
+LaborPick(int64_t offset, int64_t num_neighbors, int64_t fanout,
+          const torch::TensorOptions &options,
+          const torch::optional<torch::Tensor> &probs_or_mask,
+          SamplerArgs<S> args, PickedType *picked_data_ptr);
 
-}  // namespace sampling
-}  // namespace graphbolt
+} // namespace sampling
+} // namespace graphbolt
 
-#endif  // GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
+#endif // GRAPHBOLT_CSC_SAMPLING_GRAPH_H_

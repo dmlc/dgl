@@ -966,6 +966,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         probs_name: Optional[str] = None,
         node_timestamp_attr_name: Optional[str] = None,
         edge_timestamp_attr_name: Optional[str] = None,
+        time_window: Optional[int] = None,
     ) -> torch.ScriptObject:
         """Temporally Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -1039,6 +1040,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             probs_or_mask,
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
+            time_window,
         )
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 

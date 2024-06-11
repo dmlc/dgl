@@ -30,6 +30,7 @@ main
 │
 └───> Test set evaluation
 """
+
 import argparse
 import os
 import time
@@ -282,7 +283,7 @@ def main(args):
     print("Loading data")
     # TODO: Add the datasets to built-in.
     dataset_path = download_datasets(args.dataset)
-    dataset = gb.OnDiskDataset(dataset_path).load()
+    dataset = gb.OnDiskDataset(dataset_path, force_preprocess=True).load()
 
     # Move the dataset to the selected storage.
     graph = dataset.graph.to(args.storage_device)
