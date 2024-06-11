@@ -61,8 +61,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("set_edge_type_to_id", &FusedCSCSamplingGraph::SetEdgeTypeToID)
       .def("set_node_attributes", &FusedCSCSamplingGraph::SetNodeAttributes)
       .def("set_edge_attributes", &FusedCSCSamplingGraph::SetEdgeAttributes)
-      .def("set_node_attribute", &FusedCSCSamplingGraph::SetNodeAttribute)
-      .def("set_edge_attribute", &FusedCSCSamplingGraph::SetEdgeAttribute)
+      .def("add_node_attribute", &FusedCSCSamplingGraph::AddNodeAttribute)
+      .def("add_edge_attribute", &FusedCSCSamplingGraph::AddEdgeAttribute)
       .def("in_subgraph", &FusedCSCSamplingGraph::InSubgraph)
       .def("sample_neighbors", &FusedCSCSamplingGraph::SampleNeighbors)
       .def(

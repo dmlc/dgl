@@ -2334,8 +2334,8 @@ def test_graph_attributes():
     for key in ["B", "C"]:
         node_attributes[key] = torch.rand(num_nodes, 2)
         edge_attributes[key] = torch.rand(num_edges, 2)
-        graph.set_node_attribute(key, node_attributes[key])
-        graph.set_edge_attribute(key, edge_attributes[key])
+        graph.add_node_attribute(key, node_attributes[key])
+        graph.add_edge_attribute(key, edge_attributes[key])
     for k, v in node_attributes.items():
         assert torch.equal(v, graph.node_attributes[k])
         assert torch.equal(v, graph.node_attribute(k))
@@ -2346,8 +2346,8 @@ def test_graph_attributes():
     # Case 4: Assign more node/edge attributes which were None previously.
     graph.node_attributes = None
     graph.edge_attributes = None
-    graph.set_node_attribute("C", node_attributes["C"])
-    graph.set_edge_attribute("C", edge_attributes["C"])
+    graph.add_node_attribute("C", node_attributes["C"])
+    graph.add_edge_attribute("C", edge_attributes["C"])
     assert torch.equal(node_attributes["C"], graph.node_attribute("C"))
     assert torch.equal(node_attributes["C"], graph.node_attributes["C"])
     assert torch.equal(edge_attributes["C"], graph.edge_attribute("C"))

@@ -431,8 +431,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         return self._c_csc_graph.node_attribute(name)
 
-    def set_node_attribute(self, name: str, tensor: torch.Tensor) -> None:
-        """Sets the node attribute tensor by name.
+    def add_node_attribute(self, name: str, tensor: torch.Tensor) -> None:
+        """Adds node attribute tensor by name.
 
         Parameters
         ----------
@@ -441,7 +441,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         tensor: torch.Tensor
             The node attribute tensor.
         """
-        self._c_csc_graph.set_node_attribute(name, tensor)
+        self._c_csc_graph.add_node_attribute(name, tensor)
 
     def edge_attribute(self, name: str) -> Optional[torch.Tensor]:
         """Returns the edge attribute tensor by name.
@@ -458,8 +458,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         return self._c_csc_graph.edge_attribute(name)
 
-    def set_edge_attribute(self, name: str, tensor: torch.Tensor) -> None:
-        """Sets the edge attribute tensor by name.
+    def add_edge_attribute(self, name: str, tensor: torch.Tensor) -> None:
+        """Adds edge attribute tensor by name.
 
         Parameters
         ----------
@@ -468,7 +468,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         tensor: torch.Tensor
             The edge attribute tensor.
         """
-        self._c_csc_graph.set_edge_attribute(name, tensor)
+        self._c_csc_graph.add_edge_attribute(name, tensor)
 
     def in_subgraph(
         self,
