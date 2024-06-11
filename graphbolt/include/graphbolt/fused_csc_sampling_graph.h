@@ -253,6 +253,24 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
     edge_attributes_ = edge_attributes;
   }
 
+  /** @brief Set the node attribute by name. */
+  inline void SetNodeAttribute(
+      const std::string& name, const torch::Tensor& node_attribute) {
+    if (!node_attributes_.has_value()) {
+      node_attributes_ = NodeAttrMap();
+    }
+    node_attributes_.value().insert_or_assign(name, node_attribute);
+  }
+
+  /** @brief Set the edge attribute by name. */
+  inline void SetEdgeAttribute(
+      const std::string& name, const torch::Tensor& edge_attribute) {
+    if (!edge_attributes_.has_value()) {
+      edge_attributes_ = EdgeAttrMap();
+    }
+    edge_attributes_.value().insert_or_assign(name, edge_attribute);
+  }
+
   /**
    * @brief Magic number to indicate graph version in serialize/deserialize
    * stage.
