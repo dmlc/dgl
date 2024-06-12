@@ -416,6 +416,60 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Sets the edge attributes dictionary."""
         self._c_csc_graph.set_edge_attributes(edge_attributes)
 
+    def node_attribute(self, name: str) -> Optional[torch.Tensor]:
+        """Returns the node attribute tensor by name.
+
+        Parameters
+        ----------
+        name: str
+            The name of the node attribute.
+
+        Returns
+        -------
+        torch.Tensor or None
+            If present, returns the node attribute tensor.
+        """
+        return self._c_csc_graph.node_attribute(name)
+
+    def add_node_attribute(self, name: str, tensor: torch.Tensor) -> None:
+        """Adds node attribute tensor by name.
+
+        Parameters
+        ----------
+        name: str
+            The name of the node attribute.
+        tensor: torch.Tensor
+            The node attribute tensor.
+        """
+        self._c_csc_graph.add_node_attribute(name, tensor)
+
+    def edge_attribute(self, name: str) -> Optional[torch.Tensor]:
+        """Returns the edge attribute tensor by name.
+
+        Parameters
+        ----------
+        name: str
+            The name of the edge attribute.
+
+        Returns
+        -------
+        torch.Tensor or None
+            If present, returns the edge attribute tensor.
+        """
+        return self._c_csc_graph.edge_attribute(name)
+
+    def add_edge_attribute(self, name: str, tensor: torch.Tensor) -> None:
+        """Adds edge attribute tensor by name.
+
+        Parameters
+        ----------
+        name: str
+            The name of the edge attribute.
+        tensor: torch.Tensor
+            The edge attribute tensor.
+        """
+        self._c_csc_graph.add_edge_attribute(name, tensor)
+
     def in_subgraph(
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
