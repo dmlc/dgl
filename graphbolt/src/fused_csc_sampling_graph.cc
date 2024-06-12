@@ -805,11 +805,9 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     torch::optional<torch::Tensor> seeds,
     torch::optional<std::vector<int64_t>> seed_offsets,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids, torch::optional<std::string> probs_name,
+    bool return_eids, torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<torch::Tensor> random_seed,
     double seed2_contribution) const {
-  auto probs_or_mask = this->EdgeAttribute(probs_name);
-
   // If seeds does not have a value, then we expect all arguments to be resident
   // on the GPU. If seeds has a value, then we expect them to be accessible from
   // GPU. This is required for the dispatch to work when CUDA is not available.
@@ -903,13 +901,12 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
     const torch::Tensor& input_nodes,
     const torch::Tensor& input_nodes_timestamp,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids, torch::optional<std::string> probs_name,
+    bool return_eids, torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<std::string> node_timestamp_attr_name,
     torch::optional<std::string> edge_timestamp_attr_name) const {
   torch::optional<std::vector<int64_t>> seed_offsets = torch::nullopt;
   // 1. Get probs_or_mask.
-  auto probs_or_mask = this->EdgeAttribute(probs_name);
-  if (probs_name.has_value()) {
+  if (probs_or_mask.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
     // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
     // avoid crashes, convert 'probs_or_mask' to 'float32' data type.

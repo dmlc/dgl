@@ -253,6 +253,24 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
     edge_attributes_ = edge_attributes;
   }
 
+  /** @brief Add node attribute by name. */
+  inline void AddNodeAttribute(
+      const std::string& name, const torch::Tensor& node_attribute) {
+    if (!node_attributes_.has_value()) {
+      node_attributes_ = NodeAttrMap();
+    }
+    node_attributes_.value().insert_or_assign(name, node_attribute);
+  }
+
+  /** @brief Add edge attribute by name. */
+  inline void AddEdgeAttribute(
+      const std::string& name, const torch::Tensor& edge_attribute) {
+    if (!edge_attributes_.has_value()) {
+      edge_attributes_ = EdgeAttrMap();
+    }
+    edge_attributes_.value().insert_or_assign(name, edge_attribute);
+  }
+
   /**
    * @brief Magic number to indicate graph version in serialize/deserialize
    * stage.
@@ -323,8 +341,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * sampled edges, see arXiv:2210.13339.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
-   * @param probs_name An optional string specifying the name of an edge
-   * attribute. This attribute tensor should contain (unnormalized)
+   * @param probs_or_mask An optional edge attribute tensor for probablities
+   * or masks. This attribute tensor should contain (unnormalized)
    * probabilities corresponding to each neighboring edge of a node. It must be
    * a 1D floating-point or boolean tensor, with the number of elements
    * equalling the total number of edges.
@@ -339,7 +357,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       torch::optional<torch::Tensor> seeds,
       torch::optional<std::vector<int64_t>> seed_offsets,
       const std::vector<int64_t>& fanouts, bool replace, bool layer,
-      bool return_eids, torch::optional<std::string> probs_name,
+      bool return_eids, torch::optional<torch::Tensor> probs_or_mask,
       torch::optional<torch::Tensor> random_seed,
       double seed2_contribution) const;
 
@@ -362,8 +380,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * sampled edges, see arXiv:2210.13339.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
-   * @param probs_name An optional string specifying the name of an edge
-   * attribute, following the same rules as in SampleNeighbors.
+   * @param probs_or_mask An optional edge attribute tensor for probablities
+   * or masks, following the same rules as in SampleNeighbors.
    * @param node_timestamp_attr_name An optional string specifying the name of
    * the node attribute that contains the timestamp of nodes in the graph.
    * @param edge_timestamp_attr_name An optional string specifying the name of
@@ -377,7 +395,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       const torch::Tensor& input_nodes,
       const torch::Tensor& input_nodes_timestamp,
       const std::vector<int64_t>& fanouts, bool replace, bool layer,
-      bool return_eids, torch::optional<std::string> probs_name,
+      bool return_eids, torch::optional<torch::Tensor> probs_or_mask,
       torch::optional<std::string> node_timestamp_attr_name,
       torch::optional<std::string> edge_timestamp_attr_name) const;
 

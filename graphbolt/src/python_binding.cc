@@ -51,6 +51,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("edge_type_to_id", &FusedCSCSamplingGraph::EdgeTypeToID)
       .def("node_attributes", &FusedCSCSamplingGraph::NodeAttributes)
       .def("edge_attributes", &FusedCSCSamplingGraph::EdgeAttributes)
+      .def("node_attribute", &FusedCSCSamplingGraph::NodeAttribute)
+      .def("edge_attribute", &FusedCSCSamplingGraph::EdgeAttribute)
       .def("set_csc_indptr", &FusedCSCSamplingGraph::SetCSCIndptr)
       .def("set_indices", &FusedCSCSamplingGraph::SetIndices)
       .def("set_node_type_offset", &FusedCSCSamplingGraph::SetNodeTypeOffset)
@@ -59,6 +61,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("set_edge_type_to_id", &FusedCSCSamplingGraph::SetEdgeTypeToID)
       .def("set_node_attributes", &FusedCSCSamplingGraph::SetNodeAttributes)
       .def("set_edge_attributes", &FusedCSCSamplingGraph::SetEdgeAttributes)
+      .def("add_node_attribute", &FusedCSCSamplingGraph::AddNodeAttribute)
+      .def("add_edge_attribute", &FusedCSCSamplingGraph::AddEdgeAttribute)
       .def("in_subgraph", &FusedCSCSamplingGraph::InSubgraph)
       .def("sample_neighbors", &FusedCSCSamplingGraph::SampleNeighbors)
       .def(
