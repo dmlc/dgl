@@ -408,8 +408,13 @@ class HeteroItemSet:
 
     @property
     def names(self) -> Tuple[str]:
-        """Return the names of the items."""
+        """Returns the names of the items."""
         return self._names
+
+    @property
+    def num_types(self) -> int:
+        """Returns the number of types."""
+        return self._num_types
 
     def __repr__(self) -> str:
         ret = (
