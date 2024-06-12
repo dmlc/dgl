@@ -884,12 +884,12 @@ def test_temporal_sample_neighbors_homo(
             seed_timestamp,
             fanouts,
             replace=replace,
-            node_timestamp_attr_name="timestamp"
-            if use_node_timestamp
-            else None,
-            edge_timestamp_attr_name="timestamp"
-            if use_edge_timestamp
-            else None,
+            node_timestamp_attr_name=(
+                "timestamp" if use_node_timestamp else None
+            ),
+            edge_timestamp_attr_name=(
+                "timestamp" if use_edge_timestamp else None
+            ),
         )
 
     def _get_available_neighbors():
@@ -2285,3 +2285,70 @@ def test_sample_neighbors_hetero_pick_number(
             else:
                 # Etype 2: 0 valid neighbors.
                 assert sampled_num == 0
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_graph_attributes():
+    num_nodes = 1000
+    num_edges = 10 * 1000
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
+    graph = gb.fused_csc_sampling_graph(
+        csc_indptr,
+        indices,
+        node_attributes=None,
+        edge_attributes=None,
+    )
+
+    # Case 1: default is None.
+    assert graph.node_attributes is None
+    assert graph.edge_attributes is None
+
+    # Case 2: Assign the whole node/edge attributes.
+    node_attributes = {
+        "A": torch.rand(num_nodes, 2),
+        "B": torch.rand(num_nodes, 2),
+    }
+    edge_attributes = {
+        "A": torch.rand(num_nodes, 2),
+        "B": torch.rand(num_nodes, 2),
+    }
+    graph.node_attributes = node_attributes
+    graph.edge_attributes = edge_attributes
+    for k, v in node_attributes.items():
+        assert torch.equal(v, graph.node_attributes[k])
+        assert torch.equal(v, graph.node_attribute(k))
+    for k, v in edge_attributes.items():
+        assert torch.equal(v, graph.edge_attributes[k])
+        assert torch.equal(v, graph.edge_attribute(k))
+    assert "C" not in graph.node_attributes
+    assert "C" not in graph.edge_attributes
+    with pytest.raises(RuntimeError, match="Node attribute C does not exist."):
+        graph.node_attribute("C")
+    with pytest.raises(RuntimeError, match="Edge attribute C does not exist."):
+        graph.edge_attribute("C")
+
+    # Case 3: Assign/overwrite more node/edge attributes into existing ones.
+    for key in ["B", "C"]:
+        node_attributes[key] = torch.rand(num_nodes, 2)
+        edge_attributes[key] = torch.rand(num_edges, 2)
+        graph.add_node_attribute(key, node_attributes[key])
+        graph.add_edge_attribute(key, edge_attributes[key])
+    for k, v in node_attributes.items():
+        assert torch.equal(v, graph.node_attributes[k])
+        assert torch.equal(v, graph.node_attribute(k))
+    for k, v in edge_attributes.items():
+        assert torch.equal(v, graph.edge_attributes[k])
+        assert torch.equal(v, graph.edge_attribute(k))
+
+    # Case 4: Assign more node/edge attributes which were None previously.
+    graph.node_attributes = None
+    graph.edge_attributes = None
+    graph.add_node_attribute("C", node_attributes["C"])
+    graph.add_edge_attribute("C", edge_attributes["C"])
+    assert torch.equal(node_attributes["C"], graph.node_attribute("C"))
+    assert torch.equal(node_attributes["C"], graph.node_attributes["C"])
+    assert torch.equal(edge_attributes["C"], graph.edge_attribute("C"))
+    assert torch.equal(edge_attributes["C"], graph.edge_attributes["C"])
