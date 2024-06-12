@@ -3,6 +3,8 @@ import logging
 import os
 import platform
 
+from collections import namedtuple
+
 import constants
 
 import dgl
@@ -74,7 +76,7 @@ def _read_graph(schema):
                     f"Unknown edge format for {etype} - {schema[constants.STR_EDGES][etype][constants.STR_FORMAT]}"
                 )
 
-                src.append(data[:, 0])
+            src.append(data[:, 0])
             dst.append(data[:, 1])
         src = np.concatenate(src)
         dst = np.concatenate(dst)
@@ -92,7 +94,7 @@ def _read_graph(schema):
             for featname, featdata in schema[constants.STR_NODE_DATA][
                 ntype
             ].items():
-                files = fdata[constants.STR_DATA]
+                files = featdata[constants.STR_DATA]
                 feats = []
                 for fname in files:
                     feats.append(read_file(fname, constants.STR_NUMPY))
@@ -104,15 +106,17 @@ def _read_graph(schema):
     # read edge features here.
     for etype in schema[constants.STR_EDGE_TYPE]:
         if etype in schema[constants.STR_EDGE_DATA]:
-            for featname, fdata in schema[constants.STR_EDGE_DATA][etype]:
+            for featname, fdata in schema[constants.STR_EDGE_DATA][
+                etype
+            ].items():
                 files = fdata[constants.STR_DATA]
                 feats = []
                 for fname in files:
-                    feats.append(read_file(fname))
+                    feats.append(read_file(fname, constants.STR_NUMPY))
                 if len(feats) > 0:
-                    g.edges[etype].data[featname] = th.from_numpy(
-                        np.concatenate(feats)
-                    )
+                    g.edges[_etype_str_to_tuple(etype)].data[
+                        featname
+                    ] = th.from_numpy(np.concatenate(feats))
 
     # print from graph
     logging.info(f"|V|= {g.num_nodes()}")
@@ -128,7 +132,7 @@ def _read_graph(schema):
         for name, data in g.edges[c_etype].data.items():
             if isinstance(data, th.Tensor):
                 logging.info(
-                    f"Input Graph: efeat - {etype}/{name} - data - {g.edges[etype].data[name].size()}"
+                    f"Input Graph: efeat - {etype}/{name} - data - {g.edges[c_etype].data[name].size()}"
                 )
 
     return g
@@ -162,14 +166,21 @@ def _read_part_graphs(part_config, part_metafile):
     return part_graph_data
 
 
-def _validate_results(params):
+def validate_results(params, numeric_log_level="INFO"):
     """Main function to verify the graph partitions
 
     Parameters:
     -----------
-    params : argparser object
+    params : namedtuple
         to access the command line arguments
+    numeric_log_level : str
+        to indicate the log level
     """
+    logging.basicConfig(
+        level=numeric_log_level,
+        format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
+    )
+
     logging.info(f"loading config files...")
     part_config = os.path.join(params.part_graph_dir, "metadata.json")
     part_schema = read_json(part_config)
@@ -238,9 +249,12 @@ if __name__ == "__main__":
     params = parser.parse_args()
 
     numeric_level = getattr(logging, params.log_level.upper(), None)
-    logging.basicConfig(
-        level=numeric_level,
-        format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
-    )
 
-    _validate_results(params)
+    fn_params = namedtuple(
+        "fn_params", "orig_dataset_dir part_graph_dir partitions_dir"
+    )
+    fn_params.orig_dataset_dir = params.orig_dataset_dir
+    fn_params.part_graph_dir = params.part_graph_dir
+    fn_params.partitions_dir = params.partitions_dir
+
+    validate_results(fn_params, numeric_level)

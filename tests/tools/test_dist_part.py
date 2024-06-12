@@ -2,6 +2,8 @@ import json
 import os
 import tempfile
 
+from collections import namedtuple
+
 import dgl
 
 import numpy as np
@@ -26,6 +28,7 @@ from tools.verification_utils import (
     verify_partition_data_types,
     verify_partition_formats,
 )
+from tools.verify_partitions import validate_results
 
 
 def _test_chunk_graph(
@@ -267,11 +270,13 @@ def _test_pipeline(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = "python3 tools/verify_partitions.py "
-            cmd += f" --orig-dataset-dir {in_dir}"
-            cmd += f" --part-graph {out_dir}"
-            cmd += f" --partitions-dir {output_dir}"
-            os.system(cmd)
+            fn_params = namedtuple(
+                "fn_params", "orig_dataset_dir part_graph_dir partitions_dir"
+            )
+            fn_params.orig_dataset_dir = in_dir
+            fn_params.part_graph_dir = out_dir
+            fn_params.partitions_dir = output_dir
+            validate_results(fn_params)
             return
 
         # read original node/edge IDs
