@@ -202,14 +202,14 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
-                node_types = []
+                node_types = set()
                 sampled_csc = {}
                 for v in subgraph.sampled_csc.values():
                     cast_to_minimum_dtype(v)
                 for etype, v in subgraph.sampled_csc.items():
                     etype_tuple = etype_str_to_tuple(etype)
-                    node_types.append(etype_tuple[0])
-                    node_types.append(etype_tuple[2])
+                    node_types.add(etype_tuple[0])
+                    node_types.add(etype_tuple[2])
                     sampled_csc[etype_tuple] = (
                         "csc",
                         (
@@ -229,7 +229,7 @@ class MiniBatch:
                         if original_row_node_ids.get(ntype) is not None
                         else 0
                     )
-                    for ntype in set(node_types)
+                    for ntype in node_types
                 }
                 num_dst_nodes = {
                     ntype: (
@@ -237,7 +237,7 @@ class MiniBatch:
                         if original_column_node_ids.get(ntype) is not None
                         else 0
                     )
-                    for ntype in set(node_types)
+                    for ntype in node_types
                 }
             else:
                 sampled_csc = cast_to_minimum_dtype(subgraph.sampled_csc)
