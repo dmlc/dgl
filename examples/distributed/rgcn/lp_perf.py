@@ -18,7 +18,11 @@ def run(args, g, train_eids):
 
     neg_sampler = dgl.dataloading.negative_sampler.Uniform(3)
 
-    sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
+    prob = args.prob_or_mask
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
+        fanouts,
+        prob=prob,
+    )
 
     exclude = None
     reverse_etypes = None
@@ -70,6 +74,12 @@ def run(args, g, train_eids):
         epoch_tic = time.time()
         for step, sample_data in enumerate(dataloader):
             input_nodes, pos_graph, neg_graph, blocks = sample_data
+
+            for block in blocks:
+                for c_etype in block.canonical_etypes:
+                    homo_eids = block.edges[c_etype].data[dgl.EID]
+                    assert th.all(g.edges[c_etype].data[prob][homo_eids] > 0)
+
             if args.debug:
                 # Verify exclude_edges functionality.
                 current_eids = blocks[-1].edata[dgl.EID]
@@ -118,6 +128,18 @@ def run(args, g, train_eids):
         g.barrier()
 
 
+def rand_init_prob(shape, dtype):
+    prob = th.rand(shape)
+    prob[th.randperm(len(prob))[: int(len(prob) * 0.5)]] = 0.0
+    return prob
+
+
+def rand_init_mask(shape, dtype):
+    prob = th.rand(shape)
+    prob[th.randperm(len(prob))[: int(len(prob) * 0.5)]] = 0.0
+    return (prob > 0.2).to(th.float32)
+
+
 def main(args):
     dgl.distributed.initialize(args.ip_config, use_graphbolt=args.use_graphbolt)
 
@@ -126,6 +148,22 @@ def main(args):
 
     g = dgl.distributed.DistGraph(args.graph_name)
     print("rank:", g.rank())
+
+    # Assign prob/masks to edges.
+    for c_etype in g.canonical_etypes:
+        shape = (g.num_edges(etype=c_etype),)
+        g.edges[c_etype].data["prob"] = dgl.distributed.DistTensor(
+            shape,
+            th.float32,
+            init_func=rand_init_prob,
+            part_policy=g.get_edge_partition_policy(c_etype),
+        )
+        g.edges[c_etype].data["mask"] = dgl.distributed.DistTensor(
+            shape,
+            th.float32,
+            init_func=rand_init_mask,
+            part_policy=g.get_edge_partition_policy(c_etype),
+        )
 
     pb = g.get_partition_book()
     c_etype = ("author", "writes", "paper")
@@ -199,6 +237,12 @@ if __name__ == "__main__":
         default=False,
         action="store_true",
         help="whether to remove edges during sampling",
+    )
+    parser.add_argument(
+        "--prob_or_mask",
+        type=str,
+        default="prob",
+        help="whether to use prob or mask during sampling",
     )
     args = parser.parse_args()
 
