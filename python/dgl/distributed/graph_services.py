@@ -142,11 +142,9 @@ def _sample_neighbors_graphbolt(
     nodes = nodes.to(dtype=g.indices.dtype)
 
     # 2. Perform sampling.
-    # [Rui][TODO] `prob` is not tested yet. Skip for now.
-    assert (
-        prob is None
-    ), "DistGraphBolt does not support sampling with probability."
-
+    probs_or_mask = None
+    if prob is not None:
+        probs_or_mask = g.edge_attributes[prob]
     # Sanity checks.
     assert isinstance(
         g, gb.FusedCSCSamplingGraph
@@ -158,7 +156,12 @@ def _sample_neighbors_graphbolt(
 
     return_eids = g.edge_attributes is not None and EID in g.edge_attributes
     subgraph = g._sample_neighbors(
-        nodes, None, fanout, replace=replace, return_eids=return_eids
+        nodes,
+        None,
+        fanout,
+        replace=replace,
+        probs_or_mask=probs_or_mask,
+        return_eids=return_eids,
     )
 
     # 3. Map local node IDs to global node IDs.
@@ -470,10 +473,10 @@ class SamplingRequest(Request):
         local_g = server_state.graph
         partition_book = server_state.partition_book
         kv_store = server_state.kv_store
-        if self.prob is not None:
+        if self.prob is not None and (not self.use_graphbolt):
             prob = [kv_store.data_store[self.prob]]
         else:
-            prob = None
+            prob = self.prob
         res = _sample_neighbors(
             self.use_graphbolt,
             local_g,
@@ -546,13 +549,13 @@ class SamplingRequestEtype(Request):
         kv_store = server_state.kv_store
         etype_offset = partition_book.local_etype_offset
         # See NOTE 1
-        if self.prob is not None:
+        if self.prob is not None and (not self.use_graphbolt):
             probs = [
                 kv_store.data_store[key] if key != "" else None
                 for key in self.prob
             ]
         else:
-            probs = None
+            probs = self.prob
         res = _sample_etype_neighbors(
             self.use_graphbolt,
             local_g,
@@ -971,7 +974,7 @@ def sample_etype_neighbors(
         nodes = F.cat(homo_nids, 0)
 
     def issue_remote_req(node_ids):
-        if prob is not None:
+        if prob is not None and (not use_graphbolt):
             # See NOTE 1
             _prob = [
                 (
@@ -984,7 +987,7 @@ def sample_etype_neighbors(
                 for etype in g.canonical_etypes
             ]
         else:
-            _prob = None
+            _prob = prob
         return SamplingRequestEtype(
             node_ids,
             fanout,
@@ -999,9 +1002,7 @@ def sample_etype_neighbors(
     def local_access(local_g, partition_book, local_nids):
         etype_offset = gpb.local_etype_offset
         # See NOTE 1
-        if prob is None:
-            _prob = None
-        else:
+        if prob is not None and (not use_graphbolt):
             _prob = [
                 (
                     g.edges[etype].data[prob].local_partition
@@ -1010,6 +1011,8 @@ def sample_etype_neighbors(
                 )
                 for etype in g.canonical_etypes
             ]
+        else:
+            _prob = prob
         return _sample_etype_neighbors(
             use_graphbolt,
             local_g,
@@ -1118,11 +1121,11 @@ def sample_neighbors(
         nodes = list(nodes.values())[0]
 
     def issue_remote_req(node_ids):
-        if prob is not None:
+        if prob is not None and (not use_graphbolt):
             # See NOTE 1
             _prob = g.edata[prob].kvstore_key
         else:
-            _prob = None
+            _prob = prob
         return SamplingRequest(
             node_ids,
             fanout,
@@ -1135,7 +1138,11 @@ def sample_neighbors(
 
     def local_access(local_g, partition_book, local_nids):
         # See NOTE 1
-        _prob = [g.edata[prob].local_partition] if prob is not None else None
+        _prob = (
+            [g.edata[prob].local_partition]
+            if prob is not None and (not use_graphbolt)
+            else prob
+        )
         return _sample_neighbors(
             use_graphbolt,
             local_g,
