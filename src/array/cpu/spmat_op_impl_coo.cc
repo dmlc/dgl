@@ -325,7 +325,7 @@ CSRMatrix SortedCOOToCSR(const COOMatrix &coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
 
-  // TODO[Mingbang]: This is just a temporary check to ensure that NNZ does not
+  // TODO(Mingbang): This is just a temporary check to ensure that NNZ does not
   // exceed INT32_MAX, preventing overflow issues that could lead to undefined
   // behavior or incorrect results. Later we need to suppoort larger values of
   // NNZ.
@@ -431,7 +431,7 @@ CSRMatrix UnSortedSparseCOOToCSR(const COOMatrix &coo) {
   const UIdType N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
 
-  // TODO[Mingbang]: This is just a temporary check to ensure that NNZ does not
+  // TODO(Mingbang): This is just a temporary check to ensure that NNZ does not
   // exceed INT32_MAX, preventing overflow issues that could lead to undefined
   // behavior or incorrect results. Later we need to suppoort larger values of
   // NNZ.
@@ -566,7 +566,7 @@ CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
   const UIdType N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
 
-  // TODO[Mingbang]: This is just a temporary check to ensure that NNZ does not
+  // TODO(Mingbang): This is just a temporary check to ensure that NNZ does not
   // exceed INT32_MAX, preventing overflow issues that could lead to undefined
   // behavior or incorrect results. Later we need to suppoort larger values of
   // NNZ.
@@ -672,7 +672,7 @@ CSRMatrix UnSortedSmallCOOToCSR(COOMatrix coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
 
-  // TODO[Mingbang]: This is just a temporary check to ensure that NNZ does not
+  // TODO(Mingbang): This is just a temporary check to ensure that NNZ does not
   // exceed INT32_MAX, preventing overflow issues that could lead to undefined
   // behavior or incorrect results. Later we need to suppoort larger values of
   // NNZ.
