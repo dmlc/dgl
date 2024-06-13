@@ -128,12 +128,16 @@ def test_minibatch_representation_hetero(indptr_dtype, indices_dtype):
             relation: gb.CSCFormatBase(
                 indptr=torch.tensor([0, 1, 2], dtype=indptr_dtype),
                 indices=torch.tensor([1, 0], dtype=indices_dtype),
-            )
+            ),
+            reverse_relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0, 2], dtype=indptr_dtype),
+                indices=torch.tensor([1, 0], dtype=indices_dtype),
+            ),
         },
     ]
     original_column_node_ids = [
         {"B": torch.tensor([10, 11, 12]), "A": torch.tensor([5, 7, 9, 11])},
-        {"B": torch.tensor([10, 11])},
+        {"B": torch.tensor([10, 11]), "A": torch.tensor([5])},
     ]
     original_row_node_ids = [
         {
@@ -196,10 +200,12 @@ def test_minibatch_representation_hetero(indptr_dtype, indices_dtype):
                             ),
                             SampledSubgraphImpl(sampled_csc={'A:r:B': CSCFormatBase(indptr=tensor([0, 1, 2], dtype=torch.int32),
                                                                          indices=tensor([1, 0], dtype=torch.int32),
+                                                           ), 'B:rr:A': CSCFormatBase(indptr=tensor([0, 2], dtype=torch.int32),
+                                                                         indices=tensor([1, 0], dtype=torch.int32),
                                                            )},
                                                original_row_node_ids={'A': tensor([5, 7]), 'B': tensor([10, 11])},
                                                original_edge_ids={'A:r:B': tensor([10, 12])},
-                                               original_column_node_ids={'B': tensor([10, 11])},
+                                               original_column_node_ids={'B': tensor([10, 11]), 'A': tensor([5])},
                             )],
           node_features={('A', 'x'): tensor([6, 4, 0, 1])},
           labels={'B': tensor([2, 5])},
@@ -213,9 +219,9 @@ def test_minibatch_representation_hetero(indptr_dtype, indices_dtype):
                        num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
                        metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]),
                  Block(num_src_nodes={'A': 2, 'B': 2},
-                       num_dst_nodes={'B': 2},
-                       num_edges={('A', 'r', 'B'): 2},
-                       metagraph=[('A', 'B', 'r')])],
+                       num_dst_nodes={'A': 1, 'B': 2},
+                       num_edges={('A', 'r', 'B'): 2, ('B', 'rr', 'A'): 2},
+                       metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')])],
        )"""
     )
     result = str(minibatch)
@@ -284,12 +290,16 @@ def test_get_dgl_blocks_hetero():
         {
             relation: gb.CSCFormatBase(
                 indptr=torch.tensor([0, 1, 2]), indices=torch.tensor([1, 0])
-            )
+            ),
+            reverse_relation: gb.CSCFormatBase(
+                indptr=torch.tensor([0, 1]),
+                indices=torch.tensor([1]),
+            ),
         },
     ]
     original_column_node_ids = [
         {"B": torch.tensor([10, 11, 12]), "A": torch.tensor([5, 7, 9, 11])},
-        {"B": torch.tensor([10, 11])},
+        {"B": torch.tensor([10, 11]), "A": torch.tensor([5])},
     ]
     original_row_node_ids = [
         {
@@ -328,12 +338,94 @@ def test_get_dgl_blocks_hetero():
       num_dst_nodes={'A': 4, 'B': 3},
       num_edges={('A', 'r', 'B'): 3, ('B', 'rr', 'A'): 2},
       metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')]), Block(num_src_nodes={'A': 2, 'B': 2},
-      num_dst_nodes={'B': 2},
-      num_edges={('A', 'r', 'B'): 2},
-      metagraph=[('A', 'B', 'r')])]"""
+      num_dst_nodes={'A': 1, 'B': 2},
+      num_edges={('A', 'r', 'B'): 2, ('B', 'rr', 'A'): 1},
+      metagraph=[('A', 'B', 'r'), ('B', 'A', 'rr')])]"""
     )
     result = str(dgl_blocks)
     assert result == expect_result
+
+
+def test_get_dgl_blocks_hetero_partial_empty_edges():
+    hg = dgl.heterograph(
+        {
+            ("n1", "e1", "n1"): ([0, 1, 1], [1, 2, 0]),
+            ("n1", "e2", "n2"): ([0, 1, 2], [1, 0, 2]),
+        }
+    )
+
+    gb_g = gb.from_dglgraph(hg, is_homogeneous=False)
+
+    train_set = gb.HeteroItemSet(
+        {"n1:e2:n2": gb.ItemSet(torch.LongTensor([[0, 1]]), names="seeds")}
+    )
+    datapipe = gb.ItemSampler(train_set, batch_size=1)
+    datapipe = datapipe.sample_neighbor(gb_g, fanouts=[-1, -1])
+    dataloader = gb.DataLoader(datapipe)
+    blocks_str = str(next(iter(dataloader)).blocks)
+    expected_str = """[Block(num_src_nodes={'n1': 2, 'n2': 0},
+      num_dst_nodes={'n1': 2, 'n2': 0},
+      num_edges={('n1', 'e1', 'n1'): 2, ('n1', 'e2', 'n2'): 0},
+      metagraph=[('n1', 'n1', 'e1'), ('n1', 'n2', 'e2')]), Block(num_src_nodes={'n1': 2, 'n2': 0},
+      num_dst_nodes={'n1': 1, 'n2': 1},
+      num_edges={('n1', 'e1', 'n1'): 1, ('n1', 'e2', 'n2'): 1},
+      metagraph=[('n1', 'n1', 'e1'), ('n1', 'n2', 'e2')])]"""
+    assert expected_str == blocks_str
+
+
+def test_get_dgl_blocks_hetero_empty_edges():
+    hg = dgl.heterograph(
+        {
+            ("n3", "e1", "n1"): ([0, 1, 1], [1, 2, 0]),
+            ("n3", "e2", "n2"): ([0, 1, 2], [1, 0, 2]),
+        }
+    )
+
+    gb_g = gb.from_dglgraph(hg, is_homogeneous=False)
+
+    train_set = gb.HeteroItemSet(
+        {"n3:e1:n1": gb.ItemSet(torch.LongTensor([[2, 1]]), names="seeds")}
+    )
+    datapipe = gb.ItemSampler(train_set, batch_size=1)
+    datapipe = datapipe.sample_neighbor(gb_g, fanouts=[-1, -1])
+    dataloader = gb.DataLoader(datapipe)
+    blocks_str = str(next(iter(dataloader)).blocks)
+    expected_str = """[Block(num_src_nodes={'n1': 0, 'n2': 0, 'n3': 2},
+      num_dst_nodes={'n1': 0, 'n2': 0, 'n3': 2},
+      num_edges={('n3', 'e1', 'n1'): 0, ('n3', 'e2', 'n2'): 0},
+      metagraph=[('n3', 'n1', 'e1'), ('n3', 'n2', 'e2')]), Block(num_src_nodes={'n1': 0, 'n2': 0, 'n3': 2},
+      num_dst_nodes={'n1': 1, 'n2': 0, 'n3': 1},
+      num_edges={('n3', 'e1', 'n1'): 1, ('n3', 'e2', 'n2'): 0},
+      metagraph=[('n3', 'n1', 'e1'), ('n3', 'n2', 'e2')])]"""
+    assert expected_str == blocks_str
+
+
+def test_get_dgl_blocks_homo_empty_edges():
+    g = dgl.graph(([2, 3, 4], [3, 4, 5]))
+
+    gb_g = gb.from_dglgraph(g, is_homogeneous=True)
+    train_set = gb.ItemSet(torch.LongTensor([[0, 1]]), names="seeds")
+    datapipe = gb.ItemSampler(train_set, batch_size=1)
+    datapipe = datapipe.sample_neighbor(gb_g, fanouts=[-1, -1])
+    dataloader = gb.DataLoader(datapipe)
+    blocks_str = str(next(iter(dataloader)).blocks)
+    expected_str = "[Block(num_src_nodes=2, num_dst_nodes=2, num_edges=0), Block(num_src_nodes=2, num_dst_nodes=2, num_edges=0)]"
+    assert expected_str == blocks_str
+
+
+def test_seeds_ntype_being_passed():
+    hg = dgl.heterograph({("n1", "e1", "n2"): ([0, 1, 2], [2, 0, 1])})
+
+    gb_g = gb.from_dglgraph(hg, is_homogeneous=False)
+    train_set = gb.HeteroItemSet(
+        {"n2": gb.ItemSet(torch.LongTensor([0, 1]), names="seeds")}
+    )
+    datapipe = gb.ItemSampler(train_set, batch_size=2)
+    datapipe = datapipe.sample_neighbor(gb_g, [-1, -1, -1])
+    dataloader = gb.DataLoader(datapipe)
+    blocks = next(iter(dataloader)).blocks
+    for block in blocks:
+        assert "n2" in block.srctypes
 
 
 def create_homo_minibatch():
