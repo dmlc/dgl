@@ -6,7 +6,6 @@
 #include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
 
-#include <limits>
 #include <numeric>
 #include <tuple>
 #include <unordered_map>
@@ -324,17 +323,6 @@ template <class IdType>
 CSRMatrix SortedCOOToCSR(const COOMatrix &coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
-
-  // TODO(Mingbang): This is just a temporary check to ensure that NNZ does not
-  // exceed INT32_MAX, preventing overflow issues that could lead to undefined
-  // behavior or incorrect results. Later we need to suppoort larger values of
-  // NNZ.
-  if (std::is_same<IdType, int32_t>::value &&
-      NNZ > std::numeric_limits<int32_t>::max()) {
-    LOG(FATAL) << "Number of non zero elements exceeds the maximum value that "
-                  "can be represented by int32_t for IdType int32_t.";
-  }
-
   const IdType *const row_data = static_cast<IdType *>(coo.row->data);
   const IdType *const data =
       COOHasData(coo) ? static_cast<IdType *>(coo.data->data) : nullptr;
@@ -430,17 +418,6 @@ CSRMatrix UnSortedSparseCOOToCSR(const COOMatrix &coo) {
 
   const UIdType N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
-
-  // TODO(Mingbang): This is just a temporary check to ensure that NNZ does not
-  // exceed INT32_MAX, preventing overflow issues that could lead to undefined
-  // behavior or incorrect results. Later we need to suppoort larger values of
-  // NNZ.
-  if (std::is_same<IdType, int32_t>::value &&
-      NNZ > std::numeric_limits<int32_t>::max()) {
-    LOG(FATAL) << "Number of non zero elements exceeds the maximum value that "
-                  "can be represented by int32_t for IdType int32_t.";
-  }
-
   const IdType *const row_data = static_cast<IdType *>(coo.row->data);
   const IdType *const col_data = static_cast<IdType *>(coo.col->data);
   const IdType *const data =
@@ -565,17 +542,6 @@ CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
 
   const UIdType N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
-
-  // TODO(Mingbang): This is just a temporary check to ensure that NNZ does not
-  // exceed INT32_MAX, preventing overflow issues that could lead to undefined
-  // behavior or incorrect results. Later we need to suppoort larger values of
-  // NNZ.
-  if (std::is_same<IdType, int32_t>::value &&
-      NNZ > std::numeric_limits<int32_t>::max()) {
-    LOG(FATAL) << "Number of non zero elements exceeds the maximum value that "
-                  "can be represented by int32_t for IdType int32_t.";
-  }
-
   const IdType *const row_data = static_cast<IdType *>(coo.row->data);
   const IdType *const col_data = static_cast<IdType *>(coo.col->data);
   const IdType *const data =
@@ -671,17 +637,6 @@ template <typename IdType>
 CSRMatrix UnSortedSmallCOOToCSR(COOMatrix coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
-
-  // TODO(Mingbang): This is just a temporary check to ensure that NNZ does not
-  // exceed INT32_MAX, preventing overflow issues that could lead to undefined
-  // behavior or incorrect results. Later we need to suppoort larger values of
-  // NNZ.
-  if (std::is_same<IdType, int32_t>::value &&
-      NNZ > std::numeric_limits<int32_t>::max()) {
-    LOG(FATAL) << "Number of non zero elements exceeds the maximum value that "
-                  "can be represented by int32_t for IdType int32_t.";
-  }
-
   const IdType *row_data = static_cast<IdType *>(coo.row->data);
   const IdType *col_data = static_cast<IdType *>(coo.col->data);
   const IdType *data =
