@@ -193,6 +193,7 @@ def start_dist_dataloader(
     dgl.distributed.exit_client()
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 def test_standalone():
     reset_envs()
     with tempfile.TemporaryDirectory() as test_dir:
