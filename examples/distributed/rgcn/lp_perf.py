@@ -75,12 +75,12 @@ def run(args, g, train_eids):
         for step, sample_data in enumerate(dataloader):
             input_nodes, pos_graph, neg_graph, blocks = sample_data
 
-            for block in blocks:
-                for c_etype in block.canonical_etypes:
-                    homo_eids = block.edges[c_etype].data[dgl.EID]
-                    assert th.all(g.edges[c_etype].data[prob][homo_eids] > 0)
-
             if args.debug:
+                # Verify prob/mask values.
+                for block in blocks:
+                    for c_etype in block.canonical_etypes:
+                        homo_eids = block.edges[c_etype].data[dgl.EID]
+                        assert th.all(g.edges[c_etype].data[prob][homo_eids] > 0)
                 # Verify exclude_edges functionality.
                 current_eids = blocks[-1].edata[dgl.EID]
                 seed_eids = pos_graph.edata[dgl.EID]

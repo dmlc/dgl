@@ -1647,13 +1647,18 @@ class DistGraph:
         )
         # Wait for the response.
         assert rpc.recv_response()._name == name
-        # Send add request to backup servers.
-        for server_id in range(self._client.num_servers):
+        # Send add request to local backup servers.
+        for i in range(self._client.group_count - 1):
+            server_id = (
+                self._client.machine_id * self._client.group_count + i + 1
+            )
             rpc.send_request(
                 server_id, AddEdgeAttributeFromSharedMemRequest(name)
             )
-        for server_id in range(self._client.num_servers):
-            rpc.recv_response()
+        # Receive response from local backup servers.
+        for _ in range(self._client.group_count - 1):
+            response = rpc.recv_response()
+            assert response._name == name
         # Add edge attribute from main server's shared memory.
         data = _copy_data_from_shared_mem(
             "__edge__" + name, (self.local_partition.total_num_edges,)
