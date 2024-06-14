@@ -80,7 +80,9 @@ def run(args, g, train_eids):
                 for block in blocks:
                     for c_etype in block.canonical_etypes:
                         homo_eids = block.edges[c_etype].data[dgl.EID]
-                        assert th.all(g.edges[c_etype].data[prob][homo_eids] > 0)
+                        assert th.all(
+                            g.edges[c_etype].data[prob][homo_eids] > 0
+                        )
                 # Verify exclude_edges functionality.
                 current_eids = blocks[-1].edata[dgl.EID]
                 seed_eids = pos_graph.edata[dgl.EID]
