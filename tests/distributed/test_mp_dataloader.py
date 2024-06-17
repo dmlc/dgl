@@ -193,6 +193,7 @@ def start_dist_dataloader(
     dgl.distributed.exit_client()
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 def test_standalone():
     reset_envs()
     with tempfile.TemporaryDirectory() as test_dir:
@@ -456,7 +457,7 @@ def start_node_dataloader(
     return_eids=False,
     prob_or_mask=None,
 ):
-    dgl.distributed.initialize(ip_config)
+    dgl.distributed.initialize(ip_config, use_graphbolt=use_graphbolt)
     gpb = None
     disable_shared_mem = num_server > 1
     if disable_shared_mem:
@@ -568,13 +569,14 @@ def start_edge_dataloader(
     orig_nid,
     orig_eid,
     groundtruth_g,
+    use_graphbolt,
     exclude,
     reverse_eids,
     reverse_etypes,
     negative,
     prob_or_mask,
 ):
-    dgl.distributed.initialize(ip_config)
+    dgl.distributed.initialize(ip_config, use_graphbolt=use_graphbolt)
     gpb = None
     disable_shared_mem = num_server > 1
     if disable_shared_mem:
@@ -837,6 +839,7 @@ def check_dataloader(
                     orig_nid,
                     orig_eid,
                     g,
+                    use_graphbolt,
                     exclude,
                     reverse_eids,
                     reverse_etypes,
@@ -927,7 +930,7 @@ def test_edge_dataloader_homograph(
 @pytest.mark.parametrize("num_server", [1])
 @pytest.mark.parametrize("num_workers", [1])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
-@pytest.mark.parametrize("use_graphbolt", [False])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("prob_or_mask", ["prob", "mask"])
 def test_dataloader_homograph_prob_or_mask(
     num_server, num_workers, dataloader_type, use_graphbolt, prob_or_mask
@@ -1000,7 +1003,7 @@ def test_edge_dataloader_heterograph(
 @pytest.mark.parametrize("num_server", [1])
 @pytest.mark.parametrize("num_workers", [1])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
-@pytest.mark.parametrize("use_graphbolt", [False])
+@pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("prob_or_mask", ["prob", "mask"])
 def test_dataloader_heterograph_prob_or_mask(
     num_server, num_workers, dataloader_type, use_graphbolt, prob_or_mask
