@@ -746,9 +746,7 @@ inline COOToCSRAlg WhichCOOToCSR(const COOMatrix &coo) {
 
 template <DGLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
-  if constexpr (std::is_same<IdType, int32_t>::value) {
-    CHECK_NO_OVERFLOW(coo.row->dtype, coo.row->shape[0]);
-  }
+  CHECK_NO_OVERFLOW(coo.row->dtype, coo.row->shape[0]);
   switch (WhichCOOToCSR<IdType>(coo)) {
     case COOToCSRAlg::sorted:
       return SortedCOOToCSR<IdType>(coo);
