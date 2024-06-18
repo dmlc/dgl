@@ -366,9 +366,7 @@ def check_neg_dataloader(g, num_server, num_workers):
 @pytest.mark.parametrize("num_workers", [0, 1])
 @pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("return_eids", [False, True])
-def test_dist_dataloader(
-    num_server, num_workers, use_graphbolt, return_eids
-):
+def test_dist_dataloader(num_server, num_workers, use_graphbolt, return_eids):
     if not use_graphbolt and return_eids:
         # return_eids is not supported in non-GraphBolt mode.
         return
