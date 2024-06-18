@@ -222,7 +222,7 @@ class SubgraphSampler(MiniBatchTransformer):
             compacted_seeds,
         )
 
-    def sample_subgraphs(self, seeds, seeds_timestamp):
+    def sample_subgraphs(self, seeds, seeds_timestamp, seeds_time_window):
         """Sample subgraphs from the given seeds, possibly with temporal constraints.
 
         Any subclass of SubgraphSampler should implement this method.
@@ -237,6 +237,10 @@ class SubgraphSampler(MiniBatchTransformer):
             should not contain any nodes or edges that are newer than the
             timestamps of the seed nodes. Default: None.
 
+        seeds_time_window : Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The time windows of the seed nodes. If given, the sampled subgraphs
+            should not contain any nodes or edges that are older than the
+            `timestamps - time_windows` of the seed nodes. Default: None.
         Returns
         -------
         Union[torch.Tensor, Dict[str, torch.Tensor]]
