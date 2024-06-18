@@ -89,7 +89,7 @@ class TemporalNeighborSampler(SubgraphSampler):
         self.edge_timestamp_attr_name = edge_timestamp_attr_name
         self.sampler = graph.temporal_sample_neighbors
 
-    def sample_subgraphs(self, seeds, seeds_timestamp):
+    def sample_subgraphs(self, seeds, seeds_timestamp, seeds_time_window=None):
         assert (
             seeds_timestamp is not None
         ), "seeds_timestamp must be provided for temporal neighbor sampling."
@@ -113,12 +113,18 @@ class TemporalNeighborSampler(SubgraphSampler):
                 ntype: seeds_timestamp.get(ntype, torch.LongTensor([]))
                 for ntype in ntypes
             }
+            if seeds_time_window:
+                seeds_time_window = {
+                    ntype: seeds_time_window.get(ntype, torch.LongTensor([]))
+                    for ntype in ntypes
+                }
         for hop in range(num_layers):
             subgraph = self.sampler(
                 seeds,
                 seeds_timestamp,
                 self.fanouts[hop],
                 self.replace,
+                seeds_time_window,
                 self.prob_name,
                 self.node_timestamp_attr_name,
                 self.edge_timestamp_attr_name,
