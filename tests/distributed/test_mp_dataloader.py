@@ -21,7 +21,7 @@ from scipy import sparse as spsp
 from utils import generate_ip_config, reset_envs
 
 
-def _unique_rand_graph(num_nodes=10 * 1000, num_edges=100 * 1000):
+def _unique_rand_graph(num_nodes=1000, num_edges=10 * 1000):
     edges_set = set()
     while len(edges_set) < num_edges:
         src = np.random.randint(0, num_nodes - 1)

@@ -575,7 +575,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v240511_1440"
-                  args "-u root --shm-size=4gb"
+                  args "-u root --shm-size=8gb"
                   alwaysPull true
                 }
               }
