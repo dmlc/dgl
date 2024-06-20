@@ -107,7 +107,7 @@ For now, we need to compile and install ParMETIS manually. We clone the DGL bran
 
 .. code-block:: bash
 
-    git clone --branch dgl https://github.com/KarypisLab/ParMETIS.git
+    git clone https://github.com/KarypisLab/PM4GNN.git
 
 Then compile and install ParMETIS.
 
@@ -123,6 +123,10 @@ Before running ParMETIS, we need to set two environment variables: ``PATH`` and 
     export PATH=$PATH:$HOME/local/bin
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib/
 
+.. note::
+    For massively large graphs, with number of nodes or edges is more than `2^{32} - 1`, 
+    ParMETIS requires MPI version 4.0 or above.
+
 Input format
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -132,10 +136,11 @@ Input format
     how DGL organize heterogeneous graph for distributed training.
 
 The input graph for ParMETIS is stored in three files with the following names:
-``xxx_nodes.txt``, ``xxx_edges.txt`` and ``xxx_stats.txt``, where ``xxx`` is a
-graph name.
+``xxx_nodes.txt``, ``xxx_edges.txt`` and ``xxx_stats.txt``, 
+where ``xxx`` is a graph name and other two file types are for 
+storing nodes and edges.
 
-Each row in ``xxx_nodes.txt`` stores the information of a node. Row ID is
+Each row in any of the node files stores the information of a node. Row ID is
 also the *homogeneous* ID of a node, e.g., row 0 is for node 0; row 1 is for
 node 1, etc. Each row has the following format:
 
@@ -174,7 +179,7 @@ same number of nodes for type 0 and the same number of nodes for type 1.
     1 0 1 2
     1 0 1 3
 
-Similarly, each row in ``xxx_edges.txt`` stores the information of an edge. Row ID is
+Similarly, each row in any of the  edge files stores the information of an edge. Row ID is
 also the *homogeneous* ID of an edge, e.g., row 0 is for edge 0; row 1 is for
 edge 1, etc. Each row has the following format:
 
