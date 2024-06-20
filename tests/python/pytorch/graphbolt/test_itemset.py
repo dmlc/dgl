@@ -606,3 +606,55 @@ def test_HeteroItemSet_repr():
         ")"
     )
     assert str(item_set) == expected_str, item_set
+
+
+def test_deprecation_alias():
+    """Test `ItemSetDict` as the alias for `HeteroItemSet`."""
+
+    user_ids = torch.arange(0, 5)
+    item_ids = torch.arange(5, 10)
+    ids = {
+        "user": gb.ItemSet(user_ids, names="seeds"),
+        "item": gb.ItemSet(item_ids, names="seeds"),
+    }
+    with pytest.warns(
+        DeprecationWarning,
+        match="ItemSetDict is deprecated and will be removed in the future. Please use HeteroItemSet instead.",
+    ):
+        item_set_dict = gb.ItemSetDict(ids)
+    hetero_item_set = gb.HeteroItemSet(ids)
+    assert len(item_set_dict) == len(hetero_item_set)
+    assert item_set_dict.names == hetero_item_set.names
+    assert item_set_dict._keys == hetero_item_set._keys
+    assert torch.equal(item_set_dict._offsets, hetero_item_set._offsets)
+    assert (
+        repr(item_set_dict)[len("ItemSetDict") :]
+        == repr(hetero_item_set)[len("HeteroItemSet") :]
+    )
+    # Indexing all with a slice.
+    assert torch.equal(item_set_dict[:]["user"], hetero_item_set[:]["user"])
+    assert torch.equal(item_set_dict[:]["item"], hetero_item_set[:]["item"])
+    # Indexing partial with a slice.
+    partial_data = item_set_dict[:3]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], hetero_item_set[:3]["user"])
+    partial_data = item_set_dict[7:]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], hetero_item_set[7:]["item"])
+    partial_data = item_set_dict[3:8:2]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], hetero_item_set[3:8:2]["user"])
+    assert torch.equal(partial_data["item"], hetero_item_set[3:8:2]["item"])
+    # Indexing with an iterable of int.
+    partial_data = item_set_dict[torch.tensor([1, 0, 4])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], hetero_item_set[1, 0, 4]["user"])
+    partial_data = item_set_dict[torch.tensor([9, 8, 5])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], hetero_item_set[9, 8, 5]["item"])
+    partial_data = item_set_dict[torch.tensor([8, 1, 0, 9, 7, 5])]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], hetero_item_set[1, 0]["user"])
+    assert torch.equal(
+        partial_data["item"], hetero_item_set[8, 9, 7, 5]["item"]
+    )
