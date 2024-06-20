@@ -30,22 +30,46 @@ class GPUGraphCache(object):
             filled by quering another source with missing_keys.
         """
         self.total_queries += keys.shape[0]
-        values, missing_index, missing_keys = self._cache.query(keys)
-        self.total_miss += missing_keys.shape[0]
-        return values, missing_index, missing_keys
+        (
+            indptr,
+            edge_tensors,
+            selected_index,
+            missing_index,
+            missing_position,
+            num_cache_enter,
+        ) = self._cache.query(keys)
+        self.total_miss += missing_index.shape[0]
 
-    def replace(self, keys, values):
-        """Inserts key-value pairs into the GPU cache using the Least-Recently
-        Used (LRU) algorithm to remove old key-value pairs if it is full.
+        def replace_functional(missing_indptr, missing_edge_tensors):
+            if num_cache_enter > 0:
+                self._cache.replace(
+                    keys,
+                    missing_index,
+                    missing_position,
+                    num_cache_enter,
+                    missing_indptr,
+                    missing_edge_tensors,
+                )
 
-        Parameters
-        ----------
-        keys: Tensor
-            The keys to insert to the GPU cache.
-        values: Tensor
-            The values to insert to the GPU cache.
-        """
-        self._cache.replace(keys, values)
+        return indptr, edge_tensors, selected_index, replace_functional
+
+    @staticmethod
+    def combine_fetched_graphs(
+        indptr1, edge_tensors1, index1, indptr2, edge_tensors2, index2
+    ):
+        permutation = torch.cat([index1, index2]).sort()[1]
+        assert len(edge_tensors1) == len(edge_tensors2)
+        indptr = torch.cat([indptr1[:-1], indptr2 + indptr1[-1]])
+        edge_tensors = []
+        for e1, e2 in zip(edge_tensors1, edge_tensors2):
+            output_indptr, e = torch.ops.graphbolt.index_select_csc(
+                indptr,
+                torch.cat([e1, e2]),
+                permutation,
+                e1.size(0) + e2.size(0),
+            )
+            edge_tensors.append(e)
+        return output_indptr, edge_tensors
 
     @property
     def miss_rate(self):
