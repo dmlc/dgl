@@ -14,6 +14,13 @@ import torch
     reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
 )
 @pytest.mark.parametrize(
+    "indptr_dtype",
+    [
+        torch.int32,
+        torch.int64,
+    ],
+)
+@pytest.mark.parametrize(
     "dtype",
     [
         torch.bool,
@@ -28,76 +35,47 @@ import torch
         torch.float64,
     ],
 )
-@pytest.mark.parametrize("cache_size_a", [1, 1024])
-@pytest.mark.parametrize("cache_size_b", [1, 1024])
-def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
-    a = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype, pin_memory=True)
-    b = torch.tensor(
-        [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype, pin_memory=True
+@pytest.mark.parametrize("cache_size", [4, 9, 11])
+def test_gpu_cached_feature(indptr_dtype, dtype, cache_size):
+    indices_dtype = torch.int32
+    indptr = torch.tensor([0, 3, 6, 10], dtype=indptr_dtype, pin_memory=True)
+    indices = torch.arange(0, indptr[-1], dtype=indices_dtype, pin_memory=True)
+    probs_or_mask = indices.to(dtype).pin_memory()
+    edge_tensors = [indices, probs_or_mask]
+
+    g = gb.GPUGraphCache(
+        indptr.size(0) - 1,
+        cache_size,
+        2,
+        indptr.dtype,
+        [e.dtype for e in edge_tensors],
     )
 
-    cache_size_a *= a[:1].element_size() * a[:1].numel()
-    cache_size_b *= b[:1].element_size() * b[:1].numel()
+    for i in range(10):
+        keys = (
+            torch.arange(2, dtype=indices_dtype, device=F.ctx()) + i * 2
+        ) % (indptr.size(0) - 1)
+        missing_keys, replace = g.query(keys)
+        missing_edge_tensors = []
+        for e in edge_tensors:
+            missing_indptr, missing_e = torch.ops.graphbolt.index_select_csc(
+                indptr, e, missing_keys, None
+            )
+            missing_edge_tensors.append(missing_e)
 
-    feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), cache_size_a)
-    feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), cache_size_b)
+        output_indptr, output_edge_tensors = replace(
+            missing_indptr, missing_edge_tensors
+        )
 
-    # Test read the entire feature.
-    assert torch.equal(feat_store_a.read(), a.to("cuda"))
-    assert torch.equal(feat_store_b.read(), b.to("cuda"))
+        reference_edge_tensors = []
+        for e in edge_tensors:
+            (
+                reference_indptr,
+                reference_e,
+            ) = torch.ops.graphbolt.index_select_csc(indptr, e, keys, None)
+            reference_edge_tensors.append(reference_e)
 
-    # Test read with ids.
-    assert torch.equal(
-        feat_store_a.read(torch.tensor([0]).to("cuda")),
-        torch.tensor([[1, 2, 3]], dtype=dtype).to("cuda"),
-    )
-    assert torch.equal(
-        feat_store_b.read(torch.tensor([1, 1]).to("cuda")),
-        torch.tensor([[[4, 5], [6, 7]], [[4, 5], [6, 7]]], dtype=dtype).to(
-            "cuda"
-        ),
-    )
-    assert torch.equal(
-        feat_store_a.read(torch.tensor([1, 1]).to("cuda")),
-        torch.tensor([[4, 5, 6], [4, 5, 6]], dtype=dtype).to("cuda"),
-    )
-    assert torch.equal(
-        feat_store_b.read(torch.tensor([0]).to("cuda")),
-        torch.tensor([[[1, 2], [3, 4]]], dtype=dtype).to("cuda"),
-    )
-    # The cache should be full now for the large cache sizes, %100 hit expected.
-    if cache_size_a >= 1024:
-        total_miss = feat_store_a._feature.total_miss
-        feat_store_a.read(torch.tensor([0, 1]).to("cuda"))
-        assert total_miss == feat_store_a._feature.total_miss
-    if cache_size_b >= 1024:
-        total_miss = feat_store_b._feature.total_miss
-        feat_store_b.read(torch.tensor([0, 1]).to("cuda"))
-        assert total_miss == feat_store_b._feature.total_miss
-
-    # Test get the size of the entire feature with ids.
-    assert feat_store_a.size() == torch.Size([3])
-    assert feat_store_b.size() == torch.Size([2, 2])
-
-    # Test update the entire feature.
-    feat_store_a.update(
-        torch.tensor([[0, 1, 2], [3, 5, 2]], dtype=dtype).to("cuda")
-    )
-    assert torch.equal(
-        feat_store_a.read(),
-        torch.tensor([[0, 1, 2], [3, 5, 2]], dtype=dtype).to("cuda"),
-    )
-
-    # Test update with ids.
-    feat_store_a.update(
-        torch.tensor([[2, 0, 1]], dtype=dtype).to("cuda"),
-        torch.tensor([0]).to("cuda"),
-    )
-    assert torch.equal(
-        feat_store_a.read(),
-        torch.tensor([[2, 0, 1], [3, 5, 2]], dtype=dtype).to("cuda"),
-    )
-
-    # Test with different dimensionality
-    feat_store_a.update(b)
-    assert torch.equal(feat_store_a.read(), b.to("cuda"))
+        assert torch.equal(output_indptr, reference_indptr)
+        assert len(output_edge_tensors) == len(reference_edge_tensors)
+        for e, ref in zip(output_edge_tensors, reference_edge_tensors):
+            assert torch.equal(e, ref)

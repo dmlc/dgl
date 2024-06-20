@@ -19,8 +19,9 @@
  */
 #include <graphbolt/cuda_ops.h>
 #include <thrust/gather.h>
+#include <thrust/transform.h>
 
-#include <cub/device/device_partition.cuh>
+#include <cub/cub.cuh>
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
 #include <numeric>
@@ -97,7 +98,7 @@ __global__ void _QueryAndIncrement(
 constexpr int BLOCK_SIZE = 512;
 }  // namespace
 
-static c10::intrusive_ptr<GpuGraphCache> Create(
+c10::intrusive_ptr<GpuGraphCache> GpuGraphCache::Create(
     const int64_t num_nodes, const int64_t num_edges, const int64_t threshold,
     torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes) {
   return c10::make_intrusive<GpuGraphCache>(
@@ -145,15 +146,14 @@ std::tuple<
     torch::Tensor, std::vector<torch::Tensor>, torch::Tensor, torch::Tensor,
     torch::Tensor, int64_t>
 GpuGraphCache::Query(torch::Tensor seeds) {
+  auto allocator = cuda::GetAllocator();
   auto index_dtype = cached_edge_tensors_.at(0).scalar_type();
+  const dim3 block(BLOCK_SIZE);
+  const dim3 grid((seeds.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE);
   return AT_DISPATCH_INDEX_TYPES(
       index_dtype, "GpuGraphCache::Query", ([&] {
-        auto allocator = cuda::GetAllocator();
-        const dim3 block(BLOCK_SIZE);
-        const dim3 grid((seeds.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE);
-        auto positions = torch::empty(
-            seeds.size(0),
-            seeds.options().dtype(index_dtype));  // same as index_t
+        auto positions =
+            torch::empty(seeds.size(0), seeds.options().dtype(index_dtype));
         CUDA_KERNEL_CALL(
             _QueryAndIncrement, grid, block, 0,
             static_cast<int64_t>(seeds.size(0)),
@@ -161,6 +161,17 @@ GpuGraphCache::Query(torch::Tensor seeds) {
             positions.data_ptr<index_t>(),
             reinterpret_cast<map_t<index_t>*>(map_)->ref(
                 cuco::insert_and_find));
+        auto num_cache_enter = allocator.AllocateStorage<int64_t>(1);
+        const auto threshold = -threshold_;
+        auto is_threshold = thrust::make_transform_iterator(
+            positions.data_ptr<index_t>(),
+            [=] __host__ __device__(index_t x) -> int64_t {
+              return x == threshold;
+            });
+        CUB_CALL(
+            DeviceReduce::Sum, is_threshold, num_cache_enter.get(),
+            positions.size(0));
+        CopyScalar num_cache_enter_cpu{num_cache_enter.get()};
         thrust::counting_iterator<index_t> iota{0};
         auto position_and_index =
             thrust::make_zip_iterator(positions.data_ptr<index_t>(), iota);
@@ -172,16 +183,6 @@ GpuGraphCache::Query(torch::Tensor seeds) {
             output_positions.data_ptr<index_t>(),
             output_indices.data_ptr<index_t>());
         auto num_cache_hit = allocator.AllocateStorage<index_t>(1);
-        auto num_cache_enter = allocator.AllocateStorage<int64_t>(1);
-        auto is_threshold = thrust::make_transform_iterator(
-            positions.data_ptr<index_t>(),
-            [=] __host__ __device__(index_t x) -> int64_t {
-              return x == -threshold_;
-            });
-        CUB_CALL(
-            DeviceReduce::Sum, is_threshold, num_cache_enter.get(),
-            seeds.size(0));
-        CopyScalar num_cache_enter_cpu{num_cache_enter.get()};
         CUB_CALL(
             DevicePartition::If, position_and_index, output_position_and_index,
             num_cache_hit.get(), seeds.size(0),
@@ -223,14 +224,15 @@ void GpuGraphCache::Replace(
   TORCH_CHECK(
       edge_tensors.size() == cached_edge_tensors_.size(),
       "Same number of tensors need to be passed!");
+  auto allocator = cuda::GetAllocator();
   auto index_dtype = cached_edge_tensors_.at(0).scalar_type();
   AT_DISPATCH_INDEX_TYPES(
       index_dtype, "GpuGraphCache::Replace", ([&] {
-        auto allocator = cuda::GetAllocator();
         thrust::counting_iterator<index_t> iota{0};
+        auto threshold = -threshold_;
         auto is_threshold = thrust::make_transform_iterator(
             missing_positions.data_ptr<index_t>(),
-            [=] __host__ __device__(index_t x) { return x == -threshold_; });
+            [=] __host__ __device__(index_t x) { return x == threshold; });
         auto output_indices =
             torch::empty(num_entering, seeds.options().dtype(index_dtype));
         auto num_cache_entering = allocator.AllocateStorage<index_t>(1);
@@ -242,7 +244,7 @@ void GpuGraphCache::Replace(
         auto [in_degree, sliced_indptr] =
             ops::SliceCSCIndptr(indptr, output_indices);
         torch::optional<int64_t> output_size;
-        if (num_nodes_ + num_entering < indptr_.size(0) - 1) {
+        if (num_nodes_ + num_entering < indptr_.size(0)) {
           torch::Tensor sindptr;
           bool enough_space;
           for (size_t i = 0; i < edge_tensors.size(); i++) {
@@ -252,7 +254,7 @@ void GpuGraphCache::Replace(
                 indptr.size(0) - 2, output_size);
             output_size = sindices.size(0);
             enough_space =
-                num_edges_ + *output_size < cached_edge_tensors_.at(i).size(0);
+                num_edges_ + *output_size <= cached_edge_tensors_.at(i).size(0);
             if (enough_space) {
               cached_edge_tensors_.at(i).slice(
                   0, num_edges_, num_edges_ + *output_size) = sindices;
@@ -261,15 +263,14 @@ void GpuGraphCache::Replace(
           if (enough_space) {
             AT_DISPATCH_INDEX_TYPES(
                 sindptr.scalar_type(), "GpuGraphCache::Replace", ([&] {
-                  auto adjusted_indptr = thrust::make_transform_iterator(
-                      sindptr.data_ptr<index_t>(),
-                      [=] __host__ __device__(index_t x) {
-                        return x + num_edges_;
-                      });
-                  CUB_CALL(
-                      DeviceScan::ExclusiveSum, adjusted_indptr + 1,
+                  auto num_edges = num_edges_;
+                  THRUST_CALL(
+                      transform, sindptr.data_ptr<index_t>() + 1,
+                      sindptr.data_ptr<index_t>() + sindptr.size(0),
                       indptr_.data_ptr<index_t>() + num_nodes_ + 1,
-                      num_entering);
+                      [=] __host__ __device__(index_t x) {
+                        return x + num_edges;
+                      });
                 }));
             const dim3 block(BLOCK_SIZE);
             const dim3 grid((num_entering + BLOCK_SIZE - 1) / BLOCK_SIZE);
