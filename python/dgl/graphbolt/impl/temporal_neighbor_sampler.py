@@ -1,4 +1,5 @@
 """Temporal neighbor subgraph samplers for GraphBolt."""
+
 import torch
 from torch.utils.data import functional_datapipe
 
@@ -59,6 +60,9 @@ class TemporalNeighborSampler(SubgraphSampler):
         The name of an edge attribute used as the timestamps of edges.
         It must be a 1D integer tensor, with the number of elements
         equalling the total number of edges.
+    time_window: int, optional
+        A duration before a seed timestamp, within which target nodes will be
+        filtered.
 
     Examples
     -------
@@ -74,6 +78,7 @@ class TemporalNeighborSampler(SubgraphSampler):
         prob_name=None,
         node_timestamp_attr_name=None,
         edge_timestamp_attr_name=None,
+        time_window=None,
     ):
         super().__init__(datapipe)
         self.graph = graph
@@ -87,6 +92,7 @@ class TemporalNeighborSampler(SubgraphSampler):
         self.prob_name = prob_name
         self.node_timestamp_attr_name = node_timestamp_attr_name
         self.edge_timestamp_attr_name = edge_timestamp_attr_name
+        self.time_window = time_window
         self.sampler = graph.temporal_sample_neighbors
 
     def sample_subgraphs(self, seeds, seeds_timestamp):
@@ -122,6 +128,7 @@ class TemporalNeighborSampler(SubgraphSampler):
                 self.prob_name,
                 self.node_timestamp_attr_name,
                 self.edge_timestamp_attr_name,
+                self.time_window,
             )
             (
                 original_row_node_ids,
