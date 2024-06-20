@@ -12,3 +12,4 @@ if F.get_preferred_backend() == "pytorch":
     from .spot_target import *
     from .dataloader import *
     from .dist_dataloader import *
+    from .degree_balanced import *
