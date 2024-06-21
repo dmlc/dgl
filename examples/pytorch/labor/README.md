@@ -7,7 +7,7 @@ paper with the GraphSAGE GNN model. The model can be changed to any other model 
 NeighborSampler can be used.
 
 A more modern and performant version is provided in the
-`examples/sampling/graphbolt/labor` folder.
+`examples/sampling/graphbolt/pyg/labor` folder.
 
 Requirements
 ------------
