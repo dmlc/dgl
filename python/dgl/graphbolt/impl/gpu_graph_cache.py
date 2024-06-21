@@ -22,14 +22,15 @@ class GPUGraphCache(object):
         Parameters
         ----------
         keys : Tensor
-            The keys to query the GPU cache with.
+            The keys to query the GPU graph cache with.
 
         Returns
         -------
-        tuple(Tensor, Tensor, Tensor)
-            A tuple containing (indptr, missing_indices, missing_keys) where
-            values[missing_indices] corresponds to cache misses that should be
-            filled by quering another source with missing_keys.
+        tuple(Tensor, func)
+            A tuple containing (missing_keys, replace_fn) where replace_fn is a
+            function that should be called with the graph structure
+            corresponding to the missing keys. Its arguments are
+            (Tensor, list(Tensor)).
         """
         self.total_queries += keys.shape[0]
         (
@@ -67,16 +68,19 @@ class GPUGraphCache(object):
     def combine_fetched_graphs(
         indptr1, edge_tensors1, index1, indptr2, edge_tensors2, index2
     ):
+        """Combines the graph structure found in the cache and the fetched graph
+        structure from an outside source into a single graph structure.
+        """
         permutation = torch.cat([index1, index2]).sort()[1]
         assert len(edge_tensors1) == len(edge_tensors2)
         indptr = torch.cat([indptr1[:-1], indptr2 + indptr1[-1]])
         edge_tensors = []
-        for e1, e2 in zip(edge_tensors1, edge_tensors2):
+        for a, b in zip(edge_tensors1, edge_tensors2):
             output_indptr, e = torch.ops.graphbolt.index_select_csc(
                 indptr,
-                torch.cat([e1, e2]),
+                torch.cat([a, b]),
                 permutation,
-                e1.size(0) + e2.size(0),
+                a.size(0) + b.size(0),
             )
             edge_tensors.append(e)
         return output_indptr, edge_tensors
