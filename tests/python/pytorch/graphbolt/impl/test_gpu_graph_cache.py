@@ -44,7 +44,6 @@ def test_gpu_cached_feature(indptr_dtype, dtype, cache_size):
     edge_tensors = [indices, probs_or_mask]
 
     g = gb.GPUGraphCache(
-        indptr.size(0) - 1,
         cache_size,
         2,
         indptr.dtype,

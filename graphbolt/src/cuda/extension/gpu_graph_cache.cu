@@ -99,15 +99,16 @@ constexpr int BLOCK_SIZE = 512;
 }  // namespace
 
 c10::intrusive_ptr<GpuGraphCache> GpuGraphCache::Create(
-    const int64_t num_nodes, const int64_t num_edges, const int64_t threshold,
+    const int64_t num_edges, const int64_t threshold,
     torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes) {
   return c10::make_intrusive<GpuGraphCache>(
-      num_nodes, num_edges, threshold, indptr_dtype, dtypes);
+      num_edges, threshold, indptr_dtype, dtypes);
 }
 
 GpuGraphCache::GpuGraphCache(
-    const int64_t num_nodes, const int64_t num_edges, const int64_t threshold,
+    const int64_t num_edges, const int64_t threshold,
     torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes) {
+  const int64_t num_nodes = 1024;
   AT_DISPATCH_INDEX_TYPES(
       dtypes.at(0), "GpuGraphCache::GpuGraphCache", ([&] {
         auto map_temp = map_t<index_t>{
@@ -127,6 +128,8 @@ GpuGraphCache::GpuGraphCache(
   const auto options = torch::TensorOptions().device(c10::DeviceType::CUDA);
   threshold_ = threshold;
   device_id_ = cuda::GetCurrentStream().device_index();
+  map_size_ = 0;
+  map_capacity_ = num_nodes;
   num_nodes_ = 0;
   num_edges_ = 0;
   indptr_ = torch::zeros(num_nodes + 1, options.dtype(indptr_dtype));
@@ -142,6 +145,15 @@ GpuGraphCache::~GpuGraphCache() {
       ([&] { delete reinterpret_cast<map_t<index_t>*>(map_); }));
 }
 
+struct AddTuple {
+  template <typename T>
+  __host__ __device__ auto operator()(const T& a, const T& b) const {
+    return thrust::make_tuple(
+        thrust::get<0>(a) + thrust::get<0>(b),
+        thrust::get<1>(a) + thrust::get<1>(b));
+  }
+};
+
 std::tuple<
     torch::Tensor, std::vector<torch::Tensor>, torch::Tensor, torch::Tensor,
     torch::Tensor, int64_t>
@@ -152,6 +164,11 @@ GpuGraphCache::Query(torch::Tensor seeds) {
   const dim3 grid((seeds.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE);
   return AT_DISPATCH_INDEX_TYPES(
       index_dtype, "GpuGraphCache::Query", ([&] {
+        while ((map_size_ + seeds.size(0) >= map_capacity_)) {
+          map_capacity_ *= growth_factor;
+          reinterpret_cast<map_t<index_t>*>(map_)->rehash_async(
+              map_capacity_, cuco::cuda_stream_ref{cuda::GetCurrentStream()});
+        }
         auto positions =
             torch::empty(seeds.size(0), seeds.options().dtype(index_dtype));
         CUDA_KERNEL_CALL(
@@ -161,17 +178,25 @@ GpuGraphCache::Query(torch::Tensor seeds) {
             positions.data_ptr<index_t>(),
             reinterpret_cast<map_t<index_t>*>(map_)->ref(
                 cuco::insert_and_find));
-        auto num_cache_enter = allocator.AllocateStorage<int64_t>(1);
+        auto num_cache_enter =
+            allocator.AllocateStorage<thrust::tuple<int64_t, int64_t>>(1);
         const auto threshold = -threshold_;
         auto is_threshold = thrust::make_transform_iterator(
-            positions.data_ptr<index_t>(),
-            [=] __host__ __device__(index_t x) -> int64_t {
-              return x == threshold;
+            positions.data_ptr<index_t>(), [=] __host__ __device__(index_t x) {
+              int64_t is_threshold = x == threshold;
+              int64_t is_new = x == -1;
+              return thrust::make_tuple(is_threshold, is_new);
             });
         CUB_CALL(
-            DeviceReduce::Sum, is_threshold, num_cache_enter.get(),
-            positions.size(0));
-        CopyScalar num_cache_enter_cpu{num_cache_enter.get()};
+            DeviceReduce::Reduce, is_threshold, num_cache_enter.get(),
+            positions.size(0), AddTuple{}, thrust::tuple<int64_t, int64_t>{});
+        auto num_cache_enter_cpu = torch::empty(
+            2, c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
+        auto num_cache_enter_cpu_ptr = num_cache_enter_cpu.data_ptr<int64_t>();
+        THRUST_CALL(
+            copy, num_cache_enter.get(), num_cache_enter.get() + 1,
+            reinterpret_cast<thrust::tuple<int64_t, int64_t>*>(
+                num_cache_enter_cpu_ptr));
         thrust::counting_iterator<index_t> iota{0};
         auto position_and_index =
             thrust::make_zip_iterator(positions.data_ptr<index_t>(), iota);
@@ -211,13 +236,14 @@ GpuGraphCache::Query(torch::Tensor seeds) {
           edge_tensors.push_back(indices);
           indptr = tindptr;
         }
+        map_size_ += num_cache_enter_cpu_ptr[1];
         return std::make_tuple(
             indptr, edge_tensors, selected_indices, missing_indices,
-            missing_positions, static_cast<int64_t>(num_cache_enter_cpu));
+            missing_positions, num_cache_enter_cpu_ptr[0]);
       }));
 }
 
-void GpuGraphCache::Replace(
+int64_t GpuGraphCache::Replace(
     torch::Tensor seeds, torch::Tensor missing_indices,
     torch::Tensor missing_positions, int64_t num_entering, torch::Tensor indptr,
     std::vector<torch::Tensor> edge_tensors) {
@@ -226,7 +252,7 @@ void GpuGraphCache::Replace(
       "Same number of tensors need to be passed!");
   auto allocator = cuda::GetAllocator();
   auto index_dtype = cached_edge_tensors_.at(0).scalar_type();
-  AT_DISPATCH_INDEX_TYPES(
+  return AT_DISPATCH_INDEX_TYPES(
       index_dtype, "GpuGraphCache::Replace", ([&] {
         thrust::counting_iterator<index_t> iota{0};
         auto threshold = -threshold_;
@@ -240,50 +266,54 @@ void GpuGraphCache::Replace(
             DeviceSelect::Flagged, iota, is_threshold,
             output_indices.data_ptr<index_t>(), num_cache_entering.get(),
             seeds.size(0));
-        torch::Tensor sindptr, sindices;
         auto [in_degree, sliced_indptr] =
             ops::SliceCSCIndptr(indptr, output_indices);
         torch::optional<int64_t> output_size;
-        if (num_nodes_ + num_entering < indptr_.size(0)) {
-          torch::Tensor sindptr;
-          bool enough_space;
-          for (size_t i = 0; i < edge_tensors.size(); i++) {
-            torch::Tensor sindices;
-            std::tie(sindptr, sindices) = ops::IndexSelectCSCImpl(
-                in_degree, sliced_indptr, edge_tensors[i], output_indices,
-                indptr.size(0) - 2, output_size);
-            output_size = sindices.size(0);
-            enough_space =
-                num_edges_ + *output_size <= cached_edge_tensors_.at(i).size(0);
-            if (enough_space) {
-              cached_edge_tensors_.at(i).slice(
-                  0, num_edges_, num_edges_ + *output_size) = sindices;
-            }
-          }
+        while (num_nodes_ + num_entering >= indptr_.size(0)) {
+          auto new_indptr =
+              torch::empty(indptr_.size(0) * growth_factor, indptr_.options());
+          new_indptr.slice(0, 0, indptr_.size(0)) = indptr_;
+          indptr_ = new_indptr;
+        }
+        torch::Tensor sindptr;
+        bool enough_space;
+        for (size_t i = 0; i < edge_tensors.size(); i++) {
+          torch::Tensor sindices;
+          std::tie(sindptr, sindices) = ops::IndexSelectCSCImpl(
+              in_degree, sliced_indptr, edge_tensors[i], output_indices,
+              indptr.size(0) - 2, output_size);
+          output_size = sindices.size(0);
+          enough_space =
+              num_edges_ + *output_size <= cached_edge_tensors_.at(0).size(0);
           if (enough_space) {
-            AT_DISPATCH_INDEX_TYPES(
-                sindptr.scalar_type(), "GpuGraphCache::Replace", ([&] {
-                  auto num_edges = num_edges_;
-                  THRUST_CALL(
-                      transform, sindptr.data_ptr<index_t>() + 1,
-                      sindptr.data_ptr<index_t>() + sindptr.size(0),
-                      indptr_.data_ptr<index_t>() + num_nodes_ + 1,
-                      [=] __host__ __device__(index_t x) {
-                        return x + num_edges;
-                      });
-                }));
-            const dim3 block(BLOCK_SIZE);
-            const dim3 grid((num_entering + BLOCK_SIZE - 1) / BLOCK_SIZE);
-            CUDA_KERNEL_CALL(
-                _Insert, grid, block, 0, output_indices.size(0),
-                static_cast<index_t>(num_nodes_), seeds.data_ptr<index_t>(),
-                missing_indices.data_ptr<index_t>(),
-                output_indices.data_ptr<index_t>(),
-                reinterpret_cast<map_t<index_t>*>(map_)->ref(cuco::find));
-            num_edges_ += *output_size;
-            num_nodes_ += num_entering;
+            cached_edge_tensors_.at(i).slice(
+                0, num_edges_, num_edges_ + *output_size) = sindices;
           }
         }
+        if (enough_space) {
+          AT_DISPATCH_INDEX_TYPES(
+              sindptr.scalar_type(), "GpuGraphCache::Replace", ([&] {
+                auto num_edges = num_edges_;
+                THRUST_CALL(
+                    transform, sindptr.data_ptr<index_t>() + 1,
+                    sindptr.data_ptr<index_t>() + sindptr.size(0),
+                    indptr_.data_ptr<index_t>() + num_nodes_ + 1,
+                    [=] __host__ __device__(index_t x) {
+                      return x + num_edges;
+                    });
+              }));
+          const dim3 block(BLOCK_SIZE);
+          const dim3 grid((num_entering + BLOCK_SIZE - 1) / BLOCK_SIZE);
+          CUDA_KERNEL_CALL(
+              _Insert, grid, block, 0, output_indices.size(0),
+              static_cast<index_t>(num_nodes_), seeds.data_ptr<index_t>(),
+              missing_indices.data_ptr<index_t>(),
+              output_indices.data_ptr<index_t>(),
+              reinterpret_cast<map_t<index_t>*>(map_)->ref(cuco::find));
+          num_edges_ += *output_size;
+          num_nodes_ += num_entering;
+        }
+        return enough_space ? *output_size : 0;
       }));
 }
 

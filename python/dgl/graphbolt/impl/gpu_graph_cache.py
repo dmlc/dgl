@@ -5,13 +5,13 @@ import torch
 class GPUGraphCache(object):
     """High-level wrapper for GPU graph cache"""
 
-    def __init__(self, num_nodes, num_edges, threshold, indptr_dtype, dtypes):
+    def __init__(self, num_edges, threshold, indptr_dtype, dtypes):
         major, _ = torch.cuda.get_device_capability()
         assert (
             major >= 7
         ), "GPUCache is supported only on CUDA compute capability >= 70 (Volta)."
         self._cache = torch.ops.graphbolt.gpu_graph_cache(
-            num_nodes, num_edges, threshold, indptr_dtype, dtypes
+            num_edges, threshold, indptr_dtype, dtypes
         )
         self.total_miss = 0
         self.total_queries = 0

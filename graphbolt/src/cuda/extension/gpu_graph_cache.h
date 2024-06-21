@@ -32,6 +32,7 @@ namespace cuda {
 
 class GpuGraphCache : public torch::CustomClassHolder {
   static constexpr double load_factor = 0.8;
+  static constexpr int growth_factor = 2;
 
  public:
   /**
@@ -42,7 +43,7 @@ class GpuGraphCache : public torch::CustomClassHolder {
    * @param dtype The node id datatype.
    */
   GpuGraphCache(
-      const int64_t num_nodes, const int64_t num_edges, const int64_t threshold,
+      const int64_t num_edges, const int64_t threshold,
       torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes);
 
   GpuGraphCache() = default;
@@ -54,19 +55,21 @@ class GpuGraphCache : public torch::CustomClassHolder {
       torch::Tensor, int64_t>
   Query(torch::Tensor seeds);
 
-  void Replace(
+  int64_t Replace(
       torch::Tensor seeds, torch::Tensor missing_indices,
       torch::Tensor missing_positions, int64_t num_entering,
       torch::Tensor indptr, std::vector<torch::Tensor> edge_tensors);
 
   static c10::intrusive_ptr<GpuGraphCache> Create(
-      const int64_t num_nodes, const int64_t num_edges, const int64_t threshold,
+      const int64_t num_edges, const int64_t threshold,
       torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes);
 
  private:
   void* map_;
   int64_t threshold_;
   torch::DeviceIndex device_id_;
+  int64_t map_size_;
+  int64_t map_capacity_;
   int64_t num_nodes_;
   int64_t num_edges_;
   torch::Tensor indptr_;
