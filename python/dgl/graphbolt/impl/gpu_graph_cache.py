@@ -9,7 +9,7 @@ class GPUGraphCache(object):
         major, _ = torch.cuda.get_device_capability()
         assert (
             major >= 7
-        ), "GPUCache is supported only on CUDA compute capability >= 70 (Volta)."
+        ), "GPUGraphCache is supported only on CUDA compute capability >= 70 (Volta)."
         self._cache = torch.ops.graphbolt.gpu_graph_cache(
             num_edges, threshold, indptr_dtype, dtypes
         )
