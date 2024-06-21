@@ -144,7 +144,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         # Heterogenous
         else:
             num_nodes_per_type = {
-                _type: (offset[_idx + 1] - offset[_idx])
+                _type: offset[_idx + 1] - offset[_idx]
                 for _type, _idx in self.node_type_to_id.items()
             }
 
@@ -415,6 +415,60 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ) -> None:
         """Sets the edge attributes dictionary."""
         self._c_csc_graph.set_edge_attributes(edge_attributes)
+
+    def node_attribute(self, name: str) -> Optional[torch.Tensor]:
+        """Returns the node attribute tensor by name.
+
+        Parameters
+        ----------
+        name: str
+            The name of the node attribute.
+
+        Returns
+        -------
+        torch.Tensor or None
+            If present, returns the node attribute tensor.
+        """
+        return self._c_csc_graph.node_attribute(name)
+
+    def add_node_attribute(self, name: str, tensor: torch.Tensor) -> None:
+        """Adds node attribute tensor by name.
+
+        Parameters
+        ----------
+        name: str
+            The name of the node attribute.
+        tensor: torch.Tensor
+            The node attribute tensor.
+        """
+        self._c_csc_graph.add_node_attribute(name, tensor)
+
+    def edge_attribute(self, name: str) -> Optional[torch.Tensor]:
+        """Returns the edge attribute tensor by name.
+
+        Parameters
+        ----------
+        name: str
+            The name of the edge attribute.
+
+        Returns
+        -------
+        torch.Tensor or None
+            If present, returns the edge attribute tensor.
+        """
+        return self._c_csc_graph.edge_attribute(name)
+
+    def add_edge_attribute(self, name: str, tensor: torch.Tensor) -> None:
+        """Adds edge attribute tensor by name.
+
+        Parameters
+        ----------
+        name: str
+            The name of the edge attribute.
+        tensor: torch.Tensor
+            The edge attribute tensor.
+        """
+        self._c_csc_graph.add_edge_attribute(name, tensor)
 
     def in_subgraph(
         self,
@@ -694,19 +748,20 @@ class FusedCSCSamplingGraph(SamplingGraph):
             seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
         elif seeds is None:
             seed_offsets = self._indptr_node_type_offset_list
+        probs_or_mask = self.edge_attributes[probs_name] if probs_name else None
         C_sampled_subgraph = self._sample_neighbors(
             seeds,
             seed_offsets,
             fanouts,
             replace=replace,
-            probs_name=probs_name,
+            probs_or_mask=probs_or_mask,
             return_eids=return_eids,
         )
         return self._convert_to_sampled_subgraph(
             C_sampled_subgraph, seed_offsets
         )
 
-    def _check_sampler_arguments(self, nodes, fanouts, probs_name):
+    def _check_sampler_arguments(self, nodes, fanouts, probs_or_mask):
         if nodes is not None:
             assert nodes.dim() == 1, "Nodes should be 1-D tensor."
             assert nodes.dtype == self.indices.dtype, (
@@ -731,11 +786,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
-        if probs_name:
-            assert (
-                probs_name in self.edge_attributes
-            ), f"Unknown edge attribute '{probs_name}'."
-            probs_or_mask = self.edge_attributes[probs_name]
+        if probs_or_mask is not None:
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
                 probs_or_mask.size(0) == self.total_num_edges
@@ -755,7 +806,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         seed_offsets: Optional[list],
         fanouts: torch.Tensor,
         replace: bool = False,
-        probs_name: Optional[str] = None,
+        probs_or_mask: Optional[torch.Tensor] = None,
         return_eids: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
@@ -789,8 +840,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
-        probs_name: str, optional
-            An optional string specifying the name of an edge attribute. This
+        probs_or_mask: torch.Tensor, optional
+            An optional tensor of edge attribute for probability or masks. This
             attribute tensor should contain (unnormalized) probabilities
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
@@ -805,7 +856,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             The sampled C subgraph.
         """
         # Ensure nodes is 1-D tensor.
-        self._check_sampler_arguments(seeds, fanouts, probs_name)
+        self._check_sampler_arguments(seeds, fanouts, probs_or_mask)
         return self._c_csc_graph.sample_neighbors(
             seeds,
             seed_offsets,
@@ -813,7 +864,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             replace,
             False,  # is_labor
             return_eids,
-            probs_name,
+            probs_or_mask,
             None,  # random_seed, labor parameter
             0,  # seed2_contribution, labor_parameter
         )
@@ -943,7 +994,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
         elif seeds is None:
             seed_offsets = self._indptr_node_type_offset_list
-        self._check_sampler_arguments(seeds, fanouts, probs_name)
+        probs_or_mask = self.edge_attributes[probs_name] if probs_name else None
+        self._check_sampler_arguments(seeds, fanouts, probs_or_mask)
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
             seeds,
             seed_offsets,
@@ -951,7 +1003,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             replace,
             True,
             has_original_eids,
-            probs_name,
+            probs_or_mask,
             random_seed,
             seed2_contribution,
         )
@@ -1025,7 +1077,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             )
 
         # Ensure nodes is 1-D tensor.
-        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        probs_or_mask = self.edge_attributes[probs_name] if probs_name else None
+        self._check_sampler_arguments(nodes, fanouts, probs_or_mask)
         has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
@@ -1037,7 +1090,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             replace,
             False,
             has_original_eids,
-            probs_name,
+            probs_or_mask,
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
         )

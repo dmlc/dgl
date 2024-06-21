@@ -158,7 +158,7 @@ def is_authorized(name) {
     'frozenbugs', 'peizhou001', 'zheng-da', 'czkkkkkk', 'thvasilo',
     // Intern:
     'keli-wen', 'caojy1998', 'RamonZhou', 'xiangyuzhi', 'Skeleton003', 'yxy235',
-    'hutiechuan', 'pyynb',
+    'hutiechuan', 'pyynb', 'az15240', 
     // Friends:
     'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
     'TristonC', 'mfbalin',
@@ -575,7 +575,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v240511_1440"
-                  args "-u root --shm-size=4gb"
+                  args "-u root --shm-size=8gb"
                   alwaysPull true
                 }
               }
