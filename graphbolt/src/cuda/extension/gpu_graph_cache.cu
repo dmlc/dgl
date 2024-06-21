@@ -288,7 +288,8 @@ int64_t GpuGraphCache::Replace(
           if (enough_space) {
             cached_edge_tensors_.at(i).slice(
                 0, num_edges_, num_edges_ + *output_size) = sindices;
-          }
+          } else
+            break;
         }
         if (enough_space) {
           AT_DISPATCH_INDEX_TYPES(
