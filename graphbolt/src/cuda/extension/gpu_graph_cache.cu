@@ -129,7 +129,6 @@ GpuGraphCache::GpuGraphCache(
   threshold_ = threshold;
   device_id_ = cuda::GetCurrentStream().device_index();
   map_size_ = 0;
-  map_capacity_ = num_nodes;
   num_nodes_ = 0;
   num_edges_ = 0;
   indptr_ = torch::zeros(num_nodes + 1, options.dtype(indptr_dtype));
@@ -164,10 +163,11 @@ GpuGraphCache::Query(torch::Tensor seeds) {
   const dim3 grid((seeds.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE);
   return AT_DISPATCH_INDEX_TYPES(
       index_dtype, "GpuGraphCache::Query", ([&] {
-        while ((map_size_ + seeds.size(0) >= map_capacity_)) {
-          map_capacity_ *= growth_factor;
-          reinterpret_cast<map_t<index_t>*>(map_)->rehash_async(
-              map_capacity_, cuco::cuda_stream_ref{cuda::GetCurrentStream()});
+        auto map = reinterpret_cast<map_t<index_t>*>(map_);
+        while ((map_size_ + seeds.size(0) >= map->capacity() * load_factor)) {
+          map->rehash_async(
+              map->capacity() * growth_factor,
+              cuco::cuda_stream_ref{cuda::GetCurrentStream()});
         }
         auto positions =
             torch::empty(seeds.size(0), seeds.options().dtype(index_dtype));
@@ -175,9 +175,7 @@ GpuGraphCache::Query(torch::Tensor seeds) {
             _QueryAndIncrement, grid, block, 0,
             static_cast<int64_t>(seeds.size(0)),
             static_cast<index_t>(threshold_), seeds.data_ptr<index_t>(),
-            positions.data_ptr<index_t>(),
-            reinterpret_cast<map_t<index_t>*>(map_)->ref(
-                cuco::insert_and_find));
+            positions.data_ptr<index_t>(), map->ref(cuco::insert_and_find));
         auto num_cache_enter =
             allocator.AllocateStorage<thrust::tuple<int64_t, int64_t>>(1);
         const auto threshold = -threshold_;
@@ -303,14 +301,14 @@ int64_t GpuGraphCache::Replace(
                       return x + num_edges;
                     });
               }));
+          auto map = reinterpret_cast<map_t<index_t>*>(map_);
           const dim3 block(BLOCK_SIZE);
           const dim3 grid((num_entering + BLOCK_SIZE - 1) / BLOCK_SIZE);
           CUDA_KERNEL_CALL(
               _Insert, grid, block, 0, output_indices.size(0),
               static_cast<index_t>(num_nodes_), seeds.data_ptr<index_t>(),
               missing_indices.data_ptr<index_t>(),
-              output_indices.data_ptr<index_t>(),
-              reinterpret_cast<map_t<index_t>*>(map_)->ref(cuco::find));
+              output_indices.data_ptr<index_t>(), map->ref(cuco::find));
           num_edges_ += *output_size;
           num_nodes_ += num_entering;
         }

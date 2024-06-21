@@ -69,7 +69,6 @@ class GpuGraphCache : public torch::CustomClassHolder {
   int64_t threshold_;
   torch::DeviceIndex device_id_;
   int64_t map_size_;
-  int64_t map_capacity_;
   int64_t num_nodes_;
   int64_t num_edges_;
   torch::Tensor indptr_;
