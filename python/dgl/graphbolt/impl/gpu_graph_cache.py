@@ -71,6 +71,8 @@ class GPUGraphCache(object):
         """Combines the graph structure found in the cache and the fetched graph
         structure from an outside source into a single graph structure.
         """
+        if index2.size(0) == 0:
+            return indptr1, edge_tensors1
         permutation = torch.cat([index1, index2]).sort()[1]
         assert len(edge_tensors1) == len(edge_tensors2)
         indptr = torch.cat([indptr1[:-1], indptr2 + indptr1[-1]])
