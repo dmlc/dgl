@@ -176,6 +176,9 @@ GpuGraphCache::Query(torch::Tensor seeds) {
             positions.data_ptr<index_t>(), map->ref(cuco::insert_and_find));
         auto num_cache_enter =
             allocator.AllocateStorage<thrust::tuple<int64_t, int64_t>>(1);
+        // Since threshold_ is a class member, we want the lambda functions
+        // below to only capture this particular variable by reassigning it to a
+        // local variable.
         const auto threshold = -threshold_;
         auto is_threshold = thrust::make_transform_iterator(
             positions.data_ptr<index_t>(), [=] __host__ __device__(index_t x) {
