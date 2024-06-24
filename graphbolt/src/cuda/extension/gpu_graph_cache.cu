@@ -76,7 +76,7 @@ __global__ void _QueryAndIncrement(
     constexpr index_t minusONE = -1;
     auto [slot, is_new_key] = map.insert_and_find(cuco::pair{key, minusONE});
 
-    int64_t position;
+    int64_t position = -1;
 
     if (!is_new_key) {
       auto ref = ::cuda::atomic_ref<index_t, ::cuda::thread_scope_device>{
@@ -85,8 +85,6 @@ __global__ void _QueryAndIncrement(
       if (position < 0) {
         position = ref.fetch_add(-1, ::cuda::memory_order_relaxed) - 1;
       }
-    } else {
-      position = -1;
     }
 
     positions[i] = position;
@@ -95,7 +93,7 @@ __global__ void _QueryAndIncrement(
   }
 }
 
-constexpr int BLOCK_SIZE = 512;
+constexpr int kIntBlockSize = 512;
 }  // namespace
 
 c10::intrusive_ptr<GpuGraphCache> GpuGraphCache::Create(
@@ -159,8 +157,8 @@ std::tuple<
 GpuGraphCache::Query(torch::Tensor seeds) {
   auto allocator = cuda::GetAllocator();
   auto index_dtype = cached_edge_tensors_.at(0).scalar_type();
-  const dim3 block(BLOCK_SIZE);
-  const dim3 grid((seeds.size(0) + BLOCK_SIZE - 1) / BLOCK_SIZE);
+  const dim3 block(kIntBlockSize);
+  const dim3 grid((seeds.size(0) + kIntBlockSize - 1) / kIntBlockSize);
   return AT_DISPATCH_INDEX_TYPES(
       index_dtype, "GpuGraphCache::Query", ([&] {
         auto map = reinterpret_cast<map_t<index_t>*>(map_);
@@ -302,8 +300,8 @@ int64_t GpuGraphCache::Replace(
                     });
               }));
           auto map = reinterpret_cast<map_t<index_t>*>(map_);
-          const dim3 block(BLOCK_SIZE);
-          const dim3 grid((num_entering + BLOCK_SIZE - 1) / BLOCK_SIZE);
+          const dim3 block(kIntBlockSize);
+          const dim3 grid((num_entering + kIntBlockSize - 1) / kIntBlockSize);
           CUDA_KERNEL_CALL(
               _Insert, grid, block, 0, output_indices.size(0),
               static_cast<index_t>(num_nodes_), seeds.data_ptr<index_t>(),
