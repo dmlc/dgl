@@ -3,7 +3,21 @@ import torch
 
 
 class GPUGraphCache(object):
-    """High-level wrapper for GPU graph cache"""
+    r"""High-level wrapper for GPU graph cache.
+
+    Places the GPU graph cache to torch.cuda.current_device().
+
+    Parameters
+    ----------
+    num_edges : int
+        Upperbound on number of edges to cache.
+    threshold : int
+        The number of accesses before the neighborhood of a vertex is cached.
+    indptr_dtype : torch.dtype
+        The dtype of the indptr tensor of the graph.
+    dtypes : list[torch.dtype]
+        The dtypes of the edge tensors that are going to be cached.
+    """
 
     def __init__(self, num_edges, threshold, indptr_dtype, dtypes):
         major, _ = torch.cuda.get_device_capability()
