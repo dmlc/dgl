@@ -111,7 +111,7 @@ GpuGraphCache::GpuGraphCache(
       dtypes.at(0), "GpuGraphCache::GpuGraphCache", ([&] {
         auto map_temp = map_t<index_t>{
             num_nodes,
-            load_factor,
+            kDoubleLoadFactor,
             cuco::empty_key{static_cast<index_t>(-1)},
             cuco::empty_value{std::numeric_limits<index_t>::lowest()},
             {},
@@ -162,9 +162,10 @@ GpuGraphCache::Query(torch::Tensor seeds) {
   return AT_DISPATCH_INDEX_TYPES(
       index_dtype, "GpuGraphCache::Query", ([&] {
         auto map = reinterpret_cast<map_t<index_t>*>(map_);
-        while ((map_size_ + seeds.size(0) >= map->capacity() * load_factor)) {
+        while ((
+            map_size_ + seeds.size(0) >= map->capacity() * kDoubleLoadFactor)) {
           map->rehash_async(
-              map->capacity() * growth_factor,
+              map->capacity() * kIntGrowthFactor,
               cuco::cuda_stream_ref{cuda::GetCurrentStream()});
         }
         auto positions =
@@ -269,8 +270,8 @@ int64_t GpuGraphCache::Replace(
             ops::SliceCSCIndptr(indptr, output_indices);
         torch::optional<int64_t> output_size;
         while (num_nodes_ + num_entering >= indptr_.size(0)) {
-          auto new_indptr =
-              torch::empty(indptr_.size(0) * growth_factor, indptr_.options());
+          auto new_indptr = torch::empty(
+              indptr_.size(0) * kIntGrowthFactor, indptr_.options());
           new_indptr.slice(0, 0, indptr_.size(0)) = indptr_;
           indptr_ = new_indptr;
         }

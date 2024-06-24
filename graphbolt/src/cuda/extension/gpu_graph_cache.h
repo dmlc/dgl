@@ -31,8 +31,10 @@ namespace graphbolt {
 namespace cuda {
 
 class GpuGraphCache : public torch::CustomClassHolder {
-  static constexpr double load_factor = 0.8;
-  static constexpr int growth_factor = 2;
+  // The load factor of the constructed hash table.
+  static constexpr double kDoubleLoadFactor = 0.8;
+  // The growth factor of the hash table and the dynamically sized indptr tensor
+  static constexpr int kIntGrowthFactor = 2;
 
  public:
   /**
