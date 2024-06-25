@@ -1071,9 +1071,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
         input_nodes_pre_time_window: torch.Tensor
-            Time window of the given seed nodes. The neighbors should be
-            filtered within the interval [input_nodes_timestamp -
-            time_window, input_nodes_timestamp].
+            The time window of the nodes represents a period of time before
+            `input_nodes_timestamp`. If provided, only neighbors and related
+            edges whose timestamps fall within `[input_nodes_timestamp -
+            input_nodes_pre_time_window, input_nodes_timestamp]` will be
+            filtered.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities

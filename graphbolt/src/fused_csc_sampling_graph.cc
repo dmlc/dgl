@@ -381,25 +381,26 @@ auto GetTemporalNumPickFn(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::optional<torch::Tensor>& type_per_edge,
-    const torch::optional<torch::Tensor>& seeds_time_window,
+    const torch::optional<torch::Tensor>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
     const torch::optional<torch::Tensor>& edge_timestamp) {
   // If fanouts.size() > 1, returns the total number of all edge types of the
   // given node.
-  return [&seed_timestamp, &csc_indices, &fanouts, replace, &seeds_time_window,
-          &probs_or_mask, &type_per_edge, &node_timestamp, &edge_timestamp](
+  return [&seed_timestamp, &csc_indices, &fanouts, replace,
+          &seed_pre_time_window, &probs_or_mask, &type_per_edge,
+          &node_timestamp, &edge_timestamp](
              int64_t seed_offset, int64_t offset, int64_t num_neighbors) {
     if (fanouts.size() > 1) {
       return TemporalNumPickByEtype(
           seed_timestamp, csc_indices, fanouts, replace, type_per_edge.value(),
-          seeds_time_window, probs_or_mask, node_timestamp, edge_timestamp,
+          seed_pre_time_window, probs_or_mask, node_timestamp, edge_timestamp,
           seed_offset, offset, num_neighbors);
     } else {
       return TemporalNumPick(
-          seed_timestamp, csc_indices, fanouts[0], replace, seeds_time_window,
-          probs_or_mask, node_timestamp, edge_timestamp, seed_offset, offset,
-          num_neighbors);
+          seed_timestamp, csc_indices, fanouts[0], replace,
+          seed_pre_time_window, probs_or_mask, node_timestamp, edge_timestamp,
+          seed_offset, offset, num_neighbors);
     }
   };
 }
@@ -904,7 +905,8 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
     const torch::Tensor& input_nodes,
     const torch::Tensor& input_nodes_timestamp,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids, torch::optional<torch::Tensor> input_nodes_time_window,
+    bool return_eids,
+    torch::optional<torch::Tensor> input_nodes_pre_time_window,
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<std::string> node_timestamp_attr_name,
     torch::optional<std::string> edge_timestamp_attr_name) const {
@@ -932,11 +934,11 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
         input_nodes, seed_offsets, fanouts, return_eids,
         GetTemporalNumPickFn(
             input_nodes_timestamp, this->indices_, fanouts, replace,
-            type_per_edge_, input_nodes_time_window, probs_or_mask,
+            type_per_edge_, input_nodes_pre_time_window, probs_or_mask,
             node_timestamp, edge_timestamp),
         GetTemporalPickFn(
             input_nodes_timestamp, this->indices_, fanouts, replace,
-            indptr_.options(), type_per_edge_, input_nodes_time_window,
+            indptr_.options(), type_per_edge_, input_nodes_pre_time_window,
             probs_or_mask, node_timestamp, edge_timestamp, args));
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
@@ -944,11 +946,11 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
         input_nodes, seed_offsets, fanouts, return_eids,
         GetTemporalNumPickFn(
             input_nodes_timestamp, this->indices_, fanouts, replace,
-            type_per_edge_, input_nodes_time_window, probs_or_mask,
+            type_per_edge_, input_nodes_pre_time_window, probs_or_mask,
             node_timestamp, edge_timestamp),
         GetTemporalPickFn(
             input_nodes_timestamp, this->indices_, fanouts, replace,
-            indptr_.options(), type_per_edge_, input_nodes_time_window,
+            indptr_.options(), type_per_edge_, input_nodes_pre_time_window,
             probs_or_mask, node_timestamp, edge_timestamp, args));
   }
 }
