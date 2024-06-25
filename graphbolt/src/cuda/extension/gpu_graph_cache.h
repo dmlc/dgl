@@ -33,16 +33,19 @@ namespace cuda {
 class GpuGraphCache : public torch::CustomClassHolder {
   // The load factor of the constructed hash table.
   static constexpr double kDoubleLoadFactor = 0.8;
-  // The growth factor of the hash table and the dynamically sized indptr tensor
+  // The growth factor of the hash table and the dynamically sized indptr
+  // tensor.
   static constexpr int kIntGrowthFactor = 2;
 
  public:
   /**
    * @brief Constructor for the GpuGraphCache struct.
    *
-   * @param num_nodes The node capacity of GPU cache.
    * @param num_edges The edge capacity of GPU cache.
+   * @param threshold The access threshold before a vertex neighborhood is
+   * cached.
    * @param dtype The node id datatype.
+   * @param dtypes The dtypes of the edge tensors to be cached.
    */
   GpuGraphCache(
       const int64_t num_edges, const int64_t threshold,
@@ -52,15 +55,13 @@ class GpuGraphCache : public torch::CustomClassHolder {
 
   ~GpuGraphCache();
 
-  std::tuple<
-      torch::Tensor, std::vector<torch::Tensor>, torch::Tensor, torch::Tensor,
-      torch::Tensor, int64_t>
-  Query(torch::Tensor seeds);
+  std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> Query(
+      torch::Tensor seeds);
 
-  int64_t Replace(
-      torch::Tensor seeds, torch::Tensor missing_indices,
-      torch::Tensor missing_positions, int64_t num_entering,
-      torch::Tensor indptr, std::vector<torch::Tensor> edge_tensors);
+  std::tuple<torch::Tensor, std::vector<torch::Tensor>> Replace(
+      torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
+      int64_t num_hit, int64_t num_entering, torch::Tensor indptr,
+      std::vector<torch::Tensor> edge_tensors);
 
   static c10::intrusive_ptr<GpuGraphCache> Create(
       const int64_t num_edges, const int64_t threshold,

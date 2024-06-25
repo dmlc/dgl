@@ -36,7 +36,7 @@ import torch
     ],
 )
 @pytest.mark.parametrize("cache_size", [4, 9, 11])
-def test_gpu_cached_feature(indptr_dtype, dtype, cache_size):
+def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
     indices_dtype = torch.int32
     indptr = torch.tensor([0, 3, 6, 10], dtype=indptr_dtype, pin_memory=True)
     indices = torch.arange(0, indptr[-1], dtype=indices_dtype, pin_memory=True)

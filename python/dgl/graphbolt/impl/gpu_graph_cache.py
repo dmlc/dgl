@@ -48,58 +48,25 @@ class GPUGraphCache(object):
         """
         self.total_queries += keys.shape[0]
         (
-            indptr,
-            edge_tensors,
-            selected_index,
-            missing_index,
-            missing_position,
+            index,
+            position,
+            num_hit,
             num_cache_enter,
         ) = self._cache.query(keys)
-        self.total_miss += missing_index.shape[0]
+        self.total_miss += keys.shape[0] - num_hit
 
         def replace_functional(missing_indptr, missing_edge_tensors):
-            if num_cache_enter > 0:
-                self._cache.replace(
-                    keys,
-                    missing_index,
-                    missing_position,
-                    num_cache_enter,
-                    missing_indptr,
-                    missing_edge_tensors,
-                )
-            return self.combine_fetched_graphs(
-                indptr,
-                edge_tensors,
-                selected_index,
+            return self._cache.replace(
+                keys,
+                index,
+                position,
+                num_hit,
+                num_cache_enter,
                 missing_indptr,
                 missing_edge_tensors,
-                missing_index,
             )
 
-        return keys[missing_index], replace_functional
-
-    @staticmethod
-    def combine_fetched_graphs(
-        indptr1, edge_tensors1, index1, indptr2, edge_tensors2, index2
-    ):
-        """Combines the graph structure found in the cache and the fetched graph
-        structure from an outside source into a single graph structure.
-        """
-        if index2.size(0) == 0:
-            return indptr1, edge_tensors1
-        permutation = torch.cat([index1, index2]).sort()[1]
-        assert len(edge_tensors1) == len(edge_tensors2)
-        indptr = torch.cat([indptr1[:-1], indptr2 + indptr1[-1]])
-        edge_tensors = []
-        for a, b in zip(edge_tensors1, edge_tensors2):
-            output_indptr, e = torch.ops.graphbolt.index_select_csc(
-                indptr,
-                torch.cat([a, b]),
-                permutation,
-                a.size(0) + b.size(0),
-            )
-            edge_tensors.append(e)
-        return output_indptr, edge_tensors
+        return keys[index[num_hit:]], replace_functional
 
     @property
     def miss_rate(self):
