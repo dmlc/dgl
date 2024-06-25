@@ -265,7 +265,7 @@ int64_t GpuGraphCache::Replace(
         CUB_CALL(
             DeviceSelect::Flagged, iota, is_threshold,
             output_indices.data_ptr<index_t>(), num_cache_entering.get(),
-            seeds.size(0));
+            missing_positions.size(0));
         auto [in_degree, sliced_indptr] =
             ops::SliceCSCIndptr(indptr, output_indices);
         torch::optional<int64_t> output_size;
