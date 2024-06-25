@@ -121,6 +121,8 @@ class DataLoader(torch.utils.data.DataLoader):
         persistent_workers=True,
         overlap_feature_fetch=True,
         overlap_graph_fetch=False,
+        num_cached_edges=0,
+        threshold=1,
         max_uva_threads=6144,
     ):
         # Multiprocessing requires two modifications to the datapipe:
@@ -192,7 +194,13 @@ class DataLoader(torch.utils.data.DataLoader):
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     sampler,
-                    sampler.fetch_and_sample(_get_uva_stream(), executor, 1),
+                    sampler.fetch_and_sample(
+                        num_cached_edges,
+                        threshold,
+                        _get_uva_stream(),
+                        executor,
+                        1,
+                    ),
                 )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the

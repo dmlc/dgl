@@ -42,7 +42,10 @@ def get_hetero_graph():
 @pytest.mark.parametrize("hetero", [False, True])
 @pytest.mark.parametrize("prob_name", [None, "weight", "mask"])
 @pytest.mark.parametrize("sorted", [False, True])
-def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
+@pytest.mark.parametrize("num_cached_edges", [0, 10])
+def test_NeighborSampler_GraphFetch(
+    hetero, prob_name, sorted, num_cached_edges
+):
     if sorted:
         items = torch.arange(3)
     else:
@@ -66,8 +69,14 @@ def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
     compact_per_layer = sample_per_layer.compact_per_layer(True)
     gb.seed(123)
     expected_results = list(compact_per_layer)
-    datapipe = gb.FetchInsubgraphData(datapipe, sample_per_layer)
+    datapipe = gb.FetchInsubgraphData(
+        datapipe, sample_per_layer, num_cached_edges, 1
+    )
     datapipe = datapipe.wait_future()
+    if num_cached_edges > 0:
+        datapipe = gb.CombineCachedAndFetchedInSubgraph(
+            datapipe, sample_per_layer
+        )
     datapipe = gb.SamplePerLayerFromFetchedSubgraph(datapipe, sample_per_layer)
     datapipe = datapipe.compact_per_layer(True)
     gb.seed(123)

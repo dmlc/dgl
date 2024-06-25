@@ -1,5 +1,6 @@
 """Neighbor subgraph samplers for GraphBolt."""
 
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
@@ -12,6 +13,7 @@ from ..minibatch_transformer import MiniBatchTransformer
 
 from ..subgraph_sampler import SubgraphSampler
 from .fused_csc_sampling_graph import fused_csc_sampling_graph
+from .gpu_graph_cache import GPUGraphCache
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -21,7 +23,100 @@ __all__ = [
     "SamplePerLayer",
     "SamplePerLayerFromFetchedSubgraph",
     "FetchInsubgraphData",
+    "ConcatHeteroSeeds",
+    "CombineCachedAndFetchedInSubgraph",
 ]
+
+
+@functional_datapipe("fetch_cached_insubgraph_data")
+class FetchCachedInsubgraphData(Mapper):
+    def __init__(
+        self, datapipe, sample_per_layer_obj, num_cached_edges, threshold
+    ):
+        super().__init__(datapipe, self._fetch_per_layer)
+        graph = sample_per_layer_obj.sampler.__self__
+        num_cached_edges = min(num_cached_edges, graph.total_num_edges)
+        dtypes = OrderedDict()
+        dtypes["indices"] = graph.indices.dtype
+        if graph.type_per_edge is not None:
+            dtypes["type_per_edge"] = graph.type_per_edge.dtype
+        if graph.edge_attributes is not None:
+            probs_or_mask = graph.edge_attributes.get(
+                sample_per_layer_obj.prob_name, None
+            )
+            if probs_or_mask is not None:
+                dtypes["probs_or_mask"] = probs_or_mask.dtype
+        self.cache = GPUGraphCache(
+            num_cached_edges,
+            threshold,
+            graph.csc_indptr.dtype,
+            list(dtypes.values()),
+        )
+        self.dtypes = dtypes
+
+    def _fetch_per_layer(self, minibatch):
+        minibatch._seeds, minibatch._replace = self.cache.query(
+            minibatch._seeds
+        )
+
+        return minibatch
+
+
+@functional_datapipe("combine_cached_and_fetched_insubgraph")
+class CombineCachedAndFetchedInSubgraph(Mapper):
+    def __init__(self, datapipe, sample_per_layer_obj):
+        super().__init__(datapipe, self._combine_per_layer)
+        self.prob_name = sample_per_layer_obj.prob_name
+
+    def _combine_per_layer(self, minibatch):
+        subgraph = minibatch._sliced_sampling_graph
+
+        edge_tensors = [subgraph.indices]
+        if subgraph.type_per_edge is not None:
+            edge_tensors.append(subgraph.type_per_edge)
+        probs_or_mask = subgraph.edge_attribute(self.prob_name)
+        if probs_or_mask is not None:
+            edge_tensors.append(probs_or_mask)
+
+        subgraph.csc_indptr, edge_tensors = minibatch._replace(
+            subgraph.csc_indptr, edge_tensors
+        )
+        delattr(minibatch, "_replace")
+
+        subgraph.indices = edge_tensors[0]
+        edge_tensors = edge_tensors[1:]
+        if subgraph.type_per_edge is not None:
+            subgraph.type_per_edge = edge_tensors[0]
+            edge_tensors = edge_tensors[1:]
+        if probs_or_mask is not None:
+            subgraph.add_edge_attribute(self.prob_name, edge_tensors[0])
+            edge_tensors = edge_tensors[1:]
+        assert len(edge_tensors) == 0
+
+        return minibatch
+
+
+@functional_datapipe("concat_hetero_seeds")
+class ConcatHeteroSeeds(Mapper):
+    """Concatenates the seeds into a single tensor in the hetero case."""
+
+    def __init__(self, datapipe, sample_per_layer_obj):
+        super().__init__(datapipe, self._concat)
+        self.graph = sample_per_layer_obj.sampler.__self__
+
+    def _concat(self, minibatch):
+        seeds = minibatch._seed_nodes
+        if isinstance(seeds, dict):
+            (
+                seeds,
+                seed_offsets,
+            ) = self.graph._convert_to_homogeneous_nodes(seeds)
+        else:
+            seed_offsets = None
+        minibatch._seeds = seeds
+        minibatch._seed_offsets = seed_offsets
+
+        return minibatch
 
 
 @functional_datapipe("fetch_insubgraph_data")
@@ -33,10 +128,21 @@ class FetchInsubgraphData(Mapper):
     read as well."""
 
     def __init__(
-        self, datapipe, sample_per_layer_obj, stream=None, executor=None
+        self,
+        datapipe,
+        sample_per_layer_obj,
+        num_cached_edges=0,
+        threshold=1,
+        stream=None,
+        executor=None,
     ):
-        super().__init__(datapipe, self._fetch_per_layer)
         self.graph = sample_per_layer_obj.sampler.__self__
+        datapipe = datapipe.concat_hetero_seeds(sample_per_layer_obj)
+        if num_cached_edges > 0:
+            datapipe = datapipe.fetch_cached_insubgraph_data(
+                sample_per_layer_obj, num_cached_edges, threshold
+            )
+        super().__init__(datapipe, self._fetch_per_layer)
         self.prob_name = sample_per_layer_obj.prob_name
         self.stream = stream
         if executor is None:
@@ -46,18 +152,10 @@ class FetchInsubgraphData(Mapper):
 
     def _fetch_per_layer_impl(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
-            seeds = minibatch._seed_nodes
-            is_hetero = isinstance(seeds, dict)
-            if is_hetero:
-                for idx in seeds.values():
-                    idx.record_stream(torch.cuda.current_stream())
-                (
-                    seeds,
-                    seed_offsets,
-                ) = self.graph._convert_to_homogeneous_nodes(seeds)
-            else:
-                seeds.record_stream(torch.cuda.current_stream())
-                seed_offsets = None
+            seeds = minibatch._seeds
+            seed_offsets = minibatch._seed_offsets
+            delattr(minibatch, "_seeds")
+            delattr(minibatch, "_seed_offsets")
 
             def record_stream(tensor):
                 if stream is not None and tensor.is_cuda:
@@ -222,11 +320,21 @@ class CompactPerLayer(MiniBatchTransformer):
 class FetcherAndSampler(MiniBatchTransformer):
     """Overlapped graph sampling operation replacement."""
 
-    def __init__(self, sampler, stream, executor, buffer_size):
+    def __init__(
+        self,
+        sampler,
+        num_cached_edges,
+        threshold,
+        stream,
+        executor,
+        buffer_size,
+    ):
         datapipe = sampler.datapipe.fetch_insubgraph_data(
-            sampler, stream, executor
+            sampler, num_cached_edges, threshold, stream, executor
         )
         datapipe = datapipe.buffer(buffer_size).wait_future().wait()
+        if num_cached_edges > 0:
+            datapipe = datapipe.combine_cached_and_fetched_insubgraph(sampler)
         datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
         super().__init__(datapipe)
 
