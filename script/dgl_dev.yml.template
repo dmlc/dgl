@@ -14,7 +14,7 @@ dependencies:
     - networkx
     - nltk
     - nose
-    - numpy
+    - numpy<2
     - ogb
     - pandas
     - psutil
