@@ -55,9 +55,39 @@ class GpuGraphCache : public torch::CustomClassHolder {
 
   ~GpuGraphCache();
 
+  /**
+   * @brief Queries the cache. Returns tensors indicating which elements are
+   * missing.
+   *
+   * @param seeds The node ids to query the cache with.
+   *
+   * @return
+   * (torch::Tensor, torch::Tensor, int64_t, int64_t) index, position,
+   * number of cache hits and number of ids that will enter the cache.
+   */
   std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> Query(
       torch::Tensor seeds);
 
+  /**
+   * @brief After the graph structure for the missing node ids are fetched, it
+   * inserts some of the node ids and returns the final output graph structure,
+   * combining the information in the cache with the graph structure for the
+   * missing node ids.
+   *
+   * @param seeds The node ids that the cache was queried with.
+   * @param indices seeds[indices[:num_hit]] gives us the node ids that were
+   * found in the cache
+   * @param positions positions[:num_hit] gives where the node ids can be found
+   * in the cache.
+   * @param num_hit The number of seeds that are already in the cache.
+   * @param num_entering The number of seeds among the missing node ids that
+   * will be inserted into the cache.
+   * @param indptr The indptr for the missing seeds fetched from remote.
+   * @param edge_tensors The edge tensors for the missing seeds.
+   *
+   * @return (torch::Tensor, std::vector<torch::Tensor>) The final indptr and
+   * edge_tensors, directly corresponding to the seeds tensor.
+   */
   std::tuple<torch::Tensor, std::vector<torch::Tensor>> Replace(
       torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
       int64_t num_hit, int64_t num_entering, torch::Tensor indptr,
