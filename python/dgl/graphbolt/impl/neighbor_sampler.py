@@ -30,6 +30,10 @@ __all__ = [
 
 @functional_datapipe("fetch_cached_insubgraph_data")
 class FetchCachedInsubgraphData(Mapper):
+    """Queries the GPUGraphCache and returns the missing seeds and a lambda
+    function that can be called with the fetched graph structure.
+    """
+
     def __init__(
         self, datapipe, sample_per_layer_obj, num_cached_edges, threshold
     ):
@@ -64,6 +68,10 @@ class FetchCachedInsubgraphData(Mapper):
 
 @functional_datapipe("combine_cached_and_fetched_insubgraph")
 class CombineCachedAndFetchedInSubgraph(Mapper):
+    """Combined the fetched graph structure with the graph structure already
+    found inside the GPUGraphCache.
+    """
+
     def __init__(self, datapipe, sample_per_layer_obj):
         super().__init__(datapipe, self._combine_per_layer)
         self.prob_name = sample_per_layer_obj.prob_name
