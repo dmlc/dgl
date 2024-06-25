@@ -1029,7 +1029,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         input_nodes_timestamp: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
-        input_nodes_time_window: Optional[
+        input_nodes_pre_time_window: Optional[
             Union[torch.Tensor, Dict[str, torch.Tensor]]
         ] = None,
         probs_name: Optional[str] = None,
@@ -1070,10 +1070,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
-        input_nodes_time_window: torch.Tensor
+        input_nodes_pre_time_window: torch.Tensor
             Time window of the given seed nodes. The neighbors should be
-            filtered within the interval [input_nodes_timestamp - time_window,
-            input_nodes_timestamp].
+            filtered within the interval [input_nodes_timestamp -
+            time_window, input_nodes_timestamp].
         probs_name: str, optional
             An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities
@@ -1094,9 +1094,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             (
                 nodes,
                 input_nodes_timestamp,
-                input_nodes_time_window,
+                input_nodes_pre_time_window,
             ) = self._convert_to_homogeneous_nodes(
-                nodes, input_nodes_timestamp, input_nodes_time_window
+                nodes, input_nodes_timestamp, input_nodes_pre_time_window
             )
 
         # Ensure nodes is 1-D tensor.
@@ -1113,7 +1113,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             replace,
             False,
             has_original_eids,
-            input_nodes_time_window,
+            input_nodes_pre_time_window,
             probs_or_mask,
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
