@@ -126,6 +126,7 @@ GpuGraphCache::GpuGraphCache(
       }));
   C10_CUDA_KERNEL_LAUNCH_CHECK();  // Check the map constructor's success.
   const auto options = torch::TensorOptions().device(c10::DeviceType::CUDA);
+  TORCH_CHECK(threshold > 0, "Threshold should be a position integer.");
   threshold_ = threshold;
   device_id_ = cuda::GetCurrentStream().device_index();
   map_size_ = 0;

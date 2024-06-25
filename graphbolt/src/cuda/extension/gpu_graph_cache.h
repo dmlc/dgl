@@ -98,14 +98,15 @@ class GpuGraphCache : public torch::CustomClassHolder {
       torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes);
 
  private:
-  void* map_;
-  int64_t threshold_;
-  torch::DeviceIndex device_id_;
-  int64_t map_size_;
-  int64_t num_nodes_;
-  int64_t num_edges_;
-  torch::Tensor indptr_;
-  std::vector<torch::Tensor> cached_edge_tensors_;
+  void* map_;                     // pointer to the hash table.
+  int64_t threshold_;             // A positive threshold value.
+  torch::DeviceIndex device_id_;  // Which GPU the cache resides in.
+  int64_t map_size_;              // The number of nodes inside the hash table.
+  int64_t num_nodes_;             // The number of cached nodes in the cache.
+  int64_t num_edges_;             // The number of cached edges in the cache.
+  torch::Tensor indptr_;          // The cached graph structure indptr tensor.
+  std::vector<torch::Tensor> cached_edge_tensors_;  // The cached graph
+                                                    // structure edge tensors.
 };
 
 }  // namespace cuda
