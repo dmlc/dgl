@@ -17,14 +17,13 @@ namespace graphbolt {
 namespace cuda {
 
 /**
- * @brief Returns the major and minor compute capabilities of the given cuda
- * as a pair; (major, minor).
+ * @brief Returns the compute capability of the cuda device, e.g. 70 for Volta.
  */
-inline std::pair<int, int> compute_capability(
+inline int compute_capability(
     int device = cuda::GetCurrentStream().device_index()) {
   int sm_version;
   CUDA_RUNTIME_CHECK(cub::SmVersion(sm_version, device));
-  return {sm_version / 100, (sm_version % 100) / 10};
+  return sm_version / 10;
 };
 
 /**
