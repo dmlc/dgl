@@ -6,11 +6,12 @@ from dataclasses import dataclass
 import torch
 from torch.torch_version import TorchVersion
 
-if TorchVersion(torch.__version__) >= "2.3.0":
-    # [TODO][https://github.com/dmlc/dgl/issues/7387] Remove or refine below
-    # check.
-    # Due to https://github.com/dmlc/dgl/issues/7380, we need to check if dill
-    # is available before using it.
+if (
+    TorchVersion(torch.__version__) >= "2.3.0"
+    and TorchVersion(torch.__version__) < "2.3.1"
+):
+    # Due to https://github.com/dmlc/dgl/issues/7380, for torch 2.3.0, we need
+    # to check if dill is available before using it.
     torch.utils.data.datapipes.utils.common.DILL_AVAILABLE = (
         torch.utils._import_utils.dill_available()
     )

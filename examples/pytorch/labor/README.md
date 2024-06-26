@@ -6,6 +6,9 @@ This is the official Labor sampling example to reproduce the results in the orig
 paper with the GraphSAGE GNN model. The model can be changed to any other model where
 NeighborSampler can be used.
 
+A more modern and performant version is provided in the
+`examples/sampling/graphbolt/pyg/labor` folder.
+
 Requirements
 ------------
 
