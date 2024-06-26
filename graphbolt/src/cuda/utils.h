@@ -17,6 +17,17 @@ namespace graphbolt {
 namespace cuda {
 
 /**
+ * @brief Returns the major and minor compute capabilities of the given cuda
+ * as a pair; (major, minor).
+ */
+inline std::pair<int, int> compute_capability(
+    int device = cuda::GetCurrentStream().device_index()) {
+  int sm_version;
+  CUDA_RUNTIME_CHECK(cub::SmVersion(sm_version, device));
+  return {sm_version / 100, (sm_version % 100) / 10};
+};
+
+/**
  * @brief Calculate the number of threads needed given the size of the dimension
  * to be processed.
  *

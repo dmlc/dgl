@@ -277,22 +277,7 @@ UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
-  auto dev_id = cuda::GetCurrentStream().device_index();
-  static std::mutex mtx;
-  static std::unordered_map<decltype(dev_id), int> compute_capability_cache;
-  const auto compute_capability_major = [&] {
-    std::lock_guard lock(mtx);
-    auto it = compute_capability_cache.find(dev_id);
-    if (it != compute_capability_cache.end()) {
-      return it->second;
-    } else {
-      int major;
-      CUDA_RUNTIME_CHECK(cudaDeviceGetAttribute(
-          &major, cudaDevAttrComputeCapabilityMajor, dev_id));
-      return compute_capability_cache[dev_id] = major;
-    }
-  }();
-  if (compute_capability_major >= 7) {
+  if (cuda::compute_capability().first >= 7) {
     // Utilizes a hash table based implementation, the mapped id of a vertex
     // will be monotonically increasing as the first occurrence index of it in
     // torch.cat([unique_dst_ids, src_ids]). Thus, it is deterministic.
