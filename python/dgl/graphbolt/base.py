@@ -79,7 +79,7 @@ def isin(elements, test_elements):
 
 if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
 
-    @torch.library.impl_abstract("graphbolt::expand_indptr")
+    @torch.library.register_fake("graphbolt::expand_indptr")
     def expand_indptr_abstract(indptr, dtype, node_ids, output_size):
         """Abstract implementation of expand_indptr for torch.compile() support."""
         if output_size is None:
