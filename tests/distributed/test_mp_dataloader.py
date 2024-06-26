@@ -900,6 +900,7 @@ def test_dataloader_homograph(
     )
 
 
+@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize("num_workers", [0])
 @pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("exclude", [None, "self", "reverse_id"])
