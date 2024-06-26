@@ -466,13 +466,13 @@ auto GetTemporalPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& type_per_edge,
-    const torch::optional<torch::Tensor>& seed_time_window,
+    const torch::optional<torch::Tensor>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
     const torch::optional<torch::Tensor>& edge_timestamp, SamplerArgs<S> args) {
   return [&seed_timestamp, &csc_indices, &fanouts, replace, &options,
-          &type_per_edge, &seed_time_window, &probs_or_mask, &node_timestamp,
-          &edge_timestamp, args](
+          &type_per_edge, &seed_pre_time_window, &probs_or_mask,
+          &node_timestamp, &edge_timestamp, args](
              int64_t seed_offset, int64_t offset, int64_t num_neighbors,
              auto picked_data_ptr) {
     // If fanouts.size() > 1, perform sampling for each edge type of each
@@ -481,12 +481,13 @@ auto GetTemporalPickFn(
     if (fanouts.size() > 1) {
       return TemporalPickByEtype(
           seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
-          fanouts, replace, options, type_per_edge.value(), seed_time_window,
-          probs_or_mask, node_timestamp, edge_timestamp, args, picked_data_ptr);
+          fanouts, replace, options, type_per_edge.value(),
+          seed_pre_time_window, probs_or_mask, node_timestamp, edge_timestamp,
+          args, picked_data_ptr);
     } else {
       int64_t num_sampled = TemporalPick(
           seed_timestamp, csc_indices, seed_offset, offset, num_neighbors,
-          fanouts[0], replace, options, seed_time_window, probs_or_mask,
+          fanouts[0], replace, options, seed_pre_time_window, probs_or_mask,
           node_timestamp, edge_timestamp, args, picked_data_ptr);
       if (type_per_edge.has_value()) {
         std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
@@ -1029,7 +1030,7 @@ void NumPick(
 
 torch::Tensor TemporalMask(
     int64_t seed_timestamp, torch::Tensor csc_indices,
-    const torch::optional<int64_t>& seed_time_window,
+    const torch::optional<int64_t>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
     const torch::optional<torch::Tensor>& edge_timestamp,
@@ -1040,14 +1041,15 @@ torch::Tensor TemporalMask(
     auto neighbor_timestamp =
         node_timestamp.value().index_select(0, csc_indices.slice(0, l, r));
     mask &= neighbor_timestamp < seed_timestamp;
-    if (seed_time_window.has_value())
-      mask &= neighbor_timestamp > seed_timestamp - seed_time_window.value();
+    if (seed_pre_time_window.has_value())
+      mask &=
+          neighbor_timestamp > seed_timestamp - seed_pre_time_window.value();
   }
   if (edge_timestamp.has_value()) {
     auto edge_ts = edge_timestamp.value().slice(0, l, r);
     mask &= edge_ts < seed_timestamp;
-    if (seed_time_window.has_value())
-      mask &= edge_ts > seed_timestamp - seed_time_window.value();
+    if (seed_pre_time_window.has_value())
+      mask &= edge_ts > seed_timestamp - seed_pre_time_window.value();
   }
   if (probs_or_mask.has_value()) {
     mask &= probs_or_mask.value().slice(0, l, r) != 0;
@@ -1063,16 +1065,16 @@ torch::Tensor TemporalMask(
  */
 std::pair<bool, std::vector<int64_t>> FastTemporalPick(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices, int64_t fanout,
-    bool replace, const torch::optional<torch::Tensor>& seed_time_window,
+    bool replace, const torch::optional<torch::Tensor>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& node_timestamp,
     const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
     int64_t offset, int64_t num_neighbors) {
   constexpr int64_t kTriedThreshold = 1000;
   auto timestamp = utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset);
   torch::optional<int64_t> time_window = torch::nullopt;
-  if (seed_time_window.has_value()) {
-    time_window =
-        utils::GetValueByIndex<int64_t>(seed_time_window.value(), seed_offset);
+  if (seed_pre_time_window.has_value()) {
+    time_window = utils::GetValueByIndex<int64_t>(
+        seed_pre_time_window.value(), seed_offset);
   }
   std::vector<int64_t> sampled_edges;
   sampled_edges.reserve(fanout);
@@ -1124,7 +1126,7 @@ std::pair<bool, std::vector<int64_t>> FastTemporalPick(
 
 int64_t TemporalNumPick(
     torch::Tensor seed_timestamp, torch::Tensor csc_indics, int64_t fanout,
-    bool replace, const torch::optional<torch::Tensor>& seed_time_window,
+    bool replace, const torch::optional<torch::Tensor>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
     const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
@@ -1135,14 +1137,14 @@ int64_t TemporalNumPick(
     // TemporalPick. We may only sample once in TemporalNumPick and use the
     // sampled edges in TemporalPick to avoid sampling twice.
     auto [success, sampled_edges] = FastTemporalPick(
-        seed_timestamp, csc_indics, fanout, replace, seed_time_window,
+        seed_timestamp, csc_indics, fanout, replace, seed_pre_time_window,
         node_timestamp, edge_timestamp, seed_offset, offset, num_neighbors);
     if (success) return sampled_edges.size();
   }
   torch::optional<int64_t> time_window = torch::nullopt;
-  if (seed_time_window.has_value()) {
-    time_window =
-        utils::GetValueByIndex<int64_t>(seed_time_window.value(), seed_offset);
+  if (seed_pre_time_window.has_value()) {
+    time_window = utils::GetValueByIndex<int64_t>(
+        seed_pre_time_window.value(), seed_offset);
   }
   auto mask = TemporalMask(
       utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset), csc_indics,
@@ -1203,7 +1205,7 @@ int64_t TemporalNumPickByEtype(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& seed_time_window,
+    const torch::optional<torch::Tensor>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
     const torch::optional<torch::Tensor>& edge_timestamp, int64_t seed_offset,
@@ -1226,8 +1228,9 @@ int64_t TemporalNumPickByEtype(
           // Do sampling for one etype.
           total_count += TemporalNumPick(
               seed_timestamp, csc_indices, fanouts[etype], replace,
-              seed_time_window, probs_or_mask, node_timestamp, edge_timestamp,
-              seed_offset, etype_begin, etype_end - etype_begin);
+              seed_pre_time_window, probs_or_mask, node_timestamp,
+              edge_timestamp, seed_offset, etype_begin,
+              etype_end - etype_begin);
           etype_begin = etype_end;
         }
       }));
@@ -1525,7 +1528,7 @@ int64_t TemporalPick(
     torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     int64_t seed_offset, int64_t offset, int64_t num_neighbors, int64_t fanout,
     bool replace, const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& seed_time_window,
+    const torch::optional<torch::Tensor>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
     const torch::optional<torch::Tensor>& edge_timestamp, SamplerArgs<S> args,
@@ -1534,7 +1537,7 @@ int64_t TemporalPick(
   if (S == SamplerType::NEIGHBOR && num_neighbors > kFastPathThreshold &&
       !probs_or_mask.has_value()) {
     auto [success, sampled_edges] = FastTemporalPick(
-        seed_timestamp, csc_indices, fanout, replace, seed_time_window,
+        seed_timestamp, csc_indices, fanout, replace, seed_pre_time_window,
         node_timestamp, edge_timestamp, seed_offset, offset, num_neighbors);
     if (success) {
       for (size_t i = 0; i < sampled_edges.size(); ++i) {
@@ -1544,9 +1547,9 @@ int64_t TemporalPick(
     }
   }
   torch::optional<int64_t> time_window = torch::nullopt;
-  if (seed_time_window.has_value()) {
-    time_window =
-        utils::GetValueByIndex<int64_t>(seed_time_window.value(), seed_offset);
+  if (seed_pre_time_window.has_value()) {
+    time_window = utils::GetValueByIndex<int64_t>(
+        seed_pre_time_window.value(), seed_offset);
   }
   auto mask = TemporalMask(
       utils::GetValueByIndex<int64_t>(seed_timestamp, seed_offset), csc_indices,
@@ -1639,7 +1642,7 @@ int64_t TemporalPickByEtype(
     int64_t seed_offset, int64_t offset, int64_t num_neighbors,
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::TensorOptions& options, const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& seed_time_window,
+    const torch::optional<torch::Tensor>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
     const torch::optional<torch::Tensor>& edge_timestamp, SamplerArgs<S> args,
@@ -1666,8 +1669,8 @@ int64_t TemporalPickByEtype(
             int64_t picked_count = TemporalPick(
                 seed_timestamp, csc_indices, seed_offset, etype_begin,
                 etype_end - etype_begin, fanout, replace, options,
-                seed_time_window, probs_or_mask, node_timestamp, edge_timestamp,
-                args, picked_data_ptr + pick_offset);
+                seed_pre_time_window, probs_or_mask, node_timestamp,
+                edge_timestamp, args, picked_data_ptr + pick_offset);
             pick_offset += picked_count;
           }
           etype_begin = etype_end;
