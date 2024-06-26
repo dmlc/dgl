@@ -7,6 +7,7 @@ import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
+from dgl.graphbolt.dataloader import construct_gpu_graph_cache
 
 
 def get_hetero_graph():
@@ -69,8 +70,15 @@ def test_NeighborSampler_GraphFetch(
     compact_per_layer = sample_per_layer.compact_per_layer(True)
     gb.seed(123)
     expected_results = list(compact_per_layer)
+    gpu_graph_cache = None
+    if num_cached_edges > 0:
+        gpu_graph_cache = construct_gpu_graph_cache(
+            sample_per_layer, num_cached_edges, 1
+        )
     datapipe = gb.FetchInsubgraphData(
-        datapipe, sample_per_layer, num_cached_edges, 1
+        datapipe,
+        sample_per_layer,
+        gpu_graph_cache,
     )
     datapipe = datapipe.wait_future()
     if num_cached_edges > 0:
