@@ -51,7 +51,7 @@ class GPUGraphCache(object):
             index,
             position,
             num_hit,
-            num_cache_enter,
+            num_threshold,
         ) = self._cache.query(keys)
         self.total_miss += keys.shape[0] - num_hit
 
@@ -61,7 +61,7 @@ class GPUGraphCache(object):
                 index,
                 position,
                 num_hit,
-                num_cache_enter,
+                num_threshold,
                 missing_indptr,
                 missing_edge_tensors,
             )

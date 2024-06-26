@@ -65,6 +65,20 @@ __global__ void _Insert(
   }
 }
 
+/**
+ * @brief For node ids not in the cache, it keeps their access count inside
+ * a hash table as (v, -c) where v is the node id and c is the access count.
+ * When c == -threshold, it means that v will be inserted into the cache
+ * during the call to the replace method. Once v is inserted into the cache,
+ * c is assigned to a nonnegative value and indicates the local id of vertex
+ * v in the cache.
+ *
+ * @param num_nodes The number of node ids.
+ * @param seeds The node ids the cache is being queried with.
+ * @param positions Holds the values found in the hash table.
+ * @param map The hash table holding (v, -c) or (v, local_id).
+ *
+ */
 template <typename index_t, typename map_t>
 __global__ void _QueryAndIncrement(
     const int64_t num_nodes, const index_t* seeds, index_t* positions,
@@ -222,7 +236,7 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
 
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
     torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
-    int64_t num_hit, int64_t num_entering, torch::Tensor indptr,
+    int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
     std::vector<torch::Tensor> edge_tensors) {
   const auto num_tensors = edge_tensors.size();
   TORCH_CHECK(
@@ -327,14 +341,14 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                     return x == threshold;
                   });
               auto output_indices = torch::empty(
-                  num_entering, seeds.options().dtype(index_dtype));
+                  num_threshold, seeds.options().dtype(index_dtype));
               CUB_CALL(
                   DeviceSelect::Flagged, iota, is_threshold,
                   output_indices.data_ptr<indices_t>(),
                   cub::DiscardOutputIterator{}, missing_positions.size(0));
               auto [in_degree, sliced_indptr] =
                   ops::SliceCSCIndptr(indptr, output_indices);
-              while (num_nodes_ + num_entering >= indptr_.size(0)) {
+              while (num_nodes_ + num_threshold >= indptr_.size(0)) {
                 auto new_indptr = torch::empty(
                     indptr_.size(0) * kIntGrowthFactor, indptr_.options());
                 new_indptr.slice(0, 0, indptr_.size(0)) = indptr_;
@@ -370,7 +384,7 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                 auto map = reinterpret_cast<map_t<indices_t>*>(map_);
                 const dim3 block(kIntBlockSize);
                 const dim3 grid(
-                    (num_entering + kIntBlockSize - 1) / kIntBlockSize);
+                    (num_threshold + kIntBlockSize - 1) / kIntBlockSize);
                 CUDA_KERNEL_CALL(
                     _Insert, grid, block, 0, output_indices.size(0),
                     static_cast<indices_t>(num_nodes_),
@@ -378,7 +392,7 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                     missing_indices.data_ptr<indices_t>(),
                     output_indices.data_ptr<indices_t>(), map->ref(cuco::find));
                 num_edges_ += *cached_output_size;
-                num_nodes_ += num_entering;
+                num_nodes_ += num_threshold;
               }
 
               std::vector<torch::Tensor> output_edge_tensors;

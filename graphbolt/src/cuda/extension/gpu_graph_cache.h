@@ -44,8 +44,9 @@ class GpuGraphCache : public torch::CustomClassHolder {
    * @param num_edges The edge capacity of GPU cache.
    * @param threshold The access threshold before a vertex neighborhood is
    * cached.
-   * @param dtype The node id datatype.
-   * @param dtypes The dtypes of the edge tensors to be cached.
+   * @param indptr_dtype The node id datatype.
+   * @param dtypes The dtypes of the edge tensors to be cached. dtypes[0] is
+   * reserved for the indices edge tensor holding node ids.
    */
   GpuGraphCache(
       const int64_t num_edges, const int64_t threshold,
@@ -80,7 +81,7 @@ class GpuGraphCache : public torch::CustomClassHolder {
    * @param positions positions[:num_hit] gives where the node ids can be found
    * in the cache.
    * @param num_hit The number of seeds that are already in the cache.
-   * @param num_entering The number of seeds among the missing node ids that
+   * @param num_threshold The number of seeds among the missing node ids that
    * will be inserted into the cache.
    * @param indptr The indptr for the missing seeds fetched from remote.
    * @param edge_tensors The edge tensors for the missing seeds.
@@ -90,7 +91,7 @@ class GpuGraphCache : public torch::CustomClassHolder {
    */
   std::tuple<torch::Tensor, std::vector<torch::Tensor>> Replace(
       torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
-      int64_t num_hit, int64_t num_entering, torch::Tensor indptr,
+      int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
       std::vector<torch::Tensor> edge_tensors);
 
   static c10::intrusive_ptr<GpuGraphCache> Create(
