@@ -263,12 +263,14 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               static_assert(
                   sizeof(std::byte) == 1, "Byte needs to have a size of 1.");
               auto cache_missing_dtype = torch::empty(
-                  3 * num_tensors, c10::TensorOptions()
+                  4 * num_tensors, c10::TensorOptions()
                                        .dtype(torch::kInt64)
                                        .pinned_memory(true));
-              auto cache_missing_dtype_ptr = reinterpret_cast<
-                  ::cuda::std::tuple<std::byte*, std::byte*, int64_t>*>(
-                  cache_missing_dtype.data_ptr());
+              auto cache_missing_dtype_ptr =
+                  reinterpret_cast<::cuda::std::tuple<
+                      std::byte*, std::byte*, int64_t, int64_t>*>(
+                      cache_missing_dtype.data_ptr());
+              int64_t total_size = 0;
               for (size_t i = 0; i < num_tensors; i++) {
                 TORCH_CHECK(
                     cached_edge_tensors_[i].scalar_type() ==
@@ -279,14 +281,16 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                       edge_tensors[i - 1].size(0) == edge_tensors[i].size(0),
                       "The missing edge tensors should have identical size.");
                 }
+                const int64_t element_size = edge_tensors[i].element_size();
                 cache_missing_dtype_ptr[i] = {
                     reinterpret_cast<std::byte*>(
                         cached_edge_tensors_[i].data_ptr()),
                     reinterpret_cast<std::byte*>(edge_tensors[i].data_ptr()),
-                    edge_tensors[i].element_size()};
+                    element_size, total_size};
+                total_size += element_size;
               }
               auto cache_missing_dtype_dev = allocator.AllocateStorage<
-                  ::cuda::std::tuple<std::byte*, std::byte*, int64_t>>(
+                  ::cuda::std::tuple<std::byte*, std::byte*, int64_t, int64_t>>(
                   num_tensors);
               THRUST_CALL(
                   copy_n, cache_missing_dtype_ptr, num_tensors,
@@ -308,7 +312,7 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                 const auto idx = i % num_nodes;
                 const auto pos = positions_ptr[idx];
                 const auto original_idx = indices_ptr[idx];
-                const auto [cache_ptr, missing_ptr, size] =
+                const auto [cache_ptr, missing_ptr, size, cum_size] =
                     cache_missing_dtype_dev_ptr[tensor_idx];
                 const auto is_cached = pos >= 0;
                 const auto offset = is_cached ? cache_indptr[pos]
@@ -401,7 +405,15 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                 num_nodes_ += num_threshold;
               }
 
+              constexpr int alignment = 128;
+              const auto output_allocation_count =
+                  (static_cast<indptr_t>(output_size) + alignment - 1) /
+                  alignment * alignment;
+
               std::vector<torch::Tensor> output_edge_tensors;
+              auto output_allocation = torch::empty(
+                  output_allocation_count * total_size,
+                  seeds.options().dtype(torch::kInt8));
               auto output_tensor_ptrs = torch::empty(
                   2 * num_tensors, c10::TensorOptions()
                                        .dtype(torch::kInt64)
@@ -410,9 +422,13 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                   reinterpret_cast<::cuda::std::tuple<std::byte*, int64_t>*>(
                       output_tensor_ptrs.data_ptr());
               for (size_t i = 0; i < num_tensors; i++) {
-                output_edge_tensors.push_back(torch::empty(
-                    static_cast<indptr_t>(output_size),
-                    cached_edge_tensors_[i].options()));
+                const auto cum_size =
+                    ::cuda::std::get<3>(cache_missing_dtype_ptr[i]);
+                output_edge_tensors.push_back(
+                    output_allocation
+                        .slice(0, cum_size * output_allocation_count)
+                        .view(edge_tensors[i].scalar_type())
+                        .slice(0, 0, static_cast<indptr_t>(output_size)));
                 output_tensor_ptrs_ptr[i] = {
                     reinterpret_cast<std::byte*>(
                         output_edge_tensors.back().data_ptr()),
