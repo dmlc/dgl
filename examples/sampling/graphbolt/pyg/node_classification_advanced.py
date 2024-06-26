@@ -197,6 +197,8 @@ def create_dataloader(
         datapipe,
         num_workers=args.num_workers,
         overlap_graph_fetch=args.overlap_graph_fetch,
+        num_gpu_cached_edges=args.num_gpu_cached_edges,
+        gpu_cache_threshold=args.gpu_graph_caching_threshold,
     )
 
 
@@ -369,6 +371,18 @@ def parse_args():
         "If True, the data loader will overlap the UVA graph fetching operations"
         "with the rest of operations by using an alternative CUDA stream. Disabled"
         "by default.",
+    )
+    parser.add_argument(
+        "--num-gpu-cached-edges",
+        type=int,
+        default=0,
+        help="The number of edges to be cached from the graph on the GPU.",
+    )
+    parser.add_argument(
+        "--gpu-graph-caching-threshold",
+        type=int,
+        default=1,
+        help="The number of accesses after which a vertex neighborhood will be cached.",
     )
     parser.add_argument(
         "--torch-compile",
