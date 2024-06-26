@@ -162,11 +162,6 @@ GpuGraphCache::~GpuGraphCache() {
 
 std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
     torch::Tensor seeds) {
-  TORCH_CHECK(seeds.device().is_cuda(), "Seeds should be on a CUDA device.");
-  TORCH_CHECK(
-      seeds.device().index() == device_id_,
-      "Seeds should be on the correct CUDA device.");
-  TORCH_CHECK(seeds.sizes().size() == 1, "Keys should be a 1D tensor.");
   auto allocator = cuda::GetAllocator();
   auto index_dtype = cached_edge_tensors_.at(0).scalar_type();
   const dim3 block(kIntBlockSize);
@@ -180,7 +175,8 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
               map->capacity() * kIntGrowthFactor,
               cuco::cuda_stream_ref{cuda::GetCurrentStream()});
         }
-        auto positions = torch::empty_like(seeds);
+        auto positions =
+            torch::empty(seeds.size(0), seeds.options().dtype(index_dtype));
         CUDA_KERNEL_CALL(
             _QueryAndIncrement, grid, block, 0,
             static_cast<int64_t>(seeds.size(0)), seeds.data_ptr<index_t>(),
@@ -215,8 +211,10 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
         thrust::counting_iterator<index_t> iota{0};
         auto position_and_index =
             thrust::make_zip_iterator(positions.data_ptr<index_t>(), iota);
-        auto output_positions = torch::empty_like(seeds);
-        auto output_indices = torch::empty_like(seeds);
+        auto output_positions =
+            torch::empty(seeds.size(0), seeds.options().dtype(index_dtype));
+        auto output_indices =
+            torch::empty(seeds.size(0), seeds.options().dtype(index_dtype));
         auto output_position_and_index = thrust::make_zip_iterator(
             output_positions.data_ptr<index_t>(),
             output_indices.data_ptr<index_t>());
@@ -245,10 +243,6 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
       num_tensors == cached_edge_tensors_.size(),
       "Same number of tensors need to be passed!");
   const auto num_nodes = seeds.size(0);
-  TORCH_CHECK(
-      indptr.size(0) == num_nodes - num_hit + 1,
-      "(indptr.size(0) == seeds.size(0) - num_hit + 1) failed.");
-  const int64_t num_buffers = num_nodes * num_tensors;
   auto allocator = cuda::GetAllocator();
   auto index_dtype = cached_edge_tensors_.at(0).scalar_type();
   return AT_DISPATCH_INDEX_TYPES(
@@ -274,11 +268,6 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                     cached_edge_tensors_[i].scalar_type() ==
                         edge_tensors[i].scalar_type(),
                     "The dtypes of edge tensors must match.");
-                if (i > 0) {
-                  TORCH_CHECK(
-                      edge_tensors[i - 1].size(0) == edge_tensors[i].size(0),
-                      "The missing edge tensors should have identical size.");
-                }
                 cache_missing_dtype_ptr[i] = {
                     reinterpret_cast<std::byte*>(
                         cached_edge_tensors_[i].data_ptr()),
@@ -292,9 +281,11 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                   copy_n, cache_missing_dtype_ptr, num_tensors,
                   cache_missing_dtype_dev.get());
 
-              auto input = allocator.AllocateStorage<std::byte*>(num_buffers);
+              auto input = allocator.AllocateStorage<std::byte*>(
+                  num_tensors * num_nodes);
               auto input_size =
-                  allocator.AllocateStorage<size_t>(num_buffers + 1);
+                  allocator.AllocateStorage<size_t>(num_tensors * num_nodes);
+
               const auto cache_missing_dtype_dev_ptr =
                   cache_missing_dtype_dev.get();
               const auto indices_ptr = indices.data_ptr<indices_t>();
@@ -303,25 +294,28 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               const auto input_size_ptr = input_size.get();
               const auto cache_indptr = indptr_.data_ptr<indptr_t>();
               const auto missing_indptr = indptr.data_ptr<indptr_t>();
-              CUB_CALL(DeviceFor::Bulk, num_buffers, [=] __device__(int64_t i) {
-                const auto tensor_idx = i / num_nodes;
-                const auto idx = i % num_nodes;
-                const auto pos = positions_ptr[idx];
-                const auto original_idx = indices_ptr[idx];
-                const auto [cache_ptr, missing_ptr, size] =
-                    cache_missing_dtype_dev_ptr[tensor_idx];
-                const auto is_cached = pos >= 0;
-                const auto offset = is_cached ? cache_indptr[pos]
-                                              : missing_indptr[idx - num_hit];
-                const auto offset_end = is_cached
-                                            ? cache_indptr[pos + 1]
-                                            : missing_indptr[idx - num_hit + 1];
-                const auto out_idx = tensor_idx * num_nodes + original_idx;
+              CUB_CALL(
+                  DeviceFor::Bulk, num_tensors * num_nodes,
+                  [=] __device__(int64_t i) {
+                    const auto tensor_idx = i / num_nodes;
+                    const auto idx = i % num_nodes;
+                    const auto pos = positions_ptr[idx];
+                    const auto original_idx = indices_ptr[idx];
+                    const auto [cache_ptr, missing_ptr, size] =
+                        cache_missing_dtype_dev_ptr[tensor_idx];
+                    const auto is_cached = pos >= 0;
+                    const auto offset = is_cached
+                                            ? cache_indptr[pos]
+                                            : missing_indptr[idx - num_hit];
+                    const auto offset_end =
+                        is_cached ? cache_indptr[pos + 1]
+                                  : missing_indptr[idx - num_hit + 1];
+                    const auto out_idx = tensor_idx * num_nodes + original_idx;
 
-                input_ptr[out_idx] =
-                    (is_cached ? cache_ptr : missing_ptr) + offset * size;
-                input_size_ptr[out_idx] = size * (offset_end - offset);
-              });
+                    input_ptr[out_idx] =
+                        (is_cached ? cache_ptr : missing_ptr) + offset * size;
+                    input_size_ptr[out_idx] = size * (offset_end - offset);
+                  });
               auto output_indptr = torch::empty(
                   num_nodes + 1, seeds.options().dtype(indptr_.scalar_type()));
               auto output_indptr_ptr = output_indptr.data_ptr<indptr_t>();
@@ -346,8 +340,8 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                   [=] __host__ __device__(indices_t x) {
                     return x == threshold;
                   });
-              auto output_indices =
-                  torch::empty(num_threshold, seeds.options());
+              auto output_indices = torch::empty(
+                  num_threshold, seeds.options().dtype(index_dtype));
               CUB_CALL(
                   DeviceSelect::Flagged, iota, is_threshold,
                   output_indices.data_ptr<indices_t>(),
@@ -370,9 +364,9 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                     indptr.size(0) - 2, cached_output_size);
                 cached_output_size = sindices.size(0);
                 enough_space = num_edges_ + *cached_output_size <=
-                               cached_edge_tensors_[i].size(0);
+                               cached_edge_tensors_.at(0).size(0);
                 if (enough_space) {
-                  cached_edge_tensors_[i].slice(
+                  cached_edge_tensors_.at(i).slice(
                       0, num_edges_, num_edges_ + *cached_output_size) =
                       sindices;
                 } else
@@ -412,7 +406,7 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               for (size_t i = 0; i < num_tensors; i++) {
                 output_edge_tensors.push_back(torch::empty(
                     static_cast<indptr_t>(output_size),
-                    cached_edge_tensors_[i].options()));
+                    seeds.options().dtype(edge_tensors[i].scalar_type())));
                 output_tensor_ptrs_ptr[i] = {
                     reinterpret_cast<std::byte*>(
                         output_edge_tensors.back().data_ptr()),
@@ -425,11 +419,6 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               THRUST_CALL(
                   copy_n, output_tensor_ptrs_ptr, num_tensors,
                   output_tensor_ptrs_dev.get());
-              // This event and the later synchronization is needed so that the
-              // allocated pinned tensor stays alive during the copy operation.
-              // @todo mfbalin: eliminate this synchronization.
-              at::cuda::CUDAEvent copy_event;
-              copy_event.record(cuda::GetCurrentStream());
 
               {
                 thrust::counting_iterator<int64_t> iota{0};
@@ -445,6 +434,7 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                     });
                 constexpr int64_t max_copy_at_once =
                     std::numeric_limits<int32_t>::max();
+                const int64_t num_buffers = num_nodes * num_tensors;
                 for (int64_t i = 0; i < num_buffers; i += max_copy_at_once) {
                   CUB_CALL(
                       DeviceMemcpy::Batched, input.get() + i,
@@ -453,7 +443,6 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                 }
               }
 
-              copy_event.synchronize();
               return std::make_tuple(output_indptr, output_edge_tensors);
             }));
       }));
