@@ -71,9 +71,9 @@ class GpuGraphCache : public torch::CustomClassHolder {
 
   /**
    * @brief After the graph structure for the missing node ids are fetched, it
-   * inserts some of the node ids and returns the final output graph structure,
-   * combining the information in the cache with the graph structure for the
-   * missing node ids.
+   * inserts the node ids which passes the threshold and returns the final
+   * output graph structure, combining the information in the cache with the
+   * graph structure for the missing node ids.
    *
    * @param seeds The node ids that the cache was queried with.
    * @param indices seeds[indices[:num_hit]] gives us the node ids that were
