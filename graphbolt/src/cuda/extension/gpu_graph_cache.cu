@@ -409,18 +409,13 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               const auto output_allocation_count =
                   (static_cast<indptr_t>(output_size) + alignment - 1) /
                   alignment * alignment;
-
-              std::vector<torch::Tensor> output_edge_tensors;
               auto output_allocation = torch::empty(
                   output_allocation_count * total_size,
                   seeds.options().dtype(torch::kInt8));
-              auto output_tensor_ptrs = torch::empty(
-                  2 * num_tensors, c10::TensorOptions()
-                                       .dtype(torch::kInt64)
-                                       .pinned_memory(true));
-              const auto output_tensor_ptrs_ptr =
-                  reinterpret_cast<::cuda::std::tuple<std::byte*, int64_t>*>(
-                      output_tensor_ptrs.data_ptr());
+              const auto output_allocation_ptr =
+                  output_allocation.data_ptr<int8_t>();
+
+              std::vector<torch::Tensor> output_edge_tensors;
               for (size_t i = 0; i < num_tensors; i++) {
                 const auto cum_size =
                     ::cuda::std::get<3>(cache_missing_dtype_ptr[i]);
@@ -429,35 +424,19 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                         .slice(0, cum_size * output_allocation_count)
                         .view(edge_tensors[i].scalar_type())
                         .slice(0, 0, static_cast<indptr_t>(output_size)));
-                output_tensor_ptrs_ptr[i] = {
-                    reinterpret_cast<std::byte*>(
-                        output_edge_tensors.back().data_ptr()),
-                    ::cuda::std::get<2>(cache_missing_dtype_ptr[i])};
               }
-              auto output_tensor_ptrs_dev =
-                  allocator
-                      .AllocateStorage<::cuda::std::tuple<std::byte*, int64_t>>(
-                          num_tensors);
-              THRUST_CALL(
-                  copy_n, output_tensor_ptrs_ptr, num_tensors,
-                  output_tensor_ptrs_dev.get());
-              // This event and the later synchronization is needed so that the
-              // allocated pinned tensor stays alive during the copy operation.
-              // @todo mfbalin: eliminate this synchronization.
-              at::cuda::CUDAEvent copy_event;
-              copy_event.record(cuda::GetCurrentStream());
 
               {
                 thrust::counting_iterator<int64_t> iota{0};
-                auto output_tensor_ptrs_dev_ptr = output_tensor_ptrs_dev.get();
                 auto output_buffer_it = thrust::make_transform_iterator(
                     iota, [=] __host__ __device__(int64_t i) {
                       const auto tensor_idx = i / num_nodes;
                       const auto idx = i % num_nodes;
                       const auto offset = output_indptr_ptr[idx];
-                      const auto [output_ptr, size] =
-                          output_tensor_ptrs_dev_ptr[tensor_idx];
-                      return output_ptr + offset * size;
+                      const auto [_0, _1, size, cum_size] =
+                          cache_missing_dtype_dev_ptr[tensor_idx];
+                      return output_allocation_ptr +
+                             cum_size * output_allocation_count + offset * size;
                     });
                 constexpr int64_t max_copy_at_once =
                     std::numeric_limits<int32_t>::max();
@@ -469,7 +448,6 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                 }
               }
 
-              copy_event.synchronize();
               return std::make_tuple(output_indptr, output_edge_tensors);
             }));
       }));
