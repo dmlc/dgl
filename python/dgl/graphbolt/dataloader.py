@@ -106,6 +106,13 @@ class DataLoader(torch.utils.data.DataLoader):
         If True, the data loader will overlap the UVA graph fetching operations
         with the rest of operations by using an alternative CUDA stream. Default
         is False.
+    num_gpu_cached_edges : int, optional
+        If positive and overlap_graph_fetch is True, then the GPU will cache
+        frequently accessed vertex neighborhoods to reduce the PCI-e bandwidth
+        demand due to pinned graph accesses.
+    gpu_cache_threshold : int, optional
+        Determines how many times a vertex needs to be accessed before its
+        neighborhood ends up being cached on the GPU.
     max_uva_threads : int, optional
         Limits the number of CUDA threads used for UVA copies so that the rest
         of the computations can run simultaneously with it. Setting it to a too
@@ -121,8 +128,8 @@ class DataLoader(torch.utils.data.DataLoader):
         persistent_workers=True,
         overlap_feature_fetch=True,
         overlap_graph_fetch=False,
-        num_cached_edges=0,
-        threshold=1,
+        num_gpu_cached_edges=0,
+        gpu_cache_threshold=1,
         max_uva_threads=6144,
     ):
         # Multiprocessing requires two modifications to the datapipe:
@@ -195,8 +202,8 @@ class DataLoader(torch.utils.data.DataLoader):
                     datapipe_graph,
                     sampler,
                     sampler.fetch_and_sample(
-                        num_cached_edges,
-                        threshold,
+                        num_gpu_cached_edges,
+                        gpu_cache_threshold,
                         _get_uva_stream(),
                         executor,
                         1,

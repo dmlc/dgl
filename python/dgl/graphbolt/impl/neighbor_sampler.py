@@ -35,11 +35,15 @@ class FetchCachedInsubgraphData(Mapper):
     """
 
     def __init__(
-        self, datapipe, sample_per_layer_obj, num_cached_edges, threshold
+        self,
+        datapipe,
+        sample_per_layer_obj,
+        num_gpu_cached_edges,
+        gpu_cache_threshold,
     ):
         super().__init__(datapipe, self._fetch_per_layer)
         graph = sample_per_layer_obj.sampler.__self__
-        num_cached_edges = min(num_cached_edges, graph.total_num_edges)
+        num_gpu_cached_edges = min(num_gpu_cached_edges, graph.total_num_edges)
         dtypes = OrderedDict()
         dtypes["indices"] = graph.indices.dtype
         if graph.type_per_edge is not None:
@@ -51,8 +55,8 @@ class FetchCachedInsubgraphData(Mapper):
             if probs_or_mask is not None:
                 dtypes["probs_or_mask"] = probs_or_mask.dtype
         self.cache = GPUGraphCache(
-            num_cached_edges,
-            threshold,
+            num_gpu_cached_edges,
+            gpu_cache_threshold,
             graph.csc_indptr.dtype,
             list(dtypes.values()),
         )
@@ -139,16 +143,16 @@ class FetchInsubgraphData(Mapper):
         self,
         datapipe,
         sample_per_layer_obj,
-        num_cached_edges=0,
-        threshold=1,
+        num_gpu_cached_edges=0,
+        gpu_cache_threshold=1,
         stream=None,
         executor=None,
     ):
         self.graph = sample_per_layer_obj.sampler.__self__
         datapipe = datapipe.concat_hetero_seeds(sample_per_layer_obj)
-        if num_cached_edges > 0:
+        if num_gpu_cached_edges > 0:
             datapipe = datapipe.fetch_cached_insubgraph_data(
-                sample_per_layer_obj, num_cached_edges, threshold
+                sample_per_layer_obj, num_gpu_cached_edges, gpu_cache_threshold
             )
         super().__init__(datapipe, self._fetch_per_layer)
         self.prob_name = sample_per_layer_obj.prob_name
@@ -331,17 +335,17 @@ class FetcherAndSampler(MiniBatchTransformer):
     def __init__(
         self,
         sampler,
-        num_cached_edges,
-        threshold,
+        num_gpu_cached_edges,
+        gpu_cache_threshold,
         stream,
         executor,
         buffer_size,
     ):
         datapipe = sampler.datapipe.fetch_insubgraph_data(
-            sampler, num_cached_edges, threshold, stream, executor
+            sampler, num_gpu_cached_edges, gpu_cache_threshold, stream, executor
         )
         datapipe = datapipe.buffer(buffer_size).wait_future().wait()
-        if num_cached_edges > 0:
+        if num_gpu_cached_edges > 0:
             datapipe = datapipe.combine_cached_and_fetched_insubgraph(sampler)
         datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
         super().__init__(datapipe)
