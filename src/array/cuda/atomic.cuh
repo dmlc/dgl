@@ -65,7 +65,6 @@ struct Cast<half> {
   }
 };
 
-#if BF16_ENABLED
 template <>
 struct Cast<__nv_bfloat16> {
   typedef Code<sizeof(__nv_bfloat16)>::Type Type;
@@ -92,7 +91,6 @@ struct Cast<__nv_bfloat16> {
 #endif
   }
 };
-#endif  // BF16_ENABLED
 
 template <>
 struct Cast<float> {
@@ -120,7 +118,6 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(  // NOLINT
     unsigned short int* address,                                      // NOLINT
     unsigned short int compare,                                       // NOLINT
     unsigned short int val) {                                         // NOLINT
-  static_assert(CUDART_VERSION >= 10000, "Requires at least CUDA 10");
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
   return atomicCAS(address, compare, val);
 #else
@@ -171,17 +168,13 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(  // NOLINT
 #define OP(a, b) max(a, b)
 DEFINE_ATOMIC(Max)
 DEFINE_ATOMIC_16BIT(Max, half)
-#if BF16_ENABLED
 DEFINE_ATOMIC_16BIT(Max, __nv_bfloat16)
-#endif  // BF16_ENABLED
 #undef OP
 
 #define OP(a, b) min(a, b)
 DEFINE_ATOMIC(Min)
 DEFINE_ATOMIC_16BIT(Min, half)
-#if BF16_ENABLED
 DEFINE_ATOMIC_16BIT(Min, __nv_bfloat16)
-#endif  // BF16_ENABLED
 #undef OP
 
 #define OP(a, b) a + b
@@ -292,7 +285,6 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 #endif
 }
 
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 template <>
 __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 // make sure we have half support
@@ -308,9 +300,7 @@ __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
   return val;
 #endif  // __CUDA_ARCH__ >= 700
 }
-#endif  // defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 
-#if BF16_ENABLED
 template <>
 __device__ __forceinline__ __nv_bfloat16
 AtomicAdd<__nv_bfloat16>(__nv_bfloat16* addr, __nv_bfloat16 val) {
@@ -327,7 +317,6 @@ AtomicAdd<__nv_bfloat16>(__nv_bfloat16* addr, __nv_bfloat16 val) {
   return val;
 #endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
 }
-#endif  // BF16_ENABLED
 
 }  // namespace cuda
 }  // namespace aten
