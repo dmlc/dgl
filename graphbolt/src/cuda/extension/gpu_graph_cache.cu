@@ -263,6 +263,8 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               static_assert(
                   sizeof(std::byte) == 1, "Byte needs to have a size of 1.");
               auto cache_missing_dtype = torch::empty(
+                  // Below, we use this storage to store a tuple of 4 elements,
+                  // since each element is 64-bit, we need 4x int64 storage.
                   4 * num_tensors, c10::TensorOptions()
                                        .dtype(torch::kInt64)
                                        .pinned_memory(true));
