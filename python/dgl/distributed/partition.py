@@ -21,7 +21,7 @@ from ..partition import (
 )
 from ..random import choice as random_choice
 from ..transforms import sort_csc_by_tag, sort_csr_by_tag
-from .constants import DEFAULT_ETYPE, DEFAULT_NTYPE
+from .constants import DEFAULT_ETYPE, DEFAULT_NTYPE, DGL2GB_EID, GB_DST_ID
 from .graph_partition_book import (
     _etype_str_to_tuple,
     _etype_tuple_to_str,
@@ -1337,6 +1337,7 @@ def partition_graph(
     )
 
     if use_graphbolt:
+        kwargs["graph_formats"] = graph_formats
         dgl_partition_to_graphbolt(
             part_config,
             **kwargs,
@@ -1379,9 +1380,10 @@ def _cast_to_minimum_dtype(predicate, data, field=None):
 def dgl_partition_to_graphbolt(
     part_config,
     *,
-    store_eids=False,
+    store_eids=True,
     store_inner_node=False,
     store_inner_edge=False,
+    graph_formats=None,
 ):
     """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
 
@@ -1397,11 +1399,18 @@ def dgl_partition_to_graphbolt(
     part_config : str
         The partition configuration JSON file.
     store_eids : bool, optional
-        Whether to store edge IDs in the new graph. Default: False.
+        Whether to store edge IDs in the new graph. Default: True.
     store_inner_node : bool, optional
         Whether to store inner node mask in the new graph. Default: False.
     store_inner_edge : bool, optional
         Whether to store inner edge mask in the new graph. Default: False.
+    graph_formats : str or list[str], optional
+        Save partitions in specified formats. It could be any combination of
+        `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
+        it is not necessary to specify this argument. It's mainly for
+        specifying `coo` format to save edge ID mapping and destination node
+        IDs. If not specified, whether to save `coo` format is determined by
+        the availability of the format in DGL partitions. Default: None.
     """
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
@@ -1488,6 +1497,26 @@ def dgl_partition_to_graphbolt(
         edge_attributes = {
             attr: graph.edata[attr][edge_ids] for attr in required_edge_attrs
         }
+        # When converting DGLGraph to FusedCSCSamplingGraph, edge IDs are
+        # re-ordered(actually FusedCSCSamplingGraph does not have edge IDs
+        # in nature). So we need to save such re-order info for any
+        # operations that uses original local edge IDs. For now, this is
+        # required by `DistGraph.find_edges()` for link prediction tasks.
+        #
+        # What's more, in order to find the dst nodes efficiently, we save
+        # dst nodes directly in the edge attributes.
+        #
+        # So we require additional `(2 * E) * dtype` space in total.
+        if graph_formats is not None and isinstance(graph_formats, str):
+            graph_formats = [graph_formats]
+        save_coo = (
+            graph_formats is None and "coo" in graph.formats()["created"]
+        ) or (graph_formats is not None and "coo" in graph_formats)
+        if save_coo:
+            edge_attributes[DGL2GB_EID] = torch.argsort(edge_ids)
+            edge_attributes[GB_DST_ID] = gb.expand_indptr(
+                indptr, dtype=indices.dtype
+            )
 
         # Cast various data to minimum dtype.
         # Cast 1: indptr.
@@ -1505,6 +1534,8 @@ def dgl_partition_to_graphbolt(
             NTYPE: len(ntypes),
             EID: part_meta["num_edges"],
             ETYPE: len(etypes),
+            DGL2GB_EID: part_meta["num_edges"],
+            GB_DST_ID: part_meta["num_nodes"],
         }
         for attributes in [node_attributes, edge_attributes]:
             for key in attributes:

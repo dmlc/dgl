@@ -21,7 +21,88 @@ __all__ = [
     "SamplePerLayer",
     "SamplePerLayerFromFetchedSubgraph",
     "FetchInsubgraphData",
+    "ConcatHeteroSeeds",
+    "CombineCachedAndFetchedInSubgraph",
 ]
+
+
+@functional_datapipe("fetch_cached_insubgraph_data")
+class FetchCachedInsubgraphData(Mapper):
+    """Queries the GPUGraphCache and returns the missing seeds and a lambda
+    function that can be called with the fetched graph structure.
+    """
+
+    def __init__(self, datapipe, gpu_graph_cache):
+        super().__init__(datapipe, self._fetch_per_layer)
+        self.cache = gpu_graph_cache
+
+    def _fetch_per_layer(self, minibatch):
+        minibatch._seeds, minibatch._replace = self.cache.query(
+            minibatch._seeds
+        )
+
+        return minibatch
+
+
+@functional_datapipe("combine_cached_and_fetched_insubgraph")
+class CombineCachedAndFetchedInSubgraph(Mapper):
+    """Combined the fetched graph structure with the graph structure already
+    found inside the GPUGraphCache.
+    """
+
+    def __init__(self, datapipe, sample_per_layer_obj):
+        super().__init__(datapipe, self._combine_per_layer)
+        self.prob_name = sample_per_layer_obj.prob_name
+
+    def _combine_per_layer(self, minibatch):
+        subgraph = minibatch._sliced_sampling_graph
+
+        edge_tensors = [subgraph.indices]
+        if subgraph.type_per_edge is not None:
+            edge_tensors.append(subgraph.type_per_edge)
+        probs_or_mask = subgraph.edge_attribute(self.prob_name)
+        if probs_or_mask is not None:
+            edge_tensors.append(probs_or_mask)
+
+        subgraph.csc_indptr, edge_tensors = minibatch._replace(
+            subgraph.csc_indptr, edge_tensors
+        )
+        delattr(minibatch, "_replace")
+
+        subgraph.indices = edge_tensors[0]
+        edge_tensors = edge_tensors[1:]
+        if subgraph.type_per_edge is not None:
+            subgraph.type_per_edge = edge_tensors[0]
+            edge_tensors = edge_tensors[1:]
+        if probs_or_mask is not None:
+            subgraph.add_edge_attribute(self.prob_name, edge_tensors[0])
+            edge_tensors = edge_tensors[1:]
+        assert len(edge_tensors) == 0
+
+        return minibatch
+
+
+@functional_datapipe("concat_hetero_seeds")
+class ConcatHeteroSeeds(Mapper):
+    """Concatenates the seeds into a single tensor in the hetero case."""
+
+    def __init__(self, datapipe, sample_per_layer_obj):
+        super().__init__(datapipe, self._concat)
+        self.graph = sample_per_layer_obj.sampler.__self__
+
+    def _concat(self, minibatch):
+        seeds = minibatch._seed_nodes
+        if isinstance(seeds, dict):
+            (
+                seeds,
+                seed_offsets,
+            ) = self.graph._convert_to_homogeneous_nodes(seeds)
+        else:
+            seed_offsets = None
+        minibatch._seeds = seeds
+        minibatch._seed_offsets = seed_offsets
+
+        return minibatch
 
 
 @functional_datapipe("fetch_insubgraph_data")
@@ -33,10 +114,18 @@ class FetchInsubgraphData(Mapper):
     read as well."""
 
     def __init__(
-        self, datapipe, sample_per_layer_obj, stream=None, executor=None
+        self,
+        datapipe,
+        sample_per_layer_obj,
+        gpu_graph_cache,
+        stream=None,
+        executor=None,
     ):
-        super().__init__(datapipe, self._fetch_per_layer)
         self.graph = sample_per_layer_obj.sampler.__self__
+        datapipe = datapipe.concat_hetero_seeds(sample_per_layer_obj)
+        if gpu_graph_cache is not None:
+            datapipe = datapipe.fetch_cached_insubgraph_data(gpu_graph_cache)
+        super().__init__(datapipe, self._fetch_per_layer)
         self.prob_name = sample_per_layer_obj.prob_name
         self.stream = stream
         if executor is None:
@@ -46,18 +135,10 @@ class FetchInsubgraphData(Mapper):
 
     def _fetch_per_layer_impl(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
-            seeds = minibatch._seed_nodes
-            is_hetero = isinstance(seeds, dict)
-            if is_hetero:
-                for idx in seeds.values():
-                    idx.record_stream(torch.cuda.current_stream())
-                (
-                    seeds,
-                    seed_offsets,
-                ) = self.graph._convert_to_homogeneous_nodes(seeds)
-            else:
-                seeds.record_stream(torch.cuda.current_stream())
-                seed_offsets = None
+            seeds = minibatch._seeds
+            seed_offsets = minibatch._seed_offsets
+            delattr(minibatch, "_seeds")
+            delattr(minibatch, "_seed_offsets")
 
             def record_stream(tensor):
                 if stream is not None and tensor.is_cuda:
@@ -222,11 +303,20 @@ class CompactPerLayer(MiniBatchTransformer):
 class FetcherAndSampler(MiniBatchTransformer):
     """Overlapped graph sampling operation replacement."""
 
-    def __init__(self, sampler, stream, executor, buffer_size):
+    def __init__(
+        self,
+        sampler,
+        gpu_graph_cache,
+        stream,
+        executor,
+        buffer_size,
+    ):
         datapipe = sampler.datapipe.fetch_insubgraph_data(
-            sampler, stream, executor
+            sampler, gpu_graph_cache, stream, executor
         )
         datapipe = datapipe.buffer(buffer_size).wait_future().wait()
+        if gpu_graph_cache is not None:
+            datapipe = datapipe.combine_cached_and_fetched_insubgraph(sampler)
         datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
         super().__init__(datapipe)
 
@@ -369,7 +459,9 @@ class NeighborSampler(NeighborSamplerImpl):
     link prediction, the process needs another pre-peocess operation. That is,
     gathering unique nodes from the given node pairs, encompassing both
     positive and negative node pairs, and employs these nodes as the seed nodes
-    for subsequent steps.
+    for subsequent steps. When the graph is hetero, sampled subgraphs in
+    minibatch will contain every edge type even though it is empty after
+    sampling.
 
     Parameters
     ----------
@@ -479,7 +571,9 @@ class LayerNeighborSampler(NeighborSamplerImpl):
     link prediction, the process needs another pre-process operation. That is,
     gathering unique nodes from the given node pairs, encompassing both
     positive and negative node pairs, and employs these nodes as the seed nodes
-    for subsequent steps.
+    for subsequent steps. When the graph is hetero, sampled subgraphs in
+    minibatch will contain every edge type even though it is empty after
+    sampling.
 
     Implements the approach described in Appendix A.3 of the paper. Similar to
     dgl.dataloading.LaborSampler but this uses sequential poisson sampling

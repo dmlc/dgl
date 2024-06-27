@@ -160,7 +160,7 @@ def test_InSubgraphSampler_hetero():
         edge_type_to_id=etypes,
     ).to(F.ctx())
 
-    item_set = gb.ItemSetDict(
+    item_set = gb.HeteroItemSet(
         {
             "N0": gb.ItemSet(torch.LongTensor([1, 0, 2]), names="seeds"),
             "N1": gb.ItemSet(torch.LongTensor([0, 2, 1]), names="seeds"),

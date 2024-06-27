@@ -1,6 +1,19 @@
 /**
- *  Copyright (c) 2023 by Contributors
- *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   All rights reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ *
  * @file cuda/unique_and_compact_impl.cu
  * @brief Unique and compact operator implementation on CUDA.
  */
@@ -264,22 +277,7 @@ UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
-  auto dev_id = cuda::GetCurrentStream().device_index();
-  static std::mutex mtx;
-  static std::unordered_map<decltype(dev_id), int> compute_capability_cache;
-  const auto compute_capability_major = [&] {
-    std::lock_guard lock(mtx);
-    auto it = compute_capability_cache.find(dev_id);
-    if (it != compute_capability_cache.end()) {
-      return it->second;
-    } else {
-      int major;
-      CUDA_RUNTIME_CHECK(cudaDeviceGetAttribute(
-          &major, cudaDevAttrComputeCapabilityMajor, dev_id));
-      return compute_capability_cache[dev_id] = major;
-    }
-  }();
-  if (compute_capability_major >= 7) {
+  if (cuda::compute_capability() >= 70) {
     // Utilizes a hash table based implementation, the mapped id of a vertex
     // will be monotonically increasing as the first occurrence index of it in
     // torch.cat([unique_dst_ids, src_ids]). Thus, it is deterministic.

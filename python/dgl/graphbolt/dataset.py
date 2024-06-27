@@ -1,8 +1,9 @@
 """GraphBolt Dataset."""
+
 from typing import Dict, List, Union
 
 from .feature_store import FeatureStore
-from .itemset import ItemSet, ItemSetDict
+from .itemset import HeteroItemSet, ItemSet
 from .sampling_graph import SamplingGraph
 
 __all__ = [
@@ -32,17 +33,17 @@ class Task:
         raise NotImplementedError
 
     @property
-    def train_set(self) -> Union[ItemSet, ItemSetDict]:
+    def train_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the training set."""
         raise NotImplementedError
 
     @property
-    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
+    def validation_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the validation set."""
         raise NotImplementedError
 
     @property
-    def test_set(self) -> Union[ItemSet, ItemSetDict]:
+    def test_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the test set."""
         raise NotImplementedError
 
@@ -89,6 +90,6 @@ class Dataset:
         raise NotImplementedError
 
     @property
-    def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
+    def all_nodes_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the itemset containing all nodes."""
         raise NotImplementedError

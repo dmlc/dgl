@@ -213,7 +213,7 @@ def get_hetero_graph():
 
 def test_exclude_seed_edges_hetero():
     graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {"n1:e1:n2": gb.ItemSet(torch.tensor([[0, 1]]), names="seeds")}
     )
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())

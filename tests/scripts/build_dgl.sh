@@ -8,7 +8,10 @@ if [ $# -ne 1 ]; then
 fi
 
 if [[ $1 != "cpu" ]]; then
-    CMAKE_VARS="$CMAKE_VARS -DUSE_CUDA=ON"
+    # CI is now running on g4dn instance. Specify target arch to avoid below
+    # error: Unknown CUDA Architecture Name 9.0a in CUDA_SELECT_NVCC_ARCH_FLAGS
+    export TORCH_CUDA_ARCH_LIST=7.5 # For dgl_sparse and tensoradaptor.
+    CMAKE_VARS="$CMAKE_VARS -DUSE_CUDA=ON -DCUDA_ARCH_NAME=Turing" # For graphbolt.
 fi
 
 # This is a semicolon-separated list of Python interpreters containing PyTorch.

@@ -5,6 +5,18 @@ from dataclasses import dataclass
 
 import torch
 from torch.torch_version import TorchVersion
+
+if (
+    TorchVersion(torch.__version__) >= "2.3.0"
+    and TorchVersion(torch.__version__) < "2.3.1"
+):
+    # Due to https://github.com/dmlc/dgl/issues/7380, for torch 2.3.0, we need
+    # to check if dill is available before using it.
+    torch.utils.data.datapipes.utils.common.DILL_AVAILABLE = (
+        torch.utils._import_utils.dill_available()
+    )
+
+# pylint: disable=wrong-import-position
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
@@ -302,6 +314,20 @@ class Bufferer(IterDataPipe):
         while len(self.buffer) > 0:
             yield self.buffer.popleft()
 
+    def __getstate__(self):
+        state = (self.datapipe, self.buffer.maxlen)
+        if IterDataPipe.getstate_hook is not None:
+            return IterDataPipe.getstate_hook(state)
+        return state
+
+    def __setstate__(self, state):
+        self.datapipe, buffer_size = state
+        self.buffer = deque(maxlen=buffer_size)
+
+    def reset(self):
+        """Resets the state of the datapipe."""
+        self.buffer.clear()
+
 
 @functional_datapipe("wait")
 class Waiter(IterDataPipe):
@@ -342,6 +368,7 @@ class CSCFormatBase:
     >>> print(csc_foramt_base)
     ... torch.tensor([1, 4, 2])
     """
+
     indptr: torch.Tensor = None
     indices: torch.Tensor = None
 

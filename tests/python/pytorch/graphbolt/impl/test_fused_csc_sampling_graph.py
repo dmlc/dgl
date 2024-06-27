@@ -884,12 +884,12 @@ def test_temporal_sample_neighbors_homo(
             seed_timestamp,
             fanouts,
             replace=replace,
-            node_timestamp_attr_name="timestamp"
-            if use_node_timestamp
-            else None,
-            edge_timestamp_attr_name="timestamp"
-            if use_edge_timestamp
-            else None,
+            node_timestamp_attr_name=(
+                "timestamp" if use_node_timestamp else None
+            ),
+            edge_timestamp_attr_name=(
+                "timestamp" if use_edge_timestamp else None
+            ),
         )
 
     def _get_available_neighbors():
@@ -1613,10 +1613,14 @@ def test_csc_sampling_graph_to_pinned_memory():
     is_graph_pinned(graph)
 
 
+@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize("is_pinned", [False, True])
 @pytest.mark.parametrize("nodes", [None, True])
-def test_sample_neighbors_homo(labor, is_pinned, nodes):
+def test_sample_neighbors_homo(
+    indptr_dtype, indices_dtype, labor, is_pinned, nodes
+):
     if is_pinned and nodes is None:
         pytest.skip("Optional nodes and is_pinned is not supported together.")
     """Original graph in COO:
@@ -1630,8 +1634,10 @@ def test_sample_neighbors_homo(labor, is_pinned, nodes):
         pytest.skip("Pinning is not meaningful without a GPU.")
     # Initialize data.
     total_num_edges = 12
-    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
-    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    indptr = torch.tensor([0, 3, 5, 7, 9, 12], dtype=indptr_dtype)
+    indices = torch.tensor(
+        [0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4], dtype=indices_dtype
+    )
     assert indptr[-1] == total_num_edges
     assert indptr[-1] == len(indices)
 
@@ -1642,7 +1648,7 @@ def test_sample_neighbors_homo(labor, is_pinned, nodes):
 
     # Generate subgraph via sample neighbors.
     if nodes:
-        nodes = torch.LongTensor([1, 3, 4]).to(F.ctx())
+        nodes = torch.tensor([1, 3, 4], dtype=indices_dtype).to(F.ctx())
     elif F._default_context_str != "gpu":
         pytest.skip("Optional nodes is supported only for the GPU.")
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
@@ -1662,8 +1668,10 @@ def test_sample_neighbors_homo(labor, is_pinned, nodes):
     assert subgraph.original_edge_ids is None
 
 
+@pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
+@pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("labor", [False, True])
-def test_sample_neighbors_hetero(labor):
+def test_sample_neighbors_hetero(indptr_dtype, indices_dtype, labor):
     """Original graph in COO:
     "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
     "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
@@ -1677,10 +1685,12 @@ def test_sample_neighbors_hetero(labor):
     ntypes = {"n1": 0, "n2": 1}
     etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
     total_num_edges = 9
-    indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
-    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
-    type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
-    node_type_offset = torch.LongTensor([0, 2, 5])
+    indptr = torch.tensor([0, 2, 4, 6, 7, 9], dtype=indptr_dtype)
+    indices = torch.tensor([2, 4, 2, 3, 0, 1, 1, 0, 1], dtype=indices_dtype)
+    type_per_edge = torch.tensor(
+        [1, 1, 1, 1, 0, 0, 0, 0, 0], dtype=indices_dtype
+    )
+    node_type_offset = torch.tensor([0, 2, 5], dtype=indices_dtype)
     assert indptr[-1] == total_num_edges
     assert indptr[-1] == len(indices)
 
@@ -1696,8 +1706,8 @@ def test_sample_neighbors_hetero(labor):
 
     # Sample on both node types.
     nodes = {
-        "n1": torch.tensor([0], device=F.ctx()),
-        "n2": torch.tensor([0], device=F.ctx()),
+        "n1": torch.tensor([0], dtype=indices_dtype, device=F.ctx()),
+        "n2": torch.tensor([0], dtype=indices_dtype, device=F.ctx()),
     }
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
@@ -1725,7 +1735,7 @@ def test_sample_neighbors_hetero(labor):
     assert subgraph.original_edge_ids is None
 
     # Sample on single node type.
-    nodes = {"n1": torch.tensor([0], device=F.ctx())}
+    nodes = {"n1": torch.tensor([0], dtype=indices_dtype, device=F.ctx())}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(nodes, fanouts)
@@ -2275,3 +2285,70 @@ def test_sample_neighbors_hetero_pick_number(
             else:
                 # Etype 2: 0 valid neighbors.
                 assert sampled_num == 0
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_graph_attributes():
+    num_nodes = 1000
+    num_edges = 10 * 1000
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
+    graph = gb.fused_csc_sampling_graph(
+        csc_indptr,
+        indices,
+        node_attributes=None,
+        edge_attributes=None,
+    )
+
+    # Case 1: default is None.
+    assert graph.node_attributes is None
+    assert graph.edge_attributes is None
+
+    # Case 2: Assign the whole node/edge attributes.
+    node_attributes = {
+        "A": torch.rand(num_nodes, 2),
+        "B": torch.rand(num_nodes, 2),
+    }
+    edge_attributes = {
+        "A": torch.rand(num_nodes, 2),
+        "B": torch.rand(num_nodes, 2),
+    }
+    graph.node_attributes = node_attributes
+    graph.edge_attributes = edge_attributes
+    for k, v in node_attributes.items():
+        assert torch.equal(v, graph.node_attributes[k])
+        assert torch.equal(v, graph.node_attribute(k))
+    for k, v in edge_attributes.items():
+        assert torch.equal(v, graph.edge_attributes[k])
+        assert torch.equal(v, graph.edge_attribute(k))
+    assert "C" not in graph.node_attributes
+    assert "C" not in graph.edge_attributes
+    with pytest.raises(RuntimeError, match="Node attribute C does not exist."):
+        graph.node_attribute("C")
+    with pytest.raises(RuntimeError, match="Edge attribute C does not exist."):
+        graph.edge_attribute("C")
+
+    # Case 3: Assign/overwrite more node/edge attributes into existing ones.
+    for key in ["B", "C"]:
+        node_attributes[key] = torch.rand(num_nodes, 2)
+        edge_attributes[key] = torch.rand(num_edges, 2)
+        graph.add_node_attribute(key, node_attributes[key])
+        graph.add_edge_attribute(key, edge_attributes[key])
+    for k, v in node_attributes.items():
+        assert torch.equal(v, graph.node_attributes[k])
+        assert torch.equal(v, graph.node_attribute(k))
+    for k, v in edge_attributes.items():
+        assert torch.equal(v, graph.edge_attributes[k])
+        assert torch.equal(v, graph.edge_attribute(k))
+
+    # Case 4: Assign more node/edge attributes which were None previously.
+    graph.node_attributes = None
+    graph.edge_attributes = None
+    graph.add_node_attribute("C", node_attributes["C"])
+    graph.add_edge_attribute("C", edge_attributes["C"])
+    assert torch.equal(node_attributes["C"], graph.node_attribute("C"))
+    assert torch.equal(node_attributes["C"], graph.node_attributes["C"])
+    assert torch.equal(edge_attributes["C"], graph.edge_attribute("C"))
+    assert torch.equal(edge_attributes["C"], graph.edge_attributes["C"])

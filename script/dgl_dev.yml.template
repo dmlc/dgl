@@ -14,7 +14,7 @@ dependencies:
     - networkx
     - nltk
     - nose
-    - numpy
+    - numpy<2.0.0
     - ogb
     - pandas
     - psutil
@@ -49,5 +49,6 @@ dependencies:
     - lintrunner
     - jupyterlab
     - ipywidgets
+    - expecttest
 variables:
   DGL_HOME: __DGL_HOME__
