@@ -3,6 +3,7 @@ import os
 import tempfile
 import time
 import unittest
+import uuid
 
 import backend as F
 import dgl
@@ -121,8 +122,9 @@ def start_dist_dataloader(
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
+    graph_name = os.path.splitext(os.path.basename(part_config))[0]
     dist_graph = DistGraph(
-        "test_sampling",
+        graph_name,
         gpb=gpb,
         part_config=part_config,
     )
@@ -204,17 +206,17 @@ def test_standalone():
         print(g.idtype)
         num_parts = 1
         num_hops = 1
-
+        graph_name = f"graph_{uuid.uuid4()}"
         orig_nid, orig_eid = partition_graph(
             g,
-            "test_sampling",
+            graph_name,
             num_parts,
             test_dir,
             num_hops=num_hops,
             part_method="metis",
             return_mapping=True,
         )
-        part_config = os.path.join(test_dir, "test_sampling.json")
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
         os.environ["DGL_DIST_MODE"] = "standalone"
         try:
             start_dist_dataloader(
@@ -243,7 +245,8 @@ def start_dist_neg_dataloader(
         _, _, _, gpb, _, _, _ = load_partition(part_config, rank)
     num_edges_to_sample = 202
     batch_size = 32
-    dist_graph = DistGraph("test_mp", gpb=gpb, part_config=part_config)
+    graph_name = os.path.splitext(os.path.basename(part_config))[0]
+    dist_graph = DistGraph(graph_name, gpb=gpb, part_config=part_config)
     assert len(dist_graph.ntypes) == len(groundtruth_g.ntypes)
     assert len(dist_graph.etypes) == len(groundtruth_g.etypes)
     if len(dist_graph.etypes) == 1:
@@ -304,16 +307,17 @@ def check_neg_dataloader(g, num_server, num_workers):
 
         num_parts = num_server
         num_hops = 1
+        graph_name = f"graph_{uuid.uuid4()}"
         orig_nid, orig_eid = partition_graph(
             g,
-            "test_sampling",
+            graph_name,
             num_parts,
             test_dir,
             num_hops=num_hops,
             part_method="metis",
             return_mapping=True,
         )
-        part_config = os.path.join(test_dir, "test_sampling.json")
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
         if not isinstance(orig_nid, dict):
             orig_nid = {g.ntypes[0]: orig_nid}
         if not isinstance(orig_eid, dict):
@@ -380,10 +384,10 @@ def test_dist_dataloader(num_server, num_workers, use_graphbolt, return_eids):
         g = CitationGraphDataset("cora")[0]
         num_parts = num_server
         num_hops = 1
-
+        graph_name = f"graph_{uuid.uuid4()}"
         orig_nid, orig_eid = partition_graph(
             g,
-            "test_sampling",
+            graph_name,
             num_parts,
             test_dir,
             num_hops=num_hops,
@@ -393,7 +397,7 @@ def test_dist_dataloader(num_server, num_workers, use_graphbolt, return_eids):
             store_eids=return_eids,
         )
 
-        part_config = os.path.join(test_dir, "test_sampling.json")
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
         pserver_list = []
         ctx = mp.get_context("spawn")
         for i in range(num_server):
@@ -461,8 +465,9 @@ def start_node_dataloader(
         _, _, _, gpb, _, _, _ = load_partition(part_config, rank)
     num_nodes_to_sample = 202
     batch_size = 32
+    graph_name = os.path.splitext(os.path.basename(part_config))[0]
     dist_graph = DistGraph(
-        "test_sampling",
+        graph_name,
         gpb=gpb,
         part_config=part_config,
     )
@@ -580,7 +585,8 @@ def start_edge_dataloader(
         _, _, _, gpb, _, _, _ = load_partition(part_config, rank)
     num_edges_to_sample = 202
     batch_size = 32
-    dist_graph = DistGraph("test_sampling", gpb=gpb, part_config=part_config)
+    graph_name = os.path.splitext(os.path.basename(part_config))[0]
+    dist_graph = DistGraph(graph_name, gpb=gpb, part_config=part_config)
     assert len(dist_graph.ntypes) == len(groundtruth_g.ntypes)
     assert len(dist_graph.etypes) == len(groundtruth_g.etypes)
     if len(dist_graph.etypes) == 1:
@@ -767,9 +773,10 @@ def check_dataloader(
 
         num_parts = num_server
         num_hops = 1
+        graph_name = f"graph_{uuid.uuid4()}"
         orig_nid, orig_eid = partition_graph(
             g,
-            "test_sampling",
+            graph_name,
             num_parts,
             test_dir,
             num_hops=num_hops,
@@ -778,7 +785,7 @@ def check_dataloader(
             use_graphbolt=use_graphbolt,
             store_eids=return_eids,
         )
-        part_config = os.path.join(test_dir, "test_sampling.json")
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
         if not isinstance(orig_nid, dict):
             orig_nid = {g.ntypes[0]: orig_nid}
         if not isinstance(orig_eid, dict):
@@ -900,7 +907,6 @@ def test_dataloader_homograph(
     )
 
 
-@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize("num_workers", [0])
 @pytest.mark.parametrize("use_graphbolt", [False, True])
 @pytest.mark.parametrize("exclude", [None, "self", "reverse_id"])
@@ -950,7 +956,6 @@ def test_dataloader_homograph_prob_or_mask(
     )
 
 
-@unittest.skip(reason="Skip due to glitch in CI")
 @pytest.mark.parametrize("num_server", [1])
 @pytest.mark.parametrize("num_workers", [0, 1])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
@@ -1097,7 +1102,7 @@ def test_multiple_dist_dataloaders(
         generate_ip_config(ip_config, num_parts, num_servers)
 
         orig_g = dgl.rand_graph(1000, 10000)
-        graph_name = "test_multiple_dataloaders"
+        graph_name = f"graph_{uuid.uuid4()}"
         partition_graph(
             orig_g,
             graph_name,
