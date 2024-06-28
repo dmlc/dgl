@@ -1,0 +1,67 @@
+import unittest
+
+import backend as F
+
+import pytest
+import torch
+
+from dgl import graphbolt as gb
+
+
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+@pytest.mark.parametrize("feature_size", [2, 16])
+def test_feature_cache(dtype, feature_size):
+    cache_size = 32
+    a = torch.randint(0, 2, [1024, feature_size], dtype=dtype)
+    cache = gb.impl.FeatureCache((cache_size,) + a.shape[1:], a.dtype)
+
+    keys = torch.tensor([0, 1])
+    values, missing_index, missing_keys = cache.query(keys, False)
+    assert torch.equal(missing_keys.flip([0]), keys)
+
+    missing_values = a[missing_keys]
+    cache.replace(missing_keys, missing_values)
+    values[missing_index] = missing_values
+    assert torch.equal(values, a[keys])
+
+    pin_memory = F._default_context_str == "gpu"
+
+    keys = torch.arange(1, 33)
+    values, missing_index, missing_keys = cache.query(keys, pin_memory)
+    assert torch.equal(missing_keys.flip([0]), torch.arange(2, 33))
+    assert not pin_memory or values.is_pinned()
+
+    missing_values = a[missing_keys]
+    cache.replace(missing_keys, missing_values)
+    values[missing_index] = missing_values
+    assert torch.equal(values, a[keys])
+
+    values, missing_index, missing_keys = cache.query(keys)
+    assert torch.equal(missing_keys.flip([0]), torch.tensor([5]))
+
+    missing_values = a[missing_keys]
+    cache.replace(missing_keys, missing_values)
+    values[missing_index] = missing_values
+    assert torch.equal(values, a[keys])
+
+    values, missing_index, missing_keys = cache.query(keys)
+    assert torch.equal(missing_keys.flip([0]), torch.tensor([]))
+
+    missing_values = a[missing_keys]
+    cache.replace(missing_keys, missing_values)
+    values[missing_index] = missing_values
+    assert torch.equal(values, a[keys])
