@@ -30,6 +30,8 @@ class DeepwalkTrainer:
             fast_neg=args.fast_neg,
             ogbl_name=args.ogbl_name,
             load_from_ogbl=args.load_from_ogbl,
+            ogbn_name=args.ogbn_name,
+            load_from_ogbn=args.load_from_ogbn,
         )
         self.emb_size = self.dataset.G.num_nodes()
         self.emb_model = None
@@ -299,6 +301,16 @@ if __name__ == "__main__":
         default=False,
         action="store_true",
         help="whether load dataset from ogbl",
+    )
+
+    parser.add_argument(
+        "--ogbn_name", type=str, help="name of ogbn dataset, e.g. ogbn-proteins"
+    )
+    parser.add_argument(
+        "--load_from_ogbn",
+        default=False,
+        action="store_true",
+        help="whether load dataset from ogbn",
     )
 
     # output files
