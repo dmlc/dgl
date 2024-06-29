@@ -50,9 +50,9 @@ S3FifoCachePolicy::Query(torch::Tensor keys) {
                               const auto key = keys_ptr[i];
                               auto it = position_map_.find(key);
                               if (it != position_map_.end()) {
-                                const auto [cache_key_ptr, pos] = it->second;
-                                cache_key_ptr->increment();
-                                positions_ptr[found_cnt] = pos;
+                                auto& key_ref = *it->second;
+                                key_ref.increment();
+                                positions_ptr[found_cnt] = key_ref.position;
                                 indices_ptr[found_cnt++] = i;
                               } else {
                                 indices_ptr[--missing_cnt] = i;
@@ -100,9 +100,9 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
           const auto key = keys_ptr[i];
           auto it = position_map_.find(key);
           if (it != position_map_.end()) {  // Already in the cache, inc freq.
-            const auto [cache_key_ptr, pos] = it->second;
-            cache_key_ptr->increment();
-            positions_ptr[i] = pos;
+            auto& key_ref = *it->second;
+            key_ref.increment();
+            positions_ptr[i] = key_ref.position;
           } else {
             const auto inside_G = in_G(key);
             auto& Queue = inside_G ? M_ : S_;
@@ -110,9 +110,8 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
                                  ? (inside_G ? evict_M() : evict_S())
                                  : position_q_++;
             TORCH_CHECK(0 <= pos && pos < capacity_, "Position out of bounds!");
+            position_map_[key] = Queue.insert(cache_key{key, pos});
             positions_ptr[i] = pos;
-            const auto cache_key_ptr = Queue.insert(cache_key{key});
-            position_map_[key] = {cache_key_ptr, pos};
           }
         }
       }));

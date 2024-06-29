@@ -77,17 +77,21 @@ struct circular_queue {
 struct cache_key {
   int64_t freq : 3;
   int64_t key : 61;
+  int64_t position;
 
-  cache_key(int64_t _key = 0) : freq{0}, key{_key} {
-    static_assert(sizeof(cache_key) == sizeof(int64_t));
+  cache_key(int64_t _key, int64_t _position)
+      : freq{0}, key{_key}, position{_position} {
+    static_assert(sizeof(cache_key) == 2 * sizeof(int64_t));
   }
+
+  cache_key() = default;
 
   void increment() { freq = std::min(3, static_cast<int>(freq + 1)); }
 
   void decrement() { freq = std::max(0, static_cast<int>(freq - 1)); }
 
   friend std::ostream& operator<<(std::ostream& os, const cache_key& m) {
-    return os << '(' << m.key << ", " << m.freq << ")";
+    return os << '(' << m.key << ", " << m.freq << ", " << m.position << ")";
   }
 };
 
@@ -116,14 +120,13 @@ struct S3FifoCachePolicy : public torch::CustomClassHolder {
   int64_t evict_M() {
     for (;;) {
       auto evicted = M_.evict();
+      auto it = position_map_.find(evicted.key);
       if (evicted.freq > 0) {
         evicted.decrement();
-        M_.insert(evicted);
+        it->second = M_.insert(evicted);
       } else {
-        auto it = position_map_.find(evicted.key);
-        auto pos = it->second.second;
         position_map_.erase(it);
-        return pos;
+        return evicted.position;
       }
     }
   }
@@ -131,17 +134,15 @@ struct S3FifoCachePolicy : public torch::CustomClassHolder {
   int64_t evict_S() {
     auto evicted = S_.evict();
     const auto is_M_full = M_.is_full();
+    auto it = position_map_.find(evicted.key);
     if (evicted.freq > 0 || !is_M_full) {
-      auto it = position_map_.find(evicted.key);
       const auto pos = is_M_full ? evict_M() : position_q_++;
-      it->second.first = M_.insert(evicted);
+      it->second = M_.insert(evicted);
       return pos;
     } else {
-      auto it = position_map_.find(evicted.key);
-      auto pos = it->second.second;
       position_map_.erase(it);
       ghost_map_[evicted.key] = ghost_q_time_++;
-      return pos;
+      return evicted.position;
     }
   }
 
@@ -152,7 +153,7 @@ struct S3FifoCachePolicy : public torch::CustomClassHolder {
   }
 
   circular_queue<cache_key> S_, M_;
-  std::unordered_map<int64_t, std::pair<cache_key*, int64_t>> position_map_;
+  std::unordered_map<int64_t, cache_key*> position_map_;
   std::unordered_map<int64_t, int64_t> ghost_map_;
   int64_t position_q_;
   int64_t ghost_q_time_;
