@@ -78,7 +78,9 @@ struct cache_key {
   int64_t freq : 3;
   int64_t key : 61;
 
-  cache_key(int64_t _key = 0) : freq{0}, key{_key} {}
+  cache_key(int64_t _key = 0) : freq{0}, key{_key} {
+    static_assert(sizeof(cache_key) == sizeof(int64_t));
+  }
 
   void increment() { freq = std::min(3, static_cast<int>(freq + 1)); }
 
