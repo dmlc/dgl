@@ -7,7 +7,12 @@ __all__ = ["FeatureCache"]
 class FeatureCache(object):
     """High-level wrapper for CPU embedding cache"""
 
-    def __init__(self, cache_shape, dtype):
+    def __init__(self, cache_shape, dtype, policy="s3-fifo"):
+        policies = ["s3-fifo"]
+        assert (
+            policy in policies
+        ), f"{policies} are the available caching policies."
+        self._policy = torch.ops.graphbolt.s3_fifo_cache_policy(cache_shape[0])
         self._cache = torch.ops.graphbolt.feature_cache(cache_shape, dtype)
         self.total_miss = 0
         self.total_queries = 0
@@ -28,10 +33,10 @@ class FeatureCache(object):
             filled by quering another source with missing_keys.
         """
         self.total_queries += keys.shape[0]
-        values, missing_index, missing_keys = self._cache.query(
-            keys, pin_memory
-        )
+        positions, index, missing_keys = self._policy.query(keys)
+        values = self._cache.query(positions, index, keys.shape[0], pin_memory)
         self.total_miss += missing_keys.shape[0]
+        missing_index = index[positions.size(0) :]
         return values, missing_index, missing_keys
 
     def replace(self, keys, values):
@@ -45,7 +50,8 @@ class FeatureCache(object):
         values: Tensor
             The values to insert to the GPU cache.
         """
-        self._cache.replace(keys, values)
+        positions = self._policy.replace(keys)
+        self._cache.replace(keys, values, positions)
 
     @property
     def miss_rate(self):

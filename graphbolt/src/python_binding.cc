@@ -96,6 +96,10 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("gpu_graph_cache", &cuda::GpuGraphCache::Create);
 #endif
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
+  m.class_<storage::S3FifoCachePolicy>("S3FifoCachePolicy")
+      .def("query", &storage::S3FifoCachePolicy::Query)
+      .def("replace", &storage::S3FifoCachePolicy::Replace);
+  m.def("s3_fifo_cache_policy", &storage::S3FifoCachePolicy::Create);
   m.class_<storage::FeatureCache>("FeatureCache")
       .def("query", &storage::FeatureCache::Query)
       .def("replace", &storage::FeatureCache::Replace);

@@ -89,8 +89,8 @@ struct cache_key {
   }
 };
 
-struct S3FifoCachePolicy {
-  S3FifoCachePolicy(const int64_t capacity);
+struct S3FifoCachePolicy : public torch::CustomClassHolder {
+  S3FifoCachePolicy(int64_t capacity);
 
   S3FifoCachePolicy() = default;
 
@@ -98,6 +98,8 @@ struct S3FifoCachePolicy {
       torch::Tensor keys);
 
   torch::Tensor Replace(torch::Tensor keys);
+
+  static c10::intrusive_ptr<S3FifoCachePolicy> Create(int64_t capacity);
 
   friend std::ostream& operator<<(
       std::ostream& os, const S3FifoCachePolicy& m) {
@@ -160,17 +162,18 @@ struct FeatureCache : public torch::CustomClassHolder {
 
   FeatureCache() = default;
 
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
-      torch::Tensor keys, bool pin_memory);
+  torch::Tensor Query(
+      torch::Tensor positions, torch::Tensor indices, int64_t size,
+      bool pin_memory);
 
-  void Replace(torch::Tensor keys, torch::Tensor values);
+  void Replace(
+      torch::Tensor keys, torch::Tensor values, torch::Tensor positions);
 
   static c10::intrusive_ptr<FeatureCache> Create(
       const std::vector<int64_t>& shape, torch::ScalarType dtype);
 
  private:
   torch::Tensor tensor_;
-  S3FifoCachePolicy policy_;
 };
 
 }  // namespace storage

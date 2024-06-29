@@ -22,7 +22,7 @@
 namespace graphbolt {
 namespace storage {
 
-S3FifoCachePolicy::S3FifoCachePolicy(const int64_t capacity)
+S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
     : S_{capacity / 10},
       M_{capacity - capacity / 10},
       position_q_{0},
@@ -31,8 +31,7 @@ S3FifoCachePolicy::S3FifoCachePolicy(const int64_t capacity)
 
 FeatureCache::FeatureCache(
     const std::vector<int64_t>& shape, torch::ScalarType dtype)
-    : tensor_{torch::empty(shape, c10::TensorOptions().dtype(dtype))},
-      policy_{shape.at(0)} {}
+    : tensor_{torch::empty(shape, c10::TensorOptions().dtype(dtype))} {}
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 S3FifoCachePolicy::Query(torch::Tensor keys) {
@@ -66,33 +65,29 @@ S3FifoCachePolicy::Query(torch::Tensor keys) {
       missing_keys.slice(0, found_cnt)};
 }
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> FeatureCache::Query(
-    torch::Tensor keys, bool pin_memory) {
+torch::Tensor FeatureCache::Query(
+    torch::Tensor positions, torch::Tensor indices, int64_t size,
+    bool pin_memory) {
   std::vector<int64_t> output_shape{
       tensor_.sizes().begin(), tensor_.sizes().end()};
-  output_shape[0] = keys.size(0);
+  output_shape[0] = size;
   auto values =
       torch::empty(output_shape, tensor_.options().pinned_memory(pin_memory));
-  torch::Tensor positions, indices, missing_keys;
-  std::tie(positions, indices, missing_keys) = policy_.Query(keys);
   constexpr int grain_size = 64;
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
-  AT_DISPATCH_INDEX_TYPES(
-      missing_keys.scalar_type(), "FeatureCache::Replace", ([&] {
-        const auto positions_ptr = positions.data_ptr<int64_t>();
-        const auto indices_ptr = indices.data_ptr<int64_t>();
-        torch::parallel_for(
-            0, positions.size(0), grain_size, [&](int64_t begin, int64_t end) {
-              for (int64_t i = begin; i < end; i++) {
-                std::memcpy(
-                    values_ptr + indices_ptr[i] * row_bytes,
-                    tensor_ptr + positions_ptr[i] * row_bytes, row_bytes);
-              }
-            });
-      }));
-  return {values, indices.slice(0, positions.size(0)), missing_keys};
+  const auto positions_ptr = positions.data_ptr<int64_t>();
+  const auto indices_ptr = indices.data_ptr<int64_t>();
+  torch::parallel_for(
+      0, positions.size(0), grain_size, [&](int64_t begin, int64_t end) {
+        for (int64_t i = begin; i < end; i++) {
+          std::memcpy(
+              values_ptr + indices_ptr[i] * row_bytes,
+              tensor_ptr + positions_ptr[i] * row_bytes, row_bytes);
+        }
+      });
+  return values;
 }
 
 torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
@@ -124,12 +119,12 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
   return positions;
 }
 
-void FeatureCache::Replace(torch::Tensor keys, torch::Tensor values) {
+void FeatureCache::Replace(
+    torch::Tensor keys, torch::Tensor values, torch::Tensor positions) {
   if (keys.size(0) > tensor_.size(0)) {
     keys = keys.slice(0, 0, tensor_.size(0));
     values = values.slice(0, 0, tensor_.size(0));
   }
-  auto positions = policy_.Replace(keys);
   constexpr int grain_size = 64;
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
@@ -148,6 +143,11 @@ void FeatureCache::Replace(torch::Tensor keys, torch::Tensor values) {
 c10::intrusive_ptr<FeatureCache> FeatureCache::Create(
     const std::vector<int64_t>& shape, torch::ScalarType dtype) {
   return c10::make_intrusive<FeatureCache>(shape, dtype);
+}
+
+c10::intrusive_ptr<S3FifoCachePolicy> S3FifoCachePolicy::Create(
+    int64_t capacity) {
+  return c10::make_intrusive<S3FifoCachePolicy>(capacity);
 }
 
 }  // namespace storage
