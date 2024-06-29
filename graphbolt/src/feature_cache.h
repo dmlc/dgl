@@ -80,9 +80,9 @@ struct cache_key {
 
   cache_key(int64_t _key = 0) : freq{0}, key{_key} {}
 
-  void increment() { freq = std::min(3, freq + 1); }
+  void increment() { freq = std::min(3, static_cast<int>(freq + 1)); }
 
-  void decrement() { freq = std::max(0, freq - 1); }
+  void decrement() { freq = std::max(0, static_cast<int>(freq - 1)); }
 
   friend std::ostream& operator<<(std::ostream& os, const cache_key& m) {
     return os << '(' << m.key << ", " << m.freq << ")";
