@@ -17,11 +17,11 @@
  * @file feature_cache.h
  * @brief Feature cache implementation on the CPU.
  */
+#include <parallel_hashmap/phmap.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
 #include <optional>
-#include <unordered_map>
 #include <vector>
 
 namespace graphbolt {
@@ -153,8 +153,8 @@ struct S3FifoCachePolicy : public torch::CustomClassHolder {
   }
 
   circular_queue<cache_key> S_, M_;
-  std::unordered_map<int64_t, cache_key*> position_map_;
-  std::unordered_map<int64_t, int64_t> ghost_map_;
+  phmap::flat_hash_map<int64_t, cache_key*> position_map_;
+  phmap::flat_hash_map<int64_t, int64_t> ghost_map_;
   int64_t position_q_;
   int64_t ghost_q_time_;
   int64_t capacity_;
