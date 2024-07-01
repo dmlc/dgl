@@ -22,6 +22,8 @@
 namespace graphbolt {
 namespace storage {
 
+constexpr int grain_size = 64;
+
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
     : S_{capacity / 10},
       M_{capacity - capacity / 10},
@@ -73,7 +75,6 @@ torch::Tensor FeatureCache::Query(
   output_shape[0] = size;
   auto values =
       torch::empty(output_shape, tensor_.options().pinned_memory(pin_memory));
-  constexpr int grain_size = 64;
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
@@ -124,7 +125,6 @@ void FeatureCache::Replace(
     keys = keys.slice(0, 0, tensor_.size(0));
     values = values.slice(0, 0, tensor_.size(0));
   }
-  constexpr int grain_size = 64;
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());

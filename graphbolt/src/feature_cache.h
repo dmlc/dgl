@@ -21,7 +21,6 @@
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
-#include <optional>
 #include <vector>
 
 namespace graphbolt {
