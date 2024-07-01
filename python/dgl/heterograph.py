@@ -3262,10 +3262,11 @@ class DGLGraph(object):
                 # Raise error since some (u, v) pair is not a valid edge.
                 idx = F.nonzero_1d(is_neg_one)
                 raise DGLError(
-                    "Error: (%d, %d) does not form a valid edge."
+                    "Error: %d invalid edges, (%d, %d) is one."
                     % (
-                        F.as_scalar(F.gather_row(u, idx)),
-                        F.as_scalar(F.gather_row(v, idx)),
+                        len(idx),
+                        F.as_scalar(F.gather_row(u, idx[0])),
+                        F.as_scalar(F.gather_row(v, idx[0])),
                     )
                 )
             return F.as_scalar(eid) if is_int else eid
