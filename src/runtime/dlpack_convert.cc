@@ -9,6 +9,8 @@
 #include <dgl/runtime/ndarray.h>
 #include <dlpack/dlpack.h>
 
+#include <cstdint>
+
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
