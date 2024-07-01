@@ -37,12 +37,11 @@ def test_disk_based_feature():
             feature_a.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
         )
 
-        # Test read the feature with ids.
         assert torch.equal(
             feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
         )
 
-        # Read the feature with ids.
+        # Test read the feature with ids.
         assert torch.equal(
             feature_a.read(torch.tensor([0])),
             torch.tensor([[1, 2, 3]]),
@@ -50,6 +49,20 @@ def test_disk_based_feature():
         assert torch.equal(
             feature_b.read(torch.tensor([1])),
             torch.tensor([[[4, 5], [6, 7]]]),
+        )
+
+        # test when the index tensor is large.
+        torch_based_feature_a = gb.TorchBasedFeature(a)
+        ind_a = torch.randint(low=0, high=2, size=(1, 4097))[0]
+        assert torch.equal(
+            feature_a.read(ind_a),
+            torch_based_feature_a.read(ind_a),
+        )
+        torch_based_feature_b = gb.TorchBasedFeature(b)
+        ind_b = torch.randint(low=0, high=2, size=(1, 4097))[0]
+        assert torch.equal(
+            feature_b.read(ind_b),
+            torch_based_feature_b.read(ind_b),
         )
 
         # Test get the size of the entire feature.
