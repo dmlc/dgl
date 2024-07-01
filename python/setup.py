@@ -220,7 +220,7 @@ if include_libs:
 
 # Configure dependencies.
 install_requires = [
-    "numpy>=1.14.0,<2.0.0",
+    "numpy>=1.14.0",
     "scipy>=1.1.0",
     "networkx>=2.1",
     "requests>=2.19.0",
