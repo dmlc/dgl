@@ -17,6 +17,9 @@
  * @file feature_cache.h
  * @brief Feature cache implementation on the CPU.
  */
+#ifndef GRAPHBOLT_FEATURE_CACHE_H_
+#define GRAPHBOLT_FEATURE_CACHE_H_
+
 #include <parallel_hashmap/phmap.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
@@ -180,3 +183,5 @@ struct FeatureCache : public torch::CustomClassHolder {
 
 }  // namespace storage
 }  // namespace graphbolt
+
+#endif  // GRAPHBOLT_FEATURE_CACHE_H_

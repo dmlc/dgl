@@ -16,6 +16,7 @@
 #include "./expand_indptr.h"
 #include "./feature_cache.h"
 #include "./index_select.h"
+#include "./partitioned_cache_policy.h"
 #include "./random.h"
 
 #ifdef GRAPHBOLT_USE_CUDA
@@ -100,6 +101,13 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("query", &storage::S3FifoCachePolicy::Query)
       .def("replace", &storage::S3FifoCachePolicy::Replace);
   m.def("s3_fifo_cache_policy", &storage::S3FifoCachePolicy::Create);
+  m.class_<storage::PartitionedS3FifoCachePolicy>(
+       "PartitionedS3FifoCachePolicy")
+      .def("query", &storage::PartitionedS3FifoCachePolicy::Query)
+      .def("replace", &storage::PartitionedS3FifoCachePolicy::Replace);
+  m.def(
+      "partitioned_s3_fifo_cache_policy",
+      &storage::PartitionedS3FifoCachePolicy::Create);
   m.class_<storage::FeatureCache>("FeatureCache")
       .def("query", &storage::FeatureCache::Query)
       .def("replace", &storage::FeatureCache::Replace);

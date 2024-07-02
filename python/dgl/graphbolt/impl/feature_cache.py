@@ -7,12 +7,19 @@ __all__ = ["FeatureCache"]
 class FeatureCache(object):
     """High-level wrapper for CPU embedding cache"""
 
-    def __init__(self, cache_shape, dtype, policy="s3-fifo"):
+    def __init__(self, cache_shape, dtype, num_parts=1, policy="s3-fifo"):
         policies = ["s3-fifo"]
         assert (
             policy in policies
         ), f"{policies} are the available caching policies."
-        self._policy = torch.ops.graphbolt.s3_fifo_cache_policy(cache_shape[0])
+        assert num_parts >= 1
+        self._policy = (
+            torch.ops.graphbolt.s3_fifo_cache_policy(cache_shape[0])
+            if num_parts == 1
+            else torch.ops.graphbolt.partitioned_s3_fifo_cache_policy(
+                cache_shape[0], num_parts
+            )
+        )
         self._cache = torch.ops.graphbolt.feature_cache(cache_shape, dtype)
         self.total_miss = 0
         self.total_queries = 0
