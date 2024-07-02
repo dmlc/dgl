@@ -22,7 +22,7 @@
 namespace graphbolt {
 namespace storage {
 
-constexpr int grain_size = 64;
+constexpr int kIntGrainSize = 64;
 
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
     : S_{capacity / 10},
@@ -53,8 +53,8 @@ S3FifoCachePolicy::Query(torch::Tensor keys) {
                               auto it = position_map_.find(key);
                               if (it != position_map_.end()) {
                                 auto& key_ref = *it->second;
-                                key_ref.increment();
-                                positions_ptr[found_cnt] = key_ref.position;
+                                key_ref.Increment();
+                                positions_ptr[found_cnt] = key_ref.position_;
                                 indices_ptr[found_cnt++] = i;
                               } else {
                                 indices_ptr[--missing_cnt] = i;
@@ -81,7 +81,7 @@ torch::Tensor FeatureCache::Query(
   const auto positions_ptr = positions.data_ptr<int64_t>();
   const auto indices_ptr = indices.data_ptr<int64_t>();
   torch::parallel_for(
-      0, positions.size(0), grain_size, [&](int64_t begin, int64_t end) {
+      0, positions.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {
           std::memcpy(
               values_ptr + indices_ptr[i] * row_bytes,
@@ -102,16 +102,15 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
           auto it = position_map_.find(key);
           if (it != position_map_.end()) {  // Already in the cache, inc freq.
             auto& key_ref = *it->second;
-            key_ref.increment();
-            positions_ptr[i] = key_ref.position;
+            key_ref.Increment();
+            positions_ptr[i] = key_ref.position_;
           } else {
             const auto inside_G = in_G(key);
             auto& Queue = inside_G ? M_ : S_;
-            const auto pos = Queue.is_full()
-                                 ? (inside_G ? evict_M() : evict_S())
-                                 : position_q_++;
+            const auto pos = Queue.IsFull() ? (inside_G ? evict_M() : evict_S())
+                                            : position_q_++;
             TORCH_CHECK(0 <= pos && pos < capacity_, "Position out of bounds!");
-            position_map_[key] = Queue.insert(cache_key{key, pos});
+            position_map_[key] = Queue.Push(CacheKey{key, pos});
             positions_ptr[i] = pos;
           }
         }
@@ -130,7 +129,7 @@ void FeatureCache::Replace(
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
   const auto positions_ptr = positions.data_ptr<int64_t>();
   torch::parallel_for(
-      0, positions.size(0), grain_size, [&](int64_t begin, int64_t end) {
+      0, positions.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {
           std::memcpy(
               tensor_ptr + positions_ptr[i] * row_bytes,

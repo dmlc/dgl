@@ -5,7 +5,19 @@ __all__ = ["FeatureCache"]
 
 
 class FeatureCache(object):
-    """High-level wrapper for CPU embedding cache"""
+    r"""High level wrapper for the CPU feature cache.
+
+    Parameters
+    ----------
+    cache_shape : List[int]
+        The shape of the cache. cache_shape[0] gives us the capacity.
+    dtype : torch.dtype
+        The data type of the elements stored in the cache.
+    num_parts: int, optional
+        The number of cache partitions for parallelism. Default is 1.
+    policy: str, optional
+        The cache policy to be used. Default is "s3-fifo".
+    """
 
     def __init__(self, cache_shape, dtype, num_parts=1, policy="s3-fifo"):
         policies = ["s3-fifo"]
@@ -25,12 +37,14 @@ class FeatureCache(object):
         self.total_queries = 0
 
     def query(self, keys, pin_memory=False):
-        """Queries the GPU cache.
+        """Queries the cache.
 
         Parameters
         ----------
         keys : Tensor
-            The keys to query the GPU cache with.
+            The keys to query the cache with.
+        pin_memory : bool, optional
+            Whether the output values tensor should be pinned. Default is False.
 
         Returns
         -------
@@ -47,15 +61,15 @@ class FeatureCache(object):
         return values, missing_index, missing_keys
 
     def replace(self, keys, values):
-        """Inserts key-value pairs into the GPU cache using the S3-FIFO
+        """Inserts key-value pairs into the cache using the S3-FIFO
         algorithm to remove old key-value pairs if it is full.
 
         Parameters
         ----------
         keys: Tensor
-            The keys to insert to the GPU cache.
+            The keys to insert to the cache.
         values: Tensor
-            The values to insert to the GPU cache.
+            The values to insert to the cache.
         """
         positions = self._policy.replace(keys)
         self._cache.replace(keys, values, positions)

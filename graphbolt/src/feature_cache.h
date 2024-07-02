@@ -30,74 +30,77 @@ namespace graphbolt {
 namespace storage {
 
 template <typename T>
-struct circular_queue {
-  circular_queue(const int64_t capacity)
-      : head_{0},
-        tail_{0},
-        capacity_{capacity + 1},
-        buffer_{new T[capacity + 1]} {}
+struct CircularQueue {
+  CircularQueue(const int64_t capacity)
+      : tail_(0),
+        head_(0),
+        capacity_(capacity + 1),
+        data_{new T[capacity + 1]} {}
 
-  T* insert(const T& x) {
-    auto insert_ptr = &buffer_[head_++];
+  T* Push(const T& x) {
+    auto insert_ptr = &data_[tail_++];
     *insert_ptr = x;
-    if (head_ >= capacity_) head_ -= capacity_;
+    if (tail_ >= capacity_) tail_ -= capacity_;
     return insert_ptr;
   }
 
-  T evict() {
-    auto ret = buffer_[tail_++];
-    if (tail_ >= capacity_) tail_ -= capacity_;
+  T Pop() {
+    auto ret = data_[head_++];
+    if (head_ >= capacity_) head_ -= capacity_;
     return ret;
   }
 
-  T& tail() const { return buffer_[tail_]; }
+  T& Front() const { return data_[head_]; }
 
-  bool is_full() const {
-    const auto diff = head_ + 1 - tail_;
+  bool IsFull() const {
+    const auto diff = tail_ + 1 - head_;
     return diff == 0 || diff == capacity_;
   }
 
-  friend std::ostream& operator<<(std::ostream& os, const circular_queue& m) {
-    for (auto i = m.tail_; i != m.head_; i++) {
-      if (i >= m.capacity_) i -= m.capacity_;
-      os << m.buffer_[i] << ", ";
+  friend std::ostream& operator<<(
+      std::ostream& os, const CircularQueue& queue) {
+    for (auto i = queue.head_; i != queue.tail_; i++) {
+      if (i >= queue.capacity_) i -= queue.capacity_;
+      os << queue.data_[i] << ", ";
     }
     return os << "\n";
   }
 
-  bool is_empty() const { return head_ == tail_; }
+  bool IsEmpty() const { return tail_ == head_; }
 
-  int64_t capacity() const { return capacity_ - 1; }
+  int64_t Capacity() const { return capacity_ - 1; }
 
  private:
-  int64_t head_;
   int64_t tail_;
+  int64_t head_;
   int64_t capacity_;
-  std::unique_ptr<T[]> buffer_;
+  std::unique_ptr<T[]> data_;
 };
 
-struct cache_key {
-  int64_t freq : 3;
-  int64_t key : 61;
-  int64_t position;
+struct CacheKey {
+  int64_t freq_ : 3;
+  int64_t key_ : 61;
+  int64_t position_;
 
-  cache_key(int64_t _key, int64_t _position)
-      : freq{0}, key{_key}, position{_position} {
-    static_assert(sizeof(cache_key) == 2 * sizeof(int64_t));
+  CacheKey(int64_t key, int64_t position)
+      : freq_(0), key_(key), position_(position) {
+    static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
 
-  cache_key() = default;
+  CacheKey() = default;
 
-  void increment() { freq = std::min(3, static_cast<int>(freq + 1)); }
+  void Increment() { freq_ = std::min(3, static_cast<int>(freq_ + 1)); }
 
-  void decrement() { freq = std::max(0, static_cast<int>(freq - 1)); }
+  void Decrement() { freq_ = std::max(0, static_cast<int>(freq_ - 1)); }
 
-  friend std::ostream& operator<<(std::ostream& os, const cache_key& m) {
-    return os << '(' << m.key << ", " << m.freq << ", " << m.position << ")";
+  friend std::ostream& operator<<(std::ostream& os, const CacheKey& key_ref) {
+    return os << '(' << key_ref.key_ << ", " << key_ref.freq_ << ", "
+              << key_ref.position_ << ")";
   }
 };
 
-struct S3FifoCachePolicy : public torch::CustomClassHolder {
+class S3FifoCachePolicy : public torch::CustomClassHolder {
+ public:
   S3FifoCachePolicy(int64_t capacity);
 
   S3FifoCachePolicy() = default;
@@ -121,41 +124,42 @@ struct S3FifoCachePolicy : public torch::CustomClassHolder {
  private:
   int64_t evict_M() {
     for (;;) {
-      auto evicted = M_.evict();
-      auto it = position_map_.find(evicted.key);
-      if (evicted.freq > 0) {
-        evicted.decrement();
-        it->second = M_.insert(evicted);
+      auto evicted = M_.Pop();
+      auto it = position_map_.find(evicted.key_);
+      if (evicted.freq_ > 0) {
+        evicted.Decrement();
+        it->second = M_.Push(evicted);
       } else {
         position_map_.erase(it);
-        return evicted.position;
+        return evicted.position_;
       }
     }
   }
 
   int64_t evict_S() {
-    auto evicted = S_.evict();
-    const auto is_M_full = M_.is_full();
-    auto it = position_map_.find(evicted.key);
-    if (evicted.freq > 0 || !is_M_full) {
+    auto evicted = S_.Pop();
+    const auto is_M_full = M_.IsFull();
+    auto it = position_map_.find(evicted.key_);
+    if (evicted.freq_ > 0 || !is_M_full) {
       const auto pos = is_M_full ? evict_M() : position_q_++;
-      it->second = M_.insert(evicted);
+      it->second = M_.Push(evicted);
       return pos;
     } else {
       position_map_.erase(it);
-      ghost_map_[evicted.key] = ghost_q_time_++;
-      return evicted.position;
+      ghost_map_[evicted.key_] = ghost_q_time_++;
+      return evicted.position_;
     }
   }
 
+  // Is inside the ghost queue.
   bool in_G(int64_t key) const {
     auto it = ghost_map_.find(key);
     return it != ghost_map_.end() &&
-           ghost_q_time_ - it->second <= M_.capacity();
+           ghost_q_time_ - it->second <= M_.Capacity();
   }
 
-  circular_queue<cache_key> S_, M_;
-  phmap::flat_hash_map<int64_t, cache_key*> position_map_;
+  CircularQueue<CacheKey> S_, M_;
+  phmap::flat_hash_map<int64_t, CacheKey*> position_map_;
   phmap::flat_hash_map<int64_t, int64_t> ghost_map_;
   int64_t position_q_;
   int64_t ghost_q_time_;
