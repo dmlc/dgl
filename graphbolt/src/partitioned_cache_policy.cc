@@ -14,8 +14,8 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * @file feature_cache.cc
- * @brief Feature cache implementation on the CPU.
+ * @file partitioned_cache_policy.cc
+ * @brief Partitioned cache policy implementation on the CPU.
  */
 #include "./partitioned_cache_policy.h"
 

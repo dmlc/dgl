@@ -14,8 +14,8 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * @file feature_cache.h
- * @brief Feature cache implementation on the CPU.
+ * @file partitioned_cache_policy.h
+ * @brief Partitioned cache policy implementation on the CPU.
  */
 #ifndef GRAPHBOLT_PARTITIONED_CACHE_H_
 #define GRAPHBOLT_PARTITIONED_CACHE_H_
