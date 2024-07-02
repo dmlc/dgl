@@ -39,7 +39,7 @@ PartitionedCachePolicy<BaseCachePolicy>::PartitionedCachePolicy(
 
 template <typename BaseCachePolicy>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-PartitionedCachePolicy<BaseCachePolicy>::partition(torch::Tensor keys) {
+PartitionedCachePolicy<BaseCachePolicy>::Partition(torch::Tensor keys) {
   const int64_t num_parts = policies_.size();
   torch::Tensor offsets = torch::zeros(
       num_parts * num_parts + 1, keys.options().dtype(torch::kInt64));
@@ -116,7 +116,7 @@ template <typename BaseCachePolicy>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 PartitionedCachePolicy<BaseCachePolicy>::Query(torch::Tensor keys) {
   torch::Tensor offsets, indices, permuted_keys;
-  std::tie(offsets, indices, permuted_keys) = partition(keys);
+  std::tie(offsets, indices, permuted_keys) = Partition(keys);
   auto offsets_ptr = offsets.data_ptr<int64_t>();
   auto indices_ptr = indices.data_ptr<int64_t>();
   std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> results(
@@ -179,7 +179,7 @@ template <typename BaseCachePolicy>
 torch::Tensor PartitionedCachePolicy<BaseCachePolicy>::Replace(
     torch::Tensor keys) {
   torch::Tensor offsets, indices, permuted_keys;
-  std::tie(offsets, indices, permuted_keys) = partition(keys);
+  std::tie(offsets, indices, permuted_keys) = Partition(keys);
   auto output_positions =
       torch::empty_like(keys, keys.options().dtype(torch::kInt64));
   auto offsets_ptr = offsets.data_ptr<int64_t>();

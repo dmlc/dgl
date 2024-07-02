@@ -101,6 +101,11 @@ struct CacheKey {
 
 class S3FifoCachePolicy : public torch::CustomClassHolder {
  public:
+  /**
+   * @brief Constructor for the S3FifoCachePolicy class.
+   *
+   * @param capacity The capacity of the cache in terms of # elements.
+   */
   S3FifoCachePolicy(int64_t capacity);
 
   S3FifoCachePolicy() = default;
@@ -167,6 +172,12 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
 };
 
 struct FeatureCache : public torch::CustomClassHolder {
+  /**
+   * @brief Constructor for the FeatureCache struct.
+   *
+   * @param shape The shape of the cache.
+   * @param dtype The dtype of elements stored in the cache.
+   */
   FeatureCache(const std::vector<int64_t>& shape, torch::ScalarType dtype);
 
   FeatureCache() = default;

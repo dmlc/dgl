@@ -55,7 +55,7 @@ struct PartitionedCachePolicy : public torch::CustomClassHolder {
     return dist(rng);
   }
 
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> partition(
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Partition(
       torch::Tensor keys);
 
   int64_t capacity_;
