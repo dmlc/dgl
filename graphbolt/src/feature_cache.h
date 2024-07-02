@@ -38,17 +38,12 @@ struct CircularQueue {
         data_{new T[capacity + 1]} {}
 
   T* Push(const T& x) {
-    auto insert_ptr = &data_[tail_++];
+    auto insert_ptr = &data_[PostIncrement(tail_)];
     *insert_ptr = x;
-    if (tail_ >= capacity_) tail_ -= capacity_;
     return insert_ptr;
   }
 
-  T Pop() {
-    auto ret = data_[head_++];
-    if (head_ >= capacity_) head_ -= capacity_;
-    return ret;
-  }
+  T Pop() { return data_[PostIncrement(head_)]; }
 
   T& Front() const { return data_[head_]; }
 
@@ -59,8 +54,7 @@ struct CircularQueue {
 
   friend std::ostream& operator<<(
       std::ostream& os, const CircularQueue& queue) {
-    for (auto i = queue.head_; i != queue.tail_; i++) {
-      if (i >= queue.capacity_) i -= queue.capacity_;
+    for (auto i = queue.head_; i != queue.tail_; queue.PostIncrement(i)) {
       os << queue.data_[i] << ", ";
     }
     return os << "\n";
@@ -71,6 +65,12 @@ struct CircularQueue {
   int64_t Capacity() const { return capacity_ - 1; }
 
  private:
+  int64_t PostIncrement(int64_t& i) const {
+    const auto ret = i++;
+    if (i >= capacity_) i -= capacity_;
+    return ret;
+  }
+
   int64_t tail_;
   int64_t head_;
   int64_t capacity_;
