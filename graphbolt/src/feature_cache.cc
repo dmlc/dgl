@@ -105,9 +105,9 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
             key_ref.Increment();
             positions_ptr[i] = key_ref.position_;
           } else {
-            const auto inside_G = in_G(key);
+            const auto inside_G = InG(key);
             auto& Queue = inside_G ? M_ : S_;
-            const auto pos = Queue.IsFull() ? (inside_G ? evict_M() : evict_S())
+            const auto pos = Queue.IsFull() ? (inside_G ? EvictM() : EvictS())
                                             : position_q_++;
             TORCH_CHECK(0 <= pos && pos < capacity_, "Position out of bounds!");
             position_map_[key] = Queue.Push(CacheKey{key, pos});

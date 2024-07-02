@@ -127,7 +127,7 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
   }
 
  private:
-  int64_t evict_M() {
+  int64_t EvictM() {
     for (;;) {
       auto evicted = M_.Pop();
       auto it = position_map_.find(evicted.key_);
@@ -141,12 +141,12 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
     }
   }
 
-  int64_t evict_S() {
+  int64_t EvictS() {
     auto evicted = S_.Pop();
     const auto is_M_full = M_.IsFull();
     auto it = position_map_.find(evicted.key_);
     if (evicted.freq_ > 0 || !is_M_full) {
-      const auto pos = is_M_full ? evict_M() : position_q_++;
+      const auto pos = is_M_full ? EvictM() : position_q_++;
       it->second = M_.Push(evicted);
       return pos;
     } else {
@@ -157,7 +157,7 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
   }
 
   // Is inside the ghost queue.
-  bool in_G(int64_t key) const {
+  bool InG(int64_t key) const {
     auto it = ghost_map_.find(key);
     return it != ghost_map_.end() &&
            ghost_q_time_ - it->second <= M_.Capacity();
