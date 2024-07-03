@@ -196,6 +196,7 @@ def create_dataloader(
     return gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
+        overlap_feature_fetch=args.overlap_feature_fetch,
         overlap_graph_fetch=args.overlap_graph_fetch,
         num_gpu_cached_edges=args.num_gpu_cached_edges,
         gpu_cache_threshold=args.gpu_graph_caching_threshold,
@@ -365,14 +366,6 @@ def parse_args():
         help="The sampling function when doing layerwise sampling.",
     )
     parser.add_argument(
-        "--overlap-graph-fetch",
-        action="store_true",
-        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
-        "If True, the data loader will overlap the UVA graph fetching operations"
-        "with the rest of operations by using an alternative CUDA stream. Disabled"
-        "by default.",
-    )
-    parser.add_argument(
         "--num-gpu-cached-edges",
         type=int,
         default=0,
@@ -398,6 +391,12 @@ def main():
         args.mode = "cpu-cpu-cpu"
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
+    args.overlap_feature_fetch = args.feature_device == "pinned"
+    # For now, only sample_layer_neighbor is faster with this option
+    args.overlap_graph_fetch = (
+        args.sample_mode == "sample_layer_neighbor"
+        and args.graph_device == "pinned"
+    )
 
     # Load and preprocess dataset.
     print("Loading data...")
