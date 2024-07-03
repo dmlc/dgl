@@ -66,12 +66,24 @@ struct PartitionedCachePolicy : public torch::CustomClassHolder {
  private:
   static constexpr uint64_t seed = 1e9 + 7;
 
+  /**
+   * @brief Deterministic assignment of keys to different parts.
+   */
   int32_t PartAssignment(int64_t key) {
     pcg32 rng(seed, key);
     std::uniform_int_distribution<int32_t> dist(0, policies_.size() - 1);
     return dist(rng);
   }
 
+  /**
+   * @brief The partition function for a given keys tensor.
+   * @param keys The keys to query the cache.
+   *
+   * @return (offsets, indices, permuted_keys), the returned tensors have the
+   * following properties:
+   * permuted_keys[offsets[i]: offsets[i + 1]] belong to part i and
+   * keys[indices] == permuted_keys
+   */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Partition(
       torch::Tensor keys);
 
