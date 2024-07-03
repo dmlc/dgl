@@ -1588,7 +1588,7 @@ int64_t TemporalPick(
     masked_prob =
         probs_or_mask.value().slice(0, offset, offset + num_neighbors) * mask;
   } else {
-    masked_prob = mask.to(torch::kFloat32);
+    masked_prob = S == SamplerType::NEIGHBOR ? mask.to(torch::kFloat32) : mask;
   }
   if constexpr (S == SamplerType::NEIGHBOR) {
     auto picked_indices = NonUniformPickOp(masked_prob, fanout, replace);
@@ -1721,7 +1721,7 @@ std::enable_if_t<is_labor(S), int64_t> Pick(
           probs_or_mask.value(), picked_data_ptr);
     } else {
       int64_t picked_count;
-      AT_DISPATCH_FLOATING_TYPES(
+      GRAPHBOLT_DISPATCH_ALL_TYPES(
           probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
             if (replace) {
               picked_count = LaborPick<true, true, scalar_t>(
