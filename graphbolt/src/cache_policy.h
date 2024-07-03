@@ -120,9 +120,26 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
 
   S3FifoCachePolicy() = default;
 
+  /**
+   * @brief The policy query function.
+   * @param keys The keys to query the cache.
+   *
+   * @return (positions, indices, missing_keys), where positions has the
+   * locations of the keys which were found in the cache, missing_keys has the
+   * keys that were not found and indices is defined such that
+   * keys[indices[:positions.size(0)]] gives us the found keys and
+   * keys[indices[positions.size(0):]] is identical to missing_keys.
+   */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
       torch::Tensor keys);
 
+  /**
+   * @brief The policy replace function.
+   * @param keys The keys to query the cache.
+   *
+   * @return positions tensor is returned holding the locations of the replaced
+   * entries in the cache.
+   */
   torch::Tensor Replace(torch::Tensor keys);
 
   static c10::intrusive_ptr<S3FifoCachePolicy> Create(int64_t capacity);

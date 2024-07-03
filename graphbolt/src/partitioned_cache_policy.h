@@ -38,9 +38,26 @@ struct PartitionedCachePolicy : public torch::CustomClassHolder {
 
   PartitionedCachePolicy() = default;
 
+  /**
+   * @brief The policy query function.
+   * @param keys The keys to query the cache.
+   *
+   * @return (positions, indices, missing_keys), where positions has the
+   * locations of the keys which were found in the cache, missing_keys has the
+   * keys that were not found and indices is defined such that
+   * keys[indices[:positions.size(0)]] gives us the found keys and
+   * keys[indices[positions.size(0):]] is identical to missing_keys.
+   */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
       torch::Tensor keys);
 
+  /**
+   * @brief The policy replace function.
+   * @param keys The keys to query the cache.
+   *
+   * @return positions tensor is returned holding the locations of the replaced
+   * entries in the cache.
+   */
   torch::Tensor Replace(torch::Tensor keys);
 
   static c10::intrusive_ptr<PartitionedCachePolicy> Create(
@@ -49,7 +66,7 @@ struct PartitionedCachePolicy : public torch::CustomClassHolder {
  private:
   static constexpr uint64_t seed = 1e9 + 7;
 
-  int32_t part_assignment(int64_t key) {
+  int32_t PartAssignment(int64_t key) {
     pcg32 rng(seed, key);
     std::uniform_int_distribution<int32_t> dist(0, policies_.size() - 1);
     return dist(rng);

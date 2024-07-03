@@ -58,7 +58,7 @@ PartitionedCachePolicy<BaseCachePolicy>::Partition(torch::Tensor keys) {
           begin = tid * num_keys / num_parts;
           end = (tid + 1) * num_keys / num_parts;
           for (int64_t i = begin; i < end; i++) {
-            const auto part_id = part_assignment(keys_ptr[i]);
+            const auto part_id = PartAssignment(keys_ptr[i]);
             offsets_ptr[tid * num_parts + part_id]++;
             part_id_ptr[i] = part_id;
           }
