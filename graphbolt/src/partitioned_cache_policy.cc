@@ -29,7 +29,7 @@ constexpr int grain_size = 64;
 template <typename BaseCachePolicy>
 PartitionedCachePolicy<BaseCachePolicy>::PartitionedCachePolicy(
     int64_t capacity, int64_t num_partitions)
-    : capacity_{capacity} {
+    : capacity_(capacity) {
   for (int64_t i = 0; i < num_partitions; i++) {
     const auto begin = i * capacity / num_partitions;
     const auto end = (i + 1) * capacity / num_partitions;

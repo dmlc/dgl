@@ -26,7 +26,7 @@ constexpr int kIntGrainSize = 64;
 
 FeatureCache::FeatureCache(
     const std::vector<int64_t>& shape, torch::ScalarType dtype)
-    : tensor_{torch::empty(shape, c10::TensorOptions().dtype(dtype))} {}
+    : tensor_(torch::empty(shape, c10::TensorOptions().dtype(dtype))) {}
 
 torch::Tensor FeatureCache::Query(
     torch::Tensor positions, torch::Tensor indices, int64_t size,
