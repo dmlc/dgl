@@ -39,12 +39,30 @@ struct FeatureCache : public torch::CustomClassHolder {
 
   FeatureCache() = default;
 
+  /**
+   * @brief The cache query function. Allocates an empty tensor `values` and
+   * runs values[indices] = cache_tensor[positions] before returning it.
+   *
+   * @param positions The positions of the queries items.
+   * @param indices The indices of the queried items among the original keys.
+   * @param size The size of the original keys, hence the first dimension of
+   * the output shape.
+   * @param pin_memory Whether to pin the memory of the output values tensor.
+   *
+   * @return The values tensor is returned. Its memory is pinned if pin_memory
+   * is true.
+   */
   torch::Tensor Query(
       torch::Tensor positions, torch::Tensor indices, int64_t size,
       bool pin_memory);
 
-  void Replace(
-      torch::Tensor keys, torch::Tensor values, torch::Tensor positions);
+  /**
+   * @brief The cache replace function.
+   *
+   * @param positions The positions to replace in the cache.
+   * @param values The values to be inserted into the cache.
+   */
+  void Replace(torch::Tensor positions, torch::Tensor values);
 
   static c10::intrusive_ptr<FeatureCache> Create(
       const std::vector<int64_t>& shape, torch::ScalarType dtype);

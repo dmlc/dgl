@@ -72,7 +72,7 @@ class FeatureCache(object):
             The values to insert to the cache.
         """
         positions = self._policy.replace(keys)
-        self._cache.replace(keys, values, positions)
+        self._cache.replace(positions, values)
 
     @property
     def miss_rate(self):

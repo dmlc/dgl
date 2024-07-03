@@ -52,10 +52,9 @@ torch::Tensor FeatureCache::Query(
   return values;
 }
 
-void FeatureCache::Replace(
-    torch::Tensor keys, torch::Tensor values, torch::Tensor positions) {
-  if (keys.size(0) > tensor_.size(0)) {
-    keys = keys.slice(0, 0, tensor_.size(0));
+void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
+  if (positions.size(0) > tensor_.size(0)) {
+    positions = positions.slice(0, 0, tensor_.size(0));
     values = values.slice(0, 0, tensor_.size(0));
   }
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
