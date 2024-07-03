@@ -191,6 +191,16 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
            ghost_q_time_ - it->second <= main_queue_.Capacity();
   }
 
+  void TrimGhostQueue() {
+    if (static_cast<int64_t>(ghost_map_.size()) >= 2 * main_queue_.Capacity()) {
+      // Here, we ensure that the ghost_map_ does not grow too much.
+      phmap::priv::erase_if(ghost_map_, [&](const auto& key_value) {
+        const auto timestamp = key_value.second;
+        return ghost_q_time_ - timestamp > main_queue_.Capacity();
+      });
+    }
+  }
+
   CircularQueue<CacheKey> small_queue_, main_queue_;
   phmap::flat_hash_map<int64_t, CacheKey*> key_to_cache_key_;
   phmap::flat_hash_map<int64_t, int64_t> ghost_map_;
