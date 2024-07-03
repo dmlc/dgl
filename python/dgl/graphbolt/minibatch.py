@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 
-from ..convert import create_block, DGLBlock, EID, NID
+### FROM DGL @todo
 from ..utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
@@ -114,7 +114,10 @@ class MiniBatch:
     all node ids inside are compacted.
     """
 
-    _blocks: List[DGLBlock] = None
+    _blocks: list = None
+    """
+    A list of `DGLBlock`s.
+    """
 
     def __repr__(self) -> str:
         return _minibatch_str(self)
@@ -159,7 +162,7 @@ class MiniBatch:
         self.edge_features = edge_features
 
     @property
-    def blocks(self) -> List[DGLBlock]:
+    def blocks(self) -> list:
         """DGL blocks extracted from `MiniBatch` containing graphical structures
         and ID mappings.
         """
@@ -170,10 +173,12 @@ class MiniBatch:
             self._blocks = self.compute_blocks()
         return self._blocks
 
-    def compute_blocks(self) -> List[DGLBlock]:
+    def compute_blocks(self) -> list:
         """Extracts DGL blocks from `MiniBatch` to construct graphical
         structures and ID mappings.
         """
+        from dgl.convert import create_block, EID, NID
+
         is_heterogeneous = isinstance(
             self.sampled_subgraphs[0].sampled_csc, Dict
         )

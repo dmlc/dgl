@@ -5,7 +5,12 @@ from typing import Any, Dict, List, Optional
 
 import pydantic
 
-from ...utils import version
+try:
+    from packaging import version
+except ImportError:
+    # If packaging isn't installed, try and use the vendored copy in setuptools
+    from setuptools.extern.packaging import version
+
 
 __all__ = [
     "OnDiskFeatureDataFormat",

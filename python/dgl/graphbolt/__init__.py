@@ -4,6 +4,7 @@ import sys
 
 import torch
 
+### FROM DGL @todo
 from .._ffi import libinfo
 
 

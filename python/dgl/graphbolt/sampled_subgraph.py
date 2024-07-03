@@ -5,6 +5,7 @@ from typing import Dict, Tuple, Union
 
 import torch
 
+### FROM DGL @todo
 from dgl.utils import recursive_apply
 
 from .base import (
