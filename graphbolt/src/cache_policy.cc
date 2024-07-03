@@ -92,6 +92,17 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
           }
         }
       }));
+  if (static_cast<int64_t>(ghost_map_.size()) >= 2 * main_queue_.Capacity()) {
+    // Here, we ensure that the ghost_map_ does not grow too much.
+    decltype(ghost_map_) filtered_map;
+    filtered_map.reserve(ghost_map_.size());
+    for (const auto [key, timestamp] : ghost_map_) {
+      if (ghost_q_time_ - timestamp <= main_queue_.Capacity()) {
+        filtered_map[key] = timestamp;
+      }
+    }
+    ghost_map_ = filtered_map;
+  }
   return positions;
 }
 
