@@ -24,48 +24,9 @@ namespace storage {
 
 constexpr int kIntGrainSize = 64;
 
-S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
-    : S_{capacity / 10},
-      M_{capacity - capacity / 10},
-      position_q_{0},
-      ghost_q_time_{0},
-      capacity_{capacity} {}
-
 FeatureCache::FeatureCache(
     const std::vector<int64_t>& shape, torch::ScalarType dtype)
     : tensor_{torch::empty(shape, c10::TensorOptions().dtype(dtype))} {}
-
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-S3FifoCachePolicy::Query(torch::Tensor keys) {
-  auto positions = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
-  auto indices = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
-  auto missing_keys = torch::empty_like(keys);
-  int64_t found_cnt = 0;
-  int64_t missing_cnt = keys.size(0);
-  AT_DISPATCH_INDEX_TYPES(keys.scalar_type(), "S3FifoCachePolicy::Query", ([&] {
-                            auto keys_ptr = keys.data_ptr<index_t>();
-                            auto positions_ptr = positions.data_ptr<int64_t>();
-                            auto indices_ptr = indices.data_ptr<int64_t>();
-                            auto missing_keys_ptr =
-                                missing_keys.data_ptr<index_t>();
-                            for (int64_t i = 0; i < keys.size(0); i++) {
-                              const auto key = keys_ptr[i];
-                              auto it = position_map_.find(key);
-                              if (it != position_map_.end()) {
-                                auto& key_ref = *it->second;
-                                key_ref.Increment();
-                                positions_ptr[found_cnt] = key_ref.position_;
-                                indices_ptr[found_cnt++] = i;
-                              } else {
-                                indices_ptr[--missing_cnt] = i;
-                                missing_keys_ptr[missing_cnt] = key;
-                              }
-                            }
-                          }));
-  return {
-      positions.slice(0, 0, found_cnt), indices,
-      missing_keys.slice(0, found_cnt)};
-}
 
 torch::Tensor FeatureCache::Query(
     torch::Tensor positions, torch::Tensor indices, int64_t size,
@@ -91,33 +52,6 @@ torch::Tensor FeatureCache::Query(
   return values;
 }
 
-torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
-  auto positions = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
-  AT_DISPATCH_INDEX_TYPES(
-      keys.scalar_type(), "S3FifoCachePolicy::Replace", ([&] {
-        auto keys_ptr = keys.data_ptr<index_t>();
-        auto positions_ptr = positions.data_ptr<int64_t>();
-        for (int64_t i = 0; i < keys.size(0); i++) {
-          const auto key = keys_ptr[i];
-          auto it = position_map_.find(key);
-          if (it != position_map_.end()) {  // Already in the cache, inc freq.
-            auto& key_ref = *it->second;
-            key_ref.Increment();
-            positions_ptr[i] = key_ref.position_;
-          } else {
-            const auto inside_G = InG(key);
-            auto& Queue = inside_G ? M_ : S_;
-            const auto pos = Queue.IsFull() ? (inside_G ? EvictM() : EvictS())
-                                            : position_q_++;
-            TORCH_CHECK(0 <= pos && pos < capacity_, "Position out of bounds!");
-            position_map_[key] = Queue.Push(CacheKey{key, pos});
-            positions_ptr[i] = pos;
-          }
-        }
-      }));
-  return positions;
-}
-
 void FeatureCache::Replace(
     torch::Tensor keys, torch::Tensor values, torch::Tensor positions) {
   if (keys.size(0) > tensor_.size(0)) {
@@ -141,11 +75,6 @@ void FeatureCache::Replace(
 c10::intrusive_ptr<FeatureCache> FeatureCache::Create(
     const std::vector<int64_t>& shape, torch::ScalarType dtype) {
   return c10::make_intrusive<FeatureCache>(shape, dtype);
-}
-
-c10::intrusive_ptr<S3FifoCachePolicy> S3FifoCachePolicy::Create(
-    int64_t capacity) {
-  return c10::make_intrusive<S3FifoCachePolicy>(capacity);
 }
 
 }  // namespace storage

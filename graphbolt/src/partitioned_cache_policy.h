@@ -27,7 +27,7 @@
 #include <random>
 #include <vector>
 
-#include "./feature_cache.h"
+#include "./cache_policy.h"
 
 namespace graphbolt {
 namespace storage {
