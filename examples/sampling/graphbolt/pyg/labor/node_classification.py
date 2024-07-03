@@ -14,6 +14,7 @@ import torch.nn.functional as F
 import torchmetrics.functional as MF
 from load_dataset import load_dataset
 from sage_conv import SAGEConv
+from torch.torch_version import TorchVersion
 from tqdm import tqdm
 
 
@@ -327,10 +328,11 @@ def parse_args():
         help="The sampling function when doing layerwise sampling.",
     )
     parser.add_argument(
-        "--torch-compile",
+        "--disable-torch-compile",
         action="store_true",
-        help="Uses torch.compile() on the trained GNN model. Requires "
-        "torch>=2.2.0 to enable this option.",
+        default=TorchVersion(torch.__version__) < TorchVersion("2.2.0a0"),
+        help="Disables torch.compile() on the trained GNN model because it is "
+        "enabled by default for torch>=2.2.0 without this option.",
     )
     parser.add_argument("--precision", type=str, default="high")
     return parser.parse_args()
@@ -407,7 +409,7 @@ def main():
         args.dropout,
     ).to(args.device)
     assert len(args.fanout) == len(model.layers)
-    if args.torch_compile:
+    if not args.disable_torch_compile:
         torch._dynamo.config.cache_size_limit = 32
         model = torch.compile(model, fullgraph=True, dynamic=True)
 
