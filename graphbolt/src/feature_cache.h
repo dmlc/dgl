@@ -40,11 +40,15 @@ struct FeatureCache : public torch::CustomClassHolder {
   FeatureCache() = default;
 
   /**
-   * @brief The cache query function. Allocates an empty tensor `values` and
-   * runs values[indices] = cache_tensor[positions] before returning it.
+   * @brief The cache query function. Allocates an empty tensor `values` with
+   * size as the first dimension and runs
+   * values[indices[:positions.size(0)]] = cache_tensor[positions] before
+   * returning it.
    *
    * @param positions The positions of the queries items.
    * @param indices The indices of the queried items among the original keys.
+   * Only the first portion corresponding to the provided positions tensor is
+   * used, e.g. indices[:positions.size(0)].
    * @param size The size of the original keys, hence the first dimension of
    * the output shape.
    * @param pin_memory Whether to pin the memory of the output values tensor.

@@ -32,8 +32,23 @@
 namespace graphbolt {
 namespace storage {
 
+/**
+ * @brief PartitionedCachePolicy takes a BaseCachePolicy as template parameter.
+ * It is expected that BaseCachePolicy takes only one argument, the capacity.
+ * It works by partitioning the key space to a set number of partitions that is
+ * provided as the second argument of its constructor. Since the partitioning
+ * is random but deterministic, the caching policy performance is not affected
+ * as the key distribution stays the same in each partition.
+ **/
 template <typename BaseCachePolicy>
-struct PartitionedCachePolicy : public torch::CustomClassHolder {
+class PartitionedCachePolicy : public torch::CustomClassHolder {
+ public:
+  /**
+   * @brief The policy query function.
+   * @param capacity The capacity of the cache.
+   * @param num_partitions The number of caching policies instantiated in a
+   * one-to-one mapping to each partition.
+   */
   PartitionedCachePolicy(int64_t capacity, int64_t num_partitions);
 
   PartitionedCachePolicy() = default;

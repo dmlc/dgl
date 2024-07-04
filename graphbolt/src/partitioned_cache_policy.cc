@@ -24,7 +24,7 @@
 namespace graphbolt {
 namespace storage {
 
-constexpr int grain_size = 64;
+constexpr int kIntGrainSize = 64;
 
 template <typename BaseCachePolicy>
 PartitionedCachePolicy<BaseCachePolicy>::PartitionedCachePolicy(
@@ -69,7 +69,7 @@ PartitionedCachePolicy<BaseCachePolicy>::Partition(torch::Tensor keys) {
   auto offsets_permuted = torch::empty_like(offsets);
   auto offsets_permuted_ptr = offsets_permuted.data_ptr<int64_t>();
   torch::parallel_for(
-      0, num_parts * num_parts, grain_size, [&](int64_t begin, int64_t end) {
+      0, num_parts * num_parts, kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {
           auto part_id = i % num_parts;
           auto tid = i / num_parts;
@@ -81,7 +81,7 @@ PartitionedCachePolicy<BaseCachePolicy>::Partition(torch::Tensor keys) {
   offsets = offsets_permuted.cumsum(0);
   offsets_ptr = offsets.data_ptr<int64_t>();
   torch::parallel_for(
-      0, num_parts * num_parts, grain_size, [&](int64_t begin, int64_t end) {
+      0, num_parts * num_parts, kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {
           auto part_id = i % num_parts;
           auto tid = i / num_parts;

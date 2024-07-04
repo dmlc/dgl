@@ -61,8 +61,8 @@ class FeatureCache(object):
         return values, missing_index, missing_keys
 
     def replace(self, keys, values):
-        """Inserts key-value pairs into the cache using the S3-FIFO
-        algorithm to remove old key-value pairs if it is full.
+        """Inserts key-value pairs into the cache using the selected caching
+        policy algorithm to remove old key-value pairs if it is full.
 
         Parameters
         ----------

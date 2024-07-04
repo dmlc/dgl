@@ -25,7 +25,7 @@ namespace storage {
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
     : small_queue_(capacity / 10),
       main_queue_(capacity - capacity / 10),
-      ghost_q_time_(0),
+      ghost_queue_time_(0),
       capacity_(capacity),
       cache_usage_(0) {}
 
@@ -82,7 +82,7 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
             if (queue.IsFull()) {
               // When the queue is full, we need to make a space by evicting.
               // Inside ghost queue means insertion into M, otherwise S.
-              pos = (in_ghost_queue ? EvictM() : EvictS());
+              pos = (in_ghost_queue ? EvictMainQueue() : EvictSmallQueue());
             } else {  // If the cache is not full yet, get an unused empty slot.
               pos = cache_usage_++;
             }

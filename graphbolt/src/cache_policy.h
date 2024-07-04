@@ -149,12 +149,12 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
     return os << "small_queue_: " << policy.small_queue_ << "\n"
               << "main_queue_: " << policy.main_queue_ << "\n"
               << "cache_usage_: " << policy.cache_usage_ << "\n"
-              << "ghost_q_time_: " << policy.ghost_q_time_ << "\n"
+              << "ghost_queue_time_: " << policy.ghost_queue_time_ << "\n"
               << "capacity_: " << policy.capacity_ << "\n";
   }
 
  private:
-  int64_t EvictM() {
+  int64_t EvictMainQueue() {
     while (true) {
       auto evicted = main_queue_.Pop();
       auto it = key_to_cache_key_.find(evicted.getKey());
@@ -168,17 +168,17 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
     }
   }
 
-  int64_t EvictS() {
+  int64_t EvictSmallQueue() {
     auto evicted = small_queue_.Pop();
     const auto is_M_full = main_queue_.IsFull();
     auto it = key_to_cache_key_.find(evicted.getKey());
     if (evicted.getFreq() <= 0 && is_M_full) {
       key_to_cache_key_.erase(it);
       // No overflow is expected for any GNN workload.
-      ghost_map_[evicted.getKey()] = ghost_q_time_++;
+      ghost_map_[evicted.getKey()] = ghost_queue_time_++;
       return evicted.getPos();
     } else {
-      const auto pos = is_M_full ? EvictM() : cache_usage_++;
+      const auto pos = is_M_full ? EvictMainQueue() : cache_usage_++;
       it->second = main_queue_.Push(evicted);
       return pos;
     }
@@ -188,7 +188,7 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
   bool InGhostQueue(int64_t key) const {
     auto it = ghost_map_.find(key);
     return it != ghost_map_.end() &&
-           ghost_q_time_ - it->second <= main_queue_.Capacity();
+           ghost_queue_time_ - it->second <= main_queue_.Capacity();
   }
 
   void TrimGhostQueue() {
@@ -196,7 +196,7 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
       // Here, we ensure that the ghost_map_ does not grow too much.
       phmap::priv::erase_if(ghost_map_, [&](const auto& key_value) {
         const auto timestamp = key_value.second;
-        return ghost_q_time_ - timestamp > main_queue_.Capacity();
+        return ghost_queue_time_ - timestamp > main_queue_.Capacity();
       });
     }
   }
@@ -204,7 +204,10 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
   CircularQueue<CacheKey> small_queue_, main_queue_;
   phmap::flat_hash_map<int64_t, CacheKey*> key_to_cache_key_;
   phmap::flat_hash_map<int64_t, int64_t> ghost_map_;
-  int64_t ghost_q_time_;
+  // Keeps track of the number of insertions into the ghost queue so far. If an
+  // item's time of insertion is older than main_queue_.Capacity(), then it is
+  // not really considered in the ghost queue.
+  int64_t ghost_queue_time_;
   int64_t capacity_;
   int64_t cache_usage_;
 };
