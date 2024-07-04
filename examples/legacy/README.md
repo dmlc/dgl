@@ -1,6 +1,6 @@
 # New sampling examples via `dgl.graphbolt`
 Consider taking a look at our new sampling examples in the
-`${DGL_REPO_DIR}graphbolt_examples` folder using `dgl.graphbolt`.
+`../graphbolt` folder using `dgl.graphbolt`.
 
 # Sampling Examples Running
 
