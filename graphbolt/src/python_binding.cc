@@ -100,9 +100,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.class_<storage::PartitionedS3FifoCachePolicy>("S3FifoCachePolicy")
       .def("query", &storage::PartitionedS3FifoCachePolicy::Query)
       .def("replace", &storage::PartitionedS3FifoCachePolicy::Replace);
-  m.def(
-      "s3_fifo_cache_policy",
-      &storage::PartitionedS3FifoCachePolicy::Create);
+  m.def("s3_fifo_cache_policy", &storage::PartitionedS3FifoCachePolicy::Create);
   m.class_<storage::FeatureCache>("FeatureCache")
       .def("query", &storage::FeatureCache::Query)
       .def("replace", &storage::FeatureCache::Replace);

@@ -5,6 +5,7 @@ __all__ = ["FeatureCache"]
 
 caching_policies = {"s3-fifo": torch.ops.graphbolt.s3_fifo_cache_policy}
 
+
 class FeatureCache(object):
     r"""High level wrapper for the CPU feature cache.
 
