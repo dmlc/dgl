@@ -60,6 +60,7 @@ import torch
 import torch._inductor.codecache
 import torch.nn.functional as F
 import torchmetrics.functional as MF
+from torch.torch_version import TorchVersion
 from torch_geometric.nn import SAGEConv
 from tqdm import tqdm
 
@@ -196,6 +197,7 @@ def create_dataloader(
     return gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
+        overlap_feature_fetch=args.overlap_feature_fetch,
         overlap_graph_fetch=args.overlap_graph_fetch,
         num_gpu_cached_edges=args.num_gpu_cached_edges,
         gpu_cache_threshold=args.gpu_graph_caching_threshold,
@@ -365,14 +367,6 @@ def parse_args():
         help="The sampling function when doing layerwise sampling.",
     )
     parser.add_argument(
-        "--overlap-graph-fetch",
-        action="store_true",
-        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
-        "If True, the data loader will overlap the UVA graph fetching operations"
-        "with the rest of operations by using an alternative CUDA stream. Disabled"
-        "by default.",
-    )
-    parser.add_argument(
         "--num-gpu-cached-edges",
         type=int,
         default=0,
@@ -385,10 +379,11 @@ def parse_args():
         help="The number of accesses after which a vertex neighborhood will be cached.",
     )
     parser.add_argument(
-        "--torch-compile",
+        "--disable-torch-compile",
         action="store_true",
-        help="Uses torch.compile() on the trained GNN model. Requires "
-        "torch>=2.2.0 to enable this option.",
+        default=TorchVersion(torch.__version__) < TorchVersion("2.2.0a0"),
+        help="Disables torch.compile() on the trained GNN model because it is "
+        "enabled by default for torch>=2.2.0 without this option.",
     )
     return parser.parse_args()
 
@@ -398,6 +393,12 @@ def main():
         args.mode = "cpu-cpu-cpu"
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
+    args.overlap_feature_fetch = args.feature_device == "pinned"
+    # For now, only sample_layer_neighbor is faster with this option
+    args.overlap_graph_fetch = (
+        args.sample_mode == "sample_layer_neighbor"
+        and args.graph_device == "pinned"
+    )
 
     # Load and preprocess dataset.
     print("Loading data...")
@@ -446,7 +447,7 @@ def main():
     hidden_channels = 256
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(args.device)
     assert len(args.fanout) == len(model.layers)
-    if args.torch_compile:
+    if not args.disable_torch_compile:
         torch._dynamo.config.cache_size_limit = 32
         model = torch.compile(model, fullgraph=True, dynamic=True)
 

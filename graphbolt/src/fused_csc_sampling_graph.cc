@@ -910,7 +910,9 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
     torch::optional<torch::Tensor> input_nodes_pre_time_window,
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<std::string> node_timestamp_attr_name,
-    torch::optional<std::string> edge_timestamp_attr_name) const {
+    torch::optional<std::string> edge_timestamp_attr_name,
+    torch::optional<torch::Tensor> random_seed,
+    double seed2_contribution) const {
   torch::optional<std::vector<int64_t>> seed_offsets = torch::nullopt;
   // 1. Get probs_or_mask.
   if (probs_or_mask.has_value()) {
@@ -928,19 +930,45 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
   auto edge_timestamp = this->EdgeAttribute(edge_timestamp_attr_name);
   // 4. Call SampleNeighborsImpl
   if (layer) {
-    const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
-        static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
-    SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
-    return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
-        input_nodes, seed_offsets, fanouts, return_eids,
-        GetTemporalNumPickFn(
-            input_nodes_timestamp, this->indices_, fanouts, replace,
-            type_per_edge_, input_nodes_pre_time_window, probs_or_mask,
-            node_timestamp, edge_timestamp),
-        GetTemporalPickFn(
-            input_nodes_timestamp, this->indices_, fanouts, replace,
-            indptr_.options(), type_per_edge_, input_nodes_pre_time_window,
-            probs_or_mask, node_timestamp, edge_timestamp, args));
+    if (random_seed.has_value() && random_seed->numel() >= 2) {
+      SamplerArgs<SamplerType::LABOR_DEPENDENT> args{
+          indices_,
+          {random_seed.value(), static_cast<float>(seed2_contribution)},
+          NumNodes()};
+      return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
+          input_nodes, seed_offsets, fanouts, return_eids,
+          GetTemporalNumPickFn(
+              input_nodes_timestamp, indices_, fanouts, replace, type_per_edge_,
+              input_nodes_pre_time_window, probs_or_mask, node_timestamp,
+              edge_timestamp),
+          GetTemporalPickFn(
+              input_nodes_timestamp, indices_, fanouts, replace,
+              indptr_.options(), type_per_edge_, input_nodes_pre_time_window,
+              probs_or_mask, node_timestamp, edge_timestamp, args));
+    } else {
+      auto args = [&] {
+        if (random_seed.has_value() && random_seed->numel() == 1) {
+          return SamplerArgs<SamplerType::LABOR>{
+              indices_, random_seed.value(), NumNodes()};
+        } else {
+          return SamplerArgs<SamplerType::LABOR>{
+              indices_,
+              RandomEngine::ThreadLocal()->RandInt(
+                  static_cast<int64_t>(0), std::numeric_limits<int64_t>::max()),
+              NumNodes()};
+        }
+      }();
+      return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
+          input_nodes, seed_offsets, fanouts, return_eids,
+          GetTemporalNumPickFn(
+              input_nodes_timestamp, indices_, fanouts, replace, type_per_edge_,
+              input_nodes_pre_time_window, probs_or_mask, node_timestamp,
+              edge_timestamp),
+          GetTemporalPickFn(
+              input_nodes_timestamp, indices_, fanouts, replace,
+              indptr_.options(), type_per_edge_, input_nodes_pre_time_window,
+              probs_or_mask, node_timestamp, edge_timestamp, args));
+    }
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
@@ -1560,7 +1588,7 @@ int64_t TemporalPick(
     masked_prob =
         probs_or_mask.value().slice(0, offset, offset + num_neighbors) * mask;
   } else {
-    masked_prob = mask.to(torch::kFloat32);
+    masked_prob = S == SamplerType::NEIGHBOR ? mask.to(torch::kFloat32) : mask;
   }
   if constexpr (S == SamplerType::NEIGHBOR) {
     auto picked_indices = NonUniformPickOp(masked_prob, fanout, replace);
@@ -1693,7 +1721,7 @@ std::enable_if_t<is_labor(S), int64_t> Pick(
           probs_or_mask.value(), picked_data_ptr);
     } else {
       int64_t picked_count;
-      AT_DISPATCH_FLOATING_TYPES(
+      GRAPHBOLT_DISPATCH_ALL_TYPES(
           probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
             if (replace) {
               picked_count = LaborPick<true, true, scalar_t>(
