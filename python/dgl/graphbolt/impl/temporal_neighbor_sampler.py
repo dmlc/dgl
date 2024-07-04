@@ -10,6 +10,7 @@ from .sampled_subgraph_impl import SampledSubgraphImpl
 
 __all__ = ["TemporalNeighborSampler", "TemporalLayerNeighborSampler"]
 
+
 class TemporalNeighborSamplerImpl(SubgraphSampler):
     """Base class for TemporalNeighborSamplers."""
 
@@ -100,6 +101,7 @@ class TemporalNeighborSamplerImpl(SubgraphSampler):
             seeds_timestamp = row_timestamps
         return seeds, subgraphs
 
+
 @functional_datapipe("temporal_sample_neighbor")
 class TemporalNeighborSampler(TemporalNeighborSamplerImpl):
     """Temporally sample neighbor edges from a graph and return sampled
@@ -164,7 +166,17 @@ class TemporalNeighborSampler(TemporalNeighborSamplerImpl):
         node_timestamp_attr_name=None,
         edge_timestamp_attr_name=None,
     ):
-        super().__init__(datapipe, graph, fanouts, replace, prob_name, node_timestamp_attr_name, edge_timestamp_attr_name, graph.temporal_sample_neighbors)
+        super().__init__(
+            datapipe,
+            graph,
+            fanouts,
+            replace,
+            prob_name,
+            node_timestamp_attr_name,
+            edge_timestamp_attr_name,
+            graph.temporal_sample_neighbors,
+        )
+
 
 @functional_datapipe("temporal_sample_layer_neighbor")
 class TemporalLayerNeighborSampler(TemporalNeighborSamplerImpl):
@@ -245,4 +257,13 @@ class TemporalLayerNeighborSampler(TemporalNeighborSamplerImpl):
         node_timestamp_attr_name=None,
         edge_timestamp_attr_name=None,
     ):
-        super().__init__(datapipe, graph, fanouts, replace, prob_name, node_timestamp_attr_name, edge_timestamp_attr_name, graph.temporal_sample_layer_neighbors)
+        super().__init__(
+            datapipe,
+            graph,
+            fanouts,
+            replace,
+            prob_name,
+            node_timestamp_attr_name,
+            edge_timestamp_attr_name,
+            graph.temporal_sample_layer_neighbors,
+        )

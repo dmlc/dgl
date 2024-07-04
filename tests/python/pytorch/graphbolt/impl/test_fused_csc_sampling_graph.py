@@ -957,7 +957,12 @@ def test_temporal_sample_neighbors_homo(
 @pytest.mark.parametrize("use_node_timestamp", [False, True])
 @pytest.mark.parametrize("use_edge_timestamp", [False, True])
 def test_temporal_sample_neighbors_hetero(
-    indptr_dtype, indices_dtype, replace, labor, use_node_timestamp, use_edge_timestamp
+    indptr_dtype,
+    indices_dtype,
+    replace,
+    labor,
+    use_node_timestamp,
+    use_edge_timestamp,
 ):
     """Original graph in COO:
     "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
