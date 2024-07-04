@@ -30,6 +30,7 @@ template <typename BaseCachePolicy>
 PartitionedCachePolicy<BaseCachePolicy>::PartitionedCachePolicy(
     int64_t capacity, int64_t num_partitions)
     : capacity_(capacity) {
+  TORCH_CHECK(num_partitions >= 1, "# partitions need to be positive.");
   for (int64_t i = 0; i < num_partitions; i++) {
     const auto begin = i * capacity / num_partitions;
     const auto end = (i + 1) * capacity / num_partitions;
@@ -115,6 +116,7 @@ PartitionedCachePolicy<BaseCachePolicy>::Partition(torch::Tensor keys) {
 template <typename BaseCachePolicy>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 PartitionedCachePolicy<BaseCachePolicy>::Query(torch::Tensor keys) {
+  if (policies_.size() == 1) return policies_[0].Query(keys);
   torch::Tensor offsets, indices, permuted_keys;
   std::tie(offsets, indices, permuted_keys) = Partition(keys);
   auto offsets_ptr = offsets.data_ptr<int64_t>();
@@ -178,6 +180,7 @@ PartitionedCachePolicy<BaseCachePolicy>::Query(torch::Tensor keys) {
 template <typename BaseCachePolicy>
 torch::Tensor PartitionedCachePolicy<BaseCachePolicy>::Replace(
     torch::Tensor keys) {
+  if (policies_.size() == 1) return policies_[0].Replace(keys);
   torch::Tensor offsets, indices, permuted_keys;
   std::tie(offsets, indices, permuted_keys) = Partition(keys);
   auto output_positions =
