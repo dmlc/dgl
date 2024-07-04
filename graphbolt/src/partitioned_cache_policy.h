@@ -40,7 +40,8 @@ namespace storage {
  * policy performance is not affected as the key distribution stays the same in
  * each partition.
  **/
-class PartitionedCachePolicy : public torch::CustomClassHolder {
+class PartitionedCachePolicy : public BaseCachePolicy,
+                               public torch::CustomClassHolder {
  public:
   /**
    * @brief The policy query function.
