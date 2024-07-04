@@ -25,6 +25,7 @@
 
 #include <pcg_random.hpp>
 #include <random>
+#include <type_traits>
 #include <vector>
 
 #include "./cache_policy.h"
@@ -33,14 +34,12 @@ namespace graphbolt {
 namespace storage {
 
 /**
- * @brief PartitionedCachePolicy takes a BaseCachePolicy as template parameter.
- * It is expected that BaseCachePolicy takes only one argument, the capacity.
- * It works by partitioning the key space to a set number of partitions that is
- * provided as the second argument of its constructor. Since the partitioning
- * is random but deterministic, the caching policy performance is not affected
- * as the key distribution stays the same in each partition.
+ * @brief PartitionedCachePolicy works by partitioning the key space to a set
+ * number of partitions that is provided as the second argument of its
+ * constructor. Since the partitioning is random but deterministic, the caching
+ * policy performance is not affected as the key distribution stays the same in
+ * each partition.
  **/
-template <typename BaseCachePolicy>
 class PartitionedCachePolicy : public torch::CustomClassHolder {
  public:
   /**
@@ -49,9 +48,8 @@ class PartitionedCachePolicy : public torch::CustomClassHolder {
    * @param num_partitions The number of caching policies instantiated in a
    * one-to-one mapping to each partition.
    */
-  PartitionedCachePolicy(int64_t capacity, int64_t num_partitions);
-
-  PartitionedCachePolicy() = default;
+  template <typename CachePolicy>
+  PartitionedCachePolicy(CachePolicy, int64_t capacity, int64_t num_partitions);
 
   /**
    * @brief The policy query function.
@@ -75,6 +73,7 @@ class PartitionedCachePolicy : public torch::CustomClassHolder {
    */
   torch::Tensor Replace(torch::Tensor keys);
 
+  template <typename CachePolicy>
   static c10::intrusive_ptr<PartitionedCachePolicy> Create(
       int64_t capacity, int64_t num_partitions);
 
@@ -103,10 +102,8 @@ class PartitionedCachePolicy : public torch::CustomClassHolder {
       torch::Tensor keys);
 
   int64_t capacity_;
-  std::vector<BaseCachePolicy> policies_;
+  std::vector<std::unique_ptr<BaseCachePolicy>> policies_;
 };
-
-using PartitionedS3FifoCachePolicy = PartitionedCachePolicy<S3FifoCachePolicy>;
 
 }  // namespace storage
 }  // namespace graphbolt

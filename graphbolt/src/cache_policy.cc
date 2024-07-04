@@ -96,10 +96,5 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
   return positions;
 }
 
-c10::intrusive_ptr<S3FifoCachePolicy> S3FifoCachePolicy::Create(
-    int64_t capacity) {
-  return c10::make_intrusive<S3FifoCachePolicy>(capacity);
-}
-
 }  // namespace storage
 }  // namespace graphbolt

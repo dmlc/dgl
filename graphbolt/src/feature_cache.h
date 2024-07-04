@@ -37,8 +37,6 @@ struct FeatureCache : public torch::CustomClassHolder {
    */
   FeatureCache(const std::vector<int64_t>& shape, torch::ScalarType dtype);
 
-  FeatureCache() = default;
-
   /**
    * @brief The cache query function. Allocates an empty tensor `values` with
    * size as the first dimension and runs

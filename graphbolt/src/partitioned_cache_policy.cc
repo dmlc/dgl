@@ -26,21 +26,20 @@ namespace storage {
 
 constexpr int kIntGrainSize = 64;
 
-template <typename BaseCachePolicy>
-PartitionedCachePolicy<BaseCachePolicy>::PartitionedCachePolicy(
-    int64_t capacity, int64_t num_partitions)
+template <typename CachePolicy>
+PartitionedCachePolicy::PartitionedCachePolicy(
+    CachePolicy, int64_t capacity, int64_t num_partitions)
     : capacity_(capacity) {
   TORCH_CHECK(num_partitions >= 1, "# partitions need to be positive.");
   for (int64_t i = 0; i < num_partitions; i++) {
     const auto begin = i * capacity / num_partitions;
     const auto end = (i + 1) * capacity / num_partitions;
-    policies_.emplace_back(end - begin);
+    policies_.emplace_back(std::make_unique<CachePolicy>(end - begin));
   }
 }
 
-template <typename BaseCachePolicy>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-PartitionedCachePolicy<BaseCachePolicy>::Partition(torch::Tensor keys) {
+PartitionedCachePolicy::Partition(torch::Tensor keys) {
   const int64_t num_parts = policies_.size();
   torch::Tensor offsets = torch::zeros(
       num_parts * num_parts + 1, keys.options().dtype(torch::kInt64));
@@ -113,10 +112,9 @@ PartitionedCachePolicy<BaseCachePolicy>::Partition(torch::Tensor keys) {
       permuted_keys};
 }
 
-template <typename BaseCachePolicy>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-PartitionedCachePolicy<BaseCachePolicy>::Query(torch::Tensor keys) {
-  if (policies_.size() == 1) return policies_[0].Query(keys);
+PartitionedCachePolicy::Query(torch::Tensor keys) {
+  if (policies_.size() == 1) return policies_[0]->Query(keys);
   torch::Tensor offsets, indices, permuted_keys;
   std::tie(offsets, indices, permuted_keys) = Partition(keys);
   auto offsets_ptr = offsets.data_ptr<int64_t>();
@@ -132,7 +130,7 @@ PartitionedCachePolicy<BaseCachePolicy>::Query(torch::Tensor keys) {
     const auto tid = begin;
     begin = offsets_ptr[tid];
     end = offsets_ptr[tid + 1];
-    results[tid] = policies_.at(tid).Query(permuted_keys.slice(0, begin, end));
+    results[tid] = policies_.at(tid)->Query(permuted_keys.slice(0, begin, end));
     result_offsets[tid] = std::get<0>(results[tid]).size(0);
     result_offsets[tid + policies_.size()] = std::get<2>(results[tid]).size(0);
   });
@@ -177,10 +175,8 @@ PartitionedCachePolicy<BaseCachePolicy>::Query(torch::Tensor keys) {
   return std::make_tuple(positions, output_indices, missing_keys);
 }
 
-template <typename BaseCachePolicy>
-torch::Tensor PartitionedCachePolicy<BaseCachePolicy>::Replace(
-    torch::Tensor keys) {
-  if (policies_.size() == 1) return policies_[0].Replace(keys);
+torch::Tensor PartitionedCachePolicy::Replace(torch::Tensor keys) {
+  if (policies_.size() == 1) return policies_[0]->Replace(keys);
   torch::Tensor offsets, indices, permuted_keys;
   std::tie(offsets, indices, permuted_keys) = Partition(keys);
   auto output_positions =
@@ -194,7 +190,7 @@ torch::Tensor PartitionedCachePolicy<BaseCachePolicy>::Replace(
     begin = offsets_ptr[tid];
     end = offsets_ptr[tid + 1];
     torch::Tensor positions =
-        policies_.at(tid).Replace(permuted_keys.slice(0, begin, end));
+        policies_.at(tid)->Replace(permuted_keys.slice(0, begin, end));
     auto positions_ptr = positions.data_ptr<int64_t>();
     const auto off = tid * capacity_ / policies_.size();
     for (int64_t i = 0; i < positions.size(0); i++) {
@@ -204,14 +200,16 @@ torch::Tensor PartitionedCachePolicy<BaseCachePolicy>::Replace(
   return output_positions;
 }
 
-template <typename BaseCachePolicy>
-c10::intrusive_ptr<PartitionedCachePolicy<BaseCachePolicy>>
-PartitionedCachePolicy<BaseCachePolicy>::Create(
+template <typename CachePolicy>
+c10::intrusive_ptr<PartitionedCachePolicy> PartitionedCachePolicy::Create(
     int64_t capacity, int64_t num_partitions) {
-  return c10::make_intrusive<PartitionedCachePolicy>(capacity, num_partitions);
+  static_assert(std::is_base_of_v<BaseCachePolicy, CachePolicy>);
+  return c10::make_intrusive<PartitionedCachePolicy>(
+      CachePolicy(), capacity, num_partitions);
 }
 
-template class PartitionedCachePolicy<S3FifoCachePolicy>;
+template c10::intrusive_ptr<PartitionedCachePolicy>
+    PartitionedCachePolicy::Create<S3FifoCachePolicy>(int64_t, int64_t);
 
 }  // namespace storage
 }  // namespace graphbolt

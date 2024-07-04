@@ -36,6 +36,8 @@ struct CircularQueue {
         capacity_(capacity + 1),
         data_{new T[capacity + 1]} {}
 
+  CircularQueue() = default;
+
   T* Push(const T& x) {
     auto insert_ptr = &data_[PostIncrement(tail_)];
     *insert_ptr = x;
@@ -105,11 +107,36 @@ struct CacheKey {
   int64_t position_in_cache_;
 };
 
+class BaseCachePolicy {
+ public:
+  /**
+   * @brief The policy query function.
+   * @param keys The keys to query the cache.
+   *
+   * @return (positions, indices, missing_keys), where positions has the
+   * locations of the keys which were found in the cache, missing_keys has the
+   * keys that were not found and indices is defined such that
+   * keys[indices[:positions.size(0)]] gives us the found keys and
+   * keys[indices[positions.size(0):]] is identical to missing_keys.
+   */
+  virtual std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
+      torch::Tensor keys) = 0;
+
+  /**
+   * @brief The policy replace function.
+   * @param keys The keys to query the cache.
+   *
+   * @return positions tensor is returned holding the locations of the replaced
+   * entries in the cache.
+   */
+  virtual torch::Tensor Replace(torch::Tensor keys) = 0;
+};
+
 /**
  * @brief S3FIFO is a simple, scalable FIFObased algorithm with three static
  * queues (S3-FIFO). https://dl.acm.org/doi/pdf/10.1145/3600006.3613147
  **/
-class S3FifoCachePolicy : public torch::CustomClassHolder {
+class S3FifoCachePolicy : public BaseCachePolicy {
  public:
   /**
    * @brief Constructor for the S3FifoCachePolicy class.
@@ -141,8 +168,6 @@ class S3FifoCachePolicy : public torch::CustomClassHolder {
    * entries in the cache.
    */
   torch::Tensor Replace(torch::Tensor keys);
-
-  static c10::intrusive_ptr<S3FifoCachePolicy> Create(int64_t capacity);
 
   friend std::ostream& operator<<(
       std::ostream& os, const S3FifoCachePolicy& policy) {
