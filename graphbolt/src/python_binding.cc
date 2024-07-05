@@ -14,7 +14,9 @@
 #endif
 #include "./cnumpy.h"
 #include "./expand_indptr.h"
+#include "./feature_cache.h"
 #include "./index_select.h"
+#include "./partitioned_cache_policy.h"
 #include "./random.h"
 
 #ifdef GRAPHBOLT_USE_CUDA
@@ -95,6 +97,16 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("gpu_graph_cache", &cuda::GpuGraphCache::Create);
 #endif
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
+  m.class_<storage::PartitionedCachePolicy>("PartitionedCachePolicy")
+      .def("query", &storage::PartitionedCachePolicy::Query)
+      .def("replace", &storage::PartitionedCachePolicy::Replace);
+  m.def(
+      "s3_fifo_cache_policy",
+      &storage::PartitionedCachePolicy::Create<storage::S3FifoCachePolicy>);
+  m.class_<storage::FeatureCache>("FeatureCache")
+      .def("query", &storage::FeatureCache::Query)
+      .def("replace", &storage::FeatureCache::Replace);
+  m.def("feature_cache", &storage::FeatureCache::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
