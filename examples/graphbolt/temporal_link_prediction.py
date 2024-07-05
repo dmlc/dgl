@@ -33,7 +33,6 @@ main
 import argparse
 import os
 import time
-from functools import partial
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
