@@ -9,7 +9,7 @@
 #include <torch/torch.h>
 
 #include <cstring>
-#include <regex>
+#include <memory>
 #include <stdexcept>
 namespace graphbolt {
 namespace storage {
@@ -101,15 +101,32 @@ torch::Tensor OnDiskNpyArray::IndexSelect(torch::Tensor index) {
 torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   index = index.to(torch::kLong);
   // The minimum page size to contain one feature.
-  int64_t aligned_length =
-      (feature_size_ + kDiskAlignmentSize) & (long)~(kDiskAlignmentSize - 1);
-  int64_t num_index = index.numel();
+  const int64_t aligned_length = (feature_size_ + kDiskAlignmentSize - 1) &
+                           (long)~(kDiskAlignmentSize - 1);
+  const int64_t num_index = index.numel();
 
-  char *read_buffer = (char *)aligned_alloc(
-      kDiskAlignmentSize,
-      (aligned_length + kDiskAlignmentSize) * group_size_ * num_thread_);
-  char *result_buffer =
-      (char *)aligned_alloc(kDiskAlignmentSize, feature_size_ * num_index);
+  const size_t read_buffer_intended_size =
+      (aligned_length + kDiskAlignmentSize) * group_size_ * num_thread_;
+  size_t read_buffer_size = read_buffer_intended_size + kDiskAlignmentSize - 1;
+  auto read_tensor = torch::empty(
+      read_buffer_size,
+      torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU));
+  auto read_buffer_void_ptr = read_tensor.data_ptr();
+  auto read_buffer = reinterpret_cast<char *>(std::align(
+      kDiskAlignmentSize, read_buffer_intended_size, read_buffer_void_ptr,
+      read_buffer_size));
+  TORCH_CHECK(read_buffer, "read_buffer allocation failed!");
+
+  std::vector<int64_t> shape;
+  shape.push_back(num_index);
+  shape.insert(shape.end(), feature_dim_.begin() + 1, feature_dim_.end());
+  auto result = torch::empty(
+      shape, torch::TensorOptions()
+                 .dtype(dtype_)
+                 .layout(torch::kStrided)
+                 .device(torch::kCPU)
+                 .requires_grad(false));
+  auto result_buffer = reinterpret_cast<char *>(result.data_ptr());
   auto index_data = index.data_ptr<int64_t>();
 
   // Record the inside offsets of feteched features.
@@ -117,7 +134,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   // Indicator for index error.
   std::atomic<bool> error_flag{};
   TORCH_CHECK(
-      num_thread_ >= torch::get_num_threads(),
+      torch::get_num_threads() <= num_thread_,
       "The number of threads can not be changed to larger than the number of "
       "threads when a disk feature fetcher is constructed.");
   torch::parallel_for(
@@ -171,7 +188,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                   if (io_uring_wait_cqe(
                           &io_uring_queue_[thread_id], &complete_queue) < 0) {
                     perror("io_uring_wait_cqe");
-                    abort();
+                    std::exit(EXIT_FAILURE);
                   }
                   struct io_uring_cqe *complete_queues[group_size_];
                   int cqe_count = io_uring_peek_batch_cqe(
@@ -179,7 +196,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                       group_size_);
                   if (cqe_count == -1) {
                     perror("io_uring_peek_batch error\n");
-                    abort();
+                    std::exit(EXIT_FAILURE);
                   }
                   // Move the head pointer of completion queue.
                   io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
@@ -189,7 +206,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
 
                 for (int64_t batch_id = batch_offset; batch_id <= i;
                      batch_id++) {
-                  memcpy(
+                  std::memcpy(
                       result_buffer + feature_size_ * (batch_id),
                       read_buffer +
                           ((aligned_length + kDiskAlignmentSize) * group_size_ *
@@ -207,25 +224,10 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
           }
         }
       });
-  auto result = torch::empty({0});
-  if (!error_flag.load()) {
-    auto options = torch::TensorOptions()
-                       .dtype(dtype_)
-                       .layout(torch::kStrided)
-                       .device(torch::kCPU)
-                       .requires_grad(false);
-
-    std::vector<int64_t> shape;
-    shape.push_back(num_index);
-    shape.insert(shape.end(), feature_dim_.begin() + 1, feature_dim_.end());
-    result = torch::from_blob(result_buffer, torch::IntArrayRef(shape), options)
-                 .clone();
-  } else {
+  if (error_flag.load()) {
     throw std::runtime_error("IndexError: Index out of range.");
   }
 
-  free(read_buffer);
-  free(result_buffer);
   return result;
 }
 #endif  // HAVE_LIBRARY_LIBURING

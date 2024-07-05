@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(graphbolt C CXX)
-set (CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(USE_CUDA)
   message(STATUS "Build graphbolt with CUDA support")
@@ -75,11 +76,31 @@ include_directories(BEFORE ${BOLT_DIR}
                            "../third_party/dmlc-core/include"
                            "../third_party/pcg/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
+
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   if(USE_LIBURING)
-    target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE "../third_party/liburing/src/include")
-    get_filename_component(PARENT_DIR "${CMAKE_SOURCE_DIR}" DIRECTORY)
-    target_link_libraries(${LIB_GRAPHBOLT_NAME} ${PARENT_DIR}/build/third_party/liburing/lib/liburing.a)
+    add_definitions(-DHAVE_LIBRARY_LIBURING)
+    include(ExternalProject)
+    set(LIBURING_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/liburing)
+    set(LIBURING_C_COMPILER "${CMAKE_C_COMPILER} -w")
+    ExternalProject_Add(
+      liburing
+      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/liburing
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure --cc=${LIBURING_C_COMPILER} --cxx=${CMAKE_CXX_COMPILER} --prefix=/
+      BUILD_COMMAND bash -c "make -j 4"
+      BUILD_IN_SOURCE ON
+      INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
+      BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/lib/liburing.a
+      BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/include
+      DOWNLOAD_EXTRACT_TIMESTAMP true
+    )
+    set(LIBURING_INCLUDE ${LIBURING_INSTALL_DIR}/include)
+    set(LIBURING ${LIBURING_INSTALL_DIR}/lib/liburing.a)
+
+    target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${LIBURING_INCLUDE})
+    add_dependencies(${LIB_GRAPHBOLT_NAME} liburing)
+    target_link_libraries(${LIB_GRAPHBOLT_NAME} ${CMAKE_CURRENT_BINARY_DIR}/third_party/liburing/lib/liburing.a)
+    message(STATUS "Build graphbolt with liburing.")
   endif(USE_LIBURING)
 endif()
 
