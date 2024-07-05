@@ -102,7 +102,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   index = index.to(torch::kLong);
   // The minimum page size to contain one feature.
   const int64_t aligned_length = (feature_size_ + kDiskAlignmentSize - 1) &
-                           (long)~(kDiskAlignmentSize - 1);
+                                 (long)~(kDiskAlignmentSize - 1);
   const int64_t num_index = index.numel();
 
   const size_t read_buffer_intended_size =
