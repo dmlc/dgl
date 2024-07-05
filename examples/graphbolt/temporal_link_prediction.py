@@ -295,6 +295,15 @@ def main(args):
     features = dataset.feature.to(args.storage_device)
 
     train_set = dataset.tasks[0].train_set
+    # TODO: Fix the dataset so that this modification is not needed. node_pairs
+    # needs to be cast into graph.indices.dtype, which is int32.
+    train_set._itemsets["Query:Click:Product"]._items = tuple(
+        item.to(graph.indices.dtype if i == 0 else None)
+        for i, item in enumerate(
+            train_set._itemsets["Query:Click:Product"]._items
+        )
+    )
+
     args.fanout = list(map(int, args.fanout.split(",")))
 
     in_size = 128
