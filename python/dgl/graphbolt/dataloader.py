@@ -1,5 +1,6 @@
 """Graph Bolt DataLoaders"""
 
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 import torch
@@ -9,6 +10,7 @@ import torchdata.datapipes as dp
 
 from .base import CopyTo
 from .feature_fetcher import FeatureFetcher
+from .impl.gpu_graph_cache import GPUGraphCache
 from .impl.neighbor_sampler import SamplePerLayer
 
 from .internal import datapipe_graph_to_adjlist
@@ -17,7 +19,32 @@ from .item_sampler import ItemSampler
 
 __all__ = [
     "DataLoader",
+    "construct_gpu_graph_cache",
 ]
+
+
+def construct_gpu_graph_cache(
+    sample_per_layer_obj, num_gpu_cached_edges, gpu_cache_threshold
+):
+    "Construct a GPUGraphCache given a sample_per_layer_obj and cache parameters."
+    graph = sample_per_layer_obj.sampler.__self__
+    num_gpu_cached_edges = min(num_gpu_cached_edges, graph.total_num_edges)
+    dtypes = OrderedDict()
+    dtypes["indices"] = graph.indices.dtype
+    if graph.type_per_edge is not None:
+        dtypes["type_per_edge"] = graph.type_per_edge.dtype
+    if graph.edge_attributes is not None:
+        probs_or_mask = graph.edge_attributes.get(
+            sample_per_layer_obj.prob_name, None
+        )
+        if probs_or_mask is not None:
+            dtypes["probs_or_mask"] = probs_or_mask.dtype
+    return GPUGraphCache(
+        num_gpu_cached_edges,
+        gpu_cache_threshold,
+        graph.csc_indptr.dtype,
+        list(dtypes.values()),
+    )
 
 
 def _find_and_wrap_parent(datapipe_graph, target_datapipe, wrapper, **kwargs):
@@ -106,6 +133,13 @@ class DataLoader(torch.utils.data.DataLoader):
         If True, the data loader will overlap the UVA graph fetching operations
         with the rest of operations by using an alternative CUDA stream. Default
         is False.
+    num_gpu_cached_edges : int, optional
+        If positive and overlap_graph_fetch is True, then the GPU will cache
+        frequently accessed vertex neighborhoods to reduce the PCI-e bandwidth
+        demand due to pinned graph accesses.
+    gpu_cache_threshold : int, optional
+        Determines how many times a vertex needs to be accessed before its
+        neighborhood ends up being cached on the GPU.
     max_uva_threads : int, optional
         Limits the number of CUDA threads used for UVA copies so that the rest
         of the computations can run simultaneously with it. Setting it to a too
@@ -121,6 +155,8 @@ class DataLoader(torch.utils.data.DataLoader):
         persistent_workers=True,
         overlap_feature_fetch=True,
         overlap_graph_fetch=False,
+        num_gpu_cached_edges=0,
+        gpu_cache_threshold=1,
         max_uva_threads=6144,
     ):
         # Multiprocessing requires two modifications to the datapipe:
@@ -188,11 +224,21 @@ class DataLoader(torch.utils.data.DataLoader):
                 SamplePerLayer,
             )
             executor = ThreadPoolExecutor(max_workers=1)
+            gpu_graph_cache = None
             for sampler in samplers:
+                if gpu_graph_cache is None:
+                    gpu_graph_cache = construct_gpu_graph_cache(
+                        sampler, num_gpu_cached_edges, gpu_cache_threshold
+                    )
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     sampler,
-                    sampler.fetch_and_sample(_get_uva_stream(), executor, 1),
+                    sampler.fetch_and_sample(
+                        gpu_graph_cache,
+                        _get_uva_stream(),
+                        executor,
+                        1,
+                    ),
                 )
 
         # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the

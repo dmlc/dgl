@@ -5,8 +5,8 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 
-import dgl
-from dgl.utils import recursive_apply
+from ..convert import create_block, DGLBlock, EID, NID
+from ..utils import recursive_apply
 
 from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
 from .internal import get_attributes, get_nonproperty_attributes
@@ -114,6 +114,8 @@ class MiniBatch:
     all node ids inside are compacted.
     """
 
+    _blocks: List[DGLBlock] = None
+
     def __repr__(self) -> str:
         return _minibatch_str(self)
 
@@ -157,13 +159,21 @@ class MiniBatch:
         self.edge_features = edge_features
 
     @property
-    def blocks(self):
-        """Extracts DGL blocks from `MiniBatch` to construct a graphical
-        structure and ID mappings.
+    def blocks(self) -> List[DGLBlock]:
+        """DGL blocks extracted from `MiniBatch` containing graphical structures
+        and ID mappings.
         """
         if not self.sampled_subgraphs:
             return None
 
+        if self._blocks is None:
+            self._blocks = self.compute_blocks()
+        return self._blocks
+
+    def compute_blocks(self) -> List[DGLBlock]:
+        """Extracts DGL blocks from `MiniBatch` to construct graphical
+        structures and ID mappings.
+        """
         is_heterogeneous = isinstance(
             self.sampled_subgraphs[0].sampled_csc, Dict
         )
@@ -192,10 +202,15 @@ class MiniBatch:
                 original_column_node_ids is not None
             ), "Missing `original_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
+                node_types = set()
+                sampled_csc = {}
                 for v in subgraph.sampled_csc.values():
                     cast_to_minimum_dtype(v)
-                sampled_csc = {
-                    etype_str_to_tuple(etype): (
+                for etype, v in subgraph.sampled_csc.items():
+                    etype_tuple = etype_str_to_tuple(etype)
+                    node_types.add(etype_tuple[0])
+                    node_types.add(etype_tuple[2])
+                    sampled_csc[etype_tuple] = (
                         "csc",
                         (
                             v.indptr,
@@ -208,15 +223,21 @@ class MiniBatch:
                             ),
                         ),
                     )
-                    for etype, v in subgraph.sampled_csc.items()
-                }
                 num_src_nodes = {
-                    ntype: nodes.size(0)
-                    for ntype, nodes in original_row_node_ids.items()
+                    ntype: (
+                        original_row_node_ids[ntype].size(0)
+                        if original_row_node_ids.get(ntype) is not None
+                        else 0
+                    )
+                    for ntype in node_types
                 }
                 num_dst_nodes = {
-                    ntype: nodes.size(0)
-                    for ntype, nodes in original_column_node_ids.items()
+                    ntype: (
+                        original_column_node_ids[ntype].size(0)
+                        if original_column_node_ids.get(ntype) is not None
+                        else 0
+                    )
+                    for ntype in node_types
                 }
             else:
                 sampled_csc = cast_to_minimum_dtype(subgraph.sampled_csc)
@@ -236,7 +257,7 @@ class MiniBatch:
                 num_src_nodes = original_row_node_ids.size(0)
                 num_dst_nodes = original_column_node_ids.size(0)
             blocks.append(
-                dgl.create_block(
+                create_block(
                     sampled_csc,
                     num_src_nodes=num_src_nodes,
                     num_dst_nodes=num_dst_nodes,
@@ -249,7 +270,7 @@ class MiniBatch:
             for node_type, reverse_ids in self.sampled_subgraphs[
                 0
             ].original_row_node_ids.items():
-                blocks[0].srcnodes[node_type].data[dgl.NID] = reverse_ids
+                blocks[0].srcnodes[node_type].data[NID] = reverse_ids
             # Assign reverse edges ids.
             for block, subgraph in zip(blocks, self.sampled_subgraphs):
                 if subgraph.original_edge_ids:
@@ -258,16 +279,16 @@ class MiniBatch:
                         reverse_ids,
                     ) in subgraph.original_edge_ids.items():
                         block.edges[etype_str_to_tuple(edge_type)].data[
-                            dgl.EID
+                            EID
                         ] = reverse_ids
         else:
-            blocks[0].srcdata[dgl.NID] = self.sampled_subgraphs[
+            blocks[0].srcdata[NID] = self.sampled_subgraphs[
                 0
             ].original_row_node_ids
             # Assign reverse edges ids.
             for block, subgraph in zip(blocks, self.sampled_subgraphs):
                 if subgraph.original_edge_ids is not None:
-                    block.edata[dgl.EID] = subgraph.original_edge_ids
+                    block.edata[EID] = subgraph.original_edge_ids
         return blocks
 
     def to_pyg_data(self):
@@ -345,6 +366,8 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
     attributes.reverse()
     # Insert key with its value into the string.
     for name in attributes:
+        if name[0] == "_":
+            continue
         val = getattr(minibatch, name)
 
         def _add_indent(_str, indent):

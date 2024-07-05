@@ -5,7 +5,9 @@ from typing import Dict, Iterable, Tuple, Union
 
 import torch
 
-__all__ = ["ItemSet", "HeteroItemSet"]
+from ..base import dgl_warning
+
+__all__ = ["ItemSet", "HeteroItemSet", "ItemSetDict"]
 
 
 def is_scalar(x):
@@ -401,6 +403,50 @@ class HeteroItemSet:
             repr(self._itemsets), " " * len("    itemsets=")
         ).strip()
 
+        return ret.format(
+            Classname=self.__class__.__name__,
+            itemsets=itemsets_str,
+            names=self._names,
+        )
+
+
+class ItemSetDict:
+    """`ItemSetDict` is a deprecated class and will be removed in a future
+    version. Please use `HeteroItemSet` instead.
+
+    This class is an alias for `HeteroItemSet` and serves as a wrapper to
+    provide a smooth transition for users of the old class name. It issues a
+    deprecation warning upon instantiation and forwards all attribute access
+    and method calls to an instance of `HeteroItemSet`.
+    """
+
+    def __init__(self, itemsets: Dict[str, ItemSet]) -> None:
+        dgl_warning(
+            "ItemSetDict is deprecated and will be removed in the future. "
+            "Please use HeteroItemSet instead.",
+            category=DeprecationWarning,
+        )
+        self._new_instance = HeteroItemSet(itemsets)
+
+    def __getattr__(self, name: str):
+        return getattr(self._new_instance, name)
+
+    def __getitem__(self, index):
+        return self._new_instance[index]
+
+    def __len__(self) -> int:
+        return len(self._new_instance)
+
+    def __repr__(self) -> str:
+        ret = (
+            "{Classname}(\n"
+            "    itemsets={itemsets},\n"
+            "    names={names},\n"
+            ")"
+        )
+        itemsets_str = textwrap.indent(
+            repr(self._itemsets), " " * len("    itemsets=")
+        ).strip()
         return ret.format(
             Classname=self.__class__.__name__,
             itemsets=itemsets_str,

@@ -6,7 +6,7 @@ System requirements
 DGL works with the following operating systems:
 
 * Ubuntu 20.04+
-* CentOS 8+
+* CentOS 8+ (Although gcc 9 is needed)
 * RHEL 8+
 * macOS X
 * Windows 10

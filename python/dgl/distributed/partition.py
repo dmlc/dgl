@@ -1380,7 +1380,7 @@ def _cast_to_minimum_dtype(predicate, data, field=None):
 def dgl_partition_to_graphbolt(
     part_config,
     *,
-    store_eids=False,
+    store_eids=True,
     store_inner_node=False,
     store_inner_edge=False,
     graph_formats=None,
@@ -1399,7 +1399,7 @@ def dgl_partition_to_graphbolt(
     part_config : str
         The partition configuration JSON file.
     store_eids : bool, optional
-        Whether to store edge IDs in the new graph. Default: False.
+        Whether to store edge IDs in the new graph. Default: True.
     store_inner_node : bool, optional
         Whether to store inner node mask in the new graph. Default: False.
     store_inner_edge : bool, optional

@@ -141,6 +141,7 @@ A subgraph sampler is for sampling subgraphs from a graph.
     SubgraphSampler
     SampledSubgraph
     NeighborSampler
+    TemporalNeighborSampler
     LayerNeighborSampler
     SampledSubgraphImpl
     FusedSampledSubgraphImpl

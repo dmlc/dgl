@@ -38,6 +38,7 @@
 #include <numeric>
 #include <type_traits>
 
+#include "../macro.h"
 #include "../random.h"
 #include "../utils.h"
 #include "./common.h"
