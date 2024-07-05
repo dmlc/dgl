@@ -135,7 +135,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # considering of temporal information. Only neighbors that is earlier than
     # the seed will be sampled.
     ############################################################################
-    datapipe = datapipe.temporal_sample_neighbor(
+    datapipe = getattr(datapipe, args.sample_mode)(
         graph,
         args.fanout if is_train else [-1],
         node_timestamp_attr_name=TIMESTAMP_FEATURE_NAME,
@@ -254,6 +254,12 @@ def parse_args():
         choices=["cpu-cpu", "cpu-cuda"],
         help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
+    )
+    parser.add_argument(
+        "--sample-mode",
+        default="temporal_sample_neighbor",
+        choices=["temporal_sample_neighbor", "temporal_sample_layer_neighbor"],
+        help="The sampling function when doing layerwise sampling.",
     )
     return parser.parse_args()
 
