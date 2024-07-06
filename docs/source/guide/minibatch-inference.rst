@@ -122,7 +122,7 @@ of unlabeled data. Neighborhood sampling will work fine for model
 selection and validation.
 
 One can see
-`GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/node_classification.py>`__
+`GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/node_classification.py>`__
 and
-`RGCN <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/rgcn/hetero_rgcn.py>`__
+`RGCN <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/rgcn/hetero_rgcn.py>`__
 for examples of offline inference.

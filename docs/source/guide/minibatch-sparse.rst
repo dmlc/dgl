@@ -171,4 +171,4 @@ Launch training:
             total_loss += loss.item()
 
 For more details, please refer to the `full example
-<https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/sparse/graphsage.py>`__.
+<https://github.com/dmlc/dgl/blob/master/examples/graphbolt/sparse/graphsage.py>`__.

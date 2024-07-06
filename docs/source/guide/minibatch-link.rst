@@ -139,7 +139,7 @@ above.
 
 
 DGL provides the
-`unsupervised learning GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/link_prediction.py>`__
+`unsupervised learning GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/link_prediction.py>`__
 that shows an example of link prediction on homogeneous graphs.
 
 For heterogeneous graphs

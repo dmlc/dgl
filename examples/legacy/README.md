@@ -1,3 +1,7 @@
+# New sampling examples via `dgl.graphbolt`
+Consider taking a look at our new sampling examples in the
+`../graphbolt` folder using `dgl.graphbolt`.
+
 # Sampling Examples Running
 
 ## Requirements
