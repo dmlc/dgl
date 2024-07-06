@@ -17,7 +17,7 @@ class CappedNeighborSampler(Sampler):
 
     This code was contributed by a community member
     ([@ayushnoori](https://github.com/ayushnoori)). There aren't currently any unit
-    tests in place to verify its functionality, so please be cautious if you need 
+    tests in place to verify its functionality, so please be cautious if you need
     to make any changes to the code's logic.
 
     Parameters
