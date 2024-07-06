@@ -23,11 +23,16 @@ namespace graphbolt {
 namespace storage {
 
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
-    : small_queue_(capacity / 10),
-      main_queue_(capacity - capacity / 10),
-      ghost_queue_time_(0),
+    : small_queue_(capacity),
+      main_queue_(capacity),
+      ghost_queue_(capacity - capacity / 10),
       capacity_(capacity),
-      cache_usage_(0) {}
+      cache_usage_(0),
+      small_queue_size_target_(capacity / 10) {
+  TORCH_CHECK(small_queue_size_target_ > 0, "Capacity is not large enough.");
+  ghost_set_.reserve(ghost_queue_.Capacity());
+  key_to_cache_key_.reserve(capacity);
+}
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 S3FifoCachePolicy::Query(torch::Tensor keys) {
@@ -76,23 +81,15 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
             cache_key.Increment();
             positions_ptr[i] = cache_key.getPos();
           } else {
-            const auto in_ghost_queue = InGhostQueue(key);
-            auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
-            int64_t pos;
-            if (queue.IsFull()) {
-              // When the queue is full, we need to make a space by evicting.
-              // Inside ghost queue means insertion into M, otherwise S.
-              pos = (in_ghost_queue ? EvictMainQueue() : EvictSmallQueue());
-            } else {  // If the cache is not full yet, get an unused empty slot.
-              pos = cache_usage_++;
-            }
+            const auto pos = Evict();
             TORCH_CHECK(0 <= pos && pos < capacity_, "Position out of bounds!");
+            const auto in_ghost_queue = ghost_set_.erase(key);
+            auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
             key_to_cache_key_[key] = queue.Push(CacheKey(key, pos));
             positions_ptr[i] = pos;
           }
         }
       }));
-  TrimGhostQueue();
   return positions;
 }
 

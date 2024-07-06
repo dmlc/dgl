@@ -53,6 +53,12 @@ struct CircularQueue {
     return diff == 0 || diff == capacity_;
   }
 
+  auto Size() const {
+    auto diff = tail_ - head_;
+    if (diff < 0) diff += capacity_;
+    return diff;
+  }
+
   friend std::ostream& operator<<(
       std::ostream& os, const CircularQueue& queue) {
     for (auto i = queue.head_; i != queue.tail_; queue.PostIncrement(i)) {
@@ -63,7 +69,7 @@ struct CircularQueue {
 
   bool IsEmpty() const { return tail_ == head_; }
 
-  int64_t Capacity() const { return capacity_ - 1; }
+  auto Capacity() const { return capacity_ - 1; }
 
  private:
   int64_t PostIncrement(int64_t& i) const {
@@ -95,6 +101,11 @@ struct CacheKey {
   void Increment() { freq_ = std::min(3, static_cast<int>(freq_ + 1)); }
 
   void Decrement() { freq_ = std::max(0, static_cast<int>(freq_ - 1)); }
+
+  CacheKey& ResetFreq() {
+    freq_ = 0;
+    return *this;
+  }
 
   friend std::ostream& operator<<(std::ostream& os, const CacheKey& key_ref) {
     return os << '(' << key_ref.key_ << ", " << key_ref.freq_ << ", "
@@ -174,7 +185,6 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     return os << "small_queue_: " << policy.small_queue_ << "\n"
               << "main_queue_: " << policy.main_queue_ << "\n"
               << "cache_usage_: " << policy.cache_usage_ << "\n"
-              << "ghost_queue_time_: " << policy.ghost_queue_time_ << "\n"
               << "capacity_: " << policy.capacity_ << "\n";
   }
 
@@ -194,47 +204,40 @@ class S3FifoCachePolicy : public BaseCachePolicy {
   }
 
   int64_t EvictSmallQueue() {
-    auto evicted = small_queue_.Pop();
-    const auto is_M_full = main_queue_.IsFull();
-    auto it = key_to_cache_key_.find(evicted.getKey());
-    if (evicted.getFreq() <= 0 && is_M_full) {
-      key_to_cache_key_.erase(it);
-      // No overflow is expected for any GNN workload.
-      ghost_map_[evicted.getKey()] = ghost_queue_time_++;
-      return evicted.getPos();
-    } else {
-      const auto pos = is_M_full ? EvictMainQueue() : cache_usage_++;
-      it->second = main_queue_.Push(evicted);
-      return pos;
+    for (auto size = small_queue_.Size(); size > small_queue_size_target_;
+         size--) {
+      auto evicted = small_queue_.Pop();
+      auto it = key_to_cache_key_.find(evicted.getKey());
+      if (evicted.getFreq() <= 0) {
+        key_to_cache_key_.erase(it);
+        const auto evicted_key = evicted.getKey();
+        if (ghost_queue_.IsFull()) {
+          ghost_set_.erase(ghost_queue_.Pop());
+        }
+        ghost_set_.insert(evicted_key);
+        ghost_queue_.Push(evicted_key);
+        return evicted.getPos();
+      } else {
+        it->second = main_queue_.Push(evicted.ResetFreq());
+      }
     }
+    return -1;
   }
 
-  // Is inside the ghost queue.
-  bool InGhostQueue(int64_t key) const {
-    auto it = ghost_map_.find(key);
-    return it != ghost_map_.end() &&
-           ghost_queue_time_ - it->second <= main_queue_.Capacity();
-  }
-
-  void TrimGhostQueue() {
-    if (static_cast<int64_t>(ghost_map_.size()) >= 2 * main_queue_.Capacity()) {
-      // Here, we ensure that the ghost_map_ does not grow too much.
-      phmap::priv::erase_if(ghost_map_, [&](const auto& key_value) {
-        const auto timestamp = key_value.second;
-        return ghost_queue_time_ - timestamp > main_queue_.Capacity();
-      });
-    }
+  int64_t Evict() {
+    // If the cache has space, get an unused slot otherwise perform eviction.
+    if (cache_usage_ < capacity_) return cache_usage_++;
+    const auto pos = EvictSmallQueue();
+    return pos >= 0 ? pos : EvictMainQueue();
   }
 
   CircularQueue<CacheKey> small_queue_, main_queue_;
-  phmap::flat_hash_map<int64_t, CacheKey*> key_to_cache_key_;
-  phmap::flat_hash_map<int64_t, int64_t> ghost_map_;
-  // Keeps track of the number of insertions into the ghost queue so far. If an
-  // item's time of insertion is older than main_queue_.Capacity(), then it is
-  // not really considered in the ghost queue.
-  int64_t ghost_queue_time_;
+  CircularQueue<int64_t> ghost_queue_;
   int64_t capacity_;
   int64_t cache_usage_;
+  int64_t small_queue_size_target_;
+  phmap::flat_hash_set<int64_t> ghost_set_;
+  phmap::flat_hash_map<int64_t, CacheKey*> key_to_cache_key_;
 };
 
 }  // namespace storage
