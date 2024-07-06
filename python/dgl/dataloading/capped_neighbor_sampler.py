@@ -15,6 +15,11 @@ class CappedNeighborSampler(Sampler):
     root of the sampling probabilities. The sampler returns the subgraph induced by
     all the sampled nodes.
 
+    This code was contributed by a community member
+    ([@ayushnoori](https://github.com/ayushnoori)). There aren't currently any unit
+    tests in place to verify its functionality, so please be cautious if you need 
+    to make any changes to the code's logic.
+
     Parameters
     ----------
     fanouts : list[int] or dict[etype, int]
