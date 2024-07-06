@@ -30,26 +30,27 @@ class FeatureCache(object):
         self.total_miss = 0
         self.total_queries = 0
 
-    def query(self, keys, pin_memory=False):
+    def query(self, keys):
         """Queries the cache.
 
         Parameters
         ----------
         keys : Tensor
             The keys to query the cache with.
-        pin_memory : bool, optional
-            Whether the output values tensor should be pinned. Default is False.
 
         Returns
         -------
         tuple(Tensor, Tensor, Tensor)
             A tuple containing (values, missing_indices, missing_keys) where
             values[missing_indices] corresponds to cache misses that should be
-            filled by quering another source with missing_keys.
+            filled by quering another source with missing_keys. If keys is
+            pinned, then the returned values tensor is pinned as well.
         """
         self.total_queries += keys.shape[0]
         positions, index, missing_keys = self._policy.query(keys)
-        values = self._cache.query(positions, index, keys.shape[0], pin_memory)
+        values = self._cache.query(
+            positions, index, keys.shape[0], keys.is_pinned()
+        )
         self.total_miss += missing_keys.shape[0]
         missing_index = index[positions.size(0) :]
         return values, missing_index, missing_keys
