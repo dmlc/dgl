@@ -127,10 +127,9 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
   shape.push_back(num_index);
   shape.insert(shape.end(), feature_dim_.begin() + 1, feature_dim_.end());
   auto result = torch::empty(
-      shape, torch::TensorOptions()
+      shape, index.options()
                  .dtype(dtype_)
                  .layout(torch::kStrided)
-                 .device(torch::kCPU)
                  .requires_grad(false));
   auto result_buffer = reinterpret_cast<char *>(result.data_ptr());
 
