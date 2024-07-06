@@ -19,6 +19,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
 
 namespace graphbolt {
@@ -40,11 +41,13 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    * @return OnDiskNpyArray
    */
   OnDiskNpyArray(
-      std::string filename, torch::ScalarType dtype, torch::Tensor shape);
+      std::string filename, torch::ScalarType dtype, torch::Tensor shape,
+      torch::optional<int64_t> num_threads);
 
   /** @brief Create a disk feature fetcher from numpy file. */
   static c10::intrusive_ptr<OnDiskNpyArray> Create(
-      std::string path, torch::ScalarType dtype, torch::Tensor shape);
+      std::string path, torch::ScalarType dtype, torch::Tensor shape,
+      torch::optional<int64_t> num_threads);
 
   /** @brief Deconstructor. */
   ~OnDiskNpyArray();
@@ -78,18 +81,18 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   torch::Tensor IndexSelectIOUring(torch::Tensor index);
 #endif  // HAVE_LIBRARY_LIBURING
  private:
-  std::string filename_;              // Path to numpy file.
+  const std::string filename_;        // Path to numpy file.
   int file_description_;              // File description.
   size_t prefix_len_;                 // Length of head data in numpy file.
   std::vector<int64_t> feature_dim_;  // Shape of features, e.g. {N,M,K,L}.
-  torch::ScalarType dtype_;           // Feature data type.
+  const torch::ScalarType dtype_;     // Feature data type.
   int64_t feature_size_;              // Number of bytes of feature size.
   int num_thread_;                    // Default thread number.
-  int64_t group_size_ = 512;          // Default group size.
+  const int64_t group_size_;          // Default group size.
 
 #ifdef HAVE_LIBRARY_LIBURING
-  io_uring* io_uring_queue_;  // io_uring queue.
-#endif                        // HAVE_LIBRARY_LIBURING
+  std::unique_ptr<io_uring[]> io_uring_queue_;  // io_uring queue.
+#endif                                          // HAVE_LIBRARY_LIBURING
 };
 
 }  // namespace storage

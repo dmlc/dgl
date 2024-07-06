@@ -8,6 +8,7 @@
 
 #include <torch/torch.h>
 
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
@@ -17,8 +18,9 @@ namespace storage {
 static constexpr int kDiskAlignmentSize = 4096;
 
 OnDiskNpyArray::OnDiskNpyArray(
-    std::string filename, torch::ScalarType dtype, torch::Tensor shape)
-    : filename_(filename), dtype_(dtype) {
+    std::string filename, torch::ScalarType dtype, torch::Tensor shape,
+    torch::optional<int64_t> num_threads)
+    : filename_(filename), dtype_(dtype), group_size_(512) {
 #ifndef __linux__
   throw std::runtime_error(
       "OnDiskNpyArray is not supported on non-Linux systems.");
@@ -32,7 +34,11 @@ OnDiskNpyArray::OnDiskNpyArray(
 
   // Get system max thread number.
   num_thread_ = torch::get_num_threads();
-  io_uring_queue_ = new io_uring[num_thread_];
+  if (num_threads.has_value() && num_thread_ > *num_threads) {
+    num_thread_ = *num_threads;
+  }
+  TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
+  io_uring_queue_ = std::make_unique<io_uring[]>(num_thread_);
 
   // Init io_uring queue.
   for (int64_t t = 0; t < num_thread_; t++) {
@@ -44,8 +50,9 @@ OnDiskNpyArray::OnDiskNpyArray(
 }
 
 c10::intrusive_ptr<OnDiskNpyArray> OnDiskNpyArray::Create(
-    std::string path, torch::ScalarType dtype, torch::Tensor shape) {
-  return c10::make_intrusive<OnDiskNpyArray>(path, dtype, shape);
+    std::string path, torch::ScalarType dtype, torch::Tensor shape,
+    torch::optional<int64_t> num_threads) {
+  return c10::make_intrusive<OnDiskNpyArray>(path, dtype, shape, num_threads);
 }
 
 OnDiskNpyArray::~OnDiskNpyArray() {
@@ -99,11 +106,10 @@ torch::Tensor OnDiskNpyArray::IndexSelect(torch::Tensor index) {
 
 #ifdef HAVE_LIBRARY_LIBURING
 torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
-  index = index.to(torch::kLong);
+  const int64_t num_index = index.numel();
   // The minimum page size to contain one feature.
   const int64_t aligned_length = (feature_size_ + kDiskAlignmentSize - 1) &
                                  (long)~(kDiskAlignmentSize - 1);
-  const int64_t num_index = index.numel();
 
   const size_t read_buffer_intended_size =
       (aligned_length + kDiskAlignmentSize) * group_size_ * num_thread_;
@@ -127,103 +133,106 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUring(torch::Tensor index) {
                  .device(torch::kCPU)
                  .requires_grad(false));
   auto result_buffer = reinterpret_cast<char *>(result.data_ptr());
-  auto index_data = index.data_ptr<int64_t>();
 
   // Record the inside offsets of feteched features.
-  int64_t residual[group_size_ * num_thread_];
+  auto residual = std::make_unique<int64_t[]>(group_size_ * num_thread_);
   // Indicator for index error.
   std::atomic<bool> error_flag{};
-  TORCH_CHECK(
-      torch::get_num_threads() <= num_thread_,
-      "The number of threads can not be changed to larger than the number of "
-      "threads when a disk feature fetcher is constructed.");
-  torch::parallel_for(
-      0, num_index, group_size_, [&](int64_t begin, int64_t end) {
-        auto thread_id = torch::get_thread_num();
-        if (!error_flag.load()) {
-          int64_t batch_offset = begin;
-          for (int64_t i = begin; i < end; ++i) {
-            int64_t group_id = i - begin;
-            int64_t feature_id = index_data[i];  // Feature id.
-            if (feature_id >= feature_dim_[0]) {
-              error_flag.store(true);
-              break;
-            }
-            // calculate offset of the feature.
-            int64_t offset = feature_id * feature_size_ + prefix_len_;
-            int64_t aligned_offset = offset & (long)~(kDiskAlignmentSize - 1);
-            // put offset of the feature into array.
-            residual[thread_id * group_size_ + (group_id % group_size_)] =
-                offset - aligned_offset;
-            // If the tail of the feature extends into another block, read an
-            // additional block.
-            int64_t read_size;
-            if (residual[thread_id * group_size_ + (group_id % group_size_)] +
-                    feature_size_ >
-                kDiskAlignmentSize) {
-              read_size = aligned_length + kDiskAlignmentSize;
-            } else {
-              read_size = aligned_length;
-            }
-            // Put requests into io_uring queue.
-            struct io_uring_sqe *submit_queue =
-                io_uring_get_sqe(&io_uring_queue_[thread_id]);
-            io_uring_prep_read(
-                submit_queue, file_description_,
-                read_buffer +
-                    ((aligned_length + kDiskAlignmentSize) * group_size_ *
-                     thread_id) +
-                    ((aligned_length + kDiskAlignmentSize) *
-                     (group_id % group_size_)),
-                read_size, aligned_offset);
+  std::atomic<int64_t> work_queue{};
+  torch::parallel_for(0, num_thread_, 1, [&](int64_t begin, int64_t end) {
+    const auto thread_id = begin;
+    while (true) {
+      begin = work_queue.fetch_add(group_size_, std::memory_order_relaxed);
+      if (begin >= num_index || error_flag.load()) break;
+      end = std::min(begin + group_size_, num_index);
+      int64_t batch_offset = begin;
+      AT_DISPATCH_INDEX_TYPES(
+          index.scalar_type(), "IndexSelectIOUring", ([&] {
+            auto index_data = index.data_ptr<index_t>();
+            for (int64_t i = begin; i < end; ++i) {
+              int64_t group_id = i - begin;
+              int64_t feature_id = index_data[i];  // Feature id.
+              if (feature_id >= feature_dim_[0]) {
+                error_flag.store(true);
+                break;
+              }
+              // calculate offset of the feature.
+              int64_t offset = feature_id * feature_size_ + prefix_len_;
+              int64_t aligned_offset = offset & (long)~(kDiskAlignmentSize - 1);
+              // put offset of the feature into array.
+              residual[thread_id * group_size_ + (group_id % group_size_)] =
+                  offset - aligned_offset;
+              // If the tail of the feature extends into another block,
+              // read an additional block.
+              int64_t read_size;
+              if (residual[thread_id * group_size_ + (group_id % group_size_)] +
+                      feature_size_ >
+                  kDiskAlignmentSize) {
+                read_size = aligned_length + kDiskAlignmentSize;
+              } else {
+                read_size = aligned_length;
+              }
+              // Put requests into io_uring queue.
+              struct io_uring_sqe *submit_queue =
+                  io_uring_get_sqe(&io_uring_queue_[thread_id]);
+              io_uring_prep_read(
+                  submit_queue, file_description_,
+                  read_buffer +
+                      ((aligned_length + kDiskAlignmentSize) * group_size_ *
+                       thread_id) +
+                      ((aligned_length + kDiskAlignmentSize) *
+                       (group_id % group_size_)),
+                  read_size, aligned_offset);
 
-            if (((group_id + 1) % group_size_ == 0) || i == end - 1) {
-              if (!error_flag.load()) {
-                io_uring_submit(&io_uring_queue_[thread_id]);
-                //  Wait for completion of I/O requests.
-                int64_t num_finish = 0;
-                // Wait until all the disk blocks are loaded in current group.
-                while (num_finish < (group_id % group_size_ + 1)) {
-                  struct io_uring_cqe *complete_queue;
-                  if (io_uring_wait_cqe(
-                          &io_uring_queue_[thread_id], &complete_queue) < 0) {
-                    perror("io_uring_wait_cqe");
-                    std::exit(EXIT_FAILURE);
+              if (((group_id + 1) % group_size_ == 0) || i == end - 1) {
+                if (!error_flag.load()) {
+                  io_uring_submit(&io_uring_queue_[thread_id]);
+                  //  Wait for completion of I/O requests.
+                  int64_t num_finish = 0;
+                  // Wait until all the disk blocks are loaded in current
+                  // group.
+                  while (num_finish < (group_id % group_size_ + 1)) {
+                    struct io_uring_cqe *complete_queue;
+                    if (io_uring_wait_cqe(
+                            &io_uring_queue_[thread_id], &complete_queue) < 0) {
+                      perror("io_uring_wait_cqe");
+                      std::exit(EXIT_FAILURE);
+                    }
+                    struct io_uring_cqe *complete_queues[group_size_];
+                    int cqe_count = io_uring_peek_batch_cqe(
+                        &io_uring_queue_[thread_id], complete_queues,
+                        group_size_);
+                    if (cqe_count == -1) {
+                      perror("io_uring_peek_batch error\n");
+                      std::exit(EXIT_FAILURE);
+                    }
+                    // Move the head pointer of completion queue.
+                    io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
+                    num_finish += cqe_count;
                   }
-                  struct io_uring_cqe *complete_queues[group_size_];
-                  int cqe_count = io_uring_peek_batch_cqe(
-                      &io_uring_queue_[thread_id], complete_queues,
-                      group_size_);
-                  if (cqe_count == -1) {
-                    perror("io_uring_peek_batch error\n");
-                    std::exit(EXIT_FAILURE);
-                  }
-                  // Move the head pointer of completion queue.
-                  io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
-                  num_finish += cqe_count;
-                }
-                // copy results into result_buffer.
+                  // copy results into result_buffer.
 
-                for (int64_t batch_id = batch_offset; batch_id <= i;
-                     batch_id++) {
-                  std::memcpy(
-                      result_buffer + feature_size_ * (batch_id),
-                      read_buffer +
-                          ((aligned_length + kDiskAlignmentSize) * group_size_ *
-                           thread_id) +
-                          ((aligned_length + kDiskAlignmentSize) *
-                               ((batch_id - begin) % group_size_) +
-                           residual
-                               [thread_id * group_size_ +
-                                ((batch_id - begin) % group_size_)]),
-                      feature_size_);
+                  for (int64_t batch_id = batch_offset; batch_id <= i;
+                       batch_id++) {
+                    std::memcpy(
+                        result_buffer + feature_size_ * (batch_id),
+                        read_buffer +
+                            ((aligned_length + kDiskAlignmentSize) *
+                             group_size_ * thread_id) +
+                            ((aligned_length + kDiskAlignmentSize) *
+                                 ((batch_id - begin) % group_size_) +
+                             residual
+                                 [thread_id * group_size_ +
+                                  ((batch_id - begin) % group_size_)]),
+                        feature_size_);
+                  }
+                  batch_offset += group_size_;
                 }
-                batch_offset += group_size_;
               }
             }
-          }
-        }
-      });
+          }));
+    }
+  });
   if (error_flag.load()) {
     throw std::runtime_error("IndexError: Index out of range.");
   }
