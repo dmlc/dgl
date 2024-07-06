@@ -25,7 +25,7 @@ def test_FeatureFetcher_invoke():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    itemset = gb.ItemSet(torch.arange(10), names="seeds")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -58,7 +58,7 @@ def test_FeatureFetcher_homo():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    itemset = gb.ItemSet(torch.arange(10), names="seeds")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -77,7 +77,8 @@ def test_FeatureFetcher_with_edges_homo():
         [[random.randint(0, 10)] for _ in range(graph.total_num_edges)]
     )
 
-    def add_node_and_edge_ids(seeds):
+    def add_node_and_edge_ids(minibatch):
+        seeds = minibatch.seeds
         subgraphs = []
         for _ in range(3):
             sampled_csc = gb.CSCFormatBase(
@@ -103,7 +104,7 @@ def test_FeatureFetcher_with_edges_homo():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSet(torch.arange(10))
+    itemset = gb.ItemSet(torch.arange(10), names="seeds")
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
     fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, ["a"], ["b"])
@@ -149,28 +150,38 @@ def test_FeatureFetcher_hetero():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
-            "n1": gb.ItemSet(torch.LongTensor([0, 1]), names="seed_nodes"),
-            "n2": gb.ItemSet(torch.LongTensor([0, 1, 2]), names="seed_nodes"),
+            "n1": gb.ItemSet(torch.LongTensor([0, 1]), names="seeds"),
+            "n2": gb.ItemSet(torch.LongTensor([0, 1, 2]), names="seeds"),
         }
     )
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
+    # "n3" is not in the sampled input nodes.
+    node_feature_keys = {"n1": ["a"], "n2": ["a"], "n3": ["a"]}
     fetcher_dp = gb.FeatureFetcher(
-        sampler_dp, feature_store, {"n1": ["a"], "n2": ["a"]}
+        sampler_dp, feature_store, node_feature_keys=node_feature_keys
     )
-
     assert len(list(fetcher_dp)) == 3
+
+    # Do not fetch feature for "n1".
+    node_feature_keys = {"n2": ["a"]}
+    fetcher_dp = gb.FeatureFetcher(
+        sampler_dp, feature_store, node_feature_keys=node_feature_keys
+    )
+    for mini_batch in fetcher_dp:
+        assert ("n1", "a") not in mini_batch.node_features
 
 
 def test_FeatureFetcher_with_edges_hetero():
     a = torch.tensor([[random.randint(0, 10)] for _ in range(20)])
     b = torch.tensor([[random.randint(0, 10)] for _ in range(50)])
 
-    def add_node_and_edge_ids(seeds):
+    def add_node_and_edge_ids(minibatch):
+        seeds = minibatch.seeds
         subgraphs = []
         original_edge_ids = {
             "n1:e1:n2": torch.randint(0, 50, (10,)),
@@ -206,20 +217,31 @@ def test_FeatureFetcher_with_edges_hetero():
         return data
 
     features = {}
-    keys = [("node", "n1", "a"), ("edge", "n1:e1:n2", "a")]
+    keys = [
+        ("node", "n1", "a"),
+        ("edge", "n1:e1:n2", "a"),
+        ("edge", "n2:e2:n1", "a"),
+    ]
     features[keys[0]] = gb.TorchBasedFeature(a)
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
-            "n1": gb.ItemSet(torch.randint(0, 20, (10,))),
+            "n1": gb.ItemSet(torch.randint(0, 20, (10,)), names="seeds"),
         }
     )
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
+    # "n3:e3:n3" is not in the sampled edges.
+    # Do not fetch feature for "n2:e2:n1".
+    node_feature_keys = {"n1": ["a"]}
+    edge_feature_keys = {"n1:e1:n2": ["a"], "n3:e3:n3": ["a"]}
     fetcher_dp = gb.FeatureFetcher(
-        converter_dp, feature_store, {"n1": ["a"]}, {"n1:e1:n2": ["a"]}
+        converter_dp,
+        feature_store,
+        node_feature_keys=node_feature_keys,
+        edge_feature_keys=edge_feature_keys,
     )
 
     assert len(list(fetcher_dp)) == 5
@@ -228,3 +250,4 @@ def test_FeatureFetcher_with_edges_hetero():
         assert len(data.edge_features) == 3
         for edge_feature in data.edge_features:
             assert edge_feature[("n1:e1:n2", "a")].size(0) == 10
+            assert ("n2:e2:n1", "a") not in edge_feature

@@ -349,7 +349,7 @@ class TUDataset(DGLBuiltinDataset):
     The dataset instance is an iterable
 
     >>> len(data)
-    188
+    1178
     >>> g, label = data[1024]
     >>> g
     Graph(num_nodes=88, num_edges=410,

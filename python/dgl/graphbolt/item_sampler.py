@@ -1,21 +1,17 @@
 """Item Sampler"""
 
 from collections.abc import Mapping
-from functools import partial
 from typing import Callable, Iterator, Optional, Union
 
 import numpy as np
 import torch
 import torch.distributed as dist
-from torch.utils.data import default_collate
-from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
+from torchdata.datapipes.iter import IterDataPipe
 
 from ..base import dgl_warning
 
-from ..batch import batch as dgl_batch
-from ..heterograph import DGLGraph
 from .internal import calculate_range
-from .itemset import ItemSet, ItemSetDict
+from .itemset import HeteroItemSet, ItemSet
 from .minibatch import MiniBatch
 
 __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
@@ -50,7 +46,7 @@ def minibatcher_default(batch, names):
         return batch
     if len(names) == 1:
         # Handle the case of single item: batch = tensor([0, 1, 2, 3]), names =
-        # ("seed_nodes",) as `zip(batch, names)` will iterate over the tensor
+        # ("seeds",) as `zip(batch, names)` will iterate over the tensor
         # instead of the batch.
         init_data = {names[0]: batch}
     else:
@@ -62,6 +58,37 @@ def minibatcher_default(batch, names):
         else:
             init_data = {name: item for item, name in zip(batch, names)}
     minibatch = MiniBatch()
+    # TODO(#7254): Hacks for original `seed_nodes` and `node_pairs`, which need
+    # to be cleaned up later.
+    if "node_pairs" in names:
+        pos_seeds = init_data["node_pairs"]
+        # Build negative graph.
+        if "negative_srcs" in names and "negative_dsts" in names:
+            neg_srcs = init_data["negative_srcs"]
+            neg_dsts = init_data["negative_dsts"]
+            (
+                init_data["seeds"],
+                init_data["labels"],
+                init_data["indexes"],
+            ) = _construct_seeds(
+                pos_seeds, neg_srcs=neg_srcs, neg_dsts=neg_dsts
+            )
+        elif "negative_srcs" in names:
+            neg_srcs = init_data["negative_srcs"]
+            (
+                init_data["seeds"],
+                init_data["labels"],
+                init_data["indexes"],
+            ) = _construct_seeds(pos_seeds, neg_srcs=neg_srcs)
+        elif "negative_dsts" in names:
+            neg_dsts = init_data["negative_dsts"]
+            (
+                init_data["seeds"],
+                init_data["labels"],
+                init_data["indexes"],
+            ) = _construct_seeds(pos_seeds, neg_dsts=neg_dsts)
+        else:
+            init_data["seeds"] = pos_seeds
     for name, item in init_data.items():
         if not hasattr(minibatch, name):
             dgl_warning(
@@ -69,177 +96,21 @@ def minibatcher_default(batch, names):
                 "`MiniBatch`. You probably need to provide a customized "
                 "`MiniBatcher`."
             )
-        if name == "node_pairs":
-            # `node_pairs` is passed as a tensor in shape of `(N, 2)` and
-            # should be converted to a tuple of `(src, dst)`.
-            if isinstance(item, Mapping):
-                item = {key: (item[key][:, 0], item[key][:, 1]) for key in item}
-            else:
-                item = (item[:, 0], item[:, 1])
+        # TODO(#7254): Hacks for original `seed_nodes` and `node_pairs`, which
+        # need to be cleaned up later.
+        if name == "seed_nodes":
+            name = "seeds"
+        if name in ("node_pairs", "negative_srcs", "negative_dsts"):
+            continue
         setattr(minibatch, name, item)
     return minibatch
 
 
-class ItemShufflerAndBatcher:
-    """A shuffler to shuffle items and create batches.
-
-    This class is used internally by :class:`ItemSampler` to shuffle items and
-    create batches. It is not supposed to be used directly. The intention of
-    this class is to avoid time-consuming iteration over :class:`ItemSet`. As
-    an optimization, it slices from the :class:`ItemSet` via indexing first,
-    then shuffle and create batches.
-
-    Parameters
-    ----------
-    item_set : ItemSet
-        Data to be iterated.
-    shuffle : bool
-        Option to shuffle before batching.
-    batch_size : int
-        The size of each batch.
-    drop_last : bool
-        Option to drop the last batch if it's not full.
-    buffer_size : int
-        The size of the buffer to store items sliced from the :class:`ItemSet`
-        or :class:`ItemSetDict`.
-    distributed : bool
-        Option to apply on :class:`DistributedItemSampler`.
-    drop_uneven_inputs : bool
-        Option to make sure the numbers of batches for each replica are the
-        same. Applies only when `distributed` is True.
-    world_size : int
-        The number of model replicas that will be created during Distributed
-        Data Parallel (DDP) training. It should be the same as the real world
-        size, otherwise it could cause errors. Applies only when `distributed`
-        is True.
-    rank : int
-        The rank of the current replica. Applies only when `distributed` is
-        True.
-    rng : np.random.Generator
-        The random number generator to use for shuffling.
-    """
-
-    def __init__(
-        self,
-        item_set: ItemSet,
-        shuffle: bool,
-        batch_size: int,
-        drop_last: bool,
-        buffer_size: int,
-        distributed: Optional[bool] = False,
-        drop_uneven_inputs: Optional[bool] = False,
-        world_size: Optional[int] = 1,
-        rank: Optional[int] = 0,
-        rng: Optional[np.random.Generator] = None,
-    ):
-        self._item_set = item_set
-        self._shuffle = shuffle
-        self._batch_size = batch_size
-        self._drop_last = drop_last
-        self._buffer_size = buffer_size
-        # Round up the buffer size to the nearest multiple of batch size.
-        self._buffer_size = (
-            (self._buffer_size + batch_size - 1) // batch_size * batch_size
-        )
-        self._distributed = distributed
-        self._drop_uneven_inputs = drop_uneven_inputs
-        self._num_replicas = world_size
-        self._rank = rank
-        self._rng = rng
-
-    def _collate_batch(self, buffer, indices, offsets=None):
-        """Collate a batch from the buffer. For internal use only."""
-        if isinstance(buffer, torch.Tensor):
-            # For item set that's initialized with integer or single tensor,
-            # `buffer` is a tensor.
-            return torch.index_select(buffer, dim=0, index=indices)
-        elif isinstance(buffer, list) and isinstance(buffer[0], DGLGraph):
-            # For item set that's initialized with a list of
-            # DGLGraphs, `buffer` is a list of DGLGraphs.
-            return dgl_batch([buffer[idx] for idx in indices])
-        elif isinstance(buffer, tuple):
-            # For item set that's initialized with a tuple of items,
-            # `buffer` is a tuple of tensors.
-            return tuple(item[indices] for item in buffer)
-        elif isinstance(buffer, Mapping):
-            # For item set that's initialized with a dict of items,
-            # `buffer` is a dict of tensors/lists/tuples.
-            keys = list(buffer.keys())
-            key_indices = torch.searchsorted(offsets, indices, right=True) - 1
-            batch = {}
-            for j, key in enumerate(keys):
-                mask = (key_indices == j).nonzero().squeeze(1)
-                if len(mask) == 0:
-                    continue
-                batch[key] = self._collate_batch(
-                    buffer[key], indices[mask] - offsets[j]
-                )
-            return batch
-        raise TypeError(f"Unsupported buffer type {type(buffer).__name__}.")
-
-    def _calculate_offsets(self, buffer):
-        """Calculate offsets for each item in buffer. For internal use only."""
-        if not isinstance(buffer, Mapping):
-            return None
-        offsets = [0]
-        for value in buffer.values():
-            if isinstance(value, torch.Tensor):
-                offsets.append(offsets[-1] + len(value))
-            elif isinstance(value, tuple):
-                offsets.append(offsets[-1] + len(value[0]))
-            else:
-                raise TypeError(
-                    f"Unsupported buffer type {type(value).__name__}."
-                )
-        return torch.tensor(offsets)
-
-    def __iter__(self):
-        worker_info = torch.utils.data.get_worker_info()
-        if worker_info is not None:
-            num_workers = worker_info.num_workers
-            worker_id = worker_info.id
-        else:
-            num_workers = 1
-            worker_id = 0
-        buffer = None
-        total = len(self._item_set)
-        start_offset, assigned_count, output_count = calculate_range(
-            self._distributed,
-            total,
-            self._num_replicas,
-            self._rank,
-            num_workers,
-            worker_id,
-            self._batch_size,
-            self._drop_last,
-            self._drop_uneven_inputs,
-        )
-        start = 0
-        while start < assigned_count:
-            end = min(start + self._buffer_size, assigned_count)
-            buffer = self._item_set[start_offset + start : start_offset + end]
-            indices = torch.arange(end - start)
-            if self._shuffle:
-                self._rng.shuffle(indices.numpy())
-            offsets = self._calculate_offsets(buffer)
-            for i in range(0, len(indices), self._batch_size):
-                if output_count <= 0:
-                    break
-                batch_indices = indices[
-                    i : i + min(self._batch_size, output_count)
-                ]
-                output_count -= self._batch_size
-                yield self._collate_batch(buffer, batch_indices, offsets)
-            buffer = None
-            start = end
-
-
 class ItemSampler(IterDataPipe):
-    """A sampler to iterate over input items and create subsets.
+    """A sampler to iterate over input items and create minibatches.
 
     Input items could be node IDs, node pairs with or without labels, node
-    pairs with negative sources/destinations, DGLGraphs and heterogeneous
-    counterparts.
+    pairs with negative sources/destinations.
 
     Note: This class `ItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
@@ -248,7 +119,7 @@ class ItemSampler(IterDataPipe):
 
     Parameters
     ----------
-    item_set : Union[ItemSet, ItemSetDict]
+    item_set : Union[ItemSet, HeteroItemSet]
         Data to be sampled.
     batch_size : int
         The size of each batch.
@@ -258,24 +129,9 @@ class ItemSampler(IterDataPipe):
         Option to drop the last batch if it's not full.
     shuffle : bool
         Option to shuffle before sample.
-    use_indexing : bool
-        Option to use indexing to slice items from the item set. This is an
-        optimization to avoid time-consuming iteration over the item set. If
-        the item set does not support indexing, this option will be disabled
-        automatically. If the item set supports indexing but the user wants to
-        disable it, this option can be set to False. By default, it is set to
-        True.
-    buffer_size : int
-        The size of the buffer to store items sliced from the :class:`ItemSet`
-        or :class:`ItemSetDict`. By default, it is set to -1, which means the
-        buffer size will be set as the total number of items in the item set if
-        indexing is supported. If indexing is not supported, it is set to 10 *
-        batch size. If the item set is too large, it is recommended to set a
-        smaller buffer size to avoid out of memory error. As items are shuffled
-        within each buffer, a smaller buffer size may incur less randomness and
-        such less randomness can further affect the training performance such as
-        convergence speed and accuracy. Therefore, it is recommended to set a
-        larger buffer size if possible.
+    seed: int
+        The seed for reproducible stochastic shuffling. If None, a random seed
+        will be generated.
 
     Examples
     --------
@@ -283,84 +139,63 @@ class ItemSampler(IterDataPipe):
 
     >>> import torch
     >>> from dgl import graphbolt as gb
-    >>> item_set = gb.ItemSet(torch.arange(0, 10), names="seed_nodes")
+    >>> item_set = gb.ItemSet(torch.arange(0, 10), names="seeds")
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=tensor([0, 1, 2, 3]), node_pairs=None, labels=None,
-        negative_srcs=None, negative_dsts=None, sampled_subgraphs=None,
-        input_nodes=None, node_features=None, edge_features=None,
-        compacted_node_pairs=None, compacted_negative_srcs=None,
-        compacted_negative_dsts=None)
+    MiniBatch(seeds=tensor([0, 1, 2, 3]), sampled_subgraphs=None,
+        node_features=None, labels=None, input_nodes=None,
+        indexes=None, edge_features=None, compacted_seeds=None,
+        blocks=None,)
 
     2. Node pairs.
 
     >>> item_set = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2),
-    ...     names="node_pairs")
+    ...     names="seeds")
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
-        labels=None, negative_srcs=None, negative_dsts=None,
-        sampled_subgraphs=None, input_nodes=None, node_features=None,
-        edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds=tensor([[0, 1], [2, 3], [4, 5], [6, 7]]),
+        sampled_subgraphs=None, node_features=None, labels=None,
+        input_nodes=None, indexes=None, edge_features=None,
+        compacted_seeds=None, blocks=None,)
 
     3. Node pairs and labels.
 
     >>> item_set = gb.ItemSet(
     ...     (torch.arange(0, 20).reshape(-1, 2), torch.arange(10, 20)),
-    ...     names=("node_pairs", "labels")
+    ...     names=("seeds", "labels")
     ... )
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
-        labels=tensor([10, 11, 12, 13]), negative_srcs=None,
-        negative_dsts=None, sampled_subgraphs=None, input_nodes=None,
-        node_features=None, edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds=tensor([[0, 1], [2, 3], [4, 5], [6, 7]]),
+        sampled_subgraphs=None, node_features=None,
+        labels=tensor([10, 11, 12, 13]), input_nodes=None,
+        indexes=None, edge_features=None, compacted_seeds=None,
+        blocks=None,)
 
-    4. Node pairs and negative destinations.
+    4. Node pairs, labels and indexes.
 
-    >>> node_pairs = torch.arange(0, 20).reshape(-1, 2)
-    >>> negative_dsts = torch.arange(10, 30).reshape(-1, 2)
-    >>> item_set = gb.ItemSet((node_pairs, negative_dsts), names=("node_pairs",
-    ...     "negative_dsts"))
+    >>> seeds = torch.arange(0, 20).reshape(-1, 2)
+    >>> labels = torch.tensor([1, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+    >>> indexes = torch.tensor([0, 1, 0, 0, 0, 0, 1, 1, 1, 1])
+    >>> item_set = gb.ItemSet((seeds, labels, indexes), names=("seeds",
+    ...     "labels", "indexes"))
     >>> item_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
-        labels=None, negative_srcs=None,
-        negative_dsts=tensor([[10, 11],
-        [12, 13],
-        [14, 15],
-        [16, 17]]), sampled_subgraphs=None, input_nodes=None,
-        node_features=None, edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds=tensor([[0, 1], [2, 3], [4, 5], [6, 7]]),
+        sampled_subgraphs=None, node_features=None,
+        labels=tensor([1, 1, 0, 0]), input_nodes=None,
+        indexes=tensor([0, 1, 0, 0]), edge_features=None,
+        compacted_seeds=None, blocks=None,)
 
-    5. DGLGraphs.
-
-    >>> import dgl
-    >>> graphs = [ dgl.rand_graph(10, 20) for _ in range(5) ]
-    >>> item_set = gb.ItemSet(graphs)
-    >>> item_sampler = gb.ItemSampler(item_set, 3)
-    >>> list(item_sampler)
-    [Graph(num_nodes=30, num_edges=60,
-      ndata_schemes={}
-      edata_schemes={}),
-     Graph(num_nodes=20, num_edges=40,
-      ndata_schemes={}
-      edata_schemes={})]
-
-    6. Further process batches with other datapipes such as
+    5. Further process batches with other datapipes such as
     :class:`torchdata.datapipes.iter.Mapper`.
 
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
@@ -371,125 +206,91 @@ class ItemSampler(IterDataPipe):
     >>> list(data_pipe)
     [tensor([1, 2, 3, 4]), tensor([5, 6, 7, 8]), tensor([ 9, 10])]
 
-    7. Heterogeneous node IDs.
+    6. Heterogeneous node IDs.
 
     >>> ids = {
-    ...     "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
-    ...     "item": gb.ItemSet(torch.arange(0, 6), names="seed_nodes"),
+    ...     "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
+    ...     "item": gb.ItemSet(torch.arange(0, 6), names="seeds"),
     ... }
-    >>> item_set = gb.ItemSetDict(ids)
+    >>> item_set = gb.HeteroItemSet(ids)
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes={'user': tensor([0, 1, 2, 3])}, node_pairs=None,
-    labels=None, negative_srcs=None, negative_dsts=None, sampled_subgraphs=None,
-    input_nodes=None, node_features=None, edge_features=None,
-    compacted_node_pairs=None, compacted_negative_srcs=None,
-    compacted_negative_dsts=None)
+    MiniBatch(seeds={'user': tensor([0, 1, 2, 3])}, sampled_subgraphs=None,
+        node_features=None, labels=None, input_nodes=None, indexes=None,
+        edge_features=None, compacted_seeds=None, blocks=None,)
 
-    8. Heterogeneous node pairs.
+    7. Heterogeneous node pairs.
 
-    >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
-    >>> node_pairs_follow = torch.arange(10, 20).reshape(-1, 2)
-    >>> item_set = gb.ItemSetDict({
+    >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
+    >>> seeds_follow = torch.arange(10, 20).reshape(-1, 2)
+    >>> item_set = gb.HeteroItemSet({
     ...     "user:like:item": gb.ItemSet(
-    ...         node_pairs_like, names="node_pairs"),
+    ...         seeds_like, names="seeds"),
     ...     "user:follow:user": gb.ItemSet(
-    ...         node_pairs_follow, names="node_pairs"),
+    ...         seeds_follow, names="seeds"),
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs={'user:like:item':
-            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
-        labels=None, negative_srcs=None, negative_dsts=None,
-        sampled_subgraphs=None, input_nodes=None, node_features=None,
-        edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds={'user:like:item':
+        tensor([[0, 1], [2, 3], [4, 5], [6, 7]])}, sampled_subgraphs=None,
+        node_features=None, labels=None, input_nodes=None, indexes=None,
+        edge_features=None, compacted_seeds=None, blocks=None,)
 
-    9. Heterogeneous node pairs and labels.
+    8. Heterogeneous node pairs and labels.
 
-    >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
-    >>> labels_like = torch.arange(0, 10)
-    >>> node_pairs_follow = torch.arange(10, 20).reshape(-1, 2)
-    >>> labels_follow = torch.arange(10, 20)
-    >>> item_set = gb.ItemSetDict({
-    ...     "user:like:item": gb.ItemSet((node_pairs_like, labels_like),
-    ...         names=("node_pairs", "labels")),
-    ...     "user:follow:user": gb.ItemSet((node_pairs_follow, labels_follow),
-    ...         names=("node_pairs", "labels")),
+    >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
+    >>> labels_like = torch.arange(0, 5)
+    >>> seeds_follow = torch.arange(10, 20).reshape(-1, 2)
+    >>> labels_follow = torch.arange(5, 10)
+    >>> item_set = gb.HeteroItemSet({
+    ...     "user:like:item": gb.ItemSet((seeds_like, labels_like),
+    ...         names=("seeds", "labels")),
+    ...     "user:follow:user": gb.ItemSet((seeds_follow, labels_follow),
+    ...         names=("seeds", "labels")),
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs={'user:like:item':
-            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
-        labels={'user:like:item': tensor([0, 1, 2, 3])},
-        negative_srcs=None, negative_dsts=None, sampled_subgraphs=None,
-        input_nodes=None, node_features=None, edge_features=None,
-        compacted_node_pairs=None, compacted_negative_srcs=None,
-        compacted_negative_dsts=None)
+    MiniBatch(seeds={'user:like:item':
+        tensor([[0, 1], [2, 3], [4, 5], [6, 7]])}, sampled_subgraphs=None,
+        node_features=None, labels={'user:like:item': tensor([0, 1, 2, 3])},
+        input_nodes=None, indexes=None, edge_features=None,
+        compacted_seeds=None, blocks=None,)
 
-    10. Heterogeneous node pairs and negative destinations.
+    9. Heterogeneous node pairs, labels and indexes.
 
-    >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
-    >>> negative_dsts_like = torch.arange(10, 20).reshape(-1, 2)
-    >>> node_pairs_follow = torch.arange(20, 30).reshape(-1, 2)
-    >>> negative_dsts_follow = torch.arange(30, 40).reshape(-1, 2)
-    >>> item_set = gb.ItemSetDict({
-    ...     "user:like:item": gb.ItemSet((node_pairs_like, negative_dsts_like),
-    ...         names=("node_pairs", "negative_dsts")),
-    ...     "user:follow:user": gb.ItemSet((node_pairs_follow,
-    ...         negative_dsts_follow), names=("node_pairs", "negative_dsts")),
+    >>> seeds_like = torch.arange(0, 10).reshape(-1, 2)
+    >>> labels_like = torch.tensor([1, 1, 0, 0, 0])
+    >>> indexes_like = torch.tensor([0, 1, 0, 0, 1])
+    >>> seeds_follow = torch.arange(20, 30).reshape(-1, 2)
+    >>> labels_follow = torch.tensor([1, 1, 0, 0, 0])
+    >>> indexes_follow = torch.tensor([0, 1, 0, 0, 1])
+    >>> item_set = gb.HeteroItemSet({
+    ...     "user:like:item": gb.ItemSet((seeds_like, labels_like,
+    ...         indexes_like), names=("seeds", "labels", "indexes")),
+    ...     "user:follow:user": gb.ItemSet((seeds_follow,labels_follow,
+    ...         indexes_follow), names=("seeds", "labels", "indexes")),
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None,
-        node_pairs={'user:like:item':
-            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
-        labels=None, negative_srcs=None,
-        negative_dsts={'user:like:item': tensor([[10, 11],
-        [12, 13],
-        [14, 15],
-        [16, 17]])}, sampled_subgraphs=None, input_nodes=None,
-        node_features=None, edge_features=None, compacted_node_pairs=None,
-        compacted_negative_srcs=None, compacted_negative_dsts=None)
+    MiniBatch(seeds={'user:like:item':
+        tensor([[0, 1], [2, 3], [4, 5], [6, 7]])}, sampled_subgraphs=None,
+        node_features=None, labels={'user:like:item': tensor([1, 1, 0, 0])},
+        input_nodes=None, indexes={'user:like:item': tensor([0, 1, 0, 0])},
+        edge_features=None, compacted_seeds=None, blocks=None,)
     """
 
     def __init__(
         self,
-        item_set: Union[ItemSet, ItemSetDict],
+        item_set: Union[ItemSet, HeteroItemSet],
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
-        # [TODO][Rui] For now, it's a temporary knob to disable indexing. In
-        # the future, we will enable indexing for all the item sets.
-        use_indexing: Optional[bool] = True,
-        buffer_size: Optional[int] = -1,
+        seed: Optional[int] = None,
     ) -> None:
         super().__init__()
+        self._item_set = item_set
         self._names = item_set.names
-        # Check if the item set supports indexing.
-        indexable = True
-        try:
-            item_set[0]
-        except TypeError:
-            indexable = False
-        self._use_indexing = use_indexing and indexable
-        self._item_set = (
-            item_set if self._use_indexing else IterableWrapper(item_set)
-        )
-        if buffer_size == -1:
-            if indexable:
-                # Set the buffer size to the total number of items in the item
-                # set if indexing is supported and the buffer size is not
-                # specified.
-                buffer_size = len(self._item_set)
-            else:
-                # Set the buffer size to 10 * batch size if indexing is not
-                # supported and the buffer size is not specified.
-                buffer_size = 10 * batch_size
-        self._buffer_size = buffer_size
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
@@ -498,68 +299,56 @@ class ItemSampler(IterDataPipe):
         self._drop_uneven_inputs = False
         self._world_size = None
         self._rank = None
-        self._rng = np.random.default_rng()
-
-    def _organize_items(self, data_pipe) -> None:
-        # Shuffle before batch.
-        if self._shuffle:
-            data_pipe = data_pipe.shuffle(buffer_size=self._buffer_size)
-
-        # Batch.
-        data_pipe = data_pipe.batch(
-            batch_size=self._batch_size,
-            drop_last=self._drop_last,
-        )
-
-        return data_pipe
-
-    @staticmethod
-    def _collate(batch):
-        """Collate items into a batch. For internal use only."""
-        data = next(iter(batch))
-        if isinstance(data, DGLGraph):
-            return dgl_batch(batch)
-        elif isinstance(data, Mapping):
-            assert len(data) == 1, "Only one type of data is allowed."
-            # Collect all the keys.
-            keys = {key for item in batch for key in item.keys()}
-            # Collate each key.
-            return {
-                key: default_collate(
-                    [item[key] for item in batch if key in item]
-                )
-                for key in keys
-            }
-        return default_collate(batch)
+        # For the sake of reproducibility, the seed should be allowed to be
+        # manually set by the user.
+        if seed is None:
+            self._seed = np.random.randint(0, np.iinfo(np.int32).max)
+        else:
+            self._seed = seed
+        # The attribute `self._epoch` is added to make shuffling work properly
+        # across multiple epochs. Otherwise, the same ordering will always be
+        # used in every epoch.
+        self._epoch = 0
 
     def __iter__(self) -> Iterator:
-        if self._use_indexing:
-            seed = self._rng.integers(0, np.iinfo(np.int32).max)
-            data_pipe = IterableWrapper(
-                ItemShufflerAndBatcher(
-                    self._item_set,
-                    self._shuffle,
-                    self._batch_size,
-                    self._drop_last,
-                    self._buffer_size,
-                    distributed=self._distributed,
-                    drop_uneven_inputs=self._drop_uneven_inputs,
-                    world_size=self._world_size,
-                    rank=self._rank,
-                    rng=np.random.default_rng(seed),
-                )
-            )
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
+            num_workers = worker_info.num_workers
+            worker_id = worker_info.id
         else:
-            # Organize items.
-            data_pipe = self._organize_items(self._item_set)
+            num_workers = 1
+            worker_id = 0
+        total = len(self._item_set)
+        start_offset, assigned_count, output_count = calculate_range(
+            self._distributed,
+            total,
+            self._world_size,
+            self._rank,
+            num_workers,
+            worker_id,
+            self._batch_size,
+            self._drop_last,
+            self._drop_uneven_inputs,
+        )
+        if self._shuffle:
+            g = torch.Generator()
+            g.manual_seed(self._seed + self._epoch)
+            permutation = torch.randperm(total, generator=g)
+        else:
+            permutation = torch.arange(total)
+        indices = permutation[start_offset : start_offset + assigned_count]
+        for i in range(0, assigned_count, self._batch_size):
+            if output_count <= 0:
+                break
+            yield self._minibatcher(
+                self._item_set[
+                    indices[i : i + min(self._batch_size, output_count)]
+                ],
+                self._names,
+            )
+            output_count -= self._batch_size
 
-            # Collate.
-            data_pipe = data_pipe.collate(collate_fn=self._collate)
-
-        # Map to minibatch.
-        data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
-
-        return iter(data_pipe)
+        self._epoch += 1
 
 
 class DistributedItemSampler(ItemSampler):
@@ -583,7 +372,7 @@ class DistributedItemSampler(ItemSampler):
 
     Parameters
     ----------
-    item_set : Union[ItemSet, ItemSetDict]
+    item_set : Union[ItemSet, HeteroItemSet]
         Data to be sampled.
     batch_size : int
         The size of each batch.
@@ -611,16 +400,9 @@ class DistributedItemSampler(ItemSampler):
         https://pytorch.org/tutorials/advanced/generic_join.html. However, this
         option can be used if the Join Context Manager is not helpful for any
         reason.
-    buffer_size : int
-        The size of the buffer to store items sliced from the :class:`ItemSet`
-        or :class:`ItemSetDict`. By default, it is set to -1, which means the
-        buffer size will be set as the total number of items in the item set.
-        If the item set is too large, it is recommended to set a smaller buffer
-        size to avoid out of memory error. As items are shuffled within each
-        buffer, a smaller buffer size may incur less randomness and such less
-        randomness can further affect the training performance such as
-        convergence speed and accuracy. Therefore, it is recommended to set a
-        larger buffer size if possible.
+    seed: int
+        The seed for reproducible stochastic shuffling. If None, a random seed
+        will be generated.
 
     Examples
     --------
@@ -719,13 +501,13 @@ class DistributedItemSampler(ItemSampler):
 
     def __init__(
         self,
-        item_set: Union[ItemSet, ItemSetDict],
+        item_set: Union[ItemSet, HeteroItemSet],
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
         drop_uneven_inputs: Optional[bool] = False,
-        buffer_size: Optional[int] = -1,
+        seed: Optional[int] = None,
     ) -> None:
         super().__init__(
             item_set,
@@ -733,8 +515,7 @@ class DistributedItemSampler(ItemSampler):
             minibatcher,
             drop_last,
             shuffle,
-            use_indexing=True,
-            buffer_size=buffer_size,
+            seed,
         )
         self._distributed = True
         self._drop_uneven_inputs = drop_uneven_inputs
@@ -744,3 +525,114 @@ class DistributedItemSampler(ItemSampler):
             )
         self._world_size = dist.get_world_size()
         self._rank = dist.get_rank()
+        if self._world_size > 1:
+            # For the sake of reproducibility, the seed should be allowed to be
+            # manually set by the user.
+            self._align_seeds(src=0, seed=seed)
+
+    def _align_seeds(
+        self, src: Optional[int] = 0, seed: Optional[int] = None
+    ) -> None:
+        """Aligns seeds across distributed processes.
+
+        This method synchronizes seeds across distributed processes, ensuring
+        consistent randomness.
+
+        Parameters
+        ----------
+        src: int, optional
+            The source process rank. Defaults to 0.
+        seed: int, optional
+            The seed value to synchronize. If None, a random seed will be
+            generated. Defaults to None.
+        """
+        device = (
+            torch.cuda.current_device()
+            if torch.cuda.is_available() and dist.get_backend() == "nccl"
+            else "cpu"
+        )
+        if seed is None:
+            seed = np.random.randint(0, np.iinfo(np.int32).max)
+        if self._rank == src:
+            seed_tensor = torch.tensor(seed, dtype=torch.int32, device=device)
+        else:
+            seed_tensor = torch.empty([], dtype=torch.int32, device=device)
+        dist.broadcast(seed_tensor, src=src)
+        self._seed = seed_tensor.item()
+
+
+def _construct_seeds(pos_seeds, neg_srcs=None, neg_dsts=None):
+    # For homogeneous graph.
+    if isinstance(pos_seeds, torch.Tensor):
+        negative_ratio = neg_srcs.size(1) if neg_srcs else neg_dsts.size(1)
+        neg_srcs = (
+            neg_srcs
+            if neg_srcs is not None
+            else pos_seeds[:, 0].repeat_interleave(negative_ratio)
+        ).view(-1)
+        neg_dsts = (
+            neg_dsts
+            if neg_dsts is not None
+            else pos_seeds[:, 1].repeat_interleave(negative_ratio)
+        ).view(-1)
+        neg_seeds = torch.cat((neg_srcs, neg_dsts)).view(2, -1).T
+        seeds = torch.cat((pos_seeds, neg_seeds))
+        pos_seeds_num = pos_seeds.size(0)
+        labels = torch.empty(seeds.size(0), device=pos_seeds.device)
+        labels[:pos_seeds_num] = 1
+        labels[pos_seeds_num:] = 0
+        pos_indexes = torch.arange(
+            0,
+            pos_seeds_num,
+            device=pos_seeds.device,
+        )
+        neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
+        indexes = torch.cat((pos_indexes, neg_indexes))
+    # For heterogeneous graph.
+    else:
+        negative_ratio = (
+            list(neg_srcs.values())[0].size(1)
+            if neg_srcs
+            else list(neg_dsts.values())[0].size(1)
+        )
+        seeds = {}
+        labels = {}
+        indexes = {}
+        for etype in pos_seeds:
+            neg_src = (
+                neg_srcs[etype]
+                if neg_srcs is not None
+                else pos_seeds[etype][:, 0].repeat_interleave(negative_ratio)
+            ).view(-1)
+            neg_dst = (
+                neg_dsts[etype]
+                if neg_dsts is not None
+                else pos_seeds[etype][:, 1].repeat_interleave(negative_ratio)
+            ).view(-1)
+            seeds[etype] = torch.cat(
+                (
+                    pos_seeds[etype],
+                    torch.cat(
+                        (
+                            neg_src,
+                            neg_dst,
+                        )
+                    )
+                    .view(2, -1)
+                    .T,
+                )
+            )
+            pos_seeds_num = pos_seeds[etype].size(0)
+            labels[etype] = torch.empty(
+                seeds[etype].size(0), device=pos_seeds[etype].device
+            )
+            labels[etype][:pos_seeds_num] = 1
+            labels[etype][pos_seeds_num:] = 0
+            pos_indexes = torch.arange(
+                0,
+                pos_seeds_num,
+                device=pos_seeds[etype].device,
+            )
+            neg_indexes = pos_indexes.repeat_interleave(negative_ratio)
+            indexes[etype] = torch.cat((pos_indexes, neg_indexes))
+    return seeds, labels, indexes

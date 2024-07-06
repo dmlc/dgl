@@ -8,7 +8,6 @@ EXAMPLE_ROOT = os.path.join(
     "..",
     "..",
     "examples",
-    "sampling",
     "graphbolt",
     "quickstart",
 )

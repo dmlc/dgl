@@ -1,4 +1,5 @@
 """Module for converting graph from/to other object."""
+
 from collections import defaultdict
 from collections.abc import Mapping
 
@@ -296,9 +297,9 @@ def heterograph(data_dict, num_nodes_dict=None, idtype=None, device=None):
     >>> g = dgl.heterograph(data_dict)
     >>> g
     Graph(num_nodes={'game': 5, 'topic': 3, 'user': 4},
-          num_edges={('user', 'follows', 'user'): 2, ('user', 'follows', 'topic'): 2,
+          num_edges={('user', 'follows', 'topic'): 2, ('user', 'follows', 'user'): 2,
                      ('user', 'plays', 'game'): 2},
-          metagraph=[('user', 'user', 'follows'), ('user', 'topic', 'follows'),
+          metagraph=[('user', 'topic', 'follows'), ('user', 'user', 'follows'),
                      ('user', 'game', 'plays')])
 
     Explicitly specify the number of nodes for each node type in the graph.
@@ -386,7 +387,12 @@ def heterograph(data_dict, num_nodes_dict=None, idtype=None, device=None):
 
 
 def create_block(
-    data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None, device=None
+    data_dict,
+    num_src_nodes=None,
+    num_dst_nodes=None,
+    idtype=None,
+    device=None,
+    node_count_check=True,
 ):
     """Create a message flow graph (MFG) as a :class:`DGLBlock` object.
 
@@ -455,6 +461,9 @@ def create_block(
         the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
         returned graph is on CPU.  If the specified :attr:`device` differs from that of the
         provided tensors, it casts the given tensors to the specified device first.
+    node_count_check : bool, optional
+        When num_src_nodes and num_dst_nodes are passed, whether we should perform
+        sanity checks to ensure they are valid.
 
     Returns
     -------
@@ -539,13 +548,16 @@ def create_block(
     node_tensor_dict = {}
     for (sty, ety, dty), data in data_dict.items():
         (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(
-            data, idtype, bipartite=True
+            data,
+            idtype,
+            bipartite=True,
+            infer_node_count=need_infer or node_count_check,
         )
         node_tensor_dict[(sty, ety, dty)] = (sparse_fmt, arrays)
         if need_infer:
             num_src_nodes[sty] = max(num_src_nodes[sty], urange)
             num_dst_nodes[dty] = max(num_dst_nodes[dty], vrange)
-        else:  # sanity check
+        elif node_count_check:  # sanity check
             if num_src_nodes[sty] < urange:
                 raise DGLError(
                     "The given number of nodes of source node type {} must be larger"
@@ -1810,11 +1822,11 @@ def to_networkx(
     ...     ('user', 'follows', 'topic'): (torch.tensor([1, 1]), torch.tensor([1, 2])),
     ...     ('user', 'plays', 'game'): (torch.tensor([0, 3]), torch.tensor([3, 4]))
     ... })
-    ... g.ndata['n'] = {
+    >>> g.ndata['n'] = {
     ...     'game': torch.zeros(5, 1),
     ...     'user': torch.ones(4, 1)
     ... }
-    ... g.edata['e'] = {
+    >>> g.edata['e'] = {
     ...     ('user', 'follows', 'user'): torch.zeros(2, 1),
     ...     'plays': torch.ones(2, 1)
     ... }

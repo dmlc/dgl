@@ -3688,10 +3688,6 @@ def lap_pe(g, k, padding=False, return_eigval=False):
         )
         max_freqs = k
         topk_indices = EigVal.argsort()[1:]
-        # Since scipy may return complex value, to avoid crashing in NN code,
-        # convert them to real number.
-        topk_EigVal = EigVal[topk_indices].real
-        topk_EigVec = EigVec[:, topk_indices].real
     else:
         # Fallback to numpy since scipy.sparse do not support this case.
         EigVal, EigVec = np.linalg.eig(L.toarray())
@@ -3699,8 +3695,11 @@ def lap_pe(g, k, padding=False, return_eigval=False):
         kpartition_indices = np.argpartition(EigVal, max_freqs)[: max_freqs + 1]
         topk_eigvals = EigVal[kpartition_indices]
         topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-        topk_EigVec = EigVec[:, topk_indices]
-        topk_EigVal = EigVal[topk_indices]
+
+    # Since scipy may return complex value, to avoid crashing in NN code,
+    # convert them to real number.
+    topk_EigVal = EigVal[topk_indices].real
+    topk_EigVec = EigVec[:, topk_indices].real
     eigvals = F.tensor(topk_EigVal, dtype=F.float32)
 
     # get random flip signs

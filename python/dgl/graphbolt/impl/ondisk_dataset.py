@@ -1,5 +1,6 @@
 """GraphBolt OnDiskDataset."""
 
+import bisect
 import json
 import os
 import shutil
@@ -7,14 +8,14 @@ import textwrap
 from copy import deepcopy
 from typing import Dict, List, Union
 
+import numpy as np
+
 import torch
 import yaml
 
-import dgl
-
 from ...base import dgl_warning
 from ...data.utils import download, extract_archive
-from ..base import etype_str_to_tuple
+from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
 from ..dataset import Dataset, Task
 from ..internal import (
     calculate_dir_hash,
@@ -24,9 +25,12 @@ from ..internal import (
     read_data,
     read_edges,
 )
-from ..itemset import ItemSet, ItemSetDict
+from ..itemset import HeteroItemSet, ItemSet
 from ..sampling_graph import SamplingGraph
-from .fused_csc_sampling_graph import from_dglgraph, FusedCSCSamplingGraph
+from .fused_csc_sampling_graph import (
+    fused_csc_sampling_graph,
+    FusedCSCSamplingGraph,
+)
 from .ondisk_metadata import (
     OnDiskGraphTopology,
     OnDiskMetaData,
@@ -37,11 +41,285 @@ from .torch_based_feature_store import TorchBasedFeatureStore
 
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
+NAMES_INDICATING_NODE_IDS = [
+    "seeds",
+]
+
+
+def _graph_data_to_fused_csc_sampling_graph(
+    dataset_dir: str,
+    graph_data: Dict,
+    include_original_edge_id: bool,
+    auto_cast_to_optimal_dtype: bool,
+) -> FusedCSCSamplingGraph:
+    """Convert the raw graph data into FusedCSCSamplingGraph.
+
+    Parameters
+    ----------
+    dataset_dir : str
+        The path to the dataset directory.
+    graph_data : Dict
+        The raw data read from yaml file.
+    include_original_edge_id : bool
+        Whether to include the original edge id in the FusedCSCSamplingGraph.
+    auto_cast_to_optimal_dtype: bool, optional
+        Casts the dtypes of tensors in the dataset into smallest possible dtypes
+        for reduced storage requirements and potentially increased performance.
+
+    Returns
+    -------
+    sampling_graph : FusedCSCSamplingGraph
+        The FusedCSCSamplingGraph constructed from the raw data.
+    """
+    from ...sparse import spmatrix
+
+    is_homogeneous = (
+        len(graph_data["nodes"]) == 1
+        and len(graph_data["edges"]) == 1
+        and "type" not in graph_data["nodes"][0]
+        and "type" not in graph_data["edges"][0]
+    )
+
+    if is_homogeneous:
+        # Homogeneous graph.
+        edge_fmt = graph_data["edges"][0]["format"]
+        edge_path = graph_data["edges"][0]["path"]
+        src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
+        num_nodes = graph_data["nodes"][0]["num"]
+        num_edges = len(src)
+        coo_tensor = torch.tensor(np.array([src, dst]))
+        sparse_matrix = spmatrix(coo_tensor, shape=(num_nodes, num_nodes))
+        del coo_tensor
+        indptr, indices, edge_ids = sparse_matrix.csc()
+        del sparse_matrix
+
+        if auto_cast_to_optimal_dtype:
+            if num_nodes <= torch.iinfo(torch.int32).max:
+                indices = indices.to(torch.int32)
+            if num_edges <= torch.iinfo(torch.int32).max:
+                indptr = indptr.to(torch.int32)
+                edge_ids = edge_ids.to(torch.int32)
+
+        node_type_offset = None
+        type_per_edge = None
+        node_type_to_id = None
+        edge_type_to_id = None
+        node_attributes = {}
+        edge_attributes = {}
+        if include_original_edge_id:
+            edge_attributes[ORIGINAL_EDGE_ID] = edge_ids
+    else:
+        # Heterogeneous graph.
+        # Sort graph_data by ntype/etype lexicographically to ensure ordering.
+        graph_data["nodes"].sort(key=lambda x: x["type"])
+        graph_data["edges"].sort(key=lambda x: x["type"])
+        # Construct node_type_offset and node_type_to_id.
+        node_type_offset = [0]
+        node_type_to_id = {}
+        for ntype_id, node_info in enumerate(graph_data["nodes"]):
+            node_type_to_id[node_info["type"]] = ntype_id
+            node_type_offset.append(node_type_offset[-1] + node_info["num"])
+        total_num_nodes = node_type_offset[-1]
+        # Construct edge_type_offset, edge_type_to_id and coo_tensor.
+        edge_type_offset = [0]
+        edge_type_to_id = {}
+        coo_src_list = []
+        coo_dst_list = []
+        coo_etype_list = []
+        for etype_id, edge_info in enumerate(graph_data["edges"]):
+            edge_type_to_id[edge_info["type"]] = etype_id
+            edge_fmt = edge_info["format"]
+            edge_path = edge_info["path"]
+            src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
+            edge_type_offset.append(edge_type_offset[-1] + len(src))
+            src_type, _, dst_type = etype_str_to_tuple(edge_info["type"])
+            src += node_type_offset[node_type_to_id[src_type]]
+            dst += node_type_offset[node_type_to_id[dst_type]]
+            coo_src_list.append(torch.tensor(src))
+            coo_dst_list.append(torch.tensor(dst))
+            coo_etype_list.append(torch.full((len(src),), etype_id))
+        total_num_edges = edge_type_offset[-1]
+
+        coo_src = torch.cat(coo_src_list)
+        del coo_src_list
+        coo_dst = torch.cat(coo_dst_list)
+        del coo_dst_list
+        if auto_cast_to_optimal_dtype:
+            dtypes = [torch.uint8, torch.int16, torch.int32, torch.int64]
+            dtype_maxes = [torch.iinfo(dtype).max for dtype in dtypes]
+            dtype_id = bisect.bisect_left(dtype_maxes, len(edge_type_to_id) - 1)
+            etype_dtype = dtypes[dtype_id]
+            coo_etype_list = [
+                tensor.to(etype_dtype) for tensor in coo_etype_list
+            ]
+        coo_etype = torch.cat(coo_etype_list)
+        del coo_etype_list
+
+        sparse_matrix = spmatrix(
+            indices=torch.stack((coo_src, coo_dst), dim=0),
+            shape=(total_num_nodes, total_num_nodes),
+        )
+        del coo_src, coo_dst
+        indptr, indices, edge_ids = sparse_matrix.csc()
+        del sparse_matrix
+
+        if auto_cast_to_optimal_dtype:
+            if total_num_nodes <= torch.iinfo(torch.int32).max:
+                indices = indices.to(torch.int32)
+            if total_num_edges <= torch.iinfo(torch.int32).max:
+                indptr = indptr.to(torch.int32)
+                edge_ids = edge_ids.to(torch.int32)
+
+        node_type_offset = torch.tensor(node_type_offset, dtype=indices.dtype)
+        type_per_edge = torch.index_select(coo_etype, dim=0, index=edge_ids)
+        del coo_etype
+        node_attributes = {}
+        edge_attributes = {}
+        if include_original_edge_id:
+            # If uint8 or int16 was chosen above for etypes, we cast to int.
+            temp_etypes = (
+                type_per_edge.int()
+                if type_per_edge.element_size() < 4
+                else type_per_edge
+            )
+            edge_ids -= torch.index_select(
+                torch.tensor(edge_type_offset, dtype=edge_ids.dtype),
+                dim=0,
+                index=temp_etypes,
+            )
+            del temp_etypes
+            edge_attributes[ORIGINAL_EDGE_ID] = edge_ids
+
+    # Load the sampling related node/edge features and add them to
+    # the sampling-graph.
+    if graph_data.get("feature_data", None):
+        if is_homogeneous:
+            # Homogeneous graph.
+            for graph_feature in graph_data["feature_data"]:
+                in_memory = (
+                    True
+                    if "in_memory" not in graph_feature
+                    else graph_feature["in_memory"]
+                )
+                if graph_feature["domain"] == "node":
+                    node_data = read_data(
+                        os.path.join(dataset_dir, graph_feature["path"]),
+                        graph_feature["format"],
+                        in_memory=in_memory,
+                    )
+                    assert node_data.shape[0] == num_nodes
+                    node_attributes[graph_feature["name"]] = node_data
+                elif graph_feature["domain"] == "edge":
+                    edge_data = read_data(
+                        os.path.join(dataset_dir, graph_feature["path"]),
+                        graph_feature["format"],
+                        in_memory=in_memory,
+                    )
+                    assert edge_data.shape[0] == num_edges
+                    edge_attributes[graph_feature["name"]] = edge_data
+        else:
+            # Heterogeneous graph.
+            node_feature_collector = {}
+            edge_feature_collector = {}
+            for graph_feature in graph_data["feature_data"]:
+                in_memory = (
+                    True
+                    if "in_memory" not in graph_feature
+                    else graph_feature["in_memory"]
+                )
+                if graph_feature["domain"] == "node":
+                    node_data = read_data(
+                        os.path.join(dataset_dir, graph_feature["path"]),
+                        graph_feature["format"],
+                        in_memory=in_memory,
+                    )
+                    if graph_feature["name"] not in node_feature_collector:
+                        node_feature_collector[graph_feature["name"]] = {}
+                    node_feature_collector[graph_feature["name"]][
+                        graph_feature["type"]
+                    ] = node_data
+                elif graph_feature["domain"] == "edge":
+                    edge_data = read_data(
+                        os.path.join(dataset_dir, graph_feature["path"]),
+                        graph_feature["format"],
+                        in_memory=in_memory,
+                    )
+                    if graph_feature["name"] not in edge_feature_collector:
+                        edge_feature_collector[graph_feature["name"]] = {}
+                    edge_feature_collector[graph_feature["name"]][
+                        graph_feature["type"]
+                    ] = edge_data
+
+            # For heterogenous, a node/edge feature must cover all node/edge types.
+            all_node_types = set(node_type_to_id.keys())
+            for feat_name, feat_data in node_feature_collector.items():
+                existing_node_type = set(feat_data.keys())
+                assert all_node_types == existing_node_type, (
+                    f"Node feature {feat_name} does not cover all node types. "
+                    f"Existing types: {existing_node_type}. "
+                    f"Expected types: {all_node_types}."
+                )
+            all_edge_types = set(edge_type_to_id.keys())
+            for feat_name, feat_data in edge_feature_collector.items():
+                existing_edge_type = set(feat_data.keys())
+                assert all_edge_types == existing_edge_type, (
+                    f"Edge feature {feat_name} does not cover all edge types. "
+                    f"Existing types: {existing_edge_type}. "
+                    f"Expected types: {all_edge_types}."
+                )
+
+            for feat_name, feat_data in node_feature_collector.items():
+                _feat = next(iter(feat_data.values()))
+                feat_tensor = torch.empty(
+                    ([total_num_nodes] + list(_feat.shape[1:])),
+                    dtype=_feat.dtype,
+                )
+                for ntype, feat in feat_data.items():
+                    feat_tensor[
+                        node_type_offset[
+                            node_type_to_id[ntype]
+                        ] : node_type_offset[node_type_to_id[ntype] + 1]
+                    ] = feat
+                node_attributes[feat_name] = feat_tensor
+            del node_feature_collector
+            for feat_name, feat_data in edge_feature_collector.items():
+                _feat = next(iter(feat_data.values()))
+                feat_tensor = torch.empty(
+                    ([total_num_edges] + list(_feat.shape[1:])),
+                    dtype=_feat.dtype,
+                )
+                for etype, feat in feat_data.items():
+                    feat_tensor[
+                        edge_type_offset[
+                            edge_type_to_id[etype]
+                        ] : edge_type_offset[edge_type_to_id[etype] + 1]
+                    ] = feat
+                edge_attributes[feat_name] = feat_tensor
+            del edge_feature_collector
+
+    if not bool(node_attributes):
+        node_attributes = None
+    if not bool(edge_attributes):
+        edge_attributes = None
+
+    # Construct the FusedCSCSamplingGraph.
+    return fused_csc_sampling_graph(
+        csc_indptr=indptr,
+        indices=indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
+    )
+
 
 def preprocess_ondisk_dataset(
     dataset_dir: str,
     include_original_edge_id: bool = False,
     force_preprocess: bool = None,
+    auto_cast_to_optimal_dtype: bool = True,
 ) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
@@ -54,6 +332,10 @@ def preprocess_ondisk_dataset(
         Whether to include the original edge id in the FusedCSCSamplingGraph.
     force_preprocess: bool, optional
         Whether to force reload the ondisk dataset.
+    auto_cast_to_optimal_dtype: bool, optional
+        Casts the dtypes of tensors in the dataset into smallest possible dtypes
+        for reduced storage requirements and potentially increased performance.
+        Default is True.
 
     Returns
     -------
@@ -115,124 +397,42 @@ def preprocess_ondisk_dataset(
     os.makedirs(os.path.join(dataset_dir, processed_dir_prefix), exist_ok=True)
     output_config = deepcopy(input_config)
 
-    # 2. Load the edge data and create a DGLGraph.
+    # 2. Load the data and create a FusedCSCSamplingGraph.
     if "graph" not in input_config:
         raise RuntimeError("Invalid config: does not contain graph field.")
-    # For any graph that node/edge types are specified, we construct DGLGraph
-    # with `dgl.heterograph()` even there's only one node/edge type. This is
-    # because we want to save the node/edge types in the graph. So the logic of
-    # checking whether the graph is homogeneous is different from the logic in
-    # `DGLGraph.is_homogeneous()`. Otherwise, we construct DGLGraph with
-    # `dgl.graph()`.
-    is_homogeneous = (
-        len(input_config["graph"]["nodes"]) == 1
-        and len(input_config["graph"]["edges"]) == 1
-        and "type" not in input_config["graph"]["nodes"][0]
-        and "type" not in input_config["graph"]["edges"][0]
-    )
-    if is_homogeneous:
-        # Homogeneous graph.
-        num_nodes = input_config["graph"]["nodes"][0]["num"]
-        edge_fmt = input_config["graph"]["edges"][0]["format"]
-        edge_path = input_config["graph"]["edges"][0]["path"]
-        src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
-        g = dgl.graph((src, dst), num_nodes=num_nodes)
-    else:
-        # Heterogeneous graph.
-        # Construct the num nodes dict.
-        num_nodes_dict = {}
-        for node_info in input_config["graph"]["nodes"]:
-            num_nodes_dict[node_info["type"]] = node_info["num"]
-        # Construct the data dict.
-        data_dict = {}
-        for edge_info in input_config["graph"]["edges"]:
-            edge_fmt = edge_info["format"]
-            edge_path = edge_info["path"]
-            src, dst = read_edges(dataset_dir, edge_fmt, edge_path)
-            data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
-        # Construct the heterograph.
-        g = dgl.heterograph(data_dict, num_nodes_dict)
 
-    # 3. Load the sampling related node/edge features and add them to
-    # the sampling-graph.
-    if input_config["graph"].get("feature_data", None):
-        for graph_feature in input_config["graph"]["feature_data"]:
-            in_memory = (
-                True
-                if "in_memory" not in graph_feature
-                else graph_feature["in_memory"]
-            )
-            if graph_feature["domain"] == "node":
-                node_data = read_data(
-                    os.path.join(dataset_dir, graph_feature["path"]),
-                    graph_feature["format"],
-                    in_memory=in_memory,
-                )
-                if is_homogeneous:
-                    g.ndata[graph_feature["name"]] = node_data
-                else:
-                    g.nodes[graph_feature["type"]].data[
-                        graph_feature["name"]
-                    ] = node_data
-            if graph_feature["domain"] == "edge":
-                edge_data = read_data(
-                    os.path.join(dataset_dir, graph_feature["path"]),
-                    graph_feature["format"],
-                    in_memory=in_memory,
-                )
-                if is_homogeneous:
-                    g.edata[graph_feature["name"]] = edge_data
-                else:
-                    g.edges[etype_str_to_tuple(graph_feature["type"])].data[
-                        graph_feature["name"]
-                    ] = edge_data
-        if not is_homogeneous:
-            # For heterogenous graph, a node/edge feature must cover all
-            # node/edge types.
-            ntypes = g.ntypes
-            assert all(
-                set(g.nodes[ntypes[0]].data.keys())
-                == set(g.nodes[ntype].data.keys())
-                for ntype in ntypes
-            ), (
-                "Node feature does not cover all node types: "
-                + f"{set(g.nodes[ntype].data.keys() for ntype in ntypes)}."
-            )
-            etypes = g.canonical_etypes
-            assert all(
-                set(g.edges[etypes[0]].data.keys())
-                == set(g.edges[etype].data.keys())
-                for etype in etypes
-            ), (
-                "Edge feature does not cover all edge types: "
-                + f"{set(g.edges[etype].data.keys() for etype in etypes)}."
-            )
-
-    # 4. Convert the DGLGraph to a FusedCSCSamplingGraph.
-    fused_csc_sampling_graph = from_dglgraph(
-        g, is_homogeneous, include_original_edge_id
+    sampling_graph = _graph_data_to_fused_csc_sampling_graph(
+        dataset_dir,
+        input_config["graph"],
+        include_original_edge_id,
+        auto_cast_to_optimal_dtype,
     )
 
-    # 5. Record value of include_original_edge_id.
+    # 3. Record value of include_original_edge_id.
     output_config["include_original_edge_id"] = include_original_edge_id
 
-    # 6. Save the FusedCSCSamplingGraph and modify the output_config.
+    # 4. Save the FusedCSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "FusedCSCSamplingGraph"
     output_config["graph_topology"]["path"] = os.path.join(
         processed_dir_prefix, "fused_csc_sampling_graph.pt"
     )
 
+    node_ids_within_int32 = (
+        sampling_graph.indices.dtype == torch.int32
+        and auto_cast_to_optimal_dtype
+    )
     torch.save(
-        fused_csc_sampling_graph,
+        sampling_graph,
         os.path.join(
             dataset_dir,
             output_config["graph_topology"]["path"],
         ),
     )
+    del sampling_graph
     del output_config["graph"]
 
-    # 7. Load the node/edge features and do necessary conversion.
+    # 5. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
         has_edge_feature_data = False
         for feature, out_feature in zip(
@@ -259,7 +459,7 @@ def preprocess_ondisk_dataset(
         if has_edge_feature_data and not include_original_edge_id:
             dgl_warning("Edge feature is stored, but edge IDs are not saved.")
 
-    # 8. Save tasks and train/val/test split according to the output_config.
+    # 6. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
         for input_task, output_task in zip(
             input_config["tasks"], output_config["tasks"]
@@ -279,20 +479,25 @@ def preprocess_ondisk_dataset(
                             processed_dir_prefix,
                             input_data["path"].replace("pt", "npy"),
                         )
+                        name = (
+                            input_data["name"] if "name" in input_data else None
+                        )
                         copy_or_convert_data(
                             os.path.join(dataset_dir, input_data["path"]),
                             os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
                             output_data["format"],
+                            within_int32=node_ids_within_int32
+                            and name in NAMES_INDICATING_NODE_IDS,
                         )
 
-    # 9. Save the output_config.
+    # 7. Save the output_config.
     output_config_path = os.path.join(dataset_dir, preprocess_metadata_path)
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
 
-    # 10. Calculate and save the hash value of the dataset directory.
+    # 8. Calculate and save the hash value of the dataset directory.
     hash_value_file = "dataset_hash_value.txt"
     hash_value_file_path = os.path.join(
         dataset_dir, processed_dir_prefix, hash_value_file
@@ -303,7 +508,7 @@ def preprocess_ondisk_dataset(
     with open(hash_value_file_path, "w") as f:
         f.write(json.dumps(dir_hash, indent=4))
 
-    # 11. Return the absolute path of the preprocessing yaml file.
+    # 9. Return the absolute path of the preprocessing yaml file.
     return output_config_path
 
 
@@ -317,9 +522,9 @@ class OnDiskTask:
     def __init__(
         self,
         metadata: Dict,
-        train_set: Union[ItemSet, ItemSetDict],
-        validation_set: Union[ItemSet, ItemSetDict],
-        test_set: Union[ItemSet, ItemSetDict],
+        train_set: Union[ItemSet, HeteroItemSet],
+        validation_set: Union[ItemSet, HeteroItemSet],
+        test_set: Union[ItemSet, HeteroItemSet],
     ):
         """Initialize a task.
 
@@ -327,11 +532,11 @@ class OnDiskTask:
         ----------
         metadata : Dict
             Metadata.
-        train_set : Union[ItemSet, ItemSetDict]
+        train_set : Union[ItemSet, HeteroItemSet]
             Training set.
-        validation_set : Union[ItemSet, ItemSetDict]
+        validation_set : Union[ItemSet, HeteroItemSet]
             Validation set.
-        test_set : Union[ItemSet, ItemSetDict]
+        test_set : Union[ItemSet, HeteroItemSet]
             Test set.
         """
         self._metadata = metadata
@@ -345,17 +550,17 @@ class OnDiskTask:
         return self._metadata
 
     @property
-    def train_set(self) -> Union[ItemSet, ItemSetDict]:
+    def train_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the training set."""
         return self._train_set
 
     @property
-    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
+    def validation_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the validation set."""
         return self._validation_set
 
     @property
-    def test_set(self) -> Union[ItemSet, ItemSetDict]:
+    def test_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the test set."""
         return self._test_set
 
@@ -427,28 +632,28 @@ class OnDiskDataset(Dataset):
             train_set:
               - type: paper # could be omitted for homogeneous graph.
                 data: # multiple data sources could be specified.
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy # Can be numpy or torch.
                     in_memory: true # If not specified, default to true.
-                    path: set/paper-train-node_pairs.npy
+                    path: set/paper-train-seeds.npy
                   - name: labels
                     format: numpy
                     path: set/paper-train-labels.npy
             validation_set:
               - type: paper
                 data:
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy
-                    path: set/paper-validation-node_pairs.npy
+                    path: set/paper-validation-seeds.npy
                   - name: labels
                     format: numpy
                     path: set/paper-validation-labels.npy
             test_set:
               - type: paper
                 data:
-                  - name: node_pairs
+                  - name: seeds
                     format: numpy
-                    path: set/paper-test-node_pairs.npy
+                    path: set/paper-test-seeds.npy
                   - name: labels
                     format: numpy
                     path: set/paper-test-labels.npy
@@ -461,6 +666,10 @@ class OnDiskDataset(Dataset):
         Whether to include the original edge id in the FusedCSCSamplingGraph.
     force_preprocess: bool, optional
         Whether to force reload the ondisk dataset.
+    auto_cast_to_optimal_dtype: bool, optional
+        Casts the dtypes of tensors in the dataset into smallest possible dtypes
+        for reduced storage requirements and potentially increased performance.
+        Default is True.
     """
 
     def __init__(
@@ -468,12 +677,16 @@ class OnDiskDataset(Dataset):
         path: str,
         include_original_edge_id: bool = False,
         force_preprocess: bool = None,
+        auto_cast_to_optimal_dtype: bool = True,
     ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         self._dataset_dir = path
         yaml_path = preprocess_ondisk_dataset(
-            path, include_original_edge_id, force_preprocess
+            path,
+            include_original_edge_id,
+            force_preprocess,
+            auto_cast_to_optimal_dtype,
         )
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
@@ -583,7 +796,7 @@ class OnDiskDataset(Dataset):
         return self._dataset_name
 
     @property
-    def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
+    def all_nodes_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the itemset containing all nodes."""
         self._check_loaded()
         return self._all_nodes_set
@@ -643,7 +856,7 @@ class OnDiskDataset(Dataset):
 
     def _init_tvt_set(
         self, tvt_set: List[OnDiskTVTSet]
-    ) -> Union[ItemSet, ItemSetDict]:
+    ) -> Union[ItemSet, HeteroItemSet]:
         """Initialize the TVT set."""
         ret = None
         if (tvt_set is None) or (len(tvt_set) == 0):
@@ -660,33 +873,40 @@ class OnDiskDataset(Dataset):
                 names=tuple(data.name for data in tvt_set[0].data),
             )
         else:
-            data = {}
+            itemsets = {}
             for tvt in tvt_set:
-                data[tvt.type] = ItemSet(
+                itemsets[tvt.type] = ItemSet(
                     tuple(
                         read_data(data.path, data.format, data.in_memory)
                         for data in tvt.data
                     ),
                     names=tuple(data.name for data in tvt.data),
                 )
-            ret = ItemSetDict(data)
+            ret = HeteroItemSet(itemsets)
         return ret
 
-    def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
+    def _init_all_nodes_set(self, graph) -> Union[ItemSet, HeteroItemSet]:
         if graph is None:
             dgl_warning(
-                "`all_node_set` is returned as None, since graph is None."
+                "`all_nodes_set` is returned as None, since graph is None."
             )
             return None
         num_nodes = graph.num_nodes
+        dtype = graph.indices.dtype
         if isinstance(num_nodes, int):
-            return ItemSet(num_nodes, names="seed_nodes")
+            return ItemSet(
+                torch.tensor(num_nodes, dtype=dtype),
+                names="seeds",
+            )
         else:
             data = {
-                node_type: ItemSet(num_node, names="seed_nodes")
+                node_type: ItemSet(
+                    torch.tensor(num_node, dtype=dtype),
+                    names="seeds",
+                )
                 for node_type, num_node in num_nodes.items()
             }
-            return ItemSetDict(data)
+            return HeteroItemSet(data)
 
 
 class BuiltinDataset(OnDiskDataset):
@@ -728,6 +948,16 @@ class BuiltinDataset(OnDiskDataset):
             Reverse edges are added to the original graph and duplicated
             edges are removed.
 
+    **ogbn-papers100M**
+        The ogbn-papers100M dataset is a directed graph, representing the citation
+        network between all Computer Science (CS) arXiv papers indexed by MAG.
+        See more details in `ogbn-papers100M
+        <https://ogb.stanford.edu/docs/nodeprop/#ogbn-papers100M>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
     **ogbn-products**
         The ogbn-products dataset is an undirected and unweighted graph,
         representing an Amazon product co-purchasing network. See more details
@@ -762,15 +992,30 @@ class BuiltinDataset(OnDiskDataset):
     )
     _datasets = [
         "cora",
+        "cora-seeds",
         "ogbn-mag",
+        "ogbn-mag-seeds",
         "ogbl-citation2",
+        "ogbl-citation2-seeds",
         "ogbn-products",
+        "ogbn-products-seeds",
         "ogbn-arxiv",
+        "ogbn-arxiv-seeds",
     ]
-    _large_datasets = ["ogb-lsc-mag240m"]
+    _large_datasets = [
+        "ogb-lsc-mag240m",
+        "ogb-lsc-mag240m-seeds",
+        "ogbn-papers100M",
+        "ogbn-papers100M-seeds",
+    ]
     _all_datasets = _datasets + _large_datasets
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
+        # For user using DGL 2.2 or later version, we prefer them to use
+        # datasets with `seeds` suffix. This hack should be removed, when the
+        # datasets with `seeds` suffix have covered previous ones.
+        if "seeds" not in name:
+            name += "-seeds"
         dataset_dir = os.path.join(root, name)
         if not os.path.exists(dataset_dir):
             if name not in self._all_datasets:

@@ -13,6 +13,7 @@ from multiprocessing import Condition, Manager, Process, Value
 import backend as F
 
 import dgl
+import dgl.graphbolt as gb
 import numpy as np
 import pytest
 import torch as th
@@ -38,23 +39,7 @@ if os.name != "nt":
     import struct
 
 
-def run_server(
-    graph_name,
-    server_id,
-    server_count,
-    num_clients,
-    shared_mem,
-):
-    g = DistGraphServer(
-        server_id,
-        "kv_ip_config.txt",
-        server_count,
-        num_clients,
-        "/tmp/dist_graph/{}.json".format(graph_name),
-        disable_shared_mem=not shared_mem,
-        graph_format=["csc", "coo"],
-    )
-    print("start server", server_id)
+def _verify_dist_graph_server_dgl(g):
     # verify dtype of underlying graph
     cg = g.client_g
     for k, dtype in dgl.distributed.dist_graph.RESERVED_FIELD_DTYPE.items():
@@ -66,6 +51,39 @@ def run_server(
             assert (
                 F.dtype(cg.edata[k]) == dtype
             ), "Data type of {} in edata should be {}.".format(k, dtype)
+
+
+def _verify_dist_graph_server_graphbolt(g):
+    graph = g.client_g
+    assert isinstance(graph, gb.FusedCSCSamplingGraph)
+    # [Rui][TODO] verify dtype of underlying graph.
+
+
+def run_server(
+    graph_name,
+    server_id,
+    server_count,
+    num_clients,
+    shared_mem,
+    use_graphbolt=False,
+):
+    g = DistGraphServer(
+        server_id,
+        "kv_ip_config.txt",
+        server_count,
+        num_clients,
+        "/tmp/dist_graph/{}.json".format(graph_name),
+        disable_shared_mem=not shared_mem,
+        graph_format=["csc", "coo"],
+        use_graphbolt=use_graphbolt,
+    )
+    print(f"Starting server[{server_id}] with use_graphbolt={use_graphbolt}")
+    _verify = (
+        _verify_dist_graph_server_graphbolt
+        if use_graphbolt
+        else _verify_dist_graph_server_dgl
+    )
+    _verify(g)
     g.start()
 
 
@@ -110,7 +128,13 @@ def check_dist_graph_empty(g, num_clients, num_nodes, num_edges):
 
 
 def run_client_empty(
-    graph_name, part_id, server_count, num_clients, num_nodes, num_edges
+    graph_name,
+    part_id,
+    server_count,
+    num_clients,
+    num_nodes,
+    num_edges,
+    use_graphbolt=False,
 ):
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
@@ -121,14 +145,18 @@ def run_client_empty(
     check_dist_graph_empty(g, num_clients, num_nodes, num_edges)
 
 
-def check_server_client_empty(shared_mem, num_servers, num_clients):
+def check_server_client_empty(
+    shared_mem, num_servers, num_clients, use_graphbolt=False
+):
     prepare_dist(num_servers)
     g = create_random_graph(10000)
 
     # Partition the graph
     num_parts = 1
     graph_name = "dist_graph_test_1"
-    partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
+    partition_graph(
+        g, graph_name, num_parts, "/tmp/dist_graph", use_graphbolt=use_graphbolt
+    )
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
@@ -137,7 +165,14 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
     for serv_id in range(num_servers):
         p = ctx.Process(
             target=run_server,
-            args=(graph_name, serv_id, num_servers, num_clients, shared_mem),
+            args=(
+                graph_name,
+                serv_id,
+                num_servers,
+                num_clients,
+                shared_mem,
+                use_graphbolt,
+            ),
         )
         serv_ps.append(p)
         p.start()
@@ -154,6 +189,7 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
                 num_clients,
                 g.num_nodes(),
                 g.num_edges(),
+                use_graphbolt,
             ),
         )
         p.start()
@@ -178,6 +214,7 @@ def run_client(
     num_nodes,
     num_edges,
     group_id,
+    use_graphbolt=False,
 ):
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     os.environ["DGL_GROUP_ID"] = str(group_id)
@@ -186,7 +223,9 @@ def run_client(
         "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
-    check_dist_graph(g, num_clients, num_nodes, num_edges)
+    check_dist_graph(
+        g, num_clients, num_nodes, num_edges, use_graphbolt=use_graphbolt
+    )
 
 
 def run_emb_client(
@@ -270,7 +309,13 @@ def check_dist_optim_store(rank, num_nodes, optimizer_states, save):
 
 
 def run_client_hierarchy(
-    graph_name, part_id, server_count, node_mask, edge_mask, return_dict
+    graph_name,
+    part_id,
+    server_count,
+    node_mask,
+    edge_mask,
+    return_dict,
+    use_graphbolt=False,
 ):
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
@@ -355,7 +400,7 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         sys.exit(-1)
 
 
-def check_dist_graph(g, num_clients, num_nodes, num_edges):
+def check_dist_graph(g, num_clients, num_nodes, num_edges, use_graphbolt=False):
     # Test API
     assert g.num_nodes() == num_nodes
     assert g.num_edges() == num_edges
@@ -522,7 +567,9 @@ def check_dist_emb_server_client(
     print("clients have terminated")
 
 
-def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
+def check_server_client(
+    shared_mem, num_servers, num_clients, num_groups=1, use_graphbolt=False
+):
     prepare_dist(num_servers)
     g = create_random_graph(10000)
 
@@ -531,7 +578,9 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
     graph_name = f"check_server_client_{shared_mem}_{num_servers}_{num_clients}_{num_groups}"
     g.ndata["features"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
     g.edata["features"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
-    partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
+    partition_graph(
+        g, graph_name, num_parts, "/tmp/dist_graph", use_graphbolt=use_graphbolt
+    )
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
@@ -546,6 +595,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
                 num_servers,
                 num_clients,
                 shared_mem,
+                use_graphbolt,
             ),
         )
         serv_ps.append(p)
@@ -566,6 +616,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
                     g.num_nodes(),
                     g.num_edges(),
                     group_id,
+                    use_graphbolt,
                 ),
             )
             p.start()
@@ -582,7 +633,12 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
     print("clients have terminated")
 
 
-def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
+def check_server_client_hierarchy(
+    shared_mem, num_servers, num_clients, use_graphbolt=False
+):
+    if num_clients == 1:
+        # skip this test if there is only one client.
+        return
     prepare_dist(num_servers)
     g = create_random_graph(10000)
 
@@ -597,6 +653,7 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
         num_parts,
         "/tmp/dist_graph",
         num_trainers_per_machine=num_clients,
+        use_graphbolt=use_graphbolt,
     )
 
     # let's just test on one partition for now.
@@ -606,7 +663,14 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
     for serv_id in range(num_servers):
         p = ctx.Process(
             target=run_server,
-            args=(graph_name, serv_id, num_servers, num_clients, shared_mem),
+            args=(
+                graph_name,
+                serv_id,
+                num_servers,
+                num_clients,
+                shared_mem,
+                use_graphbolt,
+            ),
         )
         serv_ps.append(p)
         p.start()
@@ -633,6 +697,7 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
                 node_mask,
                 edge_mask,
                 return_dict,
+                use_graphbolt,
             ),
         )
         p.start()
@@ -658,7 +723,13 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
 
 
 def run_client_hetero(
-    graph_name, part_id, server_count, num_clients, num_nodes, num_edges
+    graph_name,
+    part_id,
+    server_count,
+    num_clients,
+    num_nodes,
+    num_edges,
+    use_graphbolt=False,
 ):
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
@@ -666,7 +737,9 @@ def run_client_hetero(
         "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
-    check_dist_graph_hetero(g, num_clients, num_nodes, num_edges)
+    check_dist_graph_hetero(
+        g, num_clients, num_nodes, num_edges, use_graphbolt=use_graphbolt
+    )
 
 
 def create_random_hetero():
@@ -701,7 +774,9 @@ def create_random_hetero():
     return g
 
 
-def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
+def check_dist_graph_hetero(
+    g, num_clients, num_nodes, num_edges, use_graphbolt=False
+):
     # Test API
     for ntype in num_nodes:
         assert ntype in g.ntypes
@@ -827,14 +902,18 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     print("end")
 
 
-def check_server_client_hetero(shared_mem, num_servers, num_clients):
+def check_server_client_hetero(
+    shared_mem, num_servers, num_clients, use_graphbolt=False
+):
     prepare_dist(num_servers)
     g = create_random_hetero()
 
     # Partition the graph
     num_parts = 1
     graph_name = "dist_graph_test_3"
-    partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
+    partition_graph(
+        g, graph_name, num_parts, "/tmp/dist_graph", use_graphbolt=use_graphbolt
+    )
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
@@ -843,7 +922,14 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
     for serv_id in range(num_servers):
         p = ctx.Process(
             target=run_server,
-            args=(graph_name, serv_id, num_servers, num_clients, shared_mem),
+            args=(
+                graph_name,
+                serv_id,
+                num_servers,
+                num_clients,
+                shared_mem,
+                use_graphbolt,
+            ),
         )
         serv_ps.append(p)
         p.start()
@@ -862,6 +948,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
                 num_clients,
                 num_nodes,
                 num_edges,
+                use_graphbolt,
             ),
         )
         p.start()
@@ -886,21 +973,23 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 @unittest.skipIf(
     dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support"
 )
-def test_server_client():
+@pytest.mark.parametrize("shared_mem", [True])
+@pytest.mark.parametrize("num_servers", [1])
+@pytest.mark.parametrize("num_clients", [1, 4])
+@pytest.mark.parametrize("use_graphbolt", [True, False])
+def test_server_client(shared_mem, num_servers, num_clients, use_graphbolt):
     reset_envs()
     os.environ["DGL_DIST_MODE"] = "distributed"
-    check_server_client_hierarchy(False, 1, 4)
-    check_server_client_empty(True, 1, 1)
-    check_server_client_hetero(True, 1, 1)
-    check_server_client_hetero(False, 1, 1)
-    check_server_client(True, 1, 1)
-    check_server_client(False, 1, 1)
-    # [TODO][Rhett] Tests for multiple groups may fail sometimes and
-    # root cause is unknown. Let's disable them for now.
-    # check_server_client(True, 2, 2)
-    # check_server_client(True, 1, 1, 2)
-    # check_server_client(False, 1, 1, 2)
-    # check_server_client(True, 2, 2, 2)
+    # [Rui]
+    # 1. `disable_shared_mem=False` is not supported yet. Skip it.
+    # 2. `num_servers` > 1 does not work on single machine. Skip it.
+    for func in [
+        check_server_client,
+        check_server_client_hetero,
+        check_server_client_empty,
+        check_server_client_hierarchy,
+    ]:
+        func(shared_mem, num_servers, num_clients, use_graphbolt=use_graphbolt)
 
 
 @unittest.skip(reason="Skip due to glitch in CI")

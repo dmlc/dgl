@@ -1,4 +1,5 @@
 """GPU cached feature for GraphBolt."""
+
 import torch
 
 from ..feature_store import Feature
@@ -6,6 +7,13 @@ from ..feature_store import Feature
 from .gpu_cache import GPUCache
 
 __all__ = ["GPUCachedFeature"]
+
+
+def num_cache_items(cache_capacity_in_bytes, single_item):
+    """Returns the number of rows to be cached."""
+    item_bytes = single_item.nbytes
+    # Round up so that we never get a size of 0, unless bytes is 0.
+    return (cache_capacity_in_bytes + item_bytes - 1) // item_bytes
 
 
 class GPUCachedFeature(Feature):
@@ -17,8 +25,8 @@ class GPUCachedFeature(Feature):
     ----------
     fallback_feature : Feature
         The fallback feature.
-    cache_size : int
-        The capacity of the GPU cache, the number of features to store.
+    max_cache_size_in_bytes : int
+        The capacity of the GPU cache in bytes.
 
     Examples
     --------
@@ -42,16 +50,17 @@ class GPUCachedFeature(Feature):
     torch.Size([5])
     """
 
-    def __init__(self, fallback_feature: Feature, cache_size: int):
+    def __init__(self, fallback_feature: Feature, max_cache_size_in_bytes: int):
         super(GPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
             f"The fallback_feature must be an instance of Feature, but got "
             f"{type(fallback_feature)}."
         )
         self._fallback_feature = fallback_feature
-        self.cache_size = cache_size
+        self.max_cache_size_in_bytes = max_cache_size_in_bytes
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
+        cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
         self._feature = GPUCache((cache_size,) + feat0.shape[1:], feat0.dtype)
 
     def read(self, ids: torch.Tensor = None):
@@ -104,11 +113,15 @@ class GPUCachedFeature(Feature):
             updated.
         """
         if ids is None:
+            feat0 = value[:1]
             self._fallback_feature.update(value)
-            size = min(self.cache_size, value.shape[0])
-            self._feature.replace(
-                torch.arange(0, size, device="cuda"),
-                value[:size].to("cuda"),
+            cache_size = min(
+                num_cache_items(self.max_cache_size_in_bytes, feat0),
+                value.shape[0],
+            )
+            self._feature = None  # Destroy the existing cache first.
+            self._feature = GPUCache(
+                (cache_size,) + feat0.shape[1:], feat0.dtype
             )
         else:
             self._fallback_feature.update(value, ids)

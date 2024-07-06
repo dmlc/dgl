@@ -1,6 +1,19 @@
 /**
- *  Copyright (c) 2023 by Contributors
- *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   All rights reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ *
  * @file cuda/index_select_csc_impl.cu
  * @brief Index select csc operator implementation on CUDA.
  */
@@ -14,12 +27,13 @@
 #include <numeric>
 
 #include "./common.h"
+#include "./max_uva_threads.h"
 #include "./utils.h"
 
 namespace graphbolt {
 namespace ops {
 
-constexpr int BLOCK_SIZE = 128;
+constexpr int BLOCK_SIZE = CUDA_MAX_NUM_THREADS;
 
 // Given the in_degree array and a permutation, returns in_degree of the output
 // and the permuted and modified in_degree of the input. The modified in_degree
@@ -130,7 +144,10 @@ std::tuple<torch::Tensor, torch::Tensor> UVAIndexSelectCSCCopyIndices(
   torch::Tensor output_indices =
       torch::empty(output_size.value(), options.dtype(indices.scalar_type()));
   const dim3 block(BLOCK_SIZE);
-  const dim3 grid((edge_count_aligned + BLOCK_SIZE - 1) / BLOCK_SIZE);
+  const dim3 grid(
+      (std::min(edge_count_aligned, cuda::max_uva_threads.value_or(1 << 20)) +
+       BLOCK_SIZE - 1) /
+      BLOCK_SIZE);
 
   // Find the smallest integer type to store the coo_aligned_rows tensor.
   const int num_bits = cuda::NumberOfBits(num_nodes);

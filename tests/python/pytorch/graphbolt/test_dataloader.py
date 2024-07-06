@@ -7,13 +7,15 @@ import dgl.graphbolt
 import pytest
 import torch
 
+import torchdata.dataloader2.graph as dp_utils
+
 from . import gb_test_utils
 
 
 def test_DataLoader():
     N = 40
     B = 4
-    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
+    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seeds")
     graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]
@@ -45,11 +47,26 @@ def test_DataLoader():
     F._default_context_str != "gpu",
     reason="This test requires the GPU.",
 )
+@pytest.mark.parametrize(
+    "sampler_name", ["NeighborSampler", "LayerNeighborSampler"]
+)
+@pytest.mark.parametrize("enable_feature_fetch", [True, False])
 @pytest.mark.parametrize("overlap_feature_fetch", [True, False])
-def test_gpu_sampling_DataLoader(overlap_feature_fetch):
+@pytest.mark.parametrize("overlap_graph_fetch", [True, False])
+@pytest.mark.parametrize("num_gpu_cached_edges", [0, 1024])
+@pytest.mark.parametrize("gpu_cache_threshold", [1, 3])
+def test_gpu_sampling_DataLoader(
+    sampler_name,
+    enable_feature_fetch,
+    overlap_feature_fetch,
+    overlap_graph_fetch,
+    num_gpu_cached_edges,
+    gpu_cache_threshold,
+):
     N = 40
     B = 4
-    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
+    num_layers = 2
+    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seeds")
     graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
@@ -64,19 +81,45 @@ def test_gpu_sampling_DataLoader(overlap_feature_fetch):
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     datapipe = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
-    datapipe = datapipe.copy_to(F.ctx(), extra_attrs=["seed_nodes"])
-    datapipe = dgl.graphbolt.NeighborSampler(
+    datapipe = datapipe.copy_to(F.ctx())
+    datapipe = getattr(dgl.graphbolt, sampler_name)(
         datapipe,
         graph,
-        fanouts=[torch.LongTensor([2]) for _ in range(2)],
+        fanouts=[torch.LongTensor([2]) for _ in range(num_layers)],
     )
-    datapipe = dgl.graphbolt.FeatureFetcher(
-        datapipe,
-        feature_store,
-        ["a", "b"],
-    )
+    if enable_feature_fetch:
+        datapipe = dgl.graphbolt.FeatureFetcher(
+            datapipe,
+            feature_store,
+            ["a", "b"],
+        )
 
     dataloader = dgl.graphbolt.DataLoader(
-        datapipe, overlap_feature_fetch=overlap_feature_fetch
+        datapipe,
+        overlap_feature_fetch=overlap_feature_fetch,
+        overlap_graph_fetch=overlap_graph_fetch,
+        num_gpu_cached_edges=num_gpu_cached_edges,
+        gpu_cache_threshold=gpu_cache_threshold,
     )
+    bufferer_awaiter_cnt = int(enable_feature_fetch and overlap_feature_fetch)
+    if overlap_graph_fetch:
+        bufferer_awaiter_cnt += num_layers
+    datapipe = dataloader.dataset
+    datapipe_graph = dp_utils.traverse_dps(datapipe)
+    awaiters = dp_utils.find_dps(
+        datapipe_graph,
+        dgl.graphbolt.Waiter,
+    )
+    assert len(awaiters) == bufferer_awaiter_cnt
+    bufferers = dp_utils.find_dps(
+        datapipe_graph,
+        dgl.graphbolt.Bufferer,
+    )
+    assert len(bufferers) == bufferer_awaiter_cnt
+    assert len(list(dataloader)) == N // B
+
+    for i, _ in enumerate(dataloader):
+        if i >= 1:
+            break
+
     assert len(list(dataloader)) == N // B

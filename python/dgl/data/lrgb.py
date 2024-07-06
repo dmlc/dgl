@@ -4,7 +4,7 @@ import pickle
 
 import pandas as pd
 from ogb.utils import smiles2graph as smiles2graph_OGB
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .. import backend as F
 

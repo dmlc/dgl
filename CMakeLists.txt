@@ -20,6 +20,7 @@ dgl_option(BUILD_TYPE "Type of the build: dev, dogfood or release" "dev")
 message(STATUS "Build for ${BUILD_TYPE}")
 
 dgl_option(USE_CUDA "Build with CUDA" OFF)
+dgl_option(USE_LIBURING "Build with liburing" OFF)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter for building sub-components" python3)
 
 # Conda build related options.
@@ -139,8 +140,6 @@ endif()
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
-  # see https://github.com/NVIDIA/thrust/issues/1401
-  add_definitions(-DTHRUST_CUB_WRAPPED_NAMESPACE=dgl)
   include(cmake/modules/CUDA.cmake)
   message(STATUS "Use external CCCL library for a consistent API and performance.")
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/thrust")
@@ -351,7 +350,26 @@ endif(EXTERNAL_PHMAP_PATH)
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
-
+if(USE_LIBURING)
+  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    add_definitions(-DHAVE_LIBRARY_LIBURING)
+    include(ExternalProject)
+    set(LIBURING_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/liburing)
+    ExternalProject_Add(
+      liburing
+      SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=/
+      BUILD_COMMAND bash -c "make -j 4"
+      BUILD_IN_SOURCE ON
+      INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
+      BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/lib/liburing.a
+      BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/include
+      DOWNLOAD_EXTRACT_TIMESTAMP true
+    )
+    set(LIBURING_INCLUDE ${LIBURING_INSTALL_DIR}/include)
+    set(LIBURING ${LIBURING_INSTALL_DIR}/lib/liburing.a)
+  endif()
+endif(USE_LIBURING)
 
 if(EXTERNAL_NANOFLANN_PATH)
   include_directories(SYSTEM ${EXTERNAL_NANOFLANN_PATH})
@@ -376,13 +394,14 @@ else(EXTERNAL_METIS_PATH)
   target_include_directories(dgl PRIVATE "third_party/METIS/include")
   # Compile METIS
   if(NOT MSVC)
-    set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/METIS/GKlib")
+    set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/GKlib")
     include(${GKLIB_PATH}/GKlibSystem.cmake)
     include_directories(${GKLIB_PATH})
+    add_library(GKlib ${GKlib_sources})
     include_directories("third_party/METIS/include/")
     add_subdirectory("third_party/METIS/libmetis/")
-    list(APPEND DGL_LINKER_LIBS metis)
-    endif(NOT MSVC)
+    list(APPEND DGL_LINKER_LIBS metis GKlib)
+  endif(NOT MSVC)
 endif(EXTERNAL_METIS_PATH)
 
 
@@ -574,4 +593,9 @@ if(BUILD_GRAPHBOLT)
   if(USE_CUDA)
     add_dependencies(graphbolt gpu_cache)
   endif(USE_CUDA)
+  if(USE_LIBURING)
+    if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+      add_dependencies(graphbolt liburing)
+    endif()
+  endif(USE_LIBURING)
 endif(BUILD_GRAPHBOLT)

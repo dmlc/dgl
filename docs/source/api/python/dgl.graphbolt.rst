@@ -82,7 +82,7 @@ An item set is an iterable collection of items.
     :template: graphbolt_classtemplate.rst
 
     ItemSet
-    ItemSetDict
+    HeteroItemSet
 
 
 ItemSampler
@@ -141,6 +141,7 @@ A subgraph sampler is for sampling subgraphs from a graph.
     SubgraphSampler
     SampledSubgraph
     NeighborSampler
+    TemporalNeighborSampler
     LayerNeighborSampler
     SampledSubgraphImpl
     FusedSampledSubgraphImpl
@@ -187,6 +188,7 @@ Utilities
     etype_tuple_to_str
     isin
     seed
+    index_select
     expand_indptr
     add_reverse_edges
     exclude_seed_edges

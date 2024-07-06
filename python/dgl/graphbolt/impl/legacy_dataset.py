@@ -1,10 +1,11 @@
 """Graphbolt dataset for legacy DGLDataset."""
+
 from typing import List, Union
 
 from dgl.data import AsNodePredDataset, DGLDataset
 from ..base import etype_tuple_to_str
 from ..dataset import Dataset, Task
-from ..itemset import ItemSet, ItemSetDict
+from ..itemset import HeteroItemSet, ItemSet
 from ..sampling_graph import SamplingGraph
 from .basic_feature_store import BasicFeatureStore
 from .fused_csc_sampling_graph import from_dglgraph
@@ -33,10 +34,10 @@ class LegacyDataset(Dataset):
             for key in idx.keys():
                 item_set = ItemSet(
                     (idx[key], labels[key][idx[key]]),
-                    names=("seed_nodes", "labels"),
+                    names=("seeds", "labels"),
                 )
                 item_set_dict[key] = item_set
-            return ItemSetDict(item_set_dict)
+            return HeteroItemSet(item_set_dict)
 
         # OGB Dataset has the idx split.
         if hasattr(legacy, "get_idx_split"):
@@ -58,9 +59,9 @@ class LegacyDataset(Dataset):
 
             item_set_dict = {}
             for ntype in graph.ntypes:
-                item_set = ItemSet(graph.num_nodes(ntype), names="seed_nodes")
+                item_set = ItemSet(graph.num_nodes(ntype), names="seeds")
                 item_set_dict[ntype] = item_set
-            self._all_nodes_set = ItemSetDict(item_set_dict)
+            self._all_nodes_set = HeteroItemSet(item_set_dict)
 
             features = {}
             for ntype in graph.ntypes:
@@ -100,21 +101,21 @@ class LegacyDataset(Dataset):
         test_labels = legacy[0].ndata["label"][legacy.test_idx]
         train_set = ItemSet(
             (legacy.train_idx, train_labels),
-            names=("seed_nodes", "labels"),
+            names=("seeds", "labels"),
         )
         validation_set = ItemSet(
             (legacy.val_idx, validation_labels),
-            names=("seed_nodes", "labels"),
+            names=("seeds", "labels"),
         )
         test_set = ItemSet(
-            (legacy.test_idx, test_labels), names=("seed_nodes", "labels")
+            (legacy.test_idx, test_labels), names=("seeds", "labels")
         )
         task = OnDiskTask(metadata, train_set, validation_set, test_set)
         tasks.append(task)
         self._tasks = tasks
 
         num_nodes = legacy[0].num_nodes()
-        self._all_nodes_set = ItemSet(num_nodes, names="seed_nodes")
+        self._all_nodes_set = ItemSet(num_nodes, names="seeds")
         features = {}
         for name in legacy[0].ndata.keys():
             tensor = legacy[0].ndata[name]
@@ -151,6 +152,6 @@ class LegacyDataset(Dataset):
         return self._dataset_name
 
     @property
-    def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
+    def all_nodes_set(self) -> Union[ItemSet, HeteroItemSet]:
         """Return the itemset containing all nodes."""
         return self._all_nodes_set

@@ -12,11 +12,15 @@
 #ifdef GRAPHBOLT_USE_CUDA
 #include "./cuda/max_uva_threads.h"
 #endif
+#include "./cnumpy.h"
 #include "./expand_indptr.h"
+#include "./feature_cache.h"
 #include "./index_select.h"
+#include "./partitioned_cache_policy.h"
 #include "./random.h"
 
 #ifdef GRAPHBOLT_USE_CUDA
+#include "./cuda/extension/gpu_graph_cache.h"
 #include "./cuda/gpu_cache.h"
 #endif
 
@@ -35,7 +39,10 @@ TORCH_LIBRARY(graphbolt, m) {
           &FusedSampledSubgraph::original_column_node_ids)
       .def_readwrite(
           "original_edge_ids", &FusedSampledSubgraph::original_edge_ids)
-      .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge);
+      .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge)
+      .def_readwrite("etype_offsets", &FusedSampledSubgraph::etype_offsets);
+  m.class_<storage::OnDiskNpyArray>("OnDiskNpyArray")
+      .def("index_select", &storage::OnDiskNpyArray::IndexSelect);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
       .def("num_nodes", &FusedCSCSamplingGraph::NumNodes)
       .def("num_edges", &FusedCSCSamplingGraph::NumEdges)
@@ -47,6 +54,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("edge_type_to_id", &FusedCSCSamplingGraph::EdgeTypeToID)
       .def("node_attributes", &FusedCSCSamplingGraph::NodeAttributes)
       .def("edge_attributes", &FusedCSCSamplingGraph::EdgeAttributes)
+      .def("node_attribute", &FusedCSCSamplingGraph::NodeAttribute)
+      .def("edge_attribute", &FusedCSCSamplingGraph::EdgeAttribute)
       .def("set_csc_indptr", &FusedCSCSamplingGraph::SetCSCIndptr)
       .def("set_indices", &FusedCSCSamplingGraph::SetIndices)
       .def("set_node_type_offset", &FusedCSCSamplingGraph::SetNodeTypeOffset)
@@ -55,6 +64,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("set_edge_type_to_id", &FusedCSCSamplingGraph::SetEdgeTypeToID)
       .def("set_node_attributes", &FusedCSCSamplingGraph::SetNodeAttributes)
       .def("set_edge_attributes", &FusedCSCSamplingGraph::SetEdgeAttributes)
+      .def("add_node_attribute", &FusedCSCSamplingGraph::AddNodeAttribute)
+      .def("add_edge_attribute", &FusedCSCSamplingGraph::AddEdgeAttribute)
       .def("in_subgraph", &FusedCSCSamplingGraph::InSubgraph)
       .def("sample_neighbors", &FusedCSCSamplingGraph::SampleNeighbors)
       .def(
@@ -80,19 +91,45 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("query", &cuda::GpuCache::Query)
       .def("replace", &cuda::GpuCache::Replace);
   m.def("gpu_cache", &cuda::GpuCache::Create);
+  m.class_<cuda::GpuGraphCache>("GpuGraphCache")
+      .def("query", &cuda::GpuGraphCache::Query)
+      .def("replace", &cuda::GpuGraphCache::Replace);
+  m.def("gpu_graph_cache", &cuda::GpuGraphCache::Create);
 #endif
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
+  m.class_<storage::PartitionedCachePolicy>("PartitionedCachePolicy")
+      .def("query", &storage::PartitionedCachePolicy::Query)
+      .def("replace", &storage::PartitionedCachePolicy::Replace);
+  m.def(
+      "s3_fifo_cache_policy",
+      &storage::PartitionedCachePolicy::Create<storage::S3FifoCachePolicy>);
+  m.class_<storage::FeatureCache>("FeatureCache")
+      .def("query", &storage::FeatureCache::Query)
+      .def("replace", &storage::FeatureCache::Replace);
+  m.def("feature_cache", &storage::FeatureCache::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
+  m.def("unique_and_compact_batched", &UniqueAndCompactBatched);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
-  m.def("expand_indptr", &ops::ExpandIndptr);
+  m.def("ondisk_npy_array", &storage::OnDiskNpyArray::Create);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
 #endif
+#ifdef HAS_IMPL_ABSTRACT_PYSTUB
+  m.impl_abstract_pystub("dgl.graphbolt.base", "//dgl.graphbolt.base");
+#endif
+  m.def(
+      "expand_indptr(Tensor indptr, ScalarType dtype, Tensor? node_ids, "
+      "SymInt? output_size) -> Tensor"
+#ifdef HAS_PT2_COMPLIANT_TAG
+      ,
+      {at::Tag::pt2_compliant_tag}
+#endif
+  );
 }
 
 }  // namespace sampling

@@ -32,11 +32,11 @@ def unique_and_compact(
     Returns
     -------
     Tuple[unique_nodes, compacted_node_list]
-    The Unique nodes (per type) of all nodes in the input. And the compacted
-    nodes list, where IDs inside are replaced with compacted node IDs.
-    "Compacted node list" indicates that the node IDs in the input node
-    list are replaced with mapped node IDs, where each type of node is
-    mapped to a contiguous space of IDs ranging from 0 to N.
+        The Unique nodes (per type) of all nodes in the input. And the compacted
+        nodes list, where IDs inside are replaced with compacted node IDs.
+        "Compacted node list" indicates that the node IDs in the input node
+        list are replaced with mapped node IDs, where each type of node is
+        mapped to a contiguous space of IDs ranging from 0 to N.
     """
     is_heterogeneous = isinstance(nodes, dict)
 
@@ -204,18 +204,19 @@ def unique_and_compact_csc_formats(
     compacted_indices = {}
     dtype = list(indices.values())[0].dtype
     default_tensor = torch.tensor([], dtype=dtype, device=device)
+    indice_list = []
+    unique_dst_list = []
     for ntype in ntypes:
-        indice = indices.get(ntype, default_tensor)
-        unique_dst = unique_dst_nodes.get(ntype, default_tensor)
-        (
-            unique_nodes[ntype],
-            compacted_indices[ntype],
-            _,
-        ) = torch.ops.graphbolt.unique_and_compact(
-            indice,
-            torch.tensor([], dtype=indice.dtype, device=device),
-            unique_dst,
-        )
+        indice_list.append(indices.get(ntype, default_tensor))
+        unique_dst_list.append(unique_dst_nodes.get(ntype, default_tensor))
+    dst_list = [torch.tensor([], dtype=dtype, device=device)] * len(
+        unique_dst_list
+    )
+    results = torch.ops.graphbolt.unique_and_compact_batched(
+        indice_list, dst_list, unique_dst_list
+    )
+    for i, ntype in enumerate(ntypes):
+        unique_nodes[ntype], compacted_indices[ntype], _ = results[i]
 
     compacted_csc_formats = {}
     # Map back with the same order.

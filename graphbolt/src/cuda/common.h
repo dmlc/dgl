@@ -1,6 +1,19 @@
 /**
- *  Copyright (c) 2017-2023 by Contributors
- *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   All rights reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ *
  * @file cuda/common.h
  * @brief Common utilities for CUDA
  */
@@ -12,6 +25,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAStream.h>
 #include <cuda_runtime.h>
+#include <thrust/execution_policy.h>
 #include <torch/script.h>
 
 #include <memory>
@@ -38,11 +52,16 @@ namespace cuda {
  *
  * int_array.get() gives the raw pointer.
  */
+template <typename value_t = char>
 struct CUDAWorkspaceAllocator {
+  static_assert(sizeof(char) == 1, "sizeof(char) == 1 should hold.");
   // Required by thrust to satisfy allocator requirements.
-  using value_type = char;
+  using value_type = value_t;
 
   explicit CUDAWorkspaceAllocator() { at::globalContext().lazyInitCUDA(); }
+
+  template <class U>
+  CUDAWorkspaceAllocator(CUDAWorkspaceAllocator<U> const&) noexcept {}
 
   CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
 
@@ -53,7 +72,7 @@ struct CUDAWorkspaceAllocator {
   // Required by thrust to satisfy allocator requirements.
   value_type* allocate(std::ptrdiff_t size) const {
     return reinterpret_cast<value_type*>(
-        c10::cuda::CUDACachingAllocator::raw_alloc(size));
+        c10::cuda::CUDACachingAllocator::raw_alloc(size * sizeof(value_type)));
   }
 
   // Required by thrust to satisfy allocator requirements.
@@ -63,7 +82,9 @@ struct CUDAWorkspaceAllocator {
   std::unique_ptr<T, CUDAWorkspaceAllocator> AllocateStorage(
       std::size_t size) const {
     return std::unique_ptr<T, CUDAWorkspaceAllocator>(
-        reinterpret_cast<T*>(allocate(sizeof(T) * size)), *this);
+        reinterpret_cast<T*>(
+            c10::cuda::CUDACachingAllocator::raw_alloc(sizeof(T) * size)),
+        *this);
   }
 };
 
@@ -80,6 +101,15 @@ template <>
 inline bool is_zero<dim3>(dim3 size) {
   return size.x == 0 || size.y == 0 || size.z == 0;
 }
+
+#define CUDA_RUNTIME_CHECK(EXPR)                           \
+  do {                                                     \
+    cudaError_t __err = EXPR;                              \
+    if (__err != cudaSuccess) {                            \
+      auto get_error_str_err = cudaGetErrorString(__err);  \
+      AT_ERROR("CUDA runtime error: ", get_error_str_err); \
+    }                                                      \
+  } while (0)
 
 #define CUDA_CALL(func) C10_CUDA_CHECK((func))
 
@@ -163,16 +193,6 @@ struct CopyScalar {
   at::cuda::CUDAEvent copy_event_;
   bool is_ready_;
 };
-
-// This includes all integer, float and boolean types.
-#define GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(...)            \
-  AT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__)                 \
-  AT_DISPATCH_CASE(at::ScalarType::Half, __VA_ARGS__)     \
-  AT_DISPATCH_CASE(at::ScalarType::BFloat16, __VA_ARGS__) \
-  AT_DISPATCH_CASE(at::ScalarType::Bool, __VA_ARGS__)
-
-#define GRAPHBOLT_DISPATCH_ALL_TYPES(TYPE, NAME, ...) \
-  AT_DISPATCH_SWITCH(TYPE, NAME, GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__))
 
 #define GRAPHBOLT_DISPATCH_ELEMENT_SIZES(element_size, name, ...)             \
   [&] {                                                                       \

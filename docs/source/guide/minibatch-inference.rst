@@ -106,7 +106,7 @@ and combined as well.
                         hidden_x = self.dropout(hidden_x)
                     # By design, our output nodes are contiguous.
                     y[
-                        data.seed_nodes[0] : data.seed_nodes[-1] + 1
+                        data.seeds[0] : data.seeds[-1] + 1
                     ] = hidden_x.to(device)
                 feature = y
 
@@ -122,7 +122,7 @@ of unlabeled data. Neighborhood sampling will work fine for model
 selection and validation.
 
 One can see
-`GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/node_classification.py>`__
+`GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/node_classification.py>`__
 and
-`RGCN <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/rgcn/hetero_rgcn.py>`__
+`RGCN <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/rgcn/hetero_rgcn.py>`__
 for examples of offline inference.

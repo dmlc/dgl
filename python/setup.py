@@ -84,6 +84,13 @@ def cleanup():
             remove_lib("dgl_sparse")
             remove_lib("graphbolt")
 
+    # Remove build artifacts.
+    dir_to_remove = ["build", "dgl.egg-info"]
+    for dir_ in dir_to_remove:
+        print(f"Removing {dir_}")
+        if os.path.isdir(dir_):
+            shutil.rmtree(dir_)
+
 
 def config_cython():
     """Try to configure cython and return cython configuration"""
@@ -220,6 +227,7 @@ install_requires = [
     "tqdm",
     "psutil>=5.8.0",
     "torchdata>=0.5.0",
+    "pandas",
 ]
 if "DGLBACKEND" in os.environ and os.environ["DGLBACKEND"] != "pytorch":
     install_requires.pop(install_requires.index("torchdata>=0.5.0"))

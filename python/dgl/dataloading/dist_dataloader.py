@@ -1,5 +1,6 @@
 """Distributed dataloaders.
 """
+
 import inspect
 from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Mapping
@@ -83,6 +84,8 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     if exclude_mode is None:
         return None
     elif exclude_mode == "self":
+        if isinstance(eids, Mapping):
+            eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
         return eids
     elif exclude_mode == "reverse_id":
         return _find_exclude_eids_with_reverse_id(
@@ -132,6 +135,27 @@ class Collator(ABC):
         """
         raise NotImplementedError
 
+    @staticmethod
+    def add_edge_attribute_to_graph(g, data_name):
+        """Add data into the graph as an edge attribute.
+
+        For some cases such as prob/mask-based sampling on GraphBolt partitions,
+        we need to prepare such data beforehand. This is because data are
+        usually saved in DistGraph.ndata/edata, but such data is not in the
+        format that GraphBolt partitions require. And in GraphBolt, such data
+        are saved as edge attributes. So we need to add such data into the graph
+        before any sampling is kicked off.
+
+        Parameters
+        ----------
+        g : DistGraph
+            The graph.
+        data_name : str
+            The name of data that's stored in DistGraph.ndata/edata.
+        """
+        if g._use_graphbolt and data_name:
+            g.add_edge_attribute(data_name)
+
 
 class NodeCollator(Collator):
     """DGL collator to combine nodes and their computation dependencies within a minibatch for
@@ -177,6 +201,9 @@ class NodeCollator(Collator):
 
         self.nids = utils.prepare_tensor_or_dict(g, nids, "nids")
         self._dataset = utils.maybe_flatten_dict(self.nids)
+
+        # Add prob/mask into graphbolt partition's edge attributes if needed.
+        Collator.add_edge_attribute_to_graph(self.g, self.graph_sampler.prob)
 
     @property
     def dataset(self):
@@ -433,6 +460,9 @@ class EdgeCollator(Collator):
 
         self.eids = utils.prepare_tensor_or_dict(g, eids, "eids")
         self._dataset = utils.maybe_flatten_dict(self.eids)
+
+        # Add prob/mask into graphbolt partition's edge attributes if needed.
+        Collator.add_edge_attribute_to_graph(self.g, self.graph_sampler.prob)
 
     @property
     def dataset(self):

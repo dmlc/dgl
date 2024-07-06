@@ -340,7 +340,7 @@ def main(args):
     """
     host_name = socket.gethostname()
     print(f"{host_name}: Initializing DistDGL.")
-    dgl.distributed.initialize(args.ip_config)
+    dgl.distributed.initialize(args.ip_config, use_graphbolt=args.use_graphbolt)
     print(f"{host_name}: Initializing PyTorch process group.")
     th.distributed.init_process_group(backend=args.backend)
     print(f"{host_name}: Initializing DistGraph.")
@@ -456,6 +456,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Pad train nid to the same length across machine, to ensure num "
         "of batches to be the same.",
+    )
+    parser.add_argument(
+        "--use_graphbolt",
+        action="store_true",
+        help="Use GraphBolt for distributed train.",
     )
     args = parser.parse_args()
     print(f"Arguments: {args}")

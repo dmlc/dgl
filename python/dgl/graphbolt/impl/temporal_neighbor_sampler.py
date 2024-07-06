@@ -89,29 +89,46 @@ class TemporalNeighborSampler(SubgraphSampler):
         self.edge_timestamp_attr_name = edge_timestamp_attr_name
         self.sampler = graph.temporal_sample_neighbors
 
-    def sample_subgraphs(self, seeds, seeds_timestamp):
+    def sample_subgraphs(
+        self, seeds, seeds_timestamp, seeds_pre_time_window=None
+    ):
         assert (
             seeds_timestamp is not None
         ), "seeds_timestamp must be provided for temporal neighbor sampling."
         subgraphs = []
         num_layers = len(self.fanouts)
-        # Enrich seeds with all node types.
+        # Enrich seeds with all node types. Ensure that the dtype and device
+        # remain consistent with those of the existing seeds.
         if isinstance(seeds, dict):
+            first_val = next(iter(seeds.items()))[1]
             ntypes = list(self.graph.node_type_to_id.keys())
             seeds = {
-                ntype: seeds.get(ntype, torch.LongTensor([]))
+                ntype: seeds.get(
+                    ntype,
+                    torch.tensor(
+                        [], dtype=first_val.dtype, device=first_val.device
+                    ),
+                )
                 for ntype in ntypes
             }
             seeds_timestamp = {
                 ntype: seeds_timestamp.get(ntype, torch.LongTensor([]))
                 for ntype in ntypes
             }
+            if seeds_pre_time_window:
+                seeds_pre_time_window = {
+                    ntype: seeds_pre_time_window.get(
+                        ntype, torch.LongTensor([])
+                    )
+                    for ntype in ntypes
+                }
         for hop in range(num_layers):
             subgraph = self.sampler(
                 seeds,
                 seeds_timestamp,
                 self.fanouts[hop],
                 self.replace,
+                seeds_pre_time_window,
                 self.prob_name,
                 self.node_timestamp_attr_name,
                 self.edge_timestamp_attr_name,

@@ -5,11 +5,13 @@ System requirements
 -------------------
 DGL works with the following operating systems:
 
-* Ubuntu 16.04
+* Ubuntu 20.04+
+* CentOS 8+ (Although gcc 9 is needed)
+* RHEL 8+
 * macOS X
 * Windows 10
 
-DGL requires Python version 3.6, 3.7, 3.8 or 3.9.
+DGL requires Python version 3.7, 3.8, 3.9, 3.10, 3.11.
 
 DGL supports multiple tensor libraries as backends, e.g., PyTorch, MXNet. For requirements on backends and how to select one, see :ref:`backends`.
 

@@ -81,7 +81,7 @@ def test_InSubgraphSampler_homo():
     graph = gb.fused_csc_sampling_graph(indptr, indices).to(F.ctx())
 
     seed_nodes = torch.LongTensor([0, 5, 3])
-    item_set = gb.ItemSet(seed_nodes, names="seed_nodes")
+    item_set = gb.ItemSet(seed_nodes, names="seeds")
     batch_size = 1
     item_sampler = gb.ItemSampler(item_set, batch_size=batch_size).copy_to(
         F.ctx()
@@ -99,14 +99,14 @@ def test_InSubgraphSampler_homo():
         return _indices
 
     mn = next(it)
-    assert torch.equal(mn.seed_nodes, torch.LongTensor([0]).to(F.ctx()))
+    assert torch.equal(mn.seeds, torch.LongTensor([0]).to(F.ctx()))
     assert torch.equal(
         mn.sampled_subgraphs[0].sampled_csc.indptr,
         torch.tensor([0, 3]).to(F.ctx()),
     )
 
     mn = next(it)
-    assert torch.equal(mn.seed_nodes, torch.LongTensor([5]).to(F.ctx()))
+    assert torch.equal(mn.seeds, torch.LongTensor([5]).to(F.ctx()))
     assert torch.equal(
         mn.sampled_subgraphs[0].sampled_csc.indptr,
         torch.tensor([0, 2]).to(F.ctx()),
@@ -114,7 +114,7 @@ def test_InSubgraphSampler_homo():
     assert torch.equal(original_indices(mn), torch.tensor([1, 4]).to(F.ctx()))
 
     mn = next(it)
-    assert torch.equal(mn.seed_nodes, torch.LongTensor([3]).to(F.ctx()))
+    assert torch.equal(mn.seeds, torch.LongTensor([3]).to(F.ctx()))
     assert torch.equal(
         mn.sampled_subgraphs[0].sampled_csc.indptr,
         torch.tensor([0, 2]).to(F.ctx()),
@@ -160,10 +160,10 @@ def test_InSubgraphSampler_hetero():
         edge_type_to_id=etypes,
     ).to(F.ctx())
 
-    item_set = gb.ItemSetDict(
+    item_set = gb.HeteroItemSet(
         {
-            "N0": gb.ItemSet(torch.LongTensor([1, 0, 2]), names="seed_nodes"),
-            "N1": gb.ItemSet(torch.LongTensor([0, 2, 1]), names="seed_nodes"),
+            "N0": gb.ItemSet(torch.LongTensor([1, 0, 2]), names="seeds"),
+            "N1": gb.ItemSet(torch.LongTensor([0, 2, 1]), names="seeds"),
         }
     )
     batch_size = 2
@@ -176,9 +176,7 @@ def test_InSubgraphSampler_hetero():
     it = iter(in_subgraph_sampler)
 
     mn = next(it)
-    assert torch.equal(
-        mn.seed_nodes["N0"], torch.LongTensor([1, 0]).to(F.ctx())
-    )
+    assert torch.equal(mn.seeds["N0"], torch.LongTensor([1, 0]).to(F.ctx()))
     expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 1, 3]),
@@ -203,7 +201,7 @@ def test_InSubgraphSampler_hetero():
         )
 
     mn = next(it)
-    assert mn.seed_nodes == {
+    assert mn.seeds == {
         "N0": torch.LongTensor([2]).to(F.ctx()),
         "N1": torch.LongTensor([0]).to(F.ctx()),
     }
@@ -230,9 +228,7 @@ def test_InSubgraphSampler_hetero():
         )
 
     mn = next(it)
-    assert torch.equal(
-        mn.seed_nodes["N1"], torch.LongTensor([2, 1]).to(F.ctx())
-    )
+    assert torch.equal(mn.seeds["N1"], torch.LongTensor([2, 1]).to(F.ctx()))
     expected_sampled_csc = {
         "N0:R0:N0": gb.CSCFormatBase(
             indptr=torch.LongTensor([0]), indices=torch.LongTensor([])
@@ -248,7 +244,7 @@ def test_InSubgraphSampler_hetero():
             indices=torch.LongTensor([1, 2, 0]),
         ),
     }
-    if graph.csc_indptr.is_cuda:
+    if graph.csc_indptr.is_cuda and torch.cuda.get_device_capability()[0] < 7:
         expected_sampled_csc["N0:R1:N1"] = gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 1, 2]), indices=torch.LongTensor([1, 0])
         )

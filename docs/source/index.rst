@@ -48,8 +48,6 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.geometry
    api/python/dgl.graphbolt
    api/python/nn-pytorch
-   api/python/nn-tensorflow
-   api/python/nn-mxnet
    api/python/nn.functional
    api/python/dgl.ops
    api/python/dgl.optim

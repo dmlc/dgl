@@ -85,5 +85,37 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 #endif
   return std::tuple(unique_ids, compacted_src_ids, compacted_dst_ids);
 }
+
+std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+UniqueAndCompactBatched(
+    const std::vector<torch::Tensor>& src_ids,
+    const std::vector<torch::Tensor>& dst_ids,
+    const std::vector<torch::Tensor> unique_dst_ids) {
+  TORCH_CHECK(
+      src_ids.size() == dst_ids.size() &&
+          dst_ids.size() == unique_dst_ids.size(),
+      "The batch dimension of the parameters need to be identical.");
+  bool all_on_gpu = true;
+  for (std::size_t i = 0; i < src_ids.size(); i++) {
+    all_on_gpu = all_on_gpu && utils::is_on_gpu(src_ids[i]) &&
+                 utils::is_on_gpu(dst_ids[i]) &&
+                 utils::is_on_gpu(unique_dst_ids[i]);
+    if (!all_on_gpu) break;
+  }
+  if (all_on_gpu) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+        c10::DeviceType::CUDA, "unique_and_compact", {
+          return ops::UniqueAndCompactBatched(src_ids, dst_ids, unique_dst_ids);
+        });
+  }
+  std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> results;
+  results.reserve(src_ids.size());
+  for (std::size_t i = 0; i < src_ids.size(); i++) {
+    results.emplace_back(
+        UniqueAndCompact(src_ids[i], dst_ids[i], unique_dst_ids[i]));
+  }
+  return results;
+}
+
 }  // namespace sampling
 }  // namespace graphbolt

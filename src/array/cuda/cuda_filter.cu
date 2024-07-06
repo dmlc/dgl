@@ -6,10 +6,11 @@
 
 #include <dgl/runtime/device_api.h>
 
+#include <cub/cub.cuh>
+
 #include "../../runtime/cuda/cuda_common.h"
 #include "../../runtime/cuda/cuda_hashtable.cuh"
 #include "../filter.h"
-#include "./dgl_cub.cuh"
 
 using namespace dgl::runtime::cuda;
 

@@ -4,20 +4,19 @@ import dgl
 import pytest
 import torch
 from dgl import graphbolt as gb
-from torch.testing import assert_close
 
 
 def test_ItemSet_names():
     # ItemSet with single name.
-    item_set = gb.ItemSet(torch.arange(0, 5), names="seed_nodes")
-    assert item_set.names == ("seed_nodes",)
+    item_set = gb.ItemSet(torch.arange(0, 5), names="seeds")
+    assert item_set.names == ("seeds",)
 
     # ItemSet with multiple names.
     item_set = gb.ItemSet(
         (torch.arange(0, 5), torch.arange(5, 10)),
-        names=("seed_nodes", "labels"),
+        names=("seeds", "labels"),
     )
-    assert item_set.names == ("seed_nodes", "labels")
+    assert item_set.names == ("seeds", "labels")
 
     # ItemSet without name.
     item_set = gb.ItemSet(torch.arange(0, 5))
@@ -26,16 +25,28 @@ def test_ItemSet_names():
     # Integer-initiated ItemSet with excessive names.
     with pytest.raises(
         AssertionError,
-        match=re.escape("Number of items (1) and names (2) must match."),
+        match=re.escape("Number of items (1) and names (2) don't match."),
     ):
-        _ = gb.ItemSet(5, names=("seed_nodes", "labels"))
+        _ = gb.ItemSet(5, names=("seeds", "labels"))
 
     # ItemSet with mismatched items and names.
     with pytest.raises(
         AssertionError,
-        match=re.escape("Number of items (1) and names (2) must match."),
+        match=re.escape("Number of items (1) and names (2) don't match."),
     ):
-        _ = gb.ItemSet(torch.arange(0, 5), names=("seed_nodes", "labels"))
+        _ = gb.ItemSet(torch.arange(0, 5), names=("seeds", "labels"))
+
+
+@pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
+def test_ItemSet_scalar_dtype(dtype):
+    item_set = gb.ItemSet(torch.tensor(5, dtype=dtype), names="seeds")
+    for i, item in enumerate(item_set):
+        assert i == item
+        assert item.dtype == dtype
+    assert item_set[2] == torch.tensor(2, dtype=dtype)
+    assert torch.equal(
+        item_set[slice(1, 4, 2)], torch.arange(1, 4, 2, dtype=dtype)
+    )
 
 
 def test_ItemSet_length():
@@ -66,55 +77,41 @@ def test_ItemSet_length():
             return iter([0, 1, 2])
 
     # Single iterable with invalid length.
-    item_set = gb.ItemSet(InvalidLength())
     with pytest.raises(
-        TypeError, match="ItemSet instance doesn't have valid length."
+        TypeError, match="object of type 'InvalidLength' has no len()"
     ):
-        _ = len(item_set)
-    with pytest.raises(
-        TypeError, match="ItemSet instance doesn't support indexing."
-    ):
-        _ = item_set[0]
-    for i, item in enumerate(item_set):
-        assert i == item
+        item_set = gb.ItemSet(InvalidLength())
 
     # Tuple of iterables with invalid length.
-    item_set = gb.ItemSet((InvalidLength(), InvalidLength()))
     with pytest.raises(
-        TypeError, match="ItemSet instance doesn't have valid length."
+        TypeError, match="object of type 'InvalidLength' has no len()"
     ):
-        _ = len(item_set)
-    with pytest.raises(
-        TypeError, match="ItemSet instance doesn't support indexing."
-    ):
-        _ = item_set[0]
-    for i, (item1, item2) in enumerate(item_set):
-        assert i == item1
-        assert i == item2
+        item_set = gb.ItemSet((InvalidLength(), InvalidLength()))
 
 
 def test_ItemSet_seed_nodes():
     # Node IDs with tensor.
-    item_set = gb.ItemSet(torch.arange(0, 5), names="seed_nodes")
-    assert item_set.names == ("seed_nodes",)
+    item_set = gb.ItemSet(torch.arange(0, 5), names="seeds")
+    assert item_set.names == ("seeds",)
     # Iterating over ItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert i == item.item()
         assert i == item_set[i]
     # Indexing with a slice.
-    assert torch.equal(item_set[:], torch.arange(0, 5))
+    assert torch.equal(item_set[::2], torch.tensor([0, 2, 4]))
     # Indexing with an Iterable.
     assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
 
     # Node IDs with single integer.
-    item_set = gb.ItemSet(5, names="seed_nodes")
-    assert item_set.names == ("seed_nodes",)
+    item_set = gb.ItemSet(5, names="seeds")
+    assert item_set.names == ("seeds",)
     # Iterating over ItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert i == item.item()
         assert i == item_set[i]
     # Indexing with a slice.
-    assert torch.equal(item_set[:], torch.arange(0, 5))
+    assert torch.equal(item_set[::2], torch.tensor([0, 2, 4]))
+    assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
     # Indexing with an integer.
     assert item_set[0] == 0
     assert item_set[-1] == 4
@@ -123,19 +120,20 @@ def test_ItemSet_seed_nodes():
         _ = item_set[5]
     with pytest.raises(IndexError, match="ItemSet index out of range."):
         _ = item_set[-10]
-    # Indexing with tensor.
+    # Indexing with invalid input type.
     with pytest.raises(
-        TypeError, match="ItemSet indices must be integer or slice."
+        TypeError,
+        match="ItemSet indices must be int, slice, or iterable of int, not <class 'float'>.",
     ):
-        _ = item_set[torch.arange(3)]
+        _ = item_set[1.5]
 
 
 def test_ItemSet_seed_nodes_labels():
     # Node IDs and labels.
     seed_nodes = torch.arange(0, 5)
     labels = torch.randint(0, 3, (5,))
-    item_set = gb.ItemSet((seed_nodes, labels), names=("seed_nodes", "labels"))
-    assert item_set.names == ("seed_nodes", "labels")
+    item_set = gb.ItemSet((seed_nodes, labels), names=("seeds", "labels"))
+    assert item_set.names == ("seeds", "labels")
     # Iterating over ItemSet and indexing one by one.
     for i, (seed_node, label) in enumerate(item_set):
         assert seed_node == seed_nodes[i]
@@ -153,8 +151,8 @@ def test_ItemSet_seed_nodes_labels():
 def test_ItemSet_node_pairs():
     # Node pairs.
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
-    item_set = gb.ItemSet(node_pairs, names="node_pairs")
-    assert item_set.names == ("node_pairs",)
+    item_set = gb.ItemSet(node_pairs, names="seeds")
+    assert item_set.names == ("seeds",)
     # Iterating over ItemSet and indexing one by one.
     for i, (src, dst) in enumerate(item_set):
         assert node_pairs[i][0] == src
@@ -171,8 +169,8 @@ def test_ItemSet_node_pairs_labels():
     # Node pairs and labels
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
     labels = torch.randint(0, 3, (5,))
-    item_set = gb.ItemSet((node_pairs, labels), names=("node_pairs", "labels"))
-    assert item_set.names == ("node_pairs", "labels")
+    item_set = gb.ItemSet((node_pairs, labels), names=("seeds", "labels"))
+    assert item_set.names == ("seeds", "labels")
     # Iterating over ItemSet and indexing one by one.
     for i, (node_pair, label) in enumerate(item_set):
         assert torch.equal(node_pairs[i], node_pair)
@@ -187,26 +185,31 @@ def test_ItemSet_node_pairs_labels():
     assert torch.equal(item_set[torch.arange(0, 5)][1], labels)
 
 
-def test_ItemSet_node_pairs_neg_dsts():
+def test_ItemSet_node_pairs_labels_indexes():
     # Node pairs and negative destinations.
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
-    neg_dsts = torch.arange(10, 25).reshape(-1, 3)
+    labels = torch.tensor([1, 1, 0, 0, 0])
+    indexes = torch.tensor([0, 1, 0, 0, 1])
     item_set = gb.ItemSet(
-        (node_pairs, neg_dsts), names=("node_pairs", "negative_dsts")
+        (node_pairs, labels, indexes), names=("seeds", "labels", "indexes")
     )
-    assert item_set.names == ("node_pairs", "negative_dsts")
+    assert item_set.names == ("seeds", "labels", "indexes")
     # Iterating over ItemSet and indexing one by one.
-    for i, (node_pair, neg_dst) in enumerate(item_set):
+    for i, (node_pair, label, index) in enumerate(item_set):
         assert torch.equal(node_pairs[i], node_pair)
-        assert torch.equal(neg_dsts[i], neg_dst)
+        assert torch.equal(labels[i], label)
+        assert torch.equal(indexes[i], index)
         assert torch.equal(node_pairs[i], item_set[i][0])
-        assert torch.equal(neg_dsts[i], item_set[i][1])
+        assert torch.equal(labels[i], item_set[i][1])
+        assert torch.equal(indexes[i], item_set[i][2])
     # Indexing with a slice.
     assert torch.equal(item_set[:][0], node_pairs)
-    assert torch.equal(item_set[:][1], neg_dsts)
+    assert torch.equal(item_set[:][1], labels)
+    assert torch.equal(item_set[:][2], indexes)
     # Indexing with an Iterable.
     assert torch.equal(item_set[torch.arange(0, 5)][0], node_pairs)
-    assert torch.equal(item_set[torch.arange(0, 5)][1], neg_dsts)
+    assert torch.equal(item_set[torch.arange(0, 5)][1], labels)
+    assert torch.equal(item_set[torch.arange(0, 5)][2], indexes)
 
 
 def test_ItemSet_graphs():
@@ -222,33 +225,33 @@ def test_ItemSet_graphs():
     assert item_set[:] == graphs
 
 
-def test_ItemSetDict_names():
-    # ItemSetDict with single name.
-    item_set = gb.ItemSetDict(
+def test_HeteroItemSet_names():
+    # HeteroItemSet with single name.
+    item_set = gb.HeteroItemSet(
         {
-            "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
-            "item": gb.ItemSet(torch.arange(5, 10), names="seed_nodes"),
+            "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seeds"),
         }
     )
-    assert item_set.names == ("seed_nodes",)
+    assert item_set.names == ("seeds",)
 
-    # ItemSetDict with multiple names.
-    item_set = gb.ItemSetDict(
+    # HeteroItemSet with multiple names.
+    item_set = gb.HeteroItemSet(
         {
             "user": gb.ItemSet(
                 (torch.arange(0, 5), torch.arange(5, 10)),
-                names=("seed_nodes", "labels"),
+                names=("seeds", "labels"),
             ),
             "item": gb.ItemSet(
                 (torch.arange(5, 10), torch.arange(10, 15)),
-                names=("seed_nodes", "labels"),
+                names=("seeds", "labels"),
             ),
         }
     )
-    assert item_set.names == ("seed_nodes", "labels")
+    assert item_set.names == ("seeds", "labels")
 
-    # ItemSetDict with no name.
-    item_set = gb.ItemSetDict(
+    # HeteroItemSet with no name.
+    item_set = gb.HeteroItemSet(
         {
             "user": gb.ItemSet(torch.arange(0, 5)),
             "item": gb.ItemSet(torch.arange(5, 10)),
@@ -256,29 +259,27 @@ def test_ItemSetDict_names():
     )
     assert item_set.names is None
 
-    # ItemSetDict with mismatched items and names.
+    # HeteroItemSet with mismatched items and names.
     with pytest.raises(
         AssertionError,
         match=re.escape("All itemsets must have the same names."),
     ):
-        _ = gb.ItemSetDict(
+        _ = gb.HeteroItemSet(
             {
                 "user": gb.ItemSet(
                     (torch.arange(0, 5), torch.arange(5, 10)),
-                    names=("seed_nodes", "labels"),
+                    names=("seeds", "labels"),
                 ),
-                "item": gb.ItemSet(
-                    (torch.arange(5, 10),), names=("seed_nodes",)
-                ),
+                "item": gb.ItemSet((torch.arange(5, 10),), names=("seeds",)),
             }
         )
 
 
-def test_ItemSetDict_length():
+def test_HeteroItemSet_length():
     # Single iterable with valid length.
     user_ids = torch.arange(0, 5)
     item_ids = torch.arange(0, 5)
-    item_set = gb.ItemSetDict(
+    item_set = gb.HeteroItemSet(
         {
             "user": gb.ItemSet(user_ids),
             "item": gb.ItemSet(item_ids),
@@ -291,7 +292,7 @@ def test_ItemSetDict_length():
     neg_dsts_like = torch.arange(10, 20).reshape(-1, 2)
     node_pairs_follow = torch.arange(0, 10).reshape(-1, 2)
     neg_dsts_follow = torch.arange(10, 20).reshape(-1, 2)
-    item_set = gb.ItemSetDict(
+    item_set = gb.HeteroItemSet(
         {
             "user:like:item": gb.ItemSet((node_pairs_like, neg_dsts_like)),
             "user:follow:user": gb.ItemSet(
@@ -306,52 +307,46 @@ def test_ItemSetDict_length():
             return iter([0, 1, 2])
 
     # Single iterable with invalid length.
-    item_set = gb.ItemSetDict(
-        {
-            "user": gb.ItemSet(InvalidLength()),
-            "item": gb.ItemSet(InvalidLength()),
-        }
-    )
     with pytest.raises(
-        TypeError, match="ItemSet instance doesn't have valid length."
+        TypeError, match="object of type 'InvalidLength' has no len()"
     ):
-        _ = len(item_set)
-    with pytest.raises(
-        TypeError, match="ItemSetDict instance doesn't support indexing."
-    ):
-        _ = item_set[0]
+        item_set = gb.HeteroItemSet(
+            {
+                "user": gb.ItemSet(InvalidLength()),
+                "item": gb.ItemSet(InvalidLength()),
+            }
+        )
 
     # Tuple of iterables with invalid length.
-    item_set = gb.ItemSetDict(
-        {
-            "user:like:item": gb.ItemSet((InvalidLength(), InvalidLength())),
-            "user:follow:user": gb.ItemSet((InvalidLength(), InvalidLength())),
-        }
-    )
     with pytest.raises(
-        TypeError, match="ItemSet instance doesn't have valid length."
+        TypeError, match="object of type 'InvalidLength' has no len()"
     ):
-        _ = len(item_set)
-    with pytest.raises(
-        TypeError, match="ItemSetDict instance doesn't support indexing."
-    ):
-        _ = item_set[0]
+        item_set = gb.HeteroItemSet(
+            {
+                "user:like:item": gb.ItemSet(
+                    (InvalidLength(), InvalidLength())
+                ),
+                "user:follow:user": gb.ItemSet(
+                    (InvalidLength(), InvalidLength())
+                ),
+            }
+        )
 
 
-def test_ItemSetDict_iteration_seed_nodes():
+def test_HeteroItemSet_iteration_seed_nodes():
     # Node IDs.
     user_ids = torch.arange(0, 5)
     item_ids = torch.arange(5, 10)
     ids = {
-        "user": gb.ItemSet(user_ids, names="seed_nodes"),
-        "item": gb.ItemSet(item_ids, names="seed_nodes"),
+        "user": gb.ItemSet(user_ids, names="seeds"),
+        "item": gb.ItemSet(item_ids, names="seeds"),
     }
     chained_ids = []
     for key, value in ids.items():
         chained_ids += [(key, v) for v in value]
-    item_set = gb.ItemSetDict(ids)
-    assert item_set.names == ("seed_nodes",)
-    # Iterating over ItemSetDict and indexing one by one.
+    item_set = gb.HeteroItemSet(ids)
+    assert item_set.names == ("seeds",)
+    # Iterating over HeteroItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -369,14 +364,23 @@ def test_ItemSetDict_iteration_seed_nodes():
     partial_data = item_set[7:]
     assert len(list(partial_data.keys())) == 1
     assert torch.equal(partial_data["item"], item_ids[2:])
-    partial_data = item_set[3:7]
+    partial_data = item_set[3:8:2]
     assert len(list(partial_data.keys())) == 2
-    assert torch.equal(partial_data["user"], user_ids[3:5])
-    assert torch.equal(partial_data["item"], item_ids[:2])
+    assert torch.equal(partial_data["user"], user_ids[3:-1:2])
+    assert torch.equal(partial_data["item"], item_ids[0:3:2])
+    # Indexing with an iterable of int.
+    partial_data = item_set[torch.tensor([1, 0, 4])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], torch.tensor([1, 0, 4]))
+    partial_data = item_set[torch.tensor([9, 8, 5])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], torch.tensor([9, 8, 5]))
+    partial_data = item_set[torch.tensor([8, 1, 0, 9, 7, 5])]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], torch.tensor([1, 0]))
+    assert torch.equal(partial_data["item"], torch.tensor([8, 9, 7, 5]))
 
     # Exception cases.
-    with pytest.raises(AssertionError, match="Step must be 1."):
-        _ = item_set[::2]
     with pytest.raises(
         AssertionError, match="Start must be smaller than stop."
     ):
@@ -385,36 +389,33 @@ def test_ItemSetDict_iteration_seed_nodes():
         AssertionError, match="Start must be smaller than stop."
     ):
         _ = item_set[-1:3]
-    with pytest.raises(IndexError, match="ItemSetDict index out of range."):
+    with pytest.raises(IndexError, match="HeteroItemSet index out of range."):
         _ = item_set[20]
-    with pytest.raises(IndexError, match="ItemSetDict index out of range."):
+    with pytest.raises(IndexError, match="HeteroItemSet index out of range."):
         _ = item_set[-20]
     with pytest.raises(
-        TypeError, match="ItemSetDict indices must be int or slice."
+        TypeError,
+        match="HeteroItemSet indices must be int, slice, or iterable of int, not <class 'float'>.",
     ):
-        _ = item_set[torch.arange(3)]
+        _ = item_set[1.5]
 
 
-def test_ItemSetDict_iteration_seed_nodes_labels():
+def test_HeteroItemSet_iteration_seed_nodes_labels():
     # Node IDs and labels.
     user_ids = torch.arange(0, 5)
     user_labels = torch.randint(0, 3, (5,))
     item_ids = torch.arange(5, 10)
     item_labels = torch.randint(0, 3, (5,))
     ids_labels = {
-        "user": gb.ItemSet(
-            (user_ids, user_labels), names=("seed_nodes", "labels")
-        ),
-        "item": gb.ItemSet(
-            (item_ids, item_labels), names=("seed_nodes", "labels")
-        ),
+        "user": gb.ItemSet((user_ids, user_labels), names=("seeds", "labels")),
+        "item": gb.ItemSet((item_ids, item_labels), names=("seeds", "labels")),
     }
     chained_ids = []
     for key, value in ids_labels.items():
         chained_ids += [(key, v) for v in value]
-    item_set = gb.ItemSetDict(ids_labels)
-    assert item_set.names == ("seed_nodes", "labels")
-    # Iterating over ItemSetDict and indexing one by one.
+    item_set = gb.HeteroItemSet(ids_labels)
+    assert item_set.names == ("seeds", "labels")
+    # Iterating over HeteroItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -428,19 +429,19 @@ def test_ItemSetDict_iteration_seed_nodes_labels():
     assert torch.equal(item_set[:]["item"][1], item_labels)
 
 
-def test_ItemSetDict_iteration_node_pairs():
+def test_HeteroItemSet_iteration_node_pairs():
     # Node pairs.
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
     node_pairs_dict = {
-        "user:like:item": gb.ItemSet(node_pairs, names="node_pairs"),
-        "user:follow:user": gb.ItemSet(node_pairs, names="node_pairs"),
+        "user:like:item": gb.ItemSet(node_pairs, names="seeds"),
+        "user:follow:user": gb.ItemSet(node_pairs, names="seeds"),
     }
     expected_data = []
     for key, value in node_pairs_dict.items():
         expected_data += [(key, v) for v in value]
-    item_set = gb.ItemSetDict(node_pairs_dict)
-    assert item_set.names == ("node_pairs",)
-    # Iterating over ItemSetDict and indexing one by one.
+    item_set = gb.HeteroItemSet(node_pairs_dict)
+    assert item_set.names == ("seeds",)
+    # Iterating over HeteroItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -454,24 +455,24 @@ def test_ItemSetDict_iteration_node_pairs():
     assert torch.equal(item_set[:]["user:follow:user"], node_pairs)
 
 
-def test_ItemSetDict_iteration_node_pairs_labels():
+def test_HeteroItemSet_iteration_node_pairs_labels():
     # Node pairs and labels
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
     labels = torch.randint(0, 3, (5,))
     node_pairs_labels = {
         "user:like:item": gb.ItemSet(
-            (node_pairs, labels), names=("node_pairs", "labels")
+            (node_pairs, labels), names=("seeds", "labels")
         ),
         "user:follow:user": gb.ItemSet(
-            (node_pairs, labels), names=("node_pairs", "labels")
+            (node_pairs, labels), names=("seeds", "labels")
         ),
     }
     expected_data = []
     for key, value in node_pairs_labels.items():
         expected_data += [(key, v) for v in value]
-    item_set = gb.ItemSetDict(node_pairs_labels)
-    assert item_set.names == ("node_pairs", "labels")
-    # Iterating over ItemSetDict and indexing one by one.
+    item_set = gb.HeteroItemSet(node_pairs_labels)
+    assert item_set.names == ("seeds", "labels")
+    # Iterating over HeteroItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -490,24 +491,25 @@ def test_ItemSetDict_iteration_node_pairs_labels():
     assert torch.equal(item_set[:]["user:follow:user"][1], labels)
 
 
-def test_ItemSetDict_iteration_node_pairs_neg_dsts():
+def test_HeteroItemSet_iteration_node_pairs_labels_indexes():
     # Node pairs and negative destinations.
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
-    neg_dsts = torch.arange(10, 25).reshape(-1, 3)
+    labels = torch.tensor([1, 1, 0, 0, 0])
+    indexes = torch.tensor([0, 1, 0, 0, 1])
     node_pairs_neg_dsts = {
         "user:like:item": gb.ItemSet(
-            (node_pairs, neg_dsts), names=("node_pairs", "negative_dsts")
+            (node_pairs, labels, indexes), names=("seeds", "labels", "indexes")
         ),
         "user:follow:user": gb.ItemSet(
-            (node_pairs, neg_dsts), names=("node_pairs", "negative_dsts")
+            (node_pairs, labels, indexes), names=("seeds", "labels", "indexes")
         ),
     }
     expected_data = []
     for key, value in node_pairs_neg_dsts.items():
         expected_data += [(key, v) for v in value]
-    item_set = gb.ItemSetDict(node_pairs_neg_dsts)
-    assert item_set.names == ("node_pairs", "negative_dsts")
-    # Iterating over ItemSetDict and indexing one by one.
+    item_set = gb.HeteroItemSet(node_pairs_neg_dsts)
+    assert item_set.names == ("seeds", "labels", "indexes")
+    # Iterating over HeteroItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -515,24 +517,28 @@ def test_ItemSetDict_iteration_node_pairs_neg_dsts():
         assert key in item
         assert torch.equal(item[key][0], value[0])
         assert torch.equal(item[key][1], value[1])
+        assert torch.equal(item[key][2], value[2])
         assert item_set[i].keys() == item.keys()
         key = list(item.keys())[0]
         assert torch.equal(item_set[i][key][0], item[key][0])
         assert torch.equal(item_set[i][key][1], item[key][1])
+        assert torch.equal(item_set[i][key][2], item[key][2])
     # Indexing with a slice.
     assert torch.equal(item_set[:]["user:like:item"][0], node_pairs)
-    assert torch.equal(item_set[:]["user:like:item"][1], neg_dsts)
+    assert torch.equal(item_set[:]["user:like:item"][1], labels)
+    assert torch.equal(item_set[:]["user:like:item"][2], indexes)
     assert torch.equal(item_set[:]["user:follow:user"][0], node_pairs)
-    assert torch.equal(item_set[:]["user:follow:user"][1], neg_dsts)
+    assert torch.equal(item_set[:]["user:follow:user"][1], labels)
+    assert torch.equal(item_set[:]["user:follow:user"][2], indexes)
 
 
 def test_ItemSet_repr():
     # ItemSet with single name.
-    item_set = gb.ItemSet(torch.arange(0, 5), names="seed_nodes")
+    item_set = gb.ItemSet(torch.arange(0, 5), names="seeds")
     expected_str = (
         "ItemSet(\n"
         "    items=(tensor([0, 1, 2, 3, 4]),),\n"
-        "    names=('seed_nodes',),\n"
+        "    names=('seeds',),\n"
         ")"
     )
 
@@ -541,62 +547,114 @@ def test_ItemSet_repr():
     # ItemSet with multiple names.
     item_set = gb.ItemSet(
         (torch.arange(0, 5), torch.arange(5, 10)),
-        names=("seed_nodes", "labels"),
+        names=("seeds", "labels"),
     )
     expected_str = (
         "ItemSet(\n"
         "    items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
-        "    names=('seed_nodes', 'labels'),\n"
+        "    names=('seeds', 'labels'),\n"
         ")"
     )
     assert str(item_set) == expected_str, item_set
 
 
-def test_ItemSetDict_repr():
-    # ItemSetDict with single name.
-    item_set = gb.ItemSetDict(
+def test_HeteroItemSet_repr():
+    # HeteroItemSet with single name.
+    item_set = gb.HeteroItemSet(
         {
-            "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
-            "item": gb.ItemSet(torch.arange(5, 10), names="seed_nodes"),
+            "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seeds"),
         }
     )
     expected_str = (
-        "ItemSetDict(\n"
+        "HeteroItemSet(\n"
         "    itemsets={'user': ItemSet(\n"
         "                 items=(tensor([0, 1, 2, 3, 4]),),\n"
-        "                 names=('seed_nodes',),\n"
+        "                 names=('seeds',),\n"
         "             ), 'item': ItemSet(\n"
         "                 items=(tensor([5, 6, 7, 8, 9]),),\n"
-        "                 names=('seed_nodes',),\n"
+        "                 names=('seeds',),\n"
         "             )},\n"
-        "    names=('seed_nodes',),\n"
+        "    names=('seeds',),\n"
         ")"
     )
     assert str(item_set) == expected_str, item_set
 
-    # ItemSetDict with multiple names.
-    item_set = gb.ItemSetDict(
+    # HeteroItemSet with multiple names.
+    item_set = gb.HeteroItemSet(
         {
             "user": gb.ItemSet(
                 (torch.arange(0, 5), torch.arange(5, 10)),
-                names=("seed_nodes", "labels"),
+                names=("seeds", "labels"),
             ),
             "item": gb.ItemSet(
                 (torch.arange(5, 10), torch.arange(10, 15)),
-                names=("seed_nodes", "labels"),
+                names=("seeds", "labels"),
             ),
         }
     )
     expected_str = (
-        "ItemSetDict(\n"
+        "HeteroItemSet(\n"
         "    itemsets={'user': ItemSet(\n"
         "                 items=(tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9])),\n"
-        "                 names=('seed_nodes', 'labels'),\n"
+        "                 names=('seeds', 'labels'),\n"
         "             ), 'item': ItemSet(\n"
         "                 items=(tensor([5, 6, 7, 8, 9]), tensor([10, 11, 12, 13, 14])),\n"
-        "                 names=('seed_nodes', 'labels'),\n"
+        "                 names=('seeds', 'labels'),\n"
         "             )},\n"
-        "    names=('seed_nodes', 'labels'),\n"
+        "    names=('seeds', 'labels'),\n"
         ")"
     )
     assert str(item_set) == expected_str, item_set
+
+
+def test_deprecation_alias():
+    """Test `ItemSetDict` as the alias for `HeteroItemSet`."""
+
+    user_ids = torch.arange(0, 5)
+    item_ids = torch.arange(5, 10)
+    ids = {
+        "user": gb.ItemSet(user_ids, names="seeds"),
+        "item": gb.ItemSet(item_ids, names="seeds"),
+    }
+    with pytest.warns(
+        DeprecationWarning,
+        match="ItemSetDict is deprecated and will be removed in the future. Please use HeteroItemSet instead.",
+    ):
+        item_set_dict = gb.ItemSetDict(ids)
+    hetero_item_set = gb.HeteroItemSet(ids)
+    assert len(item_set_dict) == len(hetero_item_set)
+    assert item_set_dict.names == hetero_item_set.names
+    assert item_set_dict._keys == hetero_item_set._keys
+    assert torch.equal(item_set_dict._offsets, hetero_item_set._offsets)
+    assert (
+        repr(item_set_dict)[len("ItemSetDict") :]
+        == repr(hetero_item_set)[len("HeteroItemSet") :]
+    )
+    # Indexing all with a slice.
+    assert torch.equal(item_set_dict[:]["user"], hetero_item_set[:]["user"])
+    assert torch.equal(item_set_dict[:]["item"], hetero_item_set[:]["item"])
+    # Indexing partial with a slice.
+    partial_data = item_set_dict[:3]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], hetero_item_set[:3]["user"])
+    partial_data = item_set_dict[7:]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], hetero_item_set[7:]["item"])
+    partial_data = item_set_dict[3:8:2]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], hetero_item_set[3:8:2]["user"])
+    assert torch.equal(partial_data["item"], hetero_item_set[3:8:2]["item"])
+    # Indexing with an iterable of int.
+    partial_data = item_set_dict[torch.tensor([1, 0, 4])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], hetero_item_set[1, 0, 4]["user"])
+    partial_data = item_set_dict[torch.tensor([9, 8, 5])]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], hetero_item_set[9, 8, 5]["item"])
+    partial_data = item_set_dict[torch.tensor([8, 1, 0, 9, 7, 5])]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], hetero_item_set[1, 0]["user"])
+    assert torch.equal(
+        partial_data["item"], hetero_item_set[8, 9, 7, 5]["item"]
+    )

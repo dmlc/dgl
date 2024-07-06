@@ -40,6 +40,7 @@ CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo) {
   }
 
   const int64_t nnz = coo.row->shape[0];
+  CHECK_NO_OVERFLOW(coo.row->dtype, nnz);
   // TODO(minjie): Many of our current implementation assumes that CSR must have
   //   a data array. This is a temporary workaround. Remove this after:
   //   - The old immutable graph implementation is deprecated.
