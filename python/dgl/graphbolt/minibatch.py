@@ -5,11 +5,9 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 
-### FROM DGL @todo
-from ..utils import recursive_apply
-
 from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
 from .internal import get_attributes, get_nonproperty_attributes
+from .misc_utils import recursive_apply
 from .sampled_subgraph import SampledSubgraph
 
 __all__ = ["MiniBatch"]
