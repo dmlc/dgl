@@ -404,7 +404,9 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       torch::optional<torch::Tensor> input_nodes_pre_time_window,
       torch::optional<torch::Tensor> probs_or_mask,
       torch::optional<std::string> node_timestamp_attr_name,
-      torch::optional<std::string> edge_timestamp_attr_name) const;
+      torch::optional<std::string> edge_timestamp_attr_name,
+      torch::optional<torch::Tensor> random_seed,
+      double seed2_contribution) const;
 
   /**
    * @brief Copy the graph to shared memory.

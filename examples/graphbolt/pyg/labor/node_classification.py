@@ -1,56 +1,7 @@
-"""
-This script demonstrates node classification with GraphSAGE on large graphs, 
-merging GraphBolt (GB) and PyTorch Geometric (PyG). GraphBolt efficiently manages 
-data loading for large datasets, crucial for mini-batch processing. Post data 
-loading, PyG's user-friendly framework takes over for training, showcasing seamless 
-integration with GraphBolt. This combination offers an efficient alternative to 
-traditional Deep Graph Library (DGL) methods, highlighting adaptability and 
-scalability in handling large-scale graph data for diverse real-world applications.
-
-
-
-Key Features:
-- Implements the GraphSAGE model, a scalable GNN, for node classification on large graphs.
-- Utilizes GraphBolt, an efficient framework for large-scale graph data processing.
-- Integrates with PyTorch Geometric for building and training the GraphSAGE model.
-- The script is well-documented, providing clear explanations at each step.
-
-This flowchart describes the main functional sequence of the provided example.
-main: 
-
-main
-│
-├───> Load and preprocess dataset (GraphBolt)
-│     │
-│     └───> Utilize GraphBolt's BuiltinDataset for dataset handling
-│
-├───> Instantiate the SAGE model (PyTorch Geometric)
-│     │
-│     └───> Define the GraphSAGE model architecture
-│
-├───> Train the model
-│     │
-│     ├───> Mini-Batch Processing with GraphBolt
-│     │     │
-│     │     └───> Efficient handling of mini-batches using GraphBolt's utilities
-│     │
-│     └───> Training Loop
-│           │
-│           ├───> Forward and backward passes
-│           │
-│           └───> Parameters optimization
-│
-└───> Evaluate the model
-      │
-      └───> Performance assessment on validation and test datasets
-            │
-            └───> Accuracy and other relevant metrics calculation
-
-
-"""
-
 import argparse
 import time
+
+from copy import deepcopy
 
 import dgl.graphbolt as gb
 import torch
@@ -58,9 +9,12 @@ import torch
 # Needed until https://github.com/pytorch/pytorch/issues/121197 is resolved to
 # use the `--torch-compile` cmdline option reliably.
 import torch._inductor.codecache
+import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-from torch_geometric.nn import SAGEConv
+from load_dataset import load_dataset
+from sage_conv import SAGEConv
+from torch.torch_version import TorchVersion
 from tqdm import tqdm
 
 
@@ -84,39 +38,25 @@ def convert_to_pyg(h, subgraph):
 
 
 class GraphSAGE(torch.nn.Module):
-    #####################################################################
-    # (HIGHLIGHT) Define the GraphSAGE model architecture.
-    #
-    # - This class inherits from `torch.nn.Module`.
-    # - Two convolutional layers are created using the SAGEConv class from PyG.
-    # - 'in_size', 'hidden_size', 'out_size' are the sizes of
-    #   the input, hidden, and output features, respectively.
-    # - The forward method defines the computation performed at every call.
-    #####################################################################
-    def __init__(self, in_size, hidden_size, out_size):
-        super(GraphSAGE, self).__init__()
+    def __init__(self, in_size, hidden_size, out_size, n_layers, dropout):
+        super().__init__()
         self.layers = torch.nn.ModuleList()
-        self.layers.append(SAGEConv(in_size, hidden_size))
-        self.layers.append(SAGEConv(hidden_size, hidden_size))
-        self.layers.append(SAGEConv(hidden_size, out_size))
+        sizes = [in_size] + [hidden_size] * n_layers
+        for i in range(n_layers):
+            self.layers.append(SAGEConv(sizes[i], sizes[i + 1]))
+        self.linear = nn.Linear(hidden_size, out_size)
+        self.dropout = nn.Dropout(dropout)
         self.hidden_size = hidden_size
         self.out_size = out_size
 
     def forward(self, subgraphs, x):
         h = x
-        for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
-            #####################################################################
-            # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
-            #
-            #   PyG layers have two modes, bipartite and normal. We slice the
-            #   given features to get src and dst features to use the PyG layers
-            #   in the more efficient bipartite mode.
-            #####################################################################
+        for layer, subgraph in zip(self.layers, subgraphs):
             h, edge_index, size = convert_to_pyg(h, subgraph)
             h = layer(h, edge_index, size=size)
-            if i != len(subgraphs) - 1:
-                h = F.relu(h)
-        return h
+            h = F.gelu(h)
+            h = self.dropout(h)
+        return self.linear(h)
 
     def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
@@ -139,8 +79,9 @@ class GraphSAGE(torch.nn.Module):
                     data.node_features["feat"], data.sampled_subgraphs[0]
                 )
                 hidden_x = layer(h, edge_index, size=size)
-                if not is_last_layer:
-                    hidden_x = F.relu(hidden_x)
+                hidden_x = F.gelu(hidden_x)
+                if is_last_layer:
+                    hidden_x = self.linear(hidden_x)
                 # By design, our output nodes are contiguous.
                 y[data.seeds[0] : data.seeds[-1] + 1] = hidden_x.to(
                     buffer_device
@@ -154,21 +95,6 @@ class GraphSAGE(torch.nn.Module):
 def create_dataloader(
     graph, features, itemset, batch_size, fanout, device, job
 ):
-    #####################################################################
-    # (HIGHLIGHT) Create a data loader for efficiently loading graph data.
-    #
-    # - 'ItemSampler' samples mini-batches of node IDs from the dataset.
-    # - 'CopyTo' copies the fetched data to the specified device.
-    # - 'sample_neighbor' performs neighbor sampling on the graph.
-    # - 'FeatureFetcher' fetches node features based on the sampled subgraph.
-
-    #####################################################################
-    # Create a datapipe for mini-batch sampling with a specific neighbor fanout.
-    # Here, [10, 10, 10] specifies the number of neighbors sampled for each node at each layer.
-    # We're using `sample_neighbor` for consistency with DGL's sampling API.
-    # Note: GraphBolt offers additional sampling methods, such as `sample_layer_neighbor`,
-    # which could provide further optimization and efficiency for GNN training.
-    # Users are encouraged to explore these advanced features for potentially improved performance.
 
     # Initialize an ItemSampler to sample mini-batches from the dataset.
     datapipe = gb.ItemSampler(
@@ -181,8 +107,16 @@ def create_dataloader(
     if args.graph_device != "cpu":
         datapipe = datapipe.copy_to(device=device)
     # Sample neighbors for each node in the mini-batch.
+    kwargs = (
+        {
+            "layer_dependency": args.layer_dependency,
+            "batch_dependency": args.batch_dependency,
+        }
+        if args.sample_mode == "sample_layer_neighbor"
+        else {}
+    )
     datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1]
+        graph, fanout if job != "infer" else [-1], **kwargs
     )
     # Copy the data to the specified device.
     if args.feature_device != "cpu":
@@ -196,109 +130,128 @@ def create_dataloader(
     return gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
+        overlap_feature_fetch=args.overlap_feature_fetch,
         overlap_graph_fetch=args.overlap_graph_fetch,
-        num_gpu_cached_edges=args.num_gpu_cached_edges,
-        gpu_cache_threshold=args.gpu_graph_caching_threshold,
     )
 
 
-def train(train_dataloader, valid_dataloader, num_classes, model, device):
-    #####################################################################
-    # (HIGHLIGHT) Train the model for one epoch.
-    #
-    # - Iterates over the data loader, fetching mini-batches of graph data.
-    # - For each mini-batch, it performs a forward pass, computes loss, and
-    #   updates the model parameters.
-    # - The function returns the average loss and accuracy for the epoch.
-    #
-    # Parameters:
-    #   model: The GraphSAGE model.
-    #   dataloader: DataLoader that provides mini-batches of graph data.
-    #   optimizer: Optimizer used for updating model parameters.
-    #   criterion: Loss function used for training.
-    #   device: The device (CPU/GPU) to run the training on.
-    #####################################################################
-
+def train(
+    train_dataloader,
+    valid_dataloader,
+    model,
+    multilabel,
+    kwargs,
+    cache_miss_rate_fn,
+    device,
+):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
 
-    model.train()  # Set the model to training mode
     total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
     total_correct = 0  # Accumulator for the total number of correct predictions
     total_samples = 0  # Accumulator for the total number of samples processed
     num_batches = 0  # Counter for the number of mini-batches processed
 
+    best_model = None
+    best_model_acc = 0
+    best_model_epoch = -1
+
     for epoch in range(args.epochs):
+        model.train()  # Set the model to training mode
         start = time.time()
-        for minibatch in tqdm(train_dataloader, "Training"):
+        train_dataloader_tqdm = tqdm(train_dataloader, "Training")
+        for minibatch in train_dataloader_tqdm:
             node_features = minibatch.node_features["feat"]
             labels = minibatch.labels
             optimizer.zero_grad()
             out = model(minibatch.sampled_subgraphs, node_features)
-            loss = criterion(out, labels)
+            label_dtype = out.dtype if multilabel else None
+            loss = criterion(out, labels.to(label_dtype))
             total_loss += loss.detach()
-            total_correct += MF.accuracy(
-                out, labels, task="multiclass", num_classes=num_classes
-            ) * labels.size(0)
+            total_correct += MF.f1_score(out, labels, **kwargs) * labels.size(0)
             total_samples += labels.size(0)
             loss.backward()
             optimizer.step()
             num_batches += 1
+            train_dataloader_tqdm.set_postfix(
+                {
+                    "num_nodes": node_features.size(0),
+                    "cache_miss": cache_miss_rate_fn(),
+                }
+            )
         train_loss = total_loss / num_batches
         train_acc = total_correct / total_samples
         end = time.time()
-        val_acc = evaluate(model, valid_dataloader, num_classes)
+        val_acc = evaluate(model, valid_dataloader, kwargs, cache_miss_rate_fn)
+        if val_acc > best_model_acc:
+            best_model_acc = val_acc
+            best_model = deepcopy(model.state_dict())
+            best_model_epoch = epoch
         print(
             f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
             f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}, "
             f"Time: {end - start}s"
         )
+        if best_model_epoch + args.early_stopping_patience < epoch:
+            break
+    return best_model
 
 
 @torch.no_grad()
 def layerwise_infer(
-    args, graph, features, test_set, all_nodes_set, model, num_classes
+    args,
+    graph,
+    features,
+    itemsets,
+    all_nodes_set,
+    model,
+    kwargs,
 ):
     model.eval()
     dataloader = create_dataloader(
         graph=graph,
         features=features,
         itemset=all_nodes_set,
-        batch_size=4 * args.batch_size,
+        batch_size=args.batch_size,
         fanout=[-1],
         device=args.device,
         job="infer",
     )
     pred = model.inference(graph, features, dataloader, args.feature_device)
-    pred = pred[test_set._items[0]]
-    label = test_set._items[1].to(pred.device)
 
-    return MF.accuracy(
-        pred,
-        label,
-        task="multiclass",
-        num_classes=num_classes,
-    )
+    metrics = {}
+    for split_name, itemset in itemsets.items():
+        nid, labels = itemset[:]
+        acc = MF.f1_score(
+            pred[nid.to(pred.device)],
+            labels.to(pred.device),
+            **kwargs,
+        )
+        metrics[split_name] = acc.item()
+
+    return metrics
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, num_classes):
+def evaluate(model, dataloader, kwargs, cache_miss_rate_fn):
     model.eval()
     y_hats = []
     ys = []
-    for minibatch in tqdm(dataloader, "Evaluating"):
+    val_dataloader_tqdm = tqdm(dataloader, "Evaluating")
+    for minibatch in val_dataloader_tqdm:
         node_features = minibatch.node_features["feat"]
         labels = minibatch.labels
         out = model(minibatch.sampled_subgraphs, node_features)
         y_hats.append(out)
         ys.append(labels)
+        val_dataloader_tqdm.set_postfix(
+            {
+                "num_nodes": node_features.size(0),
+                "cache_miss": cache_miss_rate_fn(),
+            }
+        )
 
-    return MF.accuracy(
-        torch.cat(y_hats),
-        torch.cat(ys),
-        task="multiclass",
-        num_classes=num_classes,
-    )
+    return MF.f1_score(torch.cat(y_hats), torch.cat(ys), **kwargs)
 
 
 def parse_args():
@@ -306,14 +259,16 @@ def parse_args():
         description="Which dataset are you going to use?"
     )
     parser.add_argument(
-        "--epochs", type=int, default=10, help="Number of training epochs."
+        "--epochs", type=int, default=9999999, help="Number of training epochs."
     )
     parser.add_argument(
         "--lr",
         type=float,
-        default=0.003,
+        default=0.001,
         help="Learning rate for optimization.",
     )
+    parser.add_argument("--num-hidden", type=int, default=256)
+    parser.add_argument("--dropout", type=float, default=0.5)
     parser.add_argument(
         "--batch-size", type=int, default=1024, help="Batch size for training."
     )
@@ -327,16 +282,21 @@ def parse_args():
         "--dataset",
         type=str,
         default="ogbn-products",
-        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
-        help="The dataset we can use for node classification example. Currently"
-        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
+        choices=[
+            "ogbn-arxiv",
+            "ogbn-products",
+            "ogbn-papers100M",
+            "reddit",
+            "yelp",
+            "flickr",
+        ],
     )
     parser.add_argument(
         "--fanout",
         type=str,
-        default="5,10,15",
-        help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
-        " identical with the number of layers in your model. Default: 5,10,15",
+        default="10,10,10",
+        help="Fan-out of neighbor sampling. len(fanout) determines the number of"
+        " GNN layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
         "--mode",
@@ -352,56 +312,48 @@ def parse_args():
         help="Graph storage - feature storage - Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
+    parser.add_argument("--layer-dependency", action="store_true")
+    parser.add_argument("--batch-dependency", type=int, default=1)
     parser.add_argument(
-        "--gpu-cache-size",
+        "--num-gpu-cached-features",
         type=int,
         default=0,
-        help="The capacity of the GPU cache in bytes.",
+        help="The capacity of the GPU cache, the number of features to store.",
     )
+    parser.add_argument("--early-stopping-patience", type=int, default=25)
     parser.add_argument(
         "--sample-mode",
-        default="sample_neighbor",
+        default="sample_layer_neighbor",
         choices=["sample_neighbor", "sample_layer_neighbor"],
         help="The sampling function when doing layerwise sampling.",
     )
     parser.add_argument(
-        "--overlap-graph-fetch",
+        "--disable-torch-compile",
         action="store_true",
-        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
-        "If True, the data loader will overlap the UVA graph fetching operations"
-        "with the rest of operations by using an alternative CUDA stream. Disabled"
-        "by default.",
+        default=TorchVersion(torch.__version__) < TorchVersion("2.2.0a0"),
+        help="Disables torch.compile() on the trained GNN model because it is "
+        "enabled by default for torch>=2.2.0 without this option.",
     )
-    parser.add_argument(
-        "--num-gpu-cached-edges",
-        type=int,
-        default=0,
-        help="The number of edges to be cached from the graph on the GPU.",
-    )
-    parser.add_argument(
-        "--gpu-graph-caching-threshold",
-        type=int,
-        default=1,
-        help="The number of accesses after which a vertex neighborhood will be cached.",
-    )
-    parser.add_argument(
-        "--torch-compile",
-        action="store_true",
-        help="Uses torch.compile() on the trained GNN model. Requires "
-        "torch>=2.2.0 to enable this option.",
-    )
+    parser.add_argument("--precision", type=str, default="high")
     return parser.parse_args()
 
 
 def main():
+    torch.set_float32_matmul_precision(args.precision)
     if not torch.cuda.is_available():
         args.mode = "cpu-cpu-cpu"
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
+    args.overlap_feature_fetch = args.feature_device == "pinned"
+    # For now, only sample_layer_neighbor is faster with this option
+    args.overlap_graph_fetch = (
+        args.sample_mode == "sample_layer_neighbor"
+        and args.graph_device == "pinned"
+    )
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset = gb.BuiltinDataset(args.dataset).load()
+    dataset, multilabel = load_dataset(args.dataset)
 
     # Move the dataset to the selected storage.
     graph = (
@@ -423,11 +375,17 @@ def main():
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    if args.gpu_cache_size > 0 and args.feature_device != "cuda":
+    if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
+        feature = features._features[("node", None, "feat")]
         features._features[("node", None, "feat")] = gb.GPUCachedFeature(
-            features._features[("node", None, "feat")],
-            args.gpu_cache_size,
+            feature,
+            args.num_gpu_cached_features * feature._tensor[:1].nbytes,
         )
+        cache_miss_rate_fn = lambda: features._features[
+            ("node", None, "feat")
+        ]._feature.miss_rate
+    else:
+        cache_miss_rate_fn = lambda: 1
 
     train_dataloader, valid_dataloader = (
         create_dataloader(
@@ -443,27 +401,49 @@ def main():
     )
 
     in_channels = features.size("node", None, "feat")[0]
-    hidden_channels = 256
-    model = GraphSAGE(in_channels, hidden_channels, num_classes).to(args.device)
+    model = GraphSAGE(
+        in_channels,
+        args.num_hidden,
+        num_classes,
+        len(args.fanout),
+        args.dropout,
+    ).to(args.device)
     assert len(args.fanout) == len(model.layers)
-    if args.torch_compile:
+    if not args.disable_torch_compile:
         torch._dynamo.config.cache_size_limit = 32
         model = torch.compile(model, fullgraph=True, dynamic=True)
 
-    train(train_dataloader, valid_dataloader, num_classes, model, args.device)
+    kwargs = {
+        "num_labels" if multilabel else "num_classes": num_classes,
+        "task": "multilabel" if multilabel else "multiclass",
+        "validate_args": False,
+    }
+
+    best_model = train(
+        train_dataloader,
+        valid_dataloader,
+        model,
+        multilabel,
+        kwargs,
+        cache_miss_rate_fn,
+        args.device,
+    )
+    model.load_state_dict(best_model)
 
     # Test the model.
     print("Testing...")
-    test_acc = layerwise_infer(
+    itemsets = {"train": train_set, "val": valid_set, "test": test_set}
+    final_acc = layerwise_infer(
         args,
         graph,
         features,
-        test_set,
+        itemsets,
         all_nodes_set,
         model,
-        num_classes,
+        kwargs,
     )
-    print(f"Test accuracy {test_acc.item():.4f}")
+    print("Final accuracy values:")
+    print(final_acc)
 
 
 if __name__ == "__main__":
