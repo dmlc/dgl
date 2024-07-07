@@ -11,8 +11,10 @@ try:
     from packaging import version
 except ImportError:
     # If packaging isn't installed, try and use the vendored copy in setuptools
-    # pylint: disable=unused-import
-    from setuptools.extern.packaging import version
+    from setuptools.extern.packaging import (
+        version,  # pylint: disable=unused-import
+    )
+
 
 # pylint: disable=invalid-name
 _default_formatwarning = warnings.formatwarning
