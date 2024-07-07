@@ -5,11 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import pydantic
 
-try:
-    from packaging import version
-except ImportError:
-    # If packaging isn't installed, try and use the vendored copy in setuptools
-    from setuptools.extern.packaging import version
+from ..misc_utils import version
 
 
 __all__ = [

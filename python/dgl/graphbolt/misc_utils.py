@@ -1,6 +1,12 @@
 """Miscallenous utils copied from DGL."""
 from collections.abc import Mapping, Sequence
 
+try:
+    from packaging import version
+except ImportError:
+    # If packaging isn't installed, try and use the vendored copy in setuptools
+    from setuptools.extern.packaging import version
+
 
 def is_listlike(data):
     """Return if the data is a sequence but not a string."""
