@@ -11,6 +11,7 @@ try:
     from packaging import version
 except ImportError:
     # If packaging isn't installed, try and use the vendored copy in setuptools
+    # pylint: disable=unused-import
     from setuptools.extern.packaging import version
 
 # pylint: disable=invalid-name
@@ -33,7 +34,9 @@ def gb_warning_format(message, category, filename, lineno, line=None):
 
 
 def gb_warning(message, category=GBWarning, stacklevel=2):
-    """GraphBolt warning wrapper that defaults to ``GBWarning`` instead of ``UserWarning`` category."""
+    """GraphBolt warning wrapper that defaults to ``GBWarning`` instead of
+    ``UserWarning`` category.
+    """
     return warnings.warn(message, category=category, stacklevel=stacklevel)
 
 
@@ -169,12 +172,12 @@ def download(
                 total_size = int(r.headers.get("content-length", 0))
                 with tqdm(
                     total=total_size, unit="B", unit_scale=True, desc=fname
-                ) as bar:
+                ) as progress_bar:
                     with open(fname, "wb") as f:
                         for chunk in r.iter_content(chunk_size=1024):
                             if chunk:  # filter out keep-alive new chunks
                                 f.write(chunk)
-                                bar.update(len(chunk))
+                                progress_bar.update(len(chunk))
                 if sha1_hash and not check_sha1(fname, sha1_hash):
                     raise UserWarning(
                         "File {} is downloaded but the content hash does not match."
@@ -187,13 +190,12 @@ def download(
                 retries -= 1
                 if retries <= 0:
                     raise e
-                else:
-                    if log:
-                        print(
-                            "download failed, retrying, {} attempt{} left".format(
-                                retries, "s" if retries > 1 else ""
-                            )
+                if log:
+                    print(
+                        "download failed, retrying, {} attempt{} left".format(
+                            retries, "s" if retries > 1 else ""
                         )
+                    )
 
     return fname
 
