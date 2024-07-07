@@ -8,12 +8,10 @@ import requests
 from tqdm.auto import tqdm
 
 try:
-    from packaging import version
+    from packaging import version  # pylint: disable=unused-import
 except ImportError:
     # If packaging isn't installed, try and use the vendored copy in setuptools
-    from setuptools.extern.packaging import (
-        version,  # pylint: disable=unused-import
-    )
+    from setuptools.extern.packaging import version
 
 
 # pylint: disable=invalid-name
