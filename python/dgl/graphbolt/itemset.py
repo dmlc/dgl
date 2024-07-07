@@ -5,8 +5,7 @@ from typing import Dict, Iterable, Tuple, Union
 
 import torch
 
-### FROM DGL @todo
-from ..base import dgl_warning
+from .misc_utils import gb_warning
 
 __all__ = ["ItemSet", "HeteroItemSet", "ItemSetDict"]
 
@@ -422,7 +421,7 @@ class ItemSetDict:
     """
 
     def __init__(self, itemsets: Dict[str, ItemSet]) -> None:
-        dgl_warning(
+        gb_warning(
             "ItemSetDict is deprecated and will be removed in the future. "
             "Please use HeteroItemSet instead.",
             category=DeprecationWarning,

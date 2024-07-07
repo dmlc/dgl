@@ -1,4 +1,5 @@
 """Miscallenous utils copied from DGL."""
+import warnings
 from collections.abc import Mapping, Sequence
 
 try:
@@ -6,6 +7,32 @@ try:
 except ImportError:
     # If packaging isn't installed, try and use the vendored copy in setuptools
     from setuptools.extern.packaging import version
+
+# pylint: disable=invalid-name
+_default_formatwarning = warnings.formatwarning
+
+
+class GBWarning(UserWarning):
+    """GraphBolt Warning class."""
+
+
+# pylint: disable=unused-argument
+def gb_warning_format(message, category, filename, lineno, line=None):
+    """Format GraphBolt warnings."""
+    if isinstance(category, GBWarning):
+        return "GraphBolt Warning: {}\n".format(message)
+    else:
+        return _default_formatwarning(
+            message, category, filename, lineno, line=None
+        )
+
+
+def gb_warning(message, category=GBWarning, stacklevel=2):
+    """GraphBolt warning wrapper that defaults to ``GBWarning`` instead of ``UserWarning`` category."""
+    return warnings.warn(message, category=category, stacklevel=stacklevel)
+
+
+warnings.formatwarning = gb_warning_format
 
 
 def is_listlike(data):

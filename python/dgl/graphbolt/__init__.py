@@ -47,6 +47,7 @@ from .impl import *
 from .itemset import *
 from .item_sampler import *
 from .minibatch_transformer import *
+from .misc_utils import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
