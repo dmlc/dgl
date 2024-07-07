@@ -140,7 +140,8 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
     auto result_buffer = reinterpret_cast<char *>(result.data_ptr());
 
     // Record the inside offsets of feteched features.
-    auto residual = std::make_unique<int64_t[]>(group_size_ * num_thread_);
+    auto residual =
+        std::unique_ptr<int64_t[]>(new int64_t[group_size_ * num_thread_]);
     // Indicator for index error.
     std::atomic<bool> error_flag{};
     std::atomic<int64_t> work_queue{};
