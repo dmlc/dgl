@@ -20,8 +20,7 @@ if (
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
-### FROM DGL @todo
-from ..utils import recursive_apply
+from .misc_utils import recursive_apply
 
 __all__ = [
     "CANONICAL_ETYPE_DELIMITER",
