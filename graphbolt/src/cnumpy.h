@@ -1,4 +1,5 @@
 /**
+ *  Copyright (c) 2024, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  *  Copyright (c) 2023 by Contributors
  * @file cnumpy.h
  * @brief Numpy File Fetecher class.
@@ -24,6 +25,24 @@
 
 namespace graphbolt {
 namespace storage {
+
+template <typename T>
+class Future : public torch::CustomClassHolder {
+ public:
+  Future(c10::intrusive_ptr<c10::ivalue::Future> future, T value)
+      : future_(future), value_(value) {}
+
+  Future() = default;
+
+  T Wait() {
+    future_->waitAndThrow();
+    return value_;
+  }
+
+ private:
+  c10::intrusive_ptr<c10::ivalue::Future> future_;
+  T value_;
+};
 
 /**
  * @brief Disk Numpy Fetecher class.
@@ -61,7 +80,7 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    * @brief Read disk numpy file based on given index and transform to
    * tensor.
    */
-  torch::Tensor IndexSelect(torch::Tensor index);
+  c10::intrusive_ptr<Future<torch::Tensor>> IndexSelect(torch::Tensor index);
 
 #ifdef HAVE_LIBRARY_LIBURING
   /**
@@ -78,7 +97,8 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    * @return A tensor containing the selected features.
    * @throws std::runtime_error If index is out of range.
    */
-  torch::Tensor IndexSelectIOUring(torch::Tensor index);
+  c10::intrusive_ptr<Future<torch::Tensor>> IndexSelectIOUring(
+      torch::Tensor index);
 #endif  // HAVE_LIBRARY_LIBURING
  private:
   const std::string filename_;        // Path to numpy file.

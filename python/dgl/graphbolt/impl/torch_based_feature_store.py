@@ -292,9 +292,7 @@ class DiskBasedFeature(Feature):
             return self._tensor
         elif platform.system() == "Linux":
             try:
-                return self._ondisk_npy_array.index_select(ids.cpu()).to(
-                    ids.device
-                )
+                return self._ondisk_npy_array.index_select(ids).wait()
             except RuntimeError:
                 raise IndexError
         else:
