@@ -13,8 +13,6 @@ import numpy as np
 import torch
 import yaml
 
-### FROM DGL @todo
-from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
 from ..dataset import Dataset, Task
 from ..internal import (
@@ -26,7 +24,7 @@ from ..internal import (
     read_edges,
 )
 from ..itemset import HeteroItemSet, ItemSet
-from ..misc_utils import gb_warning
+from ..misc_utils import download, extract_archive, gb_warning
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
     fused_csc_sampling_graph,
