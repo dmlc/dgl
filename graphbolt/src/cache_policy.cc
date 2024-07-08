@@ -122,7 +122,7 @@ torch::Tensor LruCachePolicy::Replace(torch::Tensor keys) {
 }
 
 ClockCachePolicy::ClockCachePolicy(int64_t capacity)
-    : capacity_(capacity), cache_usage_(0) {
+    : queue_(capacity), capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(capacity);
 }
