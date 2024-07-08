@@ -64,11 +64,7 @@ torch::Tensor BaseCachePolicy::ReplaceImpl(
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
           const auto pos = policy.Read(key);
-          if (pos.has_value()) {  // Already in the cache, inc freq.
-            positions_ptr[i] = *pos;
-          } else {
-            positions_ptr[i] = policy.Insert(key);
-          }
+          positions_ptr[i] = pos.has_value() ? *pos : policy.Insert(key);
         }
       }));
   return positions;
