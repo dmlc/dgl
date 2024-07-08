@@ -67,7 +67,9 @@ class InSubgraphSampler(SubgraphSampler):
         self.graph = graph
         self.sampler = graph.in_subgraph
 
-    def sample_subgraphs(self, seeds, seeds_timestamp):
+    def sample_subgraphs(
+        self, seeds, seeds_timestamp, seeds_pre_time_window=None
+    ):
         subgraph = self.sampler(seeds)
         (
             original_row_node_ids,

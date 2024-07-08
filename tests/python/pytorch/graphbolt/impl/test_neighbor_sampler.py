@@ -7,6 +7,7 @@ import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
+from dgl.graphbolt.dataloader import construct_gpu_graph_cache
 
 
 def get_hetero_graph():
@@ -42,7 +43,10 @@ def get_hetero_graph():
 @pytest.mark.parametrize("hetero", [False, True])
 @pytest.mark.parametrize("prob_name", [None, "weight", "mask"])
 @pytest.mark.parametrize("sorted", [False, True])
-def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
+@pytest.mark.parametrize("num_cached_edges", [0, 10])
+def test_NeighborSampler_GraphFetch(
+    hetero, prob_name, sorted, num_cached_edges
+):
     if sorted:
         items = torch.arange(3)
     else:
@@ -51,7 +55,7 @@ def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
     itemset = gb.ItemSet(items, names=names)
     graph = get_hetero_graph().to(F.ctx())
     if hetero:
-        itemset = gb.ItemSetDict({"n3": itemset})
+        itemset = gb.HeteroItemSet({"n3": itemset})
     else:
         graph.type_per_edge = None
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
@@ -66,8 +70,21 @@ def test_NeighborSampler_GraphFetch(hetero, prob_name, sorted):
     compact_per_layer = sample_per_layer.compact_per_layer(True)
     gb.seed(123)
     expected_results = list(compact_per_layer)
-    datapipe = gb.FetchInsubgraphData(datapipe, sample_per_layer)
+    gpu_graph_cache = None
+    if num_cached_edges > 0:
+        gpu_graph_cache = construct_gpu_graph_cache(
+            sample_per_layer, num_cached_edges, 1
+        )
+    datapipe = gb.FetchInsubgraphData(
+        datapipe,
+        sample_per_layer,
+        gpu_graph_cache,
+    )
     datapipe = datapipe.wait_future()
+    if num_cached_edges > 0:
+        datapipe = gb.CombineCachedAndFetchedInSubgraph(
+            datapipe, sample_per_layer
+        )
     datapipe = gb.SamplePerLayerFromFetchedSubgraph(datapipe, sample_per_layer)
     datapipe = datapipe.compact_per_layer(True)
     gb.seed(123)

@@ -1,6 +1,19 @@
 /**
- *  Copyright (c) 2017-2023 by Contributors
- *  Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   All rights reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ *
  * @file cuda/common.h
  * @brief Common utilities for CUDA
  */
@@ -180,16 +193,6 @@ struct CopyScalar {
   at::cuda::CUDAEvent copy_event_;
   bool is_ready_;
 };
-
-// This includes all integer, float and boolean types.
-#define GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(...)            \
-  AT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__)                 \
-  AT_DISPATCH_CASE(at::ScalarType::Half, __VA_ARGS__)     \
-  AT_DISPATCH_CASE(at::ScalarType::BFloat16, __VA_ARGS__) \
-  AT_DISPATCH_CASE(at::ScalarType::Bool, __VA_ARGS__)
-
-#define GRAPHBOLT_DISPATCH_ALL_TYPES(TYPE, NAME, ...) \
-  AT_DISPATCH_SWITCH(TYPE, NAME, GRAPHBOLT_DISPATCH_CASE_ALL_TYPES(__VA_ARGS__))
 
 #define GRAPHBOLT_DISPATCH_ELEMENT_SIZES(element_size, name, ...)             \
   [&] {                                                                       \

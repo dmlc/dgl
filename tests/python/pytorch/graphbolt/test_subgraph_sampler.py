@@ -315,7 +315,7 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
         }
         items = (items, torch.randint(0, 10, (3,)))
         names = (names, "timestamp")
-    itemset = gb.ItemSetDict({"n2": gb.ItemSet(items, names=names)})
+    itemset = gb.HeteroItemSet({"n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -350,7 +350,7 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
         first_names = (first_names, "timestamp")
         second_items = (second_items, torch.randint(0, 10, (6,)))
         second_names = (second_names, "timestamp")
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n1:e1:n2": gb.ItemSet(
                 first_items,
@@ -405,7 +405,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
         first_names = (first_names, "timestamp")
         second_items = (second_items, torch.randint(0, 10, (6,)))
         second_names = (second_names, "timestamp")
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n1:e1:n2": gb.ItemSet(
                 first_items,
@@ -451,7 +451,7 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
         second_items = (second_items, torch.randint(0, 10, (6,)))
         second_names = (second_names, "timestamp")
     # "e11" and "e22" are not valid edge types.
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n1:e11:n2": gb.ItemSet(
                 first_items,
@@ -496,7 +496,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
         second_items = (second_items, torch.randint(0, 10, (6,)))
         second_names = (second_names, "timestamp")
     # "e11" and "e22" are not valid edge types.
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n1:e11:n2": gb.ItemSet(
                 first_items,
@@ -537,7 +537,7 @@ def test_SubgraphSampler_HyperLink_Hetero(sampler_type):
         }
         items = (items, torch.randint(0, 10, (2,)))
         names = (names, "timestamp")
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n2:n1:n2:n1:n2": gb.ItemSet(
                 items,
@@ -623,7 +623,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
         first_names = (first_names, "timestamp")
         second_items = (second_items, torch.randint(0, 10, (1,)))
         second_names = (second_names, "timestamp")
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n2": gb.ItemSet(first_items, names=first_names),
             "n1": gb.ItemSet(second_items, names=second_names),
@@ -758,7 +758,7 @@ def test_SubgraphSampler_without_deduplication_Hetero_Node(sampler_type):
         }
         items = (items, torch.randint(1, 10, (2,)))
         names = (names, "timestamp")
-    itemset = gb.ItemSetDict({"n2": gb.ItemSet(items, names=names)})
+    itemset = gb.HeteroItemSet({"n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -936,7 +936,9 @@ def test_SubgraphSampler_unique_csc_format_Homo_Node_gpu(labor):
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_unique_csc_format_Hetero_Node(labor):
     graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict({"n2": gb.ItemSet(torch.arange(2), names="seeds")})
+    itemset = gb.HeteroItemSet(
+        {"n2": gb.ItemSet(torch.arange(2), names="seeds")}
+    )
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -1016,7 +1018,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
         items_n1 = (items_n1, torch.tensor([10]))
         items_n2 = (items_n2, torch.tensor([10]))
         names = (names, "timestamp")
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {
             "n1": gb.ItemSet(items=items_n1, names=names),
             "n2": gb.ItemSet(items=items_n2, names=names),
@@ -1146,7 +1148,7 @@ def test_SubgraphSampler_without_deduplication_Hetero_Link(sampler_type):
         }
         items = (items, torch.randint(1, 10, (1,)))
         names = (names, "timestamp")
-    itemset = gb.ItemSetDict({"n1:e1:n2": gb.ItemSet(items, names=names)})
+    itemset = gb.HeteroItemSet({"n1:e1:n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -1356,7 +1358,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_Link_gpu(labor):
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_unique_csc_format_Hetero_Link(labor):
     graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {"n1:e1:n2": gb.ItemSet(torch.tensor([[0, 1]]), names="seeds")}
     )
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
@@ -1517,7 +1519,7 @@ def test_SubgraphSampler_without_deduplication_Hetero_HyperLink(sampler_type):
         }
         items = (items, torch.randint(1, 10, (1,)))
         names = (names, "timestamp")
-    itemset = gb.ItemSetDict({"n2:n1:n2": gb.ItemSet(items, names=names)})
+    itemset = gb.HeteroItemSet({"n2:n1:n2": gb.ItemSet(items, names=names)})
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
@@ -1727,7 +1729,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_HyperLink_gpu(labor):
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_unique_csc_format_Hetero_HyperLink(labor):
     graph = get_hetero_graph().to(F.ctx())
-    itemset = gb.ItemSetDict(
+    itemset = gb.HeteroItemSet(
         {"n1:n2:n1": gb.ItemSet(torch.tensor([[0, 1, 0]]), names="seeds")}
     )
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())

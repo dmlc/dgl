@@ -1040,6 +1040,7 @@ class KVClient(object):
         self._machine_id = rpc.get_machine_id()
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
+
         # push and pull handler
         self._pull_handlers = {}
         self._push_handlers = {}
@@ -1070,6 +1071,11 @@ class KVClient(object):
     def num_servers(self):
         """Get the number of servers"""
         return self._server_count
+
+    @property
+    def group_count(self):
+        """Get the number of groups --num_servers"""
+        return self._group_count
 
     def barrier(self):
         """Barrier for all client nodes.

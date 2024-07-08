@@ -46,9 +46,11 @@ def _prepare_edge_arrays(g, arg):
                     result.append(None)
 
             result = [
-                F.to_dgl_nd(F.copy_to(F.tensor([], dtype=dtype), ctx))
-                if x is None
-                else x
+                (
+                    F.to_dgl_nd(F.copy_to(F.tensor([], dtype=dtype), ctx))
+                    if x is None
+                    else x
+                )
                 for x in result
             ]
             return result
@@ -71,6 +73,7 @@ def sample_etype_neighbors(
     fanout,
     edge_dir="in",
     prob=None,
+    exclude_edges=None,
     replace=False,
     copy_ndata=True,
     copy_edata=True,
@@ -113,6 +116,11 @@ def sample_etype_neighbors(
 
         The features must be non-negative floats or boolean.  Otherwise, the
         result will be undefined.
+    exclude_edges: tensor or dict
+        Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+        This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
     replace : bool, optional
         If True, sample with replacement.
     copy_ndata: bool, optional
@@ -151,6 +159,10 @@ def sample_etype_neighbors(
     As a result, users should avoid performing in-place operations
     on the node features of the new graph to avoid feature corruption.
     """
+    if exclude_edges is not None:
+        raise DGLError(
+            "exclude_edges is not supported for sample_etype_neighbors"
+        )
     if g.device != F.cpu():
         raise DGLError("The graph should be in cpu.")
     # (BarclayII) because the homogenized graph no longer contains the *name* of edge

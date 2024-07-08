@@ -5,7 +5,7 @@ data loader.
 
 Before reading this example, please familiar yourself with graphsage node
 classification using GtaphBolt data loader by reading the example in the
-`examples/sampling/graphbolt/node_classification.py`.
+`examples/graphbolt/node_classification.py`.
 
 For the usage of DDP provided by PyTorch, please read its documentation:
 https://pytorch.org/tutorials/beginner/dist_overview.html and

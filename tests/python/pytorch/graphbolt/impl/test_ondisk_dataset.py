@@ -187,7 +187,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_names():
         train_set = None
 
 
-def test_OnDiskDataset_TVTSet_ItemSetDict_names():
+def test_OnDiskDataset_TVTSet_HeteroItemSet_names():
     """Test TVTSet which returns ItemSet with IDs, labels and corresponding names."""
     with tempfile.TemporaryDirectory() as test_dir:
         train_ids = np.arange(1000)
@@ -221,7 +221,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_names():
         # Verify train set.
         train_set = dataset.tasks[0].train_set
         assert len(train_set) == 1000
-        assert isinstance(train_set, gb.ItemSetDict)
+        assert isinstance(train_set, gb.HeteroItemSet)
         for i, item in enumerate(train_set):
             assert isinstance(item, dict)
             assert "author:writes:paper" in item
@@ -592,8 +592,8 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pairs_labels_indexes():
         dataset = None
 
 
-def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
-    """Test TVTSet which returns ItemSetDict with IDs and labels."""
+def test_OnDiskDataset_TVTSet_HeteroItemSet_id_label():
+    """Test TVTSet which returns HeteroItemSet with IDs and labels."""
     with tempfile.TemporaryDirectory() as test_dir:
         train_ids = np.arange(1000)
         train_labels = np.random.randint(0, 10, size=1000)
@@ -657,7 +657,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         # Verify train set.
         train_set = dataset.tasks[0].train_set
         assert len(train_set) == 2000
-        assert isinstance(train_set, gb.ItemSetDict)
+        assert isinstance(train_set, gb.HeteroItemSet)
         for i, item in enumerate(train_set):
             assert isinstance(item, dict)
             assert len(item) == 1
@@ -672,7 +672,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         # Verify validation set.
         validation_set = dataset.tasks[0].validation_set
         assert len(validation_set) == 2000
-        assert isinstance(validation_set, gb.ItemSetDict)
+        assert isinstance(validation_set, gb.HeteroItemSet)
         for i, item in enumerate(validation_set):
             assert isinstance(item, dict)
             assert len(item) == 1
@@ -687,7 +687,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         # Verify test set.
         test_set = dataset.tasks[0].test_set
         assert len(test_set) == 2000
-        assert isinstance(test_set, gb.ItemSetDict)
+        assert isinstance(test_set, gb.HeteroItemSet)
         for i, item in enumerate(test_set):
             assert isinstance(item, dict)
             assert len(item) == 1
@@ -701,8 +701,8 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         dataset = None
 
 
-def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
-    """Test TVTSet which returns ItemSetDict with node pairs and labels."""
+def test_OnDiskDataset_TVTSet_HeteroItemSet_node_pairs_labels():
+    """Test TVTSet which returns HeteroItemSet with node pairs and labels."""
     with tempfile.TemporaryDirectory() as test_dir:
         train_seeds = np.arange(2000).reshape(1000, 2)
         train_seeds_path = os.path.join(test_dir, "train_seeds.npy")
@@ -791,7 +791,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
         # Verify train set.
         train_set = dataset.tasks[0].train_set
         assert len(train_set) == 2000
-        assert isinstance(train_set, gb.ItemSetDict)
+        assert isinstance(train_set, gb.HeteroItemSet)
         for i, item in enumerate(train_set):
             assert isinstance(item, dict)
             assert len(item) == 1
@@ -807,7 +807,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
         # Verify validation set.
         validation_set = dataset.tasks[0].validation_set
         assert len(validation_set) == 2000
-        assert isinstance(validation_set, gb.ItemSetDict)
+        assert isinstance(validation_set, gb.HeteroItemSet)
         for i, item in enumerate(validation_set):
             assert isinstance(item, dict)
             assert len(item) == 1
@@ -823,7 +823,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
         # Verify test set.
         test_set = dataset.tasks[0].test_set
         assert len(test_set) == 2000
-        assert isinstance(test_set, gb.ItemSetDict)
+        assert isinstance(test_set, gb.HeteroItemSet)
         for i, item in enumerate(test_set):
             assert isinstance(item, dict)
             assert len(item) == 1
@@ -2400,7 +2400,7 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         """
         dataset = write_yaml_and_load_dataset(yaml_content, test_dir)
         all_nodes_set = dataset.all_nodes_set
-        assert isinstance(all_nodes_set, gb.ItemSetDict)
+        assert isinstance(all_nodes_set, gb.HeteroItemSet)
         assert all_nodes_set.names == ("seeds",)
         for i, item in enumerate(all_nodes_set):
             assert len(item) == 1
@@ -2690,9 +2690,9 @@ def test_OnDiskDataset_heterogeneous(
 
         tasks = dataset.tasks
         assert len(tasks) == 1
-        assert isinstance(tasks[0].train_set, gb.ItemSetDict)
-        assert isinstance(tasks[0].validation_set, gb.ItemSetDict)
-        assert isinstance(tasks[0].test_set, gb.ItemSetDict)
+        assert isinstance(tasks[0].train_set, gb.HeteroItemSet)
+        assert isinstance(tasks[0].validation_set, gb.HeteroItemSet)
+        assert isinstance(tasks[0].test_set, gb.HeteroItemSet)
         assert tasks[0].metadata["num_classes"] == num_classes
         assert tasks[0].metadata["name"] == "node_classification"
 
@@ -2942,7 +2942,7 @@ def test_OnDiskDataset_not_include_eids():
 
 
 def test_OnDiskTask_repr_heterogeneous():
-    item_set = gb.ItemSetDict(
+    item_set = gb.HeteroItemSet(
         {
             "user": gb.ItemSet(torch.arange(0, 5), names="seeds"),
             "item": gb.ItemSet(torch.arange(5, 10), names="seeds"),
@@ -2951,7 +2951,7 @@ def test_OnDiskTask_repr_heterogeneous():
     metadata = {"name": "node_classification"}
     task = gb.OnDiskTask(metadata, item_set, item_set, item_set)
     expected_str = (
-        "OnDiskTask(validation_set=ItemSetDict(\n"
+        "OnDiskTask(validation_set=HeteroItemSet(\n"
         "               itemsets={'user': ItemSet(\n"
         "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
         "                            names=('seeds',),\n"
@@ -2961,7 +2961,7 @@ def test_OnDiskTask_repr_heterogeneous():
         "                        )},\n"
         "               names=('seeds',),\n"
         "           ),\n"
-        "           train_set=ItemSetDict(\n"
+        "           train_set=HeteroItemSet(\n"
         "               itemsets={'user': ItemSet(\n"
         "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
         "                            names=('seeds',),\n"
@@ -2971,7 +2971,7 @@ def test_OnDiskTask_repr_heterogeneous():
         "                        )},\n"
         "               names=('seeds',),\n"
         "           ),\n"
-        "           test_set=ItemSetDict(\n"
+        "           test_set=HeteroItemSet(\n"
         "               itemsets={'user': ItemSet(\n"
         "                            items=(tensor([0, 1, 2, 3, 4]),),\n"
         "                            names=('seeds',),\n"
