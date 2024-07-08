@@ -25,9 +25,14 @@ namespace storage {
 template <typename CachePolicy>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
-  auto positions = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
-  auto indices = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
-  auto missing_keys = torch::empty_like(keys);
+  auto positions = torch::empty_like(
+      keys,
+      keys.options().dtype(torch::kInt64).pinned_memory(keys.is_pinned()));
+  auto indices = torch::empty_like(
+      keys,
+      keys.options().dtype(torch::kInt64).pinned_memory(keys.is_pinned()));
+  auto missing_keys =
+      torch::empty_like(keys, keys.options().pinned_memory(keys.is_pinned()));
   int64_t found_cnt = 0;
   int64_t missing_cnt = keys.size(0);
   AT_DISPATCH_INDEX_TYPES(
@@ -56,15 +61,23 @@ BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
 template <typename CachePolicy>
 torch::Tensor BaseCachePolicy::ReplaceImpl(
     CachePolicy& policy, torch::Tensor keys) {
-  auto positions = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
+  auto positions = torch::empty_like(
+      keys,
+      keys.options().dtype(torch::kInt64).pinned_memory(keys.is_pinned()));
   AT_DISPATCH_INDEX_TYPES(
       keys.scalar_type(), "S3FifoCachePolicy::Replace", ([&] {
         auto keys_ptr = keys.data_ptr<index_t>();
         auto positions_ptr = positions.data_ptr<int64_t>();
+        phmap::flat_hash_set<int64_t> position_set;
+        position_set.reserve(keys.size(0));
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          const auto pos = policy.Read(key);
-          positions_ptr[i] = pos.has_value() ? *pos : policy.Insert(key);
+          const auto pos_optional = policy.Read(key);
+          const auto pos = pos_optional ? *pos_optional : policy.Insert(key);
+          positions_ptr[i] = pos;
+          TORCH_CHECK(
+              std::get<1>(position_set.insert(pos)),
+              "Can't insert all, larger cache capacity is needed.");
         }
       }));
   return positions;

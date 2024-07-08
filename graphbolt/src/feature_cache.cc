@@ -29,8 +29,8 @@ FeatureCache::FeatureCache(
     : tensor_(torch::empty(shape, c10::TensorOptions().dtype(dtype))) {}
 
 torch::Tensor FeatureCache::Query(
-    torch::Tensor positions, torch::Tensor indices, int64_t size,
-    bool pin_memory) {
+    torch::Tensor positions, torch::Tensor indices, int64_t size) {
+  const bool pin_memory = positions.is_pinned() || indices.is_pinned();
   std::vector<int64_t> output_shape{
       tensor_.sizes().begin(), tensor_.sizes().end()};
   output_shape[0] = size;
@@ -53,10 +53,6 @@ torch::Tensor FeatureCache::Query(
 }
 
 void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
-  if (positions.size(0) > tensor_.size(0)) {
-    positions = positions.slice(0, 0, tensor_.size(0));
-    values = values.slice(0, 0, tensor_.size(0));
-  }
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
