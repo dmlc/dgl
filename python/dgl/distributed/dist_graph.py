@@ -4,9 +4,10 @@ import gc
 
 import os
 from collections import namedtuple
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 
 import numpy as np
+import torch
 
 from .. import backend as F, graphbolt as gb, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
@@ -51,6 +52,8 @@ from .shared_mem_utils import (
 
 INIT_GRAPH = 800001
 QUERY_IF_USE_GRAPHBOLT = 800002
+ADD_EDGE_ATTRIBUTE_FROM_KV = 800003
+ADD_EDGE_ATTRIBUTE_FROM_SHARED_MEM = 800004
 
 
 class InitGraphRequest(rpc.Request):
@@ -115,6 +118,126 @@ class QueryIfUseGraphBoltResponse(rpc.Response):
 
     def __setstate__(self, state):
         self._use_graphbolt = state
+
+
+def _copy_data_to_shared_mem(data, name):
+    """Copy data to shared memory."""
+    # [TODO] Copy data to shared memory.
+    assert data.dtype == torch.float32, "Only float32 is supported."
+    data_type = F.reverse_data_type_dict[F.dtype(data)]
+    shared_data = empty_shared_mem(name, True, data.shape, data_type)
+    dlpack = shared_data.to_dlpack()
+    ret = F.zerocopy_from_dlpack(dlpack)
+    rpc.copy_data_to_shared_memory(ret, data)
+    return ret
+
+
+def _copy_data_from_shared_mem(name, shape):
+    """Copy data from shared memory."""
+    data_type = F.reverse_data_type_dict[F.float32]
+    data = empty_shared_mem(name, False, shape, data_type)
+    dlpack = data.to_dlpack()
+    return F.zerocopy_from_dlpack(dlpack)
+
+
+class AddEdgeAttributeFromKVRequest(rpc.Request):
+    """Add edge attribute from kvstore to local GraphBolt partition."""
+
+    def __init__(self, name, kv_names):
+        self._name = name
+        self._kv_names = kv_names
+
+    def __getstate__(self):
+        return self._name, self._kv_names
+
+    def __setstate__(self, state):
+        self._name, self._kv_names = state
+
+    def process_request(self, server_state):
+        # For now, this is only used to add prob/mask data to the graph.
+        name = self._name
+        g = server_state.graph
+        if name not in g.edge_attributes:
+            # Fetch target data from kvstore.
+            kv_store = server_state.kv_store
+            data = [
+                kv_store.data_store[kv_name] if kv_name else None
+                for kv_name in self._kv_names
+            ]
+            # Due to data type limitation in GraphBolt's sampling, we only support float32.
+            data_type = torch.float32
+            gpb = server_state.partition_book
+            # Initialize the edge attribute.
+            num_edges = g.total_num_edges
+            attr_data = torch.zeros(num_edges, dtype=data_type)
+            # Map data from kvstore to the local partition for inner edges only.
+            num_inner_edges = gpb.metadata()[gpb.partid]["num_edges"]
+            homo_eids = g.edge_attributes[EID][:num_inner_edges]
+            etype_ids, typed_eids = gpb.map_to_per_etype(homo_eids)
+            for etype_id, c_etype in enumerate(gpb.canonical_etypes):
+                curr_indices = torch.nonzero(etype_ids == etype_id).squeeze()
+                curr_typed_eids = typed_eids[curr_indices]
+                curr_local_eids = gpb.eid2localeid(
+                    curr_typed_eids, gpb.partid, etype=c_etype
+                )
+                if data[etype_id] is None:
+                    continue
+                attr_data[curr_indices] = data[etype_id][curr_local_eids].to(
+                    data_type
+                )
+            # Copy data to shared memory.
+            attr_data = _copy_data_to_shared_mem(attr_data, "__edge__" + name)
+            g.add_edge_attribute(name, attr_data)
+        return AddEdgeAttributeFromKVResponse(name)
+
+
+class AddEdgeAttributeFromKVResponse(rpc.Response):
+    """Ack the request of adding edge attribute."""
+
+    def __init__(self, name):
+        self._name = name
+
+    def __getstate__(self):
+        return self._name
+
+    def __setstate__(self, state):
+        self._name = state
+
+
+class AddEdgeAttributeFromSharedMemRequest(rpc.Request):
+    """Add edge attribute from shared memory to local GraphBolt partition."""
+
+    def __init__(self, name):
+        self._name = name
+
+    def __getstate__(self):
+        return self._name
+
+    def __setstate__(self, state):
+        self._name = state
+
+    def process_request(self, server_state):
+        name = self._name
+        g = server_state.graph
+        if name not in g.edge_attributes:
+            data = _copy_data_from_shared_mem(
+                "__edge__" + name, (g.total_num_edges,)
+            )
+            g.add_edge_attribute(name, data)
+        return AddEdgeAttributeFromSharedMemResponse(name)
+
+
+class AddEdgeAttributeFromSharedMemResponse(rpc.Response):
+    """Ack the request of adding edge attribute from shared memory."""
+
+    def __init__(self, name):
+        self._name = name
+
+    def __getstate__(self):
+        return self._name
+
+    def __setstate__(self, state):
+        self._name = state
 
 
 def _copy_graph_to_shared_mem(g, graph_name, graph_format, use_graphbolt):
@@ -591,6 +714,7 @@ class DistGraph:
 
     def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
+        self._added_edge_attributes = []  # For prob/mask sampling on GB.
         if os.environ.get("DGL_DIST_MODE", "standalone") == "standalone":
             # "GraphBolt is not supported in standalone mode."
             self._use_graphbolt = False
@@ -724,15 +848,34 @@ class DistGraph:
         }
 
     def __getstate__(self):
-        return self.graph_name, self._gpb, self._use_graphbolt
+        return (
+            self.graph_name,
+            self._gpb,
+            self._use_graphbolt,
+            self._added_edge_attributes,
+        )
 
     def __setstate__(self, state):
-        self.graph_name, gpb, self._use_graphbolt = state
+        (
+            self.graph_name,
+            gpb,
+            self._use_graphbolt,
+            self._added_edge_attributes,
+        ) = state
         self._init(gpb)
 
         self._init_ndata_store()
         self._init_edata_store()
         self._init_metadata()
+
+        # For prob/mask sampling on GB only.
+        if self._use_graphbolt and len(self._added_edge_attributes) > 0:
+            # Add edge attribute from main server's shared memory.
+            for name in self._added_edge_attributes:
+                data = _copy_data_from_shared_mem(
+                    "__edge__" + name, (self.local_partition.total_num_edges,)
+                )
+                self.local_partition.add_edge_attribute(name, data)
 
     @property
     def local_partition(self):
@@ -1273,9 +1416,6 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
-        assert (
-            self._use_graphbolt is False
-        ), "find_edges is not supported in GraphBolt."
         if etype is None:
             assert (
                 len(self.etypes) == 1
@@ -1421,6 +1561,14 @@ class DistGraph:
     ):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
+        if exclude_edges is not None:
+            # Convert exclude edge IDs to homogeneous edge IDs.
+            gpb = self.get_partition_book()
+            if isinstance(exclude_edges, Mapping):
+                exclude_eids = []
+                for c_etype, eids in exclude_edges.items():
+                    exclude_eids.append(gpb.map_to_homo_eid(eids, c_etype))
+                exclude_edges = torch.cat(exclude_eids)
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
                 self,
@@ -1429,6 +1577,7 @@ class DistGraph:
                 replace=replace,
                 etype_sorted=etype_sorted,
                 prob=prob,
+                exclude_edges=exclude_edges,
                 use_graphbolt=self._use_graphbolt,
             )
         else:
@@ -1438,6 +1587,7 @@ class DistGraph:
                 fanout,
                 replace=replace,
                 prob=prob,
+                exclude_edges=exclude_edges,
                 use_graphbolt=self._use_graphbolt,
             )
         return frontier
@@ -1469,6 +1619,56 @@ class DistGraph:
             if name.is_edge() and right_type:
                 edata_names.append(name)
         return edata_names
+
+    def add_edge_attribute(self, name):
+        """Add an edge attribute into GraphBolt partition from edge data.
+
+        Parameters
+        ----------
+        name : str
+            The name of the edge attribute.
+        """
+        # Sanity checks.
+        if not self._use_graphbolt:
+            raise DGLError("GraphBolt is not used.")
+
+        # Send add request to main server on the same machine.
+        kv_names = [
+            (
+                self.edges[etype].data[name].kvstore_key
+                if name in self.edges[etype].data
+                else None
+            )
+            for etype in self.canonical_etypes
+        ]
+        rpc.send_request(
+            self._client._main_server_id,
+            AddEdgeAttributeFromKVRequest(name, kv_names),
+        )
+        # Wait for the response.
+        assert rpc.recv_response()._name == name
+        # Send add request to local backup servers.
+        for i in range(self._client.group_count - 1):
+            server_id = (
+                self._client.machine_id * self._client.group_count + i + 1
+            )
+            rpc.send_request(
+                server_id, AddEdgeAttributeFromSharedMemRequest(name)
+            )
+        # Receive response from local backup servers.
+        for _ in range(self._client.group_count - 1):
+            response = rpc.recv_response()
+            assert response._name == name
+        # Add edge attribute from main server's shared memory.
+        data = _copy_data_from_shared_mem(
+            "__edge__" + name, (self.local_partition.total_num_edges,)
+        )
+        self.local_partition.add_edge_attribute(name, data)
+        # Sync local clients.
+        self._client.barrier()
+
+        # Save the edge attribute into state. This is required by separate samplers.
+        self._added_edge_attributes.append(name)
 
 
 def _get_overlap(mask_arr, ids):
@@ -1864,4 +2064,14 @@ rpc.register_service(
     QUERY_IF_USE_GRAPHBOLT,
     QueryIfUseGraphBoltRequest,
     QueryIfUseGraphBoltResponse,
+)
+rpc.register_service(
+    ADD_EDGE_ATTRIBUTE_FROM_KV,
+    AddEdgeAttributeFromKVRequest,
+    AddEdgeAttributeFromKVResponse,
+)
+rpc.register_service(
+    ADD_EDGE_ATTRIBUTE_FROM_SHARED_MEM,
+    AddEdgeAttributeFromSharedMemRequest,
+    AddEdgeAttributeFromSharedMemResponse,
 )

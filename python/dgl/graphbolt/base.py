@@ -6,11 +6,12 @@ from dataclasses import dataclass
 import torch
 from torch.torch_version import TorchVersion
 
-if TorchVersion(torch.__version__) >= "2.3.0":
-    # [TODO][https://github.com/dmlc/dgl/issues/7387] Remove or refine below
-    # check.
-    # Due to https://github.com/dmlc/dgl/issues/7380, we need to check if dill
-    # is available before using it.
+if (
+    TorchVersion(torch.__version__) >= "2.3.0"
+    and TorchVersion(torch.__version__) < "2.3.1"
+):
+    # Due to https://github.com/dmlc/dgl/issues/7380, for torch 2.3.0, we need
+    # to check if dill is available before using it.
     torch.utils.data.datapipes.utils.common.DILL_AVAILABLE = (
         torch.utils._import_utils.dill_available()
     )
@@ -78,9 +79,15 @@ def isin(elements, test_elements):
 
 if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
 
-    @torch.library.impl_abstract("graphbolt::expand_indptr")
-    def expand_indptr_abstract(indptr, dtype, node_ids, output_size):
-        """Abstract implementation of expand_indptr for torch.compile() support."""
+    torch_fake_decorator = (
+        torch.library.impl_abstract
+        if TorchVersion(torch.__version__) < TorchVersion("2.3.1")
+        else torch.library.register_fake
+    )
+
+    @torch_fake_decorator("graphbolt::expand_indptr")
+    def expand_indptr_fake(indptr, dtype, node_ids, output_size):
+        """Fake implementation of expand_indptr for torch.compile() support."""
         if output_size is None:
             output_size = torch.library.get_ctx().new_dynamic_size()
         if dtype is None:

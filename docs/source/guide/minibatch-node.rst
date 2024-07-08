@@ -162,7 +162,7 @@ customized batching iterator. During each iteration that yields
 
 
 DGL provides an end-to-end stochastic training example `GraphSAGE
-implementation <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/node_classification.py>`__.
+implementation <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/node_classification.py>`__.
 
 For heterogeneous graphs
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,7 +200,7 @@ For example, one can still use the provided
 :class:`~dgl.graphbolt.NeighborSampler` class and
 :class:`~dgl.graphbolt.DataLoader` class for
 stochastic training. The only difference is that the itemset is now an
-instance of :class:`~dgl.graphbolt.ItemSetDict` which is a dictionary
+instance of :class:`~dgl.graphbolt.HeteroItemSet` which is a dictionary
 of node types to node IDs.
 
 .. code:: python
@@ -247,6 +247,6 @@ dictionaries of node types and predictions here.
         opt.step()
 
 DGL provides an end-to-end stochastic training example `RGCN
-implementation <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/rgcn/hetero_rgcn.py>`__.
+implementation <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/rgcn/hetero_rgcn.py>`__.
 
 

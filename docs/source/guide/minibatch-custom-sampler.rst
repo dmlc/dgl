@@ -75,7 +75,7 @@ can be used on heterogeneous graphs:
 
     import dgl.graphbolt as gb
     hg = gb.FusedCSCSamplingGraph()
-    train_set = item_set = gb.ItemSetDict(
+    train_set = item_set = gb.HeteroItemSet(
         {
             "user": gb.ItemSet(
                 (torch.arange(0, 5), torch.arange(5, 10)),
@@ -130,4 +130,4 @@ criteria, you could write your own transform function. Please check the method
 for reference.
 
 You could also refer to examples in
-`Link Prediction <https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/link_prediction.py>`__.
+`Link Prediction <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/link_prediction.py>`__.

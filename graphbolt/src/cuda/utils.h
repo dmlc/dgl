@@ -17,6 +17,16 @@ namespace graphbolt {
 namespace cuda {
 
 /**
+ * @brief Returns the compute capability of the cuda device, e.g. 70 for Volta.
+ */
+inline int compute_capability(
+    int device = cuda::GetCurrentStream().device_index()) {
+  int sm_version;
+  CUDA_RUNTIME_CHECK(cub::SmVersion(sm_version, device));
+  return sm_version / 10;
+};
+
+/**
  * @brief Calculate the number of threads needed given the size of the dimension
  * to be processed.
  *

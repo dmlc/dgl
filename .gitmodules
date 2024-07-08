@@ -31,3 +31,6 @@
 [submodule "third_party/cuco"]
 	path = third_party/cuco
 	url = https://github.com/NVIDIA/cuCollections.git
+[submodule "third_party/GKlib"]
+	path = third_party/GKlib
+	url = https://github.com/KarypisLab/GKlib.git
