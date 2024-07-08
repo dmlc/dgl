@@ -277,7 +277,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
 class SieveCachePolicy : public BaseCachePolicy {
  public:
   /**
-   * @brief Constructor for the S3FifoCachePolicy class.
+   * @brief Constructor for the SieveCachePolicy class.
    *
    * @param capacity The capacity of the cache in terms of # elements.
    */
