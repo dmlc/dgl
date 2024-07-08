@@ -476,8 +476,7 @@ class ClockCachePolicy : public BaseCachePolicy {
 
   int64_t Insert(int64_t key) {
     const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    key_to_cache_key_[key] = queue_.begin();
+    key_to_cache_key_[key] = queue_.Push(CacheKey(key, pos));
     return pos;
   }
 
@@ -485,26 +484,23 @@ class ClockCachePolicy : public BaseCachePolicy {
   int64_t Evict() {
     // If the cache has space, get an unused slot otherwise perform eviction.
     if (cache_usage_ < capacity_) return cache_usage_++;
+    CacheKey cache_key;
     while (true) {
-      auto& cache_key = queue_.back();
+      cache_key = queue_.Pop();
       if (cache_key.getFreq()) {
-        queue_.push_front(cache_key.ResetFreq());
-        key_to_cache_key_[cache_key.getKey()] = queue_.begin();
-        queue_.pop_back();
+        key_to_cache_key_[cache_key.getKey()] =
+            queue_.Push(cache_key.ResetFreq());
       } else
         break;
     }
-    const auto& cache_key = queue_.back();
     TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
-    const auto pos = cache_key.getPos();
-    queue_.pop_back();
-    return pos;
+    return cache_key.getPos();
   }
 
-  std::list<CacheKey> queue_;
+  CircularQueue<CacheKey> queue_;
   int64_t capacity_;
   int64_t cache_usage_;
-  phmap::flat_hash_map<int64_t, decltype(queue_)::iterator> key_to_cache_key_;
+  phmap::flat_hash_map<int64_t, CacheKey*> key_to_cache_key_;
 };
 
 }  // namespace storage
