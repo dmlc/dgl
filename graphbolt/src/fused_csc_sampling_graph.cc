@@ -1346,16 +1346,19 @@ static torch::Tensor NonUniformPickOp(
           if (fanout >= num_neighbors / 10) {
             for (int64_t i = 0; i < fanout; ++i) {
               auto j = RandomEngine::ThreadLocal()->RandInt(i, num_neighbors);
-              std::swap(positive_probs_indices_ptr[i], positive_probs_indices_ptr[j]);
+              std::swap(
+                  positive_probs_indices_ptr[i], positive_probs_indices_ptr[j]);
             }
-            std::memcpy(ret_ptr, positive_probs_indices_ptr, fanout * sizeof(int64_t));
+            std::memcpy(
+                ret_ptr, positive_probs_indices_ptr, fanout * sizeof(int64_t));
           } else if (fanout < 64) {
             auto begin = ret_ptr;
             auto end = ret_ptr + fanout;
 
             while (begin != end) {
               // Put the new random number in the last position.
-              int64_t tmp = RandomEngine::ThreadLocal()->RandInt( static_cast<int64_t>(0), num_neighbors);
+              int64_t tmp = RandomEngine::ThreadLocal()->RandInt(
+                  static_cast<int64_t>(0), num_neighbors);
               *begin = positive_probs_indices_ptr[tmp];
               // Check if a new value doesn't exist in current
               // range(picked_data_ptr, begin). Otherwise get a new
@@ -1366,7 +1369,8 @@ static torch::Tensor NonUniformPickOp(
           } else {
             std::unordered_set<int64_t> picked_set;
             while (static_cast<int64_t>(picked_set.size()) < fanout) {
-              int64_t tmp = RandomEngine::ThreadLocal()->RandInt( static_cast<int64_t>(0), num_neighbors);
+              int64_t tmp = RandomEngine::ThreadLocal()->RandInt(
+                  static_cast<int64_t>(0), num_neighbors);
               picked_set.insert(positive_probs_indices_ptr[tmp]);
             }
             std::copy(picked_set.begin(), picked_set.end(), ret_ptr);
