@@ -22,6 +22,58 @@
 namespace graphbolt {
 namespace storage {
 
+template <typename CachePolicy>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
+  auto positions = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
+  auto indices = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
+  auto missing_keys = torch::empty_like(keys);
+  int64_t found_cnt = 0;
+  int64_t missing_cnt = keys.size(0);
+  AT_DISPATCH_INDEX_TYPES(
+      keys.scalar_type(), "S3FifoCachePolicy::Query::DispatchForKeys", ([&] {
+        auto keys_ptr = keys.data_ptr<index_t>();
+        auto positions_ptr = positions.data_ptr<int64_t>();
+        auto indices_ptr = indices.data_ptr<int64_t>();
+        auto missing_keys_ptr = missing_keys.data_ptr<index_t>();
+        for (int64_t i = 0; i < keys.size(0); i++) {
+          const auto key = keys_ptr[i];
+          auto pos = policy.Read(key);
+          if (pos.has_value()) {
+            positions_ptr[found_cnt] = *pos;
+            indices_ptr[found_cnt++] = i;
+          } else {
+            indices_ptr[--missing_cnt] = i;
+            missing_keys_ptr[missing_cnt] = key;
+          }
+        }
+      }));
+  return {
+      positions.slice(0, 0, found_cnt), indices,
+      missing_keys.slice(0, found_cnt)};
+}
+
+template <typename CachePolicy>
+torch::Tensor BaseCachePolicy::ReplaceImpl(
+    CachePolicy& policy, torch::Tensor keys) {
+  auto positions = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
+  AT_DISPATCH_INDEX_TYPES(
+      keys.scalar_type(), "S3FifoCachePolicy::Replace", ([&] {
+        auto keys_ptr = keys.data_ptr<index_t>();
+        auto positions_ptr = positions.data_ptr<int64_t>();
+        for (int64_t i = 0; i < keys.size(0); i++) {
+          const auto key = keys_ptr[i];
+          const auto pos = policy.Read(key);
+          if (pos.has_value()) {  // Already in the cache, inc freq.
+            positions_ptr[i] = *pos;
+          } else {
+            positions_ptr[i] = policy.Insert(key);
+          }
+        }
+      }));
+  return positions;
+}
+
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
     : small_queue_(capacity),
       main_queue_(capacity),
@@ -36,61 +88,26 @@ S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 S3FifoCachePolicy::Query(torch::Tensor keys) {
-  auto positions = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
-  auto indices = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
-  auto missing_keys = torch::empty_like(keys);
-  int64_t found_cnt = 0;
-  int64_t missing_cnt = keys.size(0);
-  AT_DISPATCH_INDEX_TYPES(
-      keys.scalar_type(), "S3FifoCachePolicy::Query::DispatchForKeys", ([&] {
-        auto keys_ptr = keys.data_ptr<index_t>();
-        auto positions_ptr = positions.data_ptr<int64_t>();
-        auto indices_ptr = indices.data_ptr<int64_t>();
-        auto missing_keys_ptr = missing_keys.data_ptr<index_t>();
-        for (int64_t i = 0; i < keys.size(0); i++) {
-          const auto key = keys_ptr[i];
-          auto it = key_to_cache_key_.find(key);
-          if (it != key_to_cache_key_.end()) {
-            auto& cache_key = *it->second;
-            cache_key.Increment();
-            positions_ptr[found_cnt] = cache_key.getPos();
-            indices_ptr[found_cnt++] = i;
-          } else {
-            indices_ptr[--missing_cnt] = i;
-            missing_keys_ptr[missing_cnt] = key;
-          }
-        }
-      }));
-  return {
-      positions.slice(0, 0, found_cnt), indices,
-      missing_keys.slice(0, found_cnt)};
+  return QueryImpl(*this, keys);
 }
 
 torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
-  auto positions = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
-  AT_DISPATCH_INDEX_TYPES(
-      keys.scalar_type(), "S3FifoCachePolicy::Replace", ([&] {
-        auto keys_ptr = keys.data_ptr<index_t>();
-        auto positions_ptr = positions.data_ptr<int64_t>();
-        for (int64_t i = 0; i < keys.size(0); i++) {
-          const auto key = keys_ptr[i];
-          auto it = key_to_cache_key_.find(key);
-          if (it !=
-              key_to_cache_key_.end()) {  // Already in the cache, inc freq.
-            auto& cache_key = *it->second;
-            cache_key.Increment();
-            positions_ptr[i] = cache_key.getPos();
-          } else {
-            const auto pos = Evict();
-            TORCH_CHECK(0 <= pos && pos < capacity_, "Position out of bounds!");
-            const auto in_ghost_queue = ghost_set_.erase(key);
-            auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
-            key_to_cache_key_[key] = queue.Push(CacheKey(key, pos));
-            positions_ptr[i] = pos;
-          }
-        }
-      }));
-  return positions;
+  return ReplaceImpl(*this, keys);
+}
+
+SieveCachePolicy::SieveCachePolicy(int64_t capacity)
+    : hand_(queue_.end()), capacity_(capacity), cache_usage_(0) {
+  TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
+  key_to_cache_key_.reserve(capacity);
+}
+
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> SieveCachePolicy::Query(
+    torch::Tensor keys) {
+  return QueryImpl(*this, keys);
+}
+
+torch::Tensor SieveCachePolicy::Replace(torch::Tensor keys) {
+  return ReplaceImpl(*this, keys);
 }
 
 }  // namespace storage
