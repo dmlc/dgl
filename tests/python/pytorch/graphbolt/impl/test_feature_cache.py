@@ -23,7 +23,7 @@ from dgl import graphbolt as gb
 )
 @pytest.mark.parametrize("feature_size", [2, 16])
 @pytest.mark.parametrize("num_parts", [1, 2])
-@pytest.mark.parametrize("policy", ["s3-fifo", "sieve", "lru"])
+@pytest.mark.parametrize("policy", ["s3-fifo", "sieve", "lru", "clock"])
 def test_feature_cache(dtype, feature_size, num_parts, policy):
     cache_size = 32 * num_parts
     a = torch.randint(0, 2, [1024, feature_size], dtype=dtype)

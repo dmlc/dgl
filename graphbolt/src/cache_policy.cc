@@ -125,5 +125,20 @@ torch::Tensor LruCachePolicy::Replace(torch::Tensor keys) {
   return ReplaceImpl(*this, keys);
 }
 
+ClockCachePolicy::ClockCachePolicy(int64_t capacity)
+    : capacity_(capacity), cache_usage_(0) {
+  TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
+  key_to_cache_key_.reserve(capacity);
+}
+
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ClockCachePolicy::Query(
+    torch::Tensor keys) {
+  return QueryImpl(*this, keys);
+}
+
+torch::Tensor ClockCachePolicy::Replace(torch::Tensor keys) {
+  return ReplaceImpl(*this, keys);
+}
+
 }  // namespace storage
 }  // namespace graphbolt

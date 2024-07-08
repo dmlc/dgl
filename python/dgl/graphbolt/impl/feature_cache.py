@@ -7,6 +7,7 @@ caching_policies = {
     "s3-fifo": torch.ops.graphbolt.s3_fifo_cache_policy,
     "sieve": torch.ops.graphbolt.sieve_cache_policy,
     "lru": torch.ops.graphbolt.lru_cache_policy,
+    "clock": torch.ops.graphbolt.clock_cache_policy,
 }
 
 
@@ -22,8 +23,8 @@ class FeatureCache(object):
     num_parts: int, optional
         The number of cache partitions for parallelism. Default is 1.
     policy: str, optional
-        The cache policy. Default is "sieve". "s3-fifo" and "lru" are also
-        available.
+        The cache policy. Default is "sieve". "s3-fifo", "lru" and "clock" are
+        also available.
     """
 
     def __init__(self, cache_shape, dtype, num_parts=1, policy="sieve"):
