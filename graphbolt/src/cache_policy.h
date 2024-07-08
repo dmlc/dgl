@@ -353,6 +353,79 @@ class SieveCachePolicy : public BaseCachePolicy {
   phmap::flat_hash_map<int64_t, decltype(hand_)> key_to_cache_key_;
 };
 
+/**
+ * @brief LeastRecentlyUsed is a simple, scalable FIFObased algorithm with a
+ * single static queue.
+ **/
+class LruCachePolicy : public BaseCachePolicy {
+ public:
+  /**
+   * @brief Constructor for the LruCachePolicy class.
+   *
+   * @param capacity The capacity of the cache in terms of # elements.
+   */
+  LruCachePolicy(int64_t capacity);
+
+  LruCachePolicy() = default;
+
+  /**
+   * @brief The policy query function.
+   * @param keys The keys to query the cache.
+   *
+   * @return (positions, indices, missing_keys), where positions has the
+   * locations of the keys which were found in the cache, missing_keys has the
+   * keys that were not found and indices is defined such that
+   * keys[indices[:positions.size(0)]] gives us the found keys and
+   * keys[indices[positions.size(0):]] is identical to missing_keys.
+   */
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
+      torch::Tensor keys);
+
+  /**
+   * @brief The policy replace function.
+   * @param keys The keys to query the cache.
+   *
+   * @return positions tensor is returned holding the locations of the
+   * replaced entries in the cache.
+   */
+  torch::Tensor Replace(torch::Tensor keys);
+
+  std::optional<int64_t> Read(int64_t key) {
+    auto it = key_to_cache_key_.find(key);
+    if (it != key_to_cache_key_.end()) {
+      const auto cache_key = *it->second;
+      queue_.erase(it->second);
+      queue_.push_front(cache_key);
+      it->second = queue_.begin();
+      return cache_key.getPos();
+    }
+    return std::nullopt;
+  }
+
+  int64_t Insert(int64_t key) {
+    const auto pos = Evict();
+    queue_.push_front(CacheKey(key, pos));
+    key_to_cache_key_[key] = queue_.begin();
+    return pos;
+  }
+
+ private:
+  int64_t Evict() {
+    // If the cache has space, get an unused slot otherwise perform eviction.
+    if (cache_usage_ < capacity_) return cache_usage_++;
+    const auto& cache_key = queue_.back();
+    TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
+    const auto pos = cache_key.getPos();
+    queue_.pop_back();
+    return pos;
+  }
+
+  std::list<CacheKey> queue_;
+  int64_t capacity_;
+  int64_t cache_usage_;
+  phmap::flat_hash_map<int64_t, decltype(queue_)::iterator> key_to_cache_key_;
+};
+
 }  // namespace storage
 }  // namespace graphbolt
 

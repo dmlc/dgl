@@ -212,6 +212,8 @@ template c10::intrusive_ptr<PartitionedCachePolicy>
     PartitionedCachePolicy::Create<S3FifoCachePolicy>(int64_t, int64_t);
 template c10::intrusive_ptr<PartitionedCachePolicy>
     PartitionedCachePolicy::Create<SieveCachePolicy>(int64_t, int64_t);
+template c10::intrusive_ptr<PartitionedCachePolicy>
+    PartitionedCachePolicy::Create<LruCachePolicy>(int64_t, int64_t);
 
 }  // namespace storage
 }  // namespace graphbolt

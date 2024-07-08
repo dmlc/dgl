@@ -106,6 +106,9 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def(
       "sieve_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::SieveCachePolicy>);
+  m.def(
+      "lru_cache_policy",
+      &storage::PartitionedCachePolicy::Create<storage::LruCachePolicy>);
   m.class_<storage::FeatureCache>("FeatureCache")
       .def("query", &storage::FeatureCache::Query)
       .def("replace", &storage::FeatureCache::Replace);
