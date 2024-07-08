@@ -62,7 +62,9 @@ class CappedNeighborSampler(Sampler):
         self.prefetch_edge_feats = prefetch_edge_feats
         self.output_device = output_device
 
-    def sample(self, g, indices, exclude_eids=None):
+    def sample(
+        self, g, indices, exclude_eids=None
+    ):  # pylint: disable=arguments-differ
         """Sampling function.
 
         Parameters
