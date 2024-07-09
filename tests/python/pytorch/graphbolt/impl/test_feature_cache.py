@@ -23,15 +23,16 @@ from dgl import graphbolt as gb
 )
 @pytest.mark.parametrize("feature_size", [2, 16])
 @pytest.mark.parametrize("num_parts", [1, 2])
-def test_feature_cache(dtype, feature_size, num_parts):
+@pytest.mark.parametrize("policy", ["s3-fifo", "sieve", "lru", "clock"])
+def test_feature_cache(dtype, feature_size, num_parts, policy):
     cache_size = 32 * num_parts
     a = torch.randint(0, 2, [1024, feature_size], dtype=dtype)
     cache = gb.impl.FeatureCache(
-        (cache_size,) + a.shape[1:], a.dtype, num_parts
+        (cache_size,) + a.shape[1:], a.dtype, num_parts, policy
     )
 
     keys = torch.tensor([0, 1])
-    values, missing_index, missing_keys = cache.query(keys, False)
+    values, missing_index, missing_keys = cache.query(keys)
     assert torch.equal(
         missing_keys.flip([0]) if num_parts == 1 else missing_keys.sort()[0],
         keys,
@@ -44,8 +45,8 @@ def test_feature_cache(dtype, feature_size, num_parts):
 
     pin_memory = F._default_context_str == "gpu"
 
-    keys = torch.arange(1, 33)
-    values, missing_index, missing_keys = cache.query(keys, pin_memory)
+    keys = torch.arange(1, 33, pin_memory=pin_memory)
+    values, missing_index, missing_keys = cache.query(keys)
     assert torch.equal(
         missing_keys.flip([0]) if num_parts == 1 else missing_keys.sort()[0],
         torch.arange(2, 33),
@@ -58,9 +59,7 @@ def test_feature_cache(dtype, feature_size, num_parts):
     assert torch.equal(values, a[keys])
 
     values, missing_index, missing_keys = cache.query(keys)
-    assert torch.equal(
-        missing_keys.flip([0]), torch.tensor([5] if num_parts == 1 else [])
-    )
+    assert torch.equal(missing_keys.flip([0]), torch.tensor([]))
 
     missing_values = a[missing_keys]
     cache.replace(missing_keys, missing_values)
