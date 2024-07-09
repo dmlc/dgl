@@ -1,7 +1,6 @@
 """Torch-based feature store for GraphBolt."""
 
 import copy
-import platform
 import textwrap
 from typing import Dict, List
 
@@ -290,7 +289,7 @@ class DiskBasedFeature(Feature):
             if self._tensor.is_pinned():
                 return self._tensor.cuda()
             return self._tensor
-        elif platform.system() == "Linux":
+        elif torch.ops.graphbolt.detect_io_uring():
             try:
                 return self._ondisk_npy_array.index_select(ids).wait()
             except RuntimeError:

@@ -30,10 +30,12 @@ namespace io_uring {
 
 bool IsAvailable() {
 #ifdef HAVE_LIBRARY_LIBURING
+  if (cached_is_available.has_value()) return cached_is_available.value();
   // https://unix.stackexchange.com/a/596284/314554
-  return !(
+  cached_is_available = !(
       syscall(__NR_io_uring_register, 0, IORING_UNREGISTER_BUFFERS, NULL, 0) &&
       errno == ENOSYS);
+  return cached_is_available.value();
 #else
   return false;
 #endif
