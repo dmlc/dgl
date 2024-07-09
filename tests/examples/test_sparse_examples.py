@@ -91,24 +91,34 @@ def test_sgc():
     assert float(stdout[-5:]) > 0.7
 
 
-def test_sign():
-    script = os.path.join(EXAMPLE_ROOT, "sign.py")
+def _test_flaky(test_fn, max_num_success=8, num_tries=10):
     num_success = 0
-    num_tries = 10
     for i in range(num_tries):
-        out = subprocess.run(["python", str(script)], capture_output=True)
-        assert (
-            out.returncode == 0
-        ), f"stdout: {out.stdout.decode('utf-8')}\nstderr: {out.stderr.decode('utf-8')}"
-        stdout = out.stdout.decode("utf-8")
-        num_success += float(stdout[-5:]) > 0.7
-        # If it succeeds 80% of the time.
-        if 5 * num_success >= 4 * (i + 1):
-            return
-        num_failure = i + 1 - num_success
-        # Early failure if 80% success is impossible now.
-        assert num_failure * 5 <= num_tries
-    assert False
+        try:
+            test_fn()
+            num_success += 1
+        except AssertionError:
+            pass
+    # If it succeeds max_num_success / num_tries of the time.
+    if num_tries * num_success >= max_num_success * (i + 1):
+        return
+    # Early failure if required success rate is impossible now.
+    num_failure = i + 1 - num_success
+    assert num_failure <= num_tries - max_num_success
+
+
+def _test_sign():
+    script = os.path.join(EXAMPLE_ROOT, "sign.py")
+    out = subprocess.run(["python", str(script)], capture_output=True)
+    assert (
+        out.returncode == 0
+    ), f"stdout: {out.stdout.decode('utf-8')}\nstderr: {out.stderr.decode('utf-8')}"
+    stdout = out.stdout.decode("utf-8")
+    assert float(stdout[-5:]) > 0.7
+
+
+def test_sign():
+    _test_flaky(_test_sign)
 
 
 def test_twirls():
