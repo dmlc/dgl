@@ -1,4 +1,4 @@
-"""Fixed subgraph sampler."""
+"""Capped neighbor sampler."""
 from collections import defaultdict
 
 import numpy as np
