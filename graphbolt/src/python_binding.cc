@@ -99,10 +99,22 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
   m.class_<storage::PartitionedCachePolicy>("PartitionedCachePolicy")
       .def("query", &storage::PartitionedCachePolicy::Query)
-      .def("replace", &storage::PartitionedCachePolicy::Replace);
+      .def("replace", &storage::PartitionedCachePolicy::Replace)
+      .def(
+          "reading_completed",
+          &storage::PartitionedCachePolicy::ReadingCompleted);
   m.def(
       "s3_fifo_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::S3FifoCachePolicy>);
+  m.def(
+      "sieve_cache_policy",
+      &storage::PartitionedCachePolicy::Create<storage::SieveCachePolicy>);
+  m.def(
+      "lru_cache_policy",
+      &storage::PartitionedCachePolicy::Create<storage::LruCachePolicy>);
+  m.def(
+      "clock_cache_policy",
+      &storage::PartitionedCachePolicy::Create<storage::ClockCachePolicy>);
   m.class_<storage::FeatureCache>("FeatureCache")
       .def("query", &storage::FeatureCache::Query)
       .def("replace", &storage::FeatureCache::Replace);
