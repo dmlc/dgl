@@ -172,6 +172,7 @@ class BaseCachePolicy {
    */
   virtual void ReadingCompleted(torch::Tensor keys) = 0;
 
+ protected:
   template <typename CachePolicy>
   static std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
   QueryImpl(CachePolicy& policy, torch::Tensor keys);
