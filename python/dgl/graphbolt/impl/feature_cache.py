@@ -53,8 +53,9 @@ class FeatureCache(object):
             pinned, then the returned values tensor is pinned as well.
         """
         self.total_queries += keys.shape[0]
-        positions, index, missing_keys = self._policy.query(keys)
+        positions, index, missing_keys, found_keys = self._policy.query(keys)
         values = self._cache.query(positions, index, keys.shape[0])
+        self._policy.reading_completed(found_keys)
         self.total_miss += missing_keys.shape[0]
         missing_index = index[positions.size(0) :]
         return values, missing_index, missing_keys

@@ -86,7 +86,7 @@ struct CircularQueue {
 
 struct CacheKey {
   CacheKey(int64_t key, int64_t position)
-      : freq_(0), key_(key), position_in_cache_(position) {
+      : freq_(0), key_(key), position_in_cache_(position), reference_count_(0) {
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
 
@@ -98,9 +98,15 @@ struct CacheKey {
 
   auto getPos() const { return position_in_cache_; }
 
-  void Increment() { freq_ = std::min(3, static_cast<int>(freq_ + 1)); }
+  CacheKey& Increment() {
+    freq_ = std::min(3, static_cast<int>(freq_ + 1));
+    return *this;
+  }
 
-  void Decrement() { freq_ = std::max(0, static_cast<int>(freq_ - 1)); }
+  CacheKey& Decrement() {
+    freq_ = std::max(0, static_cast<int>(freq_ - 1));
+    return *this;
+  }
 
   CacheKey& SetFreq() {
     freq_ = 1;
@@ -112,6 +118,18 @@ struct CacheKey {
     return *this;
   }
 
+  CacheKey& StartUse() {
+    ++reference_count_;
+    return *this;
+  }
+
+  CacheKey& EndUse() {
+    --reference_count_;
+    return *this;
+  }
+
+  bool InUse() { return reference_count_ > 0; }
+
   friend std::ostream& operator<<(std::ostream& os, const CacheKey& key_ref) {
     return os << '(' << key_ref.key_ << ", " << key_ref.freq_ << ", "
               << key_ref.position_in_cache_ << ")";
@@ -120,7 +138,8 @@ struct CacheKey {
  private:
   int64_t freq_ : 3;
   int64_t key_ : 61;
-  int64_t position_in_cache_;
+  int64_t position_in_cache_ : 48;
+  int64_t reference_count_ : 16;
 };
 
 class BaseCachePolicy {
@@ -129,14 +148,14 @@ class BaseCachePolicy {
    * @brief The policy query function.
    * @param keys The keys to query the cache.
    *
-   * @return (positions, indices, missing_keys), where positions has the
-   * locations of the keys which were found in the cache, missing_keys has the
-   * keys that were not found and indices is defined such that
+   * @return (positions, indices, missing_keys, found_keys), where positions has
+   * the locations of the keys which were found in the cache, missing_keys has
+   * the keys that were not found and indices is defined such that
    * keys[indices[:positions.size(0)]] gives us the found keys and
    * keys[indices[positions.size(0):]] is identical to missing_keys.
    */
-  virtual std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
-      torch::Tensor keys) = 0;
+  virtual std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+  Query(torch::Tensor keys) = 0;
 
   /**
    * @brief The policy replace function.
@@ -147,12 +166,21 @@ class BaseCachePolicy {
    */
   virtual torch::Tensor Replace(torch::Tensor keys) = 0;
 
+  /**
+   * @brief A reader has finished reading these keys, so they can be evicted.
+   * @param keys The keys to unmark.
+   */
+  virtual void ReadingCompleted(torch::Tensor keys) = 0;
+
   template <typename CachePolicy>
-  static std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> QueryImpl(
-      CachePolicy& policy, torch::Tensor keys);
+  static std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+  QueryImpl(CachePolicy& policy, torch::Tensor keys);
 
   template <typename CachePolicy>
   static torch::Tensor ReplaceImpl(CachePolicy& policy, torch::Tensor keys);
+
+  template <typename CachePolicy>
+  static void ReadingCompletedImpl(CachePolicy& policy, torch::Tensor keys);
 };
 
 /**
@@ -171,26 +199,20 @@ class S3FifoCachePolicy : public BaseCachePolicy {
   S3FifoCachePolicy() = default;
 
   /**
-   * @brief The policy query function.
-   * @param keys The keys to query the cache.
-   *
-   * @return (positions, indices, missing_keys), where positions has the
-   * locations of the keys which were found in the cache, missing_keys has the
-   * keys that were not found and indices is defined such that
-   * keys[indices[:positions.size(0)]] gives us the found keys and
-   * keys[indices[positions.size(0):]] is identical to missing_keys.
+   * @brief See BaseCachePolicy::Query.
    */
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> Query(
       torch::Tensor keys);
 
   /**
-   * @brief The policy replace function.
-   * @param keys The keys to query the cache.
-   *
-   * @return positions tensor is returned holding the locations of the replaced
-   * entries in the cache.
+   * @brief See BaseCachePolicy::Replace.
    */
   torch::Tensor Replace(torch::Tensor keys);
+
+  /**
+   * @brief See BaseCachePolicy::ReadingCompleted.
+   */
+  void ReadingCompleted(torch::Tensor keys);
 
   friend std::ostream& operator<<(
       std::ostream& os, const S3FifoCachePolicy& policy) {
@@ -204,8 +226,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
-      cache_key.Increment();
-      return cache_key.getPos();
+      return cache_key.Increment().StartUse().getPos();
     }
     return std::nullopt;
   }
@@ -218,12 +239,14 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     return pos;
   }
 
+  void Unmark(int64_t key) { key_to_cache_key_[key]->EndUse(); }
+
  private:
   int64_t EvictMainQueue() {
     while (true) {
       auto evicted = main_queue_.Pop();
       auto it = key_to_cache_key_.find(evicted.getKey());
-      if (evicted.getFreq() > 0) {
+      if (evicted.getFreq() > 0 || evicted.InUse()) {
         evicted.Decrement();
         it->second = main_queue_.Push(evicted);
       } else {
@@ -238,7 +261,9 @@ class S3FifoCachePolicy : public BaseCachePolicy {
          size--) {
       auto evicted = small_queue_.Pop();
       auto it = key_to_cache_key_.find(evicted.getKey());
-      if (evicted.getFreq() <= 0) {
+      if (evicted.getFreq() > 0 || evicted.InUse()) {
+        it->second = main_queue_.Push(evicted.ResetFreq());
+      } else {
         key_to_cache_key_.erase(it);
         const auto evicted_key = evicted.getKey();
         if (ghost_queue_.IsFull()) {
@@ -247,8 +272,6 @@ class S3FifoCachePolicy : public BaseCachePolicy {
         ghost_set_.insert(evicted_key);
         ghost_queue_.Push(evicted_key);
         return evicted.getPos();
-      } else {
-        it->second = main_queue_.Push(evicted.ResetFreq());
       }
     }
     return -1;
@@ -286,33 +309,26 @@ class SieveCachePolicy : public BaseCachePolicy {
   SieveCachePolicy() = default;
 
   /**
-   * @brief The policy query function.
-   * @param keys The keys to query the cache.
-   *
-   * @return (positions, indices, missing_keys), where positions has the
-   * locations of the keys which were found in the cache, missing_keys has the
-   * keys that were not found and indices is defined such that
-   * keys[indices[:positions.size(0)]] gives us the found keys and
-   * keys[indices[positions.size(0):]] is identical to missing_keys.
+   * @brief See BaseCachePolicy::Query.
    */
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> Query(
       torch::Tensor keys);
 
   /**
-   * @brief The policy replace function.
-   * @param keys The keys to query the cache.
-   *
-   * @return positions tensor is returned holding the locations of the
-   * replaced entries in the cache.
+   * @brief See BaseCachePolicy::Replace.
    */
   torch::Tensor Replace(torch::Tensor keys);
+
+  /**
+   * @brief See BaseCachePolicy::ReadingCompleted.
+   */
+  void ReadingCompleted(torch::Tensor keys);
 
   std::optional<int64_t> Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
-      cache_key.SetFreq();
-      return cache_key.getPos();
+      return cache_key.SetFreq().StartUse().getPos();
     }
     return std::nullopt;
   }
@@ -324,12 +340,14 @@ class SieveCachePolicy : public BaseCachePolicy {
     return pos;
   }
 
+  void Unmark(int64_t key) { key_to_cache_key_[key]->EndUse(); }
+
  private:
   int64_t Evict() {
     // If the cache has space, get an unused slot otherwise perform eviction.
     if (cache_usage_ < capacity_) return cache_usage_++;
     --hand_;
-    while (hand_->getFreq()) {
+    while (hand_->getFreq() || hand_->InUse()) {
       hand_->ResetFreq();
       if (hand_ == queue_.begin()) hand_ = queue_.end();
       --hand_;
@@ -369,33 +387,27 @@ class LruCachePolicy : public BaseCachePolicy {
   LruCachePolicy() = default;
 
   /**
-   * @brief The policy query function.
-   * @param keys The keys to query the cache.
-   *
-   * @return (positions, indices, missing_keys), where positions has the
-   * locations of the keys which were found in the cache, missing_keys has the
-   * keys that were not found and indices is defined such that
-   * keys[indices[:positions.size(0)]] gives us the found keys and
-   * keys[indices[positions.size(0):]] is identical to missing_keys.
+   * @brief See BaseCachePolicy::Query.
    */
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> Query(
       torch::Tensor keys);
 
   /**
-   * @brief The policy replace function.
-   * @param keys The keys to query the cache.
-   *
-   * @return positions tensor is returned holding the locations of the
-   * replaced entries in the cache.
+   * @brief See BaseCachePolicy::Replace.
    */
   torch::Tensor Replace(torch::Tensor keys);
+
+  /**
+   * @brief See BaseCachePolicy::ReadingCompleted.
+   */
+  void ReadingCompleted(torch::Tensor keys);
 
   std::optional<int64_t> Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
-      const auto cache_key = *it->second;
+      auto cache_key = *it->second;
       queue_.erase(it->second);
-      queue_.push_front(cache_key);
+      queue_.push_front(cache_key.StartUse());
       it->second = queue_.begin();
       return cache_key.getPos();
     }
@@ -409,10 +421,19 @@ class LruCachePolicy : public BaseCachePolicy {
     return pos;
   }
 
+  void Unmark(int64_t key) { key_to_cache_key_[key]->EndUse(); }
+
  private:
   int64_t Evict() {
     // If the cache has space, get an unused slot otherwise perform eviction.
     if (cache_usage_ < capacity_) return cache_usage_++;
+    // Do not evict items that are still in use.
+    for (auto cache_key = queue_.back(); cache_key.InUse();
+         cache_key = queue_.back()) {
+      queue_.pop_back();
+      queue_.push_front(cache_key);
+      key_to_cache_key_[cache_key.getKey()] = queue_.begin();
+    }
     const auto& cache_key = queue_.back();
     TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
     const auto pos = cache_key.getPos();
@@ -443,33 +464,26 @@ class ClockCachePolicy : public BaseCachePolicy {
   ClockCachePolicy() = default;
 
   /**
-   * @brief The policy query function.
-   * @param keys The keys to query the cache.
-   *
-   * @return (positions, indices, missing_keys), where positions has the
-   * locations of the keys which were found in the cache, missing_keys has the
-   * keys that were not found and indices is defined such that
-   * keys[indices[:positions.size(0)]] gives us the found keys and
-   * keys[indices[positions.size(0):]] is identical to missing_keys.
+   * @brief See BaseCachePolicy::Query.
    */
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> Query(
       torch::Tensor keys);
 
   /**
-   * @brief The policy replace function.
-   * @param keys The keys to query the cache.
-   *
-   * @return positions tensor is returned holding the locations of the
-   * replaced entries in the cache.
+   * @brief See BaseCachePolicy::Replace.
    */
   torch::Tensor Replace(torch::Tensor keys);
+
+  /**
+   * @brief See BaseCachePolicy::ReadingCompleted.
+   */
+  void ReadingCompleted(torch::Tensor keys);
 
   std::optional<int64_t> Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
-      cache_key.SetFreq();
-      return cache_key.getPos();
+      return cache_key.SetFreq().StartUse().getPos();
     }
     return std::nullopt;
   }
@@ -480,6 +494,8 @@ class ClockCachePolicy : public BaseCachePolicy {
     return pos;
   }
 
+  void Unmark(int64_t key) { key_to_cache_key_[key]->EndUse(); }
+
  private:
   int64_t Evict() {
     // If the cache has space, get an unused slot otherwise perform eviction.
@@ -487,7 +503,7 @@ class ClockCachePolicy : public BaseCachePolicy {
     CacheKey cache_key;
     while (true) {
       cache_key = queue_.Pop();
-      if (cache_key.getFreq()) {
+      if (cache_key.getFreq() || cache_key.InUse()) {
         key_to_cache_key_[cache_key.getKey()] =
             queue_.Push(cache_key.ResetFreq());
       } else
