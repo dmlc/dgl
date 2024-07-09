@@ -94,7 +94,8 @@ def test_sgc():
 def test_sign():
     script = os.path.join(EXAMPLE_ROOT, "sign.py")
     num_success = 0
-    for i in range(10):
+    num_tries = 10
+    for i in range(num_tries):
         out = subprocess.run(["python", str(script)], capture_output=True)
         assert (
             out.returncode == 0
@@ -104,6 +105,9 @@ def test_sign():
         # If it succeeds 80% of the time.
         if 5 * num_success >= 4 * (i + 1):
             return
+        num_failure = i + 1 - num_success
+        # Early failure if 80% success is impossible now.
+        assert num_failure * 5 <= num_tries
     assert False
 
 
