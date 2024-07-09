@@ -13,8 +13,7 @@ import pytest
 import torch
 import yaml
 from dgl import graphbolt as gb
-
-from dgl.base import DGLWarning
+from dgl.graphbolt import GBWarning
 
 from .. import gb_test_utils as gbt
 
@@ -2026,7 +2025,7 @@ def test_OnDiskDataset_preprocess_not_include_eids():
             f.write(yaml_content)
 
         with pytest.warns(
-            DGLWarning,
+            GBWarning,
             match="Edge feature is stored, but edge IDs are not saved.",
         ):
             gb.ondisk_dataset.preprocess_ondisk_dataset(
@@ -2935,7 +2934,7 @@ def test_OnDiskDataset_not_include_eids():
             f.write(yaml_content)
 
         with pytest.warns(
-            DGLWarning,
+            GBWarning,
             match="Edge feature is stored, but edge IDs are not saved.",
         ):
             gb.OnDiskDataset(test_dir, include_original_edge_id=False)
@@ -3031,7 +3030,7 @@ def test_OnDiskDataset_load_tasks_selectively():
 
         # Case3. Test load tasks with non-existent task name.
         with pytest.warns(
-            DGLWarning,
+            GBWarning,
             match="Below tasks are not found in YAML: {'fake-name'}. Skipped.",
         ):
             dataset = gb.OnDiskDataset(test_dir).load(tasks=["fake-name"])

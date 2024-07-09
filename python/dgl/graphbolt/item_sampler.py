@@ -8,9 +8,8 @@ import torch
 import torch.distributed as dist
 from torchdata.datapipes.iter import IterDataPipe
 
-from ..base import dgl_warning
-
 from .internal import calculate_range
+from .internal_utils import gb_warning
 from .itemset import HeteroItemSet, ItemSet
 from .minibatch import MiniBatch
 
@@ -38,7 +37,7 @@ def minibatcher_default(batch, names):
         A minibatch.
     """
     if names is None:
-        dgl_warning(
+        gb_warning(
             "Failed to map item list to `MiniBatch` as the names of items are "
             "not provided. Please provide a customized `MiniBatcher`. "
             "The item list is returned as is."
@@ -91,7 +90,7 @@ def minibatcher_default(batch, names):
             init_data["seeds"] = pos_seeds
     for name, item in init_data.items():
         if not hasattr(minibatch, name):
-            dgl_warning(
+            gb_warning(
                 f"Unknown item name '{name}' is detected and added into "
                 "`MiniBatch`. You probably need to provide a customized "
                 "`MiniBatcher`."

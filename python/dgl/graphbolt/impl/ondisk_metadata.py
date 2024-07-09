@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional
 
 import pydantic
 
-from ...utils import version
+from ..internal_utils import version
+
 
 __all__ = [
     "OnDiskFeatureDataFormat",

@@ -13,8 +13,6 @@ import numpy as np
 import torch
 import yaml
 
-from ...base import dgl_warning
-from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
 from ..dataset import Dataset, Task
 from ..internal import (
@@ -25,6 +23,7 @@ from ..internal import (
     read_data,
     read_edges,
 )
+from ..internal_utils import download, extract_archive, gb_warning
 from ..itemset import HeteroItemSet, ItemSet
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
@@ -457,7 +456,7 @@ def preprocess_ondisk_dataset(
                 is_feature=True,
             )
         if has_edge_feature_data and not include_original_edge_id:
-            dgl_warning("Edge feature is stored, but edge IDs are not saved.")
+            gb_warning("Edge feature is stored, but edge IDs are not saved.")
 
     # 6. Save tasks and train/val/test split according to the output_config.
     if input_config.get("tasks", None):
@@ -831,7 +830,7 @@ class OnDiskDataset(Dataset):
         if selected_tasks:
             not_found_tasks = set(selected_tasks) - task_names
             if len(not_found_tasks):
-                dgl_warning(
+                gb_warning(
                     f"Below tasks are not found in YAML: {not_found_tasks}. Skipped."
                 )
         return ret
@@ -887,7 +886,7 @@ class OnDiskDataset(Dataset):
 
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, HeteroItemSet]:
         if graph is None:
-            dgl_warning(
+            gb_warning(
                 "`all_nodes_set` is returned as None, since graph is None."
             )
             return None

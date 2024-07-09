@@ -5,8 +5,6 @@ from typing import Dict, Tuple, Union
 
 import torch
 
-from dgl.utils import recursive_apply
-
 from .base import (
     apply_to,
     CSCFormatBase,
@@ -14,6 +12,8 @@ from .base import (
     expand_indptr,
     isin,
 )
+
+from .internal_utils import recursive_apply
 
 
 __all__ = ["SampledSubgraph"]

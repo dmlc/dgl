@@ -7,12 +7,8 @@ from typing import Dict, Optional, Union
 
 import torch
 
-from dgl.utils import recursive_apply
-
-from ...base import EID, ETYPE, NID, NTYPE
-from ...convert import to_homogeneous
-from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
+from ..internal_utils import recursive_apply
 from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import CSCFormatBase, SampledSubgraphImpl
 
@@ -1538,11 +1534,15 @@ def load_from_shared_memory(
 
 
 def from_dglgraph(
-    g: DGLGraph,
+    DGLGraphInstance,
     is_homogeneous: bool = False,
     include_original_edge_id: bool = False,
 ) -> FusedCSCSamplingGraph:
     """Convert a DGLGraph to FusedCSCSamplingGraph."""
+    from dgl.base import EID, ETYPE, NID, NTYPE
+    from dgl.convert import to_homogeneous
+
+    g = DGLGraphInstance
 
     homo_g, ntype_count, _ = to_homogeneous(
         g, ndata=g.ndata, edata=g.edata, return_count=True

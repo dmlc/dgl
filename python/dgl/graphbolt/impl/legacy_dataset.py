@@ -2,7 +2,6 @@
 
 from typing import List, Union
 
-from dgl.data import AsNodePredDataset, DGLDataset
 from ..base import etype_tuple_to_str
 from ..dataset import Dataset, Task
 from ..itemset import HeteroItemSet, ItemSet
@@ -16,7 +15,7 @@ from .torch_based_feature_store import TorchBasedFeature
 class LegacyDataset(Dataset):
     """A Graphbolt dataset for legacy DGLDataset."""
 
-    def __init__(self, legacy: DGLDataset):
+    def __init__(self, legacy):
         # Only supports single graph cases.
         assert len(legacy) == 1
         graph = legacy[0]
@@ -28,7 +27,7 @@ class LegacyDataset(Dataset):
         else:
             self._init_as_heterogeneous_node_pred(legacy)
 
-    def _init_as_heterogeneous_node_pred(self, legacy: DGLDataset):
+    def _init_as_heterogeneous_node_pred(self, legacy):
         def _init_item_set_dict(idx, labels):
             item_set_dict = {}
             for key in idx.keys():
@@ -87,7 +86,9 @@ class LegacyDataset(Dataset):
                 "Only support heterogeneous ogn node pred dataset"
             )
 
-    def _init_as_homogeneous_node_pred(self, legacy: DGLDataset):
+    def _init_as_homogeneous_node_pred(self, legacy):
+        from dgl.data import AsNodePredDataset
+
         legacy = AsNodePredDataset(legacy)
 
         # Initialize tasks.

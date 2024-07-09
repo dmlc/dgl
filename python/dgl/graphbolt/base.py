@@ -20,7 +20,7 @@ if (
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
-from ..utils import recursive_apply
+from .internal_utils import recursive_apply
 
 __all__ = [
     "CANONICAL_ETYPE_DELIMITER",
