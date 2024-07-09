@@ -99,6 +99,10 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    */
   c10::intrusive_ptr<Future<torch::Tensor>> IndexSelectIOUring(
       torch::Tensor index);
+
+  void OnDiskNpyArray::IndexSelectIOUringImpl(
+      torch::Tensor index, torch::Tensor result);
+
 #endif  // HAVE_LIBRARY_LIBURING
  private:
   const std::string filename_;        // Path to numpy file.
