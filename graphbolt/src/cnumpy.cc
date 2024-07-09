@@ -232,7 +232,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
     throw std::runtime_error("IndexError: Index out of range.");
   }
 
-  return result;
+  // return result; the input result parameter is the return value of this func.
 }
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
@@ -246,8 +246,8 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
                  .layout(torch::kStrided)
                  .requires_grad(false));
 
-  auto future =
-      at::intraop_launch_future([=]() { IndexSelectIOUring(index, result); });
+  auto future = at::intraop_launch_future(
+      [=]() { IndexSelectIOUringImpl(index, result); });
 
   return c10::make_intrusive<Future<torch::Tensor>>(future, result);
 }
