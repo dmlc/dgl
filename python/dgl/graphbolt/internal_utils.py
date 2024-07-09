@@ -1,4 +1,4 @@
-"""Miscallenous utils copied from DGL."""
+"""Miscallenous internal utils."""
 import hashlib
 import os
 import warnings
