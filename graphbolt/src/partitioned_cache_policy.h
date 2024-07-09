@@ -62,7 +62,7 @@ class PartitionedCachePolicy : public BaseCachePolicy,
    * keys[indices[:positions.size(0)]] gives us the found keys and
    * keys[indices[positions.size(0):]] is identical to missing_keys.
    */
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> Query(
       torch::Tensor keys);
 
   /**
@@ -73,6 +73,12 @@ class PartitionedCachePolicy : public BaseCachePolicy,
    * entries in the cache.
    */
   torch::Tensor Replace(torch::Tensor keys);
+
+  /**
+   * @brief A reader has finished reading these keys, so they can be evicted.
+   * @param keys The keys to unmark.
+   */
+  void ReadingCompleted(torch::Tensor keys);
 
   template <typename CachePolicy>
   static c10::intrusive_ptr<PartitionedCachePolicy> Create(
