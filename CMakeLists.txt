@@ -20,7 +20,7 @@ dgl_option(BUILD_TYPE "Type of the build: dev, dogfood or release" "dev")
 message(STATUS "Build for ${BUILD_TYPE}")
 
 dgl_option(USE_CUDA "Build with CUDA" OFF)
-dgl_option(USE_LIBURING "Build with liburing" OFF)
+dgl_option(USE_LIBURING "Build with liburing" ON)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter for building sub-components" python3)
 
 # Conda build related options.
@@ -350,27 +350,6 @@ endif(EXTERNAL_PHMAP_PATH)
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
-if(USE_LIBURING)
-  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    add_definitions(-DHAVE_LIBRARY_LIBURING)
-    include(ExternalProject)
-    set(LIBURING_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/liburing)
-    ExternalProject_Add(
-      liburing
-      SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/liburing
-      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=/
-      BUILD_COMMAND bash -c "make -j 4"
-      BUILD_IN_SOURCE ON
-      INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
-      BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/lib/liburing.a
-      BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/include
-      DOWNLOAD_EXTRACT_TIMESTAMP true
-    )
-    set(LIBURING_INCLUDE ${LIBURING_INSTALL_DIR}/include)
-    set(LIBURING ${LIBURING_INSTALL_DIR}/lib/liburing.a)
-  endif()
-endif(USE_LIBURING)
-
 if(EXTERNAL_NANOFLANN_PATH)
   include_directories(SYSTEM ${EXTERNAL_NANOFLANN_PATH})
 else(EXTERNAL_NANOFLANN_PATH)
@@ -580,6 +559,7 @@ if(BUILD_GRAPHBOLT)
       CMAKE_COMMAND=${CMAKE_CMD}
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
       USE_CUDA=${USE_CUDA}
+      USE_LIBURING=${USE_LIBURING}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
       GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
@@ -593,9 +573,4 @@ if(BUILD_GRAPHBOLT)
   if(USE_CUDA)
     add_dependencies(graphbolt gpu_cache)
   endif(USE_CUDA)
-  if(USE_LIBURING)
-    if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-      add_dependencies(graphbolt liburing)
-    endif()
-  endif(USE_LIBURING)
 endif(BUILD_GRAPHBOLT)
