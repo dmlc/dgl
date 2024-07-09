@@ -91,7 +91,23 @@ def test_sgc():
     assert float(stdout[-5:]) > 0.7
 
 
-def test_sign():
+def _test_flaky(test_fn, max_num_success=8, num_tries=10):
+    num_success = 0
+    for i in range(num_tries):
+        try:
+            test_fn()
+            num_success += 1
+        except AssertionError:
+            pass
+        # If it succeeds max_num_success / num_tries of the time.
+        if num_tries * num_success >= max_num_success * (i + 1):
+            return
+        # Early failure if required success rate is impossible now.
+        num_failure = i + 1 - num_success
+        assert num_failure <= num_tries - max_num_success
+
+
+def _test_sign():
     script = os.path.join(EXAMPLE_ROOT, "sign.py")
     out = subprocess.run(["python", str(script)], capture_output=True)
     assert (
@@ -99,6 +115,10 @@ def test_sign():
     ), f"stdout: {out.stdout.decode('utf-8')}\nstderr: {out.stderr.decode('utf-8')}"
     stdout = out.stdout.decode("utf-8")
     assert float(stdout[-5:]) > 0.7
+
+
+def test_sign():
+    _test_flaky(_test_sign)
 
 
 def test_twirls():
