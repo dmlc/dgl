@@ -953,10 +953,16 @@ def test_temporal_sample_neighbors_homo(
 @pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("replace", [False, True])
+@pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize("use_node_timestamp", [False, True])
 @pytest.mark.parametrize("use_edge_timestamp", [False, True])
 def test_temporal_sample_neighbors_hetero(
-    indptr_dtype, indices_dtype, replace, use_node_timestamp, use_edge_timestamp
+    indptr_dtype,
+    indices_dtype,
+    replace,
+    labor,
+    use_node_timestamp,
+    use_edge_timestamp,
 ):
     """Original graph in COO:
     "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
@@ -992,7 +998,11 @@ def test_temporal_sample_neighbors_hetero(
 
     # Generate subgraph via sample neighbors.
     fanouts = torch.LongTensor([-1, -1])
-    sampler = graph.temporal_sample_neighbors
+    sampler = (
+        graph.temporal_sample_layer_neighbors
+        if labor
+        else graph.temporal_sample_neighbors
+    )
 
     seeds = {
         "n1": torch.tensor([0], dtype=indices_dtype),
