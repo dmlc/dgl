@@ -102,7 +102,7 @@ def test_sign():
         stdout = out.stdout.decode("utf-8")
         num_success += float(stdout[-5:]) > 0.7
         # If it succeeds 80% of the time.
-        if num_success >= 0.8 * (i + 1):
+        if 5 * num_success >= 4 * (i + 1):
             return
     assert False
 
