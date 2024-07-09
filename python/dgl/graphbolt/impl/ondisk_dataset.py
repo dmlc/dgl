@@ -24,7 +24,7 @@ from ..internal import (
     read_edges,
 )
 from ..itemset import HeteroItemSet, ItemSet
-from ..misc_utils import download, extract_archive, gb_warning
+from ..internal_utils import download, extract_archive, gb_warning
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
     fused_csc_sampling_graph,

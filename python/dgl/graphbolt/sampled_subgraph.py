@@ -13,7 +13,7 @@ from .base import (
     isin,
 )
 
-from .misc_utils import recursive_apply
+from .internal_utils import recursive_apply
 
 
 __all__ = ["SampledSubgraph"]

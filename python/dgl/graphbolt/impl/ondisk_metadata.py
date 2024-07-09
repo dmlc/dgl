@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import pydantic
 
-from ..misc_utils import version
+from ..internal_utils import version
 
 
 __all__ = [

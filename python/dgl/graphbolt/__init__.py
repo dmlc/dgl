@@ -47,7 +47,7 @@ from .impl import *
 from .itemset import *
 from .item_sampler import *
 from .minibatch_transformer import *
-from .misc_utils import *
+from .internal_utils import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
@@ -56,4 +56,4 @@ from .internal import (
     unique_and_compact,
     unique_and_compact_csc_formats,
 )
-from .utils import add_reverse_edges, exclude_seed_edges
+from .external_utils import add_reverse_edges, exclude_seed_edges

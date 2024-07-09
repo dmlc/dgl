@@ -8,7 +8,7 @@ from typing import Dict, Optional, Union
 import torch
 
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
-from ..misc_utils import recursive_apply
+from ..internal_utils import recursive_apply
 from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import CSCFormatBase, SampledSubgraphImpl
 

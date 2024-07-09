@@ -11,7 +11,7 @@ from torchdata.datapipes.iter import IterDataPipe
 from .internal import calculate_range
 from .itemset import HeteroItemSet, ItemSet
 from .minibatch import MiniBatch
-from .misc_utils import gb_warning
+from .internal_utils import gb_warning
 
 __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 

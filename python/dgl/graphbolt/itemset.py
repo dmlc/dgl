@@ -5,7 +5,7 @@ from typing import Dict, Iterable, Tuple, Union
 
 import torch
 
-from .misc_utils import gb_warning
+from .internal_utils import gb_warning
 
 __all__ = ["ItemSet", "HeteroItemSet", "ItemSetDict"]
 
