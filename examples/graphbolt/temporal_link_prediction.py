@@ -33,7 +33,6 @@ main
 import argparse
 import os
 import time
-from functools import partial
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
@@ -135,7 +134,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # considering of temporal information. Only neighbors that is earlier than
     # the seed will be sampled.
     ############################################################################
-    datapipe = datapipe.temporal_sample_neighbor(
+    datapipe = getattr(datapipe, args.sample_mode)(
         graph,
         args.fanout if is_train else [-1],
         node_timestamp_attr_name=TIMESTAMP_FEATURE_NAME,
@@ -255,6 +254,12 @@ def parse_args():
         help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
+    parser.add_argument(
+        "--sample-mode",
+        default="temporal_sample_neighbor",
+        choices=["temporal_sample_neighbor", "temporal_sample_layer_neighbor"],
+        help="The sampling function when doing layerwise sampling.",
+    )
     return parser.parse_args()
 
 
@@ -289,6 +294,15 @@ def main(args):
     features = dataset.feature.to(args.storage_device)
 
     train_set = dataset.tasks[0].train_set
+    # TODO: Fix the dataset so that this modification is not needed. node_pairs
+    # needs to be cast into graph.indices.dtype, which is int32.
+    train_set._itemsets["Query:Click:Product"]._items = tuple(
+        item.to(graph.indices.dtype if i == 0 else None)
+        for i, item in enumerate(
+            train_set._itemsets["Query:Click:Product"]._items
+        )
+    )
+
     args.fanout = list(map(int, args.fanout.split(",")))
 
     in_size = 128

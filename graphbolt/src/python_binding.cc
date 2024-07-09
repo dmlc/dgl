@@ -13,6 +13,7 @@
 #include "./cuda/max_uva_threads.h"
 #endif
 #include "./cnumpy.h"
+#include "./detect_io_uring.h"
 #include "./expand_indptr.h"
 #include "./feature_cache.h"
 #include "./index_select.h"
@@ -41,6 +42,8 @@ TORCH_LIBRARY(graphbolt, m) {
           "original_edge_ids", &FusedSampledSubgraph::original_edge_ids)
       .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge)
       .def_readwrite("etype_offsets", &FusedSampledSubgraph::etype_offsets);
+  m.class_<storage::Future<torch::Tensor>>("TensorFuture")
+      .def("wait", &storage::Future<torch::Tensor>::Wait);
   m.class_<storage::OnDiskNpyArray>("OnDiskNpyArray")
       .def("index_select", &storage::OnDiskNpyArray::IndexSelect);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
@@ -127,6 +130,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("ondisk_npy_array", &storage::OnDiskNpyArray::Create);
+  m.def("detect_io_uring", &io_uring::IsAvailable);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);

@@ -16,7 +16,7 @@ from . import gb_test_utils
 
 # Skip all tests on GPU when sampling with TemporalNeighborSampler.
 def _check_sampler_type(sampler_type):
-    if F._default_context_str != "cpu" and sampler_type == SamplerType.Temporal:
+    if F._default_context_str != "cpu" and _is_temporal(sampler_type):
         pytest.skip(
             "TemporalNeighborSampler sampling tests are only supported on CPU."
         )
@@ -32,6 +32,7 @@ class SamplerType(Enum):
     Normal = 0
     Layer = 1
     Temporal = 2
+    TemporalLayer = 3
 
 
 def _get_sampler(sampler_type):
@@ -39,11 +40,22 @@ def _get_sampler(sampler_type):
         return gb.NeighborSampler
     if sampler_type == SamplerType.Layer:
         return gb.LayerNeighborSampler
-    return partial(
-        gb.TemporalNeighborSampler,
-        node_timestamp_attr_name="timestamp",
-        edge_timestamp_attr_name="timestamp",
-    )
+    if sampler_type == SamplerType.Temporal:
+        return partial(
+            gb.TemporalNeighborSampler,
+            node_timestamp_attr_name="timestamp",
+            edge_timestamp_attr_name="timestamp",
+        )
+    else:
+        return partial(
+            gb.TemporalLayerNeighborSampler,
+            node_timestamp_attr_name="timestamp",
+            edge_timestamp_attr_name="timestamp",
+        )
+
+
+def _is_temporal(sampler_type):
+    return sampler_type in [SamplerType.Temporal, SamplerType.TemporalLayer]
 
 
 def get_hetero_graph():
@@ -179,7 +191,12 @@ def test_NeighborSampler_fanouts(labor):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Node(sampler_type):
     _check_sampler_type(sampler_type)
@@ -188,7 +205,7 @@ def test_SubgraphSampler_Node(sampler_type):
     )
     items = torch.arange(10)
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {"timestamp": torch.arange(20).to(F.ctx())}
         graph.edge_attributes = {
             "timestamp": torch.arange(len(graph.indices)).to(F.ctx())
@@ -206,7 +223,12 @@ def test_SubgraphSampler_Node(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Link(sampler_type):
     _check_sampler_type(sampler_type)
@@ -215,7 +237,7 @@ def test_SubgraphSampler_Link(sampler_type):
     )
     items = torch.arange(20).reshape(-1, 2)
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {"timestamp": torch.arange(20).to(F.ctx())}
         graph.edge_attributes = {
             "timestamp": torch.arange(len(graph.indices)).to(F.ctx())
@@ -238,7 +260,12 @@ def test_SubgraphSampler_Link(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Link_With_Negative(sampler_type):
     _check_sampler_type(sampler_type)
@@ -247,7 +274,7 @@ def test_SubgraphSampler_Link_With_Negative(sampler_type):
     )
     items = torch.arange(20).reshape(-1, 2)
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {"timestamp": torch.arange(20).to(F.ctx())}
         graph.edge_attributes = {
             "timestamp": torch.arange(len(graph.indices)).to(F.ctx())
@@ -267,7 +294,12 @@ def test_SubgraphSampler_Link_With_Negative(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_HyperLink(sampler_type):
     _check_sampler_type(sampler_type)
@@ -276,7 +308,7 @@ def test_SubgraphSampler_HyperLink(sampler_type):
     )
     items = torch.arange(20).reshape(-1, 5)
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {"timestamp": torch.arange(20).to(F.ctx())}
         graph.edge_attributes = {
             "timestamp": torch.arange(len(graph.indices)).to(F.ctx())
@@ -299,14 +331,19 @@ def test_SubgraphSampler_HyperLink(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Node_Hetero(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(3)
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -330,7 +367,12 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Link_Hetero(sampler_type):
     _check_sampler_type(sampler_type)
@@ -339,7 +381,7 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
     first_names = "seeds"
     second_items = torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T
     second_names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -372,7 +414,7 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
     _check_sampler_len(datapipe, 5)
     for data in datapipe:
         for compacted_seeds in data.compacted_seeds.values():
-            if sampler_type == SamplerType.Temporal:
+            if _is_temporal(sampler_type):
                 assert torch.equal(
                     compacted_seeds, torch.tensor([[0, 0], [1, 1]]).to(F.ctx())
                 )
@@ -385,7 +427,12 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
     _check_sampler_type(sampler_type)
@@ -394,7 +441,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
     first_names = "seeds"
     second_items = torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T
     second_names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -430,7 +477,12 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     _check_sampler_type(sampler_type)
@@ -439,7 +491,7 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     first_names = "seeds"
     second_items = torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T
     second_names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -475,7 +527,12 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     _check_sampler_type(sampler_type)
@@ -484,7 +541,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     first_names = "seeds"
     second_items = torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T
     second_names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -521,14 +578,19 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_HyperLink_Hetero(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.LongTensor([[2, 0, 1, 1, 2], [0, 1, 1, 0, 0]])
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -554,7 +616,7 @@ def test_SubgraphSampler_HyperLink_Hetero(sampler_type):
     _check_sampler_len(datapipe, 1)
     for data in datapipe:
         for compacted_seeds in data.compacted_seeds.values():
-            if sampler_type == SamplerType.Temporal:
+            if _is_temporal(sampler_type):
                 assert torch.equal(
                     compacted_seeds,
                     torch.tensor([[0, 0, 2, 2, 4], [1, 1, 3, 3, 5]]).to(
@@ -572,7 +634,12 @@ def test_SubgraphSampler_HyperLink_Hetero(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 @pytest.mark.parametrize(
     "replace",
@@ -601,7 +668,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
         "A1": torch.randn(num_edges),
         "A2": torch.randn(num_edges),
     }
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         node_attributes["timestamp"] = torch.randint(0, 10, (num_nodes,))
         edge_attributes["timestamp"] = torch.randint(0, 10, (num_edges,))
     graph = gb.fused_csc_sampling_graph(
@@ -618,7 +685,7 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
     first_names = "seeds"
     second_items = torch.tensor([0])
     second_names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         first_items = (first_items, torch.randint(0, 10, (1,)))
         first_names = (first_names, "timestamp")
         second_items = (second_items, torch.randint(0, 10, (1,)))
@@ -673,7 +740,12 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
     _check_sampler_type(sampler_type)
@@ -684,7 +756,7 @@ def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
     seed_nodes = torch.LongTensor([0, 3, 4])
     items = seed_nodes
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -702,7 +774,7 @@ def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
     sampler = _get_sampler(sampler_type)
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         datapipe = sampler(item_sampler, graph, fanouts)
     else:
         datapipe = sampler(item_sampler, graph, fanouts, deduplicate=False)
@@ -742,14 +814,19 @@ def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_without_deduplication_Hetero_Node(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2)
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -763,7 +840,7 @@ def test_SubgraphSampler_without_deduplication_Hetero_Node(sampler_type):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         datapipe = sampler(item_sampler, graph, fanouts)
     else:
         datapipe = sampler(item_sampler, graph, fanouts, deduplicate=False)
@@ -999,7 +1076,12 @@ def test_SubgraphSampler_unique_csc_format_Hetero_Node(labor):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     _check_sampler_type(sampler_type)
@@ -1007,7 +1089,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     items_n1 = torch.tensor([0])
     items_n2 = torch.tensor([1])
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.arange(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -1030,7 +1112,7 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     fanouts = [torch.LongTensor([2, 1]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
     sampler_dp = sampler(item_sampler, graph, fanouts)
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         indices_len = [
             {
                 "n1:e1:n2": 4,
@@ -1070,7 +1152,12 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
     _check_sampler_type(sampler_type)
@@ -1081,7 +1168,7 @@ def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
     seed_nodes = torch.LongTensor([[0, 1], [3, 5]])
     items = seed_nodes
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -1097,7 +1184,7 @@ def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
     sampler = _get_sampler(sampler_type)
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         datapipe = sampler(item_sampler, graph, fanouts)
     else:
         datapipe = sampler(item_sampler, graph, fanouts, deduplicate=False)
@@ -1132,14 +1219,19 @@ def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_without_deduplication_Hetero_Link(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2).view(1, 2)
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -1153,7 +1245,7 @@ def test_SubgraphSampler_without_deduplication_Hetero_Link(sampler_type):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         datapipe = sampler(item_sampler, graph, fanouts)
     else:
         datapipe = sampler(item_sampler, graph, fanouts, deduplicate=False)
@@ -1442,7 +1534,12 @@ def test_SubgraphSampler_unique_csc_format_Hetero_Link(labor):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_without_deduplication_Homo_HyperLink(sampler_type):
     _check_sampler_type(sampler_type)
@@ -1452,7 +1549,7 @@ def test_SubgraphSampler_without_deduplication_Homo_HyperLink(sampler_type):
     graph = gb.from_dglgraph(graph, True).to(F.ctx())
     items = torch.LongTensor([[0, 1, 4], [3, 5, 6]])
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -1468,7 +1565,7 @@ def test_SubgraphSampler_without_deduplication_Homo_HyperLink(sampler_type):
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
     sampler = _get_sampler(sampler_type)
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         datapipe = sampler(item_sampler, graph, fanouts)
     else:
         datapipe = sampler(item_sampler, graph, fanouts, deduplicate=False)
@@ -1503,14 +1600,19 @@ def test_SubgraphSampler_without_deduplication_Homo_HyperLink(sampler_type):
 
 @pytest.mark.parametrize(
     "sampler_type",
-    [SamplerType.Normal, SamplerType.Layer, SamplerType.Temporal],
+    [
+        SamplerType.Normal,
+        SamplerType.Layer,
+        SamplerType.Temporal,
+        SamplerType.TemporalLayer,
+    ],
 )
 def test_SubgraphSampler_without_deduplication_Hetero_HyperLink(sampler_type):
     _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(3).view(1, 3)
     names = "seeds"
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         graph.node_attributes = {
             "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
         }
@@ -1524,7 +1626,7 @@ def test_SubgraphSampler_without_deduplication_Hetero_HyperLink(sampler_type):
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     sampler = _get_sampler(sampler_type)
-    if sampler_type == SamplerType.Temporal:
+    if _is_temporal(sampler_type):
         datapipe = sampler(item_sampler, graph, fanouts)
     else:
         datapipe = sampler(item_sampler, graph, fanouts, deduplicate=False)
