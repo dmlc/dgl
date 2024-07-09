@@ -167,8 +167,9 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
                 int64_t aligned_offset =
                     offset & (long)~(kDiskAlignmentSize - 1);
                 // put offset of the feature into array.
-                residual[thread_id * group_size_ + (group_id % group_size_)] =
-                    offset - aligned_offset;
+                const auto local_residual_offset =
+                    thread_id * group_size_ + (group_id % group_size_);
+                residual[local_residual_offset] = offset - aligned_offset;
                 // If the tail of the feature extends into another block,
                 // read an additional block.
                 int64_t read_size;
@@ -181,14 +182,15 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
                 } else {
                   read_size = aligned_length;
                 }
+                const auto local_read_buffer_offset =
+                    (aligned_length + kDiskAlignmentSize) * group_size_ *
+                    thread_id;
                 // Put requests into io_uring queue.
                 struct io_uring_sqe *submit_queue =
                     io_uring_get_sqe(&io_uring_queue_[thread_id]);
                 io_uring_prep_read(
                     submit_queue, file_description_,
-                    read_buffer +
-                        ((aligned_length + kDiskAlignmentSize) * group_size_ *
-                         thread_id) +
+                    read_buffer + local_read_buffer_offset +
                         ((aligned_length + kDiskAlignmentSize) *
                          (group_id % group_size_)),
                     read_size, aligned_offset);
@@ -196,7 +198,7 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
                 if (((group_id + 1) % group_size_ == 0) || i == end - 1) {
                   if (!error_flag.load()) {
                     io_uring_submit(&io_uring_queue_[thread_id]);
-                    //  Wait for completion of I/O requests.
+                    // Wait for completion of I/O requests.
                     int64_t num_finish = 0;
                     // Wait until all the disk blocks are loaded in current
                     // group.
@@ -221,20 +223,17 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
                           &io_uring_queue_[thread_id], cqe_count);
                       num_finish += cqe_count;
                     }
-                    // copy results into result_buffer.
-
+                    // Copy results into result_buffer.
                     for (int64_t batch_id = batch_offset; batch_id <= i;
                          batch_id++) {
+                      const auto local_id = (batch_id - begin) % group_size_;
+                      const auto batch_offset =
+                          (aligned_length + kDiskAlignmentSize) * local_id;
                       std::memcpy(
-                          result_buffer + feature_size_ * (batch_id),
-                          read_buffer +
-                              ((aligned_length + kDiskAlignmentSize) *
-                               group_size_ * thread_id) +
-                              ((aligned_length + kDiskAlignmentSize) *
-                                   ((batch_id - begin) % group_size_) +
-                               residual
-                                   [thread_id * group_size_ +
-                                    ((batch_id - begin) % group_size_)]),
+                          result_buffer + feature_size_ * batch_id,
+                          read_buffer + local_read_buffer_offset +
+                              (batch_offset +
+                               residual[thread_id * group_size_ + local_id]),
                           feature_size_);
                     }
                     batch_offset += group_size_;
