@@ -3,7 +3,12 @@ import torch
 
 __all__ = ["FeatureCache"]
 
-caching_policies = {"s3-fifo": torch.ops.graphbolt.s3_fifo_cache_policy}
+caching_policies = {
+    "s3-fifo": torch.ops.graphbolt.s3_fifo_cache_policy,
+    "sieve": torch.ops.graphbolt.sieve_cache_policy,
+    "lru": torch.ops.graphbolt.lru_cache_policy,
+    "clock": torch.ops.graphbolt.clock_cache_policy,
+}
 
 
 class FeatureCache(object):
@@ -18,10 +23,11 @@ class FeatureCache(object):
     num_parts: int, optional
         The number of cache partitions for parallelism. Default is 1.
     policy: str, optional
-        The cache policy to be used. Default is "s3-fifo".
+        The cache policy. Default is "sieve". "s3-fifo", "lru" and "clock" are
+        also available.
     """
 
-    def __init__(self, cache_shape, dtype, num_parts=1, policy="s3-fifo"):
+    def __init__(self, cache_shape, dtype, num_parts=1, policy="sieve"):
         assert (
             policy in caching_policies
         ), f"{list(caching_policies.keys())} are the available caching policies."
@@ -30,26 +36,26 @@ class FeatureCache(object):
         self.total_miss = 0
         self.total_queries = 0
 
-    def query(self, keys, pin_memory=False):
+    def query(self, keys):
         """Queries the cache.
 
         Parameters
         ----------
         keys : Tensor
             The keys to query the cache with.
-        pin_memory : bool, optional
-            Whether the output values tensor should be pinned. Default is False.
 
         Returns
         -------
         tuple(Tensor, Tensor, Tensor)
             A tuple containing (values, missing_indices, missing_keys) where
             values[missing_indices] corresponds to cache misses that should be
-            filled by quering another source with missing_keys.
+            filled by quering another source with missing_keys. If keys is
+            pinned, then the returned values tensor is pinned as well.
         """
         self.total_queries += keys.shape[0]
-        positions, index, missing_keys = self._policy.query(keys)
-        values = self._cache.query(positions, index, keys.shape[0], pin_memory)
+        positions, index, missing_keys, found_keys = self._policy.query(keys)
+        values = self._cache.query(positions, index, keys.shape[0])
+        self._policy.reading_completed(found_keys)
         self.total_miss += missing_keys.shape[0]
         missing_index = index[positions.size(0) :]
         return values, missing_index, missing_keys
