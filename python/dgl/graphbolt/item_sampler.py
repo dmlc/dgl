@@ -9,9 +9,9 @@ import torch.distributed as dist
 from torchdata.datapipes.iter import IterDataPipe
 
 from .internal import calculate_range
+from .internal_utils import gb_warning
 from .itemset import HeteroItemSet, ItemSet
 from .minibatch import MiniBatch
-from .internal_utils import gb_warning
 
 __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 

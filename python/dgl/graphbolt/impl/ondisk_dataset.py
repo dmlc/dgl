@@ -23,8 +23,8 @@ from ..internal import (
     read_data,
     read_edges,
 )
-from ..itemset import HeteroItemSet, ItemSet
 from ..internal_utils import download, extract_archive, gb_warning
+from ..itemset import HeteroItemSet, ItemSet
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
     fused_csc_sampling_graph,
