@@ -55,8 +55,7 @@ struct FeatureCache : public torch::CustomClassHolder {
    * is true.
    */
   torch::Tensor Query(
-      torch::Tensor positions, torch::Tensor indices, int64_t size,
-      bool pin_memory);
+      torch::Tensor positions, torch::Tensor indices, int64_t size);
 
   /**
    * @brief The cache replace function.
