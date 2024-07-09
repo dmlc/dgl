@@ -23,9 +23,6 @@
 namespace graphbolt {
 namespace io_uring {
 
-/** @brief The cached value of whether io_uring is available. */
-inline std::optional<bool> cached_is_available;
-
 bool IsAvailable();
 
 }  // namespace io_uring
