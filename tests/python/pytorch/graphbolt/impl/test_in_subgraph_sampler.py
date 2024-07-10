@@ -67,14 +67,21 @@ def test_index_select_csc(
     assert torch.equal(cpu_indices, gpu_indices.cpu())
 
     for output_size_selection in [None, output_size]:
-        indices_list = [indices, indices.int().pin_memory() if is_pinned else indices.int()]
-        gpu_indptr2, gpu_indices_list = torch.ops.graphbolt.index_select_csc_batched(indptr, indices_list, index, output_size_selection)
+        indices_list = [
+            indices,
+            indices.int().pin_memory() if is_pinned else indices.int(),
+        ]
+        (
+            gpu_indptr2,
+            gpu_indices_list,
+        ) = torch.ops.graphbolt.index_select_csc_batched(
+            indptr, indices_list, index, output_size_selection
+        )
 
         assert torch.equal(gpu_indptr, gpu_indptr2)
         assert torch.equal(gpu_indices_list[0], gpu_indices)
         assert torch.equal(gpu_indices_list[1], gpu_indices.int())
 
-    
 
 def test_InSubgraphSampler_homo():
     """Original graph in COO:
