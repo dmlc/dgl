@@ -5,6 +5,7 @@ import warnings
 from collections.abc import Mapping, Sequence
 
 import requests
+import torch
 from tqdm.auto import tqdm
 
 try:
@@ -16,6 +17,22 @@ except ImportError:
 
 # pylint: disable=invalid-name
 _default_formatwarning = warnings.formatwarning
+
+
+def is_cuda_available():
+    try:
+        # This op is defined if graphbolt is built with CUDA support.
+        torch.ops.graphbolt.set_max_uva_threads(2**30)
+        graphbolt_cuda_available = True
+    except AttributeError:
+        graphbolt_cuda_available = False
+
+    if graphbolt_cuda_available != torch.cuda.is_available():
+        _boolean_to_enabled_disabled = {True: "enabled", False: "disabled"}
+        gb_warning(
+            f"The torch installation CUDA support is {_boolean_to_enabled_disabled[torch.cuda.is_available()]} but the graphbolt installation CUDA support is {graphbolt_cuda_available}. Consider reinstalling graphbolt so that its CUDA support matches the installed torch package."
+        )
+    return graphbolt_cuda_available
 
 
 class GBWarning(UserWarning):

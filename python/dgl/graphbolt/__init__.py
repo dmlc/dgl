@@ -57,3 +57,5 @@ from .internal import (
     unique_and_compact,
     unique_and_compact_csc_formats,
 )
+
+is_cuda_available()
