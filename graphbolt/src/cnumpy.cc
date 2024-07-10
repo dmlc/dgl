@@ -22,7 +22,7 @@ static constexpr int kDiskAlignmentSize = 4096;
 OnDiskNpyArray::OnDiskNpyArray(
     std::string filename, torch::ScalarType dtype, torch::Tensor shape,
     torch::optional<int64_t> num_threads)
-    : filename_(filename), dtype_(dtype), group_size_(512) {
+    : filename_(filename), dtype_(dtype) {
 #ifndef __linux__
   throw std::runtime_error(
       "OnDiskNpyArray is not supported on non-Linux systems.");
@@ -185,28 +185,17 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
               if (i + 1 == end && !error_flag.load()) {
                 io_uring_submit(&io_uring_queue_[thread_id]);
                 // Wait for completion of I/O requests.
-                int64_t num_finish = 0;
-                // Wait until all the disk blocks are loaded in current
-                // group.
-                while (num_finish < (group_id % group_size_ + 1)) {
-                  struct io_uring_cqe *complete_queue;
-                  if (io_uring_wait_cqe(
-                          &io_uring_queue_[thread_id], &complete_queue) < 0) {
-                    perror("io_uring_wait_cqe");
-                    std::exit(EXIT_FAILURE);
-                  }
-                  struct io_uring_cqe *complete_queues[group_size_];
-                  int cqe_count = io_uring_peek_batch_cqe(
-                      &io_uring_queue_[thread_id], complete_queues,
-                      group_size_);
-                  if (cqe_count == -1) {
-                    perror("io_uring_peek_batch error\n");
-                    std::exit(EXIT_FAILURE);
-                  }
-                  // Move the head pointer of completion queue.
-                  io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
-                  num_finish += cqe_count;
+                struct io_uring_cqe *complete_queues[group_size_];
+                // Wait for submitted end - begin reads to finish.
+                if (io_uring_wait_cqe_nr(
+                        &io_uring_queue_[thread_id], complete_queues,
+                        end - begin) < 0) {
+                  perror("io_uring_wait_cqe_nr error\n");
+                  std::exit(EXIT_FAILURE);
                 }
+                // Move the head pointer of completion queue.
+                io_uring_cq_advance(&io_uring_queue_[thread_id], end - begin);
+
                 // Copy results into result_buffer.
                 for (int64_t batch_id = batch_offset; batch_id <= i;
                      batch_id++) {
