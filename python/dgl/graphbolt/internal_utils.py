@@ -20,6 +20,7 @@ _default_formatwarning = warnings.formatwarning
 
 
 def is_cuda_available():
+    """Returns whether GraphBolt was built with CUDA support."""
     try:
         # This op is defined if graphbolt is built with CUDA support.
         _ = torch.ops.graphbolt.set_max_uva_threads
@@ -27,10 +28,12 @@ def is_cuda_available():
     except AttributeError:
         graphbolt_cuda_available = False
 
-    if graphbolt_cuda_available != torch.cuda.is_available():
-        _boolean_to_enabled_disabled = {True: "enabled", False: "disabled"}
+    if torch.cuda.is_available() and not graphbolt_cuda_available:
         gb_warning(
-            f"The torch installation CUDA support is {_boolean_to_enabled_disabled[torch.cuda.is_available()]} but the graphbolt installation CUDA support is {graphbolt_cuda_available}. Consider reinstalling graphbolt so that its CUDA support matches the installed torch package."
+            "torch was installed with CUDA support while GraphBolt's CPU "
+            "version is installed. Consider reinstalling GraphBolt with CUDA "
+            "support, see installation instructions at: "
+            "https://www.dgl.ai/pages/start.html"
         )
     return graphbolt_cuda_available
 
