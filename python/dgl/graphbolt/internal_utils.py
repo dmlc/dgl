@@ -19,7 +19,7 @@ except ImportError:
 _default_formatwarning = warnings.formatwarning
 
 
-def is_cuda_available():
+def built_with_cuda():
     """Returns whether GraphBolt was built with CUDA support."""
     # This op is defined if graphbolt is built with CUDA support.
     return hasattr(torch.ops.graphbolt, "set_max_uva_threads")
