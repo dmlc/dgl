@@ -22,7 +22,7 @@ _default_formatwarning = warnings.formatwarning
 def is_cuda_available():
     try:
         # This op is defined if graphbolt is built with CUDA support.
-        torch.ops.graphbolt.set_max_uva_threads(2**30)
+        _ = torch.ops.graphbolt.set_max_uva_threads
         graphbolt_cuda_available = True
     except AttributeError:
         graphbolt_cuda_available = False
