@@ -136,7 +136,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  * of indices tensors of shapes (M + 1,) and ((indptr[nodes + 1] -
  * indptr[nodes]).sum(),).
  */
-std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCImpl(
+std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatchedImpl(
     torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
     torch::Tensor nodes, torch::optional<int64_t> output_size);
 

@@ -55,7 +55,8 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
       utils::are_accessible_from_gpu(indices_list)) {
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "IndexSelectCSCImpl", {
-          return IndexSelectCSCImpl(indptr, indices_list, nodes, output_size);
+          return IndexSelectCSCBatchedImpl(
+              indptr, indices_list, nodes, output_size);
         });
   }
   std::vector<torch::Tensor> results;

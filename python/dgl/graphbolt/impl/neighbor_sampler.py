@@ -145,24 +145,24 @@ class FetchInsubgraphData(Mapper):
                     tensor.record_stream(stream)
                 return tensor
 
-            # Start packing tensors to be sliced here for the batched call.
+            # Packs tensors for batch slicing.
             tensors_to_be_sliced = [self.graph.indices]
 
-            type_per_edge = None
+            has_type_per_edge = False
             if self.graph.type_per_edge is not None:
                 tensors_to_be_sliced.append(self.graph.type_per_edge)
-                type_per_edge = True
+                has_type_per_edge = True
 
-            probs_or_mask = None
+            has_probs_or_mask = None
             if self.graph.edge_attributes is not None:
                 probs_or_mask = self.graph.edge_attributes.get(
                     self.prob_name, None
                 )
                 if probs_or_mask is not None:
                     tensors_to_be_sliced.append(probs_or_mask)
-                    probs_or_mask = True
+                    has_probs_or_mask = True
 
-            # Actually slice the tensors here.
+            # Slices the batched tensors.
             (
                 indptr,
                 sliced_tensors,
@@ -172,15 +172,15 @@ class FetchInsubgraphData(Mapper):
             for tensor in [indptr] + sliced_tensors:
                 record_stream(tensor)
 
-            # Start unpacking the sliced tensors here.
+            # Unpacks the sliced tensors.
             indices = sliced_tensors[0]
             sliced_tensors = sliced_tensors[1:]
 
-            if type_per_edge:
+            if has_type_per_edge:
                 type_per_edge = sliced_tensors[0]
                 sliced_tensors = sliced_tensors[1:]
 
-            if probs_or_mask:
+            if has_probs_or_mask:
                 probs_or_mask = sliced_tensors[0]
                 sliced_tensors = sliced_tensors[1:]
             assert len(sliced_tensors) == 0
