@@ -58,15 +58,14 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
           return IndexSelectCSCImpl(indptr, indices_list, nodes, output_size);
         });
   }
-  // @todo: The CPU supports only integer dtypes for indices tensor.
-  for (auto& indices : indices_list) {
-    TORCH_CHECK(
-        c10::isIntegralType(indices.scalar_type(), false),
-        "IndexSelectCSC is not implemented to slice noninteger types yet.");
-  }
   std::vector<torch::Tensor> results;
   torch::Tensor output_indptr;
   for (auto& indices : indices_list) {
+    // @todo: The CPU supports only integer dtypes for indices tensor.
+    TORCH_CHECK(
+        c10::isIntegralType(indices.scalar_type(), false),
+        "IndexSelectCSCBatched is not implemented to slice noninteger types "
+        "yet.");
     sampling::FusedCSCSamplingGraph g(indptr, indices);
     const auto res = g.InSubgraph(nodes);
     output_indptr = res->indptr;
