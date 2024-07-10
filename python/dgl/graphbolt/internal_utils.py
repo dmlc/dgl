@@ -5,6 +5,7 @@ import warnings
 from collections.abc import Mapping, Sequence
 
 import requests
+import torch
 from tqdm.auto import tqdm
 
 try:
@@ -16,6 +17,12 @@ except ImportError:
 
 # pylint: disable=invalid-name
 _default_formatwarning = warnings.formatwarning
+
+
+def built_with_cuda():
+    """Returns whether GraphBolt was built with CUDA support."""
+    # This op is defined if graphbolt is built with CUDA support.
+    return hasattr(torch.ops.graphbolt, "set_max_uva_threads")
 
 
 class GBWarning(UserWarning):
