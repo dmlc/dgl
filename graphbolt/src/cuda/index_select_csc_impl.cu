@@ -300,5 +300,24 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
       output_size);
 }
 
+std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCImpl(
+    torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
+    torch::Tensor nodes, torch::optional<int64_t> output_size) {
+  auto [in_degree, sliced_indptr] = SliceCSCIndptr(indptr, nodes);
+  std::vector<torch::Tensor> results;
+  results.reserve(indices_list.size());
+  torch::Tensor output_indptr;
+  for (auto& indices : indices_list) {
+    torch::Tensor output_indices;
+    std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
+        in_degree, sliced_indptr, indices, nodes, indptr.size(0) - 2,
+        output_size);
+    if (!output_size.has_value()) output_size = output_indices.size(0);
+    TORCH_CHECK(*output_size == output_indices.size(0));
+    results.push_back(output_indices);
+  }
+  return {output_indptr, results};
+}
+
 }  //  namespace ops
 }  //  namespace graphbolt

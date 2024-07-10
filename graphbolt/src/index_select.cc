@@ -43,5 +43,37 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
   return std::make_tuple(res->indptr, res->indices);
 }
 
+std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
+    torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
+    torch::Tensor nodes, torch::optional<int64_t> output_size) {
+  for (auto& indices : indices_list) {
+    TORCH_CHECK(
+        indices.sizes().size() == 1,
+        "IndexSelectCSCBatched only supports 1d tensors");
+  }
+  if (utils::is_on_gpu(nodes) && utils::is_accessible_from_gpu(indptr) &&
+      utils::are_accessible_from_gpu(indices_list)) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+        c10::DeviceType::CUDA, "IndexSelectCSCImpl", {
+          return IndexSelectCSCImpl(indptr, indices_list, nodes, output_size);
+        });
+  }
+  // @todo: The CPU supports only integer dtypes for indices tensor.
+  for (auto& indices : indices_list) {
+    TORCH_CHECK(
+        c10::isIntegralType(indices.scalar_type(), false),
+        "IndexSelectCSC is not implemented to slice noninteger types yet.");
+  }
+  std::vector<torch::Tensor> results;
+  torch::Tensor output_indptr;
+  for (auto& indices : indices_list) {
+    sampling::FusedCSCSamplingGraph g(indptr, indices);
+    const auto res = g.InSubgraph(nodes);
+    output_indptr = res->indptr;
+    results.push_back(res->indices);
+  }
+  return std::make_tuple(output_indptr, results);
+}
+
 }  // namespace ops
 }  // namespace graphbolt
