@@ -32,7 +32,7 @@ def is_cuda_available():
         gb_warning(
             "torch was installed with CUDA support while GraphBolt's CPU "
             "version is installed. Consider reinstalling GraphBolt with CUDA "
-            "support, see installation instructions at: "
+            "support, see installation instructions at "
             "https://www.dgl.ai/pages/start.html"
         )
     return graphbolt_cuda_available
