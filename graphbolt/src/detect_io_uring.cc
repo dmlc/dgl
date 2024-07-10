@@ -57,12 +57,16 @@ bool IsAvailable() {
 
     std::unique_ptr<struct io_uring_probe, io_uring_probe_destroyer> probe(
         io_uring_get_probe(), io_uring_probe_destroyer());
-    cached_is_available =
-        cached_is_available &&
-        io_uring_opcode_supported(probe.get(), IORING_OP_READ);
-    cached_is_available =
-        cached_is_available &&
-        io_uring_opcode_supported(probe.get(), IORING_OP_READV);
+    if (probe.get()) {
+      cached_is_available =
+          cached_is_available &&
+          io_uring_opcode_supported(probe.get(), IORING_OP_READ);
+      cached_is_available =
+          cached_is_available &&
+          io_uring_opcode_supported(probe.get(), IORING_OP_READV);
+    } else {
+      cached_is_available = false;
+    }
   });
 
   return cached_is_available;
