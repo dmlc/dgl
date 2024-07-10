@@ -176,10 +176,12 @@ class FetchInsubgraphData(Mapper):
             indices = sliced_tensors[0]
             sliced_tensors = sliced_tensors[1:]
 
+            type_per_edge = None
             if has_type_per_edge:
                 type_per_edge = sliced_tensors[0]
                 sliced_tensors = sliced_tensors[1:]
 
+            probs_or_mask = None
             if has_probs_or_mask:
                 probs_or_mask = sliced_tensors[0]
                 sliced_tensors = sliced_tensors[1:]
