@@ -182,47 +182,45 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
                        (group_id % group_size_)),
                   read_size, aligned_offset);
 
-              if (((group_id + 1) % group_size_ == 0) || i == end - 1) {
-                if (!error_flag.load()) {
-                  io_uring_submit(&io_uring_queue_[thread_id]);
-                  // Wait for completion of I/O requests.
-                  int64_t num_finish = 0;
-                  // Wait until all the disk blocks are loaded in current
-                  // group.
-                  while (num_finish < (group_id % group_size_ + 1)) {
-                    struct io_uring_cqe *complete_queue;
-                    if (io_uring_wait_cqe(
-                            &io_uring_queue_[thread_id], &complete_queue) < 0) {
-                      perror("io_uring_wait_cqe");
-                      std::exit(EXIT_FAILURE);
-                    }
-                    struct io_uring_cqe *complete_queues[group_size_];
-                    int cqe_count = io_uring_peek_batch_cqe(
-                        &io_uring_queue_[thread_id], complete_queues,
-                        group_size_);
-                    if (cqe_count == -1) {
-                      perror("io_uring_peek_batch error\n");
-                      std::exit(EXIT_FAILURE);
-                    }
-                    // Move the head pointer of completion queue.
-                    io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
-                    num_finish += cqe_count;
+              if (i + 1 == end && !error_flag.load()) {
+                io_uring_submit(&io_uring_queue_[thread_id]);
+                // Wait for completion of I/O requests.
+                int64_t num_finish = 0;
+                // Wait until all the disk blocks are loaded in current
+                // group.
+                while (num_finish < (group_id % group_size_ + 1)) {
+                  struct io_uring_cqe *complete_queue;
+                  if (io_uring_wait_cqe(
+                          &io_uring_queue_[thread_id], &complete_queue) < 0) {
+                    perror("io_uring_wait_cqe");
+                    std::exit(EXIT_FAILURE);
                   }
-                  // Copy results into result_buffer.
-                  for (int64_t batch_id = batch_offset; batch_id <= i;
-                       batch_id++) {
-                    const auto local_id = (batch_id - begin) % group_size_;
-                    const auto batch_offset =
-                        (aligned_length + kDiskAlignmentSize) * local_id;
-                    std::memcpy(
-                        result_buffer + feature_size_ * batch_id,
-                        read_buffer + local_read_buffer_offset +
-                            (batch_offset +
-                             residual[thread_id * group_size_ + local_id]),
-                        feature_size_);
+                  struct io_uring_cqe *complete_queues[group_size_];
+                  int cqe_count = io_uring_peek_batch_cqe(
+                      &io_uring_queue_[thread_id], complete_queues,
+                      group_size_);
+                  if (cqe_count == -1) {
+                    perror("io_uring_peek_batch error\n");
+                    std::exit(EXIT_FAILURE);
                   }
-                  batch_offset += group_size_;
+                  // Move the head pointer of completion queue.
+                  io_uring_cq_advance(&io_uring_queue_[thread_id], cqe_count);
+                  num_finish += cqe_count;
                 }
+                // Copy results into result_buffer.
+                for (int64_t batch_id = batch_offset; batch_id <= i;
+                     batch_id++) {
+                  const auto local_id = (batch_id - begin) % group_size_;
+                  const auto batch_offset =
+                      (aligned_length + kDiskAlignmentSize) * local_id;
+                  std::memcpy(
+                      result_buffer + feature_size_ * batch_id,
+                      read_buffer + local_read_buffer_offset +
+                          (batch_offset +
+                           residual[thread_id * group_size_ + local_id]),
+                      feature_size_);
+                }
+                batch_offset += group_size_;
               }
             }
           }));
