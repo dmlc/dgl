@@ -141,12 +141,11 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
       begin = work_queue.fetch_add(group_size_, std::memory_order_relaxed);
       if (begin >= num_index || error_flag.load()) break;
       end = std::min(begin + group_size_, num_index);
-      int64_t batch_offset = begin;
       AT_DISPATCH_INDEX_TYPES(
           index.scalar_type(), "IndexSelectIOUring", ([&] {
             auto index_data = index.data_ptr<index_t>();
             for (int64_t i = begin; i < end; ++i) {
-              int64_t group_id = i - begin;
+              int64_t local_id = i - begin;
               int64_t feature_id = index_data[i];  // Feature id.
               if (feature_id >= feature_dim_[0]) {
                 error_flag.store(true);
@@ -157,13 +156,12 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
               int64_t aligned_offset = offset & (long)~(kDiskAlignmentSize - 1);
               // put offset of the feature into array.
               const auto local_residual_offset =
-                  thread_id * group_size_ + (group_id % group_size_);
+                  thread_id * group_size_ + local_id;
               residual[local_residual_offset] = offset - aligned_offset;
               // If the tail of the feature extends into another block,
               // read an additional block.
               int64_t read_size;
-              if (residual[thread_id * group_size_ + (group_id % group_size_)] +
-                      feature_size_ >
+              if (residual[thread_id * group_size_ + local_id] + feature_size_ >
                   kDiskAlignmentSize) {
                 read_size = aligned_length + kDiskAlignmentSize;
               } else {
@@ -178,8 +176,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
               io_uring_prep_read(
                   submit_queue, file_description_,
                   read_buffer + local_read_buffer_offset +
-                      ((aligned_length + kDiskAlignmentSize) *
-                       (group_id % group_size_)),
+                      ((aligned_length + kDiskAlignmentSize) * local_id),
                   read_size, aligned_offset);
 
               if (i + 1 == end && !error_flag.load()) {
@@ -197,19 +194,17 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
                 io_uring_cq_advance(&io_uring_queue_[thread_id], end - begin);
 
                 // Copy results into result_buffer.
-                for (int64_t batch_id = batch_offset; batch_id <= i;
-                     batch_id++) {
-                  const auto local_id = (batch_id - begin) % group_size_;
+                for (int64_t j = begin; j < end; j++) {
+                  const auto local_id = j - begin;
                   const auto batch_offset =
                       (aligned_length + kDiskAlignmentSize) * local_id;
                   std::memcpy(
-                      result_buffer + feature_size_ * batch_id,
+                      result_buffer + feature_size_ * j,
                       read_buffer + local_read_buffer_offset +
                           (batch_offset +
                            residual[thread_id * group_size_ + local_id]),
                       feature_size_);
                 }
-                batch_offset += group_size_;
               }
             }
           }));
