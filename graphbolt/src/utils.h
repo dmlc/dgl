@@ -15,15 +15,27 @@ namespace utils {
 /**
  * @brief Checks whether the tensor is stored on the GPU.
  */
-inline bool is_on_gpu(torch::Tensor tensor) {
+inline bool is_on_gpu(const torch::Tensor& tensor) {
   return tensor.device().is_cuda();
 }
 
 /**
  * @brief Checks whether the tensor is stored on the GPU or the pinned memory.
  */
-inline bool is_accessible_from_gpu(torch::Tensor tensor) {
+inline bool is_accessible_from_gpu(const torch::Tensor& tensor) {
   return is_on_gpu(tensor) || tensor.is_pinned();
+}
+
+/**
+ * @brief Checks whether the tensors are all stored on the GPU or the pinned
+ * memory.
+ */
+template <typename TensorContainer>
+inline bool are_accessible_from_gpu(const TensorContainer& tensors) {
+  for (auto& tensor : tensors) {
+    if (!is_accessible_from_gpu(tensor)) return false;
+  }
+  return true;
 }
 
 /**

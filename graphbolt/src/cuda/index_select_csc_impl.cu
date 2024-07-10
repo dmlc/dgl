@@ -23,6 +23,7 @@
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 
+#include <cstdint>
 #include <cub/cub.cuh>
 #include <numeric>
 
@@ -51,7 +52,8 @@ struct AlignmentFunc {
         // A single cache line has num_elements items, we add num_elements - 1
         // to ensure there is enough slack to move forward or backward by
         // num_elements - 1 items if the performed access is not aligned.
-        (indptr_t)(in_degree[perm ? perm[row % num_nodes] : row] + num_elements - 1));
+        static_cast<indptr_t>(
+            in_degree[perm ? perm[row % num_nodes] : row] + num_elements - 1));
   }
 };
 
@@ -70,14 +72,18 @@ __global__ void _CopyIndicesAlignedKernel(
     const auto row_pos = perm ? perm[permuted_row_pos] : permuted_row_pos;
     const auto out_row = output_indptr[row_pos];
     const auto d = output_indptr[row_pos + 1] - out_row;
-    const int offset =
-        ((size_t)(indices + indptr[row_pos] - output_indptr_aligned[permuted_row_pos]) %
-         GPU_CACHE_LINE_SIZE) /
-        sizeof(indices_t);
+    const int offset = (reinterpret_cast<std::uintptr_t>(
+                            indices + indptr[row_pos] -
+                            output_indptr_aligned[permuted_row_pos]) %
+                        GPU_CACHE_LINE_SIZE) /
+                       sizeof(indices_t);
     const auto rofs = idx - output_indptr_aligned[permuted_row_pos] - offset;
     if (rofs >= 0 && rofs < d) {
       const auto in_idx = indptr[row_pos] + rofs;
-      assert((size_t)(indices + in_idx - idx) % GPU_CACHE_LINE_SIZE == 0);
+      assert(
+          reinterpret_cast<std::uintptr_t>(indices + in_idx - idx) %
+              GPU_CACHE_LINE_SIZE ==
+          0);
       const auto u = indices[in_idx];
       output_indices[out_row + rofs] = u;
     }
@@ -298,6 +304,25 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
   return IndexSelectCSCImpl(
       in_degree, sliced_indptr, indices, nodes, indptr.size(0) - 2,
       output_size);
+}
+
+std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatchedImpl(
+    torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
+    torch::Tensor nodes, torch::optional<int64_t> output_size) {
+  auto [in_degree, sliced_indptr] = SliceCSCIndptr(indptr, nodes);
+  std::vector<torch::Tensor> results;
+  results.reserve(indices_list.size());
+  torch::Tensor output_indptr;
+  for (auto& indices : indices_list) {
+    torch::Tensor output_indices;
+    std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
+        in_degree, sliced_indptr, indices, nodes, indptr.size(0) - 2,
+        output_size);
+    if (!output_size.has_value()) output_size = output_indices.size(0);
+    TORCH_CHECK(*output_size == output_indices.size(0));
+    results.push_back(output_indices);
+  }
+  return {output_indptr, results};
 }
 
 }  //  namespace ops

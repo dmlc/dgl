@@ -145,34 +145,48 @@ class FetchInsubgraphData(Mapper):
                     tensor.record_stream(stream)
                 return tensor
 
-            index_select_csc_with_indptr = partial(
-                torch.ops.graphbolt.index_select_csc, self.graph.csc_indptr
-            )
+            # Packs tensors for batch slicing.
+            tensors_to_be_sliced = [self.graph.indices]
 
-            indptr, indices = index_select_csc_with_indptr(
-                self.graph.indices, seeds, None
-            )
-            record_stream(indptr)
-            record_stream(indices)
-            output_size = len(indices)
+            has_type_per_edge = False
             if self.graph.type_per_edge is not None:
-                _, type_per_edge = index_select_csc_with_indptr(
-                    self.graph.type_per_edge, seeds, output_size
-                )
-                record_stream(type_per_edge)
-            else:
-                type_per_edge = None
+                tensors_to_be_sliced.append(self.graph.type_per_edge)
+                has_type_per_edge = True
+
+            has_probs_or_mask = None
             if self.graph.edge_attributes is not None:
                 probs_or_mask = self.graph.edge_attributes.get(
                     self.prob_name, None
                 )
                 if probs_or_mask is not None:
-                    _, probs_or_mask = index_select_csc_with_indptr(
-                        probs_or_mask, seeds, output_size
-                    )
-                    record_stream(probs_or_mask)
-            else:
-                probs_or_mask = None
+                    tensors_to_be_sliced.append(probs_or_mask)
+                    has_probs_or_mask = True
+
+            # Slices the batched tensors.
+            (
+                indptr,
+                sliced_tensors,
+            ) = torch.ops.graphbolt.index_select_csc_batched(
+                self.graph.csc_indptr, tensors_to_be_sliced, seeds, None
+            )
+            for tensor in [indptr] + sliced_tensors:
+                record_stream(tensor)
+
+            # Unpacks the sliced tensors.
+            indices = sliced_tensors[0]
+            sliced_tensors = sliced_tensors[1:]
+
+            type_per_edge = None
+            if has_type_per_edge:
+                type_per_edge = sliced_tensors[0]
+                sliced_tensors = sliced_tensors[1:]
+
+            probs_or_mask = None
+            if has_probs_or_mask:
+                probs_or_mask = sliced_tensors[0]
+                sliced_tensors = sliced_tensors[1:]
+            assert len(sliced_tensors) == 0
+
             subgraph = fused_csc_sampling_graph(
                 indptr,
                 indices,
