@@ -80,7 +80,10 @@ __global__ void _CopyIndicesAlignedKernel(
     const auto rofs = idx - output_indptr_aligned[permuted_row_pos] - offset;
     if (rofs >= 0 && rofs < d) {
       const auto in_idx = indptr[row_pos] + rofs;
-      assert((size_t)(indices + in_idx - idx) % GPU_CACHE_LINE_SIZE == 0);
+      assert(
+          reinterpret_cast<std::uintptr_t>(indices + in_idx - idx) %
+              GPU_CACHE_LINE_SIZE ==
+          0);
       const auto u = indices[in_idx];
       output_indices[out_row + rofs] = u;
     }
