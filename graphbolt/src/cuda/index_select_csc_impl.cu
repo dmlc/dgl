@@ -71,8 +71,9 @@ __global__ void _CopyIndicesAlignedKernel(
     const auto row_pos = perm ? perm[permuted_row_pos] : permuted_row_pos;
     const auto out_row = output_indptr[row_pos];
     const auto d = output_indptr[row_pos + 1] - out_row;
-    const int offset = ((size_t)(indices + indptr[row_pos] -
-                                 output_indptr_aligned[permuted_row_pos]) %
+    const int offset = (static_cast<size_t>(
+                            indices + indptr[row_pos] -
+                            output_indptr_aligned[permuted_row_pos]) %
                         GPU_CACHE_LINE_SIZE) /
                        sizeof(indices_t);
     const auto rofs = idx - output_indptr_aligned[permuted_row_pos] - offset;
