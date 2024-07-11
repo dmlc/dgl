@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+
 import backend as F
 
 import numpy as np
@@ -53,7 +54,7 @@ def test_disk_based_feature():
             feature_b.read(torch.tensor([1])),
             torch.tensor([[[4, 5], [6, 7]]]),
         )
-        
+
         # Test reading into pin_memory
         if F._default_context_str == "gpu":
             res = feature_a.read(torch.tensor([0], pin_memory=True))
