@@ -1,6 +1,8 @@
 """Miscallenous internal utils."""
+import functools
 import hashlib
 import os
+import platform
 import warnings
 from collections.abc import Mapping, Sequence
 
@@ -13,6 +15,18 @@ try:
 except ImportError:
     # If packaging isn't installed, try and use the vendored copy in setuptools
     from setuptools.extern.packaging import version
+
+
+@functools.cache
+def is_wsl(v: str = platform.uname().release) -> int:
+    """Detects if Python is running in WSL"""
+
+    if v.endswith("-Microsoft"):
+        return 1
+    elif v.endswith("microsoft-standard-WSL2"):
+        return 2
+
+    return 0
 
 
 # pylint: disable=invalid-name
