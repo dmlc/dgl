@@ -17,7 +17,7 @@ except ImportError:
     from setuptools.extern.packaging import version
 
 
-@functools.cache
+@functools.lru_cache(maxsize=None)
 def is_wsl(v: str = platform.uname().release) -> int:
     """Detects if Python is running in WSL"""
 
