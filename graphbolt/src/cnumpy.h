@@ -104,14 +104,16 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
 
 #endif  // HAVE_LIBRARY_LIBURING
  private:
-  const std::string filename_;             // Path to numpy file.
-  int file_description_;                   // File description.
-  size_t prefix_len_;                      // Length of head data in numpy file.
-  std::vector<int64_t> feature_dim_;       // Shape of features, e.g. {N,M,K,L}.
-  const torch::ScalarType dtype_;          // Feature data type.
-  int64_t feature_size_;                   // Number of bytes of feature size.
-  int num_thread_;                         // Default thread number.
-  static constexpr int group_size_ = 512;  // Default group size.
+  const std::string filename_;        // Path to numpy file.
+  int file_description_;              // File description.
+  size_t prefix_len_;                 // Length of head data in numpy file.
+  std::vector<int64_t> feature_dim_;  // Shape of features, e.g. {N,M,K,L}.
+  const torch::ScalarType dtype_;     // Feature data type.
+  int64_t feature_size_;              // Number of bytes of feature size.
+  int64_t aligned_length_;            // Aligned feature_size.
+  int num_thread_;                    // Default thread number.
+  torch::Tensor read_tensor_;         // Provides temporary read buffer.
+  char* read_buffer_;                 // Aligned pointer to read_tensor.
 
 #ifdef HAVE_LIBRARY_LIBURING
   std::unique_ptr<io_uring[]> io_uring_queue_;  // io_uring queue.
