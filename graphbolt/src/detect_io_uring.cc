@@ -21,12 +21,20 @@
 #include "./detect_io_uring.h"
 
 #include <errno.h>
+#include <liburing.h>
 #include <linux/io_uring.h>
 #include <stddef.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#include <memory>
 #include <mutex>
+
+struct io_uring_probe_destroyer {
+  void operator()(struct io_uring_probe* p) {
+    if (p) io_uring_free_probe(p);
+  }
+};
 #endif
 
 namespace graphbolt {
@@ -46,6 +54,19 @@ bool IsAvailable() {
         !(syscall(
               __NR_io_uring_register, 0, IORING_UNREGISTER_BUFFERS, NULL, 0) &&
           errno == ENOSYS);
+
+    std::unique_ptr<struct io_uring_probe, io_uring_probe_destroyer> probe(
+        io_uring_get_probe(), io_uring_probe_destroyer());
+    if (probe.get()) {
+      cached_is_available =
+          cached_is_available &&
+          io_uring_opcode_supported(probe.get(), IORING_OP_READ);
+      cached_is_available =
+          cached_is_available &&
+          io_uring_opcode_supported(probe.get(), IORING_OP_READV);
+    } else {
+      cached_is_available = false;
+    }
   });
 
   return cached_is_available;
