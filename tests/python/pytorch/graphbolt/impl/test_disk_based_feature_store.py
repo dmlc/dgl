@@ -1,7 +1,7 @@
 import os
-import sys
 import tempfile
 import unittest
+import backend as F
 
 import numpy as np
 import pytest
@@ -25,12 +25,15 @@ def test_disk_based_feature():
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 3], [4, 5, 6]])
         b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
+        c = torch.randn([5120, 133])
         metadata = {"max_value": 3}
         path_a = to_on_disk_numpy(test_dir, "a", a)
         path_b = to_on_disk_numpy(test_dir, "b", b)
+        path_c = to_on_disk_numpy(test_dir, "c", c)
 
         feature_a = gb.DiskBasedFeature(path=path_a, metadata=metadata)
         feature_b = gb.DiskBasedFeature(path=path_b)
+        feature_c = gb.DiskBasedFeature(path=path_c)
 
         # Read the entire feature.
         assert torch.equal(
@@ -50,20 +53,32 @@ def test_disk_based_feature():
             feature_b.read(torch.tensor([1])),
             torch.tensor([[[4, 5], [6, 7]]]),
         )
+        
+        # Test reading into pin_memory
+        if F._default_context_str == "gpu":
+            res = feature_a.read(torch.tensor([0], pin_memory=True))
+            assert res.is_pinned()
 
-        # test when the index tensor is large.
+        # Test when the index tensor is large.
         torch_based_feature_a = gb.TorchBasedFeature(a)
-        ind_a = torch.randint(low=0, high=2, size=(1, 4097))[0]
-        assert torch.equal(
-            feature_a.read(ind_a),
-            torch_based_feature_a.read(ind_a),
-        )
-        torch_based_feature_b = gb.TorchBasedFeature(b)
-        ind_b = torch.randint(low=0, high=2, size=(1, 4097))[0]
+        for _ in range(1000):
+            ind_a = torch.randint(low=0, high=a.size(0), size=(4111,))
+            assert torch.equal(
+                feature_a.read(ind_a),
+                torch_based_feature_a.read(ind_a),
+            )
+
+        # Test converting to torch_based_feature with read_into_memory()
+        torch_based_feature_b = feature_b.read_into_memory()
+        ind_b = torch.randint(low=0, high=b.size(0), size=(4111,))
         assert torch.equal(
             feature_b.read(ind_b),
             torch_based_feature_b.read(ind_b),
         )
+
+        # Test with larger stored feature tensor
+        ind_c = torch.randint(low=0, high=c.size(0), size=(4111,))
+        assert torch.equal(feature_c.read(ind_c), c[ind_c])
 
         # Test get the size of the entire feature.
         assert feature_a.size() == torch.Size([3])
@@ -116,13 +131,13 @@ def test_disk_based_feature():
 def test_more_disk_based_feature(dtype, idtype, shape, index):
     if dtype == torch.complex128:
         tensor = torch.complex(
-            torch.randint(0, 13, shape, dtype=torch.float64),
-            torch.randint(0, 13, shape, dtype=torch.float64),
+            torch.randint(0, 127, shape, dtype=torch.float64),
+            torch.randint(0, 127, shape, dtype=torch.float64),
         )
     else:
-        tensor = torch.randint(0, 13, shape, dtype=dtype)
+        tensor = torch.randint(0, 127, shape, dtype=dtype)
     test_tensor = tensor.clone()
-    idx = torch.tensor(index)
+    idx = torch.tensor(index, dtype=idtype)
 
     with tempfile.TemporaryDirectory() as test_dir:
         path = to_on_disk_numpy(test_dir, "tensor", tensor)
@@ -130,9 +145,7 @@ def test_more_disk_based_feature(dtype, idtype, shape, index):
         feature = gb.DiskBasedFeature(path=path)
 
         # Test read feature.
-        assert torch.equal(
-            feature.read(torch.tensor(idx, dtype=idtype)), test_tensor[idx]
-        )
+        assert torch.equal(feature.read(idx), test_tensor[idx.long()])
 
 
 @unittest.skipIf(

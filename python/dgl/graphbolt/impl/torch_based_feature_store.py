@@ -269,7 +269,7 @@ class DiskBasedFeature(Feature):
 
         self._metadata = metadata
         self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
-            path, self._tensor.dtype, torch.tensor(self._tensor.shape), None
+            path, self._tensor.dtype, self._tensor.shape, None
         )
 
     def read(self, ids: torch.Tensor = None):
@@ -286,8 +286,6 @@ class DiskBasedFeature(Feature):
             The read feature.
         """
         if ids is None:
-            if self._tensor.is_pinned():
-                return self._tensor.cuda()
             return self._tensor
         elif torch.ops.graphbolt.detect_io_uring():
             try:
