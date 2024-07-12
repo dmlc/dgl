@@ -104,8 +104,8 @@ def test_disk_based_feature():
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
-        a = b = None
-        feature_a = feature_b = None
+        a = b = c = None
+        feature_a = feature_b = feature_c = None
 
 
 @unittest.skipIf(

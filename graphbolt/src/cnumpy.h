@@ -75,7 +75,7 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   /**
    * @brief Parses the header of a numpy file to extract feature information.
    **/
-  void ParseNumpyHeader();
+  int64_t ParseNumpyHeader();
 
   /**
    * @brief Read disk numpy file based on given index and transform to
@@ -107,7 +107,8 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
  private:
   const std::string filename_;  // Path to numpy file.
   int file_description_;        // File description.
-  size_t prefix_len_;           // Length of head data in numpy file.
+  int64_t block_size_;          // Block size of the opened file.
+  int64_t prefix_len_;          // Length of head data in numpy file.
   const std::vector<int64_t>
       feature_dim_;                // Shape of features, e.g. {N,M,K,L}.
   const torch::ScalarType dtype_;  // Feature data type.
