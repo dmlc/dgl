@@ -224,7 +224,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
             ::io_uring_wait_cqe_nr(
                 &my_io_uring_queue, &cqe, num_submitted - num_completed) == 0);
         // Check the reads and abort on failure.
-        int64_t i = 0;
+        int64_t i = 0;  // Counts how many were completed in this batch.
         unsigned head;
         io_uring_for_each_cqe(&my_io_uring_queue, head, cqe) {
           const auto &req =
