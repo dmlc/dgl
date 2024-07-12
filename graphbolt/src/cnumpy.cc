@@ -220,6 +220,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
         read_queue.Clear();
         // Wait for the reads.
         struct io_uring_cqe *cqe;
+        TORCH_CHECK(num_submitted - num_completed <= 2 * kGroupSize);
         TORCH_CHECK(
             ::io_uring_wait_cqe_nr(
                 &my_io_uring_queue, &cqe, num_submitted - num_completed) == 0);
