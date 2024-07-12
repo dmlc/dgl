@@ -1,8 +1,6 @@
 import os
 import tempfile
 import unittest
-from functools import reduce
-from operator import mul
 
 import backend as F
 
@@ -216,6 +214,8 @@ def test_torch_based_pinned_feature(dtype, idtype, shape, in_place):
 
     feature = gb.TorchBasedFeature(tensor)
     if in_place:
+        if gb.is_wsl():
+            pytest.skip("In place pinning is not supported on WSL.")
         feature.pin_memory_()
 
         # Check if pinning is truly in-place.

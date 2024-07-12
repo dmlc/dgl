@@ -1618,6 +1618,9 @@ def test_csc_sampling_graph_to_device(device):
     F._default_context_str == "cpu",
     reason="Tests for pinned memory are only meaningful on GPU.",
 )
+@unittest.skipIf(
+    gb.is_wsl(), reason="In place pinning is not supported on WSL."
+)
 def test_csc_sampling_graph_to_pinned_memory():
     # Construct FusedCSCSamplingGraph.
     graph = create_fused_csc_sampling_graph()
