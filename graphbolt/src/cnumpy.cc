@@ -10,6 +10,7 @@
 #ifdef HAVE_LIBRARY_LIBURING
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #include <ATen/ParallelFuture.h>
