@@ -86,7 +86,7 @@ struct CircularQueue {
 
 struct CacheKey {
   CacheKey(int64_t key, int64_t position)
-      : freq_(0), key_(key), position_in_cache_(position), reference_count_(0) {
+      : freq_(0), key_(key), position_in_cache_(position), reference_count_(1) {
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
 
