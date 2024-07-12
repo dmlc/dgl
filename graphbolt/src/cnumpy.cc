@@ -99,8 +99,8 @@ OnDiskNpyArray::~OnDiskNpyArray() {
   for (int64_t t = 0; t < num_thread_; t++) {
     ::io_uring_queue_exit(&io_uring_queue_[t]);
   }
-#endif  // HAVE_LIBRARY_LIBURING
   TORCH_CHECK(::close(file_description_) == 0);
+#endif  // HAVE_LIBRARY_LIBURING
 }
 
 void OnDiskNpyArray::ParseNumpyHeader() {
