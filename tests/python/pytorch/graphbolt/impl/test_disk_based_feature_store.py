@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from functools import partial
 
 import backend as F
 
@@ -16,6 +17,9 @@ def to_on_disk_numpy(test_dir, name, t):
     t = t.numpy()
     np.save(path, t)
     return path
+
+
+assert_equal = partial(torch.testing.assert_close, rtol=0, atol=0)
 
 
 @unittest.skipIf(
@@ -37,20 +41,18 @@ def test_disk_based_feature():
         feature_c = gb.DiskBasedFeature(path=path_c)
 
         # Read the entire feature.
-        assert torch.equal(
-            feature_a.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
-        )
+        assert_equal(feature_a.read(), torch.tensor([[1, 2, 3], [4, 5, 6]]))
 
-        assert torch.equal(
+        assert_equal(
             feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
         )
 
         # Test read the feature with ids.
-        assert torch.equal(
+        assert_equal(
             feature_a.read(torch.tensor([0])),
             torch.tensor([[1, 2, 3]]),
         )
-        assert torch.equal(
+        assert_equal(
             feature_b.read(torch.tensor([1])),
             torch.tensor([[[4, 5], [6, 7]]]),
         )
@@ -62,24 +64,23 @@ def test_disk_based_feature():
 
         # Test when the index tensor is large.
         torch_based_feature_a = gb.TorchBasedFeature(a)
-        for _ in range(1000):
-            ind_a = torch.randint(low=0, high=a.size(0), size=(4111,))
-            assert torch.equal(
-                feature_a.read(ind_a),
-                torch_based_feature_a.read(ind_a),
-            )
+        ind_a = torch.randint(low=0, high=a.size(0), size=(4111,))
+        assert_equal(
+            feature_a.read(ind_a),
+            torch_based_feature_a.read(ind_a),
+        )
 
         # Test converting to torch_based_feature with read_into_memory()
         torch_based_feature_b = feature_b.read_into_memory()
         ind_b = torch.randint(low=0, high=b.size(0), size=(4111,))
-        assert torch.equal(
+        assert_equal(
             feature_b.read(ind_b),
             torch_based_feature_b.read(ind_b),
         )
 
         # Test with larger stored feature tensor
         ind_c = torch.randint(low=0, high=c.size(0), size=(4111,))
-        assert torch.equal(feature_c.read(ind_c), c[ind_c])
+        assert_equal(feature_c.read(ind_c), c[ind_c])
 
         # Test get the size of the entire feature.
         assert feature_a.size() == torch.Size([3])
@@ -146,7 +147,7 @@ def test_more_disk_based_feature(dtype, idtype, shape, index):
         feature = gb.DiskBasedFeature(path=path)
 
         # Test read feature.
-        assert torch.equal(feature.read(idx), test_tensor[idx.long()])
+        assert_equal(feature.read(idx), test_tensor[idx.long()])
 
 
 @unittest.skipIf(

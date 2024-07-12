@@ -5,7 +5,12 @@
  * @brief Numpy File Fetecher class.
  */
 
-#include "cnumpy.h"
+#include "./cnumpy.h"
+
+#ifdef HAVE_LIBRARY_LIBURING
+#include <fcntl.h>
+#include <sys/stat.h>
+#endif
 
 #include <ATen/ParallelFuture.h>
 #include <torch/torch.h>
@@ -17,6 +22,9 @@
 #include <memory>
 #include <numeric>
 #include <stdexcept>
+
+#include "./circular_queue.h"
+
 namespace graphbolt {
 namespace storage {
 
@@ -36,22 +44,16 @@ OnDiskNpyArray::OnDiskNpyArray(
       "OnDiskNpyArray is not supported on non-Linux systems.");
 #endif
 #ifdef HAVE_LIBRARY_LIBURING
-  const auto file_size = ParseNumpyHeader();
-  struct stat fstat;
-  stat(filename.c_str(), &fstat);
-  block_size_ = fstat.st_blksize;
-  std::cerr << "Block size of '" << filename << "' is " << block_size_
-            << std::endl;
-  file_description_ = open(filename.c_str(), O_RDWR | O_DIRECT);
+  ParseNumpyHeader();
+  file_description_ = ::open(filename.c_str(), O_RDONLY | O_DIRECT);
   if (file_description_ < 0) {
     throw std::runtime_error("npy_load: Unable to open file " + filename);
   }
-  TORCH_CHECK(
-      ::ftruncate(
-          file_description_,
-          (file_size + block_size_ - 1) & ~(block_size_ - 1)) == 0,
-      "Unable to extend file size to a multiple of the block size",
-      block_size_);
+  struct stat st;
+  TORCH_CHECK(::fstat(file_description_, &st) == 0);
+  const auto file_size = st.st_size;
+  block_size_ = st.st_blksize;
+  TORCH_CHECK(file_size - prefix_len_ >= feature_dim_[0] * feature_size_);
 
   // Get system max thread number.
   num_thread_ = torch::get_num_threads();
@@ -63,14 +65,14 @@ OnDiskNpyArray::OnDiskNpyArray(
 
   // Init io_uring queue.
   for (int64_t t = 0; t < num_thread_; t++) {
-    TORCH_CHECK(io_uring_queue_init(kGroupSize, &io_uring_queue_[t], 0) == 0);
+    TORCH_CHECK(::io_uring_queue_init(kGroupSize, &io_uring_queue_[t], 0) == 0);
   }
 
   // The minimum page size to contain one feature.
   aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
 
   const size_t read_buffer_intended_size =
-      (aligned_length_ + block_size_) * kGroupSize * num_thread_;
+      (aligned_length_ + block_size_) * kGroupSize * num_thread_ * 2;
   size_t read_buffer_size = read_buffer_intended_size + block_size_ - 1;
   read_tensor_ = torch::empty(
       read_buffer_size,
@@ -95,13 +97,13 @@ OnDiskNpyArray::~OnDiskNpyArray() {
 #ifdef HAVE_LIBRARY_LIBURING
   // IO queue exit.
   for (int64_t t = 0; t < num_thread_; t++) {
-    io_uring_queue_exit(&io_uring_queue_[t]);
+    ::io_uring_queue_exit(&io_uring_queue_[t]);
   }
 #endif  // HAVE_LIBRARY_LIBURING
-  TORCH_CHECK(close(file_description_) == 0);
+  TORCH_CHECK(::close(file_description_) == 0);
 }
 
-int64_t OnDiskNpyArray::ParseNumpyHeader() {
+void OnDiskNpyArray::ParseNumpyHeader() {
   // Parse numpy file header to get basic info of feature.
   // Get file prefix length.
   std::ifstream file(filename_);
@@ -114,12 +116,6 @@ int64_t OnDiskNpyArray::ParseNumpyHeader() {
   // Get prefix length for computing feature offset,
   // add one for new-line character.
   prefix_len_ = header.size() + 1;
-
-  file.seekg(0, std::ios_base::end);
-  const int64_t file_size = file.tellg();
-  TORCH_CHECK(file_size - prefix_len_ >= feature_dim_[0] * feature_size_);
-  std::cerr << filename_ << ' ' << file_size << std::endl;
-  return file_size;
 }
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelect(
@@ -164,18 +160,22 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
   std::atomic<int> error_flag{};
   std::atomic<int64_t> work_queue{};
   torch::parallel_for(0, num_thread_, 1, [&](int64_t begin, int64_t end) {
+    if (begin >= end) return;
     const auto thread_id = begin;
     auto &my_io_uring_queue = io_uring_queue_[thread_id];
-    auto my_read_buffer =
-        read_buffer_ + (aligned_length_ + block_size_) * kGroupSize * thread_id;
-    std::vector<ReadRequest> read_queue, read_queue_temp;
-    read_queue.reserve(kGroupSize);
-    read_queue_temp.reserve(kGroupSize);
-    while (true) {
-      const int64_t num_requested_items = kGroupSize - read_queue.size();
+    auto my_read_buffer = read_buffer_ + (aligned_length_ + block_size_) *
+                                             kGroupSize * thread_id * 2;
+    CircularQueue<ReadRequest> read_queue(2 * kGroupSize);
+    int64_t num_submitted = 0;
+    int64_t num_completed = 0;
+    for (int64_t read_buffer_slot = 0; true;) {
+      const auto num_requested_items =
+          std::max(kGroupSize - read_queue.Size(), static_cast<int64_t>(0));
       begin =
           work_queue.fetch_add(num_requested_items, std::memory_order_relaxed);
-      if ((begin >= index.numel() && read_queue.empty()) || error_flag.load())
+      if ((begin >= index.numel() && read_queue.IsEmpty() &&
+           num_completed >= num_submitted) ||
+          error_flag.load(std::memory_order_relaxed))
         break;
       end = std::min(begin + num_requested_items, index.numel());
       AT_DISPATCH_INDEX_TYPES(
@@ -183,62 +183,55 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
             auto index_data = index.data_ptr<index_t>();
             for (int64_t i = begin; i < end; ++i) {
               int64_t feature_id = index_data[i];
-              if (0 > feature_id && feature_id >= feature_dim_[0]) {
-                error_flag.store(1);
+              if (feature_id < 0) feature_id += feature_dim_[0];
+              if (feature_id < 0 || feature_id >= feature_dim_[0]) {
+                error_flag.store(1, std::memory_order_relaxed);
                 continue;
               }
               // calculate offset of the feature.
               const int64_t offset = feature_id * feature_size_ + prefix_len_;
 
-              read_queue.push_back(ReadRequest{
+              ReadRequest req{
                   result_buffer + feature_size_ * i, feature_size_, offset,
-                  block_size_});
+                  block_size_,
+                  my_read_buffer + (aligned_length_ + block_size_) *
+                                       (read_buffer_slot++ % (2 * kGroupSize))};
+
+              // Put requests into io_uring queue.
+              struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
+              TORCH_CHECK(sqe);
+              io_uring_sqe_set_data(sqe, read_queue.Push(req));
+              io_uring_prep_read(
+                  sqe, file_description_, req.aligned_read_buffer_,
+                  req.AlignedReadSize(), req.AlignedOffset());
             }
           }));
 
-      if (error_flag.load() <= 1) {
-        int64_t request_id = 0;
-        TORCH_CHECK(read_queue.size() <= kGroupSize);
-        for (auto &req : read_queue) {
-          req.aligned_read_buffer_ =
-              my_read_buffer + (aligned_length_ + block_size_) * request_id++;
-          // Put requests into io_uring queue.
-          struct io_uring_sqe *submit_queue =
-              io_uring_get_sqe(&my_io_uring_queue);
-          TORCH_CHECK(submit_queue);
-          TORCH_CHECK(
-              req.AlignedReadSize() > 0 &&
-                  req.AlignedReadSize() <= aligned_length_ + block_size_,
-              req.AlignedReadSize(), feature_size_);
-          io_uring_prep_read(
-              submit_queue, file_description_, req.aligned_read_buffer_,
-              req.AlignedReadSize(), req.AlignedOffset());
+      if (!error_flag.load(std::memory_order_relaxed)) {
+        TORCH_CHECK(read_queue.Size() <= kGroupSize);
+        // Submit and wait for the reads.
+        for (auto submitting = read_queue.Size(); submitting;) {
+          const auto submitted = ::io_uring_submit(&my_io_uring_queue);
+          TORCH_CHECK(submitted >= 0);
+          submitting -= submitted;
+          num_submitted += submitted;
         }
-        TORCH_CHECK(
-            io_uring_submit(&my_io_uring_queue) ==
-            static_cast<int>(read_queue.size()));
-        // Wait for completion of I/O requests.
+        // Clear the queue as we submitted all entries.
+        read_queue.Clear();
+        // Wait for the reads.
         struct io_uring_cqe *cqe;
-        // Wait for submitted end - begin reads to finish.
-        if (io_uring_wait_cqe_nr(&my_io_uring_queue, &cqe, read_queue.size())) {
-          error_flag.store(2);
-        }
+        TORCH_CHECK(
+            ::io_uring_wait_cqe_nr(
+                &my_io_uring_queue, &cqe, num_submitted - num_completed) == 0);
         // Check the reads and abort on failure.
         int64_t i = 0;
-        for (const auto &req : read_queue) {
-          const auto actual_read_len = cqe[i++].res;
+        unsigned head;
+        io_uring_for_each_cqe(&my_io_uring_queue, head, cqe) {
+          const auto &req =
+              *reinterpret_cast<ReadRequest *>(io_uring_cqe_get_data(cqe));
+          auto actual_read_len = cqe->res;
           if (actual_read_len < 0) {
-            std::cerr << "error_flag.store(3): " << actual_read_len << ' '
-                      << (void *)req.destination_ << ' ' << req.read_len_ << ' '
-                      << req.offset_ << ' ' << (void *)req.aligned_read_buffer_
-                      << ' ' << req.AlignedReadSize() << ' '
-                      << req.MinimumReadSize() << ' '
-                      << (req.destination_ - result_buffer) / feature_size_
-                      << ' '
-                      << (req.aligned_read_buffer_ - my_read_buffer) /
-                             (aligned_length_ + block_size_)
-                      << std::endl;
-            error_flag.store(3);
+            error_flag.store(3, std::memory_order_relaxed);
             break;
           }
           const auto remaining_read_len =
@@ -249,35 +242,38 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
               req.read_len_ - remaining_useful_read_len;
           if (remaining_read_len) {
             // Remaining portion will be read as part of the next batch.
-            read_queue_temp.push_back(ReadRequest{
+            ReadRequest rest{
                 req.destination_ + useful_read_len, remaining_useful_read_len,
-                req.offset_ + useful_read_len, block_size_});
+                req.offset_ + useful_read_len, block_size_,
+                my_read_buffer + (aligned_length_ + block_size_) *
+                                     (read_buffer_slot++ % (2 * kGroupSize))};
+            // Put requests into io_uring queue.
+            struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
+            TORCH_CHECK(sqe);
+            io_uring_sqe_set_data(sqe, read_queue.Push(rest));
+            io_uring_prep_read(
+                sqe, file_description_, rest.aligned_read_buffer_,
+                rest.AlignedReadSize(), rest.AlignedOffset());
           }
           // Copy results into result_buffer.
           std::memcpy(req.destination_, req.ReadBuffer(), useful_read_len);
+          i++;
         }
 
         // Move the head pointer of completion queue.
-        io_uring_cq_advance(&my_io_uring_queue, read_queue.size());
-
-        read_queue.clear();
-        std::swap(read_queue, read_queue_temp);
+        io_uring_cq_advance(&my_io_uring_queue, i);
+        num_completed += i;
       }
     }
   });
-  std::cerr << "error_flag: " << error_flag.load() << std::endl;
   // return result; the input result parameter is the return value of this func.
-  switch (error_flag.load()) {
-    case 0:
+  switch (error_flag.load(std::memory_order_relaxed)) {
+    case 0:  // Successful.
       return;
     case 1:
       throw std::out_of_range("IndexError: Index out of range.");
-    case 2:
-      throw std::runtime_error("io_uring_wait_cqe_nr error.");
-    case 3:
-      throw std::runtime_error("Less bytes read than requested.");
     default:
-      throw std::runtime_error("Fatal error! Shouldn't have happened.");
+      throw std::runtime_error("io_uring error!");
   }
 }
 

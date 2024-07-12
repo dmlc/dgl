@@ -5,18 +5,16 @@
  * @brief Numpy File Fetecher class.
  */
 
-#include <fcntl.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <torch/script.h>
-
 #ifdef HAVE_LIBRARY_LIBURING
 #include <liburing.h>
-#include <unistd.h>
 #endif  // HAVE_LIBRARY_LIBURING
 
+#include <torch/script.h>
+
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -75,7 +73,7 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   /**
    * @brief Parses the header of a numpy file to extract feature information.
    **/
-  int64_t ParseNumpyHeader();
+  void ParseNumpyHeader();
 
   /**
    * @brief Read disk numpy file based on given index and transform to
