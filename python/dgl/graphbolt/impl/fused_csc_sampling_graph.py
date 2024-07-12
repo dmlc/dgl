@@ -8,7 +8,7 @@ from typing import Dict, Optional, Union
 import torch
 
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
-from ..internal_utils import recursive_apply
+from ..internal_utils import gb_warning, is_wsl, recursive_apply
 from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import CSCFormatBase, SampledSubgraphImpl
 
@@ -1368,6 +1368,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def pin_memory_(self):
         """Copy `FusedCSCSamplingGraph` to the pinned memory in-place. Returns
         the same object modified in-place."""
+        if is_wsl():
+            gb_warning(
+                "In place pinning is not supported on WSL. "
+                "Returning the pinned result."
+            )
+            return self.to("pinned")
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
         # truly in-place, we need to use cudaHostRegister. Then, we need to use
         # cudaHostUnregister to unpin the tensor in the destructor.

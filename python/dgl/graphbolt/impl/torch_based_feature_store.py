@@ -9,6 +9,7 @@ import torch
 
 from ..base import index_select
 from ..feature_store import Feature
+from ..internal_utils import gb_warning, is_wsl
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
 
@@ -408,6 +409,12 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     def pin_memory_(self):
         """In-place operation to copy the feature store to pinned memory.
         Returns the same object modified in-place."""
+        if is_wsl():
+            gb_warning(
+                "In place pinning is not supported on WSL. "
+                "Returning the pinned result."
+            )
+            return self.to("pinned")
         for feature in self._features.values():
             feature.pin_memory_()
 
