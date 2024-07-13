@@ -81,7 +81,7 @@ if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
 
     torch_fake_decorator = (
         torch.library.impl_abstract
-        if TorchVersion(torch.__version__) < TorchVersion("2.3.1")
+        if TorchVersion(torch.__version__) < TorchVersion("2.4.0a0")
         else torch.library.register_fake
     )
 
