@@ -1371,7 +1371,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         if is_wsl():
             gb_warning(
                 "In place pinning is not supported on WSL. "
-                "Returning the out of place pinned result."
+                "Returning the out of place pinned `FusedCSCSamplingGraph`."
             )
             return self.to("pinned")
         # torch.Tensor.pin_memory() is not an inplace operation. To make it
