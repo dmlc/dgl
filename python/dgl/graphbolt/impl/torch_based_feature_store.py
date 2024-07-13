@@ -412,7 +412,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         if is_wsl():
             gb_warning(
                 "In place pinning is not supported on WSL. "
-                "Returning the out of place pinned result."
+                "Returning the out of place pinned `TorchBasedFeatureStore`."
             )
             return self.to("pinned")
         for feature in self._features.values():
