@@ -1,8 +1,8 @@
-name: pytorch-ci
+name: pytorch-min-ci
 dependencies:
   - python=3.10
   - pip
   - pip:
     - --find-links https://download.pytorch.org/whl/torch_stable.html
     - --requirement torch_common_pip.txt
-    - --requirement torch_cpu_pip.txt
+    - --requirement torch_cpu_pip_min.txt

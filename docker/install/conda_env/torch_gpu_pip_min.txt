@@ -1,4 +1,2 @@
 --find-links https://download.pytorch.org/whl/torch_stable.html
-filelock
-pyarrow
-torch==2.3.1+cpu
+torch==2.1.0+cu121

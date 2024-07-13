@@ -4,4 +4,5 @@ dependencies:
   - pip
   - pip:
     - --find-links https://download.pytorch.org/whl/torch_stable.html
+    - --requirement torch_common_pip.txt
     - --requirement torch_gpu_pip.txt
