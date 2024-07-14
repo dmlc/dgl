@@ -172,7 +172,10 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
     int64_t num_completed = 0;
     auto Submit = [&](int64_t submission_minimum_batch_size) {
       if (read_queue.Size() < submission_minimum_batch_size) return;
-      TORCH_CHECK(read_queue.Size() <= 2 * kGroupSize);
+      TORCH_CHECK(  // Check for sqe overflow.
+          read_queue.Size() <= 2 * kGroupSize);
+      TORCH_CHECK(  // Check for cqe overflow.
+          read_queue.Size() + num_submitted - num_completed <= 4 * kGroupSize);
       // Submit and wait for the reads.
       while (!read_queue.IsEmpty()) {
         const auto submitted = ::io_uring_submit(&my_io_uring_queue);
