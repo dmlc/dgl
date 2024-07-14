@@ -48,7 +48,7 @@ class Future : public torch::CustomClassHolder {
  */
 class OnDiskNpyArray : public torch::CustomClassHolder {
  public:
-  static constexpr int kGroupSize = 256;
+  static constexpr int kGroupSize = 128;
 
   /** @brief Default constructor. */
   OnDiskNpyArray() = default;
