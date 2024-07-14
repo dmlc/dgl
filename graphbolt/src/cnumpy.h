@@ -48,6 +48,8 @@ class Future : public torch::CustomClassHolder {
  */
 class OnDiskNpyArray : public torch::CustomClassHolder {
  public:
+  static constexpr int kGroupSize = 256;
+
   /** @brief Default constructor. */
   OnDiskNpyArray() = default;
 
@@ -103,6 +105,10 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
 
 #endif  // HAVE_LIBRARY_LIBURING
  private:
+  int64_t ReadBufferSizePerThread() const {
+    return (aligned_length_ + block_size_) * kGroupSize * 8;
+  }
+
   const std::string filename_;  // Path to numpy file.
   int file_description_;        // File description.
   int64_t block_size_;          // Block size of the opened file.

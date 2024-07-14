@@ -28,8 +28,6 @@
 namespace graphbolt {
 namespace storage {
 
-static constexpr int kGroupSize = 256;
-
 OnDiskNpyArray::OnDiskNpyArray(
     std::string filename, torch::ScalarType dtype,
     const std::vector<int64_t> &shape, torch::optional<int64_t> num_threads)
@@ -75,7 +73,7 @@ OnDiskNpyArray::OnDiskNpyArray(
   aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
 
   const size_t read_buffer_intended_size =
-      (aligned_length_ + block_size_) * kGroupSize * num_thread_ * 8;
+      ReadBufferSizePerThread() * num_thread_;
   size_t read_buffer_size = read_buffer_intended_size + block_size_ - 1;
   read_tensor_ = torch::empty(
       read_buffer_size,
@@ -166,8 +164,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
     if (begin >= end) return;
     const auto thread_id = begin;
     auto &my_io_uring_queue = io_uring_queue_[thread_id];
-    auto my_read_buffer = read_buffer_ + (aligned_length_ + block_size_) *
-                                             kGroupSize * thread_id * 8;
+    auto my_read_buffer = read_buffer_ + ReadBufferSizePerThread() * thread_id;
     // The completion queue might contain 4 * kGroupSize while we may submit
     // 4 * kGroupSize more. No harm in overallocation here.
     CircularQueue<ReadRequest> read_queue(8 * kGroupSize);
@@ -191,12 +188,8 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
                                     (read_buffer_slot++ % (8 * kGroupSize));
       };
       const auto num_requested_items = std::max(
-          std::min(
-              // The condition not to overflow the completion queue.
-              2 * kGroupSize -
-                  (read_queue.Size() + num_submitted - num_completed),
-              // The condition not to overflow the submission queue.
-              kGroupSize - read_queue.Size()),
+          // The condition not to overflow the completion queue.
+          2 * kGroupSize - (read_queue.Size() + num_submitted - num_completed),
           int64_t{});
       begin =
           work_queue.fetch_add(num_requested_items, std::memory_order_relaxed);
