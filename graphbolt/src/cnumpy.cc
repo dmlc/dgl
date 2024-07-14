@@ -28,7 +28,7 @@
 namespace graphbolt {
 namespace storage {
 
-static constexpr int kGroupSize = 512;
+static constexpr int kGroupSize = 256;
 
 OnDiskNpyArray::OnDiskNpyArray(
     std::string filename, torch::ScalarType dtype,
@@ -65,14 +65,17 @@ OnDiskNpyArray::OnDiskNpyArray(
 
   // Init io_uring queue.
   for (int64_t t = 0; t < num_thread_; t++) {
-    TORCH_CHECK(::io_uring_queue_init(kGroupSize, &io_uring_queue_[t], 0) == 0);
+    TORCH_CHECK(
+        ::io_uring_queue_init(2 * kGroupSize, &io_uring_queue_[t], 0) == 0);
+    // We have allocated 2 * kGroupSize submission queue entries and
+    // 4 * kGroupSize completion queue entries after this call.
   }
 
   // The minimum page size to contain one feature.
   aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
 
   const size_t read_buffer_intended_size =
-      (aligned_length_ + block_size_) * kGroupSize * num_thread_ * 2;
+      (aligned_length_ + block_size_) * kGroupSize * num_thread_ * 8;
   size_t read_buffer_size = read_buffer_intended_size + block_size_ - 1;
   read_tensor_ = torch::empty(
       read_buffer_size,
@@ -164,13 +167,37 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
     const auto thread_id = begin;
     auto &my_io_uring_queue = io_uring_queue_[thread_id];
     auto my_read_buffer = read_buffer_ + (aligned_length_ + block_size_) *
-                                             kGroupSize * thread_id * 2;
-    CircularQueue<ReadRequest> read_queue(2 * kGroupSize);
+                                             kGroupSize * thread_id * 8;
+    // The completion queue might contain 4 * kGroupSize while we may submit
+    // 4 * kGroupSize more. No harm in overallocation here.
+    CircularQueue<ReadRequest> read_queue(8 * kGroupSize);
     int64_t num_submitted = 0;
     int64_t num_completed = 0;
+    auto Submit = [&](int64_t submission_minimum_batch_size) {
+      if (read_queue.Size() < submission_minimum_batch_size) return;
+      TORCH_CHECK(read_queue.Size() <= 2 * kGroupSize);
+      // Submit and wait for the reads.
+      while (!read_queue.IsEmpty()) {
+        const auto submitted = ::io_uring_submit(&my_io_uring_queue);
+        TORCH_CHECK(submitted >= 0);
+        num_submitted += submitted;
+        // Pop the submitted entries from the queue.
+        read_queue.PopN(submitted);
+      }
+    };
     for (int64_t read_buffer_slot = 0; true;) {
-      const auto num_requested_items =
-          std::max(kGroupSize - read_queue.Size(), static_cast<int64_t>(0));
+      auto RequestReadBuffer = [&]() {
+        return my_read_buffer + (aligned_length_ + block_size_) *
+                                    (read_buffer_slot++ % (8 * kGroupSize));
+      };
+      const auto num_requested_items = std::max(
+          std::min(
+              // The condition not to overflow the completion queue.
+              2 * kGroupSize -
+                  (read_queue.Size() + num_submitted - num_completed),
+              // The condition not to overflow the submission queue.
+              kGroupSize - read_queue.Size()),
+          int64_t{});
       begin =
           work_queue.fetch_add(num_requested_items, std::memory_order_relaxed);
       if ((begin >= index.numel() && read_queue.IsEmpty() &&
@@ -193,9 +220,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
 
               ReadRequest req{
                   result_buffer + feature_size_ * i, feature_size_, offset,
-                  block_size_,
-                  my_read_buffer + (aligned_length_ + block_size_) *
-                                       (read_buffer_slot++ % (2 * kGroupSize))};
+                  block_size_, RequestReadBuffer()};
 
               // Put requests into io_uring queue.
               struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
@@ -204,28 +229,20 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
               io_uring_prep_read(
                   sqe, file_description_, req.aligned_read_buffer_,
                   req.AlignedReadSize(), req.AlignedOffset());
+              Submit(kGroupSize);
             }
           }));
 
       if (!error_flag.load(std::memory_order_relaxed)) {
-        TORCH_CHECK(read_queue.Size() <= kGroupSize);
-        // Submit and wait for the reads.
-        for (auto submitting = read_queue.Size(); submitting;) {
-          const auto submitted = ::io_uring_submit(&my_io_uring_queue);
-          TORCH_CHECK(submitted >= 0);
-          submitting -= submitted;
-          num_submitted += submitted;
-        }
-        // Clear the queue as we submitted all entries.
-        read_queue.Clear();
-        // Wait for the reads.
+        Submit(1);  // Submit all sqes.
+        // Wait for the reads; completion queue entries.
         struct io_uring_cqe *cqe;
         TORCH_CHECK(num_submitted - num_completed <= 2 * kGroupSize);
         TORCH_CHECK(
             ::io_uring_wait_cqe_nr(
                 &my_io_uring_queue, &cqe, num_submitted - num_completed) == 0);
         // Check the reads and abort on failure.
-        int64_t i = 0;  // Counts how many were completed in this batch.
+        int num_cqes_seen = 0;
         unsigned head;
         io_uring_for_each_cqe(&my_io_uring_queue, head, cqe) {
           const auto &req =
@@ -246,8 +263,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
             ReadRequest rest{
                 req.destination_ + useful_read_len, remaining_useful_read_len,
                 req.offset_ + useful_read_len, block_size_,
-                my_read_buffer + (aligned_length_ + block_size_) *
-                                     (read_buffer_slot++ % (2 * kGroupSize))};
+                RequestReadBuffer()};
             // Put requests into io_uring queue.
             struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
             TORCH_CHECK(sqe);
@@ -255,15 +271,16 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
             io_uring_prep_read(
                 sqe, file_description_, rest.aligned_read_buffer_,
                 rest.AlignedReadSize(), rest.AlignedOffset());
+            Submit(kGroupSize);
           }
           // Copy results into result_buffer.
           std::memcpy(req.destination_, req.ReadBuffer(), useful_read_len);
-          i++;
+          num_cqes_seen++;
         }
 
         // Move the head pointer of completion queue.
-        io_uring_cq_advance(&my_io_uring_queue, i);
-        num_completed += i;
+        io_uring_cq_advance(&my_io_uring_queue, num_cqes_seen);
+        num_completed += num_cqes_seen;
       }
     }
   });
