@@ -188,8 +188,12 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
                                     (read_buffer_slot++ % (8 * kGroupSize));
       };
       const auto num_requested_items = std::max(
-          // The condition not to overflow the completion queue.
-          2 * kGroupSize - (read_queue.Size() + num_submitted - num_completed),
+          std::min(
+              // The condition not to overflow the completion queue.
+              2 * kGroupSize -
+                  (read_queue.Size() + num_submitted - num_completed),
+              // The condition not to overflow the submission queue.
+              kGroupSize - read_queue.Size()),
           int64_t{});
       begin =
           work_queue.fetch_add(num_requested_items, std::memory_order_relaxed);
