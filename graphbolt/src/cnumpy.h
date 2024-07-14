@@ -109,6 +109,16 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
     return (aligned_length_ + block_size_) * kGroupSize * 8;
   }
 
+  char* ReadBuffer(int thread_id) const {
+    auto read_buffer_void_ptr = read_tensor_.data_ptr();
+    size_t read_buffer_size = read_tensor_.numel();
+    auto read_buffer = reinterpret_cast<char*>(std::align(
+        block_size_, ReadBufferSizePerThread() * num_thread_,
+        read_buffer_void_ptr, read_buffer_size));
+    TORCH_CHECK(read_buffer, "read_buffer allocation failed!");
+    return read_buffer + ReadBufferSizePerThread() * thread_id;
+  }
+
   const std::string filename_;  // Path to numpy file.
   int file_description_;        // File description.
   int64_t block_size_;          // Block size of the opened file.
@@ -120,7 +130,6 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   int64_t aligned_length_;         // Aligned feature_size.
   int num_thread_;                 // Default thread number.
   torch::Tensor read_tensor_;      // Provides temporary read buffer.
-  char* read_buffer_;              // Aligned pointer to read_tensor.
 
 #ifdef HAVE_LIBRARY_LIBURING
   std::unique_ptr<io_uring[]> io_uring_queue_;  // io_uring queue.

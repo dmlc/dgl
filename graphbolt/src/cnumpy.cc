@@ -53,6 +53,9 @@ OnDiskNpyArray::OnDiskNpyArray(
   block_size_ = st.st_blksize;
   TORCH_CHECK(file_size - prefix_len_ >= feature_dim_[0] * feature_size_);
 
+  // The minimum page size to contain one feature.
+  aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
+
   // Get system max thread number.
   num_thread_ = torch::get_num_threads();
   if (num_threads.has_value() && num_thread_ > *num_threads) {
@@ -69,20 +72,9 @@ OnDiskNpyArray::OnDiskNpyArray(
     // 4 * kGroupSize completion queue entries after this call.
   }
 
-  // The minimum page size to contain one feature.
-  aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
-
-  const size_t read_buffer_intended_size =
-      ReadBufferSizePerThread() * num_thread_;
-  size_t read_buffer_size = read_buffer_intended_size + block_size_ - 1;
   read_tensor_ = torch::empty(
-      read_buffer_size,
+      ReadBufferSizePerThread() * num_thread_ + block_size_ - 1,
       torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU));
-  auto read_buffer_void_ptr = read_tensor_.data_ptr();
-  read_buffer_ = reinterpret_cast<char *>(std::align(
-      block_size_, read_buffer_intended_size, read_buffer_void_ptr,
-      read_buffer_size));
-  TORCH_CHECK(read_buffer_, "read_buffer allocation failed!");
 #else
   throw std::runtime_error("DiskBasedFeature is not available now.");
 #endif  // HAVE_LIBRARY_LIBURING
@@ -164,7 +156,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
     if (begin >= end) return;
     const auto thread_id = begin;
     auto &my_io_uring_queue = io_uring_queue_[thread_id];
-    auto my_read_buffer = read_buffer_ + ReadBufferSizePerThread() * thread_id;
+    auto my_read_buffer = ReadBuffer(thread_id);
     // The completion queue might contain 4 * kGroupSize while we may submit
     // 4 * kGroupSize more. No harm in overallocation here.
     CircularQueue<ReadRequest> read_queue(8 * kGroupSize);
