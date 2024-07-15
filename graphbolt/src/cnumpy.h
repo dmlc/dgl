@@ -9,6 +9,7 @@
 #include <liburing.h>
 #endif  // HAVE_LIBRARY_LIBURING
 
+#include <graphbolt/async.h>
 #include <torch/script.h>
 
 #include <cassert>
@@ -24,29 +25,6 @@
 
 namespace graphbolt {
 namespace storage {
-
-template <typename T>
-class Future : public torch::CustomClassHolder {
- public:
-  Future(
-      c10::intrusive_ptr<c10::ivalue::Future> future,
-      std::shared_ptr<T[]> values, int num_values = 1)
-      : future_(future), values_(values), num_values_(num_values) {
-    TORCH_CHECK(values);
-  }
-
-  Future() = default;
-
-  std::vector<T> Wait() {
-    future_->waitAndThrow();
-    return std::vector(&values_[0], &values_[num_values_]);
-  }
-
- private:
-  c10::intrusive_ptr<c10::ivalue::Future> future_;
-  std::shared_ptr<T[]> values_;
-  const int num_values_;
-};
 
 /**
  * @brief Disk Numpy Fetecher class.

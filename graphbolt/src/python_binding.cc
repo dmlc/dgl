@@ -4,6 +4,7 @@
  * @brief Graph bolt library Python binding.
  */
 
+#include <graphbolt/async.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/isin.h>
 #include <graphbolt/serialize.h>
@@ -42,8 +43,8 @@ TORCH_LIBRARY(graphbolt, m) {
           "original_edge_ids", &FusedSampledSubgraph::original_edge_ids)
       .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge)
       .def_readwrite("etype_offsets", &FusedSampledSubgraph::etype_offsets);
-  m.class_<storage::Future<torch::Tensor>>("TensorFuture")
-      .def("wait", &storage::Future<torch::Tensor>::Wait);
+  m.class_<Future<torch::Tensor>>("TensorFuture")
+      .def("wait", &Future<torch::Tensor>::Wait);
   m.class_<storage::OnDiskNpyArray>("OnDiskNpyArray")
       .def("index_select", &storage::OnDiskNpyArray::IndexSelect);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
