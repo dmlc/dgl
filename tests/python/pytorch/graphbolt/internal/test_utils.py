@@ -2,6 +2,9 @@ import json
 import os
 import re
 import tempfile
+from functools import partial
+
+import dgl.graphbolt as gb
 
 import dgl.graphbolt.internal as internal
 import numpy as np
@@ -266,3 +269,16 @@ def test_check_dataset_change():
             file.write("test contents of directory changed")
 
         assert internal.check_dataset_change(test_dir, "preprocessed")
+
+
+def test_numpy_save_aligned():
+    assert_equal = partial(torch.testing.assert_close, rtol=0, atol=0)
+    a = torch.randn(1024)
+    with tempfile.TemporaryDirectory() as test_dir:
+        aligned_path = os.path.join(test_dir, "aligned.npy")
+        gb.numpy_save_aligned(aligned_path, a.numpy())
+
+        nonaligned_path = os.path.join(test_dir, "nonaligned.npy")
+        np.save(nonaligned_path, a.numpy())
+
+        assert_equal(np.load(aligned_path), np.load(nonaligned_path))

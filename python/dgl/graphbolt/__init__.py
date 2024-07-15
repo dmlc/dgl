@@ -51,13 +51,10 @@ from .internal_utils import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
-from .external_utils import (
-    add_reverse_edges,
-    exclude_seed_edges,
-    numpy_save_aligned,
-)
+from .external_utils import add_reverse_edges, exclude_seed_edges
 from .internal import (
     compact_csc_format,
+    numpy_save_aligned,
     unique_and_compact,
     unique_and_compact_csc_formats,
 )

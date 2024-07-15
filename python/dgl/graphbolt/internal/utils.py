@@ -11,7 +11,16 @@ import pandas as pd
 import torch
 from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
-from ..external_utils import numpy_save_aligned
+
+def numpy_save_aligned(*args, **kwargs):
+    """A wrapper for numpy.save(), ensures the array is stored 4KiB aligned."""
+    has_array_align = hasattr(np.lib.format, "ARRAY_ALIGN")
+    if has_array_align:
+        default_alignment = np.lib.format.ARRAY_ALIGN
+        np.lib.format.ARRAY_ALIGN = 4096
+    np.save(*args, **kwargs)
+    if has_array_align:
+        np.lib.format.ARRAY_ALIGN = default_alignment
 
 
 def _read_torch_data(path):
