@@ -56,7 +56,7 @@ torch::Tensor FeatureCache::Query(
   return values;
 }
 
-torch::Tensor FeatureCache::QueryDirect(torch::Tensor positions) {
+torch::Tensor FeatureCache::IndexSelect(torch::Tensor positions) {
   return ops::IndexSelect(tensor_, positions);
 }
 

@@ -60,13 +60,13 @@ struct FeatureCache : public torch::CustomClassHolder {
       torch::Tensor positions, torch::Tensor indices, int64_t size);
 
   /**
-   * @brief The cache query function. Returns cache_tensor[positions].
+   * @brief The cache tensor index_select returns cache_tensor[positions].
    *
    * @param positions The positions of the queries items.
    *
    * @return The values tensor is returned on the same device as positions.
    */
-  torch::Tensor QueryDirect(torch::Tensor positions);
+  torch::Tensor IndexSelect(torch::Tensor positions);
 
   /**
    * @brief The cache replace function.
