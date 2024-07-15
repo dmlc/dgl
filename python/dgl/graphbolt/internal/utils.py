@@ -14,6 +14,7 @@ from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
 def numpy_save_aligned(*args, **kwargs):
     """A wrapper for numpy.save(), ensures the array is stored 4KiB aligned."""
+    # https://github.com/numpy/numpy/blob/2093a6d5b933f812d15a3de0eafeeb23c61f948a/numpy/lib/format.py#L179
     has_array_align = hasattr(np.lib.format, "ARRAY_ALIGN")
     if has_array_align:
         default_alignment = np.lib.format.ARRAY_ALIGN
