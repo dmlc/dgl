@@ -24,6 +24,7 @@
 #include <torch/script.h>
 
 #include <future>
+#include <type_traits>
 
 namespace graphbolt {
 
@@ -45,7 +46,13 @@ auto async(F function) {
   using T = decltype(function());
   auto promise = std::make_shared<std::promise<T>>();
   auto future = promise->get_future();
-  at::launch([=]() { promise->set_value(function()); });
+  at::launch([=]() {
+    if constexpr (std::is_void_v<T>) {
+      function();
+      promise->set_value();
+    } else
+      promise->set_value(function());
+  });
   return c10::make_intrusive<Future<T>>(std::move(future));
 }
 
