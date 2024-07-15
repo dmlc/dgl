@@ -293,7 +293,7 @@ class DiskBasedFeature(Feature):
             return self._tensor
         elif torch.ops.graphbolt.detect_io_uring():
             try:
-                return self._ondisk_npy_array.index_select(ids).wait()
+                return self._ondisk_npy_array.index_select(ids).wait()[0]
             except RuntimeError:
                 raise IndexError
         else:

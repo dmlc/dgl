@@ -29,21 +29,23 @@ template <typename T>
 class Future : public torch::CustomClassHolder {
  public:
   Future(
-      c10::intrusive_ptr<c10::ivalue::Future> future, std::shared_ptr<T> value)
-      : future_(future), value_(value) {
-    TORCH_CHECK(value);
+      c10::intrusive_ptr<c10::ivalue::Future> future,
+      std::shared_ptr<T[]> values, int num_values = 1)
+      : future_(future), values_(values), num_values_(num_values) {
+    TORCH_CHECK(values);
   }
 
   Future() = default;
 
-  T Wait() {
+  std::vector<T> Wait() {
     future_->waitAndThrow();
-    return *value_;
+    return std::vector(&values_[0], &values_[num_values_]);
   }
 
  private:
   c10::intrusive_ptr<c10::ivalue::Future> future_;
-  std::shared_ptr<T> value_;
+  std::shared_ptr<T[]> values_;
+  const int num_values_;
 };
 
 /**

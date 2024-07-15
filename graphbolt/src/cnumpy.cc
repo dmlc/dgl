@@ -296,9 +296,9 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
     torch::Tensor index) {
-  auto result = std::make_shared<torch::Tensor>();
+  auto result = std::shared_ptr<torch::Tensor[]>(new torch::Tensor[1]);
   auto future = at::intraop_launch_future(
-      [=]() { *result = IndexSelectIOUringImpl(index); });
+      [=]() { result[0] = IndexSelectIOUringImpl(index); });
 
   return c10::make_intrusive<Future<torch::Tensor>>(future, result);
 }
