@@ -35,7 +35,9 @@ struct FeatureCache : public torch::CustomClassHolder {
    * @param shape The shape of the cache.
    * @param dtype The dtype of elements stored in the cache.
    */
-  FeatureCache(const std::vector<int64_t>& shape, torch::ScalarType dtype);
+  FeatureCache(
+      const std::vector<int64_t>& shape, torch::ScalarType dtype,
+      bool pin_memory);
 
   /**
    * @brief The cache query function. Allocates an empty tensor `values` with
@@ -58,6 +60,15 @@ struct FeatureCache : public torch::CustomClassHolder {
       torch::Tensor positions, torch::Tensor indices, int64_t size);
 
   /**
+   * @brief The cache query function. Returns cache_tensor[positions].
+   *
+   * @param positions The positions of the queries items.
+   *
+   * @return The values tensor is returned on the same device as positions.
+   */
+  torch::Tensor QueryDirect(torch::Tensor positions);
+
+  /**
    * @brief The cache replace function.
    *
    * @param positions The positions to replace in the cache.
@@ -66,7 +77,8 @@ struct FeatureCache : public torch::CustomClassHolder {
   void Replace(torch::Tensor positions, torch::Tensor values);
 
   static c10::intrusive_ptr<FeatureCache> Create(
-      const std::vector<int64_t>& shape, torch::ScalarType dtype);
+      const std::vector<int64_t>& shape, torch::ScalarType dtype,
+      bool pin_memory);
 
  private:
   torch::Tensor tensor_;

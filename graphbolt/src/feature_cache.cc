@@ -19,14 +19,18 @@
  */
 #include "./feature_cache.h"
 
+#include "./index_select.h"
+
 namespace graphbolt {
 namespace storage {
 
 constexpr int kIntGrainSize = 64;
 
 FeatureCache::FeatureCache(
-    const std::vector<int64_t>& shape, torch::ScalarType dtype)
-    : tensor_(torch::empty(shape, c10::TensorOptions().dtype(dtype))) {}
+    const std::vector<int64_t>& shape, torch::ScalarType dtype, bool pin_memory)
+    : tensor_(torch::empty(
+          shape, c10::TensorOptions().dtype(dtype).pinned_memory(pin_memory))) {
+}
 
 torch::Tensor FeatureCache::Query(
     torch::Tensor positions, torch::Tensor indices, int64_t size) {
@@ -52,6 +56,10 @@ torch::Tensor FeatureCache::Query(
   return values;
 }
 
+torch::Tensor FeatureCache::QueryDirect(torch::Tensor positions) {
+  return ops::IndexSelect(tensor_, positions);
+}
+
 void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
@@ -68,8 +76,9 @@ void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
 }
 
 c10::intrusive_ptr<FeatureCache> FeatureCache::Create(
-    const std::vector<int64_t>& shape, torch::ScalarType dtype) {
-  return c10::make_intrusive<FeatureCache>(shape, dtype);
+    const std::vector<int64_t>& shape, torch::ScalarType dtype,
+    bool pin_memory) {
+  return c10::make_intrusive<FeatureCache>(shape, dtype, pin_memory);
 }
 
 }  // namespace storage
