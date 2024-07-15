@@ -273,7 +273,7 @@ def test_check_dataset_change():
 
 def test_numpy_save_aligned():
     assert_equal = partial(torch.testing.assert_close, rtol=0, atol=0)
-    a = torch.randn(1024)
+    a = torch.randn(1024, dtype=torch.float32) # 4096 bytes
     with tempfile.TemporaryDirectory() as test_dir:
         aligned_path = os.path.join(test_dir, "aligned.npy")
         gb.numpy_save_aligned(aligned_path, a.numpy())
@@ -282,3 +282,4 @@ def test_numpy_save_aligned():
         np.save(nonaligned_path, a.numpy())
 
         assert_equal(np.load(aligned_path), np.load(nonaligned_path))
+        assert os.path.getsize(aligned_path) == 4096 * 2
