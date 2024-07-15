@@ -187,6 +187,14 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
   return std::make_tuple(positions, output_indices, missing_keys, found_keys);
 }
 
+c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
+PartitionedCachePolicy::QueryAsync(torch::Tensor keys) {
+  return async([=] {
+    auto [positions, output_indices, missing_keys, found_keys] = Query(keys);
+    return std::vector{positions, output_indices, missing_keys, found_keys};
+  });
+}
+
 torch::Tensor PartitionedCachePolicy::Replace(torch::Tensor keys) {
   if (policies_.size() == 1) return policies_[0]->Replace(keys);
   torch::Tensor offsets, indices, permuted_keys;
@@ -213,6 +221,11 @@ torch::Tensor PartitionedCachePolicy::Replace(torch::Tensor keys) {
   return output_positions;
 }
 
+c10::intrusive_ptr<Future<torch::Tensor>> PartitionedCachePolicy::ReplaceAsync(
+    torch::Tensor keys) {
+  return async([=] { return Replace(keys); });
+}
+
 void PartitionedCachePolicy::ReadingCompleted(torch::Tensor keys) {
   if (policies_.size() == 1) {
     policies_[0]->ReadingCompleted(keys);
@@ -228,6 +241,11 @@ void PartitionedCachePolicy::ReadingCompleted(torch::Tensor keys) {
     end = offsets_ptr[tid + 1];
     policies_.at(tid)->ReadingCompleted(permuted_keys.slice(0, begin, end));
   });
+}
+
+c10::intrusive_ptr<Future<void>> PartitionedCachePolicy::ReadingCompletedAsync(
+    torch::Tensor keys) {
+  return async([=] { return ReadingCompleted(keys); });
 }
 
 template <typename CachePolicy>

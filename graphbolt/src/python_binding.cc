@@ -44,6 +44,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def_readwrite("etype_offsets", &FusedSampledSubgraph::etype_offsets);
   m.class_<storage::Future<torch::Tensor>>("TensorFuture")
       .def("wait", &storage::Future<torch::Tensor>::Wait);
+  m.class_<storage::Future<torch::Tensor>>("TensorListFuture")
+      .def("wait", &storage::Future<std::vector<torch::Tensor>>::Wait);
   m.class_<storage::OnDiskNpyArray>("OnDiskNpyArray")
       .def("index_select", &storage::OnDiskNpyArray::IndexSelect);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
@@ -102,10 +104,15 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
   m.class_<storage::PartitionedCachePolicy>("PartitionedCachePolicy")
       .def("query", &storage::PartitionedCachePolicy::Query)
+      .def("query_async", &storage::PartitionedCachePolicy::QueryAsync)
       .def("replace", &storage::PartitionedCachePolicy::Replace)
+      .def("replace_async", &storage::PartitionedCachePolicy::ReplaceAsync)
       .def(
           "reading_completed",
-          &storage::PartitionedCachePolicy::ReadingCompleted);
+          &storage::PartitionedCachePolicy::ReadingCompleted)
+      .def(
+          "reading_completed_async",
+          &storage::PartitionedCachePolicy::ReadingCompletedAsync);
   m.def(
       "s3_fifo_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::S3FifoCachePolicy>);
@@ -120,7 +127,9 @@ TORCH_LIBRARY(graphbolt, m) {
       &storage::PartitionedCachePolicy::Create<storage::ClockCachePolicy>);
   m.class_<storage::FeatureCache>("FeatureCache")
       .def("query", &storage::FeatureCache::Query)
-      .def("replace", &storage::FeatureCache::Replace);
+      .def("query_async", &storage::FeatureCache::QueryAsync)
+      .def("replace", &storage::FeatureCache::Replace)
+      .def("replace_async", &storage::FeatureCache::ReplaceAsync);
   m.def("feature_cache", &storage::FeatureCache::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
