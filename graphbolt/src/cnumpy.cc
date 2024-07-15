@@ -145,8 +145,15 @@ struct ReadRequest {
 };
 
 #ifdef HAVE_LIBRARY_LIBURING
-void OnDiskNpyArray::IndexSelectIOUringImpl(
-    torch::Tensor index, torch::Tensor result) {
+torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
+  std::vector<int64_t> shape(index.sizes().begin(), index.sizes().end());
+  shape.insert(shape.end(), feature_dim_.begin() + 1, feature_dim_.end());
+  auto result = torch::empty(
+      shape, index.options()
+                 .dtype(dtype_)
+                 .layout(torch::kStrided)
+                 .pinned_memory(index.is_pinned())
+                 .requires_grad(false));
   auto result_buffer = reinterpret_cast<char *>(result.data_ptr());
 
   // Indicator for index error.
@@ -279,7 +286,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
   // return result; the input result parameter is the return value of this func.
   switch (error_flag.load(std::memory_order_relaxed)) {
     case 0:  // Successful.
-      return;
+      return result;
     case 1:
       throw std::out_of_range("IndexError: Index out of range.");
     default:
@@ -289,17 +296,9 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
     torch::Tensor index) {
-  std::vector<int64_t> shape(index.sizes().begin(), index.sizes().end());
-  shape.insert(shape.end(), feature_dim_.begin() + 1, feature_dim_.end());
-  auto result = torch::empty(
-      shape, index.options()
-                 .dtype(dtype_)
-                 .layout(torch::kStrided)
-                 .pinned_memory(index.is_pinned())
-                 .requires_grad(false));
-
+  auto result = std::make_shared<torch::Tensor>();
   auto future = at::intraop_launch_future(
-      [=]() { IndexSelectIOUringImpl(index, result); });
+      [=]() { *result = IndexSelectIOUringImpl(index); });
 
   return c10::make_intrusive<Future<torch::Tensor>>(future, result);
 }
