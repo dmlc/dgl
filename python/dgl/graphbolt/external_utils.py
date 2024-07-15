@@ -2,6 +2,7 @@
 
 from typing import Dict, Union
 
+import numpy
 import torch
 
 from .minibatch import MiniBatch
@@ -101,3 +102,14 @@ def exclude_seed_edges(
         for subgraph in minibatch.sampled_subgraphs
     ]
     return minibatch
+
+
+def numpy_save_aligned(*args, **kwargs):
+    """A wrapper for numpy.save(), ensures the array is stored 4KiB aligned."""
+    has_array_align = hasattr(numpy.lib.format, "ARRAY_ALIGN")
+    if has_array_align:
+        default_alignment = numpy.lib.format.ARRAY_ALIGN
+        numpy.lib.format.ARRAY_ALIGN = 4096
+    numpy.save(*args, **kwargs)
+    if has_array_align:
+        numpy.lib.format.ARRAY_ALIGN = default_alignment

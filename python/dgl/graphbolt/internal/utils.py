@@ -11,6 +11,8 @@ import pandas as pd
 import torch
 from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
+from ..external_utils import numpy_save_aligned
+
 
 def _read_torch_data(path):
     return torch.load(path)
@@ -54,7 +56,7 @@ def save_data(data, path, fmt):
                 "so it will be copied to contiguous memory."
             )
             data = np.ascontiguousarray(data)
-        np.save(path, data)
+        numpy_save_aligned(path, data)
     elif fmt == "torch":
         if not data.is_contiguous():
             Warning(
