@@ -46,7 +46,7 @@ struct FeatureCache : public torch::CustomClassHolder {
    * values[indices[:positions.size(0)]] = cache_tensor[positions] before
    * returning it.
    *
-   * @param positions The positions of the queries items.
+   * @param positions The positions of the queried items.
    * @param indices The indices of the queried items among the original keys.
    * Only the first portion corresponding to the provided positions tensor is
    * used, e.g. indices[:positions.size(0)].
@@ -62,7 +62,7 @@ struct FeatureCache : public torch::CustomClassHolder {
   /**
    * @brief The cache tensor index_select returns cache_tensor[positions].
    *
-   * @param positions The positions of the queries items.
+   * @param positions The positions of the queried items.
    *
    * @return The values tensor is returned on the same device as positions.
    */
