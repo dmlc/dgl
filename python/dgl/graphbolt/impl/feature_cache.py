@@ -1,4 +1,4 @@
-"""HugeCTR gpu_cache wrapper for graphbolt."""
+"""CPU Feature Cache implementation wrapper for graphbolt."""
 import torch
 
 __all__ = ["FeatureCache"]
@@ -20,21 +20,29 @@ class FeatureCache(object):
         The shape of the cache. cache_shape[0] gives us the capacity.
     dtype : torch.dtype
         The data type of the elements stored in the cache.
-    num_parts: int, optional
-        The number of cache partitions for parallelism. Default is 1.
     policy: str, optional
         The cache policy. Default is "sieve". "s3-fifo", "lru" and "clock" are
         also available.
+    num_parts: int, optional
+        The number of cache partitions for parallelism. Default is
+        `torch.get_num_threads()`.
     pin_memory: bool, optional
         Whether the cache storage should be pinned.
     """
 
     def __init__(
-        self, cache_shape, dtype, num_parts=1, policy="sieve", pin_memory=False
+        self,
+        cache_shape,
+        dtype,
+        policy="sieve",
+        num_parts=None,
+        pin_memory=False,
     ):
         assert (
             policy in caching_policies
         ), f"{list(caching_policies.keys())} are the available caching policies."
+        if num_parts is None:
+            num_parts = torch.get_num_threads()
         self._policy = caching_policies[policy](cache_shape[0], num_parts)
         self._cache = torch.ops.graphbolt.feature_cache(
             cache_shape, dtype, pin_memory
