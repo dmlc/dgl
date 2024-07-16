@@ -125,8 +125,15 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelect(
 }
 
 #ifdef HAVE_LIBRARY_LIBURING
-void OnDiskNpyArray::IndexSelectIOUringImpl(
-    torch::Tensor index, torch::Tensor result) {
+torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
+  std::vector<int64_t> shape(index.sizes().begin(), index.sizes().end());
+  shape.insert(shape.end(), feature_dim_.begin() + 1, feature_dim_.end());
+  auto result = torch::empty(
+      shape, index.options()
+                 .dtype(dtype_)
+                 .layout(torch::kStrided)
+                 .pinned_memory(index.is_pinned())
+                 .requires_grad(false));
   auto result_buffer = reinterpret_cast<char *>(result.data_ptr());
 
   // Indicator for index error.
@@ -214,19 +221,7 @@ void OnDiskNpyArray::IndexSelectIOUringImpl(
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
     torch::Tensor index) {
-  std::vector<int64_t> shape;
-  shape.push_back(index.numel());
-  shape.insert(shape.end(), feature_dim_.begin() + 1, feature_dim_.end());
-  auto result = torch::empty(
-      shape, index.options()
-                 .dtype(dtype_)
-                 .layout(torch::kStrided)
-                 .requires_grad(false));
-
-  auto future = at::intraop_launch_future(
-      [=]() { IndexSelectIOUringImpl(index, result); });
-
-  return c10::make_intrusive<Future<torch::Tensor>>(future, result);
+  return async([=] { return IndexSelectIOUringImpl(index); });
 }
 
 #endif  // HAVE_LIBRARY_LIBURING
