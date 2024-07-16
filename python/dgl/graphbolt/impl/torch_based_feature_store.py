@@ -49,7 +49,8 @@ class TorchBasedFeature(Feature):
     >>> feature.size()
     torch.Size([5])
 
-    2. The feature is on disk.
+    2. The feature is on disk. Note that you can use gb.numpy_save_aligned as a
+    replacement for np.save to potentially get increased performance.
 
     >>> import numpy as np
     >>> arr = np.array([[1, 2], [3, 4]])
@@ -237,7 +238,9 @@ class TorchBasedFeature(Feature):
 class DiskBasedFeature(Feature):
     r"""A wrapper of disk based feature.
 
-    Initialize a disk based feature fetcher by a numpy file.
+    Initialize a disk based feature fetcher by a numpy file. Note that you can
+    use gb.numpy_save_aligned as a replacement for np.save to potentially get
+    increased performance.
 
     Parameters
     ----------
@@ -250,7 +253,7 @@ class DiskBasedFeature(Feature):
     >>> from dgl import graphbolt as gb
     >>> torch_feat = torch.arange(10).reshape(2, -1)
     >>> pth = "path/to/feat.npy"
-    >>> np.save(pth,torch_feat)
+    >>> np.save(pth, torch_feat)
     >>> feature = gb.DiskBasedFeature(pth)
     >>> feature.read(torch.tensor([0]))
     tensor([[0, 1, 2, 3, 4]])
@@ -356,7 +359,8 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     For a feature store, its format must be either "pt" or "npy" for Pytorch or
     Numpy formats. If the format is "pt", the feature store must be loaded in
     memory. If the format is "npy", the feature store can be loaded in memory or
-    on disk.
+    on disk. Note that you can use gb.numpy_save_aligned as a replacement for
+    np.save to potentially get increased performance.
 
     Parameters
     ----------
