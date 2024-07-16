@@ -216,7 +216,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     throw std::runtime_error("IndexError: Index out of range.");
   }
 
-  // return result; the input result parameter is the return value of this func.
+  return result;
 }
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
