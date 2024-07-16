@@ -34,6 +34,7 @@ struct FeatureCache : public torch::CustomClassHolder {
    *
    * @param shape The shape of the cache.
    * @param dtype The dtype of elements stored in the cache.
+   * @param pin_memory Whether to pin the memory of the output values tensor.
    */
   FeatureCache(
       const std::vector<int64_t>& shape, torch::ScalarType dtype,
@@ -51,7 +52,6 @@ struct FeatureCache : public torch::CustomClassHolder {
    * used, e.g. indices[:positions.size(0)].
    * @param size The size of the original keys, hence the first dimension of
    * the output shape.
-   * @param pin_memory Whether to pin the memory of the output values tensor.
    *
    * @return The values tensor is returned. Its memory is pinned if pin_memory
    * is true.
