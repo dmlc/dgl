@@ -22,13 +22,15 @@ from dgl import graphbolt as gb
     ],
 )
 @pytest.mark.parametrize("feature_size", [2, 16])
-@pytest.mark.parametrize("num_parts", [1, 2])
+@pytest.mark.parametrize("num_parts", [1, 2, None])
 @pytest.mark.parametrize("policy", ["s3-fifo", "sieve", "lru", "clock"])
 def test_feature_cache(dtype, feature_size, num_parts, policy):
-    cache_size = 32 * num_parts
+    cache_size = 32 * (
+        torch.get_num_threads() if num_parts is None else num_parts
+    )
     a = torch.randint(0, 2, [1024, feature_size], dtype=dtype)
     cache = gb.impl.FeatureCache(
-        (cache_size,) + a.shape[1:], a.dtype, num_parts, policy
+        (cache_size,) + a.shape[1:], a.dtype, policy, num_parts
     )
 
     keys = torch.tensor([0, 1])
@@ -73,3 +75,14 @@ def test_feature_cache(dtype, feature_size, num_parts, policy):
     cache.replace(missing_keys, missing_values)
     values[missing_index] = missing_values
     assert torch.equal(values, a[keys])
+
+    raw_feature_cache = torch.ops.graphbolt.feature_cache(
+        (cache_size,) + a.shape[1:], a.dtype, pin_memory
+    )
+    idx = torch.tensor([0, 1, 2])
+    raw_feature_cache.replace(idx, a[idx])
+    val = raw_feature_cache.index_select(idx)
+    assert torch.equal(val, a[idx])
+    if pin_memory:
+        val = raw_feature_cache.index_select(idx.to(F.ctx()))
+        assert torch.equal(val, a[idx].to(F.ctx()))
