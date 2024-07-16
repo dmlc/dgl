@@ -56,6 +56,11 @@ torch::Tensor FeatureCache::Query(
   return values;
 }
 
+c10::intrusive_ptr<Future<torch::Tensor>> FeatureCache::QueryAsync(
+    torch::Tensor positions, torch::Tensor indices, int64_t size) {
+  return async([=] { return Query(positions, indices, size); });
+}
+
 torch::Tensor FeatureCache::IndexSelect(torch::Tensor positions) {
   return ops::IndexSelect(tensor_, positions);
 }
@@ -73,6 +78,11 @@ void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
               values_ptr + i * row_bytes, row_bytes);
         }
       });
+}
+
+c10::intrusive_ptr<Future<void>> FeatureCache::ReplaceAsync(
+    torch::Tensor positions, torch::Tensor values) {
+  return async([=] { return Replace(positions, values); });
 }
 
 c10::intrusive_ptr<FeatureCache> FeatureCache::Create(

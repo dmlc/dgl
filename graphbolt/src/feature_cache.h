@@ -20,6 +20,7 @@
 #ifndef GRAPHBOLT_FEATURE_CACHE_H_
 #define GRAPHBOLT_FEATURE_CACHE_H_
 
+#include <graphbolt/async.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
@@ -59,6 +60,9 @@ struct FeatureCache : public torch::CustomClassHolder {
   torch::Tensor Query(
       torch::Tensor positions, torch::Tensor indices, int64_t size);
 
+  c10::intrusive_ptr<Future<torch::Tensor>> QueryAsync(
+      torch::Tensor positions, torch::Tensor indices, int64_t size);
+
   /**
    * @brief The cache tensor index_select returns cache_tensor[positions].
    *
@@ -75,6 +79,9 @@ struct FeatureCache : public torch::CustomClassHolder {
    * @param values The values to be inserted into the cache.
    */
   void Replace(torch::Tensor positions, torch::Tensor values);
+
+  c10::intrusive_ptr<Future<void>> ReplaceAsync(
+      torch::Tensor positions, torch::Tensor values);
 
   static c10::intrusive_ptr<FeatureCache> Create(
       const std::vector<int64_t>& shape, torch::ScalarType dtype,
