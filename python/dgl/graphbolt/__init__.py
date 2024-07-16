@@ -59,7 +59,7 @@ from .internal import (
 )
 
 if torch.cuda.is_available() and not built_with_cuda():
-    gb_warning(
+    raise ImportError(
         "torch was installed with CUDA support while GraphBolt's CPU version "
         "is installed. Consider reinstalling GraphBolt with CUDA support, see "
         "installation instructions at https://www.dgl.ai/pages/start.html"

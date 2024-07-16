@@ -282,7 +282,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
       }
     }
   });
-  // return result; the input result parameter is the return value of this func.
+
   switch (error_flag.load(std::memory_order_relaxed)) {
     case 0:  // Successful.
       return result;
