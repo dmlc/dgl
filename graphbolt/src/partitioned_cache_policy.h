@@ -20,7 +20,6 @@
 #ifndef GRAPHBOLT_PARTITIONED_CACHE_H_
 #define GRAPHBOLT_PARTITIONED_CACHE_H_
 
-#include <graphbolt/async.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
