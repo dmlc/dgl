@@ -122,6 +122,7 @@ TORCH_LIBRARY(graphbolt, m) {
       "clock_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::ClockCachePolicy>);
   m.class_<storage::FeatureCache>("FeatureCache")
+      .def("index_select", &storage::FeatureCache::IndexSelect)
       .def("query", &storage::FeatureCache::Query)
       .def("replace", &storage::FeatureCache::Replace);
   m.def("feature_cache", &storage::FeatureCache::Create);
