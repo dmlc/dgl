@@ -54,6 +54,7 @@ from .subgraph_sampler import *
 from .external_utils import add_reverse_edges, exclude_seed_edges
 from .internal import (
     compact_csc_format,
+    numpy_save_aligned,
     unique_and_compact,
     unique_and_compact_csc_formats,
 )

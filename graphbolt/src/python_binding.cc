@@ -105,10 +105,15 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
   m.class_<storage::PartitionedCachePolicy>("PartitionedCachePolicy")
       .def("query", &storage::PartitionedCachePolicy::Query)
+      .def("query_async", &storage::PartitionedCachePolicy::QueryAsync)
       .def("replace", &storage::PartitionedCachePolicy::Replace)
+      .def("replace_async", &storage::PartitionedCachePolicy::ReplaceAsync)
       .def(
           "reading_completed",
-          &storage::PartitionedCachePolicy::ReadingCompleted);
+          &storage::PartitionedCachePolicy::ReadingCompleted)
+      .def(
+          "reading_completed_async",
+          &storage::PartitionedCachePolicy::ReadingCompletedAsync);
   m.def(
       "s3_fifo_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::S3FifoCachePolicy>);
@@ -122,8 +127,11 @@ TORCH_LIBRARY(graphbolt, m) {
       "clock_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::ClockCachePolicy>);
   m.class_<storage::FeatureCache>("FeatureCache")
+      .def("index_select", &storage::FeatureCache::IndexSelect)
       .def("query", &storage::FeatureCache::Query)
-      .def("replace", &storage::FeatureCache::Replace);
+      .def("query_async", &storage::FeatureCache::QueryAsync)
+      .def("replace", &storage::FeatureCache::Replace)
+      .def("replace_async", &storage::FeatureCache::ReplaceAsync);
   m.def("feature_cache", &storage::FeatureCache::Create);
   m.def(
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
