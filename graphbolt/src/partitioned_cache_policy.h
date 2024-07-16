@@ -66,9 +66,6 @@ class PartitionedCachePolicy : public BaseCachePolicy,
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> Query(
       torch::Tensor keys);
 
-  c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> QueryAsync(
-      torch::Tensor keys);
-
   /**
    * @brief The policy replace function.
    * @param keys The keys to query the cache.
@@ -78,15 +75,11 @@ class PartitionedCachePolicy : public BaseCachePolicy,
    */
   torch::Tensor Replace(torch::Tensor keys);
 
-  c10::intrusive_ptr<Future<torch::Tensor>> ReplaceAsync(torch::Tensor keys);
-
   /**
    * @brief A reader has finished reading these keys, so they can be evicted.
    * @param keys The keys to unmark.
    */
   void ReadingCompleted(torch::Tensor keys);
-
-  c10::intrusive_ptr<Future<void>> ReadingCompletedAsync(torch::Tensor keys);
 
   template <typename CachePolicy>
   static c10::intrusive_ptr<PartitionedCachePolicy> Create(
