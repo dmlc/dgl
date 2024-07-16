@@ -282,4 +282,5 @@ def test_numpy_save_aligned():
         np.save(nonaligned_path, a.numpy())
 
         assert_equal(np.load(aligned_path), np.load(nonaligned_path))
+        # The size of the file should be 4K (aligned header) + 4K (tensor).
         assert os.path.getsize(aligned_path) == 4096 * 2
