@@ -25,14 +25,20 @@ class FeatureCache(object):
     policy: str, optional
         The cache policy. Default is "sieve". "s3-fifo", "lru" and "clock" are
         also available.
+    pin_memory: bool, optional
+        Whether the cache storage should be pinned.
     """
 
-    def __init__(self, cache_shape, dtype, num_parts=1, policy="sieve"):
+    def __init__(
+        self, cache_shape, dtype, num_parts=1, policy="sieve", pin_memory=False
+    ):
         assert (
             policy in caching_policies
         ), f"{list(caching_policies.keys())} are the available caching policies."
         self._policy = caching_policies[policy](cache_shape[0], num_parts)
-        self._cache = torch.ops.graphbolt.feature_cache(cache_shape, dtype)
+        self._cache = torch.ops.graphbolt.feature_cache(
+            cache_shape, dtype, pin_memory
+        )
         self.total_miss = 0
         self.total_queries = 0
 
@@ -73,6 +79,7 @@ class FeatureCache(object):
         """
         positions = self._policy.replace(keys)
         self._cache.replace(positions, values)
+        self._policy.reading_completed(keys)
 
     @property
     def miss_rate(self):

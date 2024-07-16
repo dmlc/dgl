@@ -12,6 +12,21 @@ import torch
 from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
 
+def numpy_save_aligned(*args, **kwargs):
+    """A wrapper for numpy.save(), ensures the array is stored 4KiB aligned."""
+    # https://github.com/numpy/numpy/blob/2093a6d5b933f812d15a3de0eafeeb23c61f948a/numpy/lib/format.py#L179
+    has_array_align = hasattr(np.lib.format, "ARRAY_ALIGN")
+    if has_array_align:
+        default_alignment = np.lib.format.ARRAY_ALIGN
+        # The maximum allowed alignment by the numpy code linked above is 4K.
+        # Most filesystems work with block sizes of 4K so in practice, the file
+        # size on the disk won't be larger.
+        np.lib.format.ARRAY_ALIGN = 4096
+    np.save(*args, **kwargs)
+    if has_array_align:
+        np.lib.format.ARRAY_ALIGN = default_alignment
+
+
 def _read_torch_data(path):
     return torch.load(path)
 
@@ -54,7 +69,7 @@ def save_data(data, path, fmt):
                 "so it will be copied to contiguous memory."
             )
             data = np.ascontiguousarray(data)
-        np.save(path, data)
+        numpy_save_aligned(path, data)
     elif fmt == "torch":
         if not data.is_contiguous():
             Warning(

@@ -54,12 +54,13 @@ from .subgraph_sampler import *
 from .external_utils import add_reverse_edges, exclude_seed_edges
 from .internal import (
     compact_csc_format,
+    numpy_save_aligned,
     unique_and_compact,
     unique_and_compact_csc_formats,
 )
 
 if torch.cuda.is_available() and not built_with_cuda():
-    gb_warning(
+    raise ImportError(
         "torch was installed with CUDA support while GraphBolt's CPU version "
         "is installed. Consider reinstalling GraphBolt with CUDA support, see "
         "installation instructions at https://www.dgl.ai/pages/start.html"

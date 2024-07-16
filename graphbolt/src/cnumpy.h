@@ -6,6 +6,7 @@
  */
 
 #include <fcntl.h>
+#include <graphbolt/async.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <torch/script.h>
@@ -25,24 +26,6 @@
 
 namespace graphbolt {
 namespace storage {
-
-template <typename T>
-class Future : public torch::CustomClassHolder {
- public:
-  Future(c10::intrusive_ptr<c10::ivalue::Future> future, T value)
-      : future_(future), value_(value) {}
-
-  Future() = default;
-
-  T Wait() {
-    future_->waitAndThrow();
-    return value_;
-  }
-
- private:
-  c10::intrusive_ptr<c10::ivalue::Future> future_;
-  T value_;
-};
 
 /**
  * @brief Disk Numpy Fetecher class.
@@ -100,7 +83,7 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   c10::intrusive_ptr<Future<torch::Tensor>> IndexSelectIOUring(
       torch::Tensor index);
 
-  void IndexSelectIOUringImpl(torch::Tensor index, torch::Tensor result);
+  torch::Tensor IndexSelectIOUringImpl(torch::Tensor index);
 
 #endif  // HAVE_LIBRARY_LIBURING
  private:
