@@ -18,6 +18,9 @@ def numpy_save_aligned(*args, **kwargs):
     has_array_align = hasattr(np.lib.format, "ARRAY_ALIGN")
     if has_array_align:
         default_alignment = np.lib.format.ARRAY_ALIGN
+        # The maximum allowed alignment by the numpy code linked above is 4K.
+        # Most filesystems work with block sizes of 4K so in practice, the file
+        # size on the disk won't be larger.
         np.lib.format.ARRAY_ALIGN = 4096
     np.save(*args, **kwargs)
     if has_array_align:
