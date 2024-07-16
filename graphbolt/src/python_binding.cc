@@ -4,7 +4,6 @@
  * @brief Graph bolt library Python binding.
  */
 
-#include <graphbolt/async.h>
 #include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/isin.h>
 #include <graphbolt/serialize.h>
