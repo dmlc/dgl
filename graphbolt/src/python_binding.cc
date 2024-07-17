@@ -139,6 +139,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("unique_and_compact_batched", &UniqueAndCompactBatched);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
+  m.def("index_select_async", &ops::IndexSelectAsync);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("index_select_csc_batched", &ops::IndexSelectCSCBatched);
   m.def("ondisk_npy_array", &storage::OnDiskNpyArray::Create);

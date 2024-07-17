@@ -254,6 +254,10 @@ def test_index_select(dtype, idtype, pinned):
         assert torch.equal(torch_result.cpu(), gb_result)
         assert gb_result.is_pinned()
 
+    # Test the internal async API
+    future = torch.ops.graphbolt.index_select_async(tensor.cpu(), index.cpu())
+    assert torch.equal(torch_result.cpu(), future.wait())
+
 
 def torch_expand_indptr(indptr, dtype, nodes=None):
     if nodes is None:
