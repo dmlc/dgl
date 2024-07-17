@@ -5,35 +5,55 @@
  * @brief Numpy File Fetecher class.
  */
 
-#include "cnumpy.h"
+#include "./cnumpy.h"
 
-#include <ATen/ParallelFuture.h>
+#ifdef HAVE_LIBRARY_LIBURING
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 #include <torch/torch.h>
 
 #include <atomic>
 #include <cstring>
+#include <fstream>
 #include <memory>
+#include <numeric>
 #include <stdexcept>
+
+#include "./circular_queue.h"
+
 namespace graphbolt {
 namespace storage {
 
-static constexpr int kDiskAlignmentSize = 4096;
-static constexpr int kGroupSize = 512;
-
 OnDiskNpyArray::OnDiskNpyArray(
-    std::string filename, torch::ScalarType dtype, torch::Tensor shape,
-    torch::optional<int64_t> num_threads)
-    : filename_(filename), dtype_(dtype) {
+    std::string filename, torch::ScalarType dtype,
+    const std::vector<int64_t> &shape, torch::optional<int64_t> num_threads)
+    : filename_(filename),
+      feature_dim_(shape),
+      dtype_(dtype),
+      feature_size_(std::accumulate(
+          shape.begin() + 1, shape.end(), c10::elementSize(dtype),
+          std::multiplies<int64_t>())) {
 #ifndef __linux__
   throw std::runtime_error(
       "OnDiskNpyArray is not supported on non-Linux systems.");
 #endif
 #ifdef HAVE_LIBRARY_LIBURING
-  ParseNumpyHeader(shape);
-  file_description_ = open(filename.c_str(), O_RDONLY | O_DIRECT);
-  if (file_description_ == -1) {
+  ParseNumpyHeader();
+  file_description_ = ::open(filename.c_str(), O_RDONLY | O_DIRECT);
+  if (file_description_ < 0) {
     throw std::runtime_error("npy_load: Unable to open file " + filename);
   }
+  struct stat st;
+  TORCH_CHECK(::fstat(file_description_, &st) == 0);
+  const auto file_size = st.st_size;
+  block_size_ = st.st_blksize;
+  TORCH_CHECK(file_size - prefix_len_ >= feature_dim_[0] * feature_size_);
+
+  // The minimum page size to contain one feature.
+  aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
 
   // Get system max thread number.
   num_thread_ = torch::get_num_threads();
@@ -45,32 +65,23 @@ OnDiskNpyArray::OnDiskNpyArray(
 
   // Init io_uring queue.
   for (int64_t t = 0; t < num_thread_; t++) {
-    io_uring_queue_init(kGroupSize, &io_uring_queue_[t], 0);
+    TORCH_CHECK(
+        ::io_uring_queue_init(2 * kGroupSize, &io_uring_queue_[t], 0) == 0);
+    // We have allocated 2 * kGroupSize submission queue entries and
+    // 4 * kGroupSize completion queue entries after this call.
   }
 
-  // The minimum page size to contain one feature.
-  aligned_length_ = (feature_size_ + kDiskAlignmentSize - 1) &
-                    (long)~(kDiskAlignmentSize - 1);
-
-  const size_t read_buffer_intended_size =
-      (aligned_length_ + kDiskAlignmentSize) * kGroupSize * num_thread_;
-  size_t read_buffer_size = read_buffer_intended_size + kDiskAlignmentSize - 1;
   read_tensor_ = torch::empty(
-      read_buffer_size,
+      ReadBufferSizePerThread() * num_thread_ + block_size_ - 1,
       torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU));
-  auto read_buffer_void_ptr = read_tensor_.data_ptr();
-  read_buffer_ = reinterpret_cast<char *>(std::align(
-      kDiskAlignmentSize, read_buffer_intended_size, read_buffer_void_ptr,
-      read_buffer_size));
-  TORCH_CHECK(read_buffer_, "read_buffer allocation failed!");
 #else
   throw std::runtime_error("DiskBasedFeature is not available now.");
 #endif  // HAVE_LIBRARY_LIBURING
 }
 
 c10::intrusive_ptr<OnDiskNpyArray> OnDiskNpyArray::Create(
-    std::string path, torch::ScalarType dtype, torch::Tensor shape,
-    torch::optional<int64_t> num_threads) {
+    std::string path, torch::ScalarType dtype,
+    const std::vector<int64_t> &shape, torch::optional<int64_t> num_threads) {
   return c10::make_intrusive<OnDiskNpyArray>(path, dtype, shape, num_threads);
 }
 
@@ -78,28 +89,14 @@ OnDiskNpyArray::~OnDiskNpyArray() {
 #ifdef HAVE_LIBRARY_LIBURING
   // IO queue exit.
   for (int64_t t = 0; t < num_thread_; t++) {
-    io_uring_queue_exit(&io_uring_queue_[t]);
+    ::io_uring_queue_exit(&io_uring_queue_[t]);
   }
-  close(file_description_);
+  TORCH_CHECK(::close(file_description_) == 0);
 #endif  // HAVE_LIBRARY_LIBURING
 }
 
-void OnDiskNpyArray::ParseNumpyHeader(torch::Tensor shape) {
-#ifdef HAVE_LIBRARY_LIBURING
+void OnDiskNpyArray::ParseNumpyHeader() {
   // Parse numpy file header to get basic info of feature.
-  size_t word_size = c10::elementSize(dtype_);
-  int64_t num_dim = shape.numel();
-  auto shape_ptr = shape.data_ptr<int64_t>();
-  for (int64_t d = 0; d < num_dim; d++) {
-    feature_dim_.emplace_back(shape_ptr[d]);
-  }
-  // Compute single feature size.
-  signed long feature_length = 1;
-  for (size_t i = 1; i < feature_dim_.size(); i++) {
-    feature_length *= feature_dim_[i];
-  }
-  feature_size_ = feature_length * word_size;
-
   // Get file prefix length.
   std::ifstream file(filename_);
   if (!file.is_open()) {
@@ -111,7 +108,6 @@ void OnDiskNpyArray::ParseNumpyHeader(torch::Tensor shape) {
   // Get prefix length for computing feature offset,
   // add one for new-line character.
   prefix_len_ = header.size() + 1;
-#endif  // HAVE_LIBRARY_LIBURING
 }
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelect(
@@ -123,6 +119,30 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelect(
   return {};
 #endif  // HAVE_LIBRARY_LIBURING
 }
+
+class ReadRequest {
+ public:
+  char *destination_;
+  int64_t read_len_;
+  int64_t offset_;
+  int64_t block_size_;
+  char *aligned_read_buffer_;
+
+  auto AlignedOffset() const { return offset_ & ~(block_size_ - 1); }
+
+  auto ReadBuffer() const {
+    return aligned_read_buffer_ + offset_ - AlignedOffset();
+  }
+
+  auto AlignedReadSize() const {
+    const int64_t end_offset = offset_ + read_len_;
+    const int64_t aligned_end_offset =
+        (end_offset + block_size_ - 1) & ~(block_size_ - 1);
+    return aligned_end_offset - AlignedOffset();
+  }
+
+  auto MinimumReadSize() const { return offset_ + read_len_ - AlignedOffset(); }
+};
 
 #ifdef HAVE_LIBRARY_LIBURING
 torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
@@ -137,86 +157,141 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   auto result_buffer = reinterpret_cast<char *>(result.data_ptr());
 
   // Indicator for index error.
-  std::atomic<bool> error_flag{};
+  std::atomic<int> error_flag{};
   std::atomic<int64_t> work_queue{};
   torch::parallel_for(0, num_thread_, 1, [&](int64_t begin, int64_t end) {
+    if (begin >= end) return;
     const auto thread_id = begin;
-    // Record the inside offsets of fetched features.
-    int64_t residual[kGroupSize];
-    while (true) {
-      begin = work_queue.fetch_add(kGroupSize, std::memory_order_relaxed);
-      if (begin >= index.numel() || error_flag.load()) break;
-      end = std::min(begin + kGroupSize, index.numel());
+    auto &my_io_uring_queue = io_uring_queue_[thread_id];
+    auto my_read_buffer = ReadBuffer(thread_id);
+    // The completion queue might contain 4 * kGroupSize while we may submit
+    // 4 * kGroupSize more. No harm in overallocation here.
+    CircularQueue<ReadRequest> read_queue(8 * kGroupSize);
+    int64_t num_submitted = 0;
+    int64_t num_completed = 0;
+    auto submit_fn = [&](int64_t submission_minimum_batch_size) {
+      if (read_queue.Size() < submission_minimum_batch_size) return;
+      TORCH_CHECK(  // Check for sqe overflow.
+          read_queue.Size() <= 2 * kGroupSize);
+      TORCH_CHECK(  // Check for cqe overflow.
+          read_queue.Size() + num_submitted - num_completed <= 4 * kGroupSize);
+      // Submit and wait for the reads.
+      while (!read_queue.IsEmpty()) {
+        const auto submitted = ::io_uring_submit(&my_io_uring_queue);
+        TORCH_CHECK(submitted >= 0);
+        num_submitted += submitted;
+        // Pop the submitted entries from the queue.
+        read_queue.PopN(submitted);
+      }
+    };
+    for (int64_t read_buffer_slot = 0; true;) {
+      auto request_read_buffer = [&]() {
+        return my_read_buffer + (aligned_length_ + block_size_) *
+                                    (read_buffer_slot++ % (8 * kGroupSize));
+      };
+      const auto num_requested_items = std::max(
+          std::min(
+              // The condition not to overflow the completion queue.
+              2 * kGroupSize -
+                  (read_queue.Size() + num_submitted - num_completed),
+              // The condition not to overflow the submission queue.
+              kGroupSize - read_queue.Size()),
+          int64_t{});
+      begin =
+          work_queue.fetch_add(num_requested_items, std::memory_order_relaxed);
+      if ((begin >= index.numel() && read_queue.IsEmpty() &&
+           num_completed >= num_submitted) ||
+          error_flag.load(std::memory_order_relaxed))
+        break;
+      end = std::min(begin + num_requested_items, index.numel());
       AT_DISPATCH_INDEX_TYPES(
           index.scalar_type(), "IndexSelectIOUring", ([&] {
             auto index_data = index.data_ptr<index_t>();
             for (int64_t i = begin; i < end; ++i) {
-              int64_t local_id = i - begin;
-              int64_t feature_id = index_data[i];  // Feature id.
-              if (feature_id >= feature_dim_[0]) {
-                error_flag.store(true);
-                break;
+              int64_t feature_id = index_data[i];
+              if (feature_id < 0) feature_id += feature_dim_[0];
+              if (feature_id < 0 || feature_id >= feature_dim_[0]) {
+                error_flag.store(1, std::memory_order_relaxed);
+                continue;
               }
               // calculate offset of the feature.
-              int64_t offset = feature_id * feature_size_ + prefix_len_;
-              int64_t aligned_offset = offset & (long)~(kDiskAlignmentSize - 1);
-              // put offset of the feature into array.
-              residual[local_id] = offset - aligned_offset;
-              // If the tail of the feature extends into another block,
-              // read an additional block.
-              int64_t read_size;
-              if (residual[local_id] + feature_size_ > kDiskAlignmentSize) {
-                read_size = aligned_length_ + kDiskAlignmentSize;
-              } else {
-                read_size = aligned_length_;
-              }
-              const auto local_read_buffer_offset =
-                  (aligned_length_ + kDiskAlignmentSize) * kGroupSize *
-                  thread_id;
+              const int64_t offset = feature_id * feature_size_ + prefix_len_;
+
+              ReadRequest req{
+                  result_buffer + feature_size_ * i, feature_size_, offset,
+                  block_size_, request_read_buffer()};
+
               // Put requests into io_uring queue.
-              struct io_uring_sqe *submit_queue =
-                  io_uring_get_sqe(&io_uring_queue_[thread_id]);
+              struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
+              TORCH_CHECK(sqe);
+              io_uring_sqe_set_data(sqe, read_queue.Push(req));
               io_uring_prep_read(
-                  submit_queue, file_description_,
-                  read_buffer_ + local_read_buffer_offset +
-                      ((aligned_length_ + kDiskAlignmentSize) * local_id),
-                  read_size, aligned_offset);
-
-              if (i + 1 == end && !error_flag.load()) {
-                io_uring_submit(&io_uring_queue_[thread_id]);
-                // Wait for completion of I/O requests.
-                struct io_uring_cqe *complete_queues[kGroupSize];
-                // Wait for submitted end - begin reads to finish.
-                if (io_uring_wait_cqe_nr(
-                        &io_uring_queue_[thread_id], complete_queues,
-                        end - begin) < 0) {
-                  perror("io_uring_wait_cqe_nr error\n");
-                  std::exit(EXIT_FAILURE);
-                }
-                // Move the head pointer of completion queue.
-                io_uring_cq_advance(&io_uring_queue_[thread_id], end - begin);
-
-                // Copy results into result_buffer.
-                for (int64_t j = begin; j < end; j++) {
-                  const auto local_id = j - begin;
-                  const auto batch_offset =
-                      (aligned_length_ + kDiskAlignmentSize) * local_id;
-                  std::memcpy(
-                      result_buffer + feature_size_ * j,
-                      read_buffer_ + local_read_buffer_offset +
-                          (batch_offset + residual[local_id]),
-                      feature_size_);
-                }
-              }
+                  sqe, file_description_, req.aligned_read_buffer_,
+                  req.AlignedReadSize(), req.AlignedOffset());
+              submit_fn(kGroupSize);
             }
           }));
+
+      if (!error_flag.load(std::memory_order_relaxed)) {
+        submit_fn(1);  // Submit all sqes.
+        // Wait for the reads; completion queue entries.
+        struct io_uring_cqe *cqe;
+        TORCH_CHECK(num_submitted - num_completed <= 2 * kGroupSize);
+        TORCH_CHECK(
+            ::io_uring_wait_cqe_nr(
+                &my_io_uring_queue, &cqe, num_submitted - num_completed) == 0);
+        // Check the reads and abort on failure.
+        int num_cqes_seen = 0;
+        unsigned head;
+        io_uring_for_each_cqe(&my_io_uring_queue, head, cqe) {
+          const auto &req =
+              *reinterpret_cast<ReadRequest *>(io_uring_cqe_get_data(cqe));
+          auto actual_read_len = cqe->res;
+          if (actual_read_len < 0) {
+            error_flag.store(3, std::memory_order_relaxed);
+            break;
+          }
+          const auto remaining_read_len =
+              std::max(req.MinimumReadSize() - actual_read_len, int64_t{});
+          const auto remaining_useful_read_len =
+              std::min(remaining_read_len, req.read_len_);
+          const auto useful_read_len =
+              req.read_len_ - remaining_useful_read_len;
+          if (remaining_read_len) {
+            // Remaining portion will be read as part of the next batch.
+            ReadRequest rest{
+                req.destination_ + useful_read_len, remaining_useful_read_len,
+                req.offset_ + useful_read_len, block_size_,
+                request_read_buffer()};
+            // Put requests into io_uring queue.
+            struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
+            TORCH_CHECK(sqe);
+            io_uring_sqe_set_data(sqe, read_queue.Push(rest));
+            io_uring_prep_read(
+                sqe, file_description_, rest.aligned_read_buffer_,
+                rest.AlignedReadSize(), rest.AlignedOffset());
+            submit_fn(kGroupSize);
+          }
+          // Copy results into result_buffer.
+          std::memcpy(req.destination_, req.ReadBuffer(), useful_read_len);
+          num_cqes_seen++;
+        }
+
+        // Move the head pointer of completion queue.
+        io_uring_cq_advance(&my_io_uring_queue, num_cqes_seen);
+        num_completed += num_cqes_seen;
+      }
     }
   });
-  if (error_flag.load()) {
-    throw std::runtime_error("IndexError: Index out of range.");
-  }
 
-  return result;
+  switch (error_flag.load(std::memory_order_relaxed)) {
+    case 0:  // Successful.
+      return result;
+    case 1:
+      throw std::out_of_range("IndexError: Index out of range.");
+    default:
+      throw std::runtime_error("io_uring error!");
+  }
 }
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(

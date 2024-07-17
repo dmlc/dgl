@@ -248,6 +248,10 @@ class DiskBasedFeature(Feature):
     path : string
         The path to the numpy feature file.
         Note that the dimension of the numpy should be greater than 1.
+    metadata : Dict
+        The metadata of the feature.
+    num_threads : int
+        The number of threads driving io_uring queues.
     Examples
     --------
     >>> import torch
@@ -262,7 +266,7 @@ class DiskBasedFeature(Feature):
     torch.Size([5])
     """
 
-    def __init__(self, path: str, metadata: Dict = None):
+    def __init__(self, path: str, metadata: Dict = None, num_threads=None):
         super().__init__()
         mmap_mode = "r+"
         ondisk_data = np.load(path, mmap_mode=mmap_mode)
@@ -273,7 +277,7 @@ class DiskBasedFeature(Feature):
 
         self._metadata = metadata
         self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
-            path, self._tensor.dtype, torch.tensor(self._tensor.shape), None
+            path, self._tensor.dtype, self._tensor.shape, num_threads
         )
 
     def read(self, ids: torch.Tensor = None):
@@ -290,8 +294,6 @@ class DiskBasedFeature(Feature):
             The read feature.
         """
         if ids is None:
-            if self._tensor.is_pinned():
-                return self._tensor.cuda()
             return self._tensor
         elif torch.ops.graphbolt.detect_io_uring():
             try:
