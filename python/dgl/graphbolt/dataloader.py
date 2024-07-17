@@ -8,7 +8,7 @@ import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
 
-from .base import CopyTo
+from .base import CopyTo, get_host_to_device_uva_stream
 from .feature_fetcher import FeatureFetcher
 from .impl.gpu_graph_cache import GPUGraphCache
 from .impl.neighbor_sampler import SamplePerLayer
@@ -93,14 +93,6 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
 
     def __iter__(self):
         yield from self.dataloader
-
-
-# There needs to be a single instance of the uva_stream, if it is created
-# multiple times, it leads to multiple CUDA memory pools and memory leaks.
-def _get_uva_stream():
-    if not hasattr(_get_uva_stream, "stream"):
-        _get_uva_stream.stream = torch.cuda.Stream(priority=-1)
-    return _get_uva_stream.stream
 
 
 class DataLoader(torch.utils.data.DataLoader):
@@ -206,7 +198,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 FeatureFetcher,
             )
             for feature_fetcher in feature_fetchers:
-                feature_fetcher.stream = _get_uva_stream()
+                feature_fetcher.stream = get_host_to_device_uva_stream()
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     feature_fetcher,
@@ -235,7 +227,7 @@ class DataLoader(torch.utils.data.DataLoader):
                     sampler,
                     sampler.fetch_and_sample(
                         gpu_graph_cache,
-                        _get_uva_stream(),
+                        get_host_to_device_uva_stream(),
                         executor,
                         1,
                     ),
