@@ -161,7 +161,8 @@ def index_select(tensor, index):
     Returns
     -------
     torch.Tensor
-        The indexed input tensor, equivalent to tensor[index].
+        The indexed input tensor, equivalent to tensor[index]. If index is in
+        pinned memory, then the result is placed into pinned memory as well.
     """
     assert index.dim() == 1, "Index should be 1D tensor."
     return torch.ops.graphbolt.index_select(tensor, index)

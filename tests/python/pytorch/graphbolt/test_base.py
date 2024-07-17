@@ -249,6 +249,10 @@ def test_index_select(dtype, idtype, pinned):
     gb_result = gb.index_select(tensor, index)
     torch_result = tensor.to(F.ctx())[index.long()]
     assert torch.equal(torch_result, gb_result)
+    if pinned:
+        gb_result = gb.index_select(tensor.cpu(), index.cpu().pin_memory())
+        assert torch.equal(torch_result.cpu(), gb_result)
+        assert gb_result.is_pinned()
 
 
 def torch_expand_indptr(indptr, dtype, nodes=None):
