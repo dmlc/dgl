@@ -20,7 +20,12 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
         c10::DeviceType::CUDA, "UVAIndexSelect",
         { return UVAIndexSelectImpl(input, index); });
   }
-  return input.index({index.to(torch::kLong)});
+  auto output_shape = input.sizes().vec();
+  output_shape[0] = index.numel();
+  auto result = torch::empty(
+      output_shape,
+      index.options().dtype(input.dtype()).pinned_memory(index.is_pinned()));
+  return torch::index_select_out(result, input, 0, index);
 }
 
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
