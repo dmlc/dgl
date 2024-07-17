@@ -49,12 +49,14 @@ ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
 # There needs to be a single instance of the uva_stream, if it is created
 # multiple times, it leads to multiple CUDA memory pools and memory leaks.
 def get_host_to_device_uva_stream():
+    """The host to device copy stream to be used for pipeline parallelism."""
     if not hasattr(get_host_to_device_uva_stream, "stream"):
         get_host_to_device_uva_stream.stream = torch.cuda.Stream(priority=-1)
     return get_host_to_device_uva_stream.stream
 
 
 def get_device_to_host_uva_stream():
+    """The device to host copy stream to be used for pipeline parallelism."""
     if not hasattr(get_device_to_host_uva_stream, "stream"):
         get_device_to_host_uva_stream.stream = torch.cuda.Stream(priority=-1)
     return get_device_to_host_uva_stream.stream
