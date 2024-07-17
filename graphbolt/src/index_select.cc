@@ -28,6 +28,12 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
   return torch::index_select_out(result, input, 0, index);
 }
 
+c10::intrusive_ptr<Future<torch::Tensor>> IndexSelectAsync(
+    torch::Tensor input, torch::Tensor index) {
+  TORCH_CHECK(!utils::is_on_gpu(index) && !utils::is_on_gpu(input));
+  return async([=] { return IndexSelect(input, index); });
+}
+
 std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor nodes,
     torch::optional<int64_t> output_size) {
