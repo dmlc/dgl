@@ -162,7 +162,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   torch::parallel_for(0, num_thread_, 1, [&](int64_t begin, int64_t end) {
     if (begin >= end) return;
     const auto thread_id = begin;
-    auto &my_io_uring_queue = io_uring_queue_[thread_id];
+    auto &io_uring_queue = io_uring_queue_[thread_id];
     auto my_read_buffer = ReadBuffer(thread_id);
     // The completion queue might contain 4 * kGroupSize while we may submit
     // 4 * kGroupSize more. No harm in overallocation here.
@@ -177,7 +177,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
           read_queue.Size() + num_submitted - num_completed <= 4 * kGroupSize);
       // Submit and wait for the reads.
       while (!read_queue.IsEmpty()) {
-        const auto submitted = ::io_uring_submit(&my_io_uring_queue);
+        const auto submitted = ::io_uring_submit(&io_uring_queue);
         TORCH_CHECK(submitted >= 0);
         num_submitted += submitted;
         // Pop the submitted entries from the queue.
@@ -222,7 +222,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
                   block_size_, request_read_buffer()};
 
               // Put requests into io_uring queue.
-              struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
+              struct io_uring_sqe *sqe = io_uring_get_sqe(&io_uring_queue);
               TORCH_CHECK(sqe);
               io_uring_sqe_set_data(sqe, read_queue.Push(req));
               io_uring_prep_read(
@@ -239,11 +239,11 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
         TORCH_CHECK(num_submitted - num_completed <= 2 * kGroupSize);
         TORCH_CHECK(
             ::io_uring_wait_cqe_nr(
-                &my_io_uring_queue, &cqe, num_submitted - num_completed) == 0);
+                &io_uring_queue, &cqe, num_submitted - num_completed) == 0);
         // Check the reads and abort on failure.
         int num_cqes_seen = 0;
         unsigned head;
-        io_uring_for_each_cqe(&my_io_uring_queue, head, cqe) {
+        io_uring_for_each_cqe(&io_uring_queue, head, cqe) {
           const auto &req =
               *reinterpret_cast<ReadRequest *>(io_uring_cqe_get_data(cqe));
           auto actual_read_len = cqe->res;
@@ -264,7 +264,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
                 req.offset_ + useful_read_len, block_size_,
                 request_read_buffer()};
             // Put requests into io_uring queue.
-            struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
+            struct io_uring_sqe *sqe = io_uring_get_sqe(&io_uring_queue);
             TORCH_CHECK(sqe);
             io_uring_sqe_set_data(sqe, read_queue.Push(rest));
             io_uring_prep_read(
@@ -278,7 +278,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
         }
 
         // Move the head pointer of completion queue.
-        io_uring_cq_advance(&my_io_uring_queue, num_cqes_seen);
+        io_uring_cq_advance(&io_uring_queue, num_cqes_seen);
         num_completed += num_cqes_seen;
       }
     }
