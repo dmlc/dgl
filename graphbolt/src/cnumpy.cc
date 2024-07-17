@@ -120,7 +120,8 @@ c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelect(
 #endif  // HAVE_LIBRARY_LIBURING
 }
 
-struct ReadRequest {
+class ReadRequest {
+ public:
   char *destination_;
   int64_t read_len_;
   int64_t offset_;
@@ -168,7 +169,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     CircularQueue<ReadRequest> read_queue(8 * kGroupSize);
     int64_t num_submitted = 0;
     int64_t num_completed = 0;
-    auto Submit = [&](int64_t submission_minimum_batch_size) {
+    auto submit_fn = [&](int64_t submission_minimum_batch_size) {
       if (read_queue.Size() < submission_minimum_batch_size) return;
       TORCH_CHECK(  // Check for sqe overflow.
           read_queue.Size() <= 2 * kGroupSize);
@@ -184,7 +185,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
       }
     };
     for (int64_t read_buffer_slot = 0; true;) {
-      auto RequestReadBuffer = [&]() {
+      auto request_read_buffer = [&]() {
         return my_read_buffer + (aligned_length_ + block_size_) *
                                     (read_buffer_slot++ % (8 * kGroupSize));
       };
@@ -218,7 +219,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
 
               ReadRequest req{
                   result_buffer + feature_size_ * i, feature_size_, offset,
-                  block_size_, RequestReadBuffer()};
+                  block_size_, request_read_buffer()};
 
               // Put requests into io_uring queue.
               struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
@@ -227,12 +228,12 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
               io_uring_prep_read(
                   sqe, file_description_, req.aligned_read_buffer_,
                   req.AlignedReadSize(), req.AlignedOffset());
-              Submit(kGroupSize);
+              submit_fn(kGroupSize);
             }
           }));
 
       if (!error_flag.load(std::memory_order_relaxed)) {
-        Submit(1);  // Submit all sqes.
+        submit_fn(1);  // Submit all sqes.
         // Wait for the reads; completion queue entries.
         struct io_uring_cqe *cqe;
         TORCH_CHECK(num_submitted - num_completed <= 2 * kGroupSize);
@@ -261,7 +262,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
             ReadRequest rest{
                 req.destination_ + useful_read_len, remaining_useful_read_len,
                 req.offset_ + useful_read_len, block_size_,
-                RequestReadBuffer()};
+                request_read_buffer()};
             // Put requests into io_uring queue.
             struct io_uring_sqe *sqe = io_uring_get_sqe(&my_io_uring_queue);
             TORCH_CHECK(sqe);
@@ -269,7 +270,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
             io_uring_prep_read(
                 sqe, file_description_, rest.aligned_read_buffer_,
                 rest.AlignedReadSize(), rest.AlignedOffset());
-            Submit(kGroupSize);
+            submit_fn(kGroupSize);
           }
           // Copy results into result_buffer.
           std::memcpy(req.destination_, req.ReadBuffer(), useful_read_len);
