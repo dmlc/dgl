@@ -14,3 +14,4 @@ from .torch_based_feature_store import *
 from .uniform_negative_sampler import *
 from .gpu_graph_cache import *
 from .feature_cache import *
+from .cpu_cached_feature import *
