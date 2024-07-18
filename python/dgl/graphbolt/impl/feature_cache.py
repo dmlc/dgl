@@ -43,13 +43,6 @@ class FeatureCache(object):
         ), f"{list(caching_policies.keys())} are the available caching policies."
         if num_parts is None:
             num_parts = torch.get_num_threads()
-        min_num_cache_items = num_parts * (10 if policy == "s3-fifo" else 1)
-        # Since we partition the cache, each partition needs to have a positive
-        # number of slots. In addition, each "s3-fifo" partition needs at least
-        # 10 slots since the small queue is 10% and the small queue needs a
-        # positive size.
-        if cache_shape[0] < min_num_cache_items:
-            cache_shape = (min_num_cache_items,) + cache_shape[1:]
         self._policy = caching_policies[policy](cache_shape[0], num_parts)
         self._cache = torch.ops.graphbolt.feature_cache(
             cache_shape, dtype, pin_memory
