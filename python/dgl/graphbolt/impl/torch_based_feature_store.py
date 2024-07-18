@@ -7,7 +7,11 @@ from typing import Dict, List
 import numpy as np
 import torch
 
-from ..base import get_device_to_host_uva_stream, get_host_to_device_uva_stream, index_select
+from ..base import (
+    get_device_to_host_uva_stream,
+    get_host_to_device_uva_stream,
+    index_select,
+)
 from ..feature_store import Feature
 from ..internal_utils import gb_warning, is_wsl
 from .basic_feature_store import BasicFeatureStore
@@ -177,24 +181,23 @@ class TorchBasedFeature(Feature):
                 values_cuda.record_stream(current_stream)
                 values_copy_event = torch.cuda.Event()
                 values_copy_event.record()
-            
+
             class _Waiter:
                 @staticmethod
                 def wait():
                     values_copy_event.wait()
                     return values_cuda
-            
+
             yield _Waiter()
         else:
             yield torch.ops.graphbolt.index_select_async(self._tensor, ids)
-    
+
     def read_async_num_stages(self, ids_device):
         """The number of stages of the read_async operation"""
         if ids_device.type == "cuda":
             return 1 if self.is_pinned() else 3
         else:
             return 1
-         
 
     def size(self):
         """Get the size of the feature.

@@ -94,7 +94,9 @@ class GPUCachedFeature(Feature):
         values, missing_index, missing_keys = self._feature.query(ids)
 
         fallback_reader = self._fallback_feature.read_async(missing_keys)
-        for _ in range(self._fallback_feature.read_async_num_stages(missing_keys.device)):
+        for _ in range(
+            self._fallback_feature.read_async_num_stages(missing_keys.device)
+        ):
             missing_values_future = next(fallback_reader)
             yield  # fallback feature stages.
         values[missing_index] = missing_values_future.wait()
