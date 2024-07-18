@@ -1,7 +1,7 @@
 """CPU Feature Cache implementation wrapper for graphbolt."""
 import torch
 
-__all__ = ["FeatureCache"]
+__all__ = ["CPUFeatureCache"]
 
 caching_policies = {
     "s3-fifo": torch.ops.graphbolt.s3_fifo_cache_policy,
@@ -11,7 +11,7 @@ caching_policies = {
 }
 
 
-class FeatureCache(object):
+class CPUFeatureCache(object):
     r"""High level wrapper for the CPU feature cache.
 
     Parameters
@@ -34,10 +34,12 @@ class FeatureCache(object):
         self,
         cache_shape,
         dtype,
-        policy="sieve",
+        policy=None,
         num_parts=None,
         pin_memory=False,
     ):
+        if policy is None:
+            policy = "sieve"
         assert (
             policy in caching_policies
         ), f"{list(caching_policies.keys())} are the available caching policies."
