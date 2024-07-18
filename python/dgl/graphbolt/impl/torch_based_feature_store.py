@@ -192,7 +192,7 @@ class TorchBasedFeature(Feature):
         else:
             yield torch.ops.graphbolt.index_select_async(self._tensor, ids)
 
-    def read_async_num_stages(self, ids_device):
+    def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation"""
         if ids_device.type == "cuda":
             return 1 if self.is_pinned() else 3

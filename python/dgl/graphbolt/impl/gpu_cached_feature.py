@@ -108,7 +108,7 @@ class GPUCachedFeature(Feature):
 
         yield _Waiter()
 
-    def read_async_num_stages(self, ids_device):
+    def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation"""
         assert ids_device.type == "cuda"
         return self._fallback_feature.read_async_num_stages(ids_device) + 1
