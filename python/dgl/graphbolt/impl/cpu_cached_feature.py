@@ -25,11 +25,12 @@ class CPUCachedFeature(Feature):
         The fallback feature.
     max_cache_size_in_bytes : int
         The capacity of the cache in bytes.
-    policy:
+    policy : str
         The cache eviction policy algorithm name. See gb.impl.CPUFeatureCache
         for the list of available policies.
-    pin_memory:
+    pin_memory : bool
         Whether the cache storage should be allocated on system pinned memory.
+        Default is False.
     """
 
     def __init__(
