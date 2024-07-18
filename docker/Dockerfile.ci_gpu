@@ -16,9 +16,18 @@ RUN bash /install/ubuntu_install_conda.sh
 
 ENV CONDA_ALWAYS_YES="true"
 
+# torch
 COPY install/conda_env/torch_gpu.yml /install/conda_env/torch_gpu.yml
+COPY install/conda_env/torch_common_pip.txt /install/conda_env/torch_common_pip.txt
+
+# torch latest
 COPY install/conda_env/torch_gpu_pip.txt /install/conda_env/torch_gpu_pip.txt
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/torch_gpu.yml"]
+
+# torch min
+COPY install/conda_env/torch_gpu_pip_min.txt /install/conda_env/torch_gpu_pip_min.txt
+RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/torch_gpu_min.yml"]
+# torch end
 
 COPY install/conda_env/tensorflow_gpu.yml /install/conda_env/tensorflow_gpu.yml
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/tensorflow_gpu.yml"]

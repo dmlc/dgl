@@ -229,7 +229,7 @@ install_requires = [
     "torchdata>=0.5.0",
     "pandas",
 ]
-if "DGLBACKEND" in os.environ and os.environ["DGLBACKEND"] != "pytorch":
+if "DGLBACKEND" in os.environ and "pytorch" not in os.environ["DGLBACKEND"]:
     install_requires.pop(install_requires.index("torchdata>=0.5.0"))
 
 setup(
