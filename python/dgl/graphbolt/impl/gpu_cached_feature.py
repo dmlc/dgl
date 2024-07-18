@@ -93,67 +93,23 @@ class GPUCachedFeature(Feature):
     def read_async(self, ids: torch.Tensor):
         values, missing_index, missing_keys = self._feature.query(ids)
 
-        current_stream = torch.cuda.current_stream()
-        if (
-            isinstance(self._fallback_feature, TorchBasedFeature)
-            and self._fallback_feature.is_pinned()
-        ):
-            host_to_device_stream = get_host_to_device_uva_stream()
-            host_to_device_stream.wait_stream(current_stream)
-            with torch.cuda.stream(host_to_device_stream):
-                missing_keys.record_stream(torch.cuda.current_stream())
-                missing_values_cuda = self._fallback_feature.read(missing_keys)
-                missing_values_cuda.record_stream(current_stream)
-                missing_values_copy_event = torch.cuda.Event()
-                missing_values_copy_event.record()
-            yield
-        elif isinstance(
-            self._fallback_feature,
-        ):
-            pass
-        else:
-            device_to_host_stream = get_device_to_host_uva_stream()
-            device_to_host_stream.wait_stream(current_stream)
-            with torch.cuda.stream(device_to_host_stream):
-                missing_keys.record_stream(torch.cuda.current_stream())
-                missing_keys = missing_keys.to(
-                    self._fallback_feature.device, non_blocking=True
-                )
-                missing_keys_copy_event = torch.cuda.Event()
-                missing_keys_copy_event.record()
+        fallback_reader = self._fallback_feature.read_async(missing_keys)
+        for _ in range(self._fallback_feature.read_async_num_stages(missing_keys.device)):
+            missing_values_future = next(fallback_reader)
+            yield  # fallback feature stages.
+        values[missing_index] = missing_values_future.wait()
 
-            yield  # first stage is done.
+        class _Waiter:
+            @staticmethod
+            def wait():
+                return values
 
-            missing_keys_copy_event.synchronize()
-            fallback_reader = self._fallback_feature.read_async(missing_keys)
-            for _ in range(self._fallback_feature.read_async_num_stages()):
-                missing_values = next(fallback_reader)
-                yield  # fallback feature stages.
+        yield _Waiter()
 
-            host_to_device_stream.wait_stream(current_stream)
-            with torch.cuda.stream(host_to_device_stream):
-                missing_values_cuda = missing_values.wait().to(
-                    "cuda", non_blocking=True
-                )
-                missing_values_cuda.record_stream(current_stream)
-                missing_values_copy_event = torch.cuda.Event()
-                missing_values_copy_event.record()
-            yield
-
-        missing_values_copy_event.wait()
-        values[missing_index] = missing_values_cuda
-
-        yield values
-
-    def read_async_num_stages(self):
+    def read_async_num_stages(self, ids_device):
         """The number of stages of the read_async operation"""
-        if (
-            isinstance(self._fallback_feature, TorchBasedFeature)
-            and self._fallback_feature.is_pinned()
-        ):
-            return 2
-        else:
-            return 1 + self._fallback_feature.read_async_num_stages() + 2
+        assert ids_device.type == "cuda"
+        return self._fallback_feature.read_async_num_stages(ids_device) + 1
 
     def size(self):
         """Get the size of the feature.
