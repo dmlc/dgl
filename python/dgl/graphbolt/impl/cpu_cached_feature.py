@@ -37,7 +37,7 @@ class CPUCachedFeature(Feature):
         fallback_feature: Feature,
         max_cache_size_in_bytes: int,
         policy: str = None,
-        pin_memory=False,
+        pin_memory: bool = False,
     ):
         super(CPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
