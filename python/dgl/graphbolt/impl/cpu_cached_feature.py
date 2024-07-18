@@ -59,9 +59,6 @@ class CPUCachedFeature(Feature):
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
 
-        The returned tensor is always in GPU memory, no matter whether the
-        fallback feature is in memory or on disk.
-
         Parameters
         ----------
         ids : torch.Tensor, optional
