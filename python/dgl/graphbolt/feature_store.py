@@ -26,7 +26,7 @@ class Feature:
         """
         raise NotImplementedError
 
-    def read_async(self, ids: torch.Tensor = None):
+    def read_async(self, ids: torch.Tensor):
         """Read the feature by index asynchronously.
         Parameters
         ----------
@@ -41,7 +41,7 @@ class Feature:
         """
         raise NotImplementedError
 
-    def read_async_num_stages(self):
+    def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation."""
         raise NotImplementedError
 
