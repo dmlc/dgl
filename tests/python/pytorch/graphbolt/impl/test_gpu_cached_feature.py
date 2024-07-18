@@ -150,7 +150,12 @@ def test_gpu_cached_feature_read_async(dtype, pin_memory):
             values = next(reader)
         assert torch.equal(values.wait(), a_cuda[ids])
 
-    if not torch.ops.graphbolt.detect_io_uring() or dtype == torch.bfloat16:
+    # pin_memory is not applicable to DiskBasedFeature.
+    if (
+        pin_memory
+        or not torch.ops.graphbolt.detect_io_uring()
+        or dtype == torch.bfloat16
+    ):
         return
 
     with tempfile.TemporaryDirectory() as test_dir:
