@@ -154,6 +154,7 @@ class TorchBasedFeature(Feature):
             class _Waiter:
                 @staticmethod
                 def wait():
+                    """Returns the stored value when invoked."""
                     values_copy_event.wait()
                     return values
 
@@ -185,6 +186,7 @@ class TorchBasedFeature(Feature):
             class _Waiter:
                 @staticmethod
                 def wait():
+                    """Returns the stored value when invoked."""
                     values_copy_event.wait()
                     return values_cuda
 
@@ -423,6 +425,7 @@ class DiskBasedFeature(Feature):
             class _Waiter:
                 @staticmethod
                 def wait():
+                    """Returns the stored value when invoked."""
                     values_copy_event.wait()
                     return values_cuda
 

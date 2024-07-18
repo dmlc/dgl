@@ -2,11 +2,9 @@
 
 import torch
 
-from ..base import get_device_to_host_uva_stream, get_host_to_device_uva_stream
 from ..feature_store import Feature
 
 from .gpu_cache import GPUCache
-from .torch_based_feature_store import DiskBasedFeature, TorchBasedFeature
 
 __all__ = ["GPUCachedFeature"]
 
@@ -104,6 +102,7 @@ class GPUCachedFeature(Feature):
         class _Waiter:
             @staticmethod
             def wait():
+                """Returns the stored value when invoked."""
                 return values
 
         yield _Waiter()
