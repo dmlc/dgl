@@ -43,11 +43,6 @@ class Feature:
 
     def read_async_num_stages(self):
         """The number of stages of the read_async operation."""
-        return 1
-
-    @property
-    def device(self):
-        """The device this feature is stored at."""
         raise NotImplementedError
 
     def size(self):

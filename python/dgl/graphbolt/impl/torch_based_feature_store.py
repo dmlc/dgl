@@ -209,10 +209,6 @@ class TorchBasedFeature(Feature):
         """
         return self._tensor.size()[1:]
 
-    @property
-    def device(self):
-        return self._tensor.device
-
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature store.
 
@@ -410,10 +406,6 @@ class DiskBasedFeature(Feature):
             The size of the feature.
         """
         return self._tensor.size()[1:]
-
-    @property
-    def device(self):
-        return self._tensor.device
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Disk based feature does not support update for now."""
