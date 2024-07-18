@@ -121,6 +121,23 @@ class TorchBasedFeature(Feature):
             return self._tensor
         return index_select(self._tensor, ids)
 
+    def read_async(self, ids: torch.Tensor = None):
+        """Read the feature by index asynchronously. Available only if
+        underlying feature tensor is on the `cpu` device.
+        Parameters
+        ----------
+        ids : torch.Tensor
+            The index of the feature. Only the specified indices of the feature
+            are read.
+        Returns
+        -------
+        A future containing torch.Tensor. It can be accessed by calling
+        `.wait()`. on the returned object.
+            The read feature future.
+        """
+        assert self._tensor.device == torch.device("cpu")
+        yield torch.ops.graphbolt.index_select_async(self._tensor, ids)
+
     def size(self):
         """Get the size of the feature.
 
@@ -130,6 +147,10 @@ class TorchBasedFeature(Feature):
             The size of the feature.
         """
         return self._tensor.size()[1:]
+
+    @property
+    def device(self):
+        return self._tensor.device
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature store.
@@ -303,6 +324,23 @@ class DiskBasedFeature(Feature):
         else:
             return index_select(self._tensor, ids)
 
+    def read_async(self, ids: torch.Tensor = None):
+        """Read the feature by index asynchronously.
+        The returned tensor will be on CPU.
+        Parameters
+        ----------
+        ids : torch.Tensor
+            The index of the feature. Only the specified indices of the
+            feature are read.
+        Returns
+        -------
+        A future containing torch.Tensor. It can be accessed by calling
+        `.wait()`. on the returned object.
+            The read feature future.
+        """
+        assert torch.ops.graphbolt.detect_io_uring()
+        yield self._ondisk_npy_array.index_select(ids)
+
     def size(self):
         """Get the size of the feature.
         Returns
@@ -311,6 +349,10 @@ class DiskBasedFeature(Feature):
             The size of the feature.
         """
         return self._tensor.size()[1:]
+
+    @property
+    def device(self):
+        return self._tensor.device
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Disk based feature does not support update for now."""

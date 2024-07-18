@@ -26,6 +26,30 @@ class Feature:
         """
         raise NotImplementedError
 
+    def read_async(self, ids: torch.Tensor = None):
+        """Read the feature by index asynchronously.
+        Parameters
+        ----------
+        ids : torch.Tensor
+            The index of the feature. Only the specified indices of the
+            feature are read.
+        Returns
+        -------
+        A future containing torch.Tensor. It can be accessed by calling
+        `.wait()`. on the returned object.
+            The future containing the read feature.
+        """
+        raise NotImplementedError
+
+    def read_async_num_stages(self):
+        """The number of stages of the read_async operation."""
+        return 1
+
+    @property
+    def device(self):
+        """The device this feature is stored at."""
+        raise NotImplementedError
+
     def size(self):
         """Get the size of the feature.
 
