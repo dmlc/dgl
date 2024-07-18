@@ -1,11 +1,20 @@
+import os
+import tempfile
 import unittest
 
 import backend as F
 
+import numpy as np
 import pytest
 import torch
 
 from dgl import graphbolt as gb
+
+
+def to_on_disk_numpy(test_dir, name, t):
+    path = os.path.join(test_dir, name + ".npy")
+    np.save(path, t.numpy())
+    return path
 
 
 @unittest.skipIf(
@@ -126,14 +135,36 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
 @pytest.mark.parametrize("pin_memory", [False, True])
 def test_gpu_cached_feature_read_async(dtype, pin_memory):
     a = torch.randint(0, 2, [1000, 13], dtype=dtype, pin_memory=pin_memory)
+    a_cuda = a.to(F.ctx())
 
     cache_size = 256 * a[:1].nbytes
 
     feat_store = gb.GPUCachedFeature(gb.TorchBasedFeature(a), cache_size)
 
     # Test read with ids.
-    ids = torch.tensor([0, 15, 71, 101], device=F.ctx())
-    reader = feat_store.read_async(ids)
-    for _ in range(feat_store.read_async_num_stages(ids.device)):
-        values = next(reader)
-    assert torch.equal(values.wait(), a.to(ids.device)[ids])
+    ids1 = torch.tensor([0, 15, 71, 101], device=F.ctx())
+    ids2 = torch.tensor([71, 101, 202, 303], device=F.ctx())
+    for ids in [ids1, ids2]:
+        reader = feat_store.read_async(ids)
+        for _ in range(feat_store.read_async_num_stages(ids.device)):
+            values = next(reader)
+        assert torch.equal(values.wait(), a_cuda[ids])
+
+    if not torch.ops.graphbolt.detect_io_uring() or dtype == torch.bfloat16:
+        return
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = to_on_disk_numpy(test_dir, "tensor", a)
+
+        feat_store = gb.GPUCachedFeature(
+            gb.DiskBasedFeature(path=path), cache_size
+        )
+
+        # Test read feature.
+        for ids in [ids1, ids2]:
+            reader = feat_store.read_async(ids)
+            for _ in range(feat_store.read_async_num_stages(ids.device)):
+                values = next(reader)
+            assert torch.equal(values.wait(), a_cuda[ids])
+
+        feat_store = None
