@@ -77,9 +77,7 @@ torch::Tensor BaseCachePolicy::ReplaceImpl(
           const auto pos = pos_optional ? *pos_optional : policy.Insert(key);
           positions_ptr[i] = pos;
           TORCH_CHECK(
-              // If there are duplicate values and the key was just inserted,
-              // we do not have to check for the uniqueness of the positions.
-              pos_optional.has_value() || std::get<1>(position_set.insert(pos)),
+              std::get<1>(position_set.insert(pos)),
               "Can't insert all, larger cache capacity is needed.");
         }
       }));
