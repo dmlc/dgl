@@ -1,8 +1,18 @@
 """Feature store for GraphBolt."""
 
+from typing import NamedTuple
+
 import torch
 
-__all__ = ["Feature", "FeatureStore"]
+__all__ = ["Feature", "FeatureStore", "FeatureKey"]
+
+
+class FeatureKey(NamedTuple):
+    """A named tuple class to represent feature keys in FeatureStore classes."""
+
+    domain: str
+    type: str
+    name: int
 
 
 class Feature:
