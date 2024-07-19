@@ -29,7 +29,7 @@ def test_feature_cache(dtype, feature_size, num_parts, policy):
         torch.get_num_threads() if num_parts is None else num_parts
     )
     a = torch.randint(0, 2, [1024, feature_size], dtype=dtype)
-    cache = gb.impl.FeatureCache(
+    cache = gb.impl.CPUFeatureCache(
         (cache_size,) + a.shape[1:], a.dtype, policy, num_parts
     )
 
