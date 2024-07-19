@@ -2,13 +2,13 @@
 
 import copy
 import textwrap
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import numpy as np
 import torch
 
 from ..base import index_select
-from ..feature_store import Feature
+from ..feature_store import Feature, FeatureKey
 from ..internal_utils import gb_warning, is_wsl
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
@@ -369,6 +369,10 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     ----------
     feat_data : List[OnDiskFeatureData]
         The description of the feature stores.
+    disk_based_feature_list: Set[FeatureKey] = set()
+        Uses the DiskBasedFeature instead of TorchBasedFeature for the given set
+        of features indicated by a tuple containing their domains, types and
+        names as (domain, type, name).
 
     Examples
     --------
@@ -386,16 +390,20 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     ...     gb.OnDiskFeatureData(domain="node", type="paper", name="feat",
     ...         format="numpy", path="/tmp/node_feat.npy", in_memory=False),
     ... ]
-    >>> feature_sotre = gb.TorchBasedFeatureStore(feat_data)
+    >>> feature_store = gb.TorchBasedFeatureStore(feat_data)
     """
 
-    def __init__(self, feat_data: List[OnDiskFeatureData]):
+    def __init__(
+        self,
+        feat_data: List[OnDiskFeatureData],
+        disk_based_feature_list: Set[FeatureKey] = set(),
+    ):
         features = {}
         for spec in feat_data:
             key = (spec.domain, spec.type, spec.name)
             metadata = spec.extra_fields
             if spec.format == "torch":
-                assert spec.in_memory, (
+                assert spec.in_memory or key in disk_based_feature_list, (
                     f"Pytorch tensor can only be loaded in memory, "
                     f"but the feature {key} is loaded on disk."
                 )
@@ -403,11 +411,18 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                mmap_mode = "r+" if not spec.in_memory else None
-                features[key] = TorchBasedFeature(
-                    torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
-                    metadata=metadata,
-                )
+                if key in disk_based_feature_list:
+                    features[key] = DiskBasedFeature(
+                        spec.path, metadata=metadata
+                    )
+                else:
+                    mmap_mode = "r+" if not spec.in_memory else None
+                    features[key] = TorchBasedFeature(
+                        torch.as_tensor(
+                            np.load(spec.path, mmap_mode=mmap_mode)
+                        ),
+                        metadata=metadata,
+                    )
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")
         super().__init__(features)

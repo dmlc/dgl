@@ -6,7 +6,7 @@ import os
 import shutil
 import textwrap
 from copy import deepcopy
-from typing import Dict, List, Union
+from typing import Dict, List, Set, Union
 
 import numpy as np
 
@@ -15,6 +15,7 @@ import yaml
 
 from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
 from ..dataset import Dataset, Task
+from ..feature_store import FeatureKey
 from ..internal import (
     calculate_dir_hash,
     check_dataset_change,
@@ -713,7 +714,11 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(self, tasks: List[str] = None):
+    def load(
+        self,
+        tasks: List[str] = None,
+        disk_based_feature_list: Set[FeatureKey] = set(),
+    ):
         """Load the dataset.
 
         Parameters
@@ -722,6 +727,10 @@ class OnDiskDataset(Dataset):
             The name of the tasks to be loaded. For single task, the type of
             tasks can be both string and List[str]. For multiple tasks, only
             List[str] is acceptable.
+        disk_based_feature_list: Set[FeatureKey] = set()
+            Uses the DiskBasedFeature instead of TorchBasedFeature for the given
+            set of features indicated by a tuple containing their domains, types
+            and names as (domain, type, name).
 
         Examples
         --------
@@ -759,7 +768,9 @@ class OnDiskDataset(Dataset):
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
-        self._feature = TorchBasedFeatureStore(self._meta.feature_data)
+        self._feature = TorchBasedFeatureStore(
+            self._meta.feature_data, disk_based_feature_list
+        )
         self._tasks = self._init_tasks(self._meta.tasks, tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
         self._loaded = True
