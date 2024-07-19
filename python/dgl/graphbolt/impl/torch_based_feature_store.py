@@ -369,7 +369,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     ----------
     feat_data : List[OnDiskFeatureData]
         The description of the feature stores.
-    disk_based_feature_list: Set[FeatureKey] = set()
+    disk_based_feature_list: Set[FeatureKey] = None
         Uses the DiskBasedFeature instead of TorchBasedFeature for the given set
         of features indicated by a tuple containing their domains, types and
         names as (domain, type, name).
@@ -396,8 +396,10 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     def __init__(
         self,
         feat_data: List[OnDiskFeatureData],
-        disk_based_feature_list: Set[FeatureKey] = set(),
+        disk_based_feature_list: Set[FeatureKey] = None,
     ):
+        if disk_based_feature_list is None:
+            disk_based_feature_list = set()
         features = {}
         for spec in feat_data:
             key = (spec.domain, spec.type, spec.name)
