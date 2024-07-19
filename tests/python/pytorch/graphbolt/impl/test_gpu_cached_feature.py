@@ -156,6 +156,10 @@ def test_gpu_cached_feature_read_async(dtype, pin_memory):
     or torch.cuda.get_device_capability()[0] < 7,
     reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
 )
+@unittest.skipIf(
+    not torch.ops.graphbolt.detect_io_uring(),
+    reason="DiskBasedFeature is not available on this system.",
+)
 @pytest.mark.parametrize(
     "dtype",
     [

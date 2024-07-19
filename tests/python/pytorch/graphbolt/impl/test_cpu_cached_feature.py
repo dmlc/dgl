@@ -1,5 +1,6 @@
 import os
 import tempfile
+import unittest
 
 import backend as F
 import numpy as np
@@ -135,13 +136,32 @@ def test_cpu_cached_feature_read_async(dtype):
             values = next(reader)
         assert torch.equal(values.wait(), a[ids])
 
-    if (
-        # DiskBasedFeature's only backend is io_uring.
-        not torch.ops.graphbolt.detect_io_uring()
-        # numpy.save does not work with bfloat16.
-        or dtype == torch.bfloat16
-    ):
-        return
+
+@unittest.skipIf(
+    not torch.ops.graphbolt.detect_io_uring(),
+    reason="DiskBasedFeature is not available on this system.",
+)
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+def test_cpu_cached_disk_feature_read_async(dtype):
+    a = torch.randint(0, 2, [1000, 13], dtype=dtype)
+
+    cache_size = 256 * a[:1].nbytes
+
+    ids1 = torch.tensor([0, 15, 71, 101])
+    ids2 = torch.tensor([71, 101, 202, 303])
 
     with tempfile.TemporaryDirectory() as test_dir:
         path = to_on_disk_numpy(test_dir, "tensor", a)
