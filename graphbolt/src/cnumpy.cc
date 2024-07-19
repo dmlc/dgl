@@ -201,6 +201,9 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
           work_queue.fetch_add(num_requested_items, std::memory_order_relaxed);
       if ((begin >= index.numel() && read_queue.IsEmpty() &&
            num_completed >= num_submitted) ||
+          // Even when we encounter out of bounds index (error_flag == 1), we
+          // continue. We want to ensure the reads in flight successfully
+          // complete to avoid the instability due to incompleted reads.
           error_flag.load(std::memory_order_relaxed) > 1)
         break;
       end = std::min(begin + num_requested_items, index.numel());
@@ -212,6 +215,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
               if (feature_id < 0) feature_id += feature_dim_[0];
               if (feature_id < 0 || feature_id >= feature_dim_[0]) {
                 error_flag.store(1, std::memory_order_relaxed);
+                // Simply skip the out of bounds index.
                 continue;
               }
               // calculate offset of the feature.
@@ -232,55 +236,52 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
             }
           }));
 
-      if (error_flag.load(std::memory_order_relaxed) <= 1) {
-        submit_fn(1);  // Submit all sqes.
-        // Wait for the reads; completion queue entries.
-        struct io_uring_cqe *cqe;
-        TORCH_CHECK(num_submitted - num_completed <= 2 * kGroupSize);
-        TORCH_CHECK(
-            ::io_uring_wait_cqe_nr(
-                &io_uring_queue, &cqe, num_submitted - num_completed) == 0);
-        // Check the reads and abort on failure.
-        int num_cqes_seen = 0;
-        unsigned head;
-        io_uring_for_each_cqe(&io_uring_queue, head, cqe) {
-          const auto &req =
-              *reinterpret_cast<ReadRequest *>(io_uring_cqe_get_data(cqe));
-          auto actual_read_len = cqe->res;
-          if (actual_read_len < 0) {
-            error_flag.store(3, std::memory_order_relaxed);
-            break;
-          }
-          const auto remaining_read_len =
-              std::max(req.MinimumReadSize() - actual_read_len, int64_t{});
-          const auto remaining_useful_read_len =
-              std::min(remaining_read_len, req.read_len_);
-          const auto useful_read_len =
-              req.read_len_ - remaining_useful_read_len;
-          if (remaining_read_len) {
-            // Remaining portion will be read as part of the next batch.
-            ReadRequest rest{
-                req.destination_ + useful_read_len, remaining_useful_read_len,
-                req.offset_ + useful_read_len, block_size_,
-                request_read_buffer()};
-            // Put requests into io_uring queue.
-            struct io_uring_sqe *sqe = io_uring_get_sqe(&io_uring_queue);
-            TORCH_CHECK(sqe);
-            io_uring_sqe_set_data(sqe, read_queue.Push(rest));
-            io_uring_prep_read(
-                sqe, file_description_, rest.aligned_read_buffer_,
-                rest.AlignedReadSize(), rest.AlignedOffset());
-            submit_fn(kGroupSize);
-          }
-          // Copy results into result_buffer.
-          std::memcpy(req.destination_, req.ReadBuffer(), useful_read_len);
-          num_cqes_seen++;
+      submit_fn(1);  // Submit all sqes.
+      // Wait for the reads; completion queue entries.
+      struct io_uring_cqe *cqe;
+      TORCH_CHECK(num_submitted - num_completed <= 2 * kGroupSize);
+      TORCH_CHECK(
+          ::io_uring_wait_cqe_nr(
+              &io_uring_queue, &cqe, num_submitted - num_completed) == 0);
+      // Check the reads and abort on failure.
+      int num_cqes_seen = 0;
+      unsigned head;
+      io_uring_for_each_cqe(&io_uring_queue, head, cqe) {
+        const auto &req =
+            *reinterpret_cast<ReadRequest *>(io_uring_cqe_get_data(cqe));
+        auto actual_read_len = cqe->res;
+        if (actual_read_len < 0) {
+          error_flag.store(3, std::memory_order_relaxed);
+          break;
         }
-
-        // Move the head pointer of completion queue.
-        io_uring_cq_advance(&io_uring_queue, num_cqes_seen);
-        num_completed += num_cqes_seen;
+        const auto remaining_read_len =
+            std::max(req.MinimumReadSize() - actual_read_len, int64_t{});
+        const auto remaining_useful_read_len =
+            std::min(remaining_read_len, req.read_len_);
+        const auto useful_read_len = req.read_len_ - remaining_useful_read_len;
+        if (remaining_read_len) {
+          // Remaining portion will be read as part of the next batch.
+          ReadRequest rest{
+              req.destination_ + useful_read_len, remaining_useful_read_len,
+              req.offset_ + useful_read_len, block_size_,
+              request_read_buffer()};
+          // Put requests into io_uring queue.
+          struct io_uring_sqe *sqe = io_uring_get_sqe(&io_uring_queue);
+          TORCH_CHECK(sqe);
+          io_uring_sqe_set_data(sqe, read_queue.Push(rest));
+          io_uring_prep_read(
+              sqe, file_description_, rest.aligned_read_buffer_,
+              rest.AlignedReadSize(), rest.AlignedOffset());
+          submit_fn(kGroupSize);
+        }
+        // Copy results into result_buffer.
+        std::memcpy(req.destination_, req.ReadBuffer(), useful_read_len);
+        num_cqes_seen++;
       }
+
+      // Move the head pointer of completion queue.
+      io_uring_cq_advance(&io_uring_queue, num_cqes_seen);
+      num_completed += num_cqes_seen;
     }
   });
 
