@@ -1,9 +1,18 @@
-import backend as F
+import os
+import tempfile
 
+import backend as F
+import numpy as np
 import pytest
 import torch
 
 from dgl import graphbolt as gb
+
+
+def to_on_disk_numpy(test_dir, name, t):
+    path = os.path.join(test_dir, name + ".npy")
+    np.save(path, t.numpy())
+    return path
 
 
 @pytest.mark.parametrize(
@@ -93,3 +102,59 @@ def test_cpu_cached_feature(dtype, policy):
     # Test with different dimensionality
     feat_store_a.update(b)
     assert torch.equal(feat_store_a.read(), b)
+
+
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+def test_cpu_cached_feature_read_async(dtype):
+    a = torch.randint(0, 2, [1000, 13], dtype=dtype)
+
+    cache_size = 256 * a[:1].nbytes
+
+    feat_store = gb.CPUCachedFeature(gb.TorchBasedFeature(a), cache_size)
+
+    # Test read with ids.
+    ids1 = torch.tensor([0, 15, 71, 101])
+    ids2 = torch.tensor([71, 101, 202, 303])
+    for ids in [ids1, ids2]:
+        reader = feat_store.read_async(ids)
+        for _ in range(feat_store.read_async_num_stages(ids.device)):
+            values = next(reader)
+        assert torch.equal(values.wait(), a[ids])
+
+    if (
+        # DiskBasedFeature's only backend is io_uring.
+        not torch.ops.graphbolt.detect_io_uring()
+        # numpy.save does not work with bfloat16.
+        or dtype == torch.bfloat16
+    ):
+        return
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = to_on_disk_numpy(test_dir, "tensor", a)
+
+        feat_store = gb.CPUCachedFeature(
+            gb.DiskBasedFeature(path=path), cache_size
+        )
+
+        # Test read feature.
+        for ids in [ids1, ids2]:
+            reader = feat_store.read_async(ids)
+            for _ in range(feat_store.read_async_num_stages(ids.device)):
+                values = next(reader)
+            assert torch.equal(values.wait(), a[ids])
+
+        feat_store = None

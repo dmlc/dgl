@@ -163,15 +163,22 @@ def test_gpu_cached_feature_read_async(dtype, pin_memory):
     with tempfile.TemporaryDirectory() as test_dir:
         path = to_on_disk_numpy(test_dir, "tensor", a)
 
-        feat_store = gb.GPUCachedFeature(
-            gb.DiskBasedFeature(path=path), cache_size
+        disk_store = gb.DiskBasedFeature(path=path)
+        feat_store1 = gb.GPUCachedFeature(disk_store, cache_size)
+        feat_store2 = gb.GPUCachedFeature(
+            gb.CPUCachedFeature(disk_store, cache_size * 2), cache_size
+        )
+        feat_store3 = gb.GPUCachedFeature(
+            gb.CPUCachedFeature(disk_store, cache_size * 2, pin_memory=True),
+            cache_size,
         )
 
         # Test read feature.
-        for ids in [ids1, ids2]:
-            reader = feat_store.read_async(ids)
-            for _ in range(feat_store.read_async_num_stages(ids.device)):
-                values = next(reader)
-            assert torch.equal(values.wait(), a_cuda[ids])
+        for feat_store in [feat_store1, feat_store2, feat_store3]:
+            for ids in [ids1, ids2]:
+                reader = feat_store.read_async(ids)
+                for _ in range(feat_store.read_async_num_stages(ids.device)):
+                    values = next(reader)
+                assert torch.equal(values.wait(), a_cuda[ids])
 
-        feat_store = None
+        feat_store1 = feat_store2 = feat_store3 = disk_store = None
