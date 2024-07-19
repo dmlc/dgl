@@ -8,7 +8,9 @@ __all__ = ["Feature", "FeatureStore", "FeatureKey"]
 
 
 class FeatureKey(NamedTuple):
-    """A named tuple class to represent feature keys in FeatureStore classes."""
+    """A named tuple class to represent feature keys in FeatureStore classes.
+    The fields are domain, type and name all of which take string values.
+    """
 
     domain: str
     type: str
