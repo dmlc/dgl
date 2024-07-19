@@ -201,7 +201,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
           work_queue.fetch_add(num_requested_items, std::memory_order_relaxed);
       if ((begin >= index.numel() && read_queue.IsEmpty() &&
            num_completed >= num_submitted) ||
-          error_flag.load(std::memory_order_relaxed))
+          error_flag.load(std::memory_order_relaxed) > 1)
         break;
       end = std::min(begin + num_requested_items, index.numel());
       AT_DISPATCH_INDEX_TYPES(
@@ -232,7 +232,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
             }
           }));
 
-      if (!error_flag.load(std::memory_order_relaxed)) {
+      if (error_flag.load(std::memory_order_relaxed) <= 1) {
         submit_fn(1);  // Submit all sqes.
         // Wait for the reads; completion queue entries.
         struct io_uring_cqe *cqe;
