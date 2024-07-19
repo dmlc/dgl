@@ -9,7 +9,7 @@ from .feature_cache import CPUFeatureCache
 __all__ = ["CPUCachedFeature"]
 
 
-def num_cache_items(cache_capacity_in_bytes, single_item):
+def bytes_to_number_of_items(cache_capacity_in_bytes, single_item):
     """Returns the number of rows to be cached."""
     item_bytes = single_item.nbytes
     # Round up so that we never get a size of 0, unless bytes is 0.
@@ -49,7 +49,7 @@ class CPUCachedFeature(Feature):
         self.max_cache_size_in_bytes = max_cache_size_in_bytes
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
-        cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
+        cache_size = bytes_to_number_of_items(max_cache_size_in_bytes, feat0)
         self._feature = CPUFeatureCache(
             (cache_size,) + feat0.shape[1:],
             feat0.dtype,
@@ -107,7 +107,7 @@ class CPUCachedFeature(Feature):
             feat0 = value[:1]
             self._fallback_feature.update(value)
             cache_size = min(
-                num_cache_items(self.max_cache_size_in_bytes, feat0),
+                bytes_to_number_of_items(self.max_cache_size_in_bytes, feat0),
                 value.shape[0],
             )
             self._feature = None  # Destroy the existing cache first.
