@@ -233,14 +233,13 @@ class CPUCachedFeature(Feature):
             replace_future = cache.replace_async(
                 positions_future.wait(), missing_values
             )
-            # TODO, implement scatter_async
-            values[missing_index] = missing_values
+            values = torch.ops.graphbolt.scatter_async(values, missing_index, missing_values)
 
             yield
 
             host_to_device_stream = get_host_to_device_uva_stream()
             with torch.cuda.stream(host_to_device_stream):
-                values_cuda = values.to(ids_device, non_blocking=True)
+                values_cuda = values.wait().to(ids_device, non_blocking=True)
                 values_cuda.record_stream(current_stream)
                 values_copy_event = torch.cuda.Event()
                 values_copy_event.record()
@@ -288,8 +287,7 @@ class CPUCachedFeature(Feature):
             replace_future = cache.replace_async(
                 positions_future.wait(), missing_values
             )
-            # TODO, implement scatter_async
-            values[missing_index] = missing_values
+            values = torch.ops.graphbolt.scatter_async(values, missing_index, missing_values)
 
             yield
 
@@ -302,7 +300,7 @@ class CPUCachedFeature(Feature):
                 def wait():
                     """Returns the stored value when invoked."""
                     reading_completed.wait()
-                    return values
+                    return values.wait()
 
             yield _Waiter()
 
