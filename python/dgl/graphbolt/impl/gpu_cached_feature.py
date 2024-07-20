@@ -128,7 +128,9 @@ class GPUCachedFeature(Feature):
             @staticmethod
             def wait():
                 """Returns the stored value when invoked."""
-                values[missing_index] = missing_values_future.wait()
+                missing_values = missing_values_future.wait()
+                self._feature.replace(missing_keys, missing_values)
+                values[missing_index] = missing_values
                 return values
 
         yield _Waiter()
