@@ -1,11 +1,20 @@
+import os
+import tempfile
 import unittest
 
 import backend as F
 
+import numpy as np
 import pytest
 import torch
 
 from dgl import graphbolt as gb
+
+
+def to_on_disk_numpy(test_dir, name, t):
+    path = os.path.join(test_dir, name + ".npy")
+    np.save(path, t.cpu().numpy())
+    return path
 
 
 @unittest.skipIf(
@@ -140,3 +149,58 @@ def test_gpu_cached_feature_read_async(dtype, pin_memory):
         for _ in range(feat_store.read_async_num_stages(ids.device)):
             values = next(reader)
         assert torch.equal(values.wait(), a_cuda[ids])
+
+
+@unittest.skipIf(
+    F._default_context_str != "gpu"
+    or torch.cuda.get_device_capability()[0] < 7,
+    reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
+)
+@unittest.skipIf(
+    not torch.ops.graphbolt.detect_io_uring(),
+    reason="DiskBasedFeature is not available on this system.",
+)
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+def test_gpu_cached_nested_feature_async(dtype):
+    a = torch.randint(0, 2, [1000, 13], dtype=dtype, device=F.ctx())
+
+    cache_size = 256 * a[:1].nbytes
+
+    ids1 = torch.tensor([0, 15, 71, 101], device=F.ctx())
+    ids2 = torch.tensor([71, 101, 202, 303], device=F.ctx())
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = to_on_disk_numpy(test_dir, "tensor", a)
+
+        disk_store = gb.DiskBasedFeature(path=path)
+        feat_store1 = gb.GPUCachedFeature(disk_store, cache_size)
+        feat_store2 = gb.GPUCachedFeature(
+            gb.CPUCachedFeature(disk_store, cache_size * 2), cache_size
+        )
+        feat_store3 = gb.GPUCachedFeature(
+            gb.CPUCachedFeature(disk_store, cache_size * 2, pin_memory=True),
+            cache_size,
+        )
+
+        # Test read feature.
+        for feat_store in [feat_store1, feat_store2, feat_store3]:
+            for ids in [ids1, ids2]:
+                reader = feat_store.read_async(ids)
+                for _ in range(feat_store.read_async_num_stages(ids.device)):
+                    values = next(reader)
+                assert torch.equal(values.wait(), a[ids])
+
+        feat_store1 = feat_store2 = feat_store3 = disk_store = None
