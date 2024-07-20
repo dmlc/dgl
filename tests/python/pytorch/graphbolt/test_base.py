@@ -259,6 +259,31 @@ def test_index_select(dtype, idtype, pinned):
     assert torch.equal(torch_result.cpu(), future.wait())
 
 
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+@pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
+def test_scatter_async(dtype, idtype):
+    input = torch.tensor([[2, 3], [5, 5], [20, 13]], dtype=dtype)
+    index = torch.ones([1], dtype=idtype)
+    res = torch.ops.graphbolt.scatter_async(input, index, input[2:3])
+    assert torch.equal(
+        torch.tensor([[2, 3], [20, 13], [20, 13]], dtype=dtype), res.wait()
+    )
+
+
 def torch_expand_indptr(indptr, dtype, nodes=None):
     if nodes is None:
         nodes = torch.arange(len(indptr) - 1, dtype=dtype, device=indptr.device)
