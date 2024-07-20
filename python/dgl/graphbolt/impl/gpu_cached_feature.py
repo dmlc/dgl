@@ -83,7 +83,7 @@ class GPUCachedFeature(Feature):
         if ids is None:
             return self._fallback_feature.read()
         values, missing_index, missing_keys = self._feature.query(ids)
-        missing_values = self._fallback_feature.read(missing_keys).to("cuda")
+        missing_values = self._fallback_feature.read(missing_keys)
         values[missing_index] = missing_values
         self._feature.replace(missing_keys, missing_values)
         return values
@@ -112,7 +112,25 @@ class GPUCachedFeature(Feature):
         ...     future = next(async_handle)
         >>> result = future.wait()  # result contains the read values.
         """
-        raise NotImplementedError
+        values, missing_index, missing_keys = self._feature.query(ids)
+
+        fallback_reader = self._fallback_feature.read_async(missing_keys)
+        fallback_num_stages = self._fallback_feature.read_async_num_stages(
+            missing_keys.device
+        )
+        for i in range(fallback_num_stages):
+            missing_values_future = next(fallback_reader, None)
+            if i < fallback_num_stages - 1:
+                yield  # fallback feature stages.
+
+        class _Waiter:
+            @staticmethod
+            def wait():
+                """Returns the stored value when invoked."""
+                values[missing_index] = missing_values_future.wait()
+                return values
+
+        yield _Waiter()
 
     def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation. See read_async
@@ -126,7 +144,8 @@ class GPUCachedFeature(Feature):
         int
             The number of stages of the read_async operation.
         """
-        raise NotImplementedError
+        assert ids_device.type == "cuda"
+        return self._fallback_feature.read_async_num_stages(ids_device)
 
     def size(self):
         """Get the size of the feature.
