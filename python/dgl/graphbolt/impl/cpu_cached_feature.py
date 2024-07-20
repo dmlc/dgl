@@ -185,8 +185,6 @@ class CPUCachedFeature(Feature):
                     )
                     found_index = index[: positions.size(0)]
                     missing_index = index[positions.size(0) :]
-                    print(found_index.shape, values_from_cpu.shape)
-                    print(missing_index.shape, missing_values_cuda.shape)
                     values[found_index] = values_from_cpu
                     values[missing_index] = missing_values_cuda
                     return values
