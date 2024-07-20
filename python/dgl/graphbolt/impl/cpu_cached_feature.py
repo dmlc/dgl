@@ -105,11 +105,11 @@ class CPUCachedFeature(Feature):
         >>> result = future.wait()  # result contains the read values.
         """
         if ids.is_cuda and self._is_pinned:
-            raise NotImplementedError
+            pass
         elif ids.is_cuda:
-            raise NotImplementedError
+            pass
         else:
-            raise NotImplementedError
+            pass
 
     def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation. See read_async
