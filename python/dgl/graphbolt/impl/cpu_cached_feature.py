@@ -233,7 +233,9 @@ class CPUCachedFeature(Feature):
             replace_future = cache.replace_async(
                 positions_future.wait(), missing_values
             )
-            values = torch.ops.graphbolt.scatter_async(values, missing_index, missing_values)
+            values = torch.ops.graphbolt.scatter_async(
+                values, missing_index, missing_values
+            )
 
             yield
 
@@ -287,7 +289,9 @@ class CPUCachedFeature(Feature):
             replace_future = cache.replace_async(
                 positions_future.wait(), missing_values
             )
-            values = torch.ops.graphbolt.scatter_async(values, missing_index, missing_values)
+            values = torch.ops.graphbolt.scatter_async(
+                values, missing_index, missing_values
+            )
 
             yield
 
