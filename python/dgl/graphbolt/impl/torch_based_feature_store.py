@@ -342,7 +342,7 @@ class DiskBasedFeature(Feature):
                 raise IndexError
         else:
             return index_select(self._tensor, ids)
-    
+
     def read_async(self, ids: torch.Tensor):
         """Read the feature by index asynchronously.
         Parameters
