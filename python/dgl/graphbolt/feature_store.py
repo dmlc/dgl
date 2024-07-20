@@ -35,14 +35,36 @@ class Feature:
             feature are read.
         Returns
         -------
-        A future containing torch.Tensor. It can be accessed by calling
-        `.wait()`. on the returned object.
-            The future containing the read feature.
+        A generator object.
+            The returned generator object returns a future on
+            `read_async_num_stages(ids.device)`th invocation. The return result
+            can be accessed by calling `.wait()`. on the returned future object.
+            It is undefined behavior to call `.wait()` more than once.
+        
+        Example Usage
+        --------
+        >>> import dgl.graphbolt as gb
+        >>> feature = gb.Feature(...)
+        >>> ids = torch.tensor([0, 2])
+        >>> async_handle = feature.read_async(ids)
+        >>> for _ in range(feature.read_async_num_stages(ids.device)):
+        ...     future = next(async_handle)
+        >>> result = future.wait()  # result contains the read values.
         """
         raise NotImplementedError
 
     def read_async_num_stages(self, ids_device: torch.device):
-        """The number of stages of the read_async operation."""
+        """The number of stages of the read_async operation. See read_async
+        function for directions on its use.
+        Parameters
+        ----------
+        ids_device : torch.device
+            The device of the ids parameter passed into read_async.
+        Returns
+        -------
+        int
+            The number of stages of the read_async operation.
+        """
         raise NotImplementedError
 
     def size(self):
