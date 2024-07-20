@@ -43,7 +43,7 @@ c10::intrusive_ptr<Future<torch::Tensor>> ScatterAsync(
   for (size_t i = 1; i < input.sizes().size(); i++) {
     TORCH_CHECK(
         input.size(i) == src.size(i),
-        "dimension mismatch between input and src at " i,
+        "dimension mismatch between input and src at ", i,
         "th dimension: ", input.size(i), " != ", src.size(i), ".");
   }
   return async([=] {
