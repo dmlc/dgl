@@ -157,7 +157,7 @@ class CPUCachedFeature(Feature):
                 positions_future.wait(), missing_values
             )
 
-            host_to_device_stream = get_device_to_host_uva_stream()
+            host_to_device_stream = get_host_to_device_uva_stream()
             with torch.cuda.stream(host_to_device_stream):
                 missing_values_cuda = missing_values.to(
                     ids_device, non_blocking=True
@@ -238,7 +238,7 @@ class CPUCachedFeature(Feature):
 
             yield
 
-            host_to_device_stream = get_device_to_host_uva_stream()
+            host_to_device_stream = get_host_to_device_uva_stream()
             with torch.cuda.stream(host_to_device_stream):
                 values_cuda = values.to(ids_device, non_blocking=True)
                 values_cuda.record_stream(current_stream)
