@@ -56,6 +56,7 @@ class CPUCachedFeature(Feature):
             policy=policy,
             pin_memory=pin_memory,
         )
+        self._is_pinned = pin_memory
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -103,7 +104,12 @@ class CPUCachedFeature(Feature):
         ...     future = next(async_handle)
         >>> result = future.wait()  # result contains the read values.
         """
-        raise NotImplementedError
+        if ids.is_cuda and self._is_pinned:
+            raise NotImplementedError
+        elif ids.is_cuda:
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
 
     def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation. See read_async
@@ -117,7 +123,12 @@ class CPUCachedFeature(Feature):
         int
             The number of stages of the read_async operation.
         """
-        raise NotImplementedError
+        if ids_device.type == "cuda":
+            return 4 + self._fallback_feature.read_async_num_stages(
+                torch.device("cpu")
+            )
+        else:
+            return 3 + self._fallback_feature.read_async_num_stages(ids_device)
 
     def size(self):
         """Get the size of the feature.
