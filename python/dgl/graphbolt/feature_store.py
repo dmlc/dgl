@@ -40,7 +40,7 @@ class Feature:
             `read_async_num_stages(ids.device)`th invocation. The return result
             can be accessed by calling `.wait()`. on the returned future object.
             It is undefined behavior to call `.wait()` more than once.
-        
+
         Example Usage
         --------
         >>> import dgl.graphbolt as gb
