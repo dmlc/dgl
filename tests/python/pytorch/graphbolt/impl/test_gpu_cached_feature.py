@@ -101,3 +101,42 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
     # Test with different dimensionality
     feat_store_a.update(b)
     assert torch.equal(feat_store_a.read(), b.to("cuda"))
+
+
+@unittest.skipIf(
+    F._default_context_str != "gpu"
+    or torch.cuda.get_device_capability()[0] < 7,
+    reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
+)
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.bool,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ],
+)
+@pytest.mark.parametrize("pin_memory", [False, True])
+def test_gpu_cached_feature_read_async(dtype, pin_memory):
+    a = torch.randint(0, 2, [1000, 13], dtype=dtype, pin_memory=pin_memory)
+    a_cuda = a.to(F.ctx())
+
+    cache_size = 256 * a[:1].nbytes
+
+    feat_store = gb.GPUCachedFeature(gb.TorchBasedFeature(a), cache_size)
+
+    # Test read with ids.
+    ids1 = torch.tensor([0, 15, 71, 101], device=F.ctx())
+    ids2 = torch.tensor([71, 101, 202, 303], device=F.ctx())
+    for ids in [ids1, ids2]:
+        reader = feat_store.read_async(ids)
+        for _ in range(feat_store.read_async_num_stages(ids.device)):
+            values = next(reader)
+        assert torch.equal(values.wait(), a_cuda[ids])
