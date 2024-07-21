@@ -98,7 +98,7 @@ class FeatureFetcher(MiniBatchTransformer):
                                 ),
                                 max_val,
                             )
-                        except:
+                        except AssertionError:
                             pass
         datapipe = datapipe.transform(self._read)
         for i in range(max_val, 0, -1):
@@ -164,46 +164,33 @@ class FeatureFetcher(MiniBatchTransformer):
         # Read Node features.
         input_nodes = data.node_ids()
 
+        def read_helper(feature_key, index):
+            if self.max_num_stages > 0:
+                feature = self.feature_store[feature_key]
+                return (
+                    feature.read_async(index),
+                    feature.read_async_num_stages(index.device),
+                )
+            else:
+                domain, type_name, feature_name = feature_key
+                return self.feature_store.read(
+                    domain, type_name, feature_name, index
+                )
+
         if self.node_feature_keys and input_nodes is not None:
             if is_heterogeneous:
                 for type_name, nodes in input_nodes.items():
                     if type_name not in self.node_feature_keys or nodes is None:
                         continue
                     for feature_name in self.node_feature_keys[type_name]:
-                        if self.max_num_stages > 0:
-                            feature = self.feature_store[
-                                ("node", type_name, feature_name)
-                            ]
-                            result = (
-                                feature.read_async(nodes),
-                                feature.read_async_num_stages(nodes.device),
-                            )
-                        else:
-                            result = self.feature_store.read(
-                                "node",
-                                type_name,
-                                feature_name,
-                                nodes,
-                            )
-                        node_features[(type_name, feature_name)] = result
+                        node_features[(type_name, feature_name)] = read_helper(
+                            ("node", type_name, feature_name), nodes
+                        )
             else:
                 for feature_name in self.node_feature_keys:
-                    if self.max_num_stages > 0:
-                        feature = self.feature_store[
-                            ("node", None, feature_name)
-                        ]
-                        result = (
-                            feature.read_async(input_nodes),
-                            feature.read_async_num_stages(input_nodes.device),
-                        )
-                    else:
-                        result = self.feature_store.read(
-                            "node",
-                            None,
-                            feature_name,
-                            input_nodes,
-                        )
-                    node_features[feature_name] = result
+                    node_features[feature_name] = read_helper(
+                        ("node", None, feature_name), input_nodes
+                    )
         # Read Edge features.
         if self.edge_feature_keys and num_layers > 0:
             for i in range(num_layers):
@@ -227,39 +214,16 @@ class FeatureFetcher(MiniBatchTransformer):
                         ):
                             continue
                         for feature_name in self.edge_feature_keys[type_name]:
-                            if self.max_num_stages > 0:
-                                feature = self.feature_store[
-                                    ("edge", type_name, feature_name)
-                                ]
-                                result = (
-                                    feature.read_async(edges),
-                                    feature.read_async_num_stages(edges.device),
-                                )
-                            else:
-                                result = self.feature_store.read(
-                                    "edge", type_name, feature_name, edges
-                                )
-                            edge_features[i][(type_name, feature_name)] = result
+                            edge_features[i][
+                                (type_name, feature_name)
+                            ] = read_helper(
+                                ("edge", type_name, feature_name), edges
+                            )
                 else:
                     for feature_name in self.edge_feature_keys:
-                        if self.max_num_stages > 0:
-                            feature = self.feature_store[
-                                ("edge", None, feature_name)
-                            ]
-                            result = (
-                                feature.read_async(original_edge_ids),
-                                feature.read_async_num_stages(
-                                    original_edge_ids.device
-                                ),
-                            )
-                        else:
-                            result = self.feature_store.read(
-                                "edge",
-                                None,
-                                feature_name,
-                                original_edge_ids,
-                            )
-                        edge_features[i][feature_name] = result
+                        edge_features[i][feature_name] = read_helper(
+                            ("edge", None, feature_name), original_edge_ids
+                        )
         data.set_node_features(node_features)
         data.set_edge_features(edge_features)
         return data
