@@ -90,6 +90,12 @@ struct CacheKey {
 class BaseCachePolicy {
  public:
   /**
+   * @brief A virtual base class constructor ensures that the derived class
+   * destructor gets called.
+   */
+  virtual ~BaseCachePolicy() = default;
+
+  /**
    * @brief The policy query function.
    * @param keys The keys to query the cache.
    *
@@ -143,6 +149,10 @@ class S3FifoCachePolicy : public BaseCachePolicy {
   S3FifoCachePolicy(int64_t capacity);
 
   S3FifoCachePolicy() = default;
+
+  S3FifoCachePolicy(S3FifoCachePolicy&&) = default;
+
+  virtual ~S3FifoCachePolicy() = default;
 
   /**
    * @brief See BaseCachePolicy::Query.
@@ -254,6 +264,8 @@ class SieveCachePolicy : public BaseCachePolicy {
 
   SieveCachePolicy() = default;
 
+  virtual ~SieveCachePolicy() = default;
+
   /**
    * @brief See BaseCachePolicy::Query.
    */
@@ -332,6 +344,8 @@ class LruCachePolicy : public BaseCachePolicy {
 
   LruCachePolicy() = default;
 
+  virtual ~LruCachePolicy() = default;
+
   /**
    * @brief See BaseCachePolicy::Query.
    */
@@ -408,6 +422,10 @@ class ClockCachePolicy : public BaseCachePolicy {
   ClockCachePolicy(int64_t capacity);
 
   ClockCachePolicy() = default;
+
+  ClockCachePolicy(ClockCachePolicy&&) = default;
+
+  virtual ~ClockCachePolicy() = default;
 
   /**
    * @brief See BaseCachePolicy::Query.
