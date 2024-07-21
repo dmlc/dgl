@@ -124,7 +124,8 @@ void S3FifoCachePolicy::ReadingCompleted(torch::Tensor keys) {
 }
 
 SieveCachePolicy::SieveCachePolicy(int64_t capacity)
-    : hand_(queue_.end()), capacity_(capacity), cache_usage_(0) {
+    // Ensure that queue_ is constructed first before accessing its `.end()`.
+    : queue_(), hand_(queue_.end()), capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(capacity);
 }
