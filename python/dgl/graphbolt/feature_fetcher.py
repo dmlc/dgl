@@ -135,10 +135,6 @@ class FeatureFetcher(MiniBatchTransformer):
                 features[key] = features[key].wait()
         return data
 
-    @staticmethod
-    def _identity(data):
-        return data
-
     def _read(self, data):
         """
         Fill in the node/edge features field in data.
