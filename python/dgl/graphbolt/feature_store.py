@@ -1,8 +1,20 @@
 """Feature store for GraphBolt."""
 
+from typing import NamedTuple
+
 import torch
 
-__all__ = ["Feature", "FeatureStore"]
+__all__ = ["Feature", "FeatureStore", "FeatureKey"]
+
+
+class FeatureKey(NamedTuple):
+    """A named tuple class to represent feature keys in FeatureStore classes.
+    The fields are domain, type and name all of which take string values.
+    """
+
+    domain: str
+    type: str
+    name: int
 
 
 class Feature:
@@ -108,6 +120,9 @@ class FeatureStore:
 
     def __init__(self):
         pass
+
+    def __getitem__(self, feature_key: FeatureKey) -> Feature:
+        raise NotImplementedError
 
     def read(
         self,

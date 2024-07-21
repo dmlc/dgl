@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 
 import torch
 
-from ..feature_store import Feature, FeatureStore
+from ..feature_store import Feature, FeatureKey, FeatureStore
 
 __all__ = ["BasicFeatureStore"]
 
@@ -28,6 +28,9 @@ class BasicFeatureStore(FeatureStore):
         """
         super().__init__()
         self._features = features
+
+    def __getitem__(self, feature_key: FeatureKey) -> Feature:
+        return self._features[feature_key]
 
     def read(
         self,
