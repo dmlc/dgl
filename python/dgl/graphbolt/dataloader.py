@@ -145,7 +145,6 @@ class DataLoader(torch.utils.data.DataLoader):
         datapipe,
         num_workers=0,
         persistent_workers=True,
-        overlap_feature_fetch=True,
         overlap_graph_fetch=False,
         num_gpu_cached_edges=0,
         gpu_cache_threshold=1,
@@ -185,25 +184,16 @@ class DataLoader(torch.utils.data.DataLoader):
             persistent_workers=persistent_workers,
         )
 
-        # (3) Overlap UVA feature fetching by buffering and using an alternative
-        # stream.
-        if (
-            overlap_feature_fetch
-            and num_workers == 0
-            and torch.cuda.is_available()
-        ):
-            torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
+        # (3) Limit the number of UVA threads used if the feature_fetcher has
+        # overlapping optimization enabled.
+        if num_workers == 0 and torch.cuda.is_available():
             feature_fetchers = dp_utils.find_dps(
                 datapipe_graph,
                 FeatureFetcher,
             )
             for feature_fetcher in feature_fetchers:
-                feature_fetcher.stream = get_host_to_device_uva_stream()
-                datapipe_graph = dp_utils.replace_dp(
-                    datapipe_graph,
-                    feature_fetcher,
-                    feature_fetcher.buffer(1).wait(),
-                )
+                if feature_fetcher.max_num_stages > 0:  # Overlap enabled.
+                    torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
 
         if (
             overlap_graph_fetch

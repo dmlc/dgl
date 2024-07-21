@@ -29,6 +29,12 @@ class BasicFeatureStore(FeatureStore):
         super().__init__()
         self._features = features
 
+    def __getitem__(self, feature_key) -> Feature:
+        """Access the underlying `Feature` with its (domain, type, name) as
+        the feature_key.
+        """
+        return self._features[feature_key]
+
     def read(
         self,
         domain: str,
