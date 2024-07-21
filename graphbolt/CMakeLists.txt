@@ -73,7 +73,6 @@ endif()
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 include_directories(BEFORE ${BOLT_DIR}
                            ${BOLT_HEADERS}
-                           "../third_party/dmlc-core/include"
                            "../third_party/pcg/include"
                            "../third_party/phmap")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
