@@ -15,6 +15,14 @@ def test_basic_feature_store_homo():
 
     feature_store = gb.BasicFeatureStore(features)
 
+    # Test __getitem__ to access the stored Feature.
+    feature = feature_store[("node", None, "a")]
+    assert isinstance(feature, gb.Feature)
+    assert torch.equal(
+        feature.read(),
+        torch.tensor([[1, 2, 4], [2, 5, 3]]),
+    )
+
     # Test read the entire feature.
     assert torch.equal(
         feature_store.read("node", None, "a"),
@@ -59,6 +67,14 @@ def test_basic_feature_store_hetero():
     features[("edge", "paper:cites", "b")] = gb.TorchBasedFeature(b)
 
     feature_store = gb.BasicFeatureStore(features)
+
+    # Test __getitem__ to access the stored Feature.
+    feature = feature_store[("node", "author", "a")]
+    assert isinstance(feature, gb.Feature)
+    assert torch.equal(
+        feature.read(),
+        torch.tensor([[1, 2, 4], [2, 5, 3]]),
+    )
 
     # Test read the entire feature.
     assert torch.equal(
