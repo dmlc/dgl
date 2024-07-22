@@ -1379,15 +1379,25 @@ def _cast_to_minimum_dtype(predicate, data, field=None):
             return data.to(dtype)
     return data
 
+
 # Utility functions.
 def is_homogeneous(ntypes, etypes):
     return len(ntypes) == 1 and len(etypes) == 1
+
 
 def init_type_per_edge(graph, gpb):
     etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
     return etype_ids
 
-def convert_partition(part_id, graph_formats, part_config, store_eids, store_inner_node, store_inner_edge):
+
+def convert_partition(
+    part_id,
+    graph_formats,
+    part_config,
+    store_eids,
+    store_inner_node,
+    store_inner_edge,
+):
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
         dgl_warning(
@@ -1404,16 +1414,13 @@ def convert_partition(part_id, graph_formats, part_config, store_eids, store_inn
     _, _, ntypes, etypes = load_partition_book(part_config, part_id)
     is_homo = is_homogeneous(ntypes, etypes)
     node_type_to_id = (
-        None
-        if is_homo
-        else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
+        None if is_homo else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
     )
     edge_type_to_id = (
         None
         if is_homo
         else {
-            gb.etype_tuple_to_str(etype): etid
-            for etype, etid in etypes.items()
+            gb.etype_tuple_to_str(etype): etid for etype, etid in etypes.items()
         }
     )
     # Obtain CSC indtpr and indices.
@@ -1430,9 +1437,7 @@ def convert_partition(part_id, graph_formats, part_config, store_eids, store_inn
         required_node_attrs.append("inner_node")
     if debug_mode:
         required_node_attrs = list(graph.ndata.keys())
-    node_attributes = {
-        attr: graph.ndata[attr] for attr in required_node_attrs
-    }
+    node_attributes = {attr: graph.ndata[attr] for attr in required_node_attrs}
 
     # Save edge attributes. Detailed attributes are shown below.
     #  DGL_GB\Attributes  dgl.EID("_ID")  dgl.ETYPE("_TYPE")  "inner_edge"
@@ -1524,6 +1529,7 @@ def convert_partition(part_id, graph_formats, part_config, store_eids, store_inn
     return os.path.relpath(csc_graph_path, os.path.dirname(part_config))
     # Update graph path.
 
+
 def dgl_partition_to_graphbolt(
     part_config,
     *,
@@ -1573,8 +1579,6 @@ def dgl_partition_to_graphbolt(
     new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
 
-
-
     # [Rui] DGL partitions are always saved as homogeneous graphs even though
     # the original graph is heterogeneous. But heterogeneous information like
     # node/edge types are saved as node/edge data alongside with partitions.
@@ -1584,8 +1588,6 @@ def dgl_partition_to_graphbolt(
     # But this is not a problem since such information is not used in sampling.
     # We can simply pass None to it.
 
-
-
     # Iterate over partitions.
     convert_with_format = partial(
         convert_partition,
@@ -1594,7 +1596,6 @@ def dgl_partition_to_graphbolt(
         store_eids=store_eids,
         store_inner_node=store_inner_node,
         store_inner_edge=store_inner_edge,
-
     )
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=min(num_parts, n_jobs)
