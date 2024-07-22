@@ -403,7 +403,16 @@ def main():
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
     feature_num_bytes = (
-        features[("node", None, "feat")].read(torch.zeros(1).long()).nbytes
+        features[("node", None, "feat")]
+        .read(
+            torch.zeros(
+                1,
+                device=args.feature_device
+                if args.feature_device != "pinned"
+                else None,
+            ).long()
+        )
+        .nbytes  # Read a single row to query its size in bytes.
     )
     if args.num_cpu_cached_features > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
