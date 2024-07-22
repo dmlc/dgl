@@ -13,6 +13,18 @@ namespace graphbolt {
 namespace utils {
 
 /**
+ * @brief If this process is a worker part as part of a DataLoader, then returns
+ * the assigned worker id less than the # workers.
+ */
+std::optional<int64_t> GetWorkerId();
+
+/**
+ * @brief If this process is a worker part as part of a DataLoader, then this
+ * function is called to initialize its worked id to be less than the # workers.
+ */
+void SetWorkerId(int64_t worker_id_value);
+
+/**
  * @brief Checks whether the tensor is stored on the GPU.
  */
 inline bool is_on_gpu(const torch::Tensor& tensor) {
@@ -24,6 +36,14 @@ inline bool is_on_gpu(const torch::Tensor& tensor) {
  */
 inline bool is_accessible_from_gpu(const torch::Tensor& tensor) {
   return is_on_gpu(tensor) || tensor.is_pinned();
+}
+
+/**
+ * @brief Checks whether the tensor is stored on the pinned memory.
+ */
+inline bool is_pinned(const torch::Tensor& tensor) {
+  // If this process is a worker, we should avoid initializing the CUDA context.
+  return !GetWorkerId() && tensor.is_pinned();
 }
 
 /**

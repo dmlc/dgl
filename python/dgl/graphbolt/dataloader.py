@@ -66,6 +66,10 @@ def _find_and_wrap_parent(datapipe_graph, target_datapipe, wrapper, **kwargs):
     return datapipe_graph
 
 
+def _set_worker_id(worked_id):
+    torch.ops.graphbolt.set_worker_id(worked_id)
+
+
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
 
@@ -89,6 +93,7 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
             batch_size=None,
             num_workers=num_workers,
             persistent_workers=(num_workers > 0) and persistent_workers,
+            worker_init_fn=_set_worker_id if num_workers > 0 else None,
         )
 
     def __iter__(self):
