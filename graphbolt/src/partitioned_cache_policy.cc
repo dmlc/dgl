@@ -21,6 +21,8 @@
 
 #include <numeric>
 
+#include "./utils.h"
+
 namespace graphbolt {
 namespace storage {
 
@@ -140,15 +142,15 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
       result_offsets, 0);
   torch::Tensor positions = torch::empty(
       result_offsets[policies_.size()],
-      std::get<0>(results[0]).options().pinned_memory(keys.is_pinned()));
+      std::get<0>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
   torch::Tensor output_indices = torch::empty_like(
-      indices, indices.options().pinned_memory(keys.is_pinned()));
+      indices, indices.options().pinned_memory(utils::is_pinned(keys)));
   torch::Tensor missing_keys = torch::empty(
       indices.size(0) - positions.size(0),
-      std::get<2>(results[0]).options().pinned_memory(keys.is_pinned()));
+      std::get<2>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
   torch::Tensor found_keys = torch::empty(
       positions.size(0),
-      std::get<3>(results[0]).options().pinned_memory(keys.is_pinned()));
+      std::get<3>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
   auto output_indices_ptr = output_indices.data_ptr<int64_t>();
   torch::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
     if (begin == end) return;
@@ -200,8 +202,9 @@ torch::Tensor PartitionedCachePolicy::Replace(torch::Tensor keys) {
   torch::Tensor offsets, indices, permuted_keys;
   std::tie(offsets, indices, permuted_keys) = Partition(keys);
   auto output_positions = torch::empty_like(
-      keys,
-      keys.options().dtype(torch::kInt64).pinned_memory(keys.is_pinned()));
+      keys, keys.options()
+                .dtype(torch::kInt64)
+                .pinned_memory(utils::is_pinned(keys)));
   auto offsets_ptr = offsets.data_ptr<int64_t>();
   auto indices_ptr = indices.data_ptr<int64_t>();
   auto output_positions_ptr = output_positions.data_ptr<int64_t>();

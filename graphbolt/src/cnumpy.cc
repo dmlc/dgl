@@ -23,6 +23,7 @@
 #include <stdexcept>
 
 #include "./circular_queue.h"
+#include "./utils.h"
 
 namespace graphbolt {
 namespace storage {
@@ -152,7 +153,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
       shape, index.options()
                  .dtype(dtype_)
                  .layout(torch::kStrided)
-                 .pinned_memory(index.is_pinned())
+                 .pinned_memory(utils::is_pinned(index))
                  .requires_grad(false));
   auto result_buffer = reinterpret_cast<char *>(result.data_ptr());
 
