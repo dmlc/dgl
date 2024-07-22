@@ -3,11 +3,11 @@
 import concurrent
 import concurrent.futures
 import copy
-from functools import partial
 import json
 import logging
 import os
 import time
+from functools import partial
 
 import numpy as np
 
@@ -1570,17 +1570,20 @@ def dgl_partition_to_graphbolt(
         )
         torch.save(csc_graph, csc_graph_path)
 
-
         return os.path.relpath(csc_graph_path, os.path.dirname(part_config))
         # Update graph path.
 
     # Iterate over partitions.
-    convert_with_format = partial(convert_partition, graph_formats=graph_formats)
-    with concurrent.futures.ProcessPoolExecutor(max_workers=min(num_parts, n_jobs)) as executor:
-        for part_id, part_path in enumerate(executor.map(convert_with_format, range(num_parts))):
-            new_part_meta[f"part-{part_id}"][
-                "part_graph_graphbolt"
-            ] = part_path
+    convert_with_format = partial(
+        convert_partition, graph_formats=graph_formats
+    )
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=min(num_parts, n_jobs)
+    ) as executor:
+        for part_id, part_path in enumerate(
+            executor.map(convert_with_format, range(num_parts))
+        ):
+            new_part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = part_path
 
     # Save dtype info into partition config.
     # [TODO][Rui] Always use int64_t for node/edge IDs in GraphBolt. See more
