@@ -35,12 +35,12 @@ std::optional<uint64_t> RandomEngine::manual_seed;
 RandomEngine::RandomEngine() {
   std::random_device rd;
   std::lock_guard lock(manual_seed_mutex);
-  uint64_t seed = manual_seed.value_or(rd());
-  SetSeed(seed);
+  if (!manual_seed.has_value()) manual_seed = rd();
+  SetSeed(manual_seed.value());
 }
 
 /** @brief Constructor with given seed. */
-RandomEngine::RandomEngine(uint64_t seed) { RandomEngine(seed, GetThreadId()); }
+RandomEngine::RandomEngine(uint64_t seed) : RandomEngine(seed, GetThreadId()) {}
 
 /** @brief Constructor with given seed. */
 RandomEngine::RandomEngine(uint64_t seed, uint64_t stream) {
@@ -49,7 +49,8 @@ RandomEngine::RandomEngine(uint64_t seed, uint64_t stream) {
 
 /** @brief Get the thread-local random number generator instance. */
 RandomEngine* RandomEngine::ThreadLocal() {
-  return dmlc::ThreadLocalStore<RandomEngine>::Get();
+  static thread_local RandomEngine engine;
+  return &engine;
 }
 
 /** @brief Set the seed. */

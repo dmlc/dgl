@@ -1,5 +1,6 @@
 """Feature fetchers"""
 
+from functools import partial
 from typing import Dict
 
 import torch
@@ -13,7 +14,34 @@ from .minibatch_transformer import MiniBatchTransformer
 
 __all__ = [
     "FeatureFetcher",
+    "FeatureFetcherStartMarker",
 ]
+
+
+def get_feature_key_list(feature_keys, domain):
+    """Processes node_feature_keys and extracts their feature keys to a list."""
+    if isinstance(feature_keys, Dict):
+        return [
+            (domain, type_name, feature_name)
+            for type_name, feature_names in feature_keys.items()
+            for feature_name in feature_names
+        ]
+    elif feature_keys is not None:
+        return [(domain, None, feature_name) for feature_name in feature_keys]
+    else:
+        return []
+
+
+@functional_datapipe("mark_feature_fetcher_start")
+class FeatureFetcherStartMarker(MiniBatchTransformer):
+    """Used to mark the start of a FeatureFetcher and is a no-op. All the
+    datapipes created during a FeatureFetcher instantiation are guarenteed to be
+    contained between FeatureFetcherStartMarker and FeatureFetcher instances in
+    the datapipe graph.
+    """
+
+    def __init__(self, datapipe):
+        super().__init__(datapipe, self._identity)
 
 
 @functional_datapipe("fetch_feature")
@@ -41,6 +69,10 @@ class FeatureFetcher(MiniBatchTransformer):
         - If `edge_features` is a dictionary: The keys are edge types,
         following the format 'str:str:str', and the values are lists of
         feature names.
+    overlap_fetch : bool, optional
+        If True, the feature fetcher will overlap the UVA feature fetcher
+        operations with the rest of operations by using an alternative CUDA
+        stream or utilizing asynchronous operations. Default is True.
     """
 
     def __init__(
@@ -49,14 +81,71 @@ class FeatureFetcher(MiniBatchTransformer):
         feature_store,
         node_feature_keys=None,
         edge_feature_keys=None,
+        overlap_fetch=True,
     ):
-        super().__init__(datapipe, self._read)
+        datapipe = datapipe.mark_feature_fetcher_start()
         self.feature_store = feature_store
         self.node_feature_keys = node_feature_keys
         self.edge_feature_keys = edge_feature_keys
-        self.stream = None
+        max_val = 0
+        if overlap_fetch:
+            for feature_key_list in [
+                get_feature_key_list(node_feature_keys, "node"),
+                get_feature_key_list(edge_feature_keys, "edge"),
+            ]:
+                for feature_key in feature_key_list:
+                    if feature_key not in feature_store:
+                        continue
+                    for device_str in ["cpu", "cuda"]:
+                        try:
+                            max_val = max(
+                                feature_store[
+                                    feature_key
+                                ].read_async_num_stages(
+                                    torch.device(device_str)
+                                ),
+                                max_val,
+                            )
+                        except AssertionError:
+                            pass
+        datapipe = datapipe.transform(self._read)
+        for i in range(max_val, 0, -1):
+            datapipe = datapipe.transform(
+                partial(self._execute_stage, i)
+            ).buffer(1)
+        super().__init__(
+            datapipe, self._identity if max_val == 0 else self._final_stage
+        )
+        # A positive value indicates that the overlap optimization is enabled.
+        self.max_num_stages = max_val
 
-    def _read_data(self, data, stream):
+    @staticmethod
+    def _execute_stage(current_stage, data):
+        all_features = [data.node_features] + [
+            data.edge_features[i] for i in range(data.num_layers())
+        ]
+        for features in all_features:
+            for key in features:
+                handle, stage = features[key]
+                assert current_stage >= stage
+                if current_stage == stage:
+                    value = next(handle)
+                    features[key] = (handle if stage > 1 else value, stage - 1)
+        return data
+
+    @staticmethod
+    def _final_stage(data):
+        all_features = [data.node_features] + [
+            data.edge_features[i] for i in range(data.num_layers())
+        ]
+        for features in all_features:
+            for key in features:
+                value, stage = features[key]
+                assert stage == 0
+                features[key] = value.wait()
+        return data
+
+    def _read(self, data):
         """
         Fill in the node/edge features field in data.
 
@@ -81,40 +170,40 @@ class FeatureFetcher(MiniBatchTransformer):
         # Read Node features.
         input_nodes = data.node_ids()
 
-        def record_stream(tensor):
-            if stream is not None and tensor.is_cuda:
-                tensor.record_stream(stream)
-            return tensor
+        def read_helper(feature_key, index):
+            if self.max_num_stages > 0:
+                feature = self.feature_store[feature_key]
+                num_stages = feature.read_async_num_stages(index.device)
+                if num_stages > 0:
+                    return (feature.read_async(index), num_stages)
+                else:  # Asynchronicity is not needed, compute in _final_stage.
+
+                    class _Waiter:
+                        @staticmethod
+                        def wait():
+                            """Returns the stored value when invoked."""
+                            return feature.read(index)
+
+                    return (_Waiter(), 0)
+            else:
+                domain, type_name, feature_name = feature_key
+                return self.feature_store.read(
+                    domain, type_name, feature_name, index
+                )
 
         if self.node_feature_keys and input_nodes is not None:
             if is_heterogeneous:
                 for type_name, nodes in input_nodes.items():
                     if type_name not in self.node_feature_keys or nodes is None:
                         continue
-                    if nodes.is_cuda:
-                        nodes.record_stream(torch.cuda.current_stream())
                     for feature_name in self.node_feature_keys[type_name]:
-                        node_features[
-                            (type_name, feature_name)
-                        ] = record_stream(
-                            self.feature_store.read(
-                                "node",
-                                type_name,
-                                feature_name,
-                                nodes,
-                            )
+                        node_features[(type_name, feature_name)] = read_helper(
+                            ("node", type_name, feature_name), nodes
                         )
             else:
-                if input_nodes.is_cuda:
-                    input_nodes.record_stream(torch.cuda.current_stream())
                 for feature_name in self.node_feature_keys:
-                    node_features[feature_name] = record_stream(
-                        self.feature_store.read(
-                            "node",
-                            None,
-                            feature_name,
-                            input_nodes,
-                        )
+                    node_features[feature_name] = read_helper(
+                        ("node", None, feature_name), input_nodes
                     )
         # Read Edge features.
         if self.edge_feature_keys and num_layers > 0:
@@ -138,41 +227,17 @@ class FeatureFetcher(MiniBatchTransformer):
                             or edges is None
                         ):
                             continue
-                        if edges.is_cuda:
-                            edges.record_stream(torch.cuda.current_stream())
                         for feature_name in self.edge_feature_keys[type_name]:
                             edge_features[i][
                                 (type_name, feature_name)
-                            ] = record_stream(
-                                self.feature_store.read(
-                                    "edge", type_name, feature_name, edges
-                                )
+                            ] = read_helper(
+                                ("edge", type_name, feature_name), edges
                             )
                 else:
-                    if original_edge_ids.is_cuda:
-                        original_edge_ids.record_stream(
-                            torch.cuda.current_stream()
-                        )
                     for feature_name in self.edge_feature_keys:
-                        edge_features[i][feature_name] = record_stream(
-                            self.feature_store.read(
-                                "edge",
-                                None,
-                                feature_name,
-                                original_edge_ids,
-                            )
+                        edge_features[i][feature_name] = read_helper(
+                            ("edge", None, feature_name), original_edge_ids
                         )
         data.set_node_features(node_features)
         data.set_edge_features(edge_features)
         return data
-
-    def _read(self, data):
-        current_stream = None
-        if self.stream is not None:
-            current_stream = torch.cuda.current_stream()
-            self.stream.wait_stream(current_stream)
-        with torch.cuda.stream(self.stream):
-            data = self._read_data(data, current_stream)
-            if self.stream is not None:
-                data.wait = torch.cuda.current_stream().record_event().wait
-            return data

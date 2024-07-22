@@ -189,7 +189,11 @@ def create_dataloader(
     if args.feature_device != "cpu":
         datapipe = datapipe.copy_to(device=device)
     # Fetch node features for the sampled subgraph.
-    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(
+        features,
+        node_feature_keys=["feat"],
+        overlap_fetch=args.overlap_feature_fetch,
+    )
     # Copy the data to the specified device.
     if args.feature_device == "cpu":
         datapipe = datapipe.copy_to(device=device)
@@ -197,7 +201,6 @@ def create_dataloader(
     return gb.DataLoader(
         datapipe,
         num_workers=args.num_workers,
-        overlap_feature_fetch=args.overlap_feature_fetch,
         overlap_graph_fetch=args.overlap_graph_fetch,
         num_gpu_cached_edges=args.num_gpu_cached_edges,
         gpu_cache_threshold=args.gpu_graph_caching_threshold,
@@ -385,10 +388,12 @@ def parse_args():
         help="Disables torch.compile() on the trained GNN model because it is "
         "enabled by default for torch>=2.2.0 without this option.",
     )
+    parser.add_argument("--precision", type=str, default="high")
     return parser.parse_args()
 
 
 def main():
+    torch.set_float32_matmul_precision(args.precision)
     if not torch.cuda.is_available():
         args.mode = "cpu-cpu-cpu"
     print(f"Training in {args.mode} mode.")

@@ -9,7 +9,7 @@ import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
 
 from .base import CopyTo, get_host_to_device_uva_stream
-from .feature_fetcher import FeatureFetcher
+from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
 from .impl.gpu_graph_cache import GPUGraphCache
 from .impl.neighbor_sampler import SamplePerLayer
 
@@ -66,6 +66,10 @@ def _find_and_wrap_parent(datapipe_graph, target_datapipe, wrapper, **kwargs):
     return datapipe_graph
 
 
+def _set_worker_id(worked_id):
+    torch.ops.graphbolt.set_worker_id(worked_id)
+
+
 class MultiprocessingWrapper(dp.iter.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
 
@@ -89,6 +93,7 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
             batch_size=None,
             num_workers=num_workers,
             persistent_workers=(num_workers > 0) and persistent_workers,
+            worker_init_fn=_set_worker_id if num_workers > 0 else None,
         )
 
     def __iter__(self):
@@ -117,10 +122,6 @@ class DataLoader(torch.utils.data.DataLoader):
         If True, the data loader will not shut down the worker processes after a
         dataset has been consumed once. This allows to maintain the workers
         instances alive.
-    overlap_feature_fetch : bool, optional
-        If True, the data loader will overlap the UVA feature fetcher operations
-        with the rest of operations by using an alternative CUDA stream. Default
-        is True.
     overlap_graph_fetch : bool, optional
         If True, the data loader will overlap the UVA graph fetching operations
         with the rest of operations by using an alternative CUDA stream. Default
@@ -145,7 +146,6 @@ class DataLoader(torch.utils.data.DataLoader):
         datapipe,
         num_workers=0,
         persistent_workers=True,
-        overlap_feature_fetch=True,
         overlap_graph_fetch=False,
         num_gpu_cached_edges=0,
         gpu_cache_threshold=1,
@@ -179,31 +179,22 @@ class DataLoader(torch.utils.data.DataLoader):
         # (2) Cut datapipe at FeatureFetcher and wrap.
         datapipe_graph = _find_and_wrap_parent(
             datapipe_graph,
-            FeatureFetcher,
+            FeatureFetcherStartMarker,
             MultiprocessingWrapper,
             num_workers=num_workers,
             persistent_workers=persistent_workers,
         )
 
-        # (3) Overlap UVA feature fetching by buffering and using an alternative
-        # stream.
-        if (
-            overlap_feature_fetch
-            and num_workers == 0
-            and torch.cuda.is_available()
-        ):
-            torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
+        # (3) Limit the number of UVA threads used if the feature_fetcher has
+        # overlapping optimization enabled.
+        if num_workers == 0 and torch.cuda.is_available():
             feature_fetchers = dp_utils.find_dps(
                 datapipe_graph,
                 FeatureFetcher,
             )
             for feature_fetcher in feature_fetchers:
-                feature_fetcher.stream = get_host_to_device_uva_stream()
-                datapipe_graph = dp_utils.replace_dp(
-                    datapipe_graph,
-                    feature_fetcher,
-                    feature_fetcher.buffer(1).wait(),
-                )
+                if feature_fetcher.max_num_stages > 0:  # Overlap enabled.
+                    torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
 
         if (
             overlap_graph_fetch
