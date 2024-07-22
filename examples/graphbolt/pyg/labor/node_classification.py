@@ -402,15 +402,15 @@ def main():
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
+    feature_num_bytes = (
+        features[("node", None, "feat")].read(torch.zeros(1).long()).nbytes
+    )
     if args.num_cpu_cached_features > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
     ):
         features[("node", None, "feat")] = gb.CPUCachedFeature(
             features[("node", None, "feat")],
-            args.num_cpu_cached_features
-            * features[("node", None, "feat")]
-            .read(torch.zeros(1).long())
-            .nbytes,
+            args.num_cpu_cached_features * feature_num_bytes,
             args.cpu_feature_cache_policy,
             args.feature_device == "pinned",
         )
@@ -421,10 +421,7 @@ def main():
     if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
         features[("node", None, "feat")] = gb.GPUCachedFeature(
             features[("node", None, "feat")],
-            args.num_gpu_cached_features
-            * features[("node", None, "feat")]
-            .read(torch.zeros(1).long())
-            .nbytes,
+            args.num_gpu_cached_features * feature_num_bytes,
         )
         gpu_cached_feature = features[("node", None, "feat")]
         gpu_cache_miss_rate_fn = lambda: gpu_cached_feature._feature.miss_rate
