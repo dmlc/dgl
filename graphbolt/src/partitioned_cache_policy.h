@@ -24,6 +24,7 @@
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
+#include <mutex>
 #include <pcg_random.hpp>
 #include <random>
 #include <type_traits>
