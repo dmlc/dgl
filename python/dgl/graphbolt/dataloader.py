@@ -117,10 +117,6 @@ class DataLoader(torch.utils.data.DataLoader):
         If True, the data loader will not shut down the worker processes after a
         dataset has been consumed once. This allows to maintain the workers
         instances alive.
-    overlap_feature_fetch : bool, optional
-        If True, the data loader will overlap the UVA feature fetcher operations
-        with the rest of operations by using an alternative CUDA stream. Default
-        is True.
     overlap_graph_fetch : bool, optional
         If True, the data loader will overlap the UVA graph fetching operations
         with the rest of operations by using an alternative CUDA stream. Default

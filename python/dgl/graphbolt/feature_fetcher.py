@@ -42,6 +42,10 @@ class FeatureFetcher(MiniBatchTransformer):
         - If `edge_features` is a dictionary: The keys are edge types,
         following the format 'str:str:str', and the values are lists of
         feature names.
+    overlap_fetch : bool, optional
+        If True, the feature fetcher will overlap the UVA feature fetcher
+        operations with the rest of operations by using an alternative CUDA
+        stream or utilizing asynchronous operations. Default is True.
     """
 
     def __init__(
@@ -50,7 +54,7 @@ class FeatureFetcher(MiniBatchTransformer):
         feature_store,
         node_feature_keys=None,
         edge_feature_keys=None,
-        overlap_fetch=False,
+        overlap_fetch=True,
     ):
         self.feature_store = feature_store
         self.node_feature_keys = node_feature_keys
