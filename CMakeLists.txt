@@ -118,10 +118,9 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
-# Always statically link libstdc++ and libgcc for portability if build with gcc/g++.
+# Always statically link libstdc++ for portability if build with gcc/g++.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++")
 endif()
 
 # Set optimization options for different build types.
