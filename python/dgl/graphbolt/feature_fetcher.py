@@ -18,6 +18,20 @@ __all__ = [
 ]
 
 
+def get_feature_key_list(feature_keys, domain):
+    """Processes node_feature_keys and extracts their feature keys to a list."""
+    if isinstance(feature_keys, Dict):
+        return [
+            (domain, type_name, feature_name)
+            for type_name, feature_names in feature_keys.items()
+            for feature_name in feature_names
+        ]
+    elif feature_keys is not None:
+        return [(domain, None, feature_name) for feature_name in feature_keys]
+    else:
+        return []
+
+
 @functional_datapipe("mark_feature_fetcher_start")
 class FeatureFetcherStartMarker(MiniBatchTransformer):
     """Used to mark the start of a FeatureFetcher and is a no-op. All the
@@ -75,35 +89,9 @@ class FeatureFetcher(MiniBatchTransformer):
         self.edge_feature_keys = edge_feature_keys
         max_val = 0
         if overlap_fetch:
-            if isinstance(node_feature_keys, Dict):
-                node_feature_key_list = [
-                    ("node", type_name, feature_name)
-                    for type_name, feature_names in node_feature_keys.items()
-                    for feature_name in feature_names
-                ]
-            elif node_feature_keys is not None:
-                node_feature_key_list = [
-                    ("node", None, feature_name)
-                    for feature_name in node_feature_keys
-                ]
-            else:
-                node_feature_key_list = []
-            if isinstance(edge_feature_keys, Dict):
-                edge_feature_key_list = [
-                    ("edge", type_name, feature_name)
-                    for type_name, feature_names in edge_feature_keys.items()
-                    for feature_name in feature_names
-                ]
-            elif edge_feature_keys is not None:
-                edge_feature_key_list = [
-                    ("edge", None, feature_name)
-                    for feature_name in edge_feature_keys
-                ]
-            else:
-                edge_feature_key_list = []
             for feature_key_list in [
-                node_feature_key_list,
-                edge_feature_key_list,
+                get_feature_key_list(node_feature_keys, "node"),
+                get_feature_key_list(edge_feature_keys, "edge"),
             ]:
                 for feature_key in feature_key_list:
                     if feature_key not in feature_store:
@@ -142,7 +130,7 @@ class FeatureFetcher(MiniBatchTransformer):
                 assert current_stage >= stage
                 if current_stage == stage:
                     value = next(handle)
-                    features[key] = (handle, stage - 1) if stage > 1 else value
+                    features[key] = (handle if stage > 1 else value, stage - 1)
         return data
 
     @staticmethod
@@ -152,7 +140,9 @@ class FeatureFetcher(MiniBatchTransformer):
         ]
         for features in all_features:
             for key in features:
-                features[key] = features[key].wait()
+                value, stage = features[key]
+                assert stage == 0
+                features[key] = value.wait()
         return data
 
     def _read(self, data):
@@ -183,10 +173,18 @@ class FeatureFetcher(MiniBatchTransformer):
         def read_helper(feature_key, index):
             if self.max_num_stages > 0:
                 feature = self.feature_store[feature_key]
-                return (
-                    feature.read_async(index),
-                    feature.read_async_num_stages(index.device),
-                )
+                num_stages = feature.read_async_num_stages(index.device)
+                if num_stages > 0:
+                    return (feature.read_async(index), num_stages)
+                else:  # Asynchronicity is not needed, compute in _final_stage.
+
+                    class _Waiter:
+                        @staticmethod
+                        def wait():
+                            """Returns the stored value when invoked."""
+                            return feature.read(index)
+
+                    return (_Waiter(), 0)
             else:
                 domain, type_name, feature_name = feature_key
                 return self.feature_store.read(

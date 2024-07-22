@@ -217,6 +217,9 @@ class TorchBasedFeature(Feature):
             The number of stages of the read_async operation.
         """
         if ids_device.type == "cuda":
+            if self._tensor.is_cuda:
+                # If the ids and the tensor are on cuda, no need for async.
+                return 0
             return 1 if self.is_pinned() else 3
         else:
             return 1

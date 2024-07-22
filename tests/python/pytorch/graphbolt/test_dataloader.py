@@ -73,12 +73,15 @@ def test_gpu_sampling_DataLoader(
         F.ctx()
     )
     features = {}
-    keys = [("node", None, "a"), ("node", None, "b")]
+    keys = [("node", None, "a"), ("node", None, "b"), ("node", None, "c")]
     features[keys[0]] = dgl.graphbolt.TorchBasedFeature(
         torch.randn(200, 4, pin_memory=True)
     )
     features[keys[1]] = dgl.graphbolt.TorchBasedFeature(
         torch.randn(200, 4, pin_memory=True)
+    )
+    features[keys[2]] = dgl.graphbolt.TorchBasedFeature(
+        torch.randn(200, 4, device=F.ctx())
     )
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
@@ -93,7 +96,7 @@ def test_gpu_sampling_DataLoader(
         datapipe = dgl.graphbolt.FeatureFetcher(
             datapipe,
             feature_store,
-            ["a", "b"],
+            ["a", "b", "c"],
             overlap_fetch=overlap_feature_fetch,
         )
 
