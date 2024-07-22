@@ -1379,6 +1379,150 @@ def _cast_to_minimum_dtype(predicate, data, field=None):
             return data.to(dtype)
     return data
 
+# Utility functions.
+def is_homogeneous(ntypes, etypes):
+    return len(ntypes) == 1 and len(etypes) == 1
+
+def init_type_per_edge(graph, gpb):
+    etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
+    return etype_ids
+
+def convert_partition(part_id, graph_formats, part_config, store_eids, store_inner_node, store_inner_edge):
+    debug_mode = "DGL_DIST_DEBUG" in os.environ
+    if debug_mode:
+        dgl_warning(
+            "Running in debug mode which means all attributes of DGL partitions"
+            " will be saved to the new format."
+        )
+
+    part_meta = _load_part_config(part_config)
+    num_parts = part_meta["num_parts"]
+
+    graph, _, _, gpb, _, _, _ = load_partition(
+        part_config, part_id, load_feats=False
+    )
+    _, _, ntypes, etypes = load_partition_book(part_config, part_id)
+    is_homo = is_homogeneous(ntypes, etypes)
+    node_type_to_id = (
+        None
+        if is_homo
+        else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
+    )
+    edge_type_to_id = (
+        None
+        if is_homo
+        else {
+            gb.etype_tuple_to_str(etype): etid
+            for etype, etid in etypes.items()
+        }
+    )
+    # Obtain CSC indtpr and indices.
+    indptr, indices, edge_ids = graph.adj_tensors("csc")
+
+    # Save node attributes. Detailed attributes are shown below.
+    #  DGL_GB\Attributes  dgl.NID("_ID")  dgl.NTYPE("_TYPE")  "inner_node"  "part_id"
+    #  DGL_Homograph           ✅                🚫                  ✅          ✅
+    #  GB_Homograph            ✅                🚫               optional       🚫
+    #  DGL_Heterograph         ✅                ✅                  ✅          ✅
+    #  GB_Heterograph          ✅                🚫               optional       🚫
+    required_node_attrs = [NID]
+    if store_inner_node:
+        required_node_attrs.append("inner_node")
+    if debug_mode:
+        required_node_attrs = list(graph.ndata.keys())
+    node_attributes = {
+        attr: graph.ndata[attr] for attr in required_node_attrs
+    }
+
+    # Save edge attributes. Detailed attributes are shown below.
+    #  DGL_GB\Attributes  dgl.EID("_ID")  dgl.ETYPE("_TYPE")  "inner_edge"
+    #  DGL_Homograph           ✅               🚫                  ✅
+    #  GB_Homograph         optional            🚫               optional
+    #  DGL_Heterograph         ✅               ✅                  ✅
+    #  GB_Heterograph       optional            ✅               optional
+    type_per_edge = None
+    if not is_homo:
+        type_per_edge = init_type_per_edge(graph, gpb)[edge_ids]
+        type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
+    required_edge_attrs = []
+    if store_eids:
+        required_edge_attrs.append(EID)
+    if store_inner_edge:
+        required_edge_attrs.append("inner_edge")
+    if debug_mode:
+        required_edge_attrs = list(graph.edata.keys())
+    edge_attributes = {
+        attr: graph.edata[attr][edge_ids] for attr in required_edge_attrs
+    }
+    # When converting DGLGraph to FusedCSCSamplingGraph, edge IDs are
+    # re-ordered(actually FusedCSCSamplingGraph does not have edge IDs
+    # in nature). So we need to save such re-order info for any
+    # operations that uses original local edge IDs. For now, this is
+    # required by `DistGraph.find_edges()` for link prediction tasks.
+    #
+    # What's more, in order to find the dst nodes efficiently, we save
+    # dst nodes directly in the edge attributes.
+    #
+    # So we require additional `(2 * E) * dtype` space in total.
+    if graph_formats is not None and isinstance(graph_formats, str):
+        graph_formats = [graph_formats]
+    save_coo = (
+        graph_formats is None and "coo" in graph.formats()["created"]
+    ) or (graph_formats is not None and "coo" in graph_formats)
+    if save_coo:
+        edge_attributes[DGL2GB_EID] = torch.argsort(edge_ids)
+        edge_attributes[GB_DST_ID] = gb.expand_indptr(
+            indptr, dtype=indices.dtype
+        )
+
+    # Cast various data to minimum dtype.
+    # Cast 1: indptr.
+    indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
+    # Cast 2: indices.
+    indices = _cast_to_minimum_dtype(graph.num_nodes(), indices)
+    # Cast 3: type_per_edge.
+    type_per_edge = _cast_to_minimum_dtype(
+        len(etypes), type_per_edge, field=ETYPE
+    )
+    # Cast 4: node/edge_attributes.
+    predicates = {
+        NID: part_meta["num_nodes"],
+        "part_id": num_parts,
+        NTYPE: len(ntypes),
+        EID: part_meta["num_edges"],
+        ETYPE: len(etypes),
+        DGL2GB_EID: part_meta["num_edges"],
+        GB_DST_ID: part_meta["num_nodes"],
+    }
+    for attributes in [node_attributes, edge_attributes]:
+        for key in attributes:
+            if key not in predicates:
+                continue
+            attributes[key] = _cast_to_minimum_dtype(
+                predicates[key], attributes[key], field=key
+            )
+
+    csc_graph = gb.fused_csc_sampling_graph(
+        indptr,
+        indices,
+        node_type_offset=None,
+        type_per_edge=type_per_edge,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
+        node_type_to_id=node_type_to_id,
+        edge_type_to_id=edge_type_to_id,
+    )
+    orig_graph_path = os.path.join(
+        os.path.dirname(part_config),
+        part_meta[f"part-{part_id}"]["part_graph"],
+    )
+    csc_graph_path = os.path.join(
+        os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.pt"
+    )
+    torch.save(csc_graph, csc_graph_path)
+
+    return os.path.relpath(csc_graph_path, os.path.dirname(part_config))
+    # Update graph path.
 
 def dgl_partition_to_graphbolt(
     part_config,
@@ -1429,13 +1573,7 @@ def dgl_partition_to_graphbolt(
     new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
 
-    # Utility functions.
-    def is_homogeneous(ntypes, etypes):
-        return len(ntypes) == 1 and len(etypes) == 1
 
-    def init_type_per_edge(graph, gpb):
-        etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
-        return etype_ids
 
     # [Rui] DGL partitions are always saved as homogeneous graphs even though
     # the original graph is heterogeneous. But heterogeneous information like
@@ -1446,136 +1584,17 @@ def dgl_partition_to_graphbolt(
     # But this is not a problem since such information is not used in sampling.
     # We can simply pass None to it.
 
-    def convert_partition(part_id, graph_formats):
-        graph, _, _, gpb, _, _, _ = load_partition(
-            part_config, part_id, load_feats=False
-        )
-        _, _, ntypes, etypes = load_partition_book(part_config, part_id)
-        is_homo = is_homogeneous(ntypes, etypes)
-        node_type_to_id = (
-            None
-            if is_homo
-            else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
-        )
-        edge_type_to_id = (
-            None
-            if is_homo
-            else {
-                gb.etype_tuple_to_str(etype): etid
-                for etype, etid in etypes.items()
-            }
-        )
-        # Obtain CSC indtpr and indices.
-        indptr, indices, edge_ids = graph.adj_tensors("csc")
 
-        # Save node attributes. Detailed attributes are shown below.
-        #  DGL_GB\Attributes  dgl.NID("_ID")  dgl.NTYPE("_TYPE")  "inner_node"  "part_id"
-        #  DGL_Homograph           ✅                🚫                  ✅          ✅
-        #  GB_Homograph            ✅                🚫               optional       🚫
-        #  DGL_Heterograph         ✅                ✅                  ✅          ✅
-        #  GB_Heterograph          ✅                🚫               optional       🚫
-        required_node_attrs = [NID]
-        if store_inner_node:
-            required_node_attrs.append("inner_node")
-        if debug_mode:
-            required_node_attrs = list(graph.ndata.keys())
-        node_attributes = {
-            attr: graph.ndata[attr] for attr in required_node_attrs
-        }
-
-        # Save edge attributes. Detailed attributes are shown below.
-        #  DGL_GB\Attributes  dgl.EID("_ID")  dgl.ETYPE("_TYPE")  "inner_edge"
-        #  DGL_Homograph           ✅               🚫                  ✅
-        #  GB_Homograph         optional            🚫               optional
-        #  DGL_Heterograph         ✅               ✅                  ✅
-        #  GB_Heterograph       optional            ✅               optional
-        type_per_edge = None
-        if not is_homo:
-            type_per_edge = init_type_per_edge(graph, gpb)[edge_ids]
-            type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
-        required_edge_attrs = []
-        if store_eids:
-            required_edge_attrs.append(EID)
-        if store_inner_edge:
-            required_edge_attrs.append("inner_edge")
-        if debug_mode:
-            required_edge_attrs = list(graph.edata.keys())
-        edge_attributes = {
-            attr: graph.edata[attr][edge_ids] for attr in required_edge_attrs
-        }
-        # When converting DGLGraph to FusedCSCSamplingGraph, edge IDs are
-        # re-ordered(actually FusedCSCSamplingGraph does not have edge IDs
-        # in nature). So we need to save such re-order info for any
-        # operations that uses original local edge IDs. For now, this is
-        # required by `DistGraph.find_edges()` for link prediction tasks.
-        #
-        # What's more, in order to find the dst nodes efficiently, we save
-        # dst nodes directly in the edge attributes.
-        #
-        # So we require additional `(2 * E) * dtype` space in total.
-        if graph_formats is not None and isinstance(graph_formats, str):
-            graph_formats = [graph_formats]
-        save_coo = (
-            graph_formats is None and "coo" in graph.formats()["created"]
-        ) or (graph_formats is not None and "coo" in graph_formats)
-        if save_coo:
-            edge_attributes[DGL2GB_EID] = torch.argsort(edge_ids)
-            edge_attributes[GB_DST_ID] = gb.expand_indptr(
-                indptr, dtype=indices.dtype
-            )
-
-        # Cast various data to minimum dtype.
-        # Cast 1: indptr.
-        indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
-        # Cast 2: indices.
-        indices = _cast_to_minimum_dtype(graph.num_nodes(), indices)
-        # Cast 3: type_per_edge.
-        type_per_edge = _cast_to_minimum_dtype(
-            len(etypes), type_per_edge, field=ETYPE
-        )
-        # Cast 4: node/edge_attributes.
-        predicates = {
-            NID: part_meta["num_nodes"],
-            "part_id": num_parts,
-            NTYPE: len(ntypes),
-            EID: part_meta["num_edges"],
-            ETYPE: len(etypes),
-            DGL2GB_EID: part_meta["num_edges"],
-            GB_DST_ID: part_meta["num_nodes"],
-        }
-        for attributes in [node_attributes, edge_attributes]:
-            for key in attributes:
-                if key not in predicates:
-                    continue
-                attributes[key] = _cast_to_minimum_dtype(
-                    predicates[key], attributes[key], field=key
-                )
-
-        csc_graph = gb.fused_csc_sampling_graph(
-            indptr,
-            indices,
-            node_type_offset=None,
-            type_per_edge=type_per_edge,
-            node_attributes=node_attributes,
-            edge_attributes=edge_attributes,
-            node_type_to_id=node_type_to_id,
-            edge_type_to_id=edge_type_to_id,
-        )
-        orig_graph_path = os.path.join(
-            os.path.dirname(part_config),
-            part_meta[f"part-{part_id}"]["part_graph"],
-        )
-        csc_graph_path = os.path.join(
-            os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.pt"
-        )
-        torch.save(csc_graph, csc_graph_path)
-
-        return os.path.relpath(csc_graph_path, os.path.dirname(part_config))
-        # Update graph path.
 
     # Iterate over partitions.
     convert_with_format = partial(
-        convert_partition, graph_formats=graph_formats
+        convert_partition,
+        graph_formats=graph_formats,
+        part_config=part_config,
+        store_eids=store_eids,
+        store_inner_node=store_inner_node,
+        store_inner_edge=store_inner_edge,
+
     )
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=min(num_parts, n_jobs)
