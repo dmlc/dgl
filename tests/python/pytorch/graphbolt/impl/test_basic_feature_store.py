@@ -109,10 +109,18 @@ def test_basic_feature_store_hetero():
     assert feature_store.metadata("node", "author", "a") == metadata
     assert feature_store.metadata("edge", "paper:cites", "b") == {}
 
+    # Test __setitem__ and __contains__ of FeatureStore.
+    assert ("node", "author", "c") not in feature_store
+    feature_store[("node", "author", "c")] = feature_store[
+        ("node", "author", "a")
+    ]
+    assert ("node", "author", "c") in feature_store
+
     # Test get keys of the features.
     assert feature_store.keys() == [
         ("node", "author", "a"),
         ("edge", "paper:cites", "b"),
+        ("node", "author", "c"),
     ]
 
 
