@@ -51,8 +51,17 @@ def test_basic_feature_store_homo():
     assert feature_store.metadata("node", None, "a") == metadata
     assert feature_store.metadata("node", None, "b") == {}
 
+    # Test __setitem__ and __contains__ of FeatureStore.
+    assert ("node", None, "c") not in feature_store
+    feature_store[("node", None, "c")] = feature_store[("node", None, "a")]
+    assert ("node", None, "c") in feature_store
+
     # Test get keys of the features.
-    assert feature_store.keys() == [("node", None, "a"), ("node", None, "b")]
+    assert feature_store.keys() == [
+        ("node", None, "a"),
+        ("node", None, "b"),
+        ("node", None, "c"),
+    ]
 
 
 def test_basic_feature_store_hetero():
