@@ -94,12 +94,12 @@ class GraphSAGE(torch.nn.Module):
     #   the input, hidden, and output features, respectively.
     # - The forward method defines the computation performed at every call.
     #####################################################################
-    def __init__(self, in_size, hidden_size, out_size):
+    def __init__(self, in_size, hidden_size, out_size, n_layers):
         super(GraphSAGE, self).__init__()
         self.layers = torch.nn.ModuleList()
-        self.layers.append(SAGEConv(in_size, hidden_size))
-        self.layers.append(SAGEConv(hidden_size, hidden_size))
-        self.layers.append(SAGEConv(hidden_size, out_size))
+        sizes = [in_size] + [hidden_size] * (n_layers - 1) + [out_size]
+        for i in range(n_layers):
+            self.layers.append(SAGEConv(sizes[i], sizes[i + 1]))
         self.hidden_size = hidden_size
         self.out_size = out_size
 
@@ -450,7 +450,9 @@ def main():
 
     in_channels = features.size("node", None, "feat")[0]
     hidden_channels = 256
-    model = GraphSAGE(in_channels, hidden_channels, num_classes).to(args.device)
+    model = GraphSAGE(
+        in_channels, hidden_channels, num_classes, len(args.fanout)
+    ).to(args.device)
     assert len(args.fanout) == len(model.layers)
     if not args.disable_torch_compile:
         torch._dynamo.config.cache_size_limit = 32
