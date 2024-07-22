@@ -1,5 +1,9 @@
 name: __NAME__
+channels:
+  - conda-forge
+  - defaults
 dependencies:
+  - libstdcxx-ng>=9.5.0
   - python=__PYTHON_VERSION__
   - pip
   - graphviz
