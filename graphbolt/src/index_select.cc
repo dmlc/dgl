@@ -23,8 +23,9 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
   auto output_shape = input.sizes().vec();
   output_shape[0] = index.numel();
   auto result = torch::empty(
-      output_shape,
-      index.options().dtype(input.dtype()).pinned_memory(index.is_pinned()));
+      output_shape, index.options()
+                        .dtype(input.dtype())
+                        .pinned_memory(utils::is_pinned(index)));
   return torch::index_select_out(result, input, 0, index);
 }
 

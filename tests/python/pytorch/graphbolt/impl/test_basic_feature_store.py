@@ -15,6 +15,14 @@ def test_basic_feature_store_homo():
 
     feature_store = gb.BasicFeatureStore(features)
 
+    # Test __getitem__ to access the stored Feature.
+    feature = feature_store[("node", None, "a")]
+    assert isinstance(feature, gb.Feature)
+    assert torch.equal(
+        feature.read(),
+        torch.tensor([[1, 2, 4], [2, 5, 3]]),
+    )
+
     # Test read the entire feature.
     assert torch.equal(
         feature_store.read("node", None, "a"),
@@ -43,8 +51,17 @@ def test_basic_feature_store_homo():
     assert feature_store.metadata("node", None, "a") == metadata
     assert feature_store.metadata("node", None, "b") == {}
 
+    # Test __setitem__ and __contains__ of FeatureStore.
+    assert ("node", None, "c") not in feature_store
+    feature_store[("node", None, "c")] = feature_store[("node", None, "a")]
+    assert ("node", None, "c") in feature_store
+
     # Test get keys of the features.
-    assert feature_store.keys() == [("node", None, "a"), ("node", None, "b")]
+    assert feature_store.keys() == [
+        ("node", None, "a"),
+        ("node", None, "b"),
+        ("node", None, "c"),
+    ]
 
 
 def test_basic_feature_store_hetero():
@@ -59,6 +76,14 @@ def test_basic_feature_store_hetero():
     features[("edge", "paper:cites", "b")] = gb.TorchBasedFeature(b)
 
     feature_store = gb.BasicFeatureStore(features)
+
+    # Test __getitem__ to access the stored Feature.
+    feature = feature_store[("node", "author", "a")]
+    assert isinstance(feature, gb.Feature)
+    assert torch.equal(
+        feature.read(),
+        torch.tensor([[1, 2, 4], [2, 5, 3]]),
+    )
 
     # Test read the entire feature.
     assert torch.equal(
@@ -84,10 +109,18 @@ def test_basic_feature_store_hetero():
     assert feature_store.metadata("node", "author", "a") == metadata
     assert feature_store.metadata("edge", "paper:cites", "b") == {}
 
+    # Test __setitem__ and __contains__ of FeatureStore.
+    assert ("node", "author", "c") not in feature_store
+    feature_store[("node", "author", "c")] = feature_store[
+        ("node", "author", "a")
+    ]
+    assert ("node", "author", "c") in feature_store
+
     # Test get keys of the features.
     assert feature_store.keys() == [
         ("node", "author", "a"),
         ("edge", "paper:cites", "b"),
+        ("node", "author", "c"),
     ]
 
 

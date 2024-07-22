@@ -20,6 +20,7 @@
 #include "./feature_cache.h"
 
 #include "./index_select.h"
+#include "./utils.h"
 
 namespace graphbolt {
 namespace storage {
@@ -34,7 +35,8 @@ FeatureCache::FeatureCache(
 
 torch::Tensor FeatureCache::Query(
     torch::Tensor positions, torch::Tensor indices, int64_t size) {
-  const bool pin_memory = positions.is_pinned() || indices.is_pinned();
+  const bool pin_memory =
+      utils::is_pinned(positions) || utils::is_pinned(indices);
   std::vector<int64_t> output_shape{
       tensor_.sizes().begin(), tensor_.sizes().end()};
   output_shape[0] = size;

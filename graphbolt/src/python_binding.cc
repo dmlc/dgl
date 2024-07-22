@@ -19,6 +19,7 @@
 #include "./index_select.h"
 #include "./partitioned_cache_policy.h"
 #include "./random.h"
+#include "./utils.h"
 
 #ifdef GRAPHBOLT_USE_CUDA
 #include "./cuda/extension/gpu_graph_cache.h"
@@ -145,6 +146,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("index_select_csc_batched", &ops::IndexSelectCSCBatched);
   m.def("ondisk_npy_array", &storage::OnDiskNpyArray::Create);
   m.def("detect_io_uring", &io_uring::IsAvailable);
+  m.def("set_worker_id", &utils::SetWorkerId);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
