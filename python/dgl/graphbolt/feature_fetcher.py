@@ -14,7 +14,16 @@ from .minibatch_transformer import MiniBatchTransformer
 
 __all__ = [
     "FeatureFetcher",
+    "FeatureFetcherStartMarker",
 ]
+
+
+@functional_datapipe("mark_feature_fetcher_start")
+class FeatureFetcherStartMarker(MiniBatchTransformer):
+    """Used to mark the start of a FeatureFetcher and is a no-op."""
+
+    def __init__(self, datapipe):
+        super().__init__(datapipe, self._identity)
 
 
 @functional_datapipe("fetch_feature")
@@ -56,6 +65,7 @@ class FeatureFetcher(MiniBatchTransformer):
         edge_feature_keys=None,
         overlap_fetch=True,
     ):
+        datapipe = datapipe.mark_feature_fetcher_start()
         self.feature_store = feature_store
         self.node_feature_keys = node_feature_keys
         self.edge_feature_keys = edge_feature_keys
@@ -92,6 +102,8 @@ class FeatureFetcher(MiniBatchTransformer):
                 edge_feature_key_list,
             ]:
                 for feature_key in feature_key_list:
+                    if feature_key not in feature_store:
+                        continue
                     for device_str in ["cpu", "cuda"]:
                         try:
                             max_val = max(
