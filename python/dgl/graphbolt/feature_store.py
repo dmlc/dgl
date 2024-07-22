@@ -127,6 +127,17 @@ class FeatureStore:
         """
         raise NotImplementedError
 
+    def __setitem__(self, feature_key: FeatureKey, feature: Feature):
+        """Set the underlying `Feature` with its (domain, type, name) as
+        the feature_key and feature as the value.
+        """
+        raise NotImplementedError
+
+    def __contains__(self, feature_key: FeatureKey) -> bool:
+        """Checks whether the provided (domain, type, name) as the feature_key
+        is container in the FeatureStore."""
+        raise NotImplementedError
+
     def read(
         self,
         domain: str,
@@ -153,7 +164,7 @@ class FeatureStore:
         torch.Tensor
             The read feature.
         """
-        raise NotImplementedError
+        return self.__getitem__((domain, type_name, feature_name)).read(ids)
 
     def size(
         self,
@@ -176,7 +187,7 @@ class FeatureStore:
         torch.Size
             The size of the specified feature in the feature store.
         """
-        raise NotImplementedError
+        return self.__getitem__((domain, type_name, feature_name)).size()
 
     def metadata(
         self,
@@ -199,7 +210,7 @@ class FeatureStore:
         Dict
             The metadata of the feature.
         """
-        raise NotImplementedError
+        return self.__getitem__((domain, type_name, feature_name)).metadata()
 
     def update(
         self,
@@ -228,7 +239,7 @@ class FeatureStore:
             must have the same length. If None, the entire feature will be
             updated.
         """
-        raise NotImplementedError
+        self.__getitem__((domain, type_name, feature_name)).update(value, ids)
 
     def keys(self):
         """Get the keys of the features.
