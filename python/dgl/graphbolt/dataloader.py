@@ -9,7 +9,7 @@ import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
 
 from .base import CopyTo, get_host_to_device_uva_stream
-from .feature_fetcher import FeatureFetcher
+from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
 from .impl.gpu_graph_cache import GPUGraphCache
 from .impl.neighbor_sampler import SamplePerLayer
 
@@ -174,7 +174,7 @@ class DataLoader(torch.utils.data.DataLoader):
         # (2) Cut datapipe at FeatureFetcher and wrap.
         datapipe_graph = _find_and_wrap_parent(
             datapipe_graph,
-            FeatureFetcher,
+            FeatureFetcherStartMarker,
             MultiprocessingWrapper,
             num_workers=num_workers,
             persistent_workers=persistent_workers,
