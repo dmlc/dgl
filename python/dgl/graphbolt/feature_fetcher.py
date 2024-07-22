@@ -20,7 +20,11 @@ __all__ = [
 
 @functional_datapipe("mark_feature_fetcher_start")
 class FeatureFetcherStartMarker(MiniBatchTransformer):
-    """Used to mark the start of a FeatureFetcher and is a no-op."""
+    """Used to mark the start of a FeatureFetcher and is a no-op. All the
+    datapipes created during a FeatureFetcher instantiation are guarenteed to be
+    contained between FeatureFetcherStartMarker and FeatureFetcher instances in
+    the datapipe graph.
+    """
 
     def __init__(self, datapipe):
         super().__init__(datapipe, self._identity)
