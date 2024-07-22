@@ -2,9 +2,7 @@
 
 from typing import Dict, Tuple
 
-import torch
-
-from ..feature_store import Feature, FeatureStore
+from ..feature_store import Feature, FeatureKey, FeatureStore
 
 __all__ = ["BasicFeatureStore"]
 
@@ -29,109 +27,22 @@ class BasicFeatureStore(FeatureStore):
         super().__init__()
         self._features = features
 
-    def read(
-        self,
-        domain: str,
-        type_name: str,
-        feature_name: str,
-        ids: torch.Tensor = None,
-    ):
-        """Read from the feature store.
-
-        Parameters
-        ----------
-        domain : str
-            The domain of the feature such as "node", "edge" or "graph".
-        type_name : str
-            The node or edge type name.
-        feature_name : str
-            The feature name.
-        ids : torch.Tensor, optional
-            The index of the feature. If specified, only the specified indices
-            of the feature are read. If None, the entire feature is returned.
-
-        Returns
-        -------
-        torch.Tensor
-            The read feature.
+    def __getitem__(self, feature_key: FeatureKey) -> Feature:
+        """Access the underlying `Feature` with its (domain, type, name) as
+        the feature_key.
         """
-        return self._features[(domain, type_name, feature_name)].read(ids)
+        return self._features[feature_key]
 
-    def size(
-        self,
-        domain: str,
-        type_name: str,
-        feature_name: str,
-    ):
-        """Get the size of the specified feature in the feature store.
-
-        Parameters
-        ----------
-        domain : str
-            The domain of the feature such as "node", "edge" or "graph".
-        type_name : str
-            The node or edge type name.
-        feature_name : str
-            The feature name.
-
-        Returns
-        -------
-        torch.Size
-            The size of the specified feature in the feature store.
+    def __setitem__(self, feature_key: FeatureKey, feature: Feature):
+        """Set the underlying `Feature` with its (domain, type, name) as
+        the feature_key and feature as the value.
         """
-        return self._features[(domain, type_name, feature_name)].size()
+        self._features[feature_key] = feature
 
-    def metadata(
-        self,
-        domain: str,
-        type_name: str,
-        feature_name: str,
-    ):
-        """Get the metadata of the specified feature in the feature store.
-
-        Parameters
-        ----------
-        domain : str
-            The domain of the feature such as "node", "edge" or "graph".
-        type_name : str
-            The node or edge type name.
-        feature_name : str
-            The feature name.
-        Returns
-        -------
-        Dict
-            The metadata of the feature.
-        """
-        return self._features[(domain, type_name, feature_name)].metadata()
-
-    def update(
-        self,
-        domain: str,
-        type_name: str,
-        feature_name: str,
-        value: torch.Tensor,
-        ids: torch.Tensor = None,
-    ):
-        """Update the feature store.
-
-        Parameters
-        ----------
-        domain : str
-            The domain of the feature such as "node", "edge" or "graph".
-        type_name : str
-            The node or edge type name.
-        feature_name : str
-            The feature name.
-        value : torch.Tensor
-            The updated value of the feature.
-        ids : torch.Tensor, optional
-            The indices of the feature to update. If specified, only the
-            specified indices of the feature will be updated. For the feature,
-            the `ids[i]` row is updated to `value[i]`. So the indices and value
-            must have the same length. If None, the entire feature will be
-            updated.
-        """
-        self._features[(domain, type_name, feature_name)].update(value, ids)
+    def __contains__(self, feature_key: FeatureKey) -> bool:
+        """Checks whether the provided (domain, type, name) as the feature_key
+        is container in the BasicFeatureStore."""
+        return feature_key in self._features
 
     def __len__(self):
         """Return the number of features."""

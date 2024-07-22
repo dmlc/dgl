@@ -28,6 +28,8 @@ namespace cuda {
 GpuCache::GpuCache(const std::vector<int64_t> &shape, torch::ScalarType dtype) {
   TORCH_CHECK(shape.size() >= 2, "Shape must at least have 2 dimensions.");
   const auto num_items = shape[0];
+  TORCH_CHECK(
+      num_items > 0, "The capacity of GpuCache needs to be a positive.");
   const int64_t num_feats =
       std::accumulate(shape.begin() + 1, shape.end(), 1ll, std::multiplies<>());
   const int element_size =

@@ -19,6 +19,8 @@
  */
 #include "./cache_policy.h"
 
+#include "./utils.h"
+
 namespace graphbolt {
 namespace storage {
 
@@ -26,13 +28,15 @@ template <typename CachePolicy>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
   auto positions = torch::empty_like(
-      keys,
-      keys.options().dtype(torch::kInt64).pinned_memory(keys.is_pinned()));
+      keys, keys.options()
+                .dtype(torch::kInt64)
+                .pinned_memory(utils::is_pinned(keys)));
   auto indices = torch::empty_like(
-      keys,
-      keys.options().dtype(torch::kInt64).pinned_memory(keys.is_pinned()));
-  auto filtered_keys =
-      torch::empty_like(keys, keys.options().pinned_memory(keys.is_pinned()));
+      keys, keys.options()
+                .dtype(torch::kInt64)
+                .pinned_memory(utils::is_pinned(keys)));
+  auto filtered_keys = torch::empty_like(
+      keys, keys.options().pinned_memory(utils::is_pinned(keys)));
   int64_t found_cnt = 0;
   int64_t missing_cnt = keys.size(0);
   AT_DISPATCH_INDEX_TYPES(
@@ -63,8 +67,9 @@ template <typename CachePolicy>
 torch::Tensor BaseCachePolicy::ReplaceImpl(
     CachePolicy& policy, torch::Tensor keys) {
   auto positions = torch::empty_like(
-      keys,
-      keys.options().dtype(torch::kInt64).pinned_memory(keys.is_pinned()));
+      keys, keys.options()
+                .dtype(torch::kInt64)
+                .pinned_memory(utils::is_pinned(keys)));
   AT_DISPATCH_INDEX_TYPES(
       keys.scalar_type(), "BaseCachePolicy::Replace", ([&] {
         auto keys_ptr = keys.data_ptr<index_t>();
@@ -77,7 +82,9 @@ torch::Tensor BaseCachePolicy::ReplaceImpl(
           const auto pos = pos_optional ? *pos_optional : policy.Insert(key);
           positions_ptr[i] = pos;
           TORCH_CHECK(
-              std::get<1>(position_set.insert(pos)),
+              // If there are duplicate values and the key was just inserted,
+              // we do not have to check for the uniqueness of the positions.
+              pos_optional.has_value() || std::get<1>(position_set.insert(pos)),
               "Can't insert all, larger cache capacity is needed.");
         }
       }));
@@ -122,7 +129,8 @@ void S3FifoCachePolicy::ReadingCompleted(torch::Tensor keys) {
 }
 
 SieveCachePolicy::SieveCachePolicy(int64_t capacity)
-    : hand_(queue_.end()), capacity_(capacity), cache_usage_(0) {
+    // Ensure that queue_ is constructed first before accessing its `.end()`.
+    : queue_(), hand_(queue_.end()), capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(capacity);
 }

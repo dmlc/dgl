@@ -6,6 +6,7 @@
 #ifndef GRAPHBOLT_INDEX_SELECT_H_
 #define GRAPHBOLT_INDEX_SELECT_H_
 
+#include <graphbolt/async.h>
 #include <torch/script.h>
 
 namespace graphbolt {
@@ -48,6 +49,25 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
  * @return torch::Tensor Output tensor with shape (M, ...).
  */
 torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index);
+
+/**
+ * @brief The async version of IndexSelect, available for only CPU tensors.
+ *
+ * @return Returns a future containing a torch::Tensor.
+ */
+c10::intrusive_ptr<Future<torch::Tensor>> IndexSelectAsync(
+    torch::Tensor input, torch::Tensor index);
+
+/**
+ * @brief The async version of operation input[index] = src.
+ * @param input The input tensor.
+ * @param index The index tensor into input.
+ * @param src The src tensor being assigned into input.
+ *
+ * @return Returns a future containing input, a torch::Tensor.
+ */
+c10::intrusive_ptr<Future<torch::Tensor>> ScatterAsync(
+    torch::Tensor input, torch::Tensor index, torch::Tensor src);
 
 /**
  * @brief Select columns for a sparse matrix in a CSC format according to nodes
