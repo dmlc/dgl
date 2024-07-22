@@ -118,6 +118,7 @@ class PartitionedCachePolicy : public BaseCachePolicy,
 
   int64_t capacity_;
   std::vector<std::unique_ptr<BaseCachePolicy>> policies_;
+  std::mutex mtx_;
 };
 
 }  // namespace storage
