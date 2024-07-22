@@ -127,6 +127,7 @@ class TorchBasedFeature(Feature):
 
     def read_async(self, ids: torch.Tensor):
         """Read the feature by index asynchronously.
+
         Parameters
         ----------
         ids : torch.Tensor
@@ -145,9 +146,9 @@ class TorchBasedFeature(Feature):
         >>> import dgl.graphbolt as gb
         >>> feature = gb.Feature(...)
         >>> ids = torch.tensor([0, 2])
-        >>> async_handle = feature.read_async(ids)
-        >>> for _ in range(feature.read_async_num_stages(ids.device)):
-        ...     future = next(async_handle)
+        >>> for stage, future in enumerate(feature.read_async(ids)):
+        ...     pass
+        >>> assert stage + 1 == feature.read_async_num_stages(ids.device)
         >>> result = future.wait()  # result contains the read values.
         """
         assert self._tensor.device.type == "cpu"
@@ -207,7 +208,10 @@ class TorchBasedFeature(Feature):
 
     def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation. See read_async
-        function for directions on its use.
+        function for directions on its use. This function is required to return
+        the number of yield operations when read_async is used with a tensor
+        residing on ids_device.
+
         Parameters
         ----------
         ids_device : torch.device
@@ -406,6 +410,7 @@ class DiskBasedFeature(Feature):
 
     def read_async(self, ids: torch.Tensor):
         """Read the feature by index asynchronously.
+
         Parameters
         ----------
         ids : torch.Tensor
@@ -424,9 +429,9 @@ class DiskBasedFeature(Feature):
         >>> import dgl.graphbolt as gb
         >>> feature = gb.Feature(...)
         >>> ids = torch.tensor([0, 2])
-        >>> async_handle = feature.read_async(ids)
-        >>> for _ in range(feature.read_async_num_stages(ids.device)):
-        ...     future = next(async_handle)
+        >>> for stage, future in enumerate(feature.read_async(ids)):
+        ...     pass
+        >>> assert stage + 1 == feature.read_async_num_stages(ids.device)
         >>> result = future.wait()  # result contains the read values.
         """
         assert torch.ops.graphbolt.detect_io_uring()
@@ -467,7 +472,10 @@ class DiskBasedFeature(Feature):
 
     def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation. See read_async
-        function for directions on its use.
+        function for directions on its use. This function is required to return
+        the number of yield operations when read_async is used with a tensor
+        residing on ids_device.
+
         Parameters
         ----------
         ids_device : torch.device
