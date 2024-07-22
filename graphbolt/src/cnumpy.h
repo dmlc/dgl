@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -113,6 +114,7 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   int64_t aligned_length_;         // Aligned feature_size.
   int num_thread_;                 // Default thread number.
   torch::Tensor read_tensor_;      // Provides temporary read buffer.
+  std::mutex mtx_;
 
 #ifdef HAVE_LIBRARY_LIBURING
   std::unique_ptr<io_uring[]> io_uring_queue_;  // io_uring queue.

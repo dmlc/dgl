@@ -160,6 +160,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   // Indicator for index error.
   std::atomic<int> error_flag{};
   std::atomic<int64_t> work_queue{};
+  std::lock_guard lock(mtx_);
   torch::parallel_for(0, num_thread_, 1, [&](int64_t begin, int64_t end) {
     if (begin >= end) return;
     const auto thread_id = begin;
