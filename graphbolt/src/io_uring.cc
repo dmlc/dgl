@@ -17,8 +17,9 @@
  * @file io_uring.cc
  * @brief io_uring related functions.
  */
-#ifdef HAVE_LIBRARY_LIBURING
 #include "./io_uring.h"
+
+#ifdef HAVE_LIBRARY_LIBURING
 
 #include <errno.h>
 #include <liburing.h>
@@ -75,7 +76,7 @@ bool IsAvailable() {
 #endif
 }
 
-void SetNumThreads(std::int64_t count) { num_threads = count; }
+void SetNumThreads(int64_t count) { num_threads = count; }
 
 }  // namespace io_uring
 }  // namespace graphbolt
