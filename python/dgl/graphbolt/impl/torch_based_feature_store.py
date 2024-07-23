@@ -590,7 +590,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     >>> # "feat_mmap" will use the underlying OS mmap functionality to cache the
     >>> # feature into system memory on demand. "feat_disk" however does not
     >>> # do any caching by default. Consider wrapping it with
-    >>> # `gb.CPUCachedFeature` to enable caching in the system memory.            
+    >>> # `gb.CPUCachedFeature` to enable caching in the system memory.
     >>> feature_store = gb.TorchBasedFeatureStore(
     ...     feat_data, {("node", "paper", "feat_disk")},
     ... )
