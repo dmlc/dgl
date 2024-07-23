@@ -173,6 +173,7 @@ class CPUCachedFeature(Feature):
             reading_completed.wait()
             replace_future.wait()
             reading_completed = policy.reading_completed_async(missing_keys)
+            num_found = positions.size(0)
 
             class _Waiter:
                 def __init__(self, events, existing, missing, index):
@@ -190,8 +191,8 @@ class CPUCachedFeature(Feature):
                         dtype=self.missing.dtype,
                         device=ids_device,
                     )
-                    found_index = self.index[: positions.size(0)]
-                    missing_index = self.index[positions.size(0) :]
+                    found_index = self.index[: num_found]
+                    missing_index = self.index[num_found :]
                     values[found_index] = self.existing
                     values[missing_index] = self.missing
                     # Ensure there is no memory leak.
