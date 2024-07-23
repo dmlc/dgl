@@ -87,9 +87,9 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
       liburing
       SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/liburing
       CONFIGURE_COMMAND <SOURCE_DIR>/configure --cc=${LIBURING_C_COMPILER} --cxx=${CMAKE_CXX_COMPILER} --prefix=/
-      # In order to avoid the error `error: redefinition of 'struct in6_pktinfo'` on ubi7,
-      # I(Rui) added `_GNU_SOURCE` definition to the CFLAGS and CXXFLAGS.
-      BUILD_COMMAND bash -c "make -j 4 CFLAGS=-D_GNU_SOURCE CXXFLAGS=-D_GNU_SOURCE"
+      # In order to avoid the error `error: redefinition of 'struct in6_pktinfo'` on ubi7
+      # when building examples, let's build src only.
+      BUILD_COMMAND bash -c "make -j 4 -C src/"
       BUILD_IN_SOURCE ON
       INSTALL_COMMAND make install DESTDIR=${LIBURING_INSTALL_DIR}
       BUILD_BYPRODUCTS ${LIBURING_INSTALL_DIR}/lib/liburing.a
