@@ -29,12 +29,12 @@ namespace io_uring {
 bool IsAvailable();
 
 /** @brief Set a limit on # background io_uring threads. */
-inline std::optional<int64_t> num_threads;
+inline std::optional<std::int64_t> num_threads;
 
 /**
  * @brief Set the number of background io_uring threads.
  */
-void SetNumThreads(int64_t count);
+void SetNumThreads(std::int64_t count);
 
 }  // namespace io_uring
 }  // namespace graphbolt

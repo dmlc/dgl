@@ -75,7 +75,7 @@ bool IsAvailable() {
 #endif
 }
 
-void SetNumThreads(int64_t count) { num_threads = count; }
+void SetNumThreads(std::int64_t count) { num_threads = count; }
 
 }  // namespace io_uring
 }  // namespace graphbolt
