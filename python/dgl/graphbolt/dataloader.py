@@ -139,10 +139,6 @@ class DataLoader(torch.utils.data.DataLoader):
         high value will limit the amount of overlap while setting it too low may
         cause the PCI-e bandwidth to not get fully utilized. Manually tuned
         default is 6144, meaning around 3-4 Streaming Multiprocessors.
-    max_io_uring_threads: int, optional
-        Limits the number of background io_uring threads. io_uring does not need
-        many threads to saturate your storage device. It is set to
-        `min((torch.get_num_threads() + 1) // 2, 8)` by default.
     """
 
     def __init__(
@@ -154,10 +150,7 @@ class DataLoader(torch.utils.data.DataLoader):
         num_gpu_cached_edges=0,
         gpu_cache_threshold=1,
         max_uva_threads=6144,
-        max_io_uring_threads=min((torch.get_num_threads() + 1) // 2, 8),
     ):
-        torch.ops.graphbolt.set_num_io_uring_threads(max_io_uring_threads)
-
         # Multiprocessing requires two modifications to the datapipe:
         #
         # 1. Insert a stage after ItemSampler to distribute the
