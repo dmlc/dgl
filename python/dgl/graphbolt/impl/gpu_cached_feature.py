@@ -126,15 +126,38 @@ class GPUCachedFeature(Feature):
                 yield  # fallback feature stages.
 
         class _Waiter:
-            @staticmethod
-            def wait():
+            def __init__(
+                self,
+                feature,
+                values,
+                missing_index,
+                missing_keys,
+                missing_values_future,
+            ):
+                self.feature = feature
+                self.values = values
+                self.missing_index = missing_index
+                self.missing_keys = missing_keys
+                self.missing_values_future = missing_values_future
+
+            def wait(self):
                 """Returns the stored value when invoked."""
-                missing_values = missing_values_future.wait()
-                self._feature.replace(missing_keys, missing_values)
-                values[missing_index] = missing_values
+                missing_values = self.missing_values_future.wait()
+                self.feature.replace(self.missing_keys, missing_values)
+                self.values[self.missing_index] = missing_values
+                values = self.values
+                # Ensure there is no memory leak.
+                self.feature = self.values = self.missing_index = None
+                self.missing_keys = self.missing_values_future = None
                 return values
 
-        yield _Waiter()
+        yield _Waiter(
+            self._feature,
+            values,
+            missing_index,
+            missing_keys,
+            missing_values_future,
+        )
 
     def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation. See read_async

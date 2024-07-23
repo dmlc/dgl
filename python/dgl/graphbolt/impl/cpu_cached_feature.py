@@ -116,7 +116,6 @@ class CPUCachedFeature(Feature):
             device_to_host_stream.wait_stream(current_stream)
             with torch.cuda.stream(device_to_host_stream):
                 ids.record_stream(torch.cuda.current_stream())
-                ids_cuda = ids
                 ids = ids.to("cpu", non_blocking=True)
                 ids_copy_event = torch.cuda.Event()
                 ids_copy_event.record()
@@ -160,9 +159,11 @@ class CPUCachedFeature(Feature):
 
             host_to_device_stream = get_host_to_device_uva_stream()
             with torch.cuda.stream(host_to_device_stream):
+                index = index.to(ids_device, non_blocking=True)
                 missing_values_cuda = missing_values.to(
                     ids_device, non_blocking=True
                 )
+                index.record_stream(current_stream)
                 missing_values_cuda.record_stream(current_stream)
                 missing_values_copy_event = torch.cuda.Event()
                 missing_values_copy_event.record()
@@ -174,23 +175,36 @@ class CPUCachedFeature(Feature):
             reading_completed = policy.reading_completed_async(missing_keys)
 
             class _Waiter:
-                @staticmethod
-                def wait():
+                def __init__(self, events, existing, missing, index):
+                    self.events = events
+                    self.existing = existing
+                    self.missing = missing
+                    self.index = index
+
+                def wait(self):
                     """Returns the stored value when invoked."""
-                    missing_values_copy_event.wait()
-                    reading_completed.wait()
+                    for event in self.events:
+                        event.wait()
                     values = torch.empty(
-                        (ids_cuda.shape[0],) + missing_values_cuda.shape[1:],
-                        dtype=missing_values_cuda.dtype,
+                        (index.shape[0],) + self.missing.shape[1:],
+                        dtype=self.missing.dtype,
                         device=ids_device,
                     )
-                    found_index = index[: positions.size(0)]
-                    missing_index = index[positions.size(0) :]
-                    values[found_index] = values_from_cpu
-                    values[missing_index] = missing_values_cuda
+                    found_index = self.index[: positions.size(0)]
+                    missing_index = self.index[positions.size(0) :]
+                    values[found_index] = self.existing
+                    values[missing_index] = self.missing
+                    # Ensure there is no memory leak.
+                    self.events = self.existing = None
+                    self.missing = self.index = None
                     return values
 
-            yield _Waiter()
+            yield _Waiter(
+                [missing_values_copy_event, reading_completed],
+                values_from_cpu,
+                missing_values_cuda,
+                index,
+            )
         elif ids.is_cuda:
             ids_device = ids.device
             current_stream = torch.cuda.current_stream()
@@ -252,14 +266,20 @@ class CPUCachedFeature(Feature):
             reading_completed = policy.reading_completed_async(missing_keys)
 
             class _Waiter:
-                @staticmethod
-                def wait():
-                    """Returns the stored value when invoked."""
-                    values_copy_event.wait()
-                    reading_completed.wait()
-                    return values_cuda
+                def __init__(self, events, values):
+                    self.events = events
+                    self.values = values
 
-            yield _Waiter()
+                def wait(self):
+                    """Returns the stored value when invoked."""
+                    for event in self.events:
+                        event.wait()
+                    values = self.values
+                    # Ensure there is no memory leak.
+                    self.events = self.values = None
+                    return values
+
+            yield _Waiter([values_copy_event, reading_completed], values_cuda)
         else:
             policy_future = policy.query_async(ids)
 
@@ -301,13 +321,19 @@ class CPUCachedFeature(Feature):
             reading_completed = policy.reading_completed_async(missing_keys)
 
             class _Waiter:
-                @staticmethod
-                def wait():
-                    """Returns the stored value when invoked."""
-                    reading_completed.wait()
-                    return values.wait()
+                def __init__(self, event, values):
+                    self.event = event
+                    self.values = values
 
-            yield _Waiter()
+                def wait(self):
+                    """Returns the stored value when invoked."""
+                    self.event.wait()
+                    values = self.values.wait()
+                    # Ensure there is no memory leak.
+                    self.event = self.values = None
+                    return values
+
+            yield _Waiter(reading_completed, values)
 
     def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation. See read_async
