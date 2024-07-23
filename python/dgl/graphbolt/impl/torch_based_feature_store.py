@@ -518,6 +518,13 @@ class DiskBasedFeature(Feature):
         """Change disk-based feature to torch-based feature."""
         return TorchBasedFeature(self._tensor, self._metadata)
 
+    def to(self, _):  # pylint: disable=invalid-name
+        """Placeholder `DiskBasedFeature` to implementation. It is a no-op."""
+        gb_warning(
+            "`DiskBasedFeature.to(device)` is not supported. Leaving unmodified."
+        )
+        return self
+
     def __repr__(self) -> str:
         ret = (
             "{Classname}(\n"
@@ -602,7 +609,9 @@ class TorchBasedFeatureStore(BasicFeatureStore):
             elif spec.format == "numpy":
                 if key in disk_based_feature_list:
                     features[key] = DiskBasedFeature(
-                        spec.path, metadata=metadata
+                        spec.path,
+                        metadata=metadata,
+                        num_threads=min(8, torch.get_num_threads() // 2),
                     )
                 else:
                     mmap_mode = "r+" if not spec.in_memory else None
