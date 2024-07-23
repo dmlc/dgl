@@ -57,7 +57,7 @@ OnDiskNpyArray::OnDiskNpyArray(
   aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
 
   // Get system max thread number.
-  num_thread_ = torch::get_num_threads();
+  num_thread_ = std::min((torch::get_num_threads() + 1) / 2, 8);
   if (num_threads.has_value() && num_thread_ > *num_threads) {
     num_thread_ = *num_threads;
   }

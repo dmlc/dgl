@@ -585,7 +585,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     >>> # do any caching by default. Consider wrapping it with
     >>> # `gb.CPUCachedFeature` to enable caching in the system memory.
     >>> feature_store = gb.TorchBasedFeatureStore(
-    ...     feat_data, {("node", "paper", "feat_disk")},
+    ...     feat_data, {("node", "paper", "feat_disk")}
     ... )
     """
 
@@ -611,9 +611,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
             elif spec.format == "numpy":
                 if key in disk_based_feature_keys:
                     features[key] = DiskBasedFeature(
-                        spec.path,
-                        metadata=metadata,
-                        num_threads=min(8, torch.get_num_threads() // 2),
+                        spec.path, metadata=metadata
                     )
                 else:
                     mmap_mode = "r+" if not spec.in_memory else None
