@@ -563,7 +563,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     ----------
     feat_data : List[OnDiskFeatureData]
         The description of the feature stores.
-    disk_based_feature_key_set: Set[FeatureKey] = None
+    disk_based_feature_keys: Set[FeatureKey] = None
         Uses the DiskBasedFeature instead of TorchBasedFeature for the given set
         of features indicated by a tuple containing their domains, types and
         names as (domain, type, name).
@@ -594,16 +594,16 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     def __init__(
         self,
         feat_data: List[OnDiskFeatureData],
-        disk_based_feature_key_set: Set[FeatureKey] = None,
+        disk_based_feature_keys: Set[FeatureKey] = None,
     ):
-        if disk_based_feature_key_set is None:
-            disk_based_feature_key_set = set()
+        if disk_based_feature_keys is None:
+            disk_based_feature_keys = set()
         features = {}
         for spec in feat_data:
             key = (spec.domain, spec.type, spec.name)
             metadata = spec.extra_fields
             if spec.format == "torch":
-                assert spec.in_memory or key in disk_based_feature_key_set, (
+                assert spec.in_memory or key in disk_based_feature_keys, (
                     f"Pytorch tensor can only be loaded in memory, "
                     f"but the feature {key} is loaded on disk."
                 )
@@ -611,7 +611,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                if key in disk_based_feature_key_set:
+                if key in disk_based_feature_keys:
                     features[key] = DiskBasedFeature(
                         spec.path,
                         metadata=metadata,
