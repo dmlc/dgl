@@ -28,7 +28,7 @@ def load_dgl(name):
     return dataset, multilabel
 
 
-def load_dataset(dataset_name):
+def load_dataset(dataset_name, disk_based_feature_keys=None):
     multilabel = False
     if dataset_name in [
         "reddit",
@@ -47,7 +47,9 @@ def load_dataset(dataset_name):
     ]:
         if "mag240M" in dataset_name:
             dataset_name = "ogb-lsc-mag240m"
-        dataset = gb.BuiltinDataset(dataset_name).load()
+        dataset = gb.BuiltinDataset(dataset_name).load(
+            disk_based_feature_keys=disk_based_feature_keys
+        )
     else:
         raise ValueError("unknown dataset")
 
