@@ -587,7 +587,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     ...         format="numpy", path="/tmp/node_feat.npy", in_memory=False),
     ... ]
     >>> feature_store = gb.TorchBasedFeatureStore(
-    ...     feat_data, {("node", "paper", "feat_disk")}
+    ...     feat_data, {("node", "paper", "feat_disk")},
     ... )
     """
 
