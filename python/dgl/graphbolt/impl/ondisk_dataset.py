@@ -717,7 +717,7 @@ class OnDiskDataset(Dataset):
     def load(
         self,
         tasks: List[str] = None,
-        disk_based_feature_list: Set[FeatureKey] = None,
+        disk_based_feature_key_set: Set[FeatureKey] = None,
     ):
         """Load the dataset.
 
@@ -727,7 +727,7 @@ class OnDiskDataset(Dataset):
             The name of the tasks to be loaded. For single task, the type of
             tasks can be both string and List[str]. For multiple tasks, only
             List[str] is acceptable.
-        disk_based_feature_list: Set[FeatureKey] = None
+        disk_based_feature_key_set: Set[FeatureKey] = None
             Uses the DiskBasedFeature instead of TorchBasedFeature for the given
             set of features indicated by a tuple containing their domains, types
             and names as (domain, type, name).
@@ -769,7 +769,7 @@ class OnDiskDataset(Dataset):
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(
-            self._meta.feature_data, disk_based_feature_list
+            self._meta.feature_data, disk_based_feature_key_set
         )
         self._tasks = self._init_tasks(self._meta.tasks, tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
