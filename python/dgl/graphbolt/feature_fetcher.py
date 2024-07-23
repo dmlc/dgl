@@ -179,12 +179,18 @@ class FeatureFetcher(MiniBatchTransformer):
                 else:  # Asynchronicity is not needed, compute in _final_stage.
 
                     class _Waiter:
-                        @staticmethod
-                        def wait():
-                            """Returns the stored value when invoked."""
-                            return feature.read(index)
+                        def __init__(self, feature, index):
+                            self.feature = feature
+                            self.index = index
 
-                    return (_Waiter(), 0)
+                        def wait(self):
+                            """Returns the stored value when invoked."""
+                            result = self.feature.read(self.index)
+                            # Ensure there is no memory leak.
+                            self.feature = self.index = None
+                            return result
+
+                    return (_Waiter(feature, index), 0)
             else:
                 domain, type_name, feature_name = feature_key
                 return self.feature_store.read(
