@@ -373,18 +373,17 @@ else(EXTERNAL_METIS_PATH)
   target_include_directories(dgl PRIVATE "third_party/METIS/include")
   # Compile METIS
   if(NOT MSVC)
-    # When building on ubi7, it fails with the following error:
-    # /usr/include/signal.h:156:29: error: unknown type name 'siginfo_t'.
-    # So I(Rui) added the following 2 lines to fix the issue.
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_POSIX_C_SOURCE=200809L")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_POSIX_C_SOURCE=200809L")
-
     set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/GKlib")
     include(${GKLIB_PATH}/GKlibSystem.cmake)
     include_directories(${GKLIB_PATH})
     add_library(GKlib ${GKlib_sources})
     include_directories("third_party/METIS/include/")
     add_subdirectory("third_party/METIS/libmetis/")
+    # When building on ubi7, it fails with the following error:
+    # /usr/include/signal.h:156:29: error: unknown type name 'siginfo_t'.
+    # So I(Rui) define _POSIX_C_SOURCE to 200809L for GKlib and metis to avoid the error.
+    target_compile_definitions(GKlib PRIVATE _POSIX_C_SOURCE=200809L)
+    target_compile_definitions(metis PRIVATE _POSIX_C_SOURCE=200809L)
     list(APPEND DGL_LINKER_LIBS metis GKlib)
   endif(NOT MSVC)
 endif(EXTERNAL_METIS_PATH)

@@ -20,6 +20,20 @@ from .ondisk_metadata import OnDiskFeatureData
 __all__ = ["TorchBasedFeature", "DiskBasedFeature", "TorchBasedFeatureStore"]
 
 
+class _Waiter:
+    def __init__(self, event, values):
+        self.event = event
+        self.values = values
+
+    def wait(self):
+        """Returns the stored value when invoked."""
+        self.event.wait()
+        values = self.values
+        # Ensure there is no memory leak.
+        self.event = self.values = None
+        return values
+
+
 class TorchBasedFeature(Feature):
     r"""A wrapper of pytorch based feature.
 
@@ -163,14 +177,7 @@ class TorchBasedFeature(Feature):
                 values_copy_event = torch.cuda.Event()
                 values_copy_event.record()
 
-            class _Waiter:
-                @staticmethod
-                def wait():
-                    """Returns the stored value when invoked."""
-                    values_copy_event.wait()
-                    return values
-
-            yield _Waiter()
+            yield _Waiter(values_copy_event, values)
         elif ids.is_cuda:
             ids_device = ids.device
             current_stream = torch.cuda.current_stream()
@@ -195,14 +202,7 @@ class TorchBasedFeature(Feature):
                 values_copy_event = torch.cuda.Event()
                 values_copy_event.record()
 
-            class _Waiter:
-                @staticmethod
-                def wait():
-                    """Returns the stored value when invoked."""
-                    values_copy_event.wait()
-                    return values_cuda
-
-            yield _Waiter()
+            yield _Waiter(values_copy_event, values_cuda)
         else:
             yield torch.ops.graphbolt.index_select_async(self._tensor, ids)
 
@@ -462,14 +462,7 @@ class DiskBasedFeature(Feature):
                 values_copy_event = torch.cuda.Event()
                 values_copy_event.record()
 
-            class _Waiter:
-                @staticmethod
-                def wait():
-                    """Returns the stored value when invoked."""
-                    values_copy_event.wait()
-                    return values_cuda
-
-            yield _Waiter()
+            yield _Waiter(values_copy_event, values_cuda)
         else:
             yield self._ondisk_npy_array.index_select(ids)
 
