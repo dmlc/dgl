@@ -13,10 +13,10 @@
 #include "./cuda/max_uva_threads.h"
 #endif
 #include "./cnumpy.h"
-#include "./detect_io_uring.h"
 #include "./expand_indptr.h"
 #include "./feature_cache.h"
 #include "./index_select.h"
+#include "./io_uring.h"
 #include "./partitioned_cache_policy.h"
 #include "./random.h"
 #include "./utils.h"
@@ -146,6 +146,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("index_select_csc_batched", &ops::IndexSelectCSCBatched);
   m.def("ondisk_npy_array", &storage::OnDiskNpyArray::Create);
   m.def("detect_io_uring", &io_uring::IsAvailable);
+  m.def("set_num_io_uring_threads", &io_uring::SetNumThreads);
   m.def("set_worker_id", &utils::SetWorkerId);
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA

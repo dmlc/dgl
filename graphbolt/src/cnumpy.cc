@@ -7,6 +7,8 @@
 
 #include "./cnumpy.h"
 
+#include "./io_uring.h"
+
 #ifdef HAVE_LIBRARY_LIBURING
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -30,7 +32,7 @@ namespace storage {
 
 OnDiskNpyArray::OnDiskNpyArray(
     std::string filename, torch::ScalarType dtype,
-    const std::vector<int64_t> &shape, torch::optional<int64_t> num_threads)
+    const std::vector<int64_t> &shape)
     : filename_(filename),
       feature_dim_(shape),
       dtype_(dtype),
@@ -57,12 +59,10 @@ OnDiskNpyArray::OnDiskNpyArray(
   aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
 
   // Get system max thread number.
-  num_thread_ = torch::get_num_threads();
-  if (num_threads.has_value() && num_thread_ > *num_threads) {
-    num_thread_ = *num_threads;
-  }
+  num_thread_ =
+      io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2);
   TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
-  io_uring_queue_ = std::make_unique<io_uring[]>(num_thread_);
+  io_uring_queue_ = std::make_unique<::io_uring[]>(num_thread_);
 
   // Init io_uring queue.
   for (int64_t t = 0; t < num_thread_; t++) {
@@ -82,8 +82,8 @@ OnDiskNpyArray::OnDiskNpyArray(
 
 c10::intrusive_ptr<OnDiskNpyArray> OnDiskNpyArray::Create(
     std::string path, torch::ScalarType dtype,
-    const std::vector<int64_t> &shape, torch::optional<int64_t> num_threads) {
-  return c10::make_intrusive<OnDiskNpyArray>(path, dtype, shape, num_threads);
+    const std::vector<int64_t> &shape) {
+  return c10::make_intrusive<OnDiskNpyArray>(path, dtype, shape);
 }
 
 OnDiskNpyArray::~OnDiskNpyArray() {
