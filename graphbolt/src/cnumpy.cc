@@ -34,7 +34,7 @@ namespace storage {
 
 OnDiskNpyArray::OnDiskNpyArray(
     std::string filename, torch::ScalarType dtype,
-    const std::vector<int64_t> &shape)
+    const std::vector<int64_t> &shape, torch::optional<int64_t> num_threads)
     : filename_(filename),
       feature_dim_(shape),
       dtype_(dtype),
@@ -79,7 +79,8 @@ OnDiskNpyArray::OnDiskNpyArray(
 
   num_thread_ = std::min(
       static_cast<int64_t>(num_queues_),
-      io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2));
+      num_threads.value_or(
+          io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2)));
   TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
 
   read_tensor_ = torch::empty(
@@ -92,8 +93,8 @@ OnDiskNpyArray::OnDiskNpyArray(
 
 c10::intrusive_ptr<OnDiskNpyArray> OnDiskNpyArray::Create(
     std::string path, torch::ScalarType dtype,
-    const std::vector<int64_t> &shape) {
-  return c10::make_intrusive<OnDiskNpyArray>(path, dtype, shape);
+    const std::vector<int64_t> &shape, torch::optional<int64_t> num_threads) {
+  return c10::make_intrusive<OnDiskNpyArray>(path, dtype, shape, num_threads);
 }
 
 OnDiskNpyArray::~OnDiskNpyArray() {

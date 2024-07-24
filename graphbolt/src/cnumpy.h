@@ -62,12 +62,12 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    */
   OnDiskNpyArray(
       std::string filename, torch::ScalarType dtype,
-      const std::vector<int64_t>& shape);
+      const std::vector<int64_t>& shape, torch::optional<int64_t> num_threads);
 
   /** @brief Create a disk feature fetcher from numpy file. */
   static c10::intrusive_ptr<OnDiskNpyArray> Create(
       std::string path, torch::ScalarType dtype,
-      const std::vector<int64_t>& shape);
+      const std::vector<int64_t>& shape, torch::optional<int64_t> num_threads);
 
   /** @brief Deconstructor. */
   ~OnDiskNpyArray();
