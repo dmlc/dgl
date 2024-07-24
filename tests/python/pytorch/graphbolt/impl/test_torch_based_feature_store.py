@@ -257,7 +257,7 @@ def write_tensor_to_disk(dir, name, t, fmt="torch"):
 @pytest.mark.parametrize("disk_based_feature_keys", [None, True])
 def test_torch_based_feature_store(in_memory, disk_based_feature_keys):
     if disk_based_feature_keys:
-        disk_based_feature_keys = {("node", "paper", "a")}
+        disk_based_feature_keys = {("edge", "paper:cites:paper", "b")}
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 4], [2, 5, 3]])
         b = torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]])
@@ -418,20 +418,39 @@ def test_torch_based_feature_store_repr(in_memory):
         feature_store = gb.TorchBasedFeatureStore(feature_data)
 
         expected_feature_store_str = (
-            "TorchBasedFeatureStore(\n"
-            "    {(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(\n"
-            "        feature=tensor([[1, 2, 4],\n"
-            "                        [2, 5, 3]]),\n"
-            "        metadata={},\n"
-            "    ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(\n"
-            "        feature=tensor([[[1, 2],\n"
-            "                         [3, 4]],\n"
-            "\n"
-            "                        [[2, 5],\n"
-            "                         [3, 4]]]),\n"
-            "        metadata={},\n"
-            "    )}\n"
-            ")"
+            (
+                "TorchBasedFeatureStore(\n"
+                "    {(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(\n"
+                "        feature=tensor([[1, 2, 4],\n"
+                "                        [2, 5, 3]]),\n"
+                "        metadata={},\n"
+                "    ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): TorchBasedFeature(\n"
+                "        feature=tensor([[[1, 2],\n"
+                "                         [3, 4]],\n"
+                "\n"
+                "                        [[2, 5],\n"
+                "                         [3, 4]]]),\n"
+                "        metadata={},\n"
+                "    )}\n"
+                ")"
+            )
+            if in_memory
+            else (
+                "TorchBasedFeatureStore(\n"
+                "    {(<OnDiskFeatureDataDomain.NODE: 'node'>, 'paper', 'a'): TorchBasedFeature(\n"
+                "        feature=tensor([[1, 2, 4],\n"
+                "                        [2, 5, 3]]),\n"
+                "        metadata={},\n"
+                "    ), (<OnDiskFeatureDataDomain.EDGE: 'edge'>, 'paper:cites:paper', 'b'): DiskBasedFeature(\n"
+                "        feature=tensor([[[1, 2],\n"
+                "                         [3, 4]],\n"
+                "\n"
+                "                        [[2, 5],\n"
+                "                         [3, 4]]]),\n"
+                "        metadata={},\n"
+                "    )}\n"
+                ")"
+            )
         )
 
         assert repr(feature_store) == expected_feature_store_str, feature_store
