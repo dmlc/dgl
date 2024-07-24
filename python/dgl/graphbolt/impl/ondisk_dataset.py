@@ -15,7 +15,6 @@ import yaml
 
 from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
 from ..dataset import Dataset, Task
-from ..feature_store import FeatureKey
 from ..internal import (
     calculate_dir_hash,
     check_dataset_change,

@@ -2,7 +2,7 @@
 
 import copy
 import textwrap
-from typing import Dict, List, Set
+from typing import Dict, List
 
 import numpy as np
 import torch
@@ -12,7 +12,7 @@ from ..base import (
     get_host_to_device_uva_stream,
     index_select,
 )
-from ..feature_store import Feature, FeatureKey
+from ..feature_store import Feature
 from ..internal_utils import gb_warning, is_wsl
 from .basic_feature_store import BasicFeatureStore
 from .ondisk_metadata import OnDiskFeatureData
