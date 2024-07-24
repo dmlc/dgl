@@ -149,11 +149,11 @@ def train_helper(
     cpu_cache_miss_rate_fn,
     device,
 ):
+    model.train()  # Set the model to training mode
     total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
     total_correct = 0  # Accumulator for the total number of correct predictions
     total_samples = 0  # Accumulator for the total number of samples processed
     num_batches = 0  # Counter for the number of mini-batches processed
-    model.train()  # Set the model to training mode
     start = time.time()
     dataloader = tqdm(dataloader, "Training")
     for minibatch in dataloader:
