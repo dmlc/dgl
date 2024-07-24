@@ -207,6 +207,33 @@ def create_dataloader(
     )
 
 
+def train_helper(dataloader, model, optimizer, loss_fn, num_classes, device):
+    model.train()  # Set the model to training mode
+    total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
+    total_correct = 0  # Accumulator for the total number of correct predictions
+    total_samples = 0  # Accumulator for the total number of samples processed
+    num_batches = 0  # Counter for the number of mini-batches processed
+    start = time.time()
+    for minibatch in tqdm(dataloader, "Training"):
+        node_features = minibatch.node_features["feat"]
+        labels = minibatch.labels
+        optimizer.zero_grad()
+        out = model(minibatch.sampled_subgraphs, node_features)
+        loss = loss_fn(out, labels)
+        total_loss += loss.detach()
+        total_correct += MF.accuracy(
+            out, labels, task="multiclass", num_classes=num_classes
+        ) * labels.size(0)
+        total_samples += labels.size(0)
+        loss.backward()
+        optimizer.step()
+        num_batches += 1
+    train_loss = total_loss / num_batches
+    train_acc = total_correct / total_samples
+    end = time.time()
+    return train_loss, train_acc, end - start
+
+
 def train(train_dataloader, valid_dataloader, num_classes, model, device):
     #####################################################################
     # (HIGHLIGHT) Train the model for one epoch.
@@ -220,43 +247,22 @@ def train(train_dataloader, valid_dataloader, num_classes, model, device):
     #   model: The GraphSAGE model.
     #   dataloader: DataLoader that provides mini-batches of graph data.
     #   optimizer: Optimizer used for updating model parameters.
-    #   criterion: Loss function used for training.
+    #   loss_fn: Loss function used for training.
     #   device: The device (CPU/GPU) to run the training on.
     #####################################################################
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = torch.nn.CrossEntropyLoss()
-
-    model.train()  # Set the model to training mode
-    total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
-    total_correct = 0  # Accumulator for the total number of correct predictions
-    total_samples = 0  # Accumulator for the total number of samples processed
-    num_batches = 0  # Counter for the number of mini-batches processed
+    loss_fn = torch.nn.CrossEntropyLoss()
 
     for epoch in range(args.epochs):
-        start = time.time()
-        for minibatch in tqdm(train_dataloader, "Training"):
-            node_features = minibatch.node_features["feat"]
-            labels = minibatch.labels
-            optimizer.zero_grad()
-            out = model(minibatch.sampled_subgraphs, node_features)
-            loss = criterion(out, labels)
-            total_loss += loss.detach()
-            total_correct += MF.accuracy(
-                out, labels, task="multiclass", num_classes=num_classes
-            ) * labels.size(0)
-            total_samples += labels.size(0)
-            loss.backward()
-            optimizer.step()
-            num_batches += 1
-        train_loss = total_loss / num_batches
-        train_acc = total_correct / total_samples
-        end = time.time()
+        train_loss, train_acc, duration = train_helper(
+            train_dataloader, model, optimizer, loss_fn, num_classes, device
+        )
         val_acc = evaluate(model, valid_dataloader, num_classes)
         print(
             f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
             f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}, "
-            f"Time: {end - start}s"
+            f"Time: {duration}s"
         )
 
 
