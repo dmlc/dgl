@@ -384,9 +384,10 @@ class DiskBasedFeature(Feature):
         self._tensor = torch.from_numpy(ondisk_data)
 
         self._metadata = metadata
-        self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
-            path, self._tensor.dtype, self._tensor.shape, num_threads
-        )
+        if torch.ops.graphbolt.detect_io_uring():
+            self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
+                path, self._tensor.dtype, self._tensor.shape, num_threads
+            )
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
