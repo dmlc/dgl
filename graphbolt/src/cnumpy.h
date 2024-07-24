@@ -27,6 +27,22 @@
 namespace graphbolt {
 namespace storage {
 
+namespace {
+#ifdef HAVE_LIBRARY_LIBURING
+struct io_uring_queue_destroyer {
+  int num_thread_;
+  void operator()(::io_uring* queues) {
+    if (!queues) return;
+    for (int t = 0; t < num_thread_; t++) {
+      // IO queue exit.
+      ::io_uring_queue_exit(&queues[t]);
+    }
+    delete[] queues;
+  }
+};
+#endif  // HAVE_LIBRARY_LIBURING
+}  // namespace
+
 /**
  * @brief Disk Numpy Fetecher class.
  */
@@ -114,11 +130,17 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   int64_t aligned_length_;         // Aligned feature_size.
   int num_thread_;                 // Default thread number.
   torch::Tensor read_tensor_;      // Provides temporary read buffer.
-  std::mutex mtx_;
 
 #ifdef HAVE_LIBRARY_LIBURING
-  std::unique_ptr<io_uring[]> io_uring_queue_;  // io_uring queue.
-#endif                                          // HAVE_LIBRARY_LIBURING
+
+  static inline std::once_flag
+      call_once_flag_;            // Protect initialization of below.
+  static inline int num_queues_;  // Number of queues.
+  static inline std::unique_ptr<::io_uring[], io_uring_queue_destroyer>
+      io_uring_queue_;                               // io_uring queue.
+  static inline std::unique_ptr<std::mutex[]> mtx_;  // io_uring_queue mutexes.
+
+#endif  // HAVE_LIBRARY_LIBURING
 };
 
 }  // namespace storage
