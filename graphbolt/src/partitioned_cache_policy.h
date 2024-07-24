@@ -81,13 +81,24 @@ class PartitionedCachePolicy : public BaseCachePolicy,
 
   c10::intrusive_ptr<Future<torch::Tensor>> ReplaceAsync(torch::Tensor keys);
 
+  template <bool write>
+  void ReadingWritingCompletedImpl(torch::Tensor keys);
+
   /**
    * @brief A reader has finished reading these keys, so they can be evicted.
    * @param keys The keys to unmark.
    */
   void ReadingCompleted(torch::Tensor keys);
 
+  /**
+   * @brief A writer has finished writing these keys, so they can be evicted.
+   * @param keys The keys to unmark.
+   */
+  void WritingCompleted(torch::Tensor keys);
+
   c10::intrusive_ptr<Future<void>> ReadingCompletedAsync(torch::Tensor keys);
+
+  c10::intrusive_ptr<Future<void>> WritingCompletedAsync(torch::Tensor keys);
 
   template <typename CachePolicy>
   static c10::intrusive_ptr<PartitionedCachePolicy> Create(

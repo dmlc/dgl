@@ -114,7 +114,13 @@ TORCH_LIBRARY(graphbolt, m) {
           &storage::PartitionedCachePolicy::ReadingCompleted)
       .def(
           "reading_completed_async",
-          &storage::PartitionedCachePolicy::ReadingCompletedAsync);
+          &storage::PartitionedCachePolicy::ReadingCompletedAsync)
+      .def(
+          "writing_completed",
+          &storage::PartitionedCachePolicy::WritingCompleted)
+      .def(
+          "writing_completed_async",
+          &storage::PartitionedCachePolicy::WritingCompletedAsync);
   m.def(
       "s3_fifo_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::S3FifoCachePolicy>);

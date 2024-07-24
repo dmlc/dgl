@@ -47,7 +47,7 @@ BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
         auto filtered_keys_ptr = filtered_keys.data_ptr<index_t>();
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          auto pos = policy.Read(key);
+          auto pos = policy.template Read<false>(key);
           if (pos.has_value()) {
             positions_ptr[found_cnt] = *pos;
             filtered_keys_ptr[found_cnt] = key;
@@ -78,7 +78,7 @@ torch::Tensor BaseCachePolicy::ReplaceImpl(
         position_set.reserve(keys.size(0));
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          const auto pos_optional = policy.Read(key);
+          const auto pos_optional = policy.template Read<true>(key);
           const auto pos = pos_optional ? *pos_optional : policy.Insert(key);
           positions_ptr[i] = pos;
           TORCH_CHECK(
@@ -91,14 +91,14 @@ torch::Tensor BaseCachePolicy::ReplaceImpl(
   return positions;
 }
 
-template <typename CachePolicy>
-void BaseCachePolicy::ReadingCompletedImpl(
+template <bool write, typename CachePolicy>
+void BaseCachePolicy::ReadingWritingCompletedImpl(
     CachePolicy& policy, torch::Tensor keys) {
   AT_DISPATCH_INDEX_TYPES(
       keys.scalar_type(), "BaseCachePolicy::ReadingCompleted", ([&] {
         auto keys_ptr = keys.data_ptr<index_t>();
         for (int64_t i = 0; i < keys.size(0); i++) {
-          policy.Unmark(keys_ptr[i]);
+          policy.template Unmark<write>(keys_ptr[i]);
         }
       }));
 }
@@ -125,7 +125,11 @@ torch::Tensor S3FifoCachePolicy::Replace(torch::Tensor keys) {
 }
 
 void S3FifoCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingCompletedImpl(*this, keys);
+  ReadingWritingCompletedImpl<false>(*this, keys);
+}
+
+void S3FifoCachePolicy::WritingCompleted(torch::Tensor keys) {
+  ReadingWritingCompletedImpl<true>(*this, keys);
 }
 
 SieveCachePolicy::SieveCachePolicy(int64_t capacity)
@@ -145,7 +149,11 @@ torch::Tensor SieveCachePolicy::Replace(torch::Tensor keys) {
 }
 
 void SieveCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingCompletedImpl(*this, keys);
+  ReadingWritingCompletedImpl<false>(*this, keys);
+}
+
+void SieveCachePolicy::WritingCompleted(torch::Tensor keys) {
+  ReadingWritingCompletedImpl<true>(*this, keys);
 }
 
 LruCachePolicy::LruCachePolicy(int64_t capacity)
@@ -164,7 +172,11 @@ torch::Tensor LruCachePolicy::Replace(torch::Tensor keys) {
 }
 
 void LruCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingCompletedImpl(*this, keys);
+  ReadingWritingCompletedImpl<false>(*this, keys);
+}
+
+void LruCachePolicy::WritingCompleted(torch::Tensor keys) {
+  ReadingWritingCompletedImpl<true>(*this, keys);
 }
 
 ClockCachePolicy::ClockCachePolicy(int64_t capacity)
@@ -183,7 +195,11 @@ torch::Tensor ClockCachePolicy::Replace(torch::Tensor keys) {
 }
 
 void ClockCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingCompletedImpl(*this, keys);
+  ReadingWritingCompletedImpl<false>(*this, keys);
+}
+
+void ClockCachePolicy::WritingCompleted(torch::Tensor keys) {
+  ReadingWritingCompletedImpl<true>(*this, keys);
 }
 
 }  // namespace storage
