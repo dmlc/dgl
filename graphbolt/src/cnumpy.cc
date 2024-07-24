@@ -61,9 +61,8 @@ OnDiskNpyArray::OnDiskNpyArray(
   aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
 
   std::call_once(call_once_flag_, [&] {
-    // Get system max thread number.
-    num_queues_ =
-        io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2);
+    // Get system max interop thread count.
+    num_queues_ = torch::get_num_interop_threads();
     TORCH_CHECK(num_queues_ > 0, "A positive # queues is required.");
     io_uring_queue_ = std::unique_ptr<::io_uring[], io_uring_queue_destroyer>(
         new ::io_uring[num_queues_], io_uring_queue_destroyer{num_queues_});
@@ -78,11 +77,9 @@ OnDiskNpyArray::OnDiskNpyArray(
     }
   });
 
-  num_thread_ = num_queues_;
-  if (io_uring::num_threads) {
-    num_thread_ =
-        std::min(static_cast<int64_t>(num_queues_), *io_uring::num_threads);
-  }
+  num_thread_ = std::min(
+      static_cast<int64_t>(num_queues_),
+      io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2));
   TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
 
   read_tensor_ = torch::empty(
