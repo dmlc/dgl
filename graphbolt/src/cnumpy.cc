@@ -15,6 +15,7 @@
 #include <unistd.h>
 #endif
 
+#include <graphbolt/async.h>
 #include <torch/torch.h>
 
 #include <atomic>
@@ -23,6 +24,7 @@
 #include <memory>
 #include <numeric>
 #include <stdexcept>
+#include <vector>
 
 #include "./circular_queue.h"
 #include "./utils.h"
@@ -58,19 +60,30 @@ OnDiskNpyArray::OnDiskNpyArray(
   // The minimum page size to contain one feature.
   aligned_length_ = (feature_size_ + block_size_ - 1) & ~(block_size_ - 1);
 
-  // Get system max thread number.
-  num_thread_ =
-      io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2);
-  TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
-  io_uring_queue_ = std::make_unique<::io_uring[]>(num_thread_);
+  std::call_once(call_once_flag_, [&] {
+    // Get system max thread number.
+    num_queues_ =
+        io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2);
+    TORCH_CHECK(num_queues_ > 0, "A positive # queues is required.");
+    io_uring_queue_ = std::unique_ptr<::io_uring[], io_uring_queue_destroyer>(
+        new ::io_uring[num_queues_], io_uring_queue_destroyer{num_queues_});
+    mtx_ = std::make_unique<std::mutex[]>(num_queues_);
 
-  // Init io_uring queue.
-  for (int64_t t = 0; t < num_thread_; t++) {
-    TORCH_CHECK(
-        ::io_uring_queue_init(2 * kGroupSize, &io_uring_queue_[t], 0) == 0);
-    // We have allocated 2 * kGroupSize submission queue entries and
-    // 4 * kGroupSize completion queue entries after this call.
+    // Init io_uring queue.
+    for (int64_t t = 0; t < num_queues_; t++) {
+      TORCH_CHECK(
+          ::io_uring_queue_init(2 * kGroupSize, &io_uring_queue_[t], 0) == 0);
+      // We have allocated 2 * kGroupSize submission queue entries and
+      // 4 * kGroupSize completion queue entries after this call.
+    }
+  });
+
+  num_thread_ = num_queues_;
+  if (io_uring::num_threads) {
+    num_thread_ =
+        std::min(static_cast<int64_t>(num_queues_), *io_uring::num_threads);
   }
+  TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
 
   read_tensor_ = torch::empty(
       ReadBufferSizePerThread() * num_thread_ + block_size_ - 1,
@@ -88,10 +101,6 @@ c10::intrusive_ptr<OnDiskNpyArray> OnDiskNpyArray::Create(
 
 OnDiskNpyArray::~OnDiskNpyArray() {
 #ifdef HAVE_LIBRARY_LIBURING
-  // IO queue exit.
-  for (int64_t t = 0; t < num_thread_; t++) {
-    ::io_uring_queue_exit(&io_uring_queue_[t]);
-  }
   TORCH_CHECK(::close(file_description_) == 0);
 #endif  // HAVE_LIBRARY_LIBURING
 }
@@ -160,10 +169,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   // Indicator for index error.
   std::atomic<int> error_flag{};
   std::atomic<int64_t> work_queue{};
-  std::lock_guard lock(mtx_);
-  torch::parallel_for(0, num_thread_, 1, [&](int64_t begin, int64_t end) {
-    if (begin >= end) return;
-    const auto thread_id = begin;
+  auto worker_fn = [&](const int thread_id) {
     auto &io_uring_queue = io_uring_queue_[thread_id];
     auto my_read_buffer = ReadBuffer(thread_id);
     // The completion queue might contain 4 * kGroupSize while we may submit
@@ -186,6 +192,8 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
         read_queue.PopN(submitted);
       }
     };
+    // Make sure we have sole control of this thread's queue.
+    std::lock_guard io_uring_queue_lock(mtx_[thread_id]);
     for (int64_t read_buffer_slot = 0; true;) {
       auto request_read_buffer = [&]() {
         return my_read_buffer + (aligned_length_ + block_size_) *
@@ -199,7 +207,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
               // The condition not to overflow the submission queue.
               kGroupSize - read_queue.Size()),
           int64_t{});
-      begin =
+      const auto begin =
           work_queue.fetch_add(num_requested_items, std::memory_order_relaxed);
       if ((begin >= index.numel() && read_queue.IsEmpty() &&
            num_completed >= num_submitted) ||
@@ -208,7 +216,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
           // complete to avoid the instability due to incompleted reads.
           error_flag.load(std::memory_order_relaxed) > 1)
         break;
-      end = std::min(begin + num_requested_items, index.numel());
+      const auto end = std::min(begin + num_requested_items, index.numel());
       AT_DISPATCH_INDEX_TYPES(
           index.scalar_type(), "IndexSelectIOUring", ([&] {
             auto index_data = index.data_ptr<index_t>();
@@ -285,8 +293,13 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
       io_uring_cq_advance(&io_uring_queue, num_cqes_seen);
       num_completed += num_cqes_seen;
     }
-  });
-
+  };
+  std::vector<c10::intrusive_ptr<Future<void>>> futures;
+  for (int t = 0; t < num_thread_; t++) {
+    futures.emplace_back(async([&worker_fn, t] { worker_fn(t); }));
+  }
+  // Wait for the launched work to finish.
+  for (auto &future : futures) future->Wait();
   switch (error_flag.load(std::memory_order_relaxed)) {
     case 0:  // Successful.
       return result;
