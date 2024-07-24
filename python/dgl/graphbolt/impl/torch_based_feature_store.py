@@ -564,9 +564,9 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     feat_data : List[OnDiskFeatureData]
         The description of the feature stores.
     disk_based_feature_keys: Set[FeatureKey] = None
-        Uses the DiskBasedFeature instead of TorchBasedFeature for the given set
-        of features indicated by a tuple containing their domains, types and
-        names as (domain, type, name).
+        Overrides the `in_memory` field of the given set of feature keys to
+        False. The feature keys are indicated by a tuple containing their
+        domains, types and names as (domain, type, name).
 
     Examples
     --------
@@ -581,19 +581,10 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     ...     gb.OnDiskFeatureData(domain="edge", type="author:writes:paper",
     ...         name="label", format="torch", path="/tmp/edge_label.pt",
     ...         in_memory=True),
-    ...     gb.OnDiskFeatureData(domain="node", type="paper", name="feat_mmap",
-    ...         format="numpy", path="/tmp/node_feat.npy", in_memory=False),
-    ...     gb.OnDiskFeatureData(domain="node", type="paper", name="feat_disk",
+    ...     gb.OnDiskFeatureData(domain="node", type="paper", name="feat",
     ...         format="numpy", path="/tmp/node_feat.npy", in_memory=False),
     ... ]
-    >>> # The same features "feat_mmap" and "feat_disk" will be available.
-    >>> # "feat_mmap" will use the underlying OS mmap functionality to cache the
-    >>> # feature into system memory on demand. "feat_disk" however does not
-    >>> # do any caching by default. Consider wrapping it with
-    >>> # `gb.CPUCachedFeature` to enable caching in the system memory.
-    >>> feature_store = gb.TorchBasedFeatureStore(
-    ...     feat_data, {("node", "paper", "feat_disk")}
-    ... )
+    >>> feature_store = gb.TorchBasedFeatureStore(feat_data)
     """
 
     def __init__(
