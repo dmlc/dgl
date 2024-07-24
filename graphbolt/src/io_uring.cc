@@ -14,15 +14,16 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * @file detect_io_uring.cc
- * @brief Check whether io_uring is available on the system.
+ * @file io_uring.cc
+ * @brief io_uring related functions.
  */
+#include "./io_uring.h"
+
 #ifdef HAVE_LIBRARY_LIBURING
-#include "./detect_io_uring.h"
 
 #include <errno.h>
 #include <liburing.h>
-#include <linux/io_uring.h>
+#include <liburing/io_uring.h>
 #include <stddef.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -74,6 +75,8 @@ bool IsAvailable() {
   return false;
 #endif
 }
+
+void SetNumThreads(int64_t count) { num_threads = count; }
 
 }  // namespace io_uring
 }  // namespace graphbolt

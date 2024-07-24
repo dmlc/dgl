@@ -14,18 +14,29 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * @file detect_io_uring.h
- * @brief Check whether io_uring is available on the system.
+ * @file io_uring.h
+ * @brief io_uring related functions.
  */
-#ifndef GRAPHBOLT_DETECT_IO_URING_H_
-#define GRAPHBOLT_DETECT_IO_URING_H_
+#ifndef GRAPHBOLT_IO_URING_H_
+#define GRAPHBOLT_IO_URING_H_
+
+#include <cstdint>
+#include <optional>
 
 namespace graphbolt {
 namespace io_uring {
 
 bool IsAvailable();
 
+/** @brief Set a limit on # background io_uring threads. */
+inline std::optional<int64_t> num_threads;
+
+/**
+ * @brief Set the number of background io_uring threads.
+ */
+void SetNumThreads(int64_t count);
+
 }  // namespace io_uring
 }  // namespace graphbolt
 
-#endif  // GRAPHBOLT_DETECT_IO_URING_H_
+#endif  // GRAPHBOLT_IO_URING_H_

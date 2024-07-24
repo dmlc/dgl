@@ -65,3 +65,6 @@ if torch.cuda.is_available() and not built_with_cuda():
         "is installed. Consider reinstalling GraphBolt with CUDA support, see "
         "installation instructions at https://www.dgl.ai/pages/start.html"
     )
+torch.ops.graphbolt.set_num_io_uring_threads(
+    min((torch.get_num_threads() + 1) // 2, 8)
+)
