@@ -728,9 +728,9 @@ class OnDiskDataset(Dataset):
             tasks can be both string and List[str]. For multiple tasks, only
             List[str] is acceptable.
         disk_based_feature_keys: Set[FeatureKey] = None
-            Uses the DiskBasedFeature instead of TorchBasedFeature for the given
-            set of features indicated by a tuple containing their domains, types
-            and names as (domain, type, name).
+            Overrides the `in_memory` field of the given set of feature keys to
+            False. The feature keys are indicated by a tuple containing their
+            domains, types and names as (domain, type, name).
 
         Examples
         --------
