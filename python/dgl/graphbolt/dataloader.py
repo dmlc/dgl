@@ -209,7 +209,7 @@ class DataLoader(torch.utils.data.DataLoader):
             executor = ThreadPoolExecutor(max_workers=1)
             gpu_graph_cache = None
             for sampler in samplers:
-                if gpu_graph_cache is None:
+                if num_gpu_cached_edges > 0 and gpu_graph_cache is None:
                     gpu_graph_cache = construct_gpu_graph_cache(
                         sampler, num_gpu_cached_edges, gpu_cache_threshold
                     )
