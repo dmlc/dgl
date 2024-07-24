@@ -96,7 +96,7 @@ class CPUFeatureCache(object):
         """
         positions = self._policy.replace(keys)
         self._cache.replace(positions, values)
-        self._policy.reading_completed(keys)
+        self._policy.writing_completed(keys)
 
     @property
     def miss_rate(self):

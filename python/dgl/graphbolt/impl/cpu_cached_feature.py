@@ -172,7 +172,7 @@ class CPUCachedFeature(Feature):
 
             reading_completed.wait()
             replace_future.wait()
-            reading_completed = policy.reading_completed_async(missing_keys)
+            writing_completed = policy.writing_completed_async(missing_keys)
             num_found = positions.size(0)
 
             class _Waiter:
@@ -201,7 +201,7 @@ class CPUCachedFeature(Feature):
                     return values
 
             yield _Waiter(
-                [missing_values_copy_event, reading_completed],
+                [missing_values_copy_event, writing_completed],
                 values_from_cpu,
                 missing_values_cuda,
                 index,
@@ -264,7 +264,7 @@ class CPUCachedFeature(Feature):
 
             reading_completed.wait()
             replace_future.wait()
-            reading_completed = policy.reading_completed_async(missing_keys)
+            writing_completed = policy.writing_completed_async(missing_keys)
 
             class _Waiter:
                 def __init__(self, events, values):
@@ -280,7 +280,7 @@ class CPUCachedFeature(Feature):
                     self.events = self.values = None
                     return values
 
-            yield _Waiter([values_copy_event, reading_completed], values_cuda)
+            yield _Waiter([values_copy_event, writing_completed], values_cuda)
         else:
             policy_future = policy.query_async(ids)
 
@@ -319,7 +319,7 @@ class CPUCachedFeature(Feature):
 
             reading_completed.wait()
             replace_future.wait()
-            reading_completed = policy.reading_completed_async(missing_keys)
+            writing_completed = policy.writing_completed_async(missing_keys)
 
             class _Waiter:
                 def __init__(self, event, values):
@@ -334,7 +334,7 @@ class CPUCachedFeature(Feature):
                     self.event = self.values = None
                     return values
 
-            yield _Waiter(reading_completed, values)
+            yield _Waiter(writing_completed, values)
 
     def read_async_num_stages(self, ids_device: torch.device):
         """The number of stages of the read_async operation. See read_async

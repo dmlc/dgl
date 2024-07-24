@@ -1,5 +1,5 @@
 /**
- *   Copyright (c) 2023, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
+ *   Copyright (c) 2024, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  *   All rights reserved.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +24,8 @@
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
+#include <limits>
+
 #include "./circular_queue.h"
 
 namespace graphbolt {
@@ -31,7 +33,11 @@ namespace storage {
 
 struct CacheKey {
   CacheKey(int64_t key, int64_t position)
-      : freq_(0), key_(key), position_in_cache_(position), reference_count_(1) {
+      : freq_(0),
+        key_(key),
+        position_in_cache_(position),
+        read_reference_count_(0),
+        write_reference_count_(1) {
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
 
@@ -63,17 +69,30 @@ struct CacheKey {
     return *this;
   }
 
+  template <bool write>
   CacheKey& StartUse() {
-    ++reference_count_;
+    if constexpr (write) {
+      TORCH_CHECK(
+          write_reference_count_++ < std::numeric_limits<int16_t>::max());
+    } else {
+      TORCH_CHECK(read_reference_count_++ < std::numeric_limits<int8_t>::max());
+    }
     return *this;
   }
 
+  template <bool write>
   CacheKey& EndUse() {
-    --reference_count_;
+    if constexpr (write) {
+      --write_reference_count_;
+    } else {
+      --read_reference_count_;
+    }
     return *this;
   }
 
-  bool InUse() { return reference_count_ > 0; }
+  bool InUse() const { return read_reference_count_ || write_reference_count_; }
+
+  bool BeingWritten() const { return write_reference_count_; }
 
   friend std::ostream& operator<<(std::ostream& os, const CacheKey& key_ref) {
     return os << '(' << key_ref.key_ << ", " << key_ref.freq_ << ", "
@@ -83,8 +102,10 @@ struct CacheKey {
  private:
   int64_t freq_ : 3;
   int64_t key_ : 61;
-  int64_t position_in_cache_ : 48;
-  int64_t reference_count_ : 16;
+  int64_t position_in_cache_ : 40;
+  int64_t read_reference_count_ : 8;
+  // There could be a chain of writes so it is better to have larger bit count.
+  int64_t write_reference_count_ : 16;
 };
 
 class BaseCachePolicy {
@@ -123,6 +144,12 @@ class BaseCachePolicy {
    */
   virtual void ReadingCompleted(torch::Tensor keys) = 0;
 
+  /**
+   * @brief A writer has finished writing these keys, so they can be evicted.
+   * @param keys The keys to unmark.
+   */
+  virtual void WritingCompleted(torch::Tensor keys) = 0;
+
  protected:
   template <typename CachePolicy>
   static std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -131,8 +158,9 @@ class BaseCachePolicy {
   template <typename CachePolicy>
   static torch::Tensor ReplaceImpl(CachePolicy& policy, torch::Tensor keys);
 
-  template <typename CachePolicy>
-  static void ReadingCompletedImpl(CachePolicy& policy, torch::Tensor keys);
+  template <bool write, typename CachePolicy>
+  static void ReadingWritingCompletedImpl(
+      CachePolicy& policy, torch::Tensor keys);
 };
 
 /**
@@ -170,6 +198,11 @@ class S3FifoCachePolicy : public BaseCachePolicy {
    */
   void ReadingCompleted(torch::Tensor keys);
 
+  /**
+   * @brief See BaseCachePolicy::WritingCompleted.
+   */
+  void WritingCompleted(torch::Tensor keys);
+
   friend std::ostream& operator<<(
       std::ostream& os, const S3FifoCachePolicy& policy) {
     return os << "small_queue_: " << policy.small_queue_ << "\n"
@@ -178,11 +211,13 @@ class S3FifoCachePolicy : public BaseCachePolicy {
               << "capacity_: " << policy.capacity_ << "\n";
   }
 
+  template <bool write>
   std::optional<int64_t> Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
-      return cache_key.Increment().StartUse().getPos();
+      if (write || !cache_key.BeingWritten())
+        return cache_key.Increment().StartUse<write>().getPos();
     }
     return std::nullopt;
   }
@@ -195,7 +230,10 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     return pos;
   }
 
-  void Unmark(int64_t key) { key_to_cache_key_[key]->EndUse(); }
+  template <bool write>
+  void Unmark(int64_t key) {
+    key_to_cache_key_[key]->EndUse<write>();
+  }
 
  private:
   int64_t EvictMainQueue() {
@@ -282,11 +320,18 @@ class SieveCachePolicy : public BaseCachePolicy {
    */
   void ReadingCompleted(torch::Tensor keys);
 
+  /**
+   * @brief See BaseCachePolicy::WritingCompleted.
+   */
+  void WritingCompleted(torch::Tensor keys);
+
+  template <bool write>
   std::optional<int64_t> Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
-      return cache_key.SetFreq().StartUse().getPos();
+      if (write || !cache_key.BeingWritten())
+        return cache_key.SetFreq().StartUse<write>().getPos();
     }
     return std::nullopt;
   }
@@ -298,7 +343,10 @@ class SieveCachePolicy : public BaseCachePolicy {
     return pos;
   }
 
-  void Unmark(int64_t key) { key_to_cache_key_[key]->EndUse(); }
+  template <bool write>
+  void Unmark(int64_t key) {
+    key_to_cache_key_[key]->EndUse<write>();
+  }
 
  private:
   int64_t Evict() {
@@ -362,14 +410,22 @@ class LruCachePolicy : public BaseCachePolicy {
    */
   void ReadingCompleted(torch::Tensor keys);
 
+  /**
+   * @brief See BaseCachePolicy::WritingCompleted.
+   */
+  void WritingCompleted(torch::Tensor keys);
+
+  template <bool write>
   std::optional<int64_t> Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto cache_key = *it->second;
-      queue_.erase(it->second);
-      queue_.push_front(cache_key.StartUse());
-      it->second = queue_.begin();
-      return cache_key.getPos();
+      if (write || !cache_key.BeingWritten()) {
+        queue_.erase(it->second);
+        queue_.push_front(cache_key.StartUse<write>());
+        it->second = queue_.begin();
+        return cache_key.getPos();
+      }
     }
     return std::nullopt;
   }
@@ -381,7 +437,10 @@ class LruCachePolicy : public BaseCachePolicy {
     return pos;
   }
 
-  void Unmark(int64_t key) { key_to_cache_key_[key]->EndUse(); }
+  template <bool write>
+  void Unmark(int64_t key) {
+    key_to_cache_key_[key]->EndUse<write>();
+  }
 
  private:
   int64_t Evict() {
@@ -443,11 +502,18 @@ class ClockCachePolicy : public BaseCachePolicy {
    */
   void ReadingCompleted(torch::Tensor keys);
 
+  /**
+   * @brief See BaseCachePolicy::WritingCompleted.
+   */
+  void WritingCompleted(torch::Tensor keys);
+
+  template <bool write>
   std::optional<int64_t> Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
-      return cache_key.SetFreq().StartUse().getPos();
+      if (write || !cache_key.BeingWritten())
+        return cache_key.SetFreq().StartUse<write>().getPos();
     }
     return std::nullopt;
   }
@@ -458,7 +524,10 @@ class ClockCachePolicy : public BaseCachePolicy {
     return pos;
   }
 
-  void Unmark(int64_t key) { key_to_cache_key_[key]->EndUse(); }
+  template <bool write>
+  void Unmark(int64_t key) {
+    key_to_cache_key_[key]->EndUse<write>();
+  }
 
  private:
   int64_t Evict() {

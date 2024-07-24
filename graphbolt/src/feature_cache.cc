@@ -72,6 +72,7 @@ void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
   const auto positions_ptr = positions.data_ptr<int64_t>();
+  std::lock_guard lock(mtx_);
   torch::parallel_for(
       0, positions.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {

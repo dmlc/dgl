@@ -89,6 +89,8 @@ struct FeatureCache : public torch::CustomClassHolder {
 
  private:
   torch::Tensor tensor_;
+  // Protects writes only as reads are guaranteed to be safe.
+  std::mutex mtx_;
 };
 
 }  // namespace storage

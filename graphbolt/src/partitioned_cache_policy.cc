@@ -242,10 +242,14 @@ c10::intrusive_ptr<Future<torch::Tensor>> PartitionedCachePolicy::ReplaceAsync(
   return async([=] { return Replace(keys); });
 }
 
-void PartitionedCachePolicy::ReadingCompleted(torch::Tensor keys) {
+template <bool write>
+void PartitionedCachePolicy::ReadingWritingCompletedImpl(torch::Tensor keys) {
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
-    policies_[0]->ReadingCompleted(keys);
+    if constexpr (write)
+      policies_[0]->WritingCompleted(keys);
+    else
+      policies_[0]->ReadingCompleted(keys);
     return;
   }
   torch::Tensor offsets, indices, permuted_keys;
@@ -257,13 +261,29 @@ void PartitionedCachePolicy::ReadingCompleted(torch::Tensor keys) {
     const auto tid = begin;
     begin = offsets_ptr[tid];
     end = offsets_ptr[tid + 1];
-    policies_.at(tid)->ReadingCompleted(permuted_keys.slice(0, begin, end));
+    if constexpr (write)
+      policies_.at(tid)->WritingCompleted(permuted_keys.slice(0, begin, end));
+    else
+      policies_.at(tid)->ReadingCompleted(permuted_keys.slice(0, begin, end));
   });
+}
+
+void PartitionedCachePolicy::ReadingCompleted(torch::Tensor keys) {
+  ReadingWritingCompletedImpl<false>(keys);
+}
+
+void PartitionedCachePolicy::WritingCompleted(torch::Tensor keys) {
+  ReadingWritingCompletedImpl<true>(keys);
 }
 
 c10::intrusive_ptr<Future<void>> PartitionedCachePolicy::ReadingCompletedAsync(
     torch::Tensor keys) {
   return async([=] { return ReadingCompleted(keys); });
+}
+
+c10::intrusive_ptr<Future<void>> PartitionedCachePolicy::WritingCompletedAsync(
+    torch::Tensor keys) {
+  return async([=] { return WritingCompleted(keys); });
 }
 
 template <typename CachePolicy>
