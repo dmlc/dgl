@@ -404,7 +404,10 @@ def main():
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset, multilabel = load_dataset(args.dataset)
+    disk_based_feature_keys = None
+    if args.num_cpu_cached_features > 0:
+        disk_based_feature_keys = [("node", None, "feat")]
+    dataset, multilabel = load_dataset(args.dataset, disk_based_feature_keys)
 
     # Move the dataset to the selected storage.
     graph = (

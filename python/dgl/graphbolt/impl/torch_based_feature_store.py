@@ -384,9 +384,10 @@ class DiskBasedFeature(Feature):
         self._tensor = torch.from_numpy(ondisk_data)
 
         self._metadata = metadata
-        self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
-            path, self._tensor.dtype, self._tensor.shape, num_threads
-        )
+        if torch.ops.graphbolt.detect_io_uring():
+            self._ondisk_npy_array = torch.ops.graphbolt.ondisk_npy_array(
+                path, self._tensor.dtype, self._tensor.shape, num_threads
+            )
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -511,6 +512,20 @@ class DiskBasedFeature(Feature):
         """Change disk-based feature to torch-based feature."""
         return TorchBasedFeature(self._tensor, self._metadata)
 
+    def to(self, _):  # pylint: disable=invalid-name
+        """Placeholder `DiskBasedFeature` to implementation. It is a no-op."""
+        gb_warning(
+            "`DiskBasedFeature.to(device)` is not supported. Leaving unmodified."
+        )
+        return self
+
+    def pin_memory_(self):  # pylint: disable=invalid-name
+        """Placeholder `DiskBasedFeature` pin_memory_ implementation. It is a no-op."""
+        gb_warning(
+            "`DiskBasedFeature.pin_memory_()` is not supported. Leaving unmodified."
+        )
+        return self
+
     def __repr__(self) -> str:
         ret = (
             "{Classname}(\n"
@@ -558,7 +573,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     >>> edge_label = torch.tensor([[1], [2], [3]])
     >>> node_feat = torch.tensor([[1, 2, 3], [4, 5, 6]])
     >>> torch.save(edge_label, "/tmp/edge_label.pt")
-    >>> np.save("/tmp/node_feat.npy", node_feat.numpy())
+    >>> gb.numpy_save_aligned("/tmp/node_feat.npy", node_feat.numpy())
     >>> feat_data = [
     ...     gb.OnDiskFeatureData(domain="edge", type="author:writes:paper",
     ...         name="label", format="torch", path="/tmp/edge_label.pt",
@@ -566,7 +581,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     ...     gb.OnDiskFeatureData(domain="node", type="paper", name="feat",
     ...         format="numpy", path="/tmp/node_feat.npy", in_memory=False),
     ... ]
-    >>> feature_sotre = gb.TorchBasedFeatureStore(feat_data)
+    >>> feature_store = gb.TorchBasedFeatureStore(feat_data)
     """
 
     def __init__(self, feat_data: List[OnDiskFeatureData]):
@@ -583,11 +598,16 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                mmap_mode = "r+" if not spec.in_memory else None
-                features[key] = TorchBasedFeature(
-                    torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode)),
-                    metadata=metadata,
-                )
+                if spec.in_memory:
+                    # TorchBasedFeature is always in memory by default.
+                    features[key] = TorchBasedFeature(
+                        torch.as_tensor(np.load(spec.path)), metadata=metadata
+                    )
+                else:
+                    # DiskBasedFeature is always out of memory by default.
+                    features[key] = DiskBasedFeature(
+                        spec.path, metadata=metadata
+                    )
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")
         super().__init__(features)
