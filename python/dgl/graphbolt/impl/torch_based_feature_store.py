@@ -564,10 +564,6 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     ----------
     feat_data : List[OnDiskFeatureData]
         The description of the feature stores.
-    disk_based_feature_keys: Set[FeatureKey] = None
-        Overrides the `in_memory` field of the given set of feature keys to
-        False. The feature keys are indicated by a tuple containing their
-        domains, types and names as (domain, type, name).
 
     Examples
     --------
@@ -588,19 +584,13 @@ class TorchBasedFeatureStore(BasicFeatureStore):
     >>> feature_store = gb.TorchBasedFeatureStore(feat_data)
     """
 
-    def __init__(
-        self,
-        feat_data: List[OnDiskFeatureData],
-        disk_based_feature_keys: Set[FeatureKey] = None,
-    ):
-        if disk_based_feature_keys is None:
-            disk_based_feature_keys = set()
+    def __init__(self, feat_data: List[OnDiskFeatureData]):
         features = {}
         for spec in feat_data:
             key = (spec.domain, spec.type, spec.name)
             metadata = spec.extra_fields
             if spec.format == "torch":
-                assert spec.in_memory and key not in disk_based_feature_keys, (
+                assert spec.in_memory, (
                     f"Pytorch tensor can only be loaded in memory, "
                     f"but the feature {key} is loaded on disk."
                 )
@@ -608,14 +598,15 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     torch.load(spec.path), metadata=metadata
                 )
             elif spec.format == "numpy":
-                if key in disk_based_feature_keys or not spec.in_memory:
-                    features[key] = DiskBasedFeature(
-                        spec.path, metadata=metadata
-                    )
-                else:
+                if spec.in_memory:
                     # TorchBasedFeature is always in memory by default.
                     features[key] = TorchBasedFeature(
                         torch.as_tensor(np.load(spec.path)), metadata=metadata
+                    )
+                else:
+                    # DiskBasedFeature is always out of memory by default.
+                    features[key] = DiskBasedFeature(
+                        spec.path, metadata=metadata
                     )
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")

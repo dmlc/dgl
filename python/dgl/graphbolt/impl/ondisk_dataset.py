@@ -6,7 +6,7 @@ import os
 import shutil
 import textwrap
 from copy import deepcopy
-from typing import Dict, List, Set, Union
+from typing import Dict, List, Union
 
 import numpy as np
 
@@ -714,11 +714,7 @@ class OnDiskDataset(Dataset):
                                 self._dataset_dir, data["path"]
                             )
 
-    def load(
-        self,
-        tasks: List[str] = None,
-        disk_based_feature_keys: Set[FeatureKey] = None,
-    ):
+    def load(self, tasks: List[str] = None):
         """Load the dataset.
 
         Parameters
@@ -727,10 +723,6 @@ class OnDiskDataset(Dataset):
             The name of the tasks to be loaded. For single task, the type of
             tasks can be both string and List[str]. For multiple tasks, only
             List[str] is acceptable.
-        disk_based_feature_keys: Set[FeatureKey] = None
-            Overrides the `in_memory` field of the given set of feature keys to
-            False. The feature keys are indicated by a tuple containing their
-            domains, types and names as (domain, type, name).
 
         Examples
         --------
@@ -768,9 +760,7 @@ class OnDiskDataset(Dataset):
         self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
-        self._feature = TorchBasedFeatureStore(
-            self._meta.feature_data, disk_based_feature_keys
-        )
+        self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks, tasks)
         self._all_nodes_set = self._init_all_nodes_set(self._graph)
         self._loaded = True

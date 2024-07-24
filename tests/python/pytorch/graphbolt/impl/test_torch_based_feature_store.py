@@ -254,10 +254,7 @@ def write_tensor_to_disk(dir, name, t, fmt="torch"):
 
 
 @pytest.mark.parametrize("in_memory", [True, False])
-@pytest.mark.parametrize("disk_based_feature_keys", [None, True])
-def test_torch_based_feature_store(in_memory, disk_based_feature_keys):
-    if disk_based_feature_keys:
-        disk_based_feature_keys = {("edge", "paper:cites:paper", "b")}
+def test_torch_based_feature_store(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([[1, 2, 4], [2, 5, 3]])
         b = torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]])
@@ -281,15 +278,15 @@ def test_torch_based_feature_store(in_memory, disk_based_feature_keys):
                 in_memory=in_memory,
             ),
         ]
-        feature_store = gb.TorchBasedFeatureStore(
-            feature_data, disk_based_feature_keys
-        )
+        feature_store = gb.TorchBasedFeatureStore(feature_data)
 
-        if disk_based_feature_keys is not None:
-            for feature_key in disk_based_feature_keys:
-                isinstance(
-                    feature_store._features[feature_key], gb.DiskBasedFeature
-                )
+        assert isinstance(
+            feature_store[("node", "paper", "a")], gb.TorchBasedFeature
+        )
+        assert isinstance(
+            feature_store[("edge", "paper:cites:paper", "b")],
+            gb.TorchBasedFeature if in_memory else gb.DiskBasedFeature,
+        )
 
         # Test read the entire feature.
         assert torch.equal(

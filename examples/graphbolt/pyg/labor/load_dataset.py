@@ -47,9 +47,15 @@ def load_dataset(dataset_name, disk_based_feature_keys=None):
     ]:
         if "mag240M" in dataset_name:
             dataset_name = "ogb-lsc-mag240m"
-        dataset = gb.BuiltinDataset(dataset_name).load(
-            disk_based_feature_keys=disk_based_feature_keys
-        )
+        dataset = gb.BuiltinDataset(dataset_name)
+        if disk_based_feature_keys is None:
+            disk_based_feature_keys = set()
+        for feature in dataset.yaml_data["feature_data"]:
+            feature_key = (feature["domain"], feature["type"], feature["name"])
+            # Set the in_memory setting to False without modifying YAML file.
+            if feature_key in disk_based_feature_keys:
+                feature["in_memory"] = False
+        dataset = dataset.load()
     else:
         raise ValueError("unknown dataset")
 
