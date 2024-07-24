@@ -138,6 +138,50 @@ def create_dataloader(
     )
 
 
+def train_helper(
+    dataloader,
+    model,
+    optimizer,
+    loss_fn,
+    multilabel,
+    kwargs,
+    gpu_cache_miss_rate_fn,
+    cpu_cache_miss_rate_fn,
+    device,
+):
+    model.train()  # Set the model to training mode
+    total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
+    total_correct = 0  # Accumulator for the total number of correct predictions
+    total_samples = 0  # Accumulator for the total number of samples processed
+    num_batches = 0  # Counter for the number of mini-batches processed
+    start = time.time()
+    dataloader = tqdm(dataloader, "Training")
+    for minibatch in dataloader:
+        node_features = minibatch.node_features["feat"]
+        labels = minibatch.labels
+        optimizer.zero_grad()
+        out = model(minibatch.sampled_subgraphs, node_features)
+        label_dtype = out.dtype if multilabel else None
+        loss = loss_fn(out, labels.to(label_dtype))
+        total_loss += loss.detach()
+        total_correct += MF.f1_score(out, labels, **kwargs) * labels.size(0)
+        total_samples += labels.size(0)
+        loss.backward()
+        optimizer.step()
+        num_batches += 1
+        dataloader.set_postfix(
+            {
+                "num_nodes": node_features.size(0),
+                "gpu_cache_miss": gpu_cache_miss_rate_fn(),
+                "cpu_cache_miss": cpu_cache_miss_rate_fn(),
+            }
+        )
+    train_loss = total_loss / num_batches
+    train_acc = total_correct / total_samples
+    end = time.time()
+    return train_loss, train_acc, end - start
+
+
 def train(
     train_dataloader,
     valid_dataloader,
@@ -149,44 +193,24 @@ def train(
     device,
 ):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
-
-    total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
-    total_correct = 0  # Accumulator for the total number of correct predictions
-    total_samples = 0  # Accumulator for the total number of samples processed
-    num_batches = 0  # Counter for the number of mini-batches processed
+    loss_fn = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
 
     best_model = None
     best_model_acc = 0
     best_model_epoch = -1
 
     for epoch in range(args.epochs):
-        model.train()  # Set the model to training mode
-        start = time.time()
-        train_dataloader_tqdm = tqdm(train_dataloader, "Training")
-        for minibatch in train_dataloader_tqdm:
-            node_features = minibatch.node_features["feat"]
-            labels = minibatch.labels
-            optimizer.zero_grad()
-            out = model(minibatch.sampled_subgraphs, node_features)
-            label_dtype = out.dtype if multilabel else None
-            loss = criterion(out, labels.to(label_dtype))
-            total_loss += loss.detach()
-            total_correct += MF.f1_score(out, labels, **kwargs) * labels.size(0)
-            total_samples += labels.size(0)
-            loss.backward()
-            optimizer.step()
-            num_batches += 1
-            train_dataloader_tqdm.set_postfix(
-                {
-                    "num_nodes": node_features.size(0),
-                    "gpu_cache_miss": gpu_cache_miss_rate_fn(),
-                    "cpu_cache_miss": cpu_cache_miss_rate_fn(),
-                }
-            )
-        train_loss = total_loss / num_batches
-        train_acc = total_correct / total_samples
-        end = time.time()
+        train_loss, train_acc, duration = train_helper(
+            train_dataloader,
+            model,
+            optimizer,
+            loss_fn,
+            multilabel,
+            kwargs,
+            gpu_cache_miss_rate_fn,
+            cpu_cache_miss_rate_fn,
+            device,
+        )
         val_acc = evaluate(
             model,
             valid_dataloader,
@@ -201,7 +225,7 @@ def train(
         print(
             f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
             f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}, "
-            f"Time: {end - start}s"
+            f"Time: {duration}s"
         )
         if best_model_epoch + args.early_stopping_patience < epoch:
             break
@@ -331,7 +355,7 @@ def parse_args():
     parser.add_argument(
         "--cpu-feature-cache-policy",
         type=str,
-        default="sieve",
+        default=None,
         choices=["s3-fifo", "sieve", "lru", "clock"],
         help="The cache policy for the CPU feature cache.",
     )
