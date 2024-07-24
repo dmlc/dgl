@@ -518,6 +518,13 @@ class DiskBasedFeature(Feature):
         )
         return self
 
+    def pin_memory_(self, _):  # pylint: disable=invalid-name
+        """Placeholder `DiskBasedFeature` to implementation. It is a no-op."""
+        gb_warning(
+            "`DiskBasedFeature.pin_memory_()` is not supported. Leaving unmodified."
+        )
+        return self
+
     def __repr__(self) -> str:
         ret = (
             "{Classname}(\n"
