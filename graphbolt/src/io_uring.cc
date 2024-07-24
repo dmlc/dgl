@@ -23,7 +23,7 @@
 
 #include <errno.h>
 #include <liburing.h>
-#include <linux/io_uring.h>
+#include <liburing/io_uring.h>
 #include <stddef.h>
 #include <sys/syscall.h>
 #include <unistd.h>
