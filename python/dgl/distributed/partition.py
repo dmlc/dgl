@@ -5,6 +5,7 @@ import concurrent.futures
 import copy
 import json
 import logging
+import multiprocessing as mp
 import os
 import time
 from functools import partial
@@ -1390,7 +1391,7 @@ def init_type_per_edge(graph, gpb):
     return etype_ids
 
 
-def convert_partition(
+def gb_convert_single_dgl_partition(
     part_id,
     graph_formats,
     part_config,
@@ -1590,20 +1591,29 @@ def dgl_partition_to_graphbolt(
 
     # Iterate over partitions.
     convert_with_format = partial(
-        convert_partition,
+        gb_convert_single_dgl_partition,
         graph_formats=graph_formats,
         part_config=part_config,
         store_eids=store_eids,
         store_inner_node=store_inner_node,
         store_inner_edge=store_inner_edge,
     )
+    # Need to create entirely new interpreters, because we call C++ downstream
+    # See https://docs.python.org/3.12/library/multiprocessing.html#contexts-and-start-methods
+    # and https://pybind11.readthedocs.io/en/stable/advanced/misc.html#global-interpreter-lock-gil
+    mp_ctx = mp.get_context("spawn")
     with concurrent.futures.ProcessPoolExecutor(
-        max_workers=min(num_parts, n_jobs)
+        max_workers=min(num_parts, n_jobs),
+        mp_context=mp_ctx,
     ) as executor:
-        for part_id, part_path in enumerate(
-            executor.map(convert_with_format, range(num_parts))
-        ):
-            new_part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = part_path
+        futures = []
+        for part_id in range(num_parts):
+            futures.append(executor.submit(convert_with_format, part_id))
+        concurrent.futures.wait(futures)
+
+    for part_id in range(num_parts):
+        # Update graph path.
+        new_part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = futures[part_id].result()
 
     # Save dtype info into partition config.
     # [TODO][Rui] Always use int64_t for node/edge IDs in GraphBolt. See more
