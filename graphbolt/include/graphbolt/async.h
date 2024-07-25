@@ -23,7 +23,10 @@
 #include <ATen/Parallel.h>
 #include <torch/script.h>
 
+#include <atomic>
+#include <exception>
 #include <future>
+#include <memory>
 #include <type_traits>
 
 namespace graphbolt {
