@@ -46,8 +46,8 @@ class Future : public torch::CustomClassHolder {
 
 /**
  * @brief Utilizes at::launch to launch an async task in the interop thread
- * pool. We should not make use of any torch ops inside the launched task to
- * avoid spawning a new OpenMP threadpool on each interop thread.
+ * pool. We should not make use of any native CPU torch ops inside the launched
+ * task to avoid spawning a new OpenMP threadpool on each interop thread.
  */
 template <typename F>
 inline auto async(F function) {
@@ -68,8 +68,8 @@ inline auto async(F function) {
  * @brief GraphBolt's version of torch::parallel_for. Since torch::parallel_for
  * uses OpenMP threadpool, async tasks can not make use of it due to multiple
  * OpenMP threadpools being created for each async thread. Moreover, inside
- * graphbolt::parallel_for, we should not make use of any internal torch ops as
- * they will spawn an OpenMP threadpool.
+ * graphbolt::parallel_for, we should not make use of any native CPU torch ops
+ * as they will spawn an OpenMP threadpool.
  */
 template <typename F>
 inline void parallel_for(
