@@ -167,7 +167,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   // Indicator for index error.
   std::atomic<int> error_flag{};
   std::atomic<int64_t> work_queue{};
-  auto worker_fn = [&](const int thread_id) {
+  graphbolt::parallel_for(0, num_thread_, 1, [&](const int thread_id, int) {
     auto &io_uring_queue = io_uring_queue_[thread_id];
     auto my_read_buffer = ReadBuffer(thread_id);
     // The completion queue might contain 4 * kGroupSize while we may submit
@@ -291,13 +291,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
       io_uring_cq_advance(&io_uring_queue, num_cqes_seen);
       num_completed += num_cqes_seen;
     }
-  };
-  std::vector<c10::intrusive_ptr<Future<void>>> futures;
-  for (int t = 0; t < num_thread_; t++) {
-    futures.emplace_back(async([&worker_fn, t] { worker_fn(t); }));
-  }
-  // Wait for the launched work to finish.
-  for (auto &future : futures) future->Wait();
+  });
   switch (error_flag.load(std::memory_order_relaxed)) {
     case 0:  // Successful.
       return result;
