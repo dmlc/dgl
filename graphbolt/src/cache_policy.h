@@ -25,6 +25,7 @@
 #include <torch/torch.h>
 
 #include <limits>
+#include <mutex>
 
 #include "./circular_queue.h"
 
@@ -110,6 +111,7 @@ struct CacheKey {
 
 class BaseCachePolicy {
  public:
+  BaseCachePolicy() : mtx_(std::make_shared<std::mutex>()) {}
   /**
    * @brief A virtual base class constructor ensures that the derived class
    * destructor gets called.
@@ -161,6 +163,8 @@ class BaseCachePolicy {
   template <bool write, typename CachePolicy>
   static void ReadingWritingCompletedImpl(
       CachePolicy& policy, torch::Tensor keys);
+
+  std::shared_ptr<std::mutex> mtx_;
 };
 
 /**
