@@ -987,11 +987,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     0 <= seed2_contribution <= 1
                 ), "seed2_contribution should be in [0, 1]."
 
-        has_original_eids = (
-            self.edge_attributes is not None
-            and ORIGINAL_EDGE_ID in self.edge_attributes
-        )
-
         seed_offsets = None
         if isinstance(seeds, dict):
             seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
