@@ -7,6 +7,7 @@ import torch
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import Mapper
 
+from ..base import ORIGINAL_EDGE_ID
 from ..internal import compact_csc_format, unique_and_compact_csc_formats
 from ..minibatch_transformer import MiniBatchTransformer
 
@@ -78,6 +79,10 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
             subgraph.add_edge_attribute(self.prob_name, edge_tensors[0])
             edge_tensors = edge_tensors[1:]
         assert len(edge_tensors) == 0
+        # TODO @mfbalin: remove these lines after fixing cache for edge ids.
+        edge_attributes = subgraph.edge_attributes
+        edge_attributes.pop(ORIGINAL_EDGE_ID)
+        subgraph.edge_attributes = edge_attributes
 
         return minibatch
 
@@ -167,7 +172,7 @@ class FetchInsubgraphData(Mapper):
                 indptr,
                 sliced_tensors,
             ) = torch.ops.graphbolt.index_select_csc_batched(
-                self.graph.csc_indptr, tensors_to_be_sliced, seeds, None
+                self.graph.csc_indptr, tensors_to_be_sliced, seeds, True, None
             )
             for tensor in [indptr] + sliced_tensors:
                 record_stream(tensor)
@@ -185,6 +190,9 @@ class FetchInsubgraphData(Mapper):
             if has_probs_or_mask:
                 probs_or_mask = sliced_tensors[0]
                 sliced_tensors = sliced_tensors[1:]
+
+            edge_ids = sliced_tensors[0]
+            sliced_tensors = sliced_tensors[1:]
             assert len(sliced_tensors) == 0
 
             subgraph = fused_csc_sampling_graph(
@@ -196,7 +204,8 @@ class FetchInsubgraphData(Mapper):
                 edge_type_to_id=self.graph.edge_type_to_id,
             )
             if self.prob_name is not None and probs_or_mask is not None:
-                subgraph.edge_attributes = {self.prob_name: probs_or_mask}
+                subgraph.add_edge_attribute(self.prob_name, probs_or_mask)
+            subgraph.add_edge_attribute(ORIGINAL_EDGE_ID, edge_ids)
 
             subgraph._indptr_node_type_offset_list = seed_offsets
             minibatch._sliced_sampling_graph = subgraph

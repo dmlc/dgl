@@ -131,6 +131,8 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  * @param indices_list Vector of indices tensor with edge information of shape
  * (indptr[N],).
  * @param nodes Nodes tensor with shape (M,).
+ * @param with_edge_ids Whether to return edge ids tensor corresponding to
+ * sliced edges as the last element of the output.
  * @param output_size The total number of edges being copied.
  * @return (torch::Tensor, std::vector<torch::Tensor>) Output indptr and vector
  * of indices tensors of shapes (M + 1,) and ((indptr[nodes + 1] -
@@ -138,7 +140,8 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
  */
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatchedImpl(
     torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
-    torch::Tensor nodes, torch::optional<int64_t> output_size);
+    torch::Tensor nodes, bool with_edge_ids,
+    torch::optional<int64_t> output_size);
 
 /**
  * @brief Slices the indptr tensor with nodes and returns the indegrees of the
