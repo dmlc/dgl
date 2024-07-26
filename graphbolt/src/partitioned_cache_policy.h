@@ -42,8 +42,7 @@ namespace storage {
  * policy performance is not affected as the key distribution stays the same in
  * each partition.
  **/
-class PartitionedCachePolicy : public BaseCachePolicy,
-                               public torch::CustomClassHolder {
+class PartitionedCachePolicy : public torch::CustomClassHolder {
  public:
   /**
    * @brief The policy query function.
@@ -74,31 +73,43 @@ class PartitionedCachePolicy : public BaseCachePolicy,
    * @brief The policy replace function.
    * @param keys The keys to query the cache.
    *
-   * @return positions tensor is returned holding the locations of the replaced
-   * entries in the cache.
+   * @return result, where result[0] is the positions tensor holding the
+   * locations of the replaced entries in the cache. The rest of the tensors are
+   * (offsets, indices, permuted_keys) output from Partition(keys).
    */
-  torch::Tensor Replace(torch::Tensor keys);
+  std::vector<torch::Tensor> Replace(torch::Tensor keys);
 
-  c10::intrusive_ptr<Future<torch::Tensor>> ReplaceAsync(torch::Tensor keys);
+  c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> ReplaceAsync(
+      torch::Tensor keys);
 
   template <bool write>
-  void ReadingWritingCompletedImpl(torch::Tensor keys);
+  void ReadingWritingCompletedImpl(
+      torch::Tensor keys, std::vector<torch::Tensor>& partition_result);
 
   /**
-   * @brief A reader has finished reading these keys, so they can be evicted.
+   * @brief A reader has finished reading these keys, so they can be
+   * evicted.
    * @param keys The keys to unmark.
+   * @param partition_result The output of Partition(keys) if available.
+   * Otherwise when partition_result.empty() is true, it will be computed.
    */
-  void ReadingCompleted(torch::Tensor keys);
+  void ReadingCompleted(
+      torch::Tensor keys, std::vector<torch::Tensor> partition_result);
 
   /**
    * @brief A writer has finished writing these keys, so they can be evicted.
    * @param keys The keys to unmark.
+   * @param partition_result The output of Partition(keys) if available.
+   * Otherwise when partition_result.empty() is true, it will be computed.
    */
-  void WritingCompleted(torch::Tensor keys);
+  void WritingCompleted(
+      torch::Tensor keys, std::vector<torch::Tensor> partition_result);
 
-  c10::intrusive_ptr<Future<void>> ReadingCompletedAsync(torch::Tensor keys);
+  c10::intrusive_ptr<Future<void>> ReadingCompletedAsync(
+      torch::Tensor keys, std::vector<torch::Tensor> partition_result);
 
-  c10::intrusive_ptr<Future<void>> WritingCompletedAsync(torch::Tensor keys);
+  c10::intrusive_ptr<Future<void>> WritingCompletedAsync(
+      torch::Tensor keys, std::vector<torch::Tensor> partition_result);
 
   template <typename CachePolicy>
   static c10::intrusive_ptr<PartitionedCachePolicy> Create(
@@ -130,7 +141,6 @@ class PartitionedCachePolicy : public BaseCachePolicy,
 
   int64_t capacity_;
   std::vector<std::unique_ptr<BaseCachePolicy>> policies_;
-  std::mutex mtx_;
 };
 
 }  // namespace storage
