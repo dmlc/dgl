@@ -117,7 +117,7 @@ def test_exclude_seed_edges_homo_cpu():
             )
 
 
-def test_exclude_seed_edges_gpu():
+def test_exclude_seed_edges():
     graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
     graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
     items = torch.LongTensor([[0, 3], [4, 4]])
