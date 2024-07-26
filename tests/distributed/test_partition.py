@@ -2,8 +2,9 @@ import json
 import os
 import tempfile
 
-import dgl.backend as F
 import dgl
+
+import dgl.backend as F
 import numpy as np
 import pytest
 import torch as th
@@ -1449,6 +1450,7 @@ def test_partition_graph_graphbolt_hetero_find_edges(
             ][DGL_inner_local_eids]
             assert th.equal(inner_local_eids, GB_inner_local_eids)
 
+
 @pytest.mark.parametrize("num_parts", [1, 4])
 def test_partition_graph_graphbolt_hetero_multi(
     num_parts,
@@ -1465,6 +1467,7 @@ def test_partition_graph_graphbolt_hetero_multi(
         debug_mode=False,
     )
 
+
 @pytest.mark.parametrize("num_parts", [1, 4])
 def test_partition_graph_graphbolt_homo_find_edges_multi(
     num_parts,
@@ -1475,6 +1478,8 @@ def test_partition_graph_graphbolt_homo_find_edges_multi(
         graph_formats="coo",
         n_jobs=4,
     )
+
+
 @pytest.mark.parametrize("num_parts", [1, 4])
 def test_partition_graph_graphbolt_hetero_find_edges_multi(
     num_parts,
