@@ -746,11 +746,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     indices=tensor([2]),
         )}
         """
-        return_eids = (
-            self.edge_attributes is not None
-            and ORIGINAL_EDGE_ID in self.edge_attributes
-        )
-
         seed_offsets = None
         if isinstance(seeds, dict):
             seeds, seed_offsets = self._convert_to_homogeneous_nodes(seeds)
@@ -763,7 +758,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts,
             replace=replace,
             probs_or_mask=probs_or_mask,
-            return_eids=return_eids,
+            return_eids=True,
         )
         return self._convert_to_sampled_subgraph(
             C_sampled_subgraph, seed_offsets
@@ -1009,8 +1004,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             seed_offsets,
             fanouts.tolist(),
             replace,
-            True,
-            has_original_eids,
+            True,  # is_labor
+            True,  # return_eids
             probs_or_mask,
             random_seed,
             seed2_contribution,

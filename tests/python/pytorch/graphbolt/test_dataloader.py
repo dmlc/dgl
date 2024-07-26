@@ -45,11 +45,11 @@ def test_DataLoader(overlap_feature_fetch):
         device_transferrer,
         num_workers=4,
     )
-    assert len(list(dataloader)) == N // B
     for i, minibatch in enumerate(dataloader):
         assert "a" in minibatch.node_features
         assert "b" in minibatch.node_features
-        assert "c" in minibatch.edge_features
+        for layer_id in range(minibatch.num_layers()):
+            assert "c" in minibatch.edge_features[layer_id]
     assert i + 1 == N // B
 
 
