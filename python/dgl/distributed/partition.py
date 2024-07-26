@@ -1258,9 +1258,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1295,9 +1295,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1601,19 +1601,29 @@ def dgl_partition_to_graphbolt(
     # Need to create entirely new interpreters, because we call C++ downstream
     # See https://docs.python.org/3.12/library/multiprocessing.html#contexts-and-start-methods
     # and https://pybind11.readthedocs.io/en/stable/advanced/misc.html#global-interpreter-lock-gil
-    mp_ctx = mp.get_context("spawn")
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=min(num_parts, n_jobs),
-        mp_context=mp_ctx,
-    ) as executor:
-        futures = []
+    rel_path_results = []
+    if n_jobs > 1:
+        mp_ctx = mp.get_context("spawn")
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=min(num_parts, n_jobs),
+            mp_context=mp_ctx,
+        ) as executor:
+            futures = []
+            for part_id in range(num_parts):
+                futures.append(executor.submit(convert_with_format, part_id))
+            concurrent.futures.wait(futures)
         for part_id in range(num_parts):
-            futures.append(executor.submit(convert_with_format, part_id))
-        concurrent.futures.wait(futures)
+            rel_path_results.append(futures[part_id].result())
+    else:
+        # If running single-threaded, avoid spawning new interpreter, which is slow
+        for part_id in range(num_parts):
+            rel_path_results.append(convert_with_format(part_id))
 
     for part_id in range(num_parts):
         # Update graph path.
-        new_part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = futures[part_id].result()
+        new_part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = (
+            rel_path_results[part_id]
+        )
 
     # Save dtype info into partition config.
     # [TODO][Rui] Always use int64_t for node/edge IDs in GraphBolt. See more
