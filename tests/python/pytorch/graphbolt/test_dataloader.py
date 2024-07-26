@@ -81,7 +81,12 @@ def test_gpu_sampling_DataLoader(
         F.ctx()
     )
     features = {}
-    keys = [("node", None, "a"), ("node", None, "b"), ("node", None, "c")]
+    keys = [
+        ("node", None, "a"),
+        ("node", None, "b"),
+        ("node", None, "c"),
+        ("edge", None, "d"),
+    ]
     features[keys[0]] = dgl.graphbolt.TorchBasedFeature(
         torch.randn(200, 4, pin_memory=True)
     )
@@ -90,6 +95,9 @@ def test_gpu_sampling_DataLoader(
     )
     features[keys[2]] = dgl.graphbolt.TorchBasedFeature(
         torch.randn(200, 4, device=F.ctx())
+    )
+    features[keys[3]] = dgl.graphbolt.TorchBasedFeature(
+        torch.randn(graph.total_num_edges, 1, device=F.ctx())
     )
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
@@ -105,6 +113,7 @@ def test_gpu_sampling_DataLoader(
             datapipe,
             feature_store,
             ["a", "b", "c"],
+            ["d"],
             overlap_fetch=overlap_feature_fetch,
         )
 
@@ -137,4 +146,11 @@ def test_gpu_sampling_DataLoader(
         if i >= 1:
             break
 
-    assert len(list(dataloader)) == N // B
+    for i, minibatch in enumerate(dataloader):
+        if enable_feature_fetch:
+            assert "a" in minibatch.node_features
+            assert "b" in minibatch.node_features
+            assert "c" in minibatch.node_features
+            for layer_id in range(minibatch.num_layers()):
+                assert "d" in minibatch.edge_features[layer_id]
+    assert i + 1 == N // B
