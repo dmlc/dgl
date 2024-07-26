@@ -35,7 +35,6 @@ __all__ = [
     "isin",
     "index_select",
     "expand_indptr",
-    "indptr_edge_ids",
     "CSCFormatBase",
     "seed",
     "seed_type_str_to_ntypes",
