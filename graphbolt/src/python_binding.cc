@@ -169,6 +169,15 @@ TORCH_LIBRARY(graphbolt, m) {
       {at::Tag::pt2_compliant_tag}
 #endif
   );
+  m.def(
+      "indptr_edge_ids(Tensor indptr, ScalarType dtype, Tensor? offset, "
+      "SymInt? output_size) -> "
+      "Tensor"
+#ifdef HAS_PT2_COMPLIANT_TAG
+      ,
+      {at::Tag::pt2_compliant_tag}
+#endif
+  );
 }
 
 }  // namespace sampling

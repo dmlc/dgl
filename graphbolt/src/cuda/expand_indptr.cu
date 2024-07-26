@@ -37,6 +37,14 @@ struct RepeatIndex {
   }
 };
 
+template <typename indices_t, typename nodes_t>
+struct IotaIndex {
+  const nodes_t* nodes;
+  __host__ __device__ auto operator()(indices_t i) {
+    return thrust::make_counting_iterator(nodes ? nodes[i] : 0);
+  }
+};
+
 template <typename indptr_t, typename indices_t>
 struct OutputBufferIndexer {
   const indptr_t* indptr;
@@ -54,8 +62,8 @@ struct AdjacentDifference {
 
 torch::Tensor ExpandIndptrImpl(
     torch::Tensor indptr, torch::ScalarType dtype,
-    torch::optional<torch::Tensor> nodes,
-    torch::optional<int64_t> output_size) {
+    torch::optional<torch::Tensor> nodes, torch::optional<int64_t> output_size,
+    const bool edge_ids) {
   if (!output_size.has_value()) {
     output_size = AT_DISPATCH_INTEGRAL_TYPES(
         indptr.scalar_type(), "ExpandIndptrIndptr[-1]", ([&]() -> int64_t {
@@ -84,8 +92,6 @@ torch::Tensor ExpandIndptrImpl(
                         nodes ? nodes.value().data_ptr<nodes_t>() : nullptr;
 
                     thrust::counting_iterator<int64_t> iota(0);
-                    auto input_buffer = thrust::make_transform_iterator(
-                        iota, RepeatIndex<indices_t, nodes_t>{nodes_ptr});
                     auto output_buffer = thrust::make_transform_iterator(
                         iota, OutputBufferIndexer<indptr_t, indices_t>{
                                   indptr_ptr, csc_rows_ptr});
@@ -95,16 +101,44 @@ torch::Tensor ExpandIndptrImpl(
                     const auto num_rows = indptr.size(0) - 1;
                     constexpr int64_t max_copy_at_once =
                         std::numeric_limits<int32_t>::max();
-                    for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
-                      CUB_CALL(
-                          DeviceCopy::Batched, input_buffer + i,
-                          output_buffer + i, buffer_sizes + i,
-                          std::min(num_rows - i, max_copy_at_once));
+
+                    if (edge_ids) {
+                      auto input_buffer = thrust::make_transform_iterator(
+                          iota, IotaIndex<indices_t, nodes_t>{nodes_ptr});
+                      for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
+                        CUB_CALL(
+                            DeviceCopy::Batched, input_buffer + i,
+                            output_buffer + i, buffer_sizes + i,
+                            std::min(num_rows - i, max_copy_at_once));
+                      }
+                    } else {
+                      auto input_buffer = thrust::make_transform_iterator(
+                          iota, RepeatIndex<indices_t, nodes_t>{nodes_ptr});
+                      for (int64_t i = 0; i < num_rows; i += max_copy_at_once) {
+                        CUB_CALL(
+                            DeviceCopy::Batched, input_buffer + i,
+                            output_buffer + i, buffer_sizes + i,
+                            std::min(num_rows - i, max_copy_at_once));
+                      }
                     }
                   }));
             }));
       }));
   return csc_rows;
+}
+
+torch::Tensor ExpandIndptrImpl(
+    torch::Tensor indptr, torch::ScalarType dtype,
+    torch::optional<torch::Tensor> nodes,
+    torch::optional<int64_t> output_size) {
+  return ExpandIndptrImpl(indptr, dtype, nodes, output_size, false);
+}
+
+torch::Tensor IndptrEdgeIdsImpl(
+    torch::Tensor indptr, torch::ScalarType dtype,
+    torch::optional<torch::Tensor> offset,
+    torch::optional<int64_t> output_size) {
+  return ExpandIndptrImpl(indptr, dtype, offset, output_size, true);
 }
 
 }  // namespace ops
