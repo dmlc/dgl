@@ -53,7 +53,7 @@ PartitionedCachePolicy::Partition(torch::Tensor keys) {
   AT_DISPATCH_INDEX_TYPES(
       keys.scalar_type(), "PartitionedCachePolicy::partition", ([&] {
         auto keys_ptr = keys.data_ptr<index_t>();
-        using gb = graphbolt;
+        namespace gb = graphbolt;
         gb::parallel_for(0, num_parts, 1, [&](int64_t begin, int64_t end) {
           if (begin == end) return;
           TORCH_CHECK(end - begin == 1);
@@ -103,7 +103,7 @@ PartitionedCachePolicy::Partition(torch::Tensor keys) {
       keys.scalar_type(), "PartitionedCachePolicy::partition", ([&] {
         auto keys_ptr = keys.data_ptr<index_t>();
         auto permuted_keys_ptr = permuted_keys.data_ptr<index_t>();
-        using gb = graphbolt;
+        namespace gb = graphbolt;
         gb::parallel_for(0, num_parts, 1, [&](int64_t begin, int64_t end) {
           if (begin == end) return;
           const auto tid = begin;
@@ -136,7 +136,7 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
   torch::Tensor result_offsets_tensor =
       torch::empty(policies_.size() * 2 + 1, offsets.options());
   auto result_offsets = result_offsets_tensor.data_ptr<int64_t>();
-  using gb = graphbolt;
+  namespace gb = graphbolt;
   gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
     if (begin == end) return;
     TORCH_CHECK(end - begin == 1);
@@ -220,7 +220,7 @@ std::vector<torch::Tensor> PartitionedCachePolicy::Replace(torch::Tensor keys) {
   auto offsets_ptr = offsets.data_ptr<int64_t>();
   auto indices_ptr = indices.data_ptr<int64_t>();
   auto output_positions_ptr = output_positions.data_ptr<int64_t>();
-  using gb = graphbolt;
+  namespace gb = graphbolt;
   gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
     if (begin == end) return;
     const auto tid = begin;
@@ -263,7 +263,7 @@ void PartitionedCachePolicy::ReadingWritingCompletedImpl(
     TORCH_CHECK("partition_result.size() should equal 0 or 3.");
   }
   auto offsets_ptr = offsets.data_ptr<int64_t>();
-  using gb = graphbolt;
+  namespace gb = graphbolt;
   gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
     if (begin == end) return;
     const auto tid = begin;
