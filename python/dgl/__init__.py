@@ -48,7 +48,6 @@ from .heterograph import (  # pylint: disable=reimported
     DGLGraph,
     DGLGraph as DGLHeteroGraph,
 )
-from .homophily import *
 from .merge import *
 from .subgraph import *
 from .traversal import *
@@ -61,6 +60,8 @@ from .frame import LazyFeature
 from .global_config import is_libxsmm_enabled, use_libxsmm
 from .utils import apply_each
 from .mpops import *
+from .homophily import *
+from .label_informativeness import *
 
 if backend_name == "pytorch":
     from . import distributed

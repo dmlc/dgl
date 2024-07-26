@@ -5,6 +5,21 @@ The folder contains example implementations of selected research papers related 
 * For examples working with a certain release, check out `https://github.com/dmlc/dgl/tree/<release_version>/examples` (E.g., https://github.com/dmlc/dgl/tree/0.5.x/examples)
 
 To quickly locate the examples of your interest, search for the tagged keywords or use the search tool on [dgl.ai](https://www.dgl.ai/).
+
+## 2024
+
+- <a name="labor"></a> Lin et al. ARGO: An Auto-Tuning Runtime System for Scalable GNN Training on Multi-Core Processor. [Paper link](https://arxiv.org/abs/2402.03671)
+  - Example code: [PyTorch](https://github.com/dmlc/dgl/tree/master/examples/pytorch/argo)
+
+  - Tags: semi-supervised node classification
+
+## 2023
+
+- <a name="labor"></a> Zheng Wang et al. From Cluster Assumption to Graph Convolution: Graph-based Semi-Supervised Learning Revisited. [Paper link](https://arxiv.org/abs/2210.13339)
+  - Example code: [PyTorch](../examples/pytorch/ogc)
+
+  - Tags: semi-supervised node classification
+
 ## 2022
 - <a name="labor"></a> Balin et al. Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs. [Paper link](https://arxiv.org/abs/2210.13339)
     - Example code: [PyTorch](../examples/labor/train_lightning.py)

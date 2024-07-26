@@ -116,7 +116,9 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name=None):
 SparseAdjTuple = namedtuple("SparseAdjTuple", ["format", "arrays"])
 
 
-def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
+def graphdata2tensors(
+    data, idtype=None, bipartite=False, infer_node_count=True, **kwargs
+):
     """Function to convert various types of data to edge tensors and infer
     the number of nodes.
 
@@ -137,6 +139,9 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
     bipartite : bool, optional
         Whether infer number of nodes of a bipartite graph --
         num_src and num_dst can be different.
+    infer_node_count : bool, optional
+        Whether infer number of nodes at all. If False, num_src and num_dst
+        are returned as None.
     kwargs
 
         - edge_id_attr_name : The name (str) of the edge attribute that stores the edge
@@ -186,23 +191,28 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
                 data.format, tuple(F.tensor(a) for a in data.arrays)
             )
 
+    num_src, num_dst = None, None
     if isinstance(data, SparseAdjTuple):
         if idtype is not None:
             data = SparseAdjTuple(
                 data.format, tuple(F.astype(a, idtype) for a in data.arrays)
             )
-        num_src, num_dst = infer_num_nodes(data, bipartite=bipartite)
+        if infer_node_count:
+            num_src, num_dst = infer_num_nodes(data, bipartite=bipartite)
     elif isinstance(data, list):
         src, dst = elist2tensor(data, idtype)
         data = SparseAdjTuple("coo", (src, dst))
-        num_src, num_dst = infer_num_nodes(data, bipartite=bipartite)
+        if infer_node_count:
+            num_src, num_dst = infer_num_nodes(data, bipartite=bipartite)
     elif isinstance(data, sp.sparse.spmatrix):
         # We can get scipy matrix's number of rows and columns easily.
-        num_src, num_dst = infer_num_nodes(data, bipartite=bipartite)
+        if infer_node_count:
+            num_src, num_dst = infer_num_nodes(data, bipartite=bipartite)
         data = scipy2tensor(data, idtype)
     elif isinstance(data, nx.Graph):
         # We can get networkx graph's number of sources and destinations easily.
-        num_src, num_dst = infer_num_nodes(data, bipartite=bipartite)
+        if infer_node_count:
+            num_src, num_dst = infer_num_nodes(data, bipartite=bipartite)
         edge_id_attr_name = kwargs.get("edge_id_attr_name", None)
         if bipartite:
             top_map = kwargs.get("top_map")

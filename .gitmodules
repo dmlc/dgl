@@ -19,9 +19,18 @@
 [submodule "third_party/libxsmm"]
 	path = third_party/libxsmm
 	url = https://github.com/hfp/libxsmm.git
-[submodule "third_party/thrust"]
-	path = third_party/thrust
-	url = https://github.com/NVIDIA/thrust.git
 [submodule "third_party/pcg"]
 	path = third_party/pcg
 	url = https://github.com/imneme/pcg-cpp.git
+[submodule "third_party/cccl"]
+	path = third_party/cccl
+	url = https://github.com/NVIDIA/cccl.git
+[submodule "third_party/liburing"]
+	path = third_party/liburing
+	url = https://github.com/axboe/liburing.git
+[submodule "third_party/cuco"]
+	path = third_party/cuco
+	url = https://github.com/NVIDIA/cuCollections.git
+[submodule "third_party/GKlib"]
+	path = third_party/GKlib
+	url = https://github.com/KarypisLab/GKlib.git

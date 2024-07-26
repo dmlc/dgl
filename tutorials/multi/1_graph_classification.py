@@ -200,13 +200,13 @@ def evaluate(model, dataloader, device):
 
 
 ###############################################################################
-# Define the main function for each process.
+# Define the run function for each process.
 #
 
 from torch.optim import Adam
 
 
-def main(rank, world_size, dataset, seed=0):
+def run(rank, world_size, dataset, seed=0):
     init_process_group(world_size, rank)
     if torch.cuda.is_available():
         device = torch.device("cuda:{:d}".format(rank))
@@ -251,17 +251,20 @@ def main(rank, world_size, dataset, seed=0):
 ###############################################################################
 # Finally we load the dataset and launch the processes.
 #
-# .. code:: python
-#
-#    if __name__ == '__main__':
-#        import torch.multiprocessing as mp
-#
-#        from dgl.data import GINDataset
-#
-#        num_gpus = 4
-#        procs = []
-#        dataset = GINDataset(name='IMDBBINARY', self_loop=False)
-#        mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
 
-# Thumbnail credits: DGL
-# sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'
+import torch.multiprocessing as mp
+from dgl.data import GINDataset
+
+
+def main():
+    if not torch.cuda.is_available():
+        print("No GPU found!")
+        return
+
+    num_gpus = torch.cuda.device_count()
+    dataset = GINDataset(name="IMDBBINARY", self_loop=False)
+    mp.spawn(run, args=(num_gpus, dataset), nprocs=num_gpus)
+
+
+if __name__ == "__main__":
+    main()

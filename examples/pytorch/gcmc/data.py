@@ -689,6 +689,7 @@ class MovieLens(object):
                 header=None,
                 names=["id", "title", "genres"],
                 encoding="iso-8859-1",
+                engine="python",
             )
             genre_map = {ele: i for i, ele in enumerate(GENRES)}
             genre_map["Children's"] = genre_map["Children"]

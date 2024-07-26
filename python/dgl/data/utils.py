@@ -12,6 +12,7 @@ import networkx.algorithms as A
 
 import numpy as np
 import requests
+from tqdm.auto import tqdm
 
 from .. import backend as F
 from .graph_serialize import load_graphs, load_labels, save_graphs
@@ -182,10 +183,16 @@ def download(
                 r = requests.get(url, stream=True, verify=verify_ssl)
                 if r.status_code != 200:
                     raise RuntimeError("Failed downloading url %s" % url)
-                with open(fname, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024):
-                        if chunk:  # filter out keep-alive new chunks
-                            f.write(chunk)
+                # Get the total file size.
+                total_size = int(r.headers.get("content-length", 0))
+                with tqdm(
+                    total=total_size, unit="B", unit_scale=True, desc=fname
+                ) as bar:
+                    with open(fname, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=1024):
+                            if chunk:  # filter out keep-alive new chunks
+                                f.write(chunk)
+                                bar.update(len(chunk))
                 if sha1_hash and not check_sha1(fname, sha1_hash):
                     raise UserWarning(
                         "File {} is downloaded but the content hash does not match."

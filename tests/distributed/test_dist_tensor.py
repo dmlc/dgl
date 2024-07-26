@@ -57,6 +57,13 @@ def check_binary_op(key1, key2, key3, op):
             dist_g.edata[key3][i:i_end],
             op(dist_g.edata[key1][i:i_end], dist_g.edata[key2][i:i_end]),
         )
+        # Test with different index dtypes. int32 is not supported.
+        with pytest.raises(
+            dgl.utils.internal.InconsistentDtypeException,
+            match="DGL now requires the input tensor to have",
+        ):
+            _ = dist_g.edata[key3][F.tensor([100, 20, 10], F.int32)]
+        _ = dist_g.edata[key3][F.tensor([100, 20, 10], F.int64)]
 
 
 @unittest.skipIf(

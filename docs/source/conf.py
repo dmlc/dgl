@@ -194,6 +194,8 @@ epub_exclude_files = ["search.html"]
 # -- Extension configuration -------------------------------------------------
 autosummary_generate = True
 autodoc_member_order = "alphabetical"
+# Skip the following members.
+autodoc_mock_imports = ["dgl.nn.mxnet", "dgl.nn.tensorflow"]
 
 intersphinx_mapping = {
     "python": (
@@ -211,7 +213,6 @@ from sphinx_gallery.sorting import FileNameSortKey
 
 examples_dirs = [
     "../../tutorials/blitz",
-    "../../tutorials/large",
     "../../tutorials/dist",
     "../../tutorials/models",
     "../../tutorials/multi",
@@ -219,7 +220,6 @@ examples_dirs = [
 ]  # path to find sources
 gallery_dirs = [
     "tutorials/blitz/",
-    "tutorials/large/",
     "tutorials/dist/",
     "tutorials/models/",
     "tutorials/multi/",

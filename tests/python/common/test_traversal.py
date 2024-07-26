@@ -53,7 +53,7 @@ def test_bfs(idtype, n=100):
     assert len(layers_dgl) == len(layers_nx)
     assert all(toset(x) == y for x, y in zip(layers_dgl, layers_nx))
 
-    g_nx = nx.random_tree(n, seed=42)
+    g_nx = nx.random_labeled_tree(n, seed=42)
     g = dgl.from_networkx(g_nx).astype(idtype)
     src = 0
     _, edges_nx = _bfs_nx(g_nx, src)

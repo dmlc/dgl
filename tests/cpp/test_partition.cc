@@ -61,7 +61,7 @@ void _TestRemainder_MapToX() {
     // every global index should have the same remainder as the part id
     ASSERT_EQ(global->shape[0], local->shape[0]);
     global = global.CopyTo(CPU);
-    for (size_t i = 0; i < global->shape[0]; ++i) {
+    for (int64_t i = 0; i < global->shape[0]; ++i) {
       EXPECT_EQ(Ptr<IdType>(global)[i] % num_parts, part_id)
           << "i=" << i << ", num_parts=" << num_parts
           << ", part_id=" << part_id;
@@ -70,7 +70,7 @@ void _TestRemainder_MapToX() {
     // the remapped local indices to should match the original
     local = local.CopyTo(CPU);
     ASSERT_EQ(local->shape[0], act_local->shape[0]);
-    for (size_t i = 0; i < act_local->shape[0]; ++i) {
+    for (int64_t i = 0; i < act_local->shape[0]; ++i) {
       EXPECT_EQ(Ptr<IdType>(local)[i], Ptr<IdType>(act_local)[i]);
     }
   }
@@ -167,7 +167,7 @@ void _TestRange_MapToX() {
 
     ASSERT_EQ(global->shape[0], local->shape[0]);
     global = global.CopyTo(CPU);
-    for (size_t i = 0; i < global->shape[0]; ++i) {
+    for (int64_t i = 0; i < global->shape[0]; ++i) {
       EXPECT_EQ(
           _FindPart(Ptr<IdType>(global)[i], Ptr<IdType>(range), num_parts),
           part_id)
@@ -178,7 +178,7 @@ void _TestRange_MapToX() {
     // the remapped local indices to should match the original
     local = local.CopyTo(CPU);
     ASSERT_EQ(local->shape[0], act_local->shape[0]);
-    for (size_t i = 0; i < act_local->shape[0]; ++i) {
+    for (int64_t i = 0; i < act_local->shape[0]; ++i) {
       EXPECT_EQ(Ptr<IdType>(local)[i], Ptr<IdType>(act_local)[i]);
     }
   }

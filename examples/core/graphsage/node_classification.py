@@ -19,6 +19,7 @@ main
       └───> Evaluate the model
 """
 import argparse
+import time
 
 import dgl.nn as dglnn
 
@@ -68,15 +69,18 @@ def train(g, features, labels, masks, model):
 
     # Training loop.
     for epoch in range(200):
+        t0 = time.time()
         model.train()
         logits = model(g, features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        t1 = time.time()
         acc = evaluate(g, features, labels, val_mask, model)
         print(
-            f"Epoch {epoch:05d} | Loss {loss.item():.4f} | Accuracy {acc:.4f} "
+            f"Epoch {epoch:05d} | Loss {loss.item():.4f} | Accuracy {acc:.4f} | "
+            f"Time {t1 - t0:.4f}"
         )
 
 

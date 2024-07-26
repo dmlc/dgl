@@ -1,21 +1,14 @@
 import multiprocessing as mp
 import os
-import socket
 import time
 import unittest
 
 import backend as F
 
 import dgl
-import numpy as np
-from dgl.graph_index import create_graph_index
 from numpy.testing import assert_array_equal
-from scipy import sparse as spsp
 from utils import generate_ip_config, reset_envs
 
-if os.name != "nt":
-    import fcntl
-    import struct
 
 # Create an one-part Graph
 node_map = {"_N": F.tensor([[0, 6]], F.int64)}
@@ -23,7 +16,7 @@ edge_map = {("_N", "_E", "_N"): F.tensor([[0, 7]], F.int64)}
 global_nid = F.tensor([0, 1, 2, 3, 4, 5], F.int64)
 global_eid = F.tensor([0, 1, 2, 3, 4, 5, 6], F.int64)
 
-g = dgl.DGLGraph()
+g = dgl.graph([])
 g.add_nodes(6)
 g.add_edges(0, 1)  # 0
 g.add_edges(0, 2)  # 1

@@ -1,11 +1,19 @@
 """GPU cached feature for GraphBolt."""
-import torch
 
-from dgl.cuda import GPUCache
+import torch
 
 from ..feature_store import Feature
 
+from .gpu_cache import GPUCache
+
 __all__ = ["GPUCachedFeature"]
+
+
+def num_cache_items(cache_capacity_in_bytes, single_item):
+    """Returns the number of rows to be cached."""
+    item_bytes = single_item.nbytes
+    # Round up so that we never get a size of 0, unless bytes is 0.
+    return (cache_capacity_in_bytes + item_bytes - 1) // item_bytes
 
 
 class GPUCachedFeature(Feature):
@@ -17,8 +25,8 @@ class GPUCachedFeature(Feature):
     ----------
     fallback_feature : Feature
         The fallback feature.
-    cache_size : int
-        The capacity of the GPU cache, the number of features to store.
+    max_cache_size_in_bytes : int
+        The capacity of the GPU cache in bytes.
 
     Examples
     --------
@@ -42,20 +50,18 @@ class GPUCachedFeature(Feature):
     torch.Size([5])
     """
 
-    def __init__(self, fallback_feature: Feature, cache_size: int):
+    def __init__(self, fallback_feature: Feature, max_cache_size_in_bytes: int):
         super(GPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
             f"The fallback_feature must be an instance of Feature, but got "
             f"{type(fallback_feature)}."
         )
         self._fallback_feature = fallback_feature
-        self.cache_size = cache_size
+        self.max_cache_size_in_bytes = max_cache_size_in_bytes
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
-        self.item_shape = (-1,) + feat0.shape[1:]
-        feat0 = torch.reshape(feat0, (1, -1))
-        self.flat_shape = (-1, feat0.shape[1])
-        self._feature = GPUCache(cache_size, feat0.shape[1])
+        cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
+        self._feature = GPUCache((cache_size,) + feat0.shape[1:], feat0.dtype)
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -75,15 +81,101 @@ class GPUCachedFeature(Feature):
             The read feature.
         """
         if ids is None:
-            return self._fallback_feature.read().to("cuda")
-        keys = ids.to("cuda")
-        values, missing_index, missing_keys = self._feature.query(keys)
-        missing_values = self._fallback_feature.read(missing_keys).to("cuda")
-        missing_values = missing_values.reshape(self.flat_shape)
-        values = values.to(missing_values.dtype)
+            return self._fallback_feature.read()
+        values, missing_index, missing_keys = self._feature.query(ids)
+        missing_values = self._fallback_feature.read(missing_keys)
         values[missing_index] = missing_values
         self._feature.replace(missing_keys, missing_values)
-        return torch.reshape(values, self.item_shape)
+        return values
+
+    def read_async(self, ids: torch.Tensor):
+        """Read the feature by index asynchronously.
+
+        Parameters
+        ----------
+        ids : torch.Tensor
+            The index of the feature. Only the specified indices of the
+            feature are read.
+        Returns
+        -------
+        A generator object.
+            The returned generator object returns a future on
+            `read_async_num_stages(ids.device)`th invocation. The return result
+            can be accessed by calling `.wait()`. on the returned future object.
+            It is undefined behavior to call `.wait()` more than once.
+
+        Example Usage
+        --------
+        >>> import dgl.graphbolt as gb
+        >>> feature = gb.Feature(...)
+        >>> ids = torch.tensor([0, 2])
+        >>> for stage, future in enumerate(feature.read_async(ids)):
+        ...     pass
+        >>> assert stage + 1 == feature.read_async_num_stages(ids.device)
+        >>> result = future.wait()  # result contains the read values.
+        """
+        values, missing_index, missing_keys = self._feature.query(ids)
+
+        fallback_reader = self._fallback_feature.read_async(missing_keys)
+        fallback_num_stages = self._fallback_feature.read_async_num_stages(
+            missing_keys.device
+        )
+        for i in range(fallback_num_stages):
+            missing_values_future = next(fallback_reader, None)
+            if i < fallback_num_stages - 1:
+                yield  # fallback feature stages.
+
+        class _Waiter:
+            def __init__(
+                self,
+                feature,
+                values,
+                missing_index,
+                missing_keys,
+                missing_values_future,
+            ):
+                self.feature = feature
+                self.values = values
+                self.missing_index = missing_index
+                self.missing_keys = missing_keys
+                self.missing_values_future = missing_values_future
+
+            def wait(self):
+                """Returns the stored value when invoked."""
+                missing_values = self.missing_values_future.wait()
+                self.feature.replace(self.missing_keys, missing_values)
+                self.values[self.missing_index] = missing_values
+                values = self.values
+                # Ensure there is no memory leak.
+                self.feature = self.values = self.missing_index = None
+                self.missing_keys = self.missing_values_future = None
+                return values
+
+        yield _Waiter(
+            self._feature,
+            values,
+            missing_index,
+            missing_keys,
+            missing_values_future,
+        )
+
+    def read_async_num_stages(self, ids_device: torch.device):
+        """The number of stages of the read_async operation. See read_async
+        function for directions on its use. This function is required to return
+        the number of yield operations when read_async is used with a tensor
+        residing on ids_device.
+
+        Parameters
+        ----------
+        ids_device : torch.device
+            The device of the ids parameter passed into read_async.
+        Returns
+        -------
+        int
+            The number of stages of the read_async operation.
+        """
+        assert ids_device.type == "cuda"
+        return self._fallback_feature.read_async_num_stages(ids_device)
 
     def size(self):
         """Get the size of the feature.
@@ -110,14 +202,16 @@ class GPUCachedFeature(Feature):
             updated.
         """
         if ids is None:
+            feat0 = value[:1]
             self._fallback_feature.update(value)
-            size = min(self.cache_size, value.shape[0])
-            self._feature.replace(
-                torch.arange(0, size, device="cuda"),
-                value[:size].to("cuda").reshape(self.flat_shape),
+            cache_size = min(
+                num_cache_items(self.max_cache_size_in_bytes, feat0),
+                value.shape[0],
+            )
+            self._feature = None  # Destroy the existing cache first.
+            self._feature = GPUCache(
+                (cache_size,) + feat0.shape[1:], feat0.dtype
             )
         else:
             self._fallback_feature.update(value, ids)
-            self._feature.replace(
-                ids.to("cuda"), value.to("cuda").reshape(self.flat_shape)
-            )
+            self._feature.replace(ids, value)

@@ -1,4 +1,5 @@
 """Data loading components for neighbor sampling"""
+
 from .. import backend as F
 from ..base import EID, NID
 from ..heterograph import DGLGraph
@@ -192,9 +193,13 @@ class NeighborSampler(BlockSampler):
                 output_device=self.output_device,
                 exclude_edges=exclude_eids,
             )
-            eid = frontier.edata[EID]
             block = to_block(frontier, seed_nodes)
-            block.edata[EID] = eid
+            # If sampled from graphbolt-backed DistGraph, `EID` may not be in
+            # the block. If not exists, we should remove it from the block.
+            if EID in frontier.edata.keys():
+                block.edata[EID] = frontier.edata[EID]
+            else:
+                del block.edata[EID]
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)
 

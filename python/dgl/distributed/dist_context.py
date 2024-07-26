@@ -210,6 +210,7 @@ def initialize(
     max_queue_size=MAX_QUEUE_SIZE,
     net_type=None,
     num_worker_threads=1,
+    use_graphbolt=False,
 ):
     """Initialize DGL's distributed module
 
@@ -231,6 +232,8 @@ def initialize(
         [Deprecated] Networking type, can be 'socket' only.
     num_worker_threads: int
         The number of OMP threads in each sampler process.
+    use_graphbolt: bool, optional
+        Whether to use GraphBolt for distributed train.
 
     Note
     ----
@@ -238,6 +241,9 @@ def initialize(
     distributed API. For example, when used with Pytorch, users have to invoke this function
     before Pytorch's `pytorch.distributed.init_process_group`.
     """
+    print(
+        f"Initialize the distributed services with graphbolt: {use_graphbolt}"
+    )
     if net_type is not None:
         dgl_warning(
             "net_type is deprecated and will be removed in future release."
@@ -270,6 +276,7 @@ def initialize(
             int(os.environ.get("DGL_NUM_CLIENT")),
             os.environ.get("DGL_CONF_PATH"),
             graph_format=formats,
+            use_graphbolt=use_graphbolt,
         )
         serv.start()
         sys.exit()

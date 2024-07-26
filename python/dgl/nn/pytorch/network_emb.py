@@ -1,13 +1,14 @@
 """Network Embedding NN Modules"""
+
 # pylint: disable= invalid-name
 
 import random
 
 import torch
 import torch.nn.functional as F
-import tqdm
 from torch import nn
 from torch.nn import init
+from tqdm.auto import trange
 
 from ...base import NID
 from ...convert import to_heterogeneous, to_homogeneous
@@ -39,7 +40,7 @@ class DeepWalk(nn.Module):
     neg_weight : float, optional
         Weight of the loss term for negative samples in the total loss. Default: 1.0
     negative_size : int, optional
-        Number of negative samples to use for each positive sample. Default: 1
+        Number of negative samples to use for each positive sample. Default: 5
     fast_neg : bool, optional
         If True, it samples negative node pairs within a batch of random walks. Default: True
     sparse : bool, optional
@@ -340,7 +341,7 @@ class MetaPath2Vec(nn.Module):
         num_nodes_total = hg.num_nodes()
         node_frequency = torch.zeros(num_nodes_total)
         # random walk
-        for idx in tqdm.trange(hg.num_nodes(node_metapath[0])):
+        for idx in trange(hg.num_nodes(node_metapath[0])):
             traces, _ = random_walk(g=hg, nodes=[idx], metapath=metapath)
             for tr in traces.cpu().numpy():
                 tr_nids = [

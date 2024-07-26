@@ -128,9 +128,9 @@ class GASDataset(DGLBuiltinDataset):
         test_idx = index[
             int(train_size * num_edges) : num_edges - int(val_size * num_edges)
         ]
-        train_mask = np.zeros(num_edges, dtype=np.bool)
-        val_mask = np.zeros(num_edges, dtype=np.bool)
-        test_mask = np.zeros(num_edges, dtype=np.bool)
+        train_mask = np.zeros(num_edges, dtype=np.bool_)
+        val_mask = np.zeros(num_edges, dtype=np.bool_)
+        test_mask = np.zeros(num_edges, dtype=np.bool_)
         train_mask[train_idx] = True
         val_mask[val_idx] = True
         test_mask[test_idx] = True

@@ -55,6 +55,7 @@ mini-batch training and understand how evaluation and inference can be
 conducted in mini-batches.
 
 * :ref:`guide-minibatch-customizing-neighborhood-sampler`
+* :ref:`guide-minibatch-sparse`
 * :ref:`guide-minibatch-custom-gnn-module`
 * :ref:`guide-minibatch-inference`
 
@@ -62,6 +63,7 @@ The following are performance tips for implementing and using neighborhood
 sampling:
 
 * :ref:`guide-minibatch-gpu-sampling`
+* :ref:`guide-minibatch-parallelism`
 
 .. toctree::
     :maxdepth: 1
@@ -72,7 +74,8 @@ sampling:
     minibatch-edge
     minibatch-link
     minibatch-custom-sampler
+    minibatch-sparse
     minibatch-nn
     minibatch-inference
     minibatch-gpu-sampling
-    minibatch-prefetching
+    minibatch-parallelism

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.18)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
@@ -20,6 +20,7 @@ dgl_option(BUILD_TYPE "Type of the build: dev, dogfood or release" "dev")
 message(STATUS "Build for ${BUILD_TYPE}")
 
 dgl_option(USE_CUDA "Build with CUDA" OFF)
+dgl_option(USE_LIBURING "Build with liburing" ON)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter for building sub-components" python3)
 
 # Conda build related options.
@@ -75,7 +76,7 @@ dgl_feature_option(
 dgl_feature_option(
     BUILD_GRAPHBOLT
     "Build Graphbolt library"
-    "dev" "dogfood"
+    "all"
 )
 
 dgl_feature_option(
@@ -139,13 +140,11 @@ endif()
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
-  # see https://github.com/NVIDIA/thrust/issues/1401
-  add_definitions(-DTHRUST_CUB_WRAPPED_NAMESPACE=dgl)
   include(cmake/modules/CUDA.cmake)
-  message(STATUS "Use external CUB/Thrust library for a consistent API and performance.")
-  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
-  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/cub")
-  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/libcudacxx/include")
+  message(STATUS "Use external CCCL library for a consistent API and performance.")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/thrust")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/cub")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/libcudacxx/include")
 endif(USE_CUDA)
 
 # initial variables
@@ -351,8 +350,6 @@ endif(EXTERNAL_PHMAP_PATH)
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
-
-
 if(EXTERNAL_NANOFLANN_PATH)
   include_directories(SYSTEM ${EXTERNAL_NANOFLANN_PATH})
 else(EXTERNAL_NANOFLANN_PATH)
@@ -376,13 +373,19 @@ else(EXTERNAL_METIS_PATH)
   target_include_directories(dgl PRIVATE "third_party/METIS/include")
   # Compile METIS
   if(NOT MSVC)
-    set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/METIS/GKlib")
+    set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/GKlib")
     include(${GKLIB_PATH}/GKlibSystem.cmake)
     include_directories(${GKLIB_PATH})
+    add_library(GKlib ${GKlib_sources})
     include_directories("third_party/METIS/include/")
     add_subdirectory("third_party/METIS/libmetis/")
-    list(APPEND DGL_LINKER_LIBS metis)
-    endif(NOT MSVC)
+    # When building on ubi7, it fails with the following error:
+    # /usr/include/signal.h:156:29: error: unknown type name 'siginfo_t'.
+    # So I(Rui) define _POSIX_C_SOURCE to 200809L for GKlib and metis to avoid the error.
+    target_compile_definitions(GKlib PRIVATE _POSIX_C_SOURCE=200809L)
+    target_compile_definitions(metis PRIVATE _POSIX_C_SOURCE=200809L)
+    list(APPEND DGL_LINKER_LIBS metis GKlib)
+  endif(NOT MSVC)
 endif(EXTERNAL_METIS_PATH)
 
 
@@ -527,8 +530,13 @@ endif(BUILD_SPARSE)
 
 if(BUILD_GRAPHBOLT)
   message(STATUS "Configuring graphbolt library")
+  string(REPLACE ";" "\\;" CUDA_ARCHITECTURES_ESCAPED "${CUDA_ARCHITECTURES}")
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
   file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  if(USE_CUDA)
+    get_target_property(GPU_CACHE_INCLUDE_DIRS gpu_cache INCLUDE_DIRECTORIES)
+  endif(USE_CUDA)
+  string(REPLACE ";" "\\;" GPU_CACHE_INCLUDE_DIRS_ESCAPED "${GPU_CACHE_INCLUDE_DIRS}")
   if(MSVC)
     file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.bat BUILD_SCRIPT)
     add_custom_target(
@@ -539,8 +547,10 @@ if(BUILD_GRAPHBOLT)
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
       USE_CUDA=${USE_CUDA}
       BINDIR=${BINDIR}
+      GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
+      CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
       LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
       cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
@@ -554,12 +564,18 @@ if(BUILD_GRAPHBOLT)
       CMAKE_COMMAND=${CMAKE_CMD}
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
       USE_CUDA=${USE_CUDA}
+      USE_LIBURING=${USE_LIBURING}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
+      CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
       LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
       bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
   endif(MSVC)
+  if(USE_CUDA)
+    add_dependencies(graphbolt gpu_cache)
+  endif(USE_CUDA)
 endif(BUILD_GRAPHBOLT)

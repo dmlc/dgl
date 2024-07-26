@@ -34,17 +34,15 @@
 #include <thrust/zip_function.h>
 
 #include <algorithm>
+#include <cub/cub.cuh>  // NOLINT
 #include <limits>
 #include <numeric>
 #include <type_traits>
 #include <utility>
 
-#include "../../array/cuda/atomic.cuh"
 #include "../../array/cuda/utils.h"
-#include "../../graph/transform/cuda/cuda_map_edges.cuh"
 #include "../../random/continuous_seed.h"
 #include "../../runtime/cuda/cuda_common.h"
-#include "./dgl_cub.cuh"
 #include "./functor.cuh"
 #include "./spmm.cuh"
 

@@ -10,18 +10,17 @@ endif()
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-std=c++17"   SUPPORT_CXX17)
 
-set(dgl_known_gpu_archs "35" "50" "60" "70")
+set(dgl_known_gpu_archs "35" "50" "60" "70" "75")
 set(dgl_cuda_arch_ptx "70")
 if (CUDA_VERSION_MAJOR GREATER_EQUAL "11")
-  list(APPEND dgl_known_gpu_archs "80")
-  set(dgl_cuda_arch_ptx "80")
+  list(APPEND dgl_known_gpu_archs "80" "86")
+  set(dgl_cuda_arch_ptx "80" "86")
 endif()
-# CMake 3.5 doesn't support VERSION_GREATER_EQUAL
-if (NOT CUDA_VERSION VERSION_LESS "11.8")
-  list(APPEND dgl_known_gpu_archs "90")
+if (CUDA_VERSION VERSION_GREATER_EQUAL "11.8")
+  list(APPEND dgl_known_gpu_archs "89" "90")
   set(dgl_cuda_arch_ptx "90")
 endif()
-if (NOT CUDA_VERSION VERSION_LESS "12.0")
+if (CUDA_VERSION VERSION_GREATER_EQUAL "12.0")
   list(REMOVE_ITEM dgl_known_gpu_archs "35")
 endif()
 
@@ -177,6 +176,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
 
   set(__nvcc_flags "--expt-relaxed-constexpr")
   set(__nvcc_archs_readable "")
+  set(__archs "")
 
   # Tell NVCC to add binaries for the specified GPUs
   foreach(__arch ${__cuda_arch_bin})
@@ -184,10 +184,12 @@ function(dgl_select_nvcc_arch_flags out_variable)
       # User explicitly specified PTX for the concrete BIN
       list(APPEND __nvcc_flags -gencode arch=compute_${CMAKE_MATCH_2},code=sm_${CMAKE_MATCH_1})
       list(APPEND __nvcc_archs_readable sm_${CMAKE_MATCH_1})
+      list(APPEND __archs ${CMAKE_MATCH_1})
     else()
       # User didn't explicitly specify PTX for the concrete BIN, we assume PTX=BIN
       list(APPEND __nvcc_flags -gencode arch=compute_${__arch},code=sm_${__arch})
       list(APPEND __nvcc_archs_readable sm_${__arch})
+      list(APPEND __archs ${__arch})
     endif()
   endforeach()
 
@@ -200,6 +202,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
   string(REPLACE ";" " " __nvcc_archs_readable "${__nvcc_archs_readable}")
   set(${out_variable}          ${__nvcc_flags}          PARENT_SCOPE)
   set(${out_variable}_readable ${__nvcc_archs_readable} PARENT_SCOPE)
+  set(CUDA_ARCHITECTURES       ${__archs}               PARENT_SCOPE)
 endfunction()
 
 ################################################################################################

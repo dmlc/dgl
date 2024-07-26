@@ -158,10 +158,12 @@ def is_authorized(name) {
     'frozenbugs', 'peizhou001', 'zheng-da', 'czkkkkkk', 'thvasilo',
     // Intern:
     'keli-wen', 'caojy1998', 'RamonZhou', 'xiangyuzhi', 'Skeleton003', 'yxy235',
+    'hutiechuan', 'pyynb', 'az15240', 'BowenYao18', 'kec020',
     // Friends:
     'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
+    'TristonC', 'mfbalin',
     'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
-    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit', 'mfbalin',
+    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
     // Emeritus:
     'VoVAllen',
   ]
@@ -317,7 +319,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240511_1440"
                   args "-u root"
                   alwaysPull true
                 }
@@ -336,7 +338,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-gpu:cu116_v230711"
+                  image "dgllib/dgl-ci-gpu:cu121_v240511_1440"
                   args "-u root"
                   alwaysPull true
                 }
@@ -391,7 +393,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240511_1440"
                   args "-u root"
                   alwaysPull true
                 }
@@ -410,7 +412,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu116_v230711"
+                  image "dgllib/dgl-ci-gpu:cu121_v240511_1440"
                   args "-u root --runtime nvidia"
                   alwaysPull true
                 }
@@ -450,6 +452,8 @@ pipeline {
                   steps {
                     unit_test_linux('tensorflow', 'cpu')
                   }
+                  // Tensorflow is deprecated.
+                  when { expression { false } }
                 }
               }
               post {
@@ -463,7 +467,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu116_v230711"
+                  image "dgllib/dgl-ci-gpu:cu121_v240511_1440"
                   args "-u root --runtime nvidia"
                   alwaysPull true
                 }
@@ -488,7 +492,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240511_1440"
                   args "-u root --shm-size=4gb"
                   alwaysPull true
                 }
@@ -541,7 +545,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu116_v230711"
+                  image "dgllib/dgl-ci-gpu:cu121_v240511_1440"
                   args "-u root --runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -570,8 +574,8 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
-                  args "-u root --shm-size=4gb"
+                  image "dgllib/dgl-ci-cpu:v240511_1440"
+                  args "-u root --shm-size=8gb"
                   alwaysPull true
                 }
               }
@@ -580,7 +584,6 @@ pipeline {
                   steps {
                     unit_distributed_linux('pytorch', 'cpu')
                   }
-                  when { expression { false } }
                 }
               }
               post {
@@ -605,6 +608,8 @@ pipeline {
                     sh 'nvidia-smi'
                     unit_test_cugraph('pytorch', 'cugraph')
                   }
+                  // Cugraph is under refactoring. Skip the test for now.
+                  when { expression { false } }
                 }
               }
               post {
@@ -618,7 +623,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v240511_1440"
                   args "-u root"
                   alwaysPull true
                 }

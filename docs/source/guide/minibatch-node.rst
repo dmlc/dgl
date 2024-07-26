@@ -21,58 +21,57 @@ DGL provides several neighborhood sampler classes that generates the
 computation dependencies needed for each layer given the nodes we wish
 to compute on.
 
-The simplest neighborhood sampler is
-:class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler`
-which makes the node gather messages from all of its neighbors.
+The simplest neighborhood sampler is :class:`~dgl.graphbolt.NeighborSampler`
+or the equivalent function-like interface :func:`~dgl.graphbolt.sample_neighbor`
+which makes the node gather messages from its neighbors.
 
 To use a sampler provided by DGL, one also need to combine it with
-:class:`~dgl.dataloading.DataLoader`, which iterates
+:class:`~dgl.graphbolt.DataLoader`, which iterates
 over a set of indices (nodes in this case) in minibatches.
 
-For example, the following code creates a PyTorch DataLoader that
-iterates over the training node ID array ``train_nids`` in batches,
+For example, the following code creates a DataLoader that
+iterates over the training node ID set of ``ogbn-arxiv`` in batches,
 putting the list of generated MFGs onto GPU.
 
 .. code:: python
 
     import dgl
+    import dgl.graphbolt as gb
     import dgl.nn as dglnn
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
-    
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
-    dataloader = dgl.dataloading.DataLoader(
-        g, train_nids, sampler,
-        batch_size=1024,
-        shuffle=True,
-        drop_last=False,
-        num_workers=4)
 
-Iterating over the DataLoader will yield a list of specially created
-graphs representing the computation dependencies on each layer. They are
-called *message flow graphs* (MFGs) in DGL.
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    dataset = gb.BuiltinDataset("ogbn-arxiv").load()
+    g = dataset.graph
+    feature = dataset.feature
+    train_set = dataset.tasks[0].train_set
+    datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
+    datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
+    # Or equivalently:
+    # datapipe = gb.NeighborSampler(datapipe, g, [10, 10])
+    datapipe = datapipe.fetch_feature(feature, node_feature_keys=["feat"])
+    datapipe = datapipe.copy_to(device)
+    dataloader = gb.DataLoader(datapipe)
+
+
+Iterating over the DataLoader will yield :class:`~dgl.graphbolt.MiniBatch`
+which contains a list of specially created graphs representing the computation
+dependencies on each layer. In order to train with DGL, you can access the
+*message flow graphs* (MFGs) by calling `mini_batch.blocks`.
 
 .. code:: python
 
-    input_nodes, output_nodes, blocks = next(iter(dataloader))
-    print(blocks)
+    mini_batch = next(iter(dataloader))
+    print(mini_batch.blocks)
 
-The iterator generates three items at a time. ``input_nodes`` describe
-the nodes needed to compute the representation of ``output_nodes``.
-``blocks`` describe for each GNN layer which node representations are to
-be computed as output, which node representations are needed as input,
-and how does representation from the input nodes propagate to the output
-nodes.
 
 .. note::
 
-   See the :doc:`Stochastic Training Tutorial
-   <tutorials/large/L0_neighbor_sampling_overview>` for the concept of
-   message flow graph.
-
-   For a complete list of supported builtin samplers, please refer to the
-   :ref:`neighborhood sampler API reference <api-dataloading-neighbor-sampling>`.
+   See the `Stochastic Training Tutorial
+   <../notebooks/stochastic_training/neighbor_sampling_overview.nblink>`__
+   for the concept of message flow graph.
 
    If you wish to develop your own neighborhood sampler or you want a more
    detailed explanation of the concept of MFGs, please refer to
@@ -130,53 +129,40 @@ Training Loop
 ~~~~~~~~~~~~~
 
 The training loop simply consists of iterating over the dataset with the
-customized batching iterator. During each iteration that yields a list
-of MFGs, we:
+customized batching iterator. During each iteration that yields
+:class:`~dgl.graphbolt.MiniBatch`, we:
 
-1. Load the node features corresponding to the input nodes onto GPU. The
-   node features can be stored in either memory or external storage.
-   Note that we only need to load the input nodes’ features, as opposed
-   to load the features of all nodes as in full graph training.
-   
-   If the features are stored in ``g.ndata``, then the features can be loaded
-   by accessing the features in ``blocks[0].srcdata``, the features of
-   source nodes of the first MFG, which is identical to all the
-   necessary nodes needed for computing the final representations.
+1. Access the node features corresponding to the input nodes via
+   ``data.node_features["feat"]``. These features are already moved to the
+   target device (CPU or GPU) by the data loader.
 
-2. Feed the list of MFGs and the input node features to the multilayer
+2. Access the node labels corresponding to the output nodes via
+   ``data.labels``. These labels are already moved to the target device
+   (CPU or GPU) by the data loader.
+
+3. Feed the list of MFGs and the input node features to the multilayer
    GNN and get the outputs.
-
-3. Load the node labels corresponding to the output nodes onto GPU.
-   Similarly, the node labels can be stored in either memory or external
-   storage. Again, note that we only need to load the output nodes’
-   labels, as opposed to load the labels of all nodes as in full graph
-   training.
-   
-   If the features are stored in ``g.ndata``, then the labels
-   can be loaded by accessing the features in ``blocks[-1].dstdata``,
-   the features of destination nodes of the last MFG, which is identical to
-   the nodes we wish to compute the final representation.
 
 4. Compute the loss and backpropagate.
 
 .. code:: python
 
     model = StochasticTwoLayerGCN(in_features, hidden_features, out_features)
-    model = model.cuda()
+    model = model.to(device)
     opt = torch.optim.Adam(model.parameters())
-    
-    for input_nodes, output_nodes, blocks in dataloader:
-        blocks = [b.to(torch.device('cuda')) for b in blocks]
-        input_features = blocks[0].srcdata['features']
-        output_labels = blocks[-1].dstdata['label']
-        output_predictions = model(blocks, input_features)
+
+    for data in dataloader:
+        input_features = data.node_features["feat"]
+        output_labels = data.labels
+        output_predictions = model(data.blocks, input_features)
         loss = compute_loss(output_labels, output_predictions)
         opt.zero_grad()
         loss.backward()
         opt.step()
 
+
 DGL provides an end-to-end stochastic training example `GraphSAGE
-implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/node_classification.py>`__.
+implementation <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/node_classification.py>`__.
 
 For heterogeneous graphs
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -209,23 +195,32 @@ removed for simplicity):
             x = self.conv2(blocks[1], x)
             return x
 
-Some of the samplers provided by DGL also support heterogeneous graphs.
+The samplers provided by DGL also support heterogeneous graphs.
 For example, one can still use the provided
-:class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler` class and
-:class:`~dgl.dataloading.DataLoader` class for
-stochastic training. For full-neighbor sampling, the only difference
-would be that you would specify a dictionary of node
-types and node IDs for the training set.
+:class:`~dgl.graphbolt.NeighborSampler` class and
+:class:`~dgl.graphbolt.DataLoader` class for
+stochastic training. The only difference is that the itemset is now an
+instance of :class:`~dgl.graphbolt.HeteroItemSet` which is a dictionary
+of node types to node IDs.
 
 .. code:: python
 
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
-    dataloader = dgl.dataloading.DataLoader(
-        g, train_nid_dict, sampler,
-        batch_size=1024,
-        shuffle=True,
-        drop_last=False,
-        num_workers=4)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    dataset = gb.BuiltinDataset("ogbn-mag").load()
+    g = dataset.graph
+    feature = dataset.feature
+    train_set = dataset.tasks[0].train_set
+    datapipe = gb.ItemSampler(train_set, batch_size=1024, shuffle=True)
+    datapipe = datapipe.sample_neighbor(g, [10, 10]) # 2 layers.
+    # Or equivalently:
+    # datapipe = gb.NeighborSampler(datapipe, g, [10, 10])
+    # For heterogeneous graphs, we need to specify the node feature keys
+    # for each node type.
+    datapipe = datapipe.fetch_feature(
+        feature, node_feature_keys={"author": ["feat"], "paper": ["feat"]}
+    )
+    datapipe = datapipe.copy_to(device)
+    dataloader = gb.DataLoader(datapipe)
 
 The training loop is almost the same as that of homogeneous graphs,
 except for the implementation of ``compute_loss`` that will take in two
@@ -234,20 +229,24 @@ dictionaries of node types and predictions here.
 .. code:: python
 
     model = StochasticTwoLayerRGCN(in_features, hidden_features, out_features, etypes)
-    model = model.cuda()
+    model = model.to(device)
     opt = torch.optim.Adam(model.parameters())
     
-    for input_nodes, output_nodes, blocks in dataloader:
-        blocks = [b.to(torch.device('cuda')) for b in blocks]
-        input_features = blocks[0].srcdata     # returns a dict
-        output_labels = blocks[-1].dstdata     # returns a dict
-        output_predictions = model(blocks, input_features)
+    for data in dataloader:
+        # For heterogeneous graphs, we need to specify the node types and
+        # feature name when accessing the node features. So does the labels.
+        input_features = {
+            "author": data.node_features[("author", "feat")],
+            "paper": data.node_features[("paper", "feat")]
+        }
+        output_labels = data.labels["paper"]
+        output_predictions = model(data.blocks, input_features)
         loss = compute_loss(output_labels, output_predictions)
         opt.zero_grad()
         loss.backward()
         opt.step()
 
 DGL provides an end-to-end stochastic training example `RGCN
-implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/entity_classify_mb.py>`__.
+implementation <https://github.com/dmlc/dgl/blob/master/examples/graphbolt/rgcn/hetero_rgcn.py>`__.
 
 

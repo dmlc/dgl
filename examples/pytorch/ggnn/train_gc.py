@@ -60,7 +60,7 @@ def main(args):
                 labels = labels.data.numpy().tolist()
                 dev_preds += preds
                 dev_labels += labels
-        acc = np.equal(dev_labels, dev_preds).astype(np.float).tolist()
+        acc = np.equal(dev_labels, dev_preds).astype(float).tolist()
         acc = sum(acc) / len(acc)
         print(f"Epoch {epoch}, Dev acc {acc}")
 
@@ -80,7 +80,7 @@ def main(args):
                 labels = labels.data.numpy().tolist()
                 test_preds += preds
                 test_labels += labels
-        acc = np.equal(test_labels, test_preds).astype(np.float).tolist()
+        acc = np.equal(test_labels, test_preds).astype(float).tolist()
         acc = sum(acc) / len(acc)
         test_acc_list.append(acc)
 

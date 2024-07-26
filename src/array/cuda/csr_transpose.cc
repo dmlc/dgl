@@ -22,6 +22,7 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 
 template <>
 CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
+#if CUDART_VERSION < 12000
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
@@ -76,6 +77,9 @@ CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
 
   return CSRMatrix(
       csr.num_cols, csr.num_rows, t_indptr, t_indices, t_data, false);
+#else
+  return COOToCSR(COOTranspose(CSRToCOO(csr, false)));
+#endif
 }
 
 template <>
