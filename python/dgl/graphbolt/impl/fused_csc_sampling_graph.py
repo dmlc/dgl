@@ -579,7 +579,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
             etype_offsets = etype_offsets.tolist()
 
         has_original_eids = (
-            self.edge_attributes is not None
+            original_edge_ids is not None
+            and self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
         if has_original_eids:
