@@ -14,11 +14,17 @@
 namespace graphbolt {
 namespace ops {
 
+constexpr int kIntGrainSize = 64;
+
 torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
-  if (utils::is_on_gpu(index) && input.is_pinned()) {
-    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-        c10::DeviceType::CUDA, "UVAIndexSelect",
-        { return UVAIndexSelectImpl(input, index); });
+  if (utils::is_on_gpu(index)) {
+    if (input.is_pinned()) {
+      GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+          c10::DeviceType::CUDA, "UVAIndexSelect",
+          { return UVAIndexSelectImpl(input, index); });
+    } else {
+      return torch::index_select(input, 0, index);
+    }
   }
   auto output_shape = input.sizes().vec();
   output_shape[0] = index.numel();
@@ -26,7 +32,30 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
       output_shape, index.options()
                         .dtype(input.dtype())
                         .pinned_memory(utils::is_pinned(index)));
-  return torch::index_select_out(result, input, 0, index);
+  auto result_ptr = reinterpret_cast<std::byte*>(result.data_ptr());
+  const auto input_ptr = reinterpret_cast<std::byte*>(input.data_ptr());
+  const auto row_bytes = input.slice(0, 0, 1).numel() * input.element_size();
+  const auto stride = input.stride(0) * input.element_size();
+  const auto num_input_rows = input.size(0);
+  AT_DISPATCH_INDEX_TYPES(
+      index.scalar_type(), "IndexSelect::index::scalar_type()", ([&] {
+        const auto index_ptr = index.data_ptr<index_t>();
+        graphbolt::parallel_for(
+            0, index.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
+              for (int64_t i = begin; i < end; i++) {
+                auto idx = index_ptr[i];
+                if (idx < 0) idx += num_input_rows;
+                if (idx < 0 || idx >= num_input_rows) {
+                  // Throw IndexError via torch.
+                  idx += input[num_input_rows].item<index_t>();
+                }
+                std::memcpy(
+                    result_ptr + i * row_bytes, input_ptr + idx * stride,
+                    row_bytes);
+              }
+            });
+      }));
+  return result;
 }
 
 c10::intrusive_ptr<Future<torch::Tensor>> IndexSelectAsync(
@@ -54,8 +83,8 @@ c10::intrusive_ptr<Future<torch::Tensor>> ScatterAsync(
     AT_DISPATCH_INDEX_TYPES(
         index.scalar_type(), "ScatterAsync::index::scalar_type()", ([&] {
           const auto index_ptr = index.data_ptr<index_t>();
-          torch::parallel_for(
-              0, index.size(0), 64, [&](int64_t begin, int64_t end) {
+          graphbolt::parallel_for(
+              0, index.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
                 for (int64_t i = begin; i < end; i++) {
                   std::memcpy(
                       input_ptr + index_ptr[i] * row_bytes,
