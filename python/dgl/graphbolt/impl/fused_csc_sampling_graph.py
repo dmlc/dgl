@@ -626,7 +626,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                         sub_indptr[etype] = torch.cat(
                             (torch.tensor([0], device=indptr.device), cum_edges)
                         )
-                        if has_original_eids:
+                        if original_edge_ids is not None:
                             original_hetero_edge_ids[etype] = original_edge_ids[
                                 eids
                             ]
@@ -650,14 +650,14 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     sub_indices[etype] = indices[
                         etype_offsets[etype_id] : etype_offsets[etype_id + 1]
                     ]
-                    if has_original_eids:
+                    if original_edge_ids is not None:
                         original_hetero_edge_ids[etype] = original_edge_ids[
                             etype_offsets[etype_id] : etype_offsets[
                                 etype_id + 1
                             ]
                         ]
 
-            if has_original_eids:
+            if original_edge_ids is not None:
                 original_edge_ids = original_hetero_edge_ids
             sampled_csc = {
                 etype: CSCFormatBase(
@@ -1091,17 +1091,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
         # Ensure nodes is 1-D tensor.
         probs_or_mask = self.edge_attributes[probs_name] if probs_name else None
         self._check_sampler_arguments(nodes, fanouts, probs_or_mask)
-        has_original_eids = (
-            self.edge_attributes is not None
-            and ORIGINAL_EDGE_ID in self.edge_attributes
-        )
         C_sampled_subgraph = self._c_csc_graph.temporal_sample_neighbors(
             nodes,
             input_nodes_timestamp,
             fanouts.tolist(),
             replace,
-            False,
-            has_original_eids,
+            False,  # is_labor
+            True,  # return_eids
             input_nodes_pre_time_window,
             probs_or_mask,
             node_timestamp_attr_name,
@@ -1222,17 +1218,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
         # Ensure nodes is 1-D tensor.
         probs_or_mask = self.edge_attributes[probs_name] if probs_name else None
         self._check_sampler_arguments(nodes, fanouts, probs_or_mask)
-        has_original_eids = (
-            self.edge_attributes is not None
-            and ORIGINAL_EDGE_ID in self.edge_attributes
-        )
         C_sampled_subgraph = self._c_csc_graph.temporal_sample_neighbors(
             nodes,
             input_nodes_timestamp,
             fanouts.tolist(),
             replace,
-            True,
-            has_original_eids,
+            True,  # is_labor
+            True,  # return_eids
             input_nodes_pre_time_window,
             probs_or_mask,
             node_timestamp_attr_name,

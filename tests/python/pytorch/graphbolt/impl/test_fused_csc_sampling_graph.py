@@ -1692,6 +1692,7 @@ def test_sample_neighbors_homo(
     # Verify in subgraph.
     sampled_indptr_num = subgraph.sampled_csc.indptr.size(0)
     sampled_num = subgraph.sampled_csc.indices.size(0)
+    assert sampled_num == len(subgraph.original_edge_ids)
     if nodes is None:
         assert sampled_indptr_num == indptr.shape[0]
         assert sampled_num == 10
@@ -1700,7 +1701,6 @@ def test_sample_neighbors_homo(
         assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is not None
 
 
 @pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
@@ -1765,9 +1765,9 @@ def test_sample_neighbors_hetero(indptr_dtype, indices_dtype, labor):
         assert torch.equal(
             subgraph.sampled_csc[etype].indices.sort()[0], pairs.indices
         )
+        assert len(pairs.indices) == len(subgraph.original_edge_ids[etype])
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is not None
 
     # Sample on single node type.
     nodes = {"n1": torch.tensor([0], dtype=indices_dtype, device=F.ctx())}
@@ -1792,9 +1792,9 @@ def test_sample_neighbors_hetero(indptr_dtype, indices_dtype, labor):
         assert torch.equal(
             subgraph.sampled_csc[etype].indices.sort()[0], pairs.indices
         )
+        assert len(pairs.indices) == len(subgraph.original_edge_ids[etype])
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is not None
 
 
 @pytest.mark.parametrize(
