@@ -813,8 +813,20 @@ def test_in_subgraph_hetero():
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
     assert torch.equal(
-        in_subgraph.original_edge_ids,
-        torch.tensor([3, 4, 9, 10, 11, 7, 8], device=F.ctx()),
+        in_subgraph.original_edge_ids["N0:R0:N0"],
+        torch.tensor([], device=F.ctx()),
+    )
+    assert torch.equal(
+        in_subgraph.original_edge_ids["N0:R1:N1"],
+        torch.tensor([9, 7], device=F.ctx()),
+    )
+    assert torch.equal(
+        in_subgraph.original_edge_ids["N1:R2:N0"],
+        torch.tensor([3, 4], device=F.ctx()),
+    )
+    assert torch.equal(
+        in_subgraph.original_edge_ids["N1:R3:N1"],
+        torch.tensor([10, 11, 8], device=F.ctx()),
     )
 
 
