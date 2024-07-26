@@ -101,28 +101,34 @@ def test_gpu_sampling_DataLoader(
     )
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
-    datapipe = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
-    datapipe = datapipe.copy_to(F.ctx())
-    datapipe = getattr(dgl.graphbolt, sampler_name)(
-        datapipe,
-        graph,
-        fanouts=[torch.LongTensor([2]) for _ in range(num_layers)],
-    )
-    if enable_feature_fetch:
-        datapipe = dgl.graphbolt.FeatureFetcher(
+    dataloaders = []
+    for i in range(2):
+        datapipe = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
+        datapipe = datapipe.copy_to(F.ctx())
+        datapipe = getattr(dgl.graphbolt, sampler_name)(
             datapipe,
-            feature_store,
-            ["a", "b", "c"],
-            ["d"],
-            overlap_fetch=overlap_feature_fetch,
+            graph,
+            fanouts=[torch.LongTensor([2]) for _ in range(num_layers)],
         )
+        if enable_feature_fetch:
+            datapipe = dgl.graphbolt.FeatureFetcher(
+                datapipe,
+                feature_store,
+                ["a", "b", "c"],
+                ["d"],
+                overlap_fetch=overlap_feature_fetch and i == 0,
+            )
+        if i == 0:
+            dataloaders.append(dgl.graphbolt.DataLoader(
+                datapipe,
+                overlap_graph_fetch=overlap_graph_fetch,
+                num_gpu_cached_edges=num_gpu_cached_edges,
+                gpu_cache_threshold=gpu_cache_threshold,
+            ))
+        else:
+            dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
+    dataloader, dataloader2 = dataloaders
 
-    dataloader = dgl.graphbolt.DataLoader(
-        datapipe,
-        overlap_graph_fetch=overlap_graph_fetch,
-        num_gpu_cached_edges=num_gpu_cached_edges,
-        gpu_cache_threshold=gpu_cache_threshold,
-    )
     bufferer_cnt = int(enable_feature_fetch and overlap_feature_fetch)
     awaiter_cnt = 0
     if overlap_graph_fetch:
@@ -140,17 +146,28 @@ def test_gpu_sampling_DataLoader(
         dgl.graphbolt.Bufferer,
     )
     assert len(bufferers) == bufferer_cnt
-    assert len(list(dataloader)) == N // B
+    # Fixes the randomness of LayerNeighborSampler
+    torch.manual_seed(1)
+    minibatches = list(dataloader)
+    assert len(minibatches) == N // B
 
     for i, _ in enumerate(dataloader):
         if i >= 1:
             break
+    
+    torch.manual_seed(1)
 
-    for i, minibatch in enumerate(dataloader):
+    for minibatch, minibatch2 in zip(minibatches, dataloader2):
         if enable_feature_fetch:
             assert "a" in minibatch.node_features
             assert "b" in minibatch.node_features
             assert "c" in minibatch.node_features
+            if sampler_name == "LayerNeighborSampler":
+                assert torch.equal(minibatch.node_features["a"], minibatch2.node_features["a"])
             for layer_id in range(minibatch.num_layers()):
                 assert "d" in minibatch.edge_features[layer_id]
-    assert i + 1 == N // B
+                edge_feature = minibatch.edge_features[layer_id]["d"]
+                edge_feature_ref = minibatch2.edge_features[layer_id]["d"]
+                if sampler_name == "LayerNeighborSampler":
+                    assert torch.equal(edge_feature, edge_feature_ref)
+    assert len(list(dataloader)) == N // B
