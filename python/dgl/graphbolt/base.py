@@ -35,6 +35,7 @@ __all__ = [
     "isin",
     "index_select",
     "expand_indptr",
+    "indptr_edge_ids",
     "CSCFormatBase",
     "seed",
     "seed_type_str_to_ntypes",
@@ -155,6 +156,57 @@ def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
         dtype = node_ids.dtype
     return torch.ops.graphbolt.expand_indptr(
         indptr, dtype, node_ids, output_size
+    )
+
+
+if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+
+    torch_fake_decorator = (
+        torch.library.impl_abstract
+        if TorchVersion(torch.__version__) < TorchVersion("2.4.0a0")
+        else torch.library.register_fake
+    )
+
+    @torch_fake_decorator("graphbolt::indptr_edge_ids")
+    def indptr_edge_ids_fake(indptr, dtype, offset, output_size):
+        """Fake implementation of indptr_edge_ids for torch.compile() support."""
+        if output_size is None:
+            output_size = torch.library.get_ctx().new_dynamic_size()
+        if dtype is None:
+            dtype = offset.dtype
+        return indptr.new_empty(output_size, dtype=dtype)
+
+
+def indptr_edge_ids(indptr, dtype=None, offset=None, output_size=None):
+    """Converts a given indptr offset tensor to a COO format tensor for the edge
+    ids. For a given indptr [0, 2, 5, 7] and offset tensor [0, 100, 200], the
+    output will be [0, 1, 100, 101, 102, 201, 202]. If offset was not provided,
+    the output would be [0, 1, 0, 1, 2, 0, 1].
+
+    Parameters
+    ----------
+    indptr : torch.Tensor
+        A 1D tensor represents the csc_indptr tensor.
+    dtype : Optional[torch.dtype]
+        The dtype of the returned output tensor.
+    offset : Optional[torch.Tensor]
+        A 1D tensor represents the offsets that the returned tensor will be
+        populated with.
+    output_size : Optional[int]
+        The size of the output tensor. Should be equal to indptr[-1]. Using this
+        argument avoids a stream synchronization to calculate the output shape.
+
+    Returns
+    -------
+    torch.Tensor
+        The converted COO edge ids tensor.
+    """
+    assert indptr.dim() == 1, "Indptr should be 1D tensor."
+    assert offset is None or offset.dim() == 1, "Offset should be 1D tensor."
+    if dtype is None:
+        dtype = offset.dtype
+    return torch.ops.graphbolt.indptr_edge_ids(
+        indptr, dtype, offset, output_size
     )
 
 
