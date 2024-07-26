@@ -134,7 +134,7 @@ def test_exclude_seed_edges_gpu():
         deduplicate=True,
     )
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    if torch.cuda.get_device_capability()[0] < 7:
+    if F.ctx() != F.cpu() and torch.cuda.get_device_capability()[0] < 7:
         original_row_node_ids = [
             torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
             torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
