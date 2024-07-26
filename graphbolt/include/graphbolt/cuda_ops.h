@@ -229,6 +229,25 @@ torch::Tensor ExpandIndptrImpl(
     torch::optional<int64_t> output_size = torch::nullopt);
 
 /**
+ * @brief IndptrEdgeIdsImpl implements conversion from a given indptr offset
+ * tensor to a COO edge ids tensor. For a given indptr [0, 2, 5, 7] and offset
+ * tensor [0, 100, 200], the output will be [0, 1, 100, 101, 102, 201, 202]. If
+ * offset was not provided, the output would be [0, 1, 0, 1, 2, 0, 1].
+ *
+ * @param indptr       The indptr offset tensor.
+ * @param dtype        The dtype of the returned output tensor.
+ * @param offset       The offset tensor.
+ * @param output_size  Optional value of indptr[-1]. Passing it eliminates CPU
+ * GPU synchronization.
+ *
+ * @return The resulting tensor.
+ */
+torch::Tensor IndptrEdgeIdsImpl(
+    torch::Tensor indptr, torch::ScalarType dtype,
+    torch::optional<torch::Tensor> offset,
+    torch::optional<int64_t> output_size);
+
+/**
  * @brief Removes duplicate elements from the concatenated 'unique_dst_ids' and
  * 'src_ids' tensor and applies the uniqueness information to compact both
  * source and destination tensors.
