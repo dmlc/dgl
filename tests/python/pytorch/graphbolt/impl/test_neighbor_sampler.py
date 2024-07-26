@@ -92,7 +92,7 @@ def test_NeighborSampler_GraphFetch(
     assert len(expected_results) == len(new_results)
     for a, b in zip(expected_results, new_results):
         # TODO @mfbalin: Fix the edge id bug and enable this test.
-        assert True or repr(a) == repr(b)
+        assert num_cached_edges != 0 or repr(a) == repr(b)
 
 
 @pytest.mark.parametrize("layer_dependency", [False, True])
