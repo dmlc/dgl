@@ -1688,7 +1688,7 @@ def test_sample_neighbors_homo(
         assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is None
+    assert subgraph.original_edge_ids is not None
 
 
 @pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
@@ -1755,7 +1755,7 @@ def test_sample_neighbors_hetero(indptr_dtype, indices_dtype, labor):
         )
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is None
+    assert subgraph.original_edge_ids is not None
 
     # Sample on single node type.
     nodes = {"n1": torch.tensor([0], dtype=indices_dtype, device=F.ctx())}
@@ -1782,7 +1782,7 @@ def test_sample_neighbors_hetero(indptr_dtype, indices_dtype, labor):
         )
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is None
+    assert subgraph.original_edge_ids is not None
 
 
 @pytest.mark.parametrize(
