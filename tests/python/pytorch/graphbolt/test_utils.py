@@ -117,10 +117,6 @@ def test_exclude_seed_edges_homo_cpu():
             )
 
 
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="Fails due to different result on the CPU.",
-)
 def test_exclude_seed_edges_gpu():
     graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
     graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
