@@ -34,3 +34,6 @@
 [submodule "third_party/GKlib"]
 	path = third_party/GKlib
 	url = https://github.com/KarypisLab/GKlib.git
+[submodule "third_party/taskflow"]
+	path = third_party/taskflow
+	url = https://github.com/taskflow/taskflow.git
