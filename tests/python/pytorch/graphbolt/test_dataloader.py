@@ -119,12 +119,14 @@ def test_gpu_sampling_DataLoader(
                 overlap_fetch=overlap_feature_fetch and i == 0,
             )
         if i == 0:
-            dataloaders.append(dgl.graphbolt.DataLoader(
-                datapipe,
-                overlap_graph_fetch=overlap_graph_fetch,
-                num_gpu_cached_edges=num_gpu_cached_edges,
-                gpu_cache_threshold=gpu_cache_threshold,
-            ))
+            dataloaders.append(
+                dgl.graphbolt.DataLoader(
+                    datapipe,
+                    overlap_graph_fetch=overlap_graph_fetch,
+                    num_gpu_cached_edges=num_gpu_cached_edges,
+                    gpu_cache_threshold=gpu_cache_threshold,
+                )
+            )
         else:
             dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
     dataloader, dataloader2 = dataloaders
@@ -154,7 +156,7 @@ def test_gpu_sampling_DataLoader(
     for i, _ in enumerate(dataloader):
         if i >= 1:
             break
-    
+
     torch.manual_seed(1)
 
     for minibatch, minibatch2 in zip(minibatches, dataloader2):
@@ -163,7 +165,9 @@ def test_gpu_sampling_DataLoader(
             assert "b" in minibatch.node_features
             assert "c" in minibatch.node_features
             if sampler_name == "LayerNeighborSampler":
-                assert torch.equal(minibatch.node_features["a"], minibatch2.node_features["a"])
+                assert torch.equal(
+                    minibatch.node_features["a"], minibatch2.node_features["a"]
+                )
             for layer_id in range(minibatch.num_layers()):
                 assert "d" in minibatch.edge_features[layer_id]
                 edge_feature = minibatch.edge_features[layer_id]["d"]
