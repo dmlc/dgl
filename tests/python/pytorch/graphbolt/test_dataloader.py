@@ -19,9 +19,11 @@ def test_DataLoader(overlap_feature_fetch):
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seeds")
     graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
     features = {}
-    keys = [("node", None, "a"), ("node", None, "b")]
+    keys = [("node", None, "a"), ("node", None, "b"), ("edge", None, "c")]
     features[keys[0]] = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
     features[keys[1]] = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
+    M = graph.total_num_edges
+    features[keys[2]] = dgl.graphbolt.TorchBasedFeature(torch.randn(M, 1))
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     item_sampler = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
@@ -34,6 +36,7 @@ def test_DataLoader(overlap_feature_fetch):
         subgraph_sampler,
         feature_store,
         ["a", "b"],
+        ["c"],
         overlap_fetch=overlap_feature_fetch,
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
@@ -43,6 +46,11 @@ def test_DataLoader(overlap_feature_fetch):
         num_workers=4,
     )
     assert len(list(dataloader)) == N // B
+    for i, minibatch in enumerate(dataloader):
+        assert "a" in minibatch.node_features
+        assert "b" in minibatch.node_features
+        assert "c" in minibatch.edge_features
+    assert i + 1 == N // B
 
 
 @unittest.skipIf(
