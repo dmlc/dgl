@@ -10,6 +10,7 @@ from .base import (
     CSCFormatBase,
     etype_str_to_tuple,
     expand_indptr,
+    is_object_pinned,
     isin,
 )
 
@@ -232,7 +233,9 @@ class SampledSubgraph:
                 )
             return calling_class(*_slice_subgraph(self, index))
 
-    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+    def to(
+        self, device: torch.device, non_blocking=False
+    ) -> None:  # pylint: disable=invalid-name
         """Copy `SampledSubgraph` to the specified device using reflection."""
 
         for attr in dir(self):
@@ -242,11 +245,24 @@ class SampledSubgraph:
                     self,
                     attr,
                     recursive_apply(
-                        getattr(self, attr), lambda x: apply_to(x, device)
+                        getattr(self, attr),
+                        apply_to,
+                        device,
+                        non_blocking=non_blocking,
                     ),
                 )
 
         return self
+
+    def pin_memory(self):
+        """Copy `SampledSubgraph` to the pinned memory using reflection."""
+
+        return self.to("pinned")
+
+    def is_pinned(self) -> bool:
+        """Check whether `SampledSubgraph` is pinned using reflection."""
+
+        return is_object_pinned(self)
 
 
 def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
