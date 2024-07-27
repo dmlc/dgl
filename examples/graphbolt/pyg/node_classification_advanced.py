@@ -72,7 +72,7 @@ def accuracy(out, labels):
     assert labels.ndim == 1 or (labels.ndim == 2 and labels.size(1) == 1)
     labels = labels.flatten()
     predictions = torch.argmax(out, 1)
-    return torch.sum(labels == predictions).float() / labels.size(0)
+    return torch.sum(labels == predictions).double() / labels.size(0)
 
 
 def convert_to_pyg(h, subgraph):
@@ -234,7 +234,7 @@ def train_helper(dataloader, model, optimizer, loss_fn, num_classes, device):
     model.train()  # Set the model to training mode
     total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
     # Accumulator for the total number of correct predictions
-    total_correct = torch.zeros(1, device=device)
+    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0  # Accumulator for the total number of samples processed
     num_batches = 0  # Counter for the number of mini-batches processed
     start = time.time()
@@ -315,7 +315,7 @@ def evaluate_step(minibatch, model):
 @torch.no_grad()
 def evaluate(model, dataloader, device):
     model.eval()
-    total_correct = torch.zeros(1, device=device)
+    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0
     for minibatch in tqdm(dataloader, "Evaluating"):
         num_correct, num_samples = evaluate_step(minibatch, model)
