@@ -45,6 +45,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 
 set(LIB_GRAPHBOLT_NAME "graphbolt_pytorch_${TORCH_VER}")
+option(BUILD_WITH_TASKFLOW "Use taskflow as parallel backend" ON)
 
 set(BOLT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(BOLT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -76,6 +77,10 @@ include_directories(BEFORE ${BOLT_DIR}
                            "../third_party/pcg/include"
                            "../third_party/phmap")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
+if(BUILD_WITH_TASKFLOW)
+  target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE "../third_party/taskflow")
+  target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE BUILD_WITH_TASKFLOW=1)
+endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   if(USE_LIBURING)
