@@ -491,9 +491,9 @@ class CSCFormatBase:
     def __repr__(self) -> str:
         return _csc_format_base_str(self)
 
-    def to(
+    def to(  # pylint: disable=invalid-name
         self, device: torch.device, non_blocking=False
-    ) -> None:  # pylint: disable=invalid-name
+    ) -> None:
         """Copy `CSCFormatBase` to the specified device using reflection."""
 
         for attr in dir(self):
