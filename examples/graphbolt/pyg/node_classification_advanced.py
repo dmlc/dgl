@@ -358,7 +358,7 @@ def parse_args():
     parser.add_argument(
         "--fanout",
         type=str,
-        default="5,10,15",
+        default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
         " identical with the number of layers in your model. Default: 5,10,15",
     )
