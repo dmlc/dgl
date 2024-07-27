@@ -6,8 +6,11 @@ from typing import Dict, List, Tuple, Union
 import torch
 
 from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
-from .internal import get_attributes, get_nonproperty_attributes
-from .internal_utils import recursive_apply
+from .internal_utils import (
+    get_attributes,
+    get_nonproperty_attributes,
+    recursive_apply,
+)
 from .sampled_subgraph import SampledSubgraph
 
 __all__ = ["MiniBatch"]

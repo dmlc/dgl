@@ -144,32 +144,6 @@ def copy_or_convert_data(
     save_data(data, output_path, output_format)
 
 
-def get_nonproperty_attributes(_obj) -> list:
-    """Get attributes of the class except for the properties."""
-    attributes = [
-        attribute
-        for attribute in dir(_obj)
-        if not attribute.startswith("__")
-        and (
-            not hasattr(type(_obj), attribute)
-            or not isinstance(getattr(type(_obj), attribute), property)
-        )
-        and not callable(getattr(_obj, attribute))
-    ]
-    return attributes
-
-
-def get_attributes(_obj) -> list:
-    """Get attributes of the class."""
-    attributes = [
-        attribute
-        for attribute in dir(_obj)
-        if not attribute.startswith("__")
-        and not callable(getattr(_obj, attribute))
-    ]
-    return attributes
-
-
 def read_edges(dataset_dir, edge_fmt, edge_path):
     """Read egde data from numpy or csv."""
     assert edge_fmt in [

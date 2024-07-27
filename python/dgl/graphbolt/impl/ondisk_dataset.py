@@ -19,11 +19,15 @@ from ..internal import (
     calculate_dir_hash,
     check_dataset_change,
     copy_or_convert_data,
-    get_attributes,
     read_data,
     read_edges,
 )
-from ..internal_utils import download, extract_archive, gb_warning
+from ..internal_utils import (
+    download,
+    extract_archive,
+    gb_warning,
+    get_attributes,
+)
 from ..itemset import HeteroItemSet, ItemSet
 from ..sampling_graph import SamplingGraph
 from .fused_csc_sampling_graph import (
