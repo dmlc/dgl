@@ -55,24 +55,22 @@ def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
             torch.arange(2, dtype=indices_dtype, device=F.ctx()) + i * 2
         ) % (indptr.size(0) - 1)
         missing_keys, replace = g.query(keys)
-        missing_edge_tensors = []
-        for e in edge_tensors:
-            missing_indptr, missing_e = torch.ops.graphbolt.index_select_csc(
-                indptr, e, missing_keys, None
-            )
-            missing_edge_tensors.append(missing_e)
-
+        (
+            missing_indptr,
+            missing_edge_tensors,
+        ) = torch.ops.graphbolt.index_select_csc_batched(
+            indptr, edge_tensors, missing_keys, True, None
+        )
         output_indptr, output_edge_tensors = replace(
             missing_indptr, missing_edge_tensors
         )
 
-        reference_edge_tensors = []
-        for e in edge_tensors:
-            (
-                reference_indptr,
-                reference_e,
-            ) = torch.ops.graphbolt.index_select_csc(indptr, e, keys, None)
-            reference_edge_tensors.append(reference_e)
+        (
+            reference_indptr,
+            reference_edge_tensors,
+        ) = torch.ops.graphbolt.index_select_csc_batched(
+            indptr, edge_tensors, keys, True, None
+        )
 
         assert torch.equal(output_indptr, reference_indptr)
         assert len(output_edge_tensors) == len(reference_edge_tensors)

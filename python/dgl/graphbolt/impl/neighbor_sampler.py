@@ -64,6 +64,7 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
         probs_or_mask = subgraph.edge_attribute(self.prob_name)
         if probs_or_mask is not None:
             edge_tensors.append(probs_or_mask)
+        edge_tensors.append(subgraph.edge_attribute(ORIGINAL_EDGE_ID))
 
         subgraph.csc_indptr, edge_tensors = minibatch._replace(
             subgraph.csc_indptr, edge_tensors
@@ -78,11 +79,9 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
         if probs_or_mask is not None:
             subgraph.add_edge_attribute(self.prob_name, edge_tensors[0])
             edge_tensors = edge_tensors[1:]
+        subgraph.add_edge_attribute(ORIGINAL_EDGE_ID, edge_tensors[0])
+        edge_tensors = edge_tensors[1:]
         assert len(edge_tensors) == 0
-        # TODO @mfbalin: remove these lines after fixing cache for edge ids.
-        edge_attributes = subgraph.edge_attributes
-        edge_attributes.pop(ORIGINAL_EDGE_ID)
-        subgraph.edge_attributes = edge_attributes
 
         return minibatch
 
