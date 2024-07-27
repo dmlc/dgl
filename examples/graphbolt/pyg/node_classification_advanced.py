@@ -279,7 +279,8 @@ def train(train_dataloader, valid_dataloader, num_classes, model, device):
         val_acc = evaluate(model, valid_dataloader, device)
         print(
             f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
-            f"Approx. Train: {train_acc.item():.4f}, Approx. Val: {val_acc.item():.4f}, "
+            f"Approx. Train: {train_acc.item():.4f}, "
+            f"Approx. Val: {val_acc.item():.4f}, "
             f"Time: {duration}s"
         )
 
