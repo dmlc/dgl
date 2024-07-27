@@ -308,7 +308,8 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSCImpl(
 
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatchedImpl(
     torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
-    torch::Tensor nodes, torch::optional<int64_t> output_size) {
+    torch::Tensor nodes, bool with_edge_ids,
+    torch::optional<int64_t> output_size) {
   auto [in_degree, sliced_indptr] = SliceCSCIndptr(indptr, nodes);
   std::vector<torch::Tensor> results;
   results.reserve(indices_list.size());
@@ -321,6 +322,11 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatchedImpl(
     if (!output_size.has_value()) output_size = output_indices.size(0);
     TORCH_CHECK(*output_size == output_indices.size(0));
     results.push_back(output_indices);
+  }
+  if (with_edge_ids) {
+    results.push_back(IndptrEdgeIdsImpl(
+        output_indptr, sliced_indptr.scalar_type(), sliced_indptr,
+        output_size));
   }
   return {output_indptr, results};
 }
