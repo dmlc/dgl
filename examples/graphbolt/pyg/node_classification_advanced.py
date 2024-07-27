@@ -55,8 +55,8 @@ import time
 import dgl.graphbolt as gb
 import torch
 
-# Needed until https://github.com/pytorch/pytorch/issues/121197 is resolved to
-# use the `--torch-compile` cmdline option reliably.
+# For torch.compile until https://github.com/pytorch/pytorch/issues/121197 is
+# resolved.
 import torch._inductor.codecache
 
 torch._dynamo.config.cache_size_limit = 32
