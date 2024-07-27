@@ -164,11 +164,7 @@ def test_gpu_sampling_DataLoader(
             assert "a" in minibatch.node_features
             assert "b" in minibatch.node_features
             assert "c" in minibatch.node_features
-            # TODO @mfbalin: enable this if.
-            if (
-                num_gpu_cached_edges == 0
-                and sampler_name == "LayerNeighborSampler"
-            ):
+            if sampler_name == "LayerNeighborSampler":
                 assert torch.equal(
                     minibatch.node_features["a"], minibatch2.node_features["a"]
                 )
@@ -176,10 +172,6 @@ def test_gpu_sampling_DataLoader(
                 assert "d" in minibatch.edge_features[layer_id]
                 edge_feature = minibatch.edge_features[layer_id]["d"]
                 edge_feature_ref = minibatch2.edge_features[layer_id]["d"]
-                # TODO @mfbalin: enable this if.
-                if (
-                    num_gpu_cached_edges == 0
-                    and sampler_name == "LayerNeighborSampler"
-                ):
+                if sampler_name == "LayerNeighborSampler":
                     assert torch.equal(edge_feature, edge_feature_ref)
     assert len(list(dataloader)) == N // B
