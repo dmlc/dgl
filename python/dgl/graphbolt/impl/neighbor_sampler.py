@@ -82,6 +82,10 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
         subgraph.add_edge_attribute(ORIGINAL_EDGE_ID, edge_tensors[0])
         edge_tensors = edge_tensors[1:]
         assert len(edge_tensors) == 0
+        # TODO @mfbalin: remove these lines after fixing cache for edge ids.
+        edge_attributes = subgraph.edge_attributes
+        edge_attributes.pop(ORIGINAL_EDGE_ID)
+        subgraph.edge_attributes = edge_attributes
 
         return minibatch
 
