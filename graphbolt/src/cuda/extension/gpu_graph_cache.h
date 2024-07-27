@@ -84,7 +84,9 @@ class GpuGraphCache : public torch::CustomClassHolder {
    * @param num_threshold The number of seeds among the missing node ids that
    * will be inserted into the cache.
    * @param indptr The indptr for the missing seeds fetched from remote.
-   * @param edge_tensors The edge tensors for the missing seeds.
+   * @param edge_tensors The edge tensors for the missing seeds. The last
+   * element of edge_tensors is treated as the edge ids tensor with
+   * indptr_dtype.
    *
    * @return (torch::Tensor, std::vector<torch::Tensor>) The final indptr and
    * edge_tensors, directly corresponding to the seeds tensor.
@@ -106,6 +108,7 @@ class GpuGraphCache : public torch::CustomClassHolder {
   int64_t num_nodes_;             // The number of cached nodes in the cache.
   int64_t num_edges_;             // The number of cached edges in the cache.
   torch::Tensor indptr_;          // The cached graph structure indptr tensor.
+  torch::Tensor offset_;          // The original graph's sliced_indptr tensor.
   std::vector<torch::Tensor> cached_edge_tensors_;  // The cached graph
                                                     // structure edge tensors.
 };

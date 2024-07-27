@@ -118,7 +118,8 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
 
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
     torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
-    torch::Tensor nodes, torch::optional<int64_t> output_size) {
+    torch::Tensor nodes, bool with_edge_ids,
+    torch::optional<int64_t> output_size) {
   for (auto& indices : indices_list) {
     TORCH_CHECK(
         indices.sizes().size() == 1,
@@ -129,11 +130,12 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
     GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
         c10::DeviceType::CUDA, "IndexSelectCSCImpl", {
           return IndexSelectCSCBatchedImpl(
-              indptr, indices_list, nodes, output_size);
+              indptr, indices_list, nodes, with_edge_ids, output_size);
         });
   }
   std::vector<torch::Tensor> results;
   torch::Tensor output_indptr;
+  torch::Tensor edge_ids;
   for (auto& indices : indices_list) {
     // @todo: The CPU supports only integer dtypes for indices tensor.
     TORCH_CHECK(
@@ -144,7 +146,10 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
     const auto res = g.InSubgraph(nodes);
     output_indptr = res->indptr;
     results.push_back(res->indices);
+    TORCH_CHECK(res->original_edge_ids.has_value());
+    edge_ids = *res->original_edge_ids;
   }
+  if (with_edge_ids) results.push_back(edge_ids);
   return std::make_tuple(output_indptr, results);
 }
 

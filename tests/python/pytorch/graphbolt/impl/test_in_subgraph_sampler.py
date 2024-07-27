@@ -22,9 +22,10 @@ from .. import gb_test_utils
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("is_pinned", [False, True])
+@pytest.mark.parametrize("with_edge_ids", [False, True])
 @pytest.mark.parametrize("output_size", [None, True])
 def test_index_select_csc(
-    indptr_dtype, indices_dtype, idtype, is_pinned, output_size
+    indptr_dtype, indices_dtype, idtype, is_pinned, with_edge_ids, output_size
 ):
     """Original graph in COO:
     1   0   1   0   1   0
@@ -50,6 +51,9 @@ def test_index_select_csc(
         indptr = indptr.cuda()
         indices = indices.cuda()
     index = index.cuda()
+    edge_ids = torch.tensor(
+        [0, 1, 2, 12, 13, 7, 8], dtype=indptr_dtype, device=index.device
+    )
 
     if output_size:
         output_size = len(cpu_indices)
@@ -75,12 +79,14 @@ def test_index_select_csc(
             gpu_indptr2,
             gpu_indices_list,
         ) = torch.ops.graphbolt.index_select_csc_batched(
-            indptr, indices_list, index, output_size_selection
+            indptr, indices_list, index, with_edge_ids, output_size_selection
         )
 
         assert torch.equal(gpu_indptr, gpu_indptr2)
         assert torch.equal(gpu_indices_list[0], gpu_indices)
         assert torch.equal(gpu_indices_list[1], gpu_indices.int())
+        if with_edge_ids:
+            assert torch.equal(gpu_indices_list[2], edge_ids)
 
 
 def test_InSubgraphSampler_homo():

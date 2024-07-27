@@ -276,7 +276,7 @@ class MiniBatch:
                 blocks[0].srcnodes[node_type].data[NID] = reverse_ids
             # Assign reverse edges ids.
             for block, subgraph in zip(blocks, self.sampled_subgraphs):
-                if subgraph.original_edge_ids:
+                if subgraph.original_edge_ids is not None:
                     for (
                         edge_type,
                         reverse_ids,
