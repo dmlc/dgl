@@ -72,7 +72,7 @@ def accuracy(out, labels):
     assert labels.ndim == 1 or (labels.ndim == 2 and labels.size(1) == 1)
     labels = labels.flatten()
     predictions = torch.argmax(out, 1)
-    return torch.sum(labels == predictions).double() / labels.size(0)
+    return (labels == predictions).sum(dtype=torch.float64) / labels.size(0)
 
 
 def convert_to_pyg(h, subgraph):
