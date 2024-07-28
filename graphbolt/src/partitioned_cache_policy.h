@@ -103,13 +103,13 @@ class PartitionedCachePolicy : public torch::CustomClassHolder {
    * @param pointers The CacheKey pointers in the cache to unmark.
    * @param offsets The partition offsets for the pointers.
    */
-  void WritingCompleted(torch::Tensor keys, torch::Tensor offsets);
+  void WritingCompleted(torch::Tensor pointers, torch::Tensor offsets);
 
   c10::intrusive_ptr<Future<void>> ReadingCompletedAsync(
-      torch::Tensor keys, torch::Tensor offsets);
+      torch::Tensor pointers, torch::Tensor offsets);
 
   c10::intrusive_ptr<Future<void>> WritingCompletedAsync(
-      torch::Tensor keys, torch::Tensor offsets);
+      torch::Tensor pointers, torch::Tensor offsets);
 
   template <typename CachePolicy>
   static c10::intrusive_ptr<PartitionedCachePolicy> Create(
