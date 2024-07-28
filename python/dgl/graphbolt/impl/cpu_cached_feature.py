@@ -127,7 +127,13 @@ class CPUCachedFeature(Feature):
 
             yield
 
-            positions, index, missing_keys, found_keys = policy_future.wait()
+            (
+                positions,
+                index,
+                missing_keys,
+                found_pointers,
+                found_offsets,
+            ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
             host_to_device_stream = get_host_to_device_uva_stream()
@@ -150,11 +156,12 @@ class CPUCachedFeature(Feature):
                 yield  # fallback feature stages.
 
             values_from_cpu_copy_event.wait()
-            reading_completed = policy.reading_completed_async(found_keys, [])
+            reading_completed = policy.reading_completed_async(
+                found_pointers, found_offsets
+            )
 
             missing_values = missing_values_future.wait()
-            policy_replace_output = positions_future.wait()
-            positions = policy_replace_output[0]
+            positions, pointers, offsets = positions_future.wait()
             replace_future = cache.replace_async(positions, missing_values)
 
             host_to_device_stream = get_host_to_device_uva_stream()
@@ -173,7 +180,7 @@ class CPUCachedFeature(Feature):
             reading_completed.wait()
             replace_future.wait()
             writing_completed = policy.writing_completed_async(
-                missing_keys, policy_replace_output[1:]
+                pointers, offsets
             )
 
             class _Waiter:
@@ -226,7 +233,13 @@ class CPUCachedFeature(Feature):
 
             yield
 
-            positions, index, missing_keys, found_keys = policy_future.wait()
+            (
+                positions,
+                index,
+                missing_keys,
+                found_pointers,
+                found_offsets,
+            ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
             values_future = cache.query_async(positions, index, ids.shape[0])
@@ -243,13 +256,14 @@ class CPUCachedFeature(Feature):
                 yield  # fallback feature stages.
 
             values = values_future.wait()
-            reading_completed = policy.reading_completed_async(found_keys, [])
+            reading_completed = policy.reading_completed_async(
+                found_pointers, found_offsets
+            )
 
             missing_index = index[positions.size(0) :]
 
             missing_values = missing_values_future.wait()
-            policy_replace_output = positions_future.wait()
-            positions = policy_replace_output[0]
+            positions, pointers, offsets = positions_future.wait()
             replace_future = cache.replace_async(positions, missing_values)
             values = torch.ops.graphbolt.scatter_async(
                 values, missing_index, missing_values
@@ -267,7 +281,7 @@ class CPUCachedFeature(Feature):
             reading_completed.wait()
             replace_future.wait()
             writing_completed = policy.writing_completed_async(
-                missing_keys, policy_replace_output[1:]
+                pointers, offsets
             )
 
             class _Waiter:
@@ -290,7 +304,13 @@ class CPUCachedFeature(Feature):
 
             yield
 
-            positions, index, missing_keys, found_keys = policy_future.wait()
+            (
+                positions,
+                index,
+                missing_keys,
+                found_pointers,
+                found_offsets,
+            ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
             values_future = cache.query_async(positions, index, ids.shape[0])
@@ -307,13 +327,14 @@ class CPUCachedFeature(Feature):
                 yield  # fallback feature stages.
 
             values = values_future.wait()
-            reading_completed = policy.reading_completed_async(found_keys, [])
+            reading_completed = policy.reading_completed_async(
+                found_pointers, found_offsets
+            )
 
             missing_index = index[positions.size(0) :]
 
             missing_values = missing_values_future.wait()
-            policy_replace_output = positions_future.wait()
-            positions = policy_replace_output[0]
+            positions, pointers, offsets = positions_future.wait()
             replace_future = cache.replace_async(positions, missing_values)
             values = torch.ops.graphbolt.scatter_async(
                 values, missing_index, missing_values
@@ -324,7 +345,7 @@ class CPUCachedFeature(Feature):
             reading_completed.wait()
             replace_future.wait()
             writing_completed = policy.writing_completed_async(
-                missing_keys, policy_replace_output[1:]
+                pointers, offsets
             )
 
             class _Waiter:

@@ -76,9 +76,15 @@ class CPUFeatureCache(object):
             pinned, then the returned values tensor is pinned as well.
         """
         self.total_queries += keys.shape[0]
-        positions, index, missing_keys, found_keys = self._policy.query(keys)
+        (
+            positions,
+            index,
+            missing_keys,
+            found_pointers,
+            found_offsets,
+        ) = self._policy.query(keys)
         values = self._cache.query(positions, index, keys.shape[0])
-        self._policy.reading_completed(found_keys, [])
+        self._policy.reading_completed(found_pointers, found_offsets)
         self.total_miss += missing_keys.shape[0]
         missing_index = index[positions.size(0) :]
         return values, missing_index, missing_keys
@@ -94,10 +100,9 @@ class CPUFeatureCache(object):
         values: Tensor
             The values to insert to the cache.
         """
-        output = self._policy.replace(keys)
-        positions = output[0]
+        positions, pointers, offsets = self._policy.replace(keys)
         self._cache.replace(positions, values)
-        self._policy.writing_completed(keys, output[1:])
+        self._policy.writing_completed(pointers, offsets)
 
     @property
     def miss_rate(self):
