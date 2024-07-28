@@ -225,7 +225,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 )
 
         # (4) Cut datapipe at CopyTo and wrap with pinning and prefetching
-        # before CopyTo. This enables enables non_blocking copies to the device.
+        # before it. This enables enables non_blocking copies to the device.
         # Prefetching enables the data pipeline up to the CopyTo to run in a
         # separate thread.
         if torch.cuda.is_available():
