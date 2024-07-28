@@ -155,6 +155,12 @@ class BaseCachePolicy {
   virtual void WritingCompleted(torch::Tensor pointers) = 0;
 
  protected:
+  template <typename K, typename V>
+  using map_t = phmap::flat_hash_map<K, V>;
+  template <typename K>
+  using set_t = phmap::flat_hash_set<K>;
+  static constexpr int kCapacityFactor = 2;
+
   template <typename CachePolicy>
   static std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
   QueryImpl(CachePolicy& policy, torch::Tensor keys);
@@ -290,8 +296,8 @@ class S3FifoCachePolicy : public BaseCachePolicy {
   int64_t capacity_;
   int64_t cache_usage_;
   int64_t small_queue_size_target_;
-  phmap::flat_hash_set<int64_t> ghost_set_;
-  phmap::flat_hash_map<int64_t, CacheKey*> key_to_cache_key_;
+  set_t<int64_t> ghost_set_;
+  map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
 
 /**
@@ -383,7 +389,7 @@ class SieveCachePolicy : public BaseCachePolicy {
   decltype(queue_)::iterator hand_;
   int64_t capacity_;
   int64_t cache_usage_;
-  phmap::flat_hash_map<int64_t, CacheKey*> key_to_cache_key_;
+  map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
 
 /**
@@ -485,7 +491,7 @@ class LruCachePolicy : public BaseCachePolicy {
   std::list<CacheKey> queue_;
   int64_t capacity_;
   int64_t cache_usage_;
-  phmap::flat_hash_map<int64_t, decltype(queue_)::iterator> key_to_cache_key_;
+  map_t<int64_t, decltype(queue_)::iterator> key_to_cache_key_;
 };
 
 /**
@@ -573,7 +579,7 @@ class ClockCachePolicy : public BaseCachePolicy {
   CircularQueue<CacheKey> queue_;
   int64_t capacity_;
   int64_t cache_usage_;
-  phmap::flat_hash_map<int64_t, CacheKey*> key_to_cache_key_;
+  map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
 
 }  // namespace storage
