@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .... import to_heterogeneous, to_homogeneous
+from .... import khop_out_subgraph, to_heterogeneous, to_homogeneous
 from ....base import NID
 from ....convert import to_networkx
 from ....subgraph import node_subgraph
@@ -153,6 +153,13 @@ class SubgraphX(nn.Module):
             exclude_mask = torch.ones(num_nodes)
             exclude_mask[local_region] = 0.0
             exclude_mask[selected_nodes] = 1.0
+
+            # TODO: per paper, "when computing the marginalized contributions,
+            # the zero-padding strategy should exclude the target node v_i"
+            if (
+                self.explanation_type == "node"
+            ):  # and self.explanation_node_target in subgraph_nodes # TODO(detailed impl.)
+                exclude_mask[self.node_explanation_target] = 1.0
 
             # Mask for set S_i and g_i
             include_mask = exclude_mask.clone()
@@ -335,6 +342,7 @@ class SubgraphX(nn.Module):
         ), f"The number of nodes in the\
             graph {graph.num_nodes()} should be bigger than {self.node_min}."
 
+        self.explanation_type = "graph"
         self.graph = graph
         self.feat = feat
         self.target_class = target_class
@@ -365,6 +373,89 @@ class SubgraphX(nn.Module):
                 best_immediate_reward = best_leaf.immediate_reward
 
         return best_leaf.nodes
+
+    def explain_node(self, node_id, graph, feat, target_class, **kwargs):
+        r"""Find the most important subgraph from a k-hop neighborhood
+        rooted at a given node of the original graph for the model to
+        classify the graph into the target class.
+
+        Parameters
+        ----------
+        node_id : int
+            The ID of the node to explain.
+        graph : DGLGraph
+            A homogeneous graph
+        feat : Tensor
+            The input node feature of shape :math:`(N, D)`, :math:`N` is the
+            number of nodes, and :math:`D` is the feature size
+        target_class : int
+            The target class to explain
+        kwargs : dict
+            Additional arguments passed to the GNN model
+
+        Returns
+        -------
+        Tensor
+            Nodes that represent the most important subgraph
+
+        Examples
+        --------
+
+        >>> import torch
+        >>> import torch.nn as nn
+        >>> import torch.nn.functional as F
+        >>> from dgl.data import GINDataset
+        >>> from dgl.dataloading import GraphDataLoader
+        >>> from dgl.nn import GraphConv, AvgPooling, SubgraphX
+
+        >>> # Define the model
+        >>> class Model(nn.Module):
+        ...     def __init__(self, in_dim, n_classes, hidden_dim=128):
+        ...         super().__init__()
+        ...         self.conv1 = GraphConv(in_dim, hidden_dim)
+        ...         self.conv2 = GraphConv(hidden_dim, n_classes)
+        ...         self.pool = AvgPooling()
+        ...
+        ...     def forward(self, g, h):
+        ...         h = F.relu(self.conv1(g, h))
+        ...         h = self.conv2(g, h)
+        ...         return self.pool(g, h)
+
+        >>> # Load dataset
+        >>> data = GINDataset("MUTAG", self_loop=True)
+        >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
+
+        >>> # Train the model
+        >>> feat_size = data[0][0].ndata["attr"].shape[1]
+        >>> model = Model(feat_size, data.gclasses)
+        >>> criterion = nn.CrossEntropyLoss()
+        >>> optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+        >>> for bg, labels in dataloader:
+        ...     logits = model(bg, bg.ndata["attr"])
+        ...     loss = criterion(logits, labels)
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Initialize the explainer
+        >>> explainer = SubgraphX(model, num_hops=2)
+
+        >>> # Explain the prediction for node 0 in graph 0
+        >>> graph, l = data[0]
+        >>> graph_feat = graph.ndata.pop("attr")
+        >>> g_nodes_explain = explainer.explain_node(0, graph, graph_feat, target_class=l)
+        """
+        # Extract node-centered k-hop subgraph and its associated node features.
+        sg, inverse_indices = khop_out_subgraph(graph, node_id, self.num_hops)
+        sg_nodes = sg.ndata[NID].long()
+        sg_feat = feat[sg_nodes]
+
+        self.explanation_type = "node"
+        self.node_explanation_target = inverse_indices[0]
+
+        eg_nodes = self.explain_graph(sg, sg_feat, target_class, **kwargs)
+        original_nodes = sg_nodes[eg_nodes.long()]
+        return original_nodes
 
 
 class HeteroSubgraphX(nn.Module):
