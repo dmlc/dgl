@@ -424,15 +424,25 @@ class LruCachePolicy : public BaseCachePolicy {
    */
   void WritingCompleted(torch::Tensor pointers);
 
+  void MoveToFront(std::list<CacheKey>::iterator it) {
+    std::list<CacheKey> temp;
+    // Transfer the element to temp to keep references valid.
+    auto next_it = it;
+    std::advance(next_it, 1);
+    temp.splice(temp.begin(), queue_, it, next_it);
+    // Move the element to the beginning of the queue.
+    queue_.splice(queue_.begin(), temp);
+    // The iterators and references are not invalidated.
+    TORCH_CHECK(it == queue_.begin());
+  }
+
   template <bool write>
   std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
       if (write || !cache_key.BeingWritten()) {
-        queue_.erase(it->second);
-        queue_.push_front(cache_key.StartUse<write>());
-        it->second = queue_.begin();
+        MoveToFront(it->second);
         return std::make_pair(cache_key.getPos(), &cache_key);
       }
     }
@@ -458,9 +468,12 @@ class LruCachePolicy : public BaseCachePolicy {
     // Do not evict items that are still in use.
     for (auto cache_key = queue_.back(); cache_key.InUse();
          cache_key = queue_.back()) {
-      queue_.pop_back();
-      queue_.push_front(cache_key);
-      key_to_cache_key_[cache_key.getKey()] = queue_.begin();
+      auto it = queue_.end();
+      std::advance(it, -1);
+      // Move the last element to the front without invalidating references.
+      MoveToFront(it);
+      // The check below will hold true. Disabled for performance reasons.
+      // TORCH_CHECK(key_to_cache_key_[cache_key.getKey()] == queue_.begin());
     }
     const auto& cache_key = queue_.back();
     TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
