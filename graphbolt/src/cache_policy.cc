@@ -92,7 +92,7 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
             sizeof(CacheKey*) == sizeof(int64_t), "You need 64 bit pointers.");
         auto pointers_ptr =
             reinterpret_cast<CacheKey**>(pointers.data_ptr<int64_t>());
-        phmap::flat_hash_set<int64_t> position_set;
+        set_t<int64_t> position_set;
         position_set.reserve(keys.size(0));
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
@@ -132,7 +132,7 @@ S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
       small_queue_size_target_(capacity / 10) {
   TORCH_CHECK(small_queue_size_target_ > 0, "Capacity is not large enough.");
   ghost_set_.reserve(ghost_queue_.Capacity());
-  key_to_cache_key_.reserve(capacity);
+  key_to_cache_key_.reserve(kCapacityFactor * capacity);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -157,7 +157,7 @@ SieveCachePolicy::SieveCachePolicy(int64_t capacity)
     // Ensure that queue_ is constructed first before accessing its `.end()`.
     : queue_(), hand_(queue_.end()), capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
-  key_to_cache_key_.reserve(capacity);
+  key_to_cache_key_.reserve(kCapacityFactor * capacity);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -181,7 +181,7 @@ void SieveCachePolicy::WritingCompleted(torch::Tensor keys) {
 LruCachePolicy::LruCachePolicy(int64_t capacity)
     : capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
-  key_to_cache_key_.reserve(capacity);
+  key_to_cache_key_.reserve(kCapacityFactor * capacity);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -205,7 +205,7 @@ void LruCachePolicy::WritingCompleted(torch::Tensor keys) {
 ClockCachePolicy::ClockCachePolicy(int64_t capacity)
     : queue_(capacity), capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
-  key_to_cache_key_.reserve(capacity);
+  key_to_cache_key_.reserve(kCapacityFactor * capacity);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
