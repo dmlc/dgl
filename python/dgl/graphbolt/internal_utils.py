@@ -151,6 +151,32 @@ def recursive_apply_reduce_all(data, fn, *args, **kwargs):
         return fn(data, *args, **kwargs)
 
 
+def get_nonproperty_attributes(_obj) -> list:
+    """Get attributes of the class except for the properties."""
+    attributes = [
+        attribute
+        for attribute in dir(_obj)
+        if not attribute.startswith("__")
+        and (
+            not hasattr(type(_obj), attribute)
+            or not isinstance(getattr(type(_obj), attribute), property)
+        )
+        and not callable(getattr(_obj, attribute))
+    ]
+    return attributes
+
+
+def get_attributes(_obj) -> list:
+    """Get attributes of the class."""
+    attributes = [
+        attribute
+        for attribute in dir(_obj)
+        if not attribute.startswith("__")
+        and not callable(getattr(_obj, attribute))
+    ]
+    return attributes
+
+
 def download(
     url,
     path=None,
