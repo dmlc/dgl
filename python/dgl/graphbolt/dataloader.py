@@ -224,14 +224,23 @@ class DataLoader(torch.utils.data.DataLoader):
                     ),
                 )
 
-        # (4) Cut datapipe at CopyTo and wrap with prefetcher. This enables the
-        # data pipeline up to the CopyTo operation to run in a separate thread.
-        datapipe_graph = _find_and_wrap_parent(
-            datapipe_graph,
-            CopyTo,
-            dp.iter.Prefetcher,
-            buffer_size=2,
-        )
+        # (4) Cut datapipe at CopyTo and wrap with pinning and prefetching
+        # before it. This enables enables non_blocking copies to the device.
+        # Prefetching enables the data pipeline up to the CopyTo to run in a
+        # separate thread.
+        if torch.cuda.is_available():
+            copiers = dp_utils.find_dps(datapipe_graph, CopyTo)
+            for copier in copiers:
+                if copier.device.type == "cuda":
+                    datapipe_graph = dp_utils.replace_dp(
+                        datapipe_graph,
+                        copier,
+                        copier.datapipe.transform(
+                            lambda x: x.pin_memory()
+                        ).prefetch(2)
+                        # After the data gets pinned, we can copy non_blocking.
+                        .copy_to(copier.device, non_blocking=True),
+                    )
 
         # The stages after feature fetching is still done in the main process.
         # So we set num_workers to 0 here.
