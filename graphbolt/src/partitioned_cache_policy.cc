@@ -173,7 +173,7 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
   torch::Tensor missing_keys = torch::empty(
       indices.size(0) - positions.size(0),
       std::get<2>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
-  torch::Tensor found_keys = torch::empty(
+  torch::Tensor found_pointers = torch::empty(
       positions.size(0),
       std::get<3>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
   auto output_indices_ptr = output_indices.data_ptr<int64_t>();
@@ -194,10 +194,10 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
         positions.data_ptr<int64_t>() + begin,
         [off = tid * capacity_ / policies_.size()](auto x) { return x + off; });
     std::memcpy(
-        reinterpret_cast<std::byte*>(found_keys.data_ptr()) +
-            begin * found_keys.element_size(),
+        reinterpret_cast<std::byte*>(found_pointers.data_ptr()) +
+            begin * found_pointers.element_size(),
         std::get<3>(results[tid]).data_ptr(),
-        num_selected * found_keys.element_size());
+        num_selected * found_pointers.element_size());
     begin = result_offsets[policies_.size() + tid];
     end = result_offsets[policies_.size() + tid + 1];
     const auto num_missing = end - begin;
@@ -212,17 +212,18 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
         num_missing * missing_keys.element_size());
   });
   return std::make_tuple(
-      positions, output_indices, missing_keys, found_keys,
+      positions, output_indices, missing_keys, found_pointers,
       result_offsets_tensor.slice(0, 0, policies_.size() + 1));
 }
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
 PartitionedCachePolicy::QueryAsync(torch::Tensor keys) {
   return async([=] {
-    auto [positions, output_indices, missing_keys, found_keys, found_offsets] =
-        Query(keys);
+    auto
+        [positions, output_indices, missing_keys, found_pointers,
+         found_offsets] = Query(keys);
     return std::vector{
-        positions, output_indices, missing_keys, found_keys, found_offsets};
+        positions, output_indices, missing_keys, found_pointers, found_offsets};
   });
 }
 
