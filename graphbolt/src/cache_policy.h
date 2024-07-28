@@ -443,7 +443,7 @@ class LruCachePolicy : public BaseCachePolicy {
       auto& cache_key = *it->second;
       if (write || !cache_key.BeingWritten()) {
         MoveToFront(it->second);
-        return std::make_pair(cache_key.getPos(), &cache_key);
+        return std::make_pair(cache_key.StartUse<write>().getPos(), &cache_key);
       }
     }
     return std::nullopt;
