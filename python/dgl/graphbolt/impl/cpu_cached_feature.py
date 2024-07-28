@@ -127,7 +127,13 @@ class CPUCachedFeature(Feature):
 
             yield
 
-            positions, index, missing_keys, found_pointers, found_offsets = policy_future.wait()
+            (
+                positions,
+                index,
+                missing_keys,
+                found_pointers,
+                found_offsets,
+            ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
             host_to_device_stream = get_host_to_device_uva_stream()
@@ -150,7 +156,9 @@ class CPUCachedFeature(Feature):
                 yield  # fallback feature stages.
 
             values_from_cpu_copy_event.wait()
-            reading_completed = policy.reading_completed_async(found_pointers, found_offsets)
+            reading_completed = policy.reading_completed_async(
+                found_pointers, found_offsets
+            )
 
             missing_values = missing_values_future.wait()
             positions, pointers, offsets = positions_future.wait()
@@ -225,7 +233,13 @@ class CPUCachedFeature(Feature):
 
             yield
 
-            positions, index, missing_keys, found_pointers, found_offsets = policy_future.wait()
+            (
+                positions,
+                index,
+                missing_keys,
+                found_pointers,
+                found_offsets,
+            ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
             values_future = cache.query_async(positions, index, ids.shape[0])
@@ -242,7 +256,9 @@ class CPUCachedFeature(Feature):
                 yield  # fallback feature stages.
 
             values = values_future.wait()
-            reading_completed = policy.reading_completed_async(found_pointers, found_offsets)
+            reading_completed = policy.reading_completed_async(
+                found_pointers, found_offsets
+            )
 
             missing_index = index[positions.size(0) :]
 
@@ -288,7 +304,13 @@ class CPUCachedFeature(Feature):
 
             yield
 
-            positions, index, missing_keys, found_pointers, found_offsets = policy_future.wait()
+            (
+                positions,
+                index,
+                missing_keys,
+                found_pointers,
+                found_offsets,
+            ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
             values_future = cache.query_async(positions, index, ids.shape[0])
@@ -305,7 +327,9 @@ class CPUCachedFeature(Feature):
                 yield  # fallback feature stages.
 
             values = values_future.wait()
-            reading_completed = policy.reading_completed_async(found_pointers, found_offsets)
+            reading_completed = policy.reading_completed_async(
+                found_pointers, found_offsets
+            )
 
             missing_index = index[positions.size(0) :]
 
