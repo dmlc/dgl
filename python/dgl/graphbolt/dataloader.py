@@ -4,7 +4,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 import torch
-import torch.utils.data
+import torch.utils.data as torch_data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
 
@@ -70,7 +70,7 @@ def _set_worker_id(worked_id):
     torch.ops.graphbolt.set_worker_id(worked_id)
 
 
-class MultiprocessingWrapper(dp.iter.IterDataPipe):
+class MultiprocessingWrapper(torch_data.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
 
     Parameters
@@ -88,7 +88,7 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
 
     def __init__(self, datapipe, num_workers=0, persistent_workers=True):
         self.datapipe = datapipe
-        self.dataloader = torch.utils.data.DataLoader(
+        self.dataloader = torch_data.DataLoader(
             datapipe,
             batch_size=None,
             num_workers=num_workers,
@@ -100,7 +100,7 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
         yield from self.dataloader
 
 
-class DataLoader(torch.utils.data.DataLoader):
+class DataLoader(torch_data.DataLoader):
     """Multiprocessing DataLoader.
 
     Iterates over the data pipeline with everything before feature fetching
