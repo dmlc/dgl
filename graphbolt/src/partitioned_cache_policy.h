@@ -57,16 +57,18 @@ class PartitionedCachePolicy : public torch::CustomClassHolder {
    * @brief The policy query function.
    * @param keys The keys to query the cache.
    *
-   * @return (positions, indices, missing_keys, found_ptrs, found_offsets),
-   * where positions has the locations of the keys which were found in the
-   * cache, missing_keys has the keys that were not found and indices is defined
-   * such that keys[indices[:positions.size(0)]] gives us the keys for the found
-   * pointers and keys[indices[positions.size(0):]] is identical to
-   * missing_keys. The found_offsets tensor holds the partition offsets for the
-   * found pointers.
+   * @return (positions, indices, missing_keys, found_ptrs, found_offsets,
+   * missing_offsets), where positions has the locations of the keys which were
+   * found in the cache, missing_keys has the keys that were not found and
+   * indices is defined such that keys[indices[:positions.size(0)]] gives us the
+   * keys for the found pointers and keys[indices[positions.size(0):]] is
+   * identical to missing_keys. The found_offsets tensor holds the partition
+   * offsets for the found pointers. The missing_offsets holds the partition
+   * offsets for the missing_keys.
    */
   std::tuple<
-      torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+      torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
+      torch::Tensor>
   Query(torch::Tensor keys);
 
   c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> QueryAsync(
@@ -75,16 +77,17 @@ class PartitionedCachePolicy : public torch::CustomClassHolder {
   /**
    * @brief The policy replace function.
    * @param keys The keys to query the cache.
+   * @param offsets The partition offsets for the keys.
    *
    * @return (positions, pointers, offsets), where positions holds the locations
    * of the replaced entries in the cache, pointers holds the CacheKey pointers
    * for the inserted keys and offsets holds the partition offsets for pointers.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Replace(
-      torch::Tensor keys);
+      torch::Tensor keys, torch::optional<torch::Tensor> offsets);
 
   c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> ReplaceAsync(
-      torch::Tensor keys);
+      torch::Tensor keys, torch::optional<torch::Tensor> offsets);
 
   template <bool write>
   void ReadingWritingCompletedImpl(

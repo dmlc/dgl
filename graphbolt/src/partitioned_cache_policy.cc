@@ -44,13 +44,14 @@ PartitionedCachePolicy::PartitionedCachePolicy(
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 PartitionedCachePolicy::Partition(torch::Tensor keys) {
   const int64_t num_parts = policies_.size();
-  torch::Tensor offsets = torch::zeros(
+  torch::Tensor offsets = torch::empty(
       num_parts * num_parts + 1, keys.options().dtype(torch::kInt64));
+  auto offsets_ptr = offsets.data_ptr<int64_t>();
+  std::memset(offsets_ptr, 0, offsets.size(0) * offsets.element_size());
   auto indices = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
   auto part_id = torch::empty_like(keys, keys.options().dtype(torch::kInt32));
   const auto num_keys = keys.size(0);
   auto part_id_ptr = part_id.data_ptr<int32_t>();
-  auto offsets_ptr = offsets.data_ptr<int64_t>();
   AT_DISPATCH_INDEX_TYPES(
       keys.scalar_type(), "PartitionedCachePolicy::partition", ([&] {
         auto keys_ptr = keys.data_ptr<index_t>();
@@ -123,18 +124,26 @@ PartitionedCachePolicy::Partition(torch::Tensor keys) {
 }
 
 std::tuple<
-    torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+    torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
+    torch::Tensor>
 PartitionedCachePolicy::Query(torch::Tensor keys) {
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
     auto [positions, output_indices, missing_keys, found_pointers] =
         policies_[0]->Query(keys);
-    auto found_offsets = torch::empty(2, found_pointers.options());
-    auto found_offsets_ptr = found_offsets.data_ptr<int64_t>();
-    found_offsets_ptr[0] = 0;
-    found_offsets_ptr[1] = found_pointers.size(0);
-    return {
-        positions, output_indices, missing_keys, found_pointers, found_offsets};
+    auto found_and_missing_offsets = torch::empty(4, found_pointers.options());
+    auto found_and_missing_offsets_ptr =
+        found_and_missing_offsets.data_ptr<int64_t>();
+    // Found offsets part.
+    found_and_missing_offsets_ptr[0] = 0;
+    found_and_missing_offsets_ptr[1] = found_pointers.size(0);
+    // Missing offsets part.
+    found_and_missing_offsets_ptr[2] = 0;
+    found_and_missing_offsets_ptr[3] = missing_keys.size(0);
+    auto found_offsets = found_and_missing_offsets.slice(0, 0, 2);
+    auto missing_offsets = found_and_missing_offsets.slice(0, 2);
+    return {positions,      output_indices, missing_keys,
+            found_pointers, found_offsets,  missing_offsets};
   };
   torch::Tensor offsets, indices, permuted_keys;
   std::tie(offsets, indices, permuted_keys) = Partition(keys);
@@ -176,7 +185,11 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
   torch::Tensor found_pointers = torch::empty(
       positions.size(0),
       std::get<3>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
+  auto missing_offsets =
+      torch::empty(policies_.size() + 1, result_offsets_tensor.options());
   auto output_indices_ptr = output_indices.data_ptr<int64_t>();
+  auto missing_offsets_ptr = missing_offsets.data_ptr<int64_t>();
+  missing_offsets_ptr[0] = 0;
   gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
     if (begin == end) return;
     const auto tid = begin;
@@ -200,6 +213,7 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
         num_selected * found_pointers.element_size());
     begin = result_offsets[policies_.size() + tid];
     end = result_offsets[policies_.size() + tid + 1];
+    missing_offsets[tid + 1] = end - result_offsets[policies_.size()];
     const auto num_missing = end - begin;
     for (int64_t i = 0; i < num_missing; i++) {
       output_indices_ptr[begin + i] =
@@ -211,35 +225,44 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
         std::get<2>(results[tid]).data_ptr(),
         num_missing * missing_keys.element_size());
   });
+  auto found_offsets = result_offsets_tensor.slice(0, 0, policies_.size() + 1);
   return std::make_tuple(
-      positions, output_indices, missing_keys, found_pointers,
-      result_offsets_tensor.slice(0, 0, policies_.size() + 1));
+      positions, output_indices, missing_keys, found_pointers, found_offsets,
+      missing_offsets);
 }
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
 PartitionedCachePolicy::QueryAsync(torch::Tensor keys) {
   return async([=] {
     auto
-        [positions, output_indices, missing_keys, found_pointers,
-         found_offsets] = Query(keys);
-    return std::vector{
-        positions, output_indices, missing_keys, found_pointers, found_offsets};
+        [positions, output_indices, missing_keys, found_pointers, found_offsets,
+         missing_offsets] = Query(keys);
+    return std::vector{positions,      output_indices, missing_keys,
+                       found_pointers, found_offsets,  missing_offsets};
   });
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-PartitionedCachePolicy::Replace(torch::Tensor keys) {
+PartitionedCachePolicy::Replace(
+    torch::Tensor keys, torch::optional<torch::Tensor> offsets) {
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
     auto [positions, pointers] = policies_[0]->Replace(keys);
-    auto offsets = torch::empty(2, pointers.options());
-    auto offsets_ptr = offsets.data_ptr<int64_t>();
-    offsets_ptr[0] = 0;
-    offsets_ptr[1] = pointers.size(0);
-    return {positions, pointers, offsets};
+    if (!offsets.has_value()) {
+      offsets = torch::empty(2, pointers.options());
+      auto offsets_ptr = offsets->data_ptr<int64_t>();
+      offsets_ptr[0] = 0;
+      offsets_ptr[1] = pointers.size(0);
+    }
+    return {positions, pointers, *offsets};
   }
-  torch::Tensor offsets, indices, permuted_keys;
-  std::tie(offsets, indices, permuted_keys) = Partition(keys);
+  const auto offsets_provided = offsets.has_value();
+  torch::Tensor indices, permuted_keys;
+  if (!offsets_provided) {
+    std::tie(offsets, indices, permuted_keys) = Partition(keys);
+  } else {
+    permuted_keys = keys;
+  }
   auto output_positions = torch::empty_like(
       keys, keys.options()
                 .dtype(torch::kInt64)
@@ -248,8 +271,8 @@ PartitionedCachePolicy::Replace(torch::Tensor keys) {
       keys, keys.options()
                 .dtype(torch::kInt64)
                 .pinned_memory(utils::is_pinned(keys)));
-  auto offsets_ptr = offsets.data_ptr<int64_t>();
-  auto indices_ptr = indices.data_ptr<int64_t>();
+  auto offsets_ptr = offsets->data_ptr<int64_t>();
+  auto indices_ptr = offsets_provided ? nullptr : indices.data_ptr<int64_t>();
   auto output_positions_ptr = output_positions.data_ptr<int64_t>();
   auto output_pointers_ptr = output_pointers.data_ptr<int64_t>();
   namespace gb = graphbolt;
@@ -269,22 +292,29 @@ PartitionedCachePolicy::Replace(torch::Tensor keys) {
     }
     auto positions_ptr = positions.data_ptr<int64_t>();
     const auto off = tid * capacity_ / policies_.size();
-    for (int64_t i = 0; i < positions.size(0); i++) {
-      output_positions_ptr[indices_ptr[begin + i]] = positions_ptr[i] + off;
+    if (indices_ptr) {
+      for (int64_t i = 0; i < positions.size(0); i++) {
+        output_positions_ptr[indices_ptr[begin + i]] = positions_ptr[i] + off;
+      }
+    } else {
+      std::transform(
+          positions_ptr, positions_ptr + positions.size(0),
+          output_positions_ptr + begin, [off](auto x) { return x + off; });
     }
     auto pointers_ptr = pointers.data_ptr<int64_t>();
     std::copy(
         pointers_ptr, pointers_ptr + pointers.size(0),
         output_pointers_ptr + begin);
   });
-  return {output_positions, output_pointers, offsets};
+  return {output_positions, output_pointers, *offsets};
 }
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
-PartitionedCachePolicy::ReplaceAsync(torch::Tensor keys) {
+PartitionedCachePolicy::ReplaceAsync(
+    torch::Tensor keys, torch::optional<torch::Tensor> offsets) {
   return async([=] {
-    auto [positions, pointers, offsets] = Replace(keys);
-    return std::vector{positions, pointers, offsets};
+    auto [positions, pointers, offsets_out] = Replace(keys, offsets);
+    return std::vector{positions, pointers, offsets_out};
   });
 }
 
