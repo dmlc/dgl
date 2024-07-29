@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor
 import torch
 import torch.utils.data as torch_data
 import torchdata.dataloader2.graph as dp_utils
-import torchdata.datapipes as dp
 
 from .base import CopyTo, get_host_to_device_uva_stream
 from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
