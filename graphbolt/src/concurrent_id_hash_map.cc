@@ -51,7 +51,6 @@ ConcurrentIdHashMap<IdType>::ConcurrentIdHashMap(
   // Place the first `num_seeds` ids.
   unique_ids_.slice(0, 0, num_seeds) = ids.slice(0, 0, num_seeds);
 
-  // int8_t is threadsafe while bool is not for std::vector.
   auto valid_tensor = torch::empty(num_ids, ids.options().dtype(torch::kInt8));
   auto valid = valid_tensor.data_ptr<int8_t>();
 
