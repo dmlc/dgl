@@ -69,11 +69,13 @@ class CPUFeatureCache(object):
 
         Returns
         -------
-        tuple(Tensor, Tensor, Tensor)
-            A tuple containing (values, missing_indices, missing_keys) where
+        tuple(Tensor, Tensor, Tensor, Tensor)
+            A tuple containing
+            (values, missing_indices, missing_keys, missing_offsets) where
             values[missing_indices] corresponds to cache misses that should be
             filled by quering another source with missing_keys. If keys is
-            pinned, then the returned values tensor is pinned as well.
+            pinned, then the returned values tensor is pinned as well. The
+            missing_offsets tensor has the partition offsets of missing_keys.
         """
         self.total_queries += keys.shape[0]
         (
@@ -96,10 +98,12 @@ class CPUFeatureCache(object):
 
         Parameters
         ----------
-        keys: Tensor
+        keys : Tensor
             The keys to insert to the cache.
-        values: Tensor
+        values : Tensor
             The values to insert to the cache.
+        offsets : Tensor, optional
+            The partition offsets of the keys.
         """
         positions, pointers, offsets = self._policy.replace(keys, offsets)
         self._cache.replace(positions, values)
