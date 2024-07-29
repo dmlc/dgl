@@ -80,8 +80,6 @@ class ConcurrentIdHashMap {
    *
    * @param ids The array of the ids to be inserted.
    * @param num_seeds The number of seed ids.
-   *
-   * @return Unique ids from the input `ids`.
    */
   ConcurrentIdHashMap(const torch::Tensor& ids, size_t num_seeds);
 
