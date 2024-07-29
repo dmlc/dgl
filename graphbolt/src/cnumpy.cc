@@ -304,7 +304,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
     torch::Tensor index) {
-  return async([=] { return IndexSelectIOUringImpl(index); });
+  return async([=, this] { return IndexSelectIOUringImpl(index); });
 }
 
 #endif  // HAVE_LIBRARY_LIBURING
