@@ -75,10 +75,15 @@ class CPUCachedFeature(Feature):
         """
         if ids is None:
             return self._fallback_feature.read()
-        values, missing_index, missing_keys = self._feature.query(ids)
+        (
+            values,
+            missing_index,
+            missing_keys,
+            missing_offsets,
+        ) = self._feature.query(ids)
         missing_values = self._fallback_feature.read(missing_keys)
         values[missing_index] = missing_values
-        self._feature.replace(missing_keys, missing_values)
+        self._feature.replace(missing_keys, missing_values, missing_offsets)
         return values
 
     def read_async(self, ids: torch.Tensor):
@@ -133,6 +138,7 @@ class CPUCachedFeature(Feature):
                 missing_keys,
                 found_pointers,
                 found_offsets,
+                missing_offsets,
             ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
@@ -144,7 +150,9 @@ class CPUCachedFeature(Feature):
                 values_from_cpu_copy_event = torch.cuda.Event()
                 values_from_cpu_copy_event.record()
 
-            positions_future = policy.replace_async(missing_keys)
+            positions_future = policy.replace_async(
+                missing_keys, missing_offsets
+            )
 
             fallback_reader = self._fallback_feature.read_async(missing_keys)
             for _ in range(
@@ -239,12 +247,15 @@ class CPUCachedFeature(Feature):
                 missing_keys,
                 found_pointers,
                 found_offsets,
+                missing_offsets,
             ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
             values_future = cache.query_async(positions, index, ids.shape[0])
 
-            positions_future = policy.replace_async(missing_keys)
+            positions_future = policy.replace_async(
+                missing_keys, missing_offsets
+            )
 
             fallback_reader = self._fallback_feature.read_async(missing_keys)
             for _ in range(
@@ -310,12 +321,15 @@ class CPUCachedFeature(Feature):
                 missing_keys,
                 found_pointers,
                 found_offsets,
+                missing_offsets,
             ) = policy_future.wait()
             self._feature.total_queries += ids.shape[0]
             self._feature.total_miss += missing_keys.shape[0]
             values_future = cache.query_async(positions, index, ids.shape[0])
 
-            positions_future = policy.replace_async(missing_keys)
+            positions_future = policy.replace_async(
+                missing_keys, missing_offsets
+            )
 
             fallback_reader = self._fallback_feature.read_async(missing_keys)
             for _ in range(

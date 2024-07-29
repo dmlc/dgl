@@ -82,14 +82,15 @@ class CPUFeatureCache(object):
             missing_keys,
             found_pointers,
             found_offsets,
+            missing_offsets,
         ) = self._policy.query(keys)
         values = self._cache.query(positions, index, keys.shape[0])
         self._policy.reading_completed(found_pointers, found_offsets)
         self.total_miss += missing_keys.shape[0]
         missing_index = index[positions.size(0) :]
-        return values, missing_index, missing_keys
+        return values, missing_index, missing_keys, missing_offsets
 
-    def replace(self, keys, values):
+    def replace(self, keys, values, offsets=None):
         """Inserts key-value pairs into the cache using the selected caching
         policy algorithm to remove old key-value pairs if it is full.
 
@@ -100,7 +101,7 @@ class CPUFeatureCache(object):
         values: Tensor
             The values to insert to the cache.
         """
-        positions, pointers, offsets = self._policy.replace(keys)
+        positions, pointers, offsets = self._policy.replace(keys, offsets)
         self._cache.replace(positions, values)
         self._policy.writing_completed(pointers, offsets)
 
