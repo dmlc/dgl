@@ -69,7 +69,7 @@ OnDiskNpyArray::OnDiskNpyArray(
         new ::io_uring[num_queues_], io_uring_queue_destroyer{num_queues_});
     TORCH_CHECK(num_queues_ + 1 <= counting_semaphore_t::max());
     // The +1 is for the thread that calls parallel_for.
-    semaphore_ = std::make_unique<counting_semaphore_t>(num_queues_ + 1);
+    semaphore_.release(num_queues_ + 1);
     available_queues_.reserve(num_queues_);
     // Init io_uring queue.
     for (int64_t t = 0; t < num_queues_; t++) {
@@ -172,7 +172,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   std::atomic_flag exiting_first = ATOMIC_FLAG_INIT;
   // Consume a slot so that parallel_for is called only if there are available
   // queues.
-  semaphore_->acquire();
+  semaphore_.acquire();
   graphbolt::parallel_for(0, num_thread_, 1, [&](int thread_id, int) {
     // The completion queue might contain 4 * kGroupSize while we may submit
     // 4 * kGroupSize more. No harm in overallocation here.
@@ -181,7 +181,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     int64_t num_completed = 0;
     {
       // We consume a slot from the semaphore to use a queue.
-      semaphore_->acquire();
+      semaphore_.acquire();
       std::lock_guard lock(available_queues_mtx_);
       TORCH_CHECK(!available_queues_.empty());
       thread_id = available_queues_.back();
@@ -310,7 +310,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     }
     // If this is the first thread exiting, release the master thread's ticket
     // as well by releasing 2 slots. Otherwise, release 1 slot.
-    semaphore_->release(exiting_first.test_and_set() ? 1 : 2);
+    semaphore_.release(exiting_first.test_and_set() ? 1 : 2);
   });
   switch (error_flag.load(std::memory_order_relaxed)) {
     case 0:  // Successful.
