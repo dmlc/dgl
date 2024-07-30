@@ -25,7 +25,7 @@ else:
             [k + ":" + v for k, v in configs.items()]
         )
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position, wrong-import-order
 import torch
 
 ### FROM DGL @todo
