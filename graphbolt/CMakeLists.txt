@@ -73,7 +73,8 @@ endif()
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 include_directories(BEFORE ${BOLT_DIR}
                            ${BOLT_HEADERS}
-                           # For CXX20 features.
+                           # For CXX20 features:
+                           # `std::atomic_ref`, `std::counting_semaphore`
                            "../third_party/cccl/libcudacxx/include"
                            "../third_party/pcg/include"
                            "../third_party/phmap")
