@@ -17,11 +17,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cuda/std/semaphore>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
-#include <semaphore>
 #include <string>
 #include <vector>
 
@@ -49,7 +49,7 @@ struct io_uring_queue_destroyer {
  */
 class OnDiskNpyArray : public torch::CustomClassHolder {
   // No user will need more than 1024 io_uring queues.
-  using counting_semaphore_t = std::counting_semaphore<1024>;
+  using counting_semaphore_t = ::cuda::std::counting_semaphore<1024>;
 
  public:
   static constexpr int kGroupSize = 256;
