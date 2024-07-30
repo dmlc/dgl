@@ -75,6 +75,9 @@ class CPUCachedFeature(Feature):
         """
         if ids is None:
             return self._fallback_feature.read()
+        return self._feature.query_and_then_replace(
+            ids, self._fallback_feature.read
+        )
         (
             values,
             missing_index,

@@ -130,6 +130,8 @@ BaseCachePolicy::QueryAndThenReplaceImpl(
                 // we do not have to check for the uniqueness of the positions.
                 std::get<1>(position_set.insert(it->second->getPos())),
                 "Can't insert all, larger cache capacity is needed.");
+          } else {
+            policy.MarkExistingWriting(it);
           }
           auto& cache_key = *it->second;
           positions_ptr[i] = cache_key.getPos();

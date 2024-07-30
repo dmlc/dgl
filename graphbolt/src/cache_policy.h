@@ -264,7 +264,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
 
   std::pair<map_iterator, bool> Emplace(int64_t key) {
     auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
-    if (it->second != nullptr) {
+    if (it->second != getMapSentinelValue()) {
       auto& cache_key = *it->second;
       if (!cache_key.BeingWritten()) {
         // Not being written so we use StartUse<write=false>() and return
@@ -294,6 +294,10 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     const auto in_ghost_queue = ghost_set_.erase(key);
     auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
     it->second = queue.Push(CacheKey(key, pos));
+  }
+
+  void MarkExistingWriting(map_iterator it) {
+    it->second->Increment().StartUse<true>();
   }
 
   template <bool write>
@@ -414,7 +418,7 @@ class SieveCachePolicy : public BaseCachePolicy {
 
   std::pair<map_iterator, bool> Emplace(int64_t key) {
     auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
-    if (it->second != nullptr) {
+    if (it->second != getMapSentinelValue()) {
       auto& cache_key = *it->second;
       if (!cache_key.BeingWritten()) {
         // Not being written so we use StartUse<write=false>() and return
@@ -442,6 +446,10 @@ class SieveCachePolicy : public BaseCachePolicy {
     const auto pos = Evict();
     queue_.push_front(CacheKey(key, pos));
     it->second = &queue_.front();
+  }
+
+  void MarkExistingWriting(map_iterator it) {
+    it->second->SetFreq().StartUse<true>();
   }
 
   template <bool write>
@@ -552,7 +560,7 @@ class LruCachePolicy : public BaseCachePolicy {
 
   std::pair<map_iterator, bool> Emplace(int64_t key) {
     auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
-    if (it->second != queue_.end()) {
+    if (it->second != getMapSentinelValue()) {
       MoveToFront(it->second);
       auto& cache_key = *it->second;
       if (!cache_key.BeingWritten()) {
@@ -580,6 +588,11 @@ class LruCachePolicy : public BaseCachePolicy {
     const auto pos = Evict();
     queue_.push_front(CacheKey(key, pos));
     it->second = queue_.begin();
+  }
+
+  void MarkExistingWriting(map_iterator it) {
+    MoveToFront(it->second);
+    it->second->StartUse<true>();
   }
 
   template <bool write>
@@ -678,15 +691,13 @@ class ClockCachePolicy : public BaseCachePolicy {
 
   std::pair<map_iterator, bool> Emplace(int64_t key) {
     auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
-    if (it->second != nullptr) {
+    if (it->second != getMapSentinelValue()) {
       auto& cache_key = *it->second;
       if (!cache_key.BeingWritten()) {
         // Not being written so we use StartUse<write=false>() and return
         // true to indicate the key is ready to read.
         cache_key.SetFreq().StartUse<false>();
         return {it, true};
-      } else {
-        cache_key.SetFreq().StartUse<true>();
       }
     }
     // First time insertion, return false to indicate not ready to read.
@@ -704,6 +715,10 @@ class ClockCachePolicy : public BaseCachePolicy {
     const auto key = it->first;
     const auto pos = Evict();
     it->second = queue_.Push(CacheKey(key, pos));
+  }
+
+  void MarkExistingWriting(map_iterator it) {
+    it->second->SetFreq().StartUse<true>();
   }
 
   template <bool write>
