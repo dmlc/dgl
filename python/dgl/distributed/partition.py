@@ -1602,7 +1602,7 @@ def dgl_partition_to_graphbolt(
     # See https://docs.python.org/3.12/library/multiprocessing.html#contexts-and-start-methods
     # and https://pybind11.readthedocs.io/en/stable/advanced/misc.html#global-interpreter-lock-gil
     rel_path_results = []
-    if n_jobs > 1:
+    if n_jobs > 1 and num_parts > 1:
         mp_ctx = mp.get_context("spawn")
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=min(num_parts, n_jobs),
@@ -1611,7 +1611,7 @@ def dgl_partition_to_graphbolt(
             futures = []
             for part_id in range(num_parts):
                 futures.append(executor.submit(convert_with_format, part_id))
-            concurrent.futures.wait(futures)
+
         for part_id in range(num_parts):
             rel_path_results.append(futures[part_id].result())
     else:
