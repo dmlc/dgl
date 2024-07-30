@@ -242,6 +242,41 @@ PartitionedCachePolicy::QueryAsync(torch::Tensor keys) {
   });
 }
 
+std::tuple<
+    torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
+    torch::Tensor>
+PartitionedCachePolicy::QueryAndThenReplace(torch::Tensor keys) {
+  if (policies_.size() == 1) {
+    std::lock_guard lock(mtx_);
+    auto [positions, output_indices, pointers, missing_keys] =
+        policies_[0]->QueryAndThenReplace(keys);
+    auto found_and_missing_offsets = torch::empty(4, pointers.options());
+    auto found_and_missing_offsets_ptr =
+        found_and_missing_offsets.data_ptr<int64_t>();
+    // Found offsets part.
+    found_and_missing_offsets_ptr[0] = 0;
+    found_and_missing_offsets_ptr[1] = keys.size(0) - missing_keys.size(0);
+    // Missing offsets part.
+    found_and_missing_offsets_ptr[2] = 0;
+    found_and_missing_offsets_ptr[3] = missing_keys.size(0);
+    auto found_offsets = found_and_missing_offsets.slice(0, 0, 2);
+    auto missing_offsets = found_and_missing_offsets.slice(0, 2);
+    return {positions,    output_indices, pointers,
+            missing_keys, found_offsets,  missing_offsets};
+  };
+}
+
+c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
+PartitionedCachePolicy::QueryAndThenReplaceAsync(torch::Tensor keys) {
+  return async([=] {
+    auto
+        [positions, output_indices, pointers, missing_keys, found_offsets,
+         missing_offsets] = QueryAndThenReplace(keys);
+    return std::vector{positions,    output_indices, pointers,
+                       missing_keys, found_offsets,  missing_offsets};
+  });
+}
+
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 PartitionedCachePolicy::Replace(
     torch::Tensor keys, torch::optional<torch::Tensor> offsets) {
