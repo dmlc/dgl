@@ -136,7 +136,7 @@ BaseCachePolicy::QueryAndThenReplaceImpl(
           pointers_ptr[i] = &cache_key;
         }
       }));
-  return {positions, indices, pointers, missing_keys};
+  return {positions, indices, pointers, missing_keys.slice(0, found_cnt)};
 }
 
 template <typename CachePolicy>
