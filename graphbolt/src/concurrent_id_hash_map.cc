@@ -189,7 +189,7 @@ void ConcurrentIdHashMap<IdType>::InsertAndSetMin(IdType id, IdType value) {
 
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType val_pos = getValueIndex(pos);
-  cuda::std::atomic_ref value_ref(
+  ::cuda::std::atomic_ref value_ref(
       reinterpret_cast<IdType*>(hash_map_.data_ptr())[val_pos]);
   for (auto old_val = empty_key; old_val == empty_key || old_val > value;) {
     // It is more efficient to use weak variant in a loop.
@@ -201,7 +201,7 @@ template <typename IdType>
 inline typename ConcurrentIdHashMap<IdType>::InsertState
 ConcurrentIdHashMap<IdType>::AttemptInsertAt(int64_t pos, IdType key) {
   auto expected = static_cast<IdType>(kEmptyKey);
-  cuda::std::atomic_ref key_ref(
+  ::cuda::std::atomic_ref key_ref(
       reinterpret_cast<IdType*>(hash_map_.data_ptr())[getKeyIndex(pos)]);
   if (key_ref.compare_exchange_strong(expected, key)) {
     return InsertState::INSERTED;
