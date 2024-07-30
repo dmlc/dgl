@@ -271,8 +271,6 @@ class S3FifoCachePolicy : public BaseCachePolicy {
         // true to indicate the key is ready to read.
         cache_key.Increment().StartUse<false>();
         return {it, true};
-      } else {
-        cache_key.Increment().StartUse<true>();
       }
     }
     // First time insertion, return false to indicate not ready to read.
@@ -425,8 +423,6 @@ class SieveCachePolicy : public BaseCachePolicy {
         // true to indicate the key is ready to read.
         cache_key.SetFreq().StartUse<false>();
         return {it, true};
-      } else {
-        cache_key.SetFreq().StartUse<true>();
       }
     }
     // First time insertion, return false to indicate not ready to read.
@@ -568,8 +564,6 @@ class LruCachePolicy : public BaseCachePolicy {
         // true to indicate the key is ready to read.
         cache_key.StartUse<false>();
         return {it, true};
-      } else {
-        cache_key.StartUse<true>();
       }
     }
     // First time insertion, return false to indicate not ready to read.
