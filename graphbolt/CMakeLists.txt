@@ -73,6 +73,8 @@ endif()
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 include_directories(BEFORE ${BOLT_DIR}
                            ${BOLT_HEADERS}
+                           # For CXX20 features.
+                           "../third_party/cccl/libcudacxx/include"
                            "../third_party/pcg/include"
                            "../third_party/phmap")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
@@ -124,7 +126,6 @@ if(USE_CUDA)
   include_directories(BEFORE
                       "../third_party/cccl/thrust"
                       "../third_party/cccl/cub"
-                      "../third_party/cccl/libcudacxx/include"
                       "../third_party/cuco/include")
 
   message(STATUS "Use HugeCTR gpu_cache for graphbolt with INCLUDE_DIRS $ENV{GPU_CACHE_INCLUDE_DIRS}.")
