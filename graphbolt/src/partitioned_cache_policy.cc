@@ -206,11 +206,10 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
         selected_positions_ptr, selected_positions_ptr + num_selected,
         positions.data_ptr<int64_t>() + begin,
         [off = tid * capacity_ / policies_.size()](auto x) { return x + off; });
-    std::memcpy(
-        reinterpret_cast<std::byte*>(found_pointers.data_ptr()) +
-            begin * found_pointers.element_size(),
-        std::get<3>(results[tid]).data_ptr(),
-        num_selected * found_pointers.element_size());
+    auto selected_pointers_ptr = std::get<3>(results[tid]).data_ptr<int64_t>();
+    std::copy(
+        selected_pointers_ptr, selected_pointers_ptr + num_selected,
+        found_pointers.data_ptr<int64_t>() + begin);
     begin = result_offsets[policies_.size() + tid];
     end = result_offsets[policies_.size() + tid + 1];
     missing_offsets[tid + 1] = end - result_offsets[policies_.size()];
@@ -263,7 +262,102 @@ PartitionedCachePolicy::QueryAndThenReplace(torch::Tensor keys) {
     auto missing_offsets = found_and_missing_offsets.slice(0, 2);
     return {positions,    output_indices, pointers,
             missing_keys, found_offsets,  missing_offsets};
-  };
+  }
+  torch::Tensor offsets, indices, permuted_keys;
+  std::tie(offsets, indices, permuted_keys) = Partition(keys);
+  auto offsets_ptr = offsets.data_ptr<int64_t>();
+  auto indices_ptr = indices.data_ptr<int64_t>();
+  std::vector<
+      std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
+      results(policies_.size());
+  torch::Tensor result_offsets_tensor =
+      torch::empty(policies_.size() * 2 + 1, offsets.options());
+  auto result_offsets = result_offsets_tensor.data_ptr<int64_t>();
+  namespace gb = graphbolt;
+  {
+    std::lock_guard lock(mtx_);
+    gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
+      if (begin == end) return;
+      TORCH_CHECK(end - begin == 1);
+      const auto tid = begin;
+      begin = offsets_ptr[tid];
+      end = offsets_ptr[tid + 1];
+      results[tid] = policies_.at(tid)->QueryAndThenReplace(
+          permuted_keys.slice(0, begin, end));
+      const auto missing_cnt = std::get<3>(results[tid]).size(0);
+      result_offsets[tid] = end - begin - missing_cnt;
+      result_offsets[tid + policies_.size()] = missing_cnt;
+    });
+  }
+  std::exclusive_scan(
+      result_offsets, result_offsets + result_offsets_tensor.size(0),
+      result_offsets, 0);
+  torch::Tensor positions = torch::empty(
+      keys.size(0),
+      std::get<0>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
+  torch::Tensor output_indices = torch::empty_like(
+      indices, indices.options().pinned_memory(utils::is_pinned(keys)));
+  torch::Tensor pointers = torch::empty(
+      keys.size(0),
+      std::get<2>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
+  torch::Tensor missing_keys = torch::empty(
+      result_offsets[2 * policies_.size()] - result_offsets[policies_.size()],
+      std::get<3>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
+  auto missing_offsets =
+      torch::empty(policies_.size() + 1, result_offsets_tensor.options());
+  auto positions_ptr = positions.data_ptr<int64_t>();
+  auto output_indices_ptr = output_indices.data_ptr<int64_t>();
+  auto pointers_ptr = pointers.data_ptr<int64_t>();
+  auto missing_offsets_ptr = missing_offsets.data_ptr<int64_t>();
+  missing_offsets_ptr[0] = 0;
+  gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
+    if (begin == end) return;
+    const auto tid = begin;
+    auto out_index_ptr = indices_ptr + offsets_ptr[tid];
+    begin = result_offsets[tid];
+    end = result_offsets[tid + 1];
+    const auto num_selected = end - begin;
+    auto indices_ptr = std::get<1>(results[tid]).data_ptr<int64_t>();
+    for (int64_t i = 0; i < num_selected; i++) {
+      output_indices_ptr[begin + i] = out_index_ptr[indices_ptr[i]];
+    }
+    auto selected_positions_ptr = std::get<0>(results[tid]).data_ptr<int64_t>();
+    std::transform(
+        selected_positions_ptr, selected_positions_ptr + num_selected,
+        positions_ptr + begin,
+        [off = tid * capacity_ / policies_.size()](auto x) { return x + off; });
+    auto selected_pointers_ptr = std::get<2>(results[tid]).data_ptr<int64_t>();
+    std::copy(
+        selected_pointers_ptr, selected_pointers_ptr + num_selected,
+        pointers_ptr + begin);
+    begin = result_offsets[policies_.size() + tid];
+    end = result_offsets[policies_.size() + tid + 1];
+    missing_offsets[tid + 1] = end - result_offsets[policies_.size()];
+    const auto num_missing = end - begin;
+    for (int64_t i = 0; i < num_missing; i++) {
+      output_indices_ptr[begin + i] =
+          out_index_ptr[indices_ptr[i + num_selected]];
+    }
+    auto missing_positions_ptr = selected_positions_ptr + num_selected;
+    std::transform(
+        missing_positions_ptr, missing_positions_ptr + num_missing,
+        positions_ptr + begin,
+        [off = tid * capacity_ / policies_.size()](auto x) { return x + off; });
+    auto missing_pointers_ptr = selected_pointers_ptr + num_selected;
+    std::copy(
+        missing_pointers_ptr, missing_pointers_ptr + num_missing,
+        pointers_ptr + begin);
+    std::memcpy(
+        reinterpret_cast<std::byte*>(missing_keys.data_ptr()) +
+            (begin - result_offsets[policies_.size()]) *
+                missing_keys.element_size(),
+        std::get<3>(results[tid]).data_ptr(),
+        num_missing * missing_keys.element_size());
+  });
+  auto found_offsets = result_offsets_tensor.slice(0, 0, policies_.size() + 1);
+  return std::make_tuple(
+      positions, output_indices, pointers, missing_keys, found_offsets,
+      missing_offsets);
 }
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
