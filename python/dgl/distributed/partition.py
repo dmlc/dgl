@@ -1383,10 +1383,12 @@ def _cast_to_minimum_dtype(predicate, data, field=None):
 
 # Utility functions.
 def is_homogeneous(ntypes, etypes):
+    """Checks if the provided ntypes and etypes form a homogeneous graph."""
     return len(ntypes) == 1 and len(etypes) == 1
 
 
 def init_type_per_edge(graph, gpb):
+    """Initialize edge ids for every edge type."""
     etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
     return etype_ids
 
@@ -1399,6 +1401,26 @@ def gb_convert_single_dgl_partition(
     store_inner_node,
     store_inner_edge,
 ):
+    """Converts a single DGL partition to GraphBolt.
+
+    Parameters
+    ----------
+    part_id : int
+        The numerical ID of the partition to convert.
+    graph_formats : str or list[str], optional
+        Save partitions in specified formats. It could be any combination of
+        `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
+        it is not necessary to specify this argument. It's mainly for
+        specifying `coo` format to save edge ID mapping and destination node
+        IDs. If not specified, whether to save `coo` format is determined by
+        the availability of the format in DGL partitions. Default: None.
+    store_eids : bool, optional
+        Whether to store edge IDs in the new graph. Default: True.
+    store_inner_node : bool, optional
+        Whether to store inner node mask in the new graph. Default: False.
+    store_inner_edge : bool, optional
+        Whether to store inner edge mask in the new graph. Default: False.
+    """
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
         dgl_warning(
@@ -1604,7 +1626,7 @@ def dgl_partition_to_graphbolt(
     rel_path_results = []
     if n_jobs > 1 and num_parts > 1:
         mp_ctx = mp.get_context("spawn")
-        with concurrent.futures.ProcessPoolExecutor(
+        with concurrent.futures.ProcessPoolExecutor(  # pylint: disable=unexpected-keyword-arg
             max_workers=min(num_parts, n_jobs),
             mp_context=mp_ctx,
         ) as executor:
