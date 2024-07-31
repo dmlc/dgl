@@ -47,7 +47,7 @@ torch::Tensor FeatureCache::Query(
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
   const auto positions_ptr = positions.data_ptr<int64_t>();
   const auto indices_ptr = indices.data_ptr<int64_t>();
-  torch::parallel_for(
+  graphbolt::parallel_for(
       0, positions.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {
           std::memcpy(
@@ -73,7 +73,7 @@ void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
   const auto positions_ptr = positions.data_ptr<int64_t>();
   std::lock_guard lock(mtx_);
-  torch::parallel_for(
+  graphbolt::parallel_for(
       0, positions.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {
           std::memcpy(

@@ -2,8 +2,9 @@ import json
 import os
 import tempfile
 
-import backend as F
 import dgl
+
+import dgl.backend as F
 import numpy as np
 import pytest
 import torch as th
@@ -1157,6 +1158,7 @@ def test_partition_graph_graphbolt_hetero(
     store_inner_node,
     store_inner_edge,
     debug_mode,
+    n_jobs=1,
 ):
     reset_envs()
     if debug_mode:
@@ -1174,6 +1176,7 @@ def test_partition_graph_graphbolt_hetero(
             store_eids=store_eids,
             store_inner_node=store_inner_node,
             store_inner_edge=store_inner_edge,
+            n_jobs=n_jobs,
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         for part_id in range(num_parts):
@@ -1241,6 +1244,7 @@ def test_partition_graph_graphbolt_homo_find_edges(
     part_method,
     num_parts,
     graph_formats,
+    n_jobs=1,
 ):
     reset_envs()
     os.environ["DGL_DIST_DEBUG"] = "1"
@@ -1260,6 +1264,7 @@ def test_partition_graph_graphbolt_homo_find_edges(
             store_eids=True,
             store_inner_node=True,
             store_inner_edge=True,
+            n_jobs=n_jobs,
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         for part_id in range(num_parts):
@@ -1326,6 +1331,7 @@ def test_partition_graph_graphbolt_hetero_find_edges(
     part_method,
     num_parts,
     graph_formats,
+    n_jobs=1,
 ):
     reset_envs()
     os.environ["DGL_DIST_DEBUG"] = "1"
@@ -1344,6 +1350,7 @@ def test_partition_graph_graphbolt_hetero_find_edges(
             store_eids=True,
             store_inner_node=True,
             store_inner_edge=True,
+            n_jobs=n_jobs,
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         for part_id in range(num_parts):
@@ -1442,3 +1449,44 @@ def test_partition_graph_graphbolt_hetero_find_edges(
                 dgl.distributed.DGL2GB_EID
             ][DGL_inner_local_eids]
             assert th.equal(inner_local_eids, GB_inner_local_eids)
+
+
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_partition_graph_graphbolt_hetero_multi(
+    num_parts,
+):
+    reset_envs()
+
+    test_partition_graph_graphbolt_hetero(
+        part_method="random",
+        num_parts=num_parts,
+        n_jobs=4,
+        store_eids=True,
+        store_inner_node=True,
+        store_inner_edge=True,
+        debug_mode=False,
+    )
+
+
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_partition_graph_graphbolt_homo_find_edges_multi(
+    num_parts,
+):
+    test_partition_graph_graphbolt_homo_find_edges(
+        part_method="random",
+        num_parts=num_parts,
+        graph_formats="coo",
+        n_jobs=4,
+    )
+
+
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_partition_graph_graphbolt_hetero_find_edges_multi(
+    num_parts,
+):
+    test_partition_graph_graphbolt_hetero_find_edges(
+        part_method="random",
+        num_parts=num_parts,
+        graph_formats="coo",
+        n_jobs=4,
+    )
