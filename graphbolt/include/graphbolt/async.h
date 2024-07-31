@@ -42,7 +42,7 @@ enum ThreadPool { intraop, interop };
 #ifdef BUILD_WITH_TASKFLOW
 
 template <ThreadPool pool_type>
-inline tf::Executor& get_thread_pool() {
+inline tf::Executor& _get_thread_pool() {
   static std::unique_ptr<tf::Executor> pool;
   static std::once_flag flag;
   std::call_once(flag, [&] {
@@ -55,12 +55,17 @@ inline tf::Executor& get_thread_pool() {
 }
 
 inline tf::Executor& intraop_pool() {
-  return get_thread_pool<ThreadPool::intraop>();
+  return _get_thread_pool<ThreadPool::intraop>();
 }
 
 inline tf::Executor& interop_pool() {
-  return get_thread_pool<ThreadPool::interop>();
+  return _get_thread_pool<ThreadPool::interop>();
 }
+
+inline tf::Executor& get_thread_pool(ThreadPool pool_type) {
+  return pool_type == ThreadPool::intraop ? intraop_pool() : interop_pool();
+}
+#endif  // BUILD_WITH_TASKFLOW
 
 inline int get_num_threads() {
 #ifdef BUILD_WITH_TASKFLOW
@@ -77,8 +82,6 @@ inline int get_num_interop_threads() {
   return torch::get_num_interop_threads();
 #endif
 }
-
-#endif
 
 template <typename T>
 class Future : public torch::CustomClassHolder {
@@ -117,15 +120,8 @@ inline auto async(F function) {
   return c10::make_intrusive<Future<T>>(std::move(future));
 }
 
-/**
- * @brief GraphBolt's version of torch::parallel_for. Since torch::parallel_for
- * uses OpenMP threadpool, async tasks can not make use of it due to multiple
- * OpenMP threadpools being created for each async thread. Moreover, inside
- * graphbolt::parallel_for, we should not make use of any native CPU torch ops
- * as they will spawn an OpenMP threadpool.
- */
-template <typename F>
-inline void parallel_for(
+template <ThreadPool pool_type, typename F>
+inline void _parallel_for(
     const int64_t begin, const int64_t end, const int64_t grain_size,
     const F& f) {
   if (begin >= end) return;
@@ -145,10 +141,12 @@ inline void parallel_for(
   tf::Taskflow flow;
   flow.for_each_index(int64_t{0}, num_threads, int64_t{1}, [=](int64_t tid) {
     const int64_t begin_tid = begin + tid * chunk_size;
-    const int64_t end_tid = std::min(end, begin_tid + chunk_size);
-    if (begin_tid < end) f(begin_tid, end_tid);
+    if (begin_tid < end) {
+      const int64_t end_tid = std::min(end, begin_tid + chunk_size);
+      f(begin_tid, end_tid);
+    }
   });
-  interop_pool().run(flow).wait();
+  _get_thread_pool<pool_type>().run(flow).wait();
 #else
   std::promise<void> promise;
   std::future<void> future;
@@ -194,6 +192,27 @@ inline void parallel_for(
     }
   }
 #endif
+}
+
+/**
+ * @brief GraphBolt's version of torch::parallel_for. Since torch::parallel_for
+ * uses OpenMP threadpool, async tasks can not make use of it due to multiple
+ * OpenMP threadpools being created for each async thread. Moreover, inside
+ * graphbolt::parallel_for, we should not make use of any native CPU torch ops
+ * as they will spawn an OpenMP threadpool.
+ */
+template <typename F>
+inline void parallel_for(
+    const int64_t begin, const int64_t end, const int64_t grain_size,
+    const F& f) {
+  _parallel_for<ThreadPool::intraop>(begin, end, grain_size, f);
+}
+
+template <typename F>
+inline void parallel_for_interop(
+    const int64_t begin, const int64_t end, const int64_t grain_size,
+    const F& f) {
+  _parallel_for<ThreadPool::interop>(begin, end, grain_size, f);
 }
 
 }  // namespace graphbolt
