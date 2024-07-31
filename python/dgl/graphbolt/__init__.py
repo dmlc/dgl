@@ -7,8 +7,8 @@ from .internal_utils import *
 cuda_allocator_env_warning_str = """
 An experimental feature for CUDA allocations is turned on for better allocation
 pattern resulting in better memory usage for minibatch GNN training workloads.
-See https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf"
-, and set the environment variable `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False`
+See https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf,
+and set the environment variable `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False`
 if you want to disable it.
 """
 cuda_allocator_env = os.getenv("PYTORCH_CUDA_ALLOC_CONF")
