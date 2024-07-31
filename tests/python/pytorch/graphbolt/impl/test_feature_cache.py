@@ -6,6 +6,44 @@ import torch
 from dgl import graphbolt as gb
 
 
+def _test_query_and_then_replace(policy1, policy2, keys):
+    # Testing query_and_then_replace equivalence to query and then replace.
+    (
+        positions,
+        index,
+        pointers,
+        missing_keys,
+        found_offsets,
+        missing_offsets,
+    ) = policy1.query_and_then_replace(keys)
+    found_cnt = keys.size(0) - missing_keys.size(0)
+    found_positions = positions[:found_cnt]
+    found_pointers = pointers[:found_cnt]
+    policy1.reading_completed(found_pointers, found_offsets)
+    missing_positions = positions[found_cnt:]
+    missing_pointers = pointers[found_cnt:]
+    policy1.writing_completed(missing_pointers, missing_offsets)
+
+    (
+        found_positions2,
+        index2,
+        missing_keys2,
+        found_pointers2,
+        found_offsets2,
+        missing_offsets2,
+    ) = policy2.query(keys)
+    policy2.reading_completed(found_pointers2, found_offsets2)
+    (missing_positions2, missing_pointers2, missing_offsets2) = policy2.replace(
+        missing_keys2, missing_offsets2
+    )
+    policy2.writing_completed(missing_pointers2, missing_offsets2)
+
+    assert torch.equal(found_positions, found_positions2)
+    assert torch.equal(missing_positions, missing_positions2)
+    assert torch.equal(index, index2)
+    assert torch.equal(missing_keys, missing_keys2)
+
+
 @pytest.mark.parametrize("offsets", [False, True])
 @pytest.mark.parametrize(
     "dtype",
@@ -36,6 +74,12 @@ def test_feature_cache(offsets, dtype, feature_size, num_parts, policy):
     cache2 = gb.impl.CPUFeatureCache(
         (cache_size,) + a.shape[1:], a.dtype, policy, num_parts
     )
+    policy1 = gb.impl.CPUFeatureCache(
+        (cache_size,) + a.shape[1:], a.dtype, policy, num_parts
+    )._policy
+    policy2 = gb.impl.CPUFeatureCache(
+        (cache_size,) + a.shape[1:], a.dtype, policy, num_parts
+    )._policy
     reader_fn = lambda keys: a[keys]
 
     keys = torch.tensor([0, 1])
@@ -51,11 +95,9 @@ def test_feature_cache(offsets, dtype, feature_size, num_parts, policy):
     cache.replace(missing_keys, missing_values, missing_offsets)
     values[missing_index] = missing_values
     assert torch.equal(values, a[keys])
+    assert torch.equal(cache2.query_and_then_replace(keys, reader_fn), a[keys])
 
-    if num_parts == 1:
-        assert torch.equal(
-            cache2.query_and_then_replace(keys, reader_fn), a[keys]
-        )
+    _test_query_and_then_replace(policy1, policy2, keys)
 
     pin_memory = F._default_context_str == "gpu"
 
@@ -73,11 +115,9 @@ def test_feature_cache(offsets, dtype, feature_size, num_parts, policy):
     cache.replace(missing_keys, missing_values, missing_offsets)
     values[missing_index] = missing_values
     assert torch.equal(values, a[keys])
+    assert torch.equal(cache2.query_and_then_replace(keys, reader_fn), a[keys])
 
-    if num_parts == 1:
-        assert torch.equal(
-            cache2.query_and_then_replace(keys, reader_fn), a[keys]
-        )
+    _test_query_and_then_replace(policy1, policy2, keys)
 
     values, missing_index, missing_keys, missing_offsets = cache.query(keys)
     if not offsets:
@@ -88,11 +128,9 @@ def test_feature_cache(offsets, dtype, feature_size, num_parts, policy):
     cache.replace(missing_keys, missing_values, missing_offsets)
     values[missing_index] = missing_values
     assert torch.equal(values, a[keys])
+    assert torch.equal(cache2.query_and_then_replace(keys, reader_fn), a[keys])
 
-    if num_parts == 1:
-        assert torch.equal(
-            cache2.query_and_then_replace(keys, reader_fn), a[keys]
-        )
+    _test_query_and_then_replace(policy1, policy2, keys)
 
     values, missing_index, missing_keys, missing_offsets = cache.query(keys)
     if not offsets:
@@ -103,12 +141,11 @@ def test_feature_cache(offsets, dtype, feature_size, num_parts, policy):
     cache.replace(missing_keys, missing_values, missing_offsets)
     values[missing_index] = missing_values
     assert torch.equal(values, a[keys])
+    assert torch.equal(cache2.query_and_then_replace(keys, reader_fn), a[keys])
 
-    if num_parts == 1:
-        assert torch.equal(
-            cache2.query_and_then_replace(keys, reader_fn), a[keys]
-        )
-        assert cache.miss_rate == cache2.miss_rate
+    _test_query_and_then_replace(policy1, policy2, keys)
+
+    assert cache.miss_rate == cache2.miss_rate
 
     raw_feature_cache = torch.ops.graphbolt.feature_cache(
         (cache_size,) + a.shape[1:], a.dtype, pin_memory
