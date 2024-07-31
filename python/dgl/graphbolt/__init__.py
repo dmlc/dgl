@@ -26,7 +26,8 @@ else:
                 "You should consider `expandable_segments:True` in the"
                 " environment variable `PYTORCH_CUDA_ALLOC_CONF` for lower"
                 " memory usage. See "
-                "https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf"
+                "https://pytorch.org/docs/stable/notes/cuda.html"
+                "#optimizing-memory-usage-with-pytorch-cuda-alloc-conf"
             )
     else:
         configs["expandable_segments"] = "True"
