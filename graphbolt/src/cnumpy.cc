@@ -62,14 +62,18 @@ OnDiskNpyArray::OnDiskNpyArray(
 
   std::call_once(call_once_flag_, [&] {
     // Get system max interop thread count.
-    num_queues_ = torch::get_num_interop_threads();
+    num_queues_ =
+        io_uring::num_threads.value_or(torch::get_num_interop_threads());
     TORCH_CHECK(num_queues_ > 0, "A positive # queues is required.");
     io_uring_queue_ = std::unique_ptr<::io_uring[], io_uring_queue_destroyer>(
         new ::io_uring[num_queues_], io_uring_queue_destroyer{num_queues_});
-    mtx_ = std::make_unique<std::mutex[]>(num_queues_);
-
+    TORCH_CHECK(num_queues_ + 1 <= counting_semaphore_t::max());
+    // The +1 is for the thread that calls parallel_for.
+    semaphore_.release(num_queues_ + 1);
+    available_queues_.reserve(num_queues_);
     // Init io_uring queue.
     for (int64_t t = 0; t < num_queues_; t++) {
+      available_queues_.push_back(t);
       TORCH_CHECK(
           ::io_uring_queue_init(2 * kGroupSize, &io_uring_queue_[t], 0) == 0);
       // We have allocated 2 * kGroupSize submission queue entries and
@@ -78,9 +82,7 @@ OnDiskNpyArray::OnDiskNpyArray(
   });
 
   num_thread_ = std::min(
-      static_cast<int64_t>(num_queues_),
-      num_threads.value_or(
-          io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2)));
+      static_cast<int64_t>(num_queues_), num_threads.value_or(num_queues_));
   TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
 
   read_tensor_ = torch::empty(
@@ -167,14 +169,25 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   // Indicator for index error.
   std::atomic<int> error_flag{};
   std::atomic<int64_t> work_queue{};
-  auto worker_fn = [&](const int thread_id) {
-    auto &io_uring_queue = io_uring_queue_[thread_id];
-    auto my_read_buffer = ReadBuffer(thread_id);
+  std::atomic_flag exiting_first = ATOMIC_FLAG_INIT;
+  // Consume a slot so that parallel_for is called only if there are available
+  // queues.
+  semaphore_.acquire();
+  graphbolt::parallel_for(0, num_thread_, 1, [&](int thread_id, int) {
     // The completion queue might contain 4 * kGroupSize while we may submit
     // 4 * kGroupSize more. No harm in overallocation here.
     CircularQueue<ReadRequest> read_queue(8 * kGroupSize);
     int64_t num_submitted = 0;
     int64_t num_completed = 0;
+    {
+      // We consume a slot from the semaphore to use a queue.
+      semaphore_.acquire();
+      std::lock_guard lock(available_queues_mtx_);
+      TORCH_CHECK(!available_queues_.empty());
+      thread_id = available_queues_.back();
+      available_queues_.pop_back();
+    }
+    auto &io_uring_queue = io_uring_queue_[thread_id];
     auto submit_fn = [&](int64_t submission_minimum_batch_size) {
       if (read_queue.Size() < submission_minimum_batch_size) return;
       TORCH_CHECK(  // Check for sqe overflow.
@@ -190,8 +203,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
         read_queue.PopN(submitted);
       }
     };
-    // Make sure we have sole control of this thread's queue.
-    std::lock_guard io_uring_queue_lock(mtx_[thread_id]);
+    auto my_read_buffer = ReadBuffer(thread_id);
     for (int64_t read_buffer_slot = 0; true;) {
       auto request_read_buffer = [&]() {
         return my_read_buffer + (aligned_length_ + block_size_) *
@@ -291,13 +303,15 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
       io_uring_cq_advance(&io_uring_queue, num_cqes_seen);
       num_completed += num_cqes_seen;
     }
-  };
-  std::vector<c10::intrusive_ptr<Future<void>>> futures;
-  for (int t = 0; t < num_thread_; t++) {
-    futures.emplace_back(async([&worker_fn, t] { worker_fn(t); }));
-  }
-  // Wait for the launched work to finish.
-  for (auto &future : futures) future->Wait();
+    {
+      // We give back the slot we used.
+      std::lock_guard lock(available_queues_mtx_);
+      available_queues_.push_back(thread_id);
+    }
+    // If this is the first thread exiting, release the master thread's ticket
+    // as well by releasing 2 slots. Otherwise, release 1 slot.
+    semaphore_.release(exiting_first.test_and_set() ? 1 : 2);
+  });
   switch (error_flag.load(std::memory_order_relaxed)) {
     case 0:  // Successful.
       return result;
@@ -310,7 +324,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
     torch::Tensor index) {
-  return async([=] { return IndexSelectIOUringImpl(index); });
+  return async([=, this] { return IndexSelectIOUringImpl(index); });
 }
 
 #endif  // HAVE_LIBRARY_LIBURING

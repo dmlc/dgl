@@ -19,6 +19,7 @@
  */
 #include "./partitioned_cache_policy.h"
 
+#include <algorithm>
 #include <numeric>
 
 #include "./utils.h"
@@ -43,17 +44,19 @@ PartitionedCachePolicy::PartitionedCachePolicy(
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 PartitionedCachePolicy::Partition(torch::Tensor keys) {
   const int64_t num_parts = policies_.size();
-  torch::Tensor offsets = torch::zeros(
+  torch::Tensor offsets = torch::empty(
       num_parts * num_parts + 1, keys.options().dtype(torch::kInt64));
+  auto offsets_ptr = offsets.data_ptr<int64_t>();
+  std::memset(offsets_ptr, 0, offsets.size(0) * offsets.element_size());
   auto indices = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
   auto part_id = torch::empty_like(keys, keys.options().dtype(torch::kInt32));
   const auto num_keys = keys.size(0);
   auto part_id_ptr = part_id.data_ptr<int32_t>();
-  auto offsets_ptr = offsets.data_ptr<int64_t>();
   AT_DISPATCH_INDEX_TYPES(
       keys.scalar_type(), "PartitionedCachePolicy::partition", ([&] {
         auto keys_ptr = keys.data_ptr<index_t>();
-        torch::parallel_for(0, num_parts, 1, [&](int64_t begin, int64_t end) {
+        namespace gb = graphbolt;
+        gb::parallel_for(0, num_parts, 1, [&](int64_t begin, int64_t end) {
           if (begin == end) return;
           TORCH_CHECK(end - begin == 1);
           const auto tid = begin;
@@ -70,7 +73,7 @@ PartitionedCachePolicy::Partition(torch::Tensor keys) {
   // Transpose the offsets tensor, take cumsum and transpose back.
   auto offsets_permuted = torch::empty_like(offsets);
   auto offsets_permuted_ptr = offsets_permuted.data_ptr<int64_t>();
-  torch::parallel_for(
+  graphbolt::parallel_for(
       0, num_parts * num_parts, kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {
           auto part_id = i % num_parts;
@@ -80,9 +83,12 @@ PartitionedCachePolicy::Partition(torch::Tensor keys) {
         }
       });
   offsets_permuted_ptr[0] = 0;
-  offsets = offsets_permuted.cumsum(0);
+  // offsets = offsets_permuted.cumsum(0); @TODO implement this in parallel.
+  std::inclusive_scan(
+      offsets_permuted_ptr, offsets_permuted_ptr + num_parts * num_parts + 1,
+      offsets_ptr);
   offsets_ptr = offsets.data_ptr<int64_t>();
-  torch::parallel_for(
+  graphbolt::parallel_for(
       0, num_parts * num_parts, kIntGrainSize, [&](int64_t begin, int64_t end) {
         for (int64_t i = begin; i < end; i++) {
           auto part_id = i % num_parts;
@@ -92,11 +98,15 @@ PartitionedCachePolicy::Partition(torch::Tensor keys) {
       });
   auto indices_ptr = indices.data_ptr<int64_t>();
   auto permuted_keys = torch::empty_like(keys);
+  auto offsets_sliced = torch::empty(num_parts + 1, offsets.options());
+  auto offsets_sliced_ptr = offsets_sliced.data_ptr<int64_t>();
+  offsets_sliced_ptr[0] = 0;
   AT_DISPATCH_INDEX_TYPES(
       keys.scalar_type(), "PartitionedCachePolicy::partition", ([&] {
         auto keys_ptr = keys.data_ptr<index_t>();
         auto permuted_keys_ptr = permuted_keys.data_ptr<index_t>();
-        torch::parallel_for(0, num_parts, 1, [&](int64_t begin, int64_t end) {
+        namespace gb = graphbolt;
+        gb::parallel_for(0, num_parts, 1, [&](int64_t begin, int64_t end) {
           if (begin == end) return;
           const auto tid = begin;
           begin = tid * num_keys / num_parts;
@@ -107,18 +117,33 @@ PartitionedCachePolicy::Partition(torch::Tensor keys) {
             indices_ptr[offset] = i;
             permuted_keys_ptr[offset++] = keys_ptr[i];
           }
+          offsets_sliced_ptr[tid + 1] = offsets_ptr[(tid + 1) * num_parts];
         });
       }));
-  return {
-      offsets.slice(0, 0, offsets.size(0), num_parts).contiguous(), indices,
-      permuted_keys};
+  return {offsets_sliced, indices, permuted_keys};
 }
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+std::tuple<
+    torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
+    torch::Tensor>
 PartitionedCachePolicy::Query(torch::Tensor keys) {
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
-    return policies_[0]->Query(keys);
+    auto [positions, output_indices, missing_keys, found_pointers] =
+        policies_[0]->Query(keys);
+    auto found_and_missing_offsets = torch::empty(4, found_pointers.options());
+    auto found_and_missing_offsets_ptr =
+        found_and_missing_offsets.data_ptr<int64_t>();
+    // Found offsets part.
+    found_and_missing_offsets_ptr[0] = 0;
+    found_and_missing_offsets_ptr[1] = found_pointers.size(0);
+    // Missing offsets part.
+    found_and_missing_offsets_ptr[2] = 0;
+    found_and_missing_offsets_ptr[3] = missing_keys.size(0);
+    auto found_offsets = found_and_missing_offsets.slice(0, 0, 2);
+    auto missing_offsets = found_and_missing_offsets.slice(0, 2);
+    return {positions,      output_indices, missing_keys,
+            found_pointers, found_offsets,  missing_offsets};
   };
   torch::Tensor offsets, indices, permuted_keys;
   std::tie(offsets, indices, permuted_keys) = Partition(keys);
@@ -130,21 +155,21 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
   torch::Tensor result_offsets_tensor =
       torch::empty(policies_.size() * 2 + 1, offsets.options());
   auto result_offsets = result_offsets_tensor.data_ptr<int64_t>();
+  namespace gb = graphbolt;
   {
     std::lock_guard lock(mtx_);
-    torch::parallel_for(
-        0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
-          if (begin == end) return;
-          TORCH_CHECK(end - begin == 1);
-          const auto tid = begin;
-          begin = offsets_ptr[tid];
-          end = offsets_ptr[tid + 1];
-          results[tid] =
-              policies_.at(tid)->Query(permuted_keys.slice(0, begin, end));
-          result_offsets[tid] = std::get<0>(results[tid]).size(0);
-          result_offsets[tid + policies_.size()] =
-              std::get<2>(results[tid]).size(0);
-        });
+    gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
+      if (begin == end) return;
+      TORCH_CHECK(end - begin == 1);
+      const auto tid = begin;
+      begin = offsets_ptr[tid];
+      end = offsets_ptr[tid + 1];
+      results[tid] =
+          policies_.at(tid)->Query(permuted_keys.slice(0, begin, end));
+      result_offsets[tid] = std::get<0>(results[tid]).size(0);
+      result_offsets[tid + policies_.size()] =
+          std::get<2>(results[tid]).size(0);
+    });
   }
   std::exclusive_scan(
       result_offsets, result_offsets + result_offsets_tensor.size(0),
@@ -157,11 +182,15 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
   torch::Tensor missing_keys = torch::empty(
       indices.size(0) - positions.size(0),
       std::get<2>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
-  torch::Tensor found_keys = torch::empty(
+  torch::Tensor found_pointers = torch::empty(
       positions.size(0),
       std::get<3>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
+  auto missing_offsets =
+      torch::empty(policies_.size() + 1, result_offsets_tensor.options());
   auto output_indices_ptr = output_indices.data_ptr<int64_t>();
-  torch::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
+  auto missing_offsets_ptr = missing_offsets.data_ptr<int64_t>();
+  missing_offsets_ptr[0] = 0;
+  gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
     if (begin == end) return;
     const auto tid = begin;
     auto out_index_ptr = indices_ptr + offsets_ptr[tid];
@@ -177,13 +206,13 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
         selected_positions_ptr, selected_positions_ptr + num_selected,
         positions.data_ptr<int64_t>() + begin,
         [off = tid * capacity_ / policies_.size()](auto x) { return x + off; });
-    std::memcpy(
-        reinterpret_cast<std::byte*>(found_keys.data_ptr()) +
-            begin * found_keys.element_size(),
-        std::get<3>(results[tid]).data_ptr(),
-        num_selected * found_keys.element_size());
+    auto selected_pointers_ptr = std::get<3>(results[tid]).data_ptr<int64_t>();
+    std::copy(
+        selected_pointers_ptr, selected_pointers_ptr + num_selected,
+        found_pointers.data_ptr<int64_t>() + begin);
     begin = result_offsets[policies_.size() + tid];
     end = result_offsets[policies_.size() + tid + 1];
+    missing_offsets[tid + 1] = end - result_offsets[policies_.size()];
     const auto num_missing = end - begin;
     for (int64_t i = 0; i < num_missing; i++) {
       output_indices_ptr[begin + i] =
@@ -195,95 +224,273 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
         std::get<2>(results[tid]).data_ptr(),
         num_missing * missing_keys.element_size());
   });
-  return std::make_tuple(positions, output_indices, missing_keys, found_keys);
+  auto found_offsets = result_offsets_tensor.slice(0, 0, policies_.size() + 1);
+  return std::make_tuple(
+      positions, output_indices, missing_keys, found_pointers, found_offsets,
+      missing_offsets);
 }
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
 PartitionedCachePolicy::QueryAsync(torch::Tensor keys) {
   return async([=] {
-    auto [positions, output_indices, missing_keys, found_keys] = Query(keys);
-    return std::vector{positions, output_indices, missing_keys, found_keys};
+    auto
+        [positions, output_indices, missing_keys, found_pointers, found_offsets,
+         missing_offsets] = Query(keys);
+    return std::vector{positions,      output_indices, missing_keys,
+                       found_pointers, found_offsets,  missing_offsets};
   });
 }
 
-torch::Tensor PartitionedCachePolicy::Replace(torch::Tensor keys) {
+std::tuple<
+    torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
+    torch::Tensor>
+PartitionedCachePolicy::QueryAndThenReplace(torch::Tensor keys) {
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
-    return policies_[0]->Replace(keys);
+    auto [positions, output_indices, pointers, missing_keys] =
+        policies_[0]->QueryAndThenReplace(keys);
+    auto found_and_missing_offsets = torch::empty(4, pointers.options());
+    auto found_and_missing_offsets_ptr =
+        found_and_missing_offsets.data_ptr<int64_t>();
+    // Found offsets part.
+    found_and_missing_offsets_ptr[0] = 0;
+    found_and_missing_offsets_ptr[1] = keys.size(0) - missing_keys.size(0);
+    // Missing offsets part.
+    found_and_missing_offsets_ptr[2] = 0;
+    found_and_missing_offsets_ptr[3] = missing_keys.size(0);
+    auto found_offsets = found_and_missing_offsets.slice(0, 0, 2);
+    auto missing_offsets = found_and_missing_offsets.slice(0, 2);
+    return {positions,    output_indices, pointers,
+            missing_keys, found_offsets,  missing_offsets};
   }
   torch::Tensor offsets, indices, permuted_keys;
   std::tie(offsets, indices, permuted_keys) = Partition(keys);
+  auto offsets_ptr = offsets.data_ptr<int64_t>();
+  auto indices_ptr = indices.data_ptr<int64_t>();
+  std::vector<
+      std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
+      results(policies_.size());
+  torch::Tensor result_offsets_tensor =
+      torch::empty(policies_.size() * 2 + 1, offsets.options());
+  auto result_offsets = result_offsets_tensor.data_ptr<int64_t>();
+  namespace gb = graphbolt;
+  {
+    std::lock_guard lock(mtx_);
+    gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
+      if (begin == end) return;
+      TORCH_CHECK(end - begin == 1);
+      const auto tid = begin;
+      begin = offsets_ptr[tid];
+      end = offsets_ptr[tid + 1];
+      results[tid] = policies_.at(tid)->QueryAndThenReplace(
+          permuted_keys.slice(0, begin, end));
+      const auto missing_cnt = std::get<3>(results[tid]).size(0);
+      result_offsets[tid] = end - begin - missing_cnt;
+      result_offsets[tid + policies_.size()] = missing_cnt;
+    });
+  }
+  std::exclusive_scan(
+      result_offsets, result_offsets + result_offsets_tensor.size(0),
+      result_offsets, 0);
+  torch::Tensor positions = torch::empty(
+      keys.size(0),
+      std::get<0>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
+  torch::Tensor output_indices = torch::empty_like(
+      indices, indices.options().pinned_memory(utils::is_pinned(keys)));
+  torch::Tensor pointers = torch::empty(
+      keys.size(0),
+      std::get<2>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
+  torch::Tensor missing_keys = torch::empty(
+      result_offsets[2 * policies_.size()] - result_offsets[policies_.size()],
+      std::get<3>(results[0]).options().pinned_memory(utils::is_pinned(keys)));
+  auto missing_offsets =
+      torch::empty(policies_.size() + 1, result_offsets_tensor.options());
+  auto positions_ptr = positions.data_ptr<int64_t>();
+  auto output_indices_ptr = output_indices.data_ptr<int64_t>();
+  auto pointers_ptr = pointers.data_ptr<int64_t>();
+  auto missing_offsets_ptr = missing_offsets.data_ptr<int64_t>();
+  missing_offsets_ptr[0] = 0;
+  gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
+    if (begin == end) return;
+    const auto tid = begin;
+    auto out_index_ptr = indices_ptr + offsets_ptr[tid];
+    begin = result_offsets[tid];
+    end = result_offsets[tid + 1];
+    const auto num_selected = end - begin;
+    auto indices_ptr = std::get<1>(results[tid]).data_ptr<int64_t>();
+    for (int64_t i = 0; i < num_selected; i++) {
+      output_indices_ptr[begin + i] = out_index_ptr[indices_ptr[i]];
+    }
+    auto selected_positions_ptr = std::get<0>(results[tid]).data_ptr<int64_t>();
+    std::transform(
+        selected_positions_ptr, selected_positions_ptr + num_selected,
+        positions_ptr + begin,
+        [off = tid * capacity_ / policies_.size()](auto x) { return x + off; });
+    auto selected_pointers_ptr = std::get<2>(results[tid]).data_ptr<int64_t>();
+    std::copy(
+        selected_pointers_ptr, selected_pointers_ptr + num_selected,
+        pointers_ptr + begin);
+    begin = result_offsets[policies_.size() + tid];
+    end = result_offsets[policies_.size() + tid + 1];
+    missing_offsets[tid + 1] = end - result_offsets[policies_.size()];
+    const auto num_missing = end - begin;
+    for (int64_t i = 0; i < num_missing; i++) {
+      output_indices_ptr[begin + i] =
+          out_index_ptr[indices_ptr[i + num_selected]];
+    }
+    auto missing_positions_ptr = selected_positions_ptr + num_selected;
+    std::transform(
+        missing_positions_ptr, missing_positions_ptr + num_missing,
+        positions_ptr + begin,
+        [off = tid * capacity_ / policies_.size()](auto x) { return x + off; });
+    auto missing_pointers_ptr = selected_pointers_ptr + num_selected;
+    std::copy(
+        missing_pointers_ptr, missing_pointers_ptr + num_missing,
+        pointers_ptr + begin);
+    std::memcpy(
+        reinterpret_cast<std::byte*>(missing_keys.data_ptr()) +
+            (begin - result_offsets[policies_.size()]) *
+                missing_keys.element_size(),
+        std::get<3>(results[tid]).data_ptr(),
+        num_missing * missing_keys.element_size());
+  });
+  auto found_offsets = result_offsets_tensor.slice(0, 0, policies_.size() + 1);
+  return std::make_tuple(
+      positions, output_indices, pointers, missing_keys, found_offsets,
+      missing_offsets);
+}
+
+c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
+PartitionedCachePolicy::QueryAndThenReplaceAsync(torch::Tensor keys) {
+  return async([=] {
+    auto
+        [positions, output_indices, pointers, missing_keys, found_offsets,
+         missing_offsets] = QueryAndThenReplace(keys);
+    return std::vector{positions,    output_indices, pointers,
+                       missing_keys, found_offsets,  missing_offsets};
+  });
+}
+
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+PartitionedCachePolicy::Replace(
+    torch::Tensor keys, torch::optional<torch::Tensor> offsets) {
+  if (policies_.size() == 1) {
+    std::lock_guard lock(mtx_);
+    auto [positions, pointers] = policies_[0]->Replace(keys);
+    if (!offsets.has_value()) {
+      offsets = torch::empty(2, pointers.options());
+      auto offsets_ptr = offsets->data_ptr<int64_t>();
+      offsets_ptr[0] = 0;
+      offsets_ptr[1] = pointers.size(0);
+    }
+    return {positions, pointers, *offsets};
+  }
+  const auto offsets_provided = offsets.has_value();
+  torch::Tensor indices, permuted_keys;
+  if (!offsets_provided) {
+    std::tie(offsets, indices, permuted_keys) = Partition(keys);
+  } else {
+    permuted_keys = keys;
+  }
   auto output_positions = torch::empty_like(
       keys, keys.options()
                 .dtype(torch::kInt64)
                 .pinned_memory(utils::is_pinned(keys)));
-  auto offsets_ptr = offsets.data_ptr<int64_t>();
-  auto indices_ptr = indices.data_ptr<int64_t>();
+  auto output_pointers = torch::empty_like(
+      keys, keys.options()
+                .dtype(torch::kInt64)
+                .pinned_memory(utils::is_pinned(keys)));
+  auto offsets_ptr = offsets->data_ptr<int64_t>();
+  auto indices_ptr = offsets_provided ? nullptr : indices.data_ptr<int64_t>();
   auto output_positions_ptr = output_positions.data_ptr<int64_t>();
-  std::lock_guard lock(mtx_);
-  torch::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
+  auto output_pointers_ptr = output_pointers.data_ptr<int64_t>();
+  namespace gb = graphbolt;
+  std::unique_lock lock(mtx_);
+  std::atomic<size_t> semaphore = policies_.size();
+  gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
     if (begin == end) return;
     const auto tid = begin;
     begin = offsets_ptr[tid];
     end = offsets_ptr[tid + 1];
-    torch::Tensor positions =
+    auto [positions, pointers] =
         policies_.at(tid)->Replace(permuted_keys.slice(0, begin, end));
+    const auto ticket = semaphore.fetch_add(-1, std::memory_order_release) - 1;
+    if (ticket == 0) {
+      // This thread was the last thread in the critical region.
+      lock.unlock();
+    }
     auto positions_ptr = positions.data_ptr<int64_t>();
     const auto off = tid * capacity_ / policies_.size();
-    for (int64_t i = 0; i < positions.size(0); i++) {
-      output_positions_ptr[indices_ptr[begin + i]] = positions_ptr[i] + off;
+    if (indices_ptr) {
+      for (int64_t i = 0; i < positions.size(0); i++) {
+        output_positions_ptr[indices_ptr[begin + i]] = positions_ptr[i] + off;
+      }
+    } else {
+      std::transform(
+          positions_ptr, positions_ptr + positions.size(0),
+          output_positions_ptr + begin, [off](auto x) { return x + off; });
     }
+    auto pointers_ptr = pointers.data_ptr<int64_t>();
+    std::copy(
+        pointers_ptr, pointers_ptr + pointers.size(0),
+        output_pointers_ptr + begin);
   });
-  return output_positions;
+  return {output_positions, output_pointers, *offsets};
 }
 
-c10::intrusive_ptr<Future<torch::Tensor>> PartitionedCachePolicy::ReplaceAsync(
-    torch::Tensor keys) {
-  return async([=] { return Replace(keys); });
+c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
+PartitionedCachePolicy::ReplaceAsync(
+    torch::Tensor keys, torch::optional<torch::Tensor> offsets) {
+  return async([=] {
+    auto [positions, pointers, offsets_out] = Replace(keys, offsets);
+    return std::vector{positions, pointers, offsets_out};
+  });
 }
 
 template <bool write>
-void PartitionedCachePolicy::ReadingWritingCompletedImpl(torch::Tensor keys) {
+void PartitionedCachePolicy::ReadingWritingCompletedImpl(
+    torch::Tensor pointers, torch::Tensor offsets) {
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
     if constexpr (write)
-      policies_[0]->WritingCompleted(keys);
+      policies_[0]->WritingCompleted(pointers);
     else
-      policies_[0]->ReadingCompleted(keys);
+      policies_[0]->ReadingCompleted(pointers);
     return;
   }
-  torch::Tensor offsets, indices, permuted_keys;
-  std::tie(offsets, indices, permuted_keys) = Partition(keys);
   auto offsets_ptr = offsets.data_ptr<int64_t>();
+  namespace gb = graphbolt;
   std::lock_guard lock(mtx_);
-  torch::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
+  gb::parallel_for(0, policies_.size(), 1, [&](int64_t begin, int64_t end) {
     if (begin == end) return;
     const auto tid = begin;
     begin = offsets_ptr[tid];
     end = offsets_ptr[tid + 1];
     if constexpr (write)
-      policies_.at(tid)->WritingCompleted(permuted_keys.slice(0, begin, end));
+      policies_.at(tid)->WritingCompleted(pointers.slice(0, begin, end));
     else
-      policies_.at(tid)->ReadingCompleted(permuted_keys.slice(0, begin, end));
+      policies_.at(tid)->ReadingCompleted(pointers.slice(0, begin, end));
   });
 }
 
-void PartitionedCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<false>(keys);
+void PartitionedCachePolicy::ReadingCompleted(
+    torch::Tensor pointers, torch::Tensor offsets) {
+  ReadingWritingCompletedImpl<false>(pointers, offsets);
 }
 
-void PartitionedCachePolicy::WritingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<true>(keys);
+void PartitionedCachePolicy::WritingCompleted(
+    torch::Tensor pointers, torch::Tensor offsets) {
+  ReadingWritingCompletedImpl<true>(pointers, offsets);
 }
 
 c10::intrusive_ptr<Future<void>> PartitionedCachePolicy::ReadingCompletedAsync(
-    torch::Tensor keys) {
-  return async([=] { return ReadingCompleted(keys); });
+    torch::Tensor pointers, torch::Tensor offsets) {
+  return async([=] { return ReadingCompleted(pointers, offsets); });
 }
 
 c10::intrusive_ptr<Future<void>> PartitionedCachePolicy::WritingCompletedAsync(
-    torch::Tensor keys) {
-  return async([=] { return WritingCompleted(keys); });
+    torch::Tensor pointers, torch::Tensor offsets) {
+  return async([=] { return WritingCompleted(pointers, offsets); });
 }
 
 template <typename CachePolicy>

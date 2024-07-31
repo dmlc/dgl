@@ -12,19 +12,26 @@ from torch.torch_version import TorchVersion
 from . import gb_test_utils
 
 
-@unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
-def test_CopyTo():
+@unittest.skipIf(F._default_context_str != "gpu", "CopyTo needs GPU to test")
+@pytest.mark.parametrize("non_blocking", [False, True])
+def test_CopyTo(non_blocking):
     item_sampler = gb.ItemSampler(
         gb.ItemSet(torch.arange(20), names="seeds"), 4
     )
+    if non_blocking:
+        item_sampler = item_sampler.transform(lambda x: x.pin_memory())
 
     # Invoke CopyTo via class constructor.
     dp = gb.CopyTo(item_sampler, "cuda")
     for data in dp:
         assert data.seeds.device.type == "cuda"
 
+    dp = gb.CopyTo(item_sampler, "cuda", non_blocking)
+    for data in dp:
+        assert data.seeds.device.type == "cuda"
+
     # Invoke CopyTo via functional form.
-    dp = item_sampler.copy_to("cuda")
+    dp = item_sampler.copy_to("cuda", non_blocking)
     for data in dp:
         assert data.seeds.device.type == "cuda"
 
@@ -324,6 +331,54 @@ def test_expand_indptr(nodes, dtype):
 
             explanation = dynamo.explain(gb.expand_indptr)(
                 indptr, dtype, nodes, output_size
+            )
+            expected_breaks = -1 if output_size is None else 0
+            assert explanation.graph_break_count == expected_breaks
+
+
+@unittest.skipIf(
+    F._default_context_str != "gpu", "Only GPU implementation is available."
+)
+@pytest.mark.parametrize("offset", [None, True])
+@pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
+def test_indptr_edge_ids(offset, dtype):
+    indptr = torch.tensor([0, 2, 2, 7, 10, 12], device=F.ctx())
+    if offset:
+        offset = indptr[:-1]
+        ref_result = torch.arange(
+            0, indptr[-1].item(), dtype=dtype, device=F.ctx()
+        )
+    else:
+        ref_result = torch.tensor(
+            [0, 1, 0, 1, 2, 3, 4, 0, 1, 2, 0, 1], dtype=dtype, device=F.ctx()
+        )
+    gb_result = gb.indptr_edge_ids(indptr, dtype, offset)
+    assert torch.equal(ref_result, gb_result)
+    gb_result = gb.indptr_edge_ids(indptr, dtype, offset, indptr[-1].item())
+    assert torch.equal(ref_result, gb_result)
+
+    if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+        import torch._dynamo as dynamo
+        from torch.testing._internal.optests import opcheck
+
+        # Tests torch.compile compatibility
+        for output_size in [None, indptr[-1].item()]:
+            kwargs = {"offset": offset, "output_size": output_size}
+            opcheck(
+                torch.ops.graphbolt.indptr_edge_ids,
+                (indptr, dtype),
+                kwargs,
+                test_utils=[
+                    "test_schema",
+                    "test_autograd_registration",
+                    "test_faketensor",
+                    "test_aot_dispatch_dynamic",
+                ],
+                raise_exception=True,
+            )
+
+            explanation = dynamo.explain(gb.indptr_edge_ids)(
+                indptr, dtype, offset, output_size
             )
             expected_breaks = -1 if output_size is None else 0
             assert explanation.graph_break_count == expected_breaks

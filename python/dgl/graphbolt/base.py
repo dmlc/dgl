@@ -20,7 +20,11 @@ if (
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
-from .internal_utils import recursive_apply
+from .internal_utils import (
+    get_nonproperty_attributes,
+    recursive_apply,
+    recursive_apply_reduce_all,
+)
 
 __all__ = [
     "CANONICAL_ETYPE_DELIMITER",
@@ -35,6 +39,7 @@ __all__ = [
     "isin",
     "index_select",
     "expand_indptr",
+    "indptr_edge_ids",
     "CSCFormatBase",
     "seed",
     "seed_type_str_to_ntypes",
@@ -158,6 +163,57 @@ def expand_indptr(indptr, dtype=None, node_ids=None, output_size=None):
     )
 
 
+if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+
+    torch_fake_decorator = (
+        torch.library.impl_abstract
+        if TorchVersion(torch.__version__) < TorchVersion("2.4.0a0")
+        else torch.library.register_fake
+    )
+
+    @torch_fake_decorator("graphbolt::indptr_edge_ids")
+    def indptr_edge_ids_fake(indptr, dtype, offset, output_size):
+        """Fake implementation of indptr_edge_ids for torch.compile() support."""
+        if output_size is None:
+            output_size = torch.library.get_ctx().new_dynamic_size()
+        if dtype is None:
+            dtype = offset.dtype
+        return indptr.new_empty(output_size, dtype=dtype)
+
+
+def indptr_edge_ids(indptr, dtype=None, offset=None, output_size=None):
+    """Converts a given indptr offset tensor to a COO format tensor for the edge
+    ids. For a given indptr [0, 2, 5, 7] and offset tensor [0, 100, 200], the
+    output will be [0, 1, 100, 101, 102, 201, 202]. If offset was not provided,
+    the output would be [0, 1, 0, 1, 2, 0, 1].
+
+    Parameters
+    ----------
+    indptr : torch.Tensor
+        A 1D tensor represents the csc_indptr tensor.
+    dtype : Optional[torch.dtype]
+        The dtype of the returned output tensor.
+    offset : Optional[torch.Tensor]
+        A 1D tensor represents the offsets that the returned tensor will be
+        populated with.
+    output_size : Optional[int]
+        The size of the output tensor. Should be equal to indptr[-1]. Using this
+        argument avoids a stream synchronization to calculate the output shape.
+
+    Returns
+    -------
+    torch.Tensor
+        The converted COO edge ids tensor.
+    """
+    assert indptr.dim() == 1, "Indptr should be 1D tensor."
+    assert offset is None or offset.dim() == 1, "Offset should be 1D tensor."
+    if dtype is None:
+        dtype = offset.dtype
+    return torch.ops.graphbolt.indptr_edge_ids(
+        indptr, dtype, offset, output_size
+    )
+
+
 def index_select(tensor, index):
     """Returns a new tensor which indexes the input tensor along dimension dim
     using the entries in index.
@@ -254,10 +310,30 @@ def seed_type_str_to_ntypes(seed_type, seed_size):
     return ntypes
 
 
-def apply_to(x, device):
+def apply_to(x, device, non_blocking=False):
     """Apply `to` function to object x only if it has `to`."""
 
-    return x.to(device) if hasattr(x, "to") else x
+    if device == "pinned" and hasattr(x, "pin_memory"):
+        return x.pin_memory()
+    if not hasattr(x, "to"):
+        return x
+    if not non_blocking:
+        return x.to(device)
+    return x.to(device, non_blocking=True)
+
+
+def is_object_pinned(obj):
+    """Recursively check all members of the object and return True if only if
+    all are pinned."""
+
+    for attr in get_nonproperty_attributes(obj):
+        member_result = recursive_apply_reduce_all(
+            getattr(obj, attr),
+            lambda x: x is None or x.is_pinned(),
+        )
+        if not member_result:
+            return False
+    return True
 
 
 @functional_datapipe("copy_to")
@@ -282,17 +358,25 @@ class CopyTo(IterDataPipe):
         The DataPipe.
     device : torch.device
         The PyTorch CUDA device.
+    non_blocking : bool
+        Whether the copy should be performed without blocking. All elements have
+        to be already in pinned system memory if enabled. Default is False.
     """
 
-    def __init__(self, datapipe, device):
+    def __init__(self, datapipe, device, non_blocking=False):
         super().__init__()
         self.datapipe = datapipe
-        self.device = device
+        self.device = torch.device(device)
+        self.non_blocking = non_blocking
 
     def __iter__(self):
         for data in self.datapipe:
-            data = recursive_apply(data, apply_to, self.device)
-            yield data
+            if self.non_blocking:
+                # The copy is non blocking only if contents of data are pinned.
+                assert data.is_pinned(), f"{data} should be pinned."
+            yield recursive_apply(
+                data, apply_to, self.device, self.non_blocking
+            )
 
 
 @functional_datapipe("mark_end")
@@ -408,7 +492,9 @@ class CSCFormatBase:
     def __repr__(self) -> str:
         return _csc_format_base_str(self)
 
-    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+    def to(  # pylint: disable=invalid-name
+        self, device: torch.device, non_blocking=False
+    ) -> None:
         """Copy `CSCFormatBase` to the specified device using reflection."""
 
         for attr in dir(self):
@@ -418,11 +504,24 @@ class CSCFormatBase:
                     self,
                     attr,
                     recursive_apply(
-                        getattr(self, attr), lambda x: apply_to(x, device)
+                        getattr(self, attr),
+                        apply_to,
+                        device,
+                        non_blocking=non_blocking,
                     ),
                 )
 
         return self
+
+    def pin_memory(self):
+        """Copy `SampledSubgraph` to the pinned memory using reflection."""
+
+        return self.to("pinned")
+
+    def is_pinned(self) -> bool:
+        """Check whether `SampledSubgraph` is pinned using reflection."""
+
+        return is_object_pinned(self)
 
 
 def _csc_format_base_str(csc_format_base: CSCFormatBase) -> str:

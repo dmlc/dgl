@@ -73,35 +73,23 @@ class ConcurrentIdHashMap {
 
  public:
   /**
-   * @brief Cross platform CAS operation.
-   * It is an atomic operation that compares the contents of a memory
-   * location with a given value and, only if they are the same, modifies
-   * the contents of that memory location to a new given value.
+   * @brief Initialize the hashmap with an array of ids. The first `num_seeds`
+   * ids are unique and must be mapped to a contiguous array starting
+   * from 0. The left can be duplicated and the mapping result is not stable.
+   * The unique'ified ids can be accessed through calling `GetUniqueIds()`;
    *
-   * @param ptr The pointer to the object to test and modify .
-   * @param old_val The value expected to be found in `ptr`.
-   * @param new_val The value to store in `ptr` if it is as expected.
-   *
-   * @return Old value pointed by the `ptr`.
+   * @param ids The array of the ids to be inserted.
+   * @param num_seeds The number of seed ids.
    */
-  static IdType CompareAndSwap(IdType* ptr, IdType old_val, IdType new_val);
-
-  ConcurrentIdHashMap();
+  ConcurrentIdHashMap(const torch::Tensor& ids, size_t num_seeds);
 
   ConcurrentIdHashMap(const ConcurrentIdHashMap& other) = delete;
   ConcurrentIdHashMap& operator=(const ConcurrentIdHashMap& other) = delete;
 
   /**
-   * @brief Initialize the hashmap with an array of ids. The first `num_seeds`
-   * ids are unique and must be mapped to a contiguous array starting
-   * from 0. The left can be duplicated and the mapping result is not stable.
-   *
-   * @param ids The array of the ids to be inserted.
-   * @param num_seeds The number of seed ids.
-   *
-   * @return Unique ids from the input `ids`.
+   * @brief Get the unique ids for the keys given in the constructor.
    */
-  torch::Tensor Init(const torch::Tensor& ids, size_t num_seeds);
+  const torch::Tensor& GetUniqueIds() const { return unique_ids_; }
 
   /**
    * @brief Find mappings of given keys.
@@ -183,6 +171,11 @@ class ConcurrentIdHashMap {
    * @brief Hash maps which is used to store all elements.
    */
   torch::Tensor hash_map_;
+
+  /**
+   * @brief Holds the ids that are made unique in the constructor.
+   */
+  torch::Tensor unique_ids_;
 
   /**
    * @brief Mask which is assisted to get the position in the table

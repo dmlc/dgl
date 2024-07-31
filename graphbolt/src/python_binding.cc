@@ -107,6 +107,12 @@ TORCH_LIBRARY(graphbolt, m) {
   m.class_<storage::PartitionedCachePolicy>("PartitionedCachePolicy")
       .def("query", &storage::PartitionedCachePolicy::Query)
       .def("query_async", &storage::PartitionedCachePolicy::QueryAsync)
+      .def(
+          "query_and_then_replace",
+          &storage::PartitionedCachePolicy::QueryAndThenReplace)
+      .def(
+          "query_and_then_replace_async",
+          &storage::PartitionedCachePolicy::QueryAndThenReplaceAsync)
       .def("replace", &storage::PartitionedCachePolicy::Replace)
       .def("replace_async", &storage::PartitionedCachePolicy::ReplaceAsync)
       .def(
@@ -164,6 +170,15 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def(
       "expand_indptr(Tensor indptr, ScalarType dtype, Tensor? node_ids, "
       "SymInt? output_size) -> Tensor"
+#ifdef HAS_PT2_COMPLIANT_TAG
+      ,
+      {at::Tag::pt2_compliant_tag}
+#endif
+  );
+  m.def(
+      "indptr_edge_ids(Tensor indptr, ScalarType dtype, Tensor? offset, "
+      "SymInt? output_size) -> "
+      "Tensor"
 #ifdef HAS_PT2_COMPLIANT_TAG
       ,
       {at::Tag::pt2_compliant_tag}
