@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cuda/std/semaphore>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -47,6 +48,9 @@ struct io_uring_queue_destroyer {
  * @brief Disk Numpy Fetecher class.
  */
 class OnDiskNpyArray : public torch::CustomClassHolder {
+  // No user will need more than 1024 io_uring queues.
+  using counting_semaphore_t = ::cuda::std::counting_semaphore<1024>;
+
  public:
   static constexpr int kGroupSize = 256;
 
@@ -137,8 +141,11 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
       call_once_flag_;            // Protect initialization of below.
   static inline int num_queues_;  // Number of queues.
   static inline std::unique_ptr<::io_uring[], io_uring_queue_destroyer>
-      io_uring_queue_;                               // io_uring queue.
-  static inline std::unique_ptr<std::mutex[]> mtx_;  // io_uring_queue mutexes.
+      io_uring_queue_;  // io_uring queue.
+  static inline counting_semaphore_t
+      semaphore_;  // Control access to the io_uring queues.
+  static inline std::mutex available_queues_mtx_;  // available_queues_ mutex.
+  static inline std::vector<int> available_queues_;
 
 #endif  // HAVE_LIBRARY_LIBURING
 };
