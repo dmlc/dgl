@@ -75,6 +75,29 @@ class PartitionedCachePolicy : public torch::CustomClassHolder {
       torch::Tensor keys);
 
   /**
+   * @brief The policy query and then replace function.
+   * @param keys The keys to query the cache.
+   *
+   * @return (positions, indices, pointers, missing_keys, found_offsets,
+   * missing_offsets), where positions has the locations of the keys which were
+   * emplaced into the cache, pointers point to the emplaced CacheKey pointers
+   * in the cache, missing_keys has the keys that were not found and just
+   * inserted and indices is defined such that keys[indices[:keys.size(0) -
+   * missing_keys.size(0)]] gives us the keys for the found keys and
+   * keys[indices[keys.size(0) - missing_keys.size(0):]] is identical to
+   * missing_keys. The found_offsets tensor holds the partition offsets for the
+   * found pointers. The missing_offsets holds the partition offsets for the
+   * missing_keys and missing pointers.
+   */
+  std::tuple<
+      torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
+      torch::Tensor>
+  QueryAndThenReplace(torch::Tensor keys);
+
+  c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
+  QueryAndThenReplaceAsync(torch::Tensor keys);
+
+  /**
    * @brief The policy replace function.
    * @param keys The keys to query the cache.
    * @param offsets The partition offsets for the keys.
