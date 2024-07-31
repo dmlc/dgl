@@ -5,10 +5,10 @@ from copy import deepcopy
 from functools import partial
 
 import dgl.graphbolt as gb
+import dgl.nn as dglnn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl.nn as dglnn
 import torchmetrics.functional as MF
 from load_dataset import load_dataset
 from tqdm import tqdm
