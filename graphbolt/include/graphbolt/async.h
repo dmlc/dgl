@@ -106,14 +106,13 @@ inline auto async(F function) {
 #else
   auto promise = std::make_shared<std::promise<T>>();
   auto future = promise->get_future();
-  auto async_task = [=]() {
+  at::launch([=]() {
     if constexpr (std::is_void_v<T>) {
       function();
       promise->set_value();
     } else
       promise->set_value(function());
-  };
-  at::launch(async_task);
+  });
 #endif
   return c10::make_intrusive<Future<T>>(std::move(future));
 }
