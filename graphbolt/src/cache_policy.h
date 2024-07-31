@@ -557,9 +557,9 @@ class LruCachePolicy : public BaseCachePolicy {
   std::pair<map_iterator, bool> Emplace(int64_t key) {
     auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
     if (it->second != getMapSentinelValue()) {
-      MoveToFront(it->second);
       auto& cache_key = *it->second;
       if (!cache_key.BeingWritten()) {
+        MoveToFront(it->second);
         // Not being written so we use StartUse<write=false>() and return
         // true to indicate the key is ready to read.
         cache_key.StartUse<false>();
