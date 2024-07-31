@@ -75,16 +75,9 @@ class CPUCachedFeature(Feature):
         """
         if ids is None:
             return self._fallback_feature.read()
-        (
-            values,
-            missing_index,
-            missing_keys,
-            missing_offsets,
-        ) = self._feature.query(ids)
-        missing_values = self._fallback_feature.read(missing_keys)
-        values[missing_index] = missing_values
-        self._feature.replace(missing_keys, missing_values, missing_offsets)
-        return values
+        return self._feature.query_and_then_replace(
+            ids, self._fallback_feature.read
+        )
 
     def read_async(self, ids: torch.Tensor):
         """Read the feature by index asynchronously.
