@@ -5,7 +5,7 @@ from functools import partial
 
 import torch
 from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import Mapper
+from torch.utils.data.datapipes.iter import Mapper
 
 from ..base import ORIGINAL_EDGE_ID
 from ..internal import compact_csc_format, unique_and_compact_csc_formats
