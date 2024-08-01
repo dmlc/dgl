@@ -80,7 +80,6 @@ def test_NeighborSampler_GraphFetch(
         sample_per_layer,
         gpu_graph_cache,
     )
-    datapipe = datapipe.wait_future()
     if num_cached_edges > 0:
         datapipe = gb.CombineCachedAndFetchedInSubgraph(
             datapipe, sample_per_layer

@@ -31,7 +31,6 @@ __all__ = [
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
-    "FutureWaiter",
     "Waiter",
     "Bufferer",
     "EndMarker",
@@ -448,18 +447,6 @@ class Waiter(IterDataPipe):
         for data in self.datapipe:
             data.wait()
             yield data
-
-
-@functional_datapipe("wait_future")
-class FutureWaiter(IterDataPipe):
-    """Calls the result function of all items and returns their results."""
-
-    def __init__(self, datapipe):
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        for data in self.datapipe:
-            yield data.result()
 
 
 @dataclass
