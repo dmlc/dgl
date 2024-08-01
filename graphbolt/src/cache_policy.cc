@@ -74,6 +74,74 @@ BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
 }
 
 template <typename CachePolicy>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+BaseCachePolicy::QueryAndThenReplaceImpl(
+    CachePolicy& policy, torch::Tensor keys) {
+  auto positions = torch::empty_like(
+      keys, keys.options()
+                .dtype(torch::kInt64)
+                .pinned_memory(utils::is_pinned(keys)));
+  auto indices = torch::empty_like(
+      keys, keys.options()
+                .dtype(torch::kInt64)
+                .pinned_memory(utils::is_pinned(keys)));
+  auto pointers = torch::empty_like(keys, keys.options().dtype(torch::kInt64));
+  auto missing_keys = torch::empty_like(
+      keys, keys.options().pinned_memory(utils::is_pinned(keys)));
+  int64_t found_cnt = 0;
+  int64_t missing_cnt = keys.size(0);
+  AT_DISPATCH_INDEX_TYPES(
+      keys.scalar_type(), "BaseCachePolicy::Replace", ([&] {
+        auto keys_ptr = keys.data_ptr<index_t>();
+        auto positions_ptr = positions.data_ptr<int64_t>();
+        auto indices_ptr = indices.data_ptr<int64_t>();
+        static_assert(
+            sizeof(CacheKey*) == sizeof(int64_t), "You need 64 bit pointers.");
+        auto pointers_ptr =
+            reinterpret_cast<CacheKey**>(pointers.data_ptr<int64_t>());
+        auto missing_keys_ptr = missing_keys.data_ptr<index_t>();
+        auto iterators = std::unique_ptr<typename CachePolicy::map_iterator[]>(
+            new typename CachePolicy::map_iterator[keys.size(0)]);
+        // QueryImpl here.
+        for (int64_t i = 0; i < keys.size(0); i++) {
+          const auto key = keys_ptr[i];
+          const auto [it, can_read] = policy.Emplace(key);
+          if (can_read) {
+            auto& cache_key = *it->second;
+            positions_ptr[found_cnt] = cache_key.getPos();
+            pointers_ptr[found_cnt] = &cache_key;
+            indices_ptr[found_cnt++] = i;
+          } else {
+            indices_ptr[--missing_cnt] = i;
+            missing_keys_ptr[missing_cnt] = key;
+            iterators[missing_cnt] = it;
+          }
+        }
+        // ReplaceImpl here.
+        set_t<int64_t> position_set;
+        position_set.reserve(keys.size(0));
+        for (int64_t i = missing_cnt; i < missing_keys.size(0); i++) {
+          auto it = iterators[i];
+          if (it->second == policy.getMapSentinelValue()) {
+            policy.Insert(it);
+            // After Insert, it->second is not nullptr anymore.
+            TORCH_CHECK(
+                // If there are duplicate values and the key was just inserted,
+                // we do not have to check for the uniqueness of the positions.
+                std::get<1>(position_set.insert(it->second->getPos())),
+                "Can't insert all, larger cache capacity is needed.");
+          } else {
+            policy.MarkExistingWriting(it);
+          }
+          auto& cache_key = *it->second;
+          positions_ptr[i] = cache_key.getPos();
+          pointers_ptr[i] = &cache_key;
+        }
+      }));
+  return {positions, indices, pointers, missing_keys.slice(0, found_cnt)};
+}
+
+template <typename CachePolicy>
 std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
     CachePolicy& policy, torch::Tensor keys) {
   auto positions = torch::empty_like(
@@ -140,6 +208,11 @@ S3FifoCachePolicy::Query(torch::Tensor keys) {
   return QueryImpl(*this, keys);
 }
 
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+S3FifoCachePolicy::QueryAndThenReplace(torch::Tensor keys) {
+  return QueryAndThenReplaceImpl(*this, keys);
+}
+
 std::tuple<torch::Tensor, torch::Tensor> S3FifoCachePolicy::Replace(
     torch::Tensor keys) {
   return ReplaceImpl(*this, keys);
@@ -163,6 +236,11 @@ SieveCachePolicy::SieveCachePolicy(int64_t capacity)
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 SieveCachePolicy::Query(torch::Tensor keys) {
   return QueryImpl(*this, keys);
+}
+
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+SieveCachePolicy::QueryAndThenReplace(torch::Tensor keys) {
+  return QueryAndThenReplaceImpl(*this, keys);
 }
 
 std::tuple<torch::Tensor, torch::Tensor> SieveCachePolicy::Replace(
@@ -189,6 +267,11 @@ LruCachePolicy::Query(torch::Tensor keys) {
   return QueryImpl(*this, keys);
 }
 
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+LruCachePolicy::QueryAndThenReplace(torch::Tensor keys) {
+  return QueryAndThenReplaceImpl(*this, keys);
+}
+
 std::tuple<torch::Tensor, torch::Tensor> LruCachePolicy::Replace(
     torch::Tensor keys) {
   return ReplaceImpl(*this, keys);
@@ -211,6 +294,11 @@ ClockCachePolicy::ClockCachePolicy(int64_t capacity)
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 ClockCachePolicy::Query(torch::Tensor keys) {
   return QueryImpl(*this, keys);
+}
+
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+ClockCachePolicy::QueryAndThenReplace(torch::Tensor keys) {
+  return QueryAndThenReplaceImpl(*this, keys);
 }
 
 std::tuple<torch::Tensor, torch::Tensor> ClockCachePolicy::Replace(
