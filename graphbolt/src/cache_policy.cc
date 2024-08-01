@@ -117,9 +117,7 @@ BaseCachePolicy::QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys) {
               policy.Insert(it);
               // After Insert, it->second is not nullptr anymore.
               TORCH_CHECK(
-                  // If there are duplicate values and the key was just
-                  // inserted, we do not have to check for the uniqueness of the
-                  // positions.
+                  // We check for the uniqueness of the positions.
                   std::get<1>(position_set.insert(it->second->getPos())),
                   "Can't insert all, larger cache capacity is needed.");
             } else {
