@@ -1,6 +1,5 @@
 """Neighbor subgraph samplers for GraphBolt."""
 
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import torch

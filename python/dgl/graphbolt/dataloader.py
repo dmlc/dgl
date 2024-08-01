@@ -1,7 +1,6 @@
 """Graph Bolt DataLoaders"""
 
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
 
 import torch
 import torch.utils.data as torch_data

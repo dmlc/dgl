@@ -31,7 +31,6 @@ __all__ = [
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
-    "FutureWaiter",
     "Waiter",
     "Bufferer",
     "EndMarker",
