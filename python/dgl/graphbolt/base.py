@@ -450,18 +450,6 @@ class Waiter(IterDataPipe):
             yield data
 
 
-@functional_datapipe("wait_future")
-class FutureWaiter(IterDataPipe):
-    """Calls the result function of all items and returns their results."""
-
-    def __init__(self, datapipe):
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        for data in self.datapipe:
-            yield data.result()
-
-
 @dataclass
 class CSCFormatBase:
     r"""Basic class representing data in Compressed Sparse Column (CSC) format.

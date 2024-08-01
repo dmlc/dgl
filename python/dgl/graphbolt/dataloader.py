@@ -205,7 +205,6 @@ class DataLoader(torch_data.DataLoader):
                 datapipe_graph,
                 SamplePerLayer,
             )
-            executor = ThreadPoolExecutor(max_workers=1)
             gpu_graph_cache = None
             for sampler in samplers:
                 if num_gpu_cached_edges > 0 and gpu_graph_cache is None:
@@ -218,7 +217,6 @@ class DataLoader(torch_data.DataLoader):
                     sampler.fetch_and_sample(
                         gpu_graph_cache,
                         get_host_to_device_uva_stream(),
-                        executor,
                         1,
                     ),
                 )
