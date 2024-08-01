@@ -1,16 +1,17 @@
+"""
+This example references examples/graphbolt/pyg/labor/node_classification.py
+"""
+
 import argparse
 import time
 
 from copy import deepcopy
-from functools import partial
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchmetrics.functional as MF
-from load_dataset import load_dataset
 from tqdm import tqdm
 
 
@@ -130,13 +131,12 @@ def create_dataloader(
     )
 
 
-def train_step(minibatch, optimizer, model, loss_fn, multilabel, eval_fn):
+def train_step(minibatch, optimizer, model, loss_fn, eval_fn):
     node_features = minibatch.node_features["feat"]
     labels = minibatch.labels
     optimizer.zero_grad()
     out = model(minibatch.blocks, node_features)
-    label_dtype = out.dtype if multilabel else None
-    loss = loss_fn(out, labels.to(label_dtype))
+    loss = loss_fn(out, labels)
     num_correct = eval_fn(out, labels) * labels.size(0)
     loss.backward()
     optimizer.step()
@@ -148,7 +148,6 @@ def train_helper(
     model,
     optimizer,
     loss_fn,
-    multilabel,
     eval_fn,
     gpu_cache_miss_rate_fn,
     cpu_cache_miss_rate_fn,
@@ -164,7 +163,7 @@ def train_helper(
     dataloader = tqdm(dataloader, "Training")
     for step, minibatch in enumerate(dataloader):
         loss, num_correct, num_samples = train_step(
-            minibatch, optimizer, model, loss_fn, multilabel, eval_fn
+            minibatch, optimizer, model, loss_fn, eval_fn
         )
         total_loss += loss
         total_correct += num_correct
@@ -189,14 +188,13 @@ def train(
     train_dataloader,
     valid_dataloader,
     model,
-    multilabel,
     eval_fn,
     gpu_cache_miss_rate_fn,
     cpu_cache_miss_rate_fn,
     device,
 ):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    loss_fn = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
+    loss_fn = nn.CrossEntropyLoss()
 
     best_model = None
     best_model_acc = 0
@@ -208,7 +206,6 @@ def train(
             model,
             optimizer,
             loss_fn,
-            multilabel,
             eval_fn,
             gpu_cache_miss_rate_fn,
             cpu_cache_miss_rate_fn,
@@ -345,6 +342,7 @@ def parse_args():
             "flickr",
         ],
     )
+    parser.add_argument("--root", type=str, default="datasets")
     parser.add_argument(
         "--fanout",
         type=str,
@@ -376,14 +374,14 @@ def parse_args():
         help="The cache policy for the CPU feature cache.",
     )
     parser.add_argument(
-        "--num-cpu-cached-features",
-        type=int,
+        "--cpu-cache-size-in-gigabytes",
+        type=float,
         default=0,
         help="The capacity of the CPU cache, the number of features to store.",
     )
     parser.add_argument(
-        "--num-gpu-cached-features",
-        type=int,
+        "--gpu-cache-size-in-gigabytes",
+        type=float,
         default=0,
         help="The capacity of the GPU cache, the number of features to store.",
     )
@@ -415,9 +413,18 @@ def main():
     # Load and preprocess dataset.
     print("Loading data...")
     disk_based_feature_keys = None
-    if args.num_cpu_cached_features > 0:
+    if args.cpu_cache_size_in_gigabytes > 0:
         disk_based_feature_keys = [("node", None, "feat")]
-    dataset, multilabel = load_dataset(args.dataset, disk_based_feature_keys)
+
+    dataset = gb.BuiltinDataset(args.dataset, root=args.root)
+    if disk_based_feature_keys is None:
+        disk_based_feature_keys = set()
+    for feature in dataset.yaml_data["feature_data"]:
+        feature_key = (feature["domain"], feature["type"], feature["name"])
+        # Set the in_memory setting to False without modifying YAML file.
+        if feature_key in disk_based_feature_keys:
+            feature["in_memory"] = False
+    dataset = dataset.load()
 
     # Move the dataset to the selected storage.
     graph = (
@@ -439,20 +446,12 @@ def main():
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    feature_index_device = (
-        args.feature_device if args.feature_device != "pinned" else None
-    )
-    feature_num_bytes = (
-        features[("node", None, "feat")]
-        # Read a single row to query its size in bytes.
-        .read(torch.zeros(1, device=feature_index_device).long()).nbytes
-    )
-    if args.num_cpu_cached_features > 0 and isinstance(
+    if args.cpu_cache_size_in_gigabytes > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
     ):
         features[("node", None, "feat")] = gb.CPUCachedFeature(
             features[("node", None, "feat")],
-            args.num_cpu_cached_features * feature_num_bytes,
+            int(args.cpu_cache_size_in_gigabytes * 1024 * 1024 * 1024),
             args.cpu_feature_cache_policy,
             args.feature_device == "pinned",
         )
@@ -460,10 +459,10 @@ def main():
         cpu_cache_miss_rate_fn = lambda: cpu_cached_feature._feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
-    if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
+    if args.gpu_cache_size_in_gigabytes > 0 and args.feature_device != "cuda":
         features[("node", None, "feat")] = gb.GPUCachedFeature(
             features[("node", None, "feat")],
-            args.num_gpu_cached_features * feature_num_bytes,
+            int(args.gpu_cache_size_in_gigabytes * 1024 * 1024 * 1024),
         )
         gpu_cached_feature = features[("node", None, "feat")]
         gpu_cache_miss_rate_fn = lambda: gpu_cached_feature._feature.miss_rate
@@ -493,24 +492,11 @@ def main():
     ).to(args.device)
     assert len(args.fanout) == len(model.layers)
 
-    eval_fn = (
-        partial(
-            # TODO @mfbalin: Find an implementation that does not synchronize.
-            MF.f1_score,
-            task="multilabel",
-            num_labels=num_classes,
-            validate_args=False,
-        )
-        if multilabel
-        else accuracy
-    )
-
     best_model = train(
         train_dataloader,
         valid_dataloader,
         model,
-        multilabel,
-        eval_fn,
+        accuracy,
         gpu_cache_miss_rate_fn,
         cpu_cache_miss_rate_fn,
         args.device,
@@ -528,7 +514,7 @@ def main():
             itemsets,
             all_nodes_set,
             model,
-            eval_fn,
+            accuracy,
         )
         print("Final accuracy values:")
         print(final_acc)
