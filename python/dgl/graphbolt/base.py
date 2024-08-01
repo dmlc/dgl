@@ -369,9 +369,6 @@ class CopyTo(IterDataPipe):
 
     def __iter__(self):
         for data in self.datapipe:
-            if self.non_blocking:
-                # The copy is non blocking only if contents of data are pinned.
-                assert data.is_pinned(), f"{data} should be pinned."
             yield recursive_apply(
                 data, apply_to, self.device, self.non_blocking
             )
