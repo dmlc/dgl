@@ -144,7 +144,7 @@ class BaseCachePolicy {
    * identical to missing_keys.
    */
   virtual std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys) = 0;
+  QueryAndReplace(torch::Tensor keys) = 0;
 
   /**
    * @brief The policy replace function.
@@ -182,7 +182,7 @@ class BaseCachePolicy {
 
   template <typename CachePolicy>
   static std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplaceImpl(CachePolicy& policy, torch::Tensor keys);
+  QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys);
 
   template <typename CachePolicy>
   static std::tuple<torch::Tensor, torch::Tensor> ReplaceImpl(
@@ -220,10 +220,10 @@ class S3FifoCachePolicy : public BaseCachePolicy {
       torch::Tensor keys);
 
   /**
-   * @brief See BaseCachePolicy::QueryAndThenReplace.
+   * @brief See BaseCachePolicy::QueryAndReplace.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
   /**
    * @brief See BaseCachePolicy::Replace.
@@ -380,10 +380,10 @@ class SieveCachePolicy : public BaseCachePolicy {
       torch::Tensor keys);
 
   /**
-   * @brief See BaseCachePolicy::QueryAndThenReplace.
+   * @brief See BaseCachePolicy::QueryAndReplace.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
   /**
    * @brief See BaseCachePolicy::Replace.
@@ -507,10 +507,10 @@ class LruCachePolicy : public BaseCachePolicy {
       torch::Tensor keys);
 
   /**
-   * @brief See BaseCachePolicy::QueryAndThenReplace.
+   * @brief See BaseCachePolicy::QueryAndReplace.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
   /**
    * @brief See BaseCachePolicy::Replace.
@@ -649,10 +649,10 @@ class ClockCachePolicy : public BaseCachePolicy {
       torch::Tensor keys);
 
   /**
-   * @brief See BaseCachePolicy::QueryAndThenReplace.
+   * @brief See BaseCachePolicy::QueryAndReplace.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
   /**
    * @brief See BaseCachePolicy::Replace.
