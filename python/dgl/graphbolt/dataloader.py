@@ -226,6 +226,9 @@ class DataLoader(torch_data.DataLoader):
         # separate thread.
         if torch.cuda.is_available():
             copiers = dp_utils.find_dps(datapipe_graph, CopyTo)
+            assert (
+                len(copiers) <= 1
+            ), "There are multiple CopyTo operations in the datapipe graph."
             for copier in copiers:
                 if copier.device.type == "cuda":
                     datapipe_graph = dp_utils.replace_dp(
