@@ -113,19 +113,19 @@ BaseCachePolicy::QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys) {
           } else {
             indices_ptr[--missing_cnt] = i;
             missing_keys_ptr[missing_cnt] = key;
+            CacheKey* cache_key_ptr;
             if (it->second == policy.getMapSentinelValue()) {
-              policy.Insert(it);
-              // After Insert, it->second is not nullptr anymore.
+              cache_key_ptr = policy.Insert(it);
               TORCH_CHECK(
                   // We check for the uniqueness of the positions.
-                  std::get<1>(position_set.insert(it->second->getPos())),
+                  std::get<1>(position_set.insert(cache_key_ptr->getPos())),
                   "Can't insert all, larger cache capacity is needed.");
             } else {
+              cache_key_ptr = &*it->second;
               policy.MarkExistingWriting(it);
             }
-            auto& cache_key = *it->second;
-            positions_ptr[missing_cnt] = cache_key.getPos();
-            pointers_ptr[missing_cnt] = &cache_key;
+            positions_ptr[missing_cnt] = cache_key_ptr->getPos();
+            pointers_ptr[missing_cnt] = cache_key_ptr;
           }
         }
       }));
@@ -183,15 +183,16 @@ void BaseCachePolicy::ReadingWritingCompletedImpl(
 }
 
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
-    : small_queue_(capacity),
-      main_queue_(capacity),
+    // We sometimes first insert and then evict. + 1 is to compensate for that.
+    : small_queue_(capacity + 1),
+      main_queue_(capacity + 1),
       ghost_queue_(capacity - capacity / 10),
       capacity_(capacity),
       cache_usage_(0),
       small_queue_size_target_(capacity / 10) {
   TORCH_CHECK(small_queue_size_target_ > 0, "Capacity is not large enough.");
   ghost_set_.reserve(ghost_queue_.Capacity());
-  key_to_cache_key_.reserve(kCapacityFactor * capacity);
+  key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -221,7 +222,7 @@ SieveCachePolicy::SieveCachePolicy(int64_t capacity)
     // Ensure that queue_ is constructed first before accessing its `.end()`.
     : queue_(), hand_(queue_.end()), capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
-  key_to_cache_key_.reserve(kCapacityFactor * capacity);
+  key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -250,7 +251,7 @@ void SieveCachePolicy::WritingCompleted(torch::Tensor keys) {
 LruCachePolicy::LruCachePolicy(int64_t capacity)
     : capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
-  key_to_cache_key_.reserve(kCapacityFactor * capacity);
+  key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -277,9 +278,10 @@ void LruCachePolicy::WritingCompleted(torch::Tensor keys) {
 }
 
 ClockCachePolicy::ClockCachePolicy(int64_t capacity)
-    : queue_(capacity), capacity_(capacity), cache_usage_(0) {
+    // We sometimes first insert and then evict. + 1 is to compensate for that.
+    : queue_(capacity + 1), capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
-  key_to_cache_key_.reserve(kCapacityFactor * capacity);
+  key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
