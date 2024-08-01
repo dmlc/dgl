@@ -1,6 +1,6 @@
 #!/bin/bash
 
-readonly CUDA_VERSIONS="11.8,12.1"
+readonly CUDA_VERSIONS="11.8,12.1,12.4"
 readonly TORCH_VERSION="2.1.0"
 readonly PYTHON_VERSION="3.10"
 

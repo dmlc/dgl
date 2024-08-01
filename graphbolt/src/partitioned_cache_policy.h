@@ -92,10 +92,10 @@ class PartitionedCachePolicy : public torch::CustomClassHolder {
   std::tuple<
       torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
       torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
-  c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
-  QueryAndThenReplaceAsync(torch::Tensor keys);
+  c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> QueryAndReplaceAsync(
+      torch::Tensor keys);
 
   /**
    * @brief The policy replace function.

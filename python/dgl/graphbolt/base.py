@@ -17,8 +17,7 @@ if (
     )
 
 # pylint: disable=wrong-import-position
-from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import IterDataPipe
+from torch.utils.data import functional_datapipe, IterDataPipe
 
 from .internal_utils import (
     get_nonproperty_attributes,
