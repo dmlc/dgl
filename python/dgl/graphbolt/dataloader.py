@@ -231,11 +231,10 @@ class DataLoader(torch_data.DataLoader):
                     datapipe_graph = dp_utils.replace_dp(
                         datapipe_graph,
                         copier,
-                        copier.datapipe.transform(
-                            lambda x: x.pin_memory()
-                        ).prefetch(2)
-                        # After the data gets pinned, we can copy non_blocking.
-                        .copy_to(copier.device, non_blocking=True),
+                        # Add prefetch so that CPU and GPU can run concurrently.
+                        copier.datapipe.prefetch(2).copy_to(
+                            copier.device, non_blocking=True
+                        ),
                     )
 
         # The stages after feature fetching is still done in the main process.
