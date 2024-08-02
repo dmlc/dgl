@@ -131,13 +131,13 @@ def create_dataloader(
     )
 
 
-def train_step(minibatch, optimizer, model, loss_fn, eval_fn):
+def train_step(minibatch, optimizer, model, loss_fn):
     node_features = minibatch.node_features["feat"]
     labels = minibatch.labels
     optimizer.zero_grad()
     out = model(minibatch.blocks, node_features)
     loss = loss_fn(out, labels)
-    num_correct = eval_fn(out, labels) * labels.size(0)
+    num_correct = accuracy(out, labels) * labels.size(0)
     loss.backward()
     optimizer.step()
     return loss.detach(), num_correct, labels.size(0)
@@ -148,7 +148,6 @@ def train_helper(
     model,
     optimizer,
     loss_fn,
-    eval_fn,
     gpu_cache_miss_rate_fn,
     cpu_cache_miss_rate_fn,
     device,
@@ -163,7 +162,7 @@ def train_helper(
     dataloader = tqdm(dataloader, "Training")
     for step, minibatch in enumerate(dataloader):
         loss, num_correct, num_samples = train_step(
-            minibatch, optimizer, model, loss_fn, eval_fn
+            minibatch, optimizer, model, loss_fn
         )
         total_loss += loss
         total_correct += num_correct
@@ -188,7 +187,6 @@ def train(
     train_dataloader,
     valid_dataloader,
     model,
-    eval_fn,
     gpu_cache_miss_rate_fn,
     cpu_cache_miss_rate_fn,
     device,
@@ -206,7 +204,6 @@ def train(
             model,
             optimizer,
             loss_fn,
-            eval_fn,
             gpu_cache_miss_rate_fn,
             cpu_cache_miss_rate_fn,
             device,
@@ -214,7 +211,6 @@ def train(
         val_acc = evaluate(
             model,
             valid_dataloader,
-            eval_fn,
             gpu_cache_miss_rate_fn,
             cpu_cache_miss_rate_fn,
             device,
@@ -242,7 +238,6 @@ def layerwise_infer(
     itemsets,
     all_nodes_set,
     model,
-    eval_fn,
 ):
     model.eval()
     dataloader = create_dataloader(
@@ -259,7 +254,7 @@ def layerwise_infer(
     metrics = {}
     for split_name, itemset in itemsets.items():
         nid, labels = itemset[:]
-        acc = eval_fn(
+        acc = accuracy(
             pred[nid.to(pred.device)],
             labels.to(pred.device),
         )
@@ -268,11 +263,11 @@ def layerwise_infer(
     return metrics
 
 
-def evaluate_step(minibatch, model, eval_fn):
+def evaluate_step(minibatch, model):
     node_features = minibatch.node_features["feat"]
     labels = minibatch.labels
     out = model(minibatch.blocks, node_features)
-    num_correct = eval_fn(out, labels) * labels.size(0)
+    num_correct = accuracy(out, labels) * labels.size(0)
     return num_correct, labels.size(0)
 
 
@@ -280,7 +275,6 @@ def evaluate_step(minibatch, model, eval_fn):
 def evaluate(
     model,
     dataloader,
-    eval_fn,
     gpu_cache_miss_rate_fn,
     cpu_cache_miss_rate_fn,
     device,
@@ -290,7 +284,7 @@ def evaluate(
     total_samples = 0
     val_dataloader_tqdm = tqdm(dataloader, "Evaluating")
     for step, minibatch in enumerate(val_dataloader_tqdm):
-        num_correct, num_samples = evaluate_step(minibatch, model, eval_fn)
+        num_correct, num_samples = evaluate_step(minibatch, model)
         total_correct += num_correct
         total_samples += num_samples
         if step % 25 == 0:
@@ -496,7 +490,6 @@ def main():
         train_dataloader,
         valid_dataloader,
         model,
-        accuracy,
         gpu_cache_miss_rate_fn,
         cpu_cache_miss_rate_fn,
         args.device,
@@ -514,7 +507,6 @@ def main():
             itemsets,
             all_nodes_set,
             model,
-            accuracy,
         )
         print("Final accuracy values:")
         print(final_acc)
