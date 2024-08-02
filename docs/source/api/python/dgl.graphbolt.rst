@@ -5,7 +5,7 @@
 
 .. currentmodule:: dgl.graphbolt
 
-**dgl.graphbolt** is a dataloading framework for GNN that provides well-defined
+**dgl.graphbolt** is a dataloading framework for GNNs that provides well-defined
 APIs for each stage of the data pipeline and multiple standard implementations.
 
 Dataset
@@ -55,6 +55,8 @@ collection of features.
     BasicFeatureStore
     TorchBasedFeature
     TorchBasedFeatureStore
+    DiskBasedFeature
+    CPUCachedFeature
     GPUCachedFeature
 
 
