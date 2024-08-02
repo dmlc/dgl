@@ -147,19 +147,19 @@ def _assign_attr(obj, old_dp, new_dp, inner_dp: bool = False):
     elif isinstance(obj, tuple):
         temp_list = []
         flag = False
-        for o in obj:
-            new_obj = _assign_attr(o, old_dp, new_dp, inner_dp)
+        for item in obj:
+            new_obj = _assign_attr(item, old_dp, new_dp, inner_dp)
             if new_obj is not None:
                 flag = True
                 temp_list.append(new_dp)
             else:
-                temp_list.append(o)
+                temp_list.append(item)
         if flag:
             return tuple(temp_list)  # Special case
         else:
             return None
     elif isinstance(obj, list):
-        for i in range(len(obj)):
+        for i in range(len(obj)):  # pylint: disable=consider-using-enumerate
             new_obj = _assign_attr(obj[i], old_dp, new_dp, inner_dp)
             if new_obj is not None:
                 obj[i] = new_obj
@@ -167,8 +167,8 @@ def _assign_attr(obj, old_dp, new_dp, inner_dp: bool = False):
         return None
     elif isinstance(obj, set):
         new_obj = None
-        for o in obj:
-            if _assign_attr(o, old_dp, new_dp, inner_dp) is not None:
+        for item in obj:
+            if _assign_attr(item, old_dp, new_dp, inner_dp) is not None:
                 new_obj = new_dp
                 break
         if new_obj is not None:
