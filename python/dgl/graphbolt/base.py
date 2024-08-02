@@ -17,8 +17,7 @@ if (
     )
 
 # pylint: disable=wrong-import-position
-from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import IterDataPipe
+from torch.utils.data import functional_datapipe, IterDataPipe
 
 from .internal_utils import (
     get_nonproperty_attributes,
@@ -32,7 +31,6 @@ __all__ = [
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
-    "FutureWaiter",
     "Waiter",
     "Bufferer",
     "EndMarker",
@@ -371,9 +369,6 @@ class CopyTo(IterDataPipe):
 
     def __iter__(self):
         for data in self.datapipe:
-            if self.non_blocking:
-                # The copy is non blocking only if contents of data are pinned.
-                assert data.is_pinned(), f"{data} should be pinned."
             yield recursive_apply(
                 data, apply_to, self.device, self.non_blocking
             )
@@ -449,18 +444,6 @@ class Waiter(IterDataPipe):
         for data in self.datapipe:
             data.wait()
             yield data
-
-
-@functional_datapipe("wait_future")
-class FutureWaiter(IterDataPipe):
-    """Calls the result function of all items and returns their results."""
-
-    def __init__(self, datapipe):
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        for data in self.datapipe:
-            yield data.result()
 
 
 @dataclass

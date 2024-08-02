@@ -1,12 +1,10 @@
 """Graph Bolt DataLoaders"""
 
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
 
 import torch
-import torch.utils.data
+import torch.utils.data as torch_data
 import torchdata.dataloader2.graph as dp_utils
-import torchdata.datapipes as dp
 
 from .base import CopyTo, get_host_to_device_uva_stream
 from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
@@ -70,7 +68,7 @@ def _set_worker_id(worked_id):
     torch.ops.graphbolt.set_worker_id(worked_id)
 
 
-class MultiprocessingWrapper(dp.iter.IterDataPipe):
+class MultiprocessingWrapper(torch_data.IterDataPipe):
     """Wraps a datapipe with multiprocessing.
 
     Parameters
@@ -88,7 +86,7 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
 
     def __init__(self, datapipe, num_workers=0, persistent_workers=True):
         self.datapipe = datapipe
-        self.dataloader = torch.utils.data.DataLoader(
+        self.dataloader = torch_data.DataLoader(
             datapipe,
             batch_size=None,
             num_workers=num_workers,
@@ -100,7 +98,7 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
         yield from self.dataloader
 
 
-class DataLoader(torch.utils.data.DataLoader):
+class DataLoader(torch_data.DataLoader):
     """Multiprocessing DataLoader.
 
     Iterates over the data pipeline with everything before feature fetching
@@ -206,7 +204,6 @@ class DataLoader(torch.utils.data.DataLoader):
                 datapipe_graph,
                 SamplePerLayer,
             )
-            executor = ThreadPoolExecutor(max_workers=1)
             gpu_graph_cache = None
             for sampler in samplers:
                 if num_gpu_cached_edges > 0 and gpu_graph_cache is None:
@@ -219,7 +216,6 @@ class DataLoader(torch.utils.data.DataLoader):
                     sampler.fetch_and_sample(
                         gpu_graph_cache,
                         get_host_to_device_uva_stream(),
-                        executor,
                         1,
                     ),
                 )
@@ -235,11 +231,10 @@ class DataLoader(torch.utils.data.DataLoader):
                     datapipe_graph = dp_utils.replace_dp(
                         datapipe_graph,
                         copier,
-                        copier.datapipe.transform(
-                            lambda x: x.pin_memory()
-                        ).prefetch(2)
-                        # After the data gets pinned, we can copy non_blocking.
-                        .copy_to(copier.device, non_blocking=True),
+                        # Add prefetch so that CPU and GPU can run concurrently.
+                        copier.datapipe.prefetch(2).copy_to(
+                            copier.device, non_blocking=True
+                        ),
                     )
 
         # The stages after feature fetching is still done in the main process.

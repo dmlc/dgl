@@ -2,7 +2,7 @@
 
 from torch.utils.data import functional_datapipe
 
-from torchdata.datapipes.iter import Mapper
+from torch.utils.data.datapipes.iter import Mapper
 
 from .minibatch import MiniBatch
 

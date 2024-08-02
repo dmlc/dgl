@@ -33,6 +33,8 @@ namespace graphbolt {
 namespace storage {
 
 struct CacheKey {
+  CacheKey(int64_t key) : CacheKey(key, -1) {}
+
   CacheKey(int64_t key, int64_t position)
       : freq_(0),
         key_(key),
@@ -49,6 +51,11 @@ struct CacheKey {
   auto getKey() const { return key_; }
 
   auto getPos() const { return position_in_cache_; }
+
+  CacheKey& setPos(int64_t pos) {
+    position_in_cache_ = pos;
+    return *this;
+  }
 
   CacheKey& Increment() {
     freq_ = std::min(3, static_cast<int>(freq_ + 1));
@@ -144,7 +151,7 @@ class BaseCachePolicy {
    * identical to missing_keys.
    */
   virtual std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys) = 0;
+  QueryAndReplace(torch::Tensor keys) = 0;
 
   /**
    * @brief The policy replace function.
@@ -182,7 +189,7 @@ class BaseCachePolicy {
 
   template <typename CachePolicy>
   static std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplaceImpl(CachePolicy& policy, torch::Tensor keys);
+  QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys);
 
   template <typename CachePolicy>
   static std::tuple<torch::Tensor, torch::Tensor> ReplaceImpl(
@@ -220,10 +227,10 @@ class S3FifoCachePolicy : public BaseCachePolicy {
       torch::Tensor keys);
 
   /**
-   * @brief See BaseCachePolicy::QueryAndThenReplace.
+   * @brief See BaseCachePolicy::QueryAndReplace.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
   /**
    * @brief See BaseCachePolicy::Replace.
@@ -286,12 +293,13 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     return {pos, cache_key_ptr};
   }
 
-  void Insert(map_iterator it) {
+  CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
-    const auto pos = Evict();
     const auto in_ghost_queue = ghost_set_.erase(key);
     auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
-    it->second = queue.Push(CacheKey(key, pos));
+    auto cache_key_ptr = queue.Push(CacheKey(key));
+    it->second = cache_key_ptr;
+    return &cache_key_ptr->setPos(Evict());
   }
 
   void MarkExistingWriting(map_iterator it) {
@@ -380,10 +388,10 @@ class SieveCachePolicy : public BaseCachePolicy {
       torch::Tensor keys);
 
   /**
-   * @brief See BaseCachePolicy::QueryAndThenReplace.
+   * @brief See BaseCachePolicy::QueryAndReplace.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
   /**
    * @brief See BaseCachePolicy::Replace.
@@ -437,11 +445,12 @@ class SieveCachePolicy : public BaseCachePolicy {
     return {pos, cache_key_ptr};
   }
 
-  void Insert(map_iterator it) {
+  CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    it->second = &queue_.front();
+    queue_.push_front(CacheKey(key));
+    auto cache_key_ptr = &queue_.front();
+    it->second = cache_key_ptr;
+    return &cache_key_ptr->setPos(Evict());
   }
 
   void MarkExistingWriting(map_iterator it) {
@@ -507,10 +516,10 @@ class LruCachePolicy : public BaseCachePolicy {
       torch::Tensor keys);
 
   /**
-   * @brief See BaseCachePolicy::QueryAndThenReplace.
+   * @brief See BaseCachePolicy::QueryAndReplace.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
   /**
    * @brief See BaseCachePolicy::Replace.
@@ -577,11 +586,12 @@ class LruCachePolicy : public BaseCachePolicy {
     return {pos, &queue_.front()};
   }
 
-  void Insert(map_iterator it) {
+  CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
+    queue_.push_front(CacheKey(key));
     it->second = queue_.begin();
+    auto cache_key_ptr = &*queue_.begin();
+    return &cache_key_ptr->setPos(Evict());
   }
 
   void MarkExistingWriting(map_iterator it) {
@@ -649,10 +659,10 @@ class ClockCachePolicy : public BaseCachePolicy {
       torch::Tensor keys);
 
   /**
-   * @brief See BaseCachePolicy::QueryAndThenReplace.
+   * @brief See BaseCachePolicy::QueryAndReplace.
    */
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-  QueryAndThenReplace(torch::Tensor keys);
+  QueryAndReplace(torch::Tensor keys);
 
   /**
    * @brief See BaseCachePolicy::Replace.
@@ -705,10 +715,11 @@ class ClockCachePolicy : public BaseCachePolicy {
     return {pos, cache_key_ptr};
   }
 
-  void Insert(map_iterator it) {
+  CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
-    const auto pos = Evict();
-    it->second = queue_.Push(CacheKey(key, pos));
+    auto cache_key_ptr = queue_.Push(CacheKey(key));
+    it->second = cache_key_ptr;
+    return &cache_key_ptr->setPos(Evict());
   }
 
   void MarkExistingWriting(map_iterator it) {
