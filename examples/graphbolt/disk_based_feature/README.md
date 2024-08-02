@@ -4,7 +4,7 @@ This project demonstrates how to use GraphBolt to train and evaluate a GraphSAGE
 
 # Node classification task
 
-This example demonstrates how to run node classification task with **GraphBolt.DiskBasedFeature**.
+This example demonstrates how to run node classification task with **GraphBolt.DiskBasedFeature**. All results are collected on an AWS EC2 g5.8xlarge instance with 128GB RAM, 32 cores, an 24GB A10G GPU and a instance storage of 250K IOPS.
 
 ## Run on `ogbn-papers100M` dataset
 
@@ -16,9 +16,7 @@ This example demonstrates how to run node classification task with **GraphBolt.D
 
 This part trains a three-layer GraphSAGE model for 3 epochs on `ogbn-papers100M` dataset with 10GB CPU cache, using neighbor sampling.
 
-Below results are collected on an AWS EC2 g5.8xlarge instance with 128GB RAM, 32 cores, an 24GB A10G GPU and a instance storage of 250K IOPS.
-
-### SIEVE
+### Run default SIEVE policy
 
 Instruction:
 
@@ -40,68 +38,56 @@ Evaluating: 123it [00:14,  8.56it/s, num_nodes=624204, gpu_cache_miss=1, cpu_cac
 Epoch 02, Loss: 1.0948, Approx. Train: 0.6516, Approx. Val: 0.6590, Time: 118.57369756698608s
 ```
 
-### S3-FIFO
+### Performance Comparison on four caching polices
+
+Below results demonstrate the epoch time with four different caching policies.
+
+| Policy | Epoch 1 (s) | Epoch 2 (s) | Epoch 3 (s) |
+| :-----: | :---------: | :---------: | :---------: |
+|  SIEVE  |   250.589   |   116.465   |   118.574   |
+| S3-FiFO |   263.150   |   179.917   |   177.347   |
+|   LRU   |   265.154   |   157.818   |   157.937   |
+|  CLOCK  |   292.897   |   243.783   |   253.275   |
+
+## Results with Layer-Neighbor Sampling
+
+This part trains a three-layer GraphSAGE model for 3 epochs on `ogbn-papers100M` dataset with 10GB CPU cache, using Layer-Neighbor Sampling and default SIEVE policy.
+
+### Run default `--batch-dependency=1`
 
 Instruction:
 
 ```
-python node_classification.py --gpu-cache-size-in-gigabytes=0 --cpu-cache-size-in-gigabytes=10 --cpu-feature-cache-policy=s3-fifo --dataset=ogbn-papers100M --epochs=3
+python node_classification.py --gpu-cache-size-in-gigabytes=0 --cpu-cache-size-in-gigabytes=10 --dataset=ogbn-papers100M --sample-mode=sample_layer_neighbor --batch-dependency=1 --epochs=3
 ```
 
 Result:
 
 ```
-Training: 1178it [04:23,  4.48it/s, num_nodes=668079, gpu_cache_miss=1, cpu_cache_miss=0.0844]
-Evaluating: 123it [00:23,  5.23it/s, num_nodes=623303, gpu_cache_miss=1, cpu_cache_miss=0.0831]
-Epoch 00, Loss: 1.4094, Approx. Train: 0.5798, Approx. Val: 0.6184, Time: 263.1500926017761s
-Training: 1178it [02:59,  6.55it/s, num_nodes=658380, gpu_cache_miss=1, cpu_cache_miss=0.071] 
-Evaluating: 123it [00:22,  5.37it/s, num_nodes=627476, gpu_cache_miss=1, cpu_cache_miss=0.0708]
-Epoch 01, Loss: 1.1435, Approx. Train: 0.6385, Approx. Val: 0.6599, Time: 179.91719889640808s
-Training: 1178it [02:57,  6.64it/s, num_nodes=661097, gpu_cache_miss=1, cpu_cache_miss=0.0665]
-Evaluating: 123it [00:22,  5.40it/s, num_nodes=624593, gpu_cache_miss=1, cpu_cache_miss=0.0665]
-Epoch 02, Loss: 1.0952, Approx. Train: 0.6514, Approx. Val: 0.6602, Time: 177.34704399108887s
+Training: 1178it [02:57,  6.63it/s, num_nodes=464607, gpu_cache_miss=1, cpu_cache_miss=0.0803]                     
+Evaluating: 123it [00:15,  7.93it/s, num_nodes=463812, gpu_cache_miss=1, cpu_cache_miss=0.0789]                    
+Epoch 00, Loss: 1.4134, Approx. Train: 0.5790, Approx. Val: 0.6277, Time: 177.58959531784058s                      
+Training: 1178it [01:34, 12.45it/s, num_nodes=476553, gpu_cache_miss=1, cpu_cache_miss=0.0617]                     
+Evaluating: 123it [00:14,  8.45it/s, num_nodes=465260, gpu_cache_miss=1, cpu_cache_miss=0.0616]                    
+Epoch 01, Loss: 1.1470, Approx. Train: 0.6383, Approx. Val: 0.6406, Time: 94.6372172832489s                        
+Training: 1178it [01:31, 12.84it/s, num_nodes=474932, gpu_cache_miss=1, cpu_cache_miss=0.0554]                     
+Evaluating: 123it [00:14,  8.70it/s, num_nodes=464145, gpu_cache_miss=1, cpu_cache_miss=0.0554]                    
+Epoch 02, Loss: 1.0990, Approx. Train: 0.6506, Approx. Val: 0.6492, Time: 91.75295209884644s
 ```
 
-### LRU
+### Performance Comparison on different `--batch-dependency`
 
-Instruction:
+| batch-dependency | Epoch 1 (s) | Epoch 2 (s) | Epoch 3 (s) |
+| :--------------: | :---------: | :---------: | :---------: |
+|        1        |   177.590   |   94.637   |   91.753   |
+|        64        |   174.810   |   82.209   |   81.020   |
+|       4096       |   241.959   |   76.377   |   77.082   |
 
-```
-python node_classification.py --gpu-cache-size-in-gigabytes=0 --cpu-cache-size-in-gigabytes=10 --cpu-feature-cache-policy=lru --dataset=ogbn-papers100M --epochs=3
-```
+### Effect of `--layer-dependency`
 
-Result:
+Below results demonstrate the effect of enabling `--layer-dependency` on epoch time when setting `--batch-dependency=1`.
 
-```
-Training: 1178it [04:25,  4.44it/s, num_nodes=660848, gpu_cache_miss=1, cpu_cache_miss=0.0849]
-Evaluating: 123it [00:20,  6.03it/s, num_nodes=626265, gpu_cache_miss=1, cpu_cache_miss=0.0828]
-Epoch 00, Loss: 1.4170, Approx. Train: 0.5780, Approx. Val: 0.6372, Time: 265.1538300514221s
-Training: 1178it [02:37,  7.46it/s, num_nodes=663757, gpu_cache_miss=1, cpu_cache_miss=0.0644]
-Evaluating: 123it [00:19,  6.27it/s, num_nodes=627385, gpu_cache_miss=1, cpu_cache_miss=0.0642]
-Epoch 01, Loss: 1.1450, Approx. Train: 0.6390, Approx. Val: 0.6355, Time: 157.8178265094757s
-Training: 1178it [02:37,  7.46it/s, num_nodes=676522, gpu_cache_miss=1, cpu_cache_miss=0.0581]
-Evaluating: 123it [00:19,  6.27it/s, num_nodes=625828, gpu_cache_miss=1, cpu_cache_miss=0.0581]
-Epoch 02, Loss: 1.0964, Approx. Train: 0.6518, Approx. Val: 0.6547, Time: 157.93660283088684s
-```
-
-### CLOCK
-
-Instruction:
-
-```
-python node_classification.py --gpu-cache-size-in-gigabytes=0 --cpu-cache-size-in-gigabytes=10 --cpu-feature-cache-policy=clock --dataset=ogbn-papers100M --epochs=3
-```
-
-Result:
-
-```
-Training: 1178it [04:52,  4.02it/s, num_nodes=662105, gpu_cache_miss=1, cpu_cache_miss=0.0938]
-Evaluating: 123it [00:28,  4.30it/s, num_nodes=625796, gpu_cache_miss=1, cpu_cache_miss=0.0931]
-Epoch 00, Loss: 1.4158, Approx. Train: 0.5782, Approx. Val: 0.6375, Time: 292.89667797088623s
-Training: 1178it [04:03,  4.83it/s, num_nodes=677917, gpu_cache_miss=1, cpu_cache_miss=0.0859]
-Evaluating: 123it [00:29,  4.15it/s, num_nodes=626673, gpu_cache_miss=1, cpu_cache_miss=0.086]
-Epoch 01, Loss: 1.1436, Approx. Train: 0.6388, Approx. Val: 0.6482, Time: 243.7826919555664s
-Training: 1178it [04:13,  4.65it/s, num_nodes=671817, gpu_cache_miss=1, cpu_cache_miss=0.0845]
-Evaluating: 123it [00:30,  4.08it/s, num_nodes=629312, gpu_cache_miss=1, cpu_cache_miss=0.0847]
-Epoch 02, Loss: 1.0960, Approx. Train: 0.6512, Approx. Val: 0.6572, Time: 253.2754566669464s
-```
+| layer-dependency | Epoch 1 (s) | Epoch 2 (s) | Epoch 3 (s) |
+| :--------------: | :---------: | :---------: | :---------: |
+|      False      |   177.590   |   94.637   |   91.753   |
+|       True       |   163.657   |   86.158   |   83.115   |
