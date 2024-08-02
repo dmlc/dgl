@@ -4,14 +4,18 @@ from collections import OrderedDict
 
 import torch
 import torch.utils.data as torch_data
-from torch.utils.data.graph import traverse_dps
 
 from .base import CopyTo, get_host_to_device_uva_stream
 from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
 from .impl.gpu_graph_cache import GPUGraphCache
 from .impl.neighbor_sampler import SamplePerLayer
 
-from .internal import datapipe_graph_to_adjlist, find_dps, replace_dp
+from .internal import (
+    datapipe_graph_to_adjlist,
+    find_dps,
+    replace_dp,
+    traverse_dps,
+)
 from .item_sampler import ItemSampler
 
 

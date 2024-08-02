@@ -7,8 +7,7 @@ import dgl.graphbolt
 import pytest
 import torch
 
-from dgl.graphbolt.internal import find_dps
-from torch.utils.data.graph import traverse_dps
+from dgl.graphbolt.internal import find_dps, traverse_dps
 
 from . import gb_test_utils
 

@@ -5,7 +5,12 @@ from typing import List, Set, Type
 from torch.utils.data import IterDataPipe, MapDataPipe
 from torch.utils.data.graph import DataPipe, DataPipeGraph, traverse_dps
 
-__all__ = ["datapipe_graph_to_adjlist", "find_dps", "replace_dp"]
+__all__ = [
+    "datapipe_graph_to_adjlist",
+    "find_dps",
+    "replace_dp",
+    "traverse_dps",
+]
 
 
 def _get_parents(result_dict, datapipe_graph):
