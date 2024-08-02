@@ -268,17 +268,17 @@ class S3FifoCachePolicy : public BaseCachePolicy {
   void WritingCompleted(torch::Tensor pointers);
 
   template <bool write>
-  std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
+  CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->Increment();
       if constexpr (write) {
-        return std::make_pair(cache_key.getPos(), &cache_key);
+        return &cache_key;
       } else if (!cache_key.BeingWritten()) {
-        return std::make_pair(cache_key.StartUse<write>().getPos(), &cache_key);
+        return &cache_key.StartUse<write>();
       }
     }
-    return std::nullopt;
+    return nullptr;
   }
 
   auto getMapSentinelValue() const { return nullptr; }
@@ -430,17 +430,17 @@ class SieveCachePolicy : public BaseCachePolicy {
   void WritingCompleted(torch::Tensor pointers);
 
   template <bool write>
-  std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
+  CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->SetFreq();
       if constexpr (write) {
-        std::make_pair(cache_key.getPos(), &cache_key);
+        return &cache_key;
       } else if (!cache_key.BeingWritten()) {
-        return std::make_pair(cache_key.StartUse<write>().getPos(), &cache_key);
+        return &cache_key.StartUse<write>();
       }
     }
-    return std::nullopt;
+    return nullptr;
   }
 
   auto getMapSentinelValue() const { return nullptr; }
@@ -556,18 +556,18 @@ class LruCachePolicy : public BaseCachePolicy {
   void WritingCompleted(torch::Tensor pointers);
 
   template <bool write>
-  std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
+  CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
       MoveToFront(queue_, queue_, it->second);
       if constexpr (write) {
-        std::make_pair(cache_key.getPos(), &cache_key);
+        return &cache_key;
       } else if (!cache_key.BeingWritten()) {
-        return std::make_pair(cache_key.StartUse<write>().getPos(), &cache_key);
+        return &cache_key.StartUse<write>();
       }
     }
-    return std::nullopt;
+    return nullptr;
   }
 
   auto getMapSentinelValue() { return queue_.end(); }
@@ -681,17 +681,17 @@ class ClockCachePolicy : public BaseCachePolicy {
   void WritingCompleted(torch::Tensor pointers);
 
   template <bool write>
-  std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
+  CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->SetFreq();
       if constexpr (write) {
-        return std::make_pair(cache_key.getPos(), &cache_key);
+        return &cache_key;
       } else if (!cache_key.BeingWritten()) {
-        return std::make_pair(cache_key.StartUse<write>().getPos(), &cache_key);
+        return &cache_key.StartUse<write>();
       }
     }
-    return std::nullopt;
+    return nullptr;
   }
 
   auto getMapSentinelValue() const { return nullptr; }

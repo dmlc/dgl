@@ -55,10 +55,9 @@ BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
         auto missing_keys_ptr = missing_keys.data_ptr<index_t>();
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          auto res = policy.template Read<false>(key);
-          if (res.has_value()) {
-            const auto [pos, cache_key_ptr] = *res;
-            positions_ptr[found_cnt] = pos;
+          auto cache_key_ptr = policy.template Read<false>(key);
+          if (cache_key_ptr) {
+            positions_ptr[found_cnt] = cache_key_ptr->getPos();
             found_ptr[found_cnt] = cache_key_ptr;
             indices_ptr[found_cnt++] = i;
           } else {
@@ -156,7 +155,7 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
           const auto key = keys_ptr[i];
           int64_t pos = -1;
           CacheKey* cache_key_ptr = nullptr;
-          if (!policy.template Read<true>(key).has_value()) {
+          if (!policy.template Read<true>(key)) {
             std::tie(pos, cache_key_ptr) = policy.Insert(key);
             TORCH_CHECK(
                 // We check for the uniqueness of the positions.
