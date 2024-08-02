@@ -175,6 +175,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   // Consume a slot so that parallel_for is called only if there are available
   // queues.
   semaphore_.acquire();
+  std::atomic<int> num_semaphore_acquisitions = 1;
   graphbolt::parallel_for_interop(0, num_thread_, 1, [&](int thread_id, int) {
     // The completion queue might contain 4 * kGroupSize while we may submit
     // 4 * kGroupSize more. No harm in overallocation here.
@@ -184,6 +185,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     {
       // We consume a slot from the semaphore to use a queue.
       semaphore_.acquire();
+      num_semaphore_acquisitions.fetch_add(1, std::memory_order_relaxed);
       std::lock_guard lock(available_queues_mtx_);
       TORCH_CHECK(!available_queues_.empty());
       thread_id = available_queues_.back();
@@ -312,8 +314,14 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     }
     // If this is the first thread exiting, release the master thread's ticket
     // as well by releasing 2 slots. Otherwise, release 1 slot.
-    semaphore_.release(exiting_first.test_and_set() ? 1 : 2);
+    const auto releasing = exiting_first.test_and_set() ? 1 : 2;
+    semaphore_.release(releasing);
+    num_semaphore_acquisitions.fetch_add(-releasing, std::memory_order_relaxed);
   });
+  // If any of the worker threads exit early without being able to release the
+  // semaphore, we make sure to release it for them in the main thread.
+  semaphore_.release(
+      num_semaphore_acquisitions.load(std::memory_order_relaxed));
   const auto ret_val = error_flag.load(std::memory_order_relaxed);
   switch (ret_val) {
     case 0:  // Successful.
