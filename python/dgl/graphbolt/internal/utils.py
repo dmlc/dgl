@@ -134,7 +134,7 @@ def copy_or_convert_data(
         if is_feature and get_npy_dim(input_path) == 1:
             data = data.reshape(-1, 1)
         # If the data does not need to be modified, just copy the file.
-        elif not within_int32:
+        elif not within_int32 and data.numpy().flags["C_CONTIGUOUS"]:
             shutil.copyfile(input_path, output_path)
             return
     else:
