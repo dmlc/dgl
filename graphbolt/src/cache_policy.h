@@ -334,7 +334,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
         std::advance(it, -1);
         MoveToFront(main_queue_, main_queue_, it);
       } else {
-        key_to_cache_key_.erase(it);
+        key_to_cache_key_.erase_fast(it);
         const auto evicted_pos = evicted.getPos();
         main_queue_.pop_back();
         return evicted_pos;
@@ -353,7 +353,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
         std::advance(it, -1);
         MoveToFront(small_queue_, main_queue_, it);
       } else {
-        key_to_cache_key_.erase(it);
+        key_to_cache_key_.erase_fast(it);
         const auto evicted_key = evicted.getKey();
         const auto evicted_pos = evicted.getPos();
         small_queue_.pop_back();
