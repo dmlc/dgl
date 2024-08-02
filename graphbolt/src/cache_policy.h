@@ -20,9 +20,10 @@
 #ifndef GRAPHBOLT_CACHE_POLICY_H_
 #define GRAPHBOLT_CACHE_POLICY_H_
 
-#include <parallel_hashmap/phmap.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
+#include <tsl/robin_map.h>
+#include <tsl/robin_set.h>
 
 #include <limits>
 #include <mutex>
@@ -178,9 +179,13 @@ class BaseCachePolicy {
 
  protected:
   template <typename K, typename V>
-  using map_t = phmap::flat_hash_map<K, V>;
+  using map_t = tsl::robin_map<K, V>;
   template <typename K>
-  using set_t = phmap::flat_hash_set<K>;
+  using set_t = tsl::robin_set<K>;
+  template <typename iterator>
+  static auto& mutable_value_ref(iterator it) {
+    return it.value();
+  }
   static constexpr int kCapacityFactor = 2;
 
   template <typename CachePolicy>
@@ -298,7 +303,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     const auto in_ghost_queue = ghost_set_.erase(key);
     auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
     auto cache_key_ptr = queue.Push(CacheKey(key));
-    it->second = cache_key_ptr;
+    mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
   }
 
@@ -318,7 +323,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
       auto it = key_to_cache_key_.find(evicted.getKey());
       if (evicted.getFreq() > 0 || evicted.InUse()) {
         evicted.Decrement();
-        it->second = main_queue_.Push(evicted);
+        mutable_value_ref(it) = main_queue_.Push(evicted);
       } else {
         key_to_cache_key_.erase(it);
         return evicted.getPos();
@@ -332,7 +337,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
       auto evicted = small_queue_.Pop();
       auto it = key_to_cache_key_.find(evicted.getKey());
       if (evicted.getFreq() > 0 || evicted.InUse()) {
-        it->second = main_queue_.Push(evicted.ResetFreq());
+        mutable_value_ref(it) = main_queue_.Push(evicted.ResetFreq());
       } else {
         key_to_cache_key_.erase(it);
         const auto evicted_key = evicted.getKey();
@@ -449,7 +454,7 @@ class SieveCachePolicy : public BaseCachePolicy {
     const auto key = it->first;
     queue_.push_front(CacheKey(key));
     auto cache_key_ptr = &queue_.front();
-    it->second = cache_key_ptr;
+    mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
   }
 
@@ -589,7 +594,7 @@ class LruCachePolicy : public BaseCachePolicy {
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
     queue_.push_front(CacheKey(key));
-    it->second = queue_.begin();
+    mutable_value_ref(it) = queue_.begin();
     auto cache_key_ptr = &*queue_.begin();
     return &cache_key_ptr->setPos(Evict());
   }
@@ -718,7 +723,7 @@ class ClockCachePolicy : public BaseCachePolicy {
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
     auto cache_key_ptr = queue_.Push(CacheKey(key));
-    it->second = cache_key_ptr;
+    mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
   }
 

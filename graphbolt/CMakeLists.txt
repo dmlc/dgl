@@ -78,7 +78,7 @@ include_directories(BEFORE ${BOLT_DIR}
                            # `std::atomic_ref`, `std::counting_semaphore`
                            "../third_party/cccl/libcudacxx/include"
                            "../third_party/pcg/include"
-                           "../third_party/phmap")
+                           "../third_party/tsl_robin_map/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 if(BUILD_WITH_TASKFLOW)
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE "../third_party/taskflow")
