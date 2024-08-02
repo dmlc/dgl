@@ -55,10 +55,9 @@ BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
         auto missing_keys_ptr = missing_keys.data_ptr<index_t>();
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          auto res = policy.template Read<false>(key);
-          if (res.has_value()) {
-            const auto [pos, cache_key_ptr] = *res;
-            positions_ptr[found_cnt] = pos;
+          auto cache_key_ptr = policy.template Read<false>(key);
+          if (cache_key_ptr) {
+            positions_ptr[found_cnt] = cache_key_ptr->getPos();
             found_ptr[found_cnt] = cache_key_ptr;
             indices_ptr[found_cnt++] = i;
           } else {
@@ -113,18 +112,17 @@ BaseCachePolicy::QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys) {
           } else {
             indices_ptr[--missing_cnt] = i;
             missing_keys_ptr[missing_cnt] = key;
-            CacheKey* cache_key_ptr;
+            int64_t position = -1;
+            CacheKey* cache_key_ptr = nullptr;
             if (it->second == policy.getMapSentinelValue()) {
               cache_key_ptr = policy.Insert(it);
+              position = cache_key_ptr->getPos();
               TORCH_CHECK(
                   // We check for the uniqueness of the positions.
-                  std::get<1>(position_set.insert(cache_key_ptr->getPos())),
+                  std::get<1>(position_set.insert(position)),
                   "Can't insert all, larger cache capacity is needed.");
-            } else {
-              cache_key_ptr = &*it->second;
-              policy.MarkExistingWriting(it);
             }
-            positions_ptr[missing_cnt] = cache_key_ptr->getPos();
+            positions_ptr[missing_cnt] = position;
             pointers_ptr[missing_cnt] = cache_key_ptr;
           }
         }
@@ -155,16 +153,17 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
         position_set.reserve(keys.size(0));
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          const auto res_optional = policy.template Read<true>(key);
-          const auto [pos, cache_key_ptr] =
-              res_optional ? *res_optional : policy.Insert(key);
+          int64_t pos = -1;
+          CacheKey* cache_key_ptr = nullptr;
+          if (!policy.template Read<true>(key)) {
+            std::tie(pos, cache_key_ptr) = policy.Insert(key);
+            TORCH_CHECK(
+                // We check for the uniqueness of the positions.
+                std::get<1>(position_set.insert(pos)),
+                "Can't insert all, larger cache capacity is needed.");
+          }
           positions_ptr[i] = pos;
           pointers_ptr[i] = cache_key_ptr;
-          TORCH_CHECK(
-              // If there are duplicate values and the key was just inserted,
-              // we do not have to check for the uniqueness of the positions.
-              res_optional.has_value() || std::get<1>(position_set.insert(pos)),
-              "Can't insert all, larger cache capacity is needed.");
         }
       }));
   return {positions, pointers};
@@ -178,15 +177,16 @@ void BaseCachePolicy::ReadingWritingCompletedImpl(
   auto pointers_ptr =
       reinterpret_cast<CacheKey**>(pointers.data_ptr<int64_t>());
   for (int64_t i = 0; i < pointers.size(0); i++) {
-    policy.template Unmark<write>(pointers_ptr[i]);
+    const auto pointer = pointers_ptr[i];
+    if (!write || pointer) {
+      policy.template Unmark<write>(pointer);
+    }
   }
 }
 
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
     // We sometimes first insert and then evict. + 1 is to compensate for that.
-    : small_queue_(capacity + 1),
-      main_queue_(capacity + 1),
-      ghost_queue_(capacity - capacity / 10),
+    : ghost_queue_(capacity - capacity / 10),
       capacity_(capacity),
       cache_usage_(0),
       small_queue_size_target_(capacity / 10) {
@@ -279,7 +279,7 @@ void LruCachePolicy::WritingCompleted(torch::Tensor keys) {
 
 ClockCachePolicy::ClockCachePolicy(int64_t capacity)
     // We sometimes first insert and then evict. + 1 is to compensate for that.
-    : queue_(capacity + 1), capacity_(capacity), cache_usage_(0) {
+    : capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
 }
