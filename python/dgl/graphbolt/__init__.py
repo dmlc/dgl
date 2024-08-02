@@ -2,6 +2,42 @@
 import os
 import sys
 
+from .internal_utils import *
+
+CUDA_ALLOCATOR_ENV_WARNING_STR = """
+An experimental feature for CUDA allocations is turned on for better allocation
+pattern resulting in better memory usage for minibatch GNN training workloads.
+See https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf,
+and set the environment variable `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False`
+if you want to disable it.
+"""
+cuda_allocator_env = os.getenv("PYTORCH_CUDA_ALLOC_CONF")
+if cuda_allocator_env is None:
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    gb_warning(CUDA_ALLOCATOR_ENV_WARNING_STR)
+else:
+    configs = {
+        kv_pair.split(":")[0]: kv_pair.split(":")[1]
+        for kv_pair in cuda_allocator_env.split(",")
+    }
+    if "expandable_segments" in configs:
+        if configs["expandable_segments"] != "True":
+            gb_warning(
+                "You should consider `expandable_segments:True` in the"
+                " environment variable `PYTORCH_CUDA_ALLOC_CONF` for lower"
+                " memory usage. See "
+                "https://pytorch.org/docs/stable/notes/cuda.html"
+                "#optimizing-memory-usage-with-pytorch-cuda-alloc-conf"
+            )
+    else:
+        configs["expandable_segments"] = "True"
+        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = ",".join(
+            [k + ":" + v for k, v in configs.items()]
+        )
+        gb_warning(CUDA_ALLOCATOR_ENV_WARNING_STR)
+
+
+# pylint: disable=wrong-import-position, wrong-import-order
 import torch
 
 ### FROM DGL @todo
@@ -47,7 +83,6 @@ from .impl import *
 from .itemset import *
 from .item_sampler import *
 from .minibatch_transformer import *
-from .internal_utils import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
