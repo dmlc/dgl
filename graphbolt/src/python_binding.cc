@@ -108,11 +108,11 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("query", &storage::PartitionedCachePolicy::Query)
       .def("query_async", &storage::PartitionedCachePolicy::QueryAsync)
       .def(
-          "query_and_then_replace",
-          &storage::PartitionedCachePolicy::QueryAndThenReplace)
+          "query_and_replace",
+          &storage::PartitionedCachePolicy::QueryAndReplace)
       .def(
-          "query_and_then_replace_async",
-          &storage::PartitionedCachePolicy::QueryAndThenReplaceAsync)
+          "query_and_replace_async",
+          &storage::PartitionedCachePolicy::QueryAndReplaceAsync)
       .def("replace", &storage::PartitionedCachePolicy::Replace)
       .def("replace_async", &storage::PartitionedCachePolicy::ReplaceAsync)
       .def(
