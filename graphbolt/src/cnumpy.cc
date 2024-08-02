@@ -85,8 +85,10 @@ OnDiskNpyArray::OnDiskNpyArray(
       static_cast<int64_t>(num_queues_), num_threads.value_or(num_queues_));
   TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
 
+  // We allocate buffers for each existing queue because we might get assigned
+  // any queue in range [0, num_queues_).
   read_tensor_ = torch::empty(
-      ReadBufferSizePerThread() * num_thread_ + block_size_ - 1,
+      ReadBufferSizePerThread() * num_queues_ + block_size_ - 1,
       torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU));
 #else
   throw std::runtime_error("DiskBasedFeature is not available now.");
@@ -271,7 +273,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
             *reinterpret_cast<ReadRequest *>(io_uring_cqe_get_data(cqe));
         auto actual_read_len = cqe->res;
         if (actual_read_len < 0) {
-          error_flag.store(3, std::memory_order_relaxed);
+          error_flag.store(actual_read_len, std::memory_order_relaxed);
           break;
         }
         const auto remaining_read_len =
@@ -312,13 +314,15 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     // as well by releasing 2 slots. Otherwise, release 1 slot.
     semaphore_.release(exiting_first.test_and_set() ? 1 : 2);
   });
-  switch (error_flag.load(std::memory_order_relaxed)) {
+  const auto ret_val = error_flag.load(std::memory_order_relaxed);
+  switch (ret_val) {
     case 0:  // Successful.
       return result;
     case 1:
       throw std::out_of_range("IndexError: Index out of range.");
     default:
-      throw std::runtime_error("io_uring error!");
+      throw std::runtime_error(
+          "io_uring error with errno: " + std::to_string(-ret_val));
   }
 }
 
