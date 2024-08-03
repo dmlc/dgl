@@ -41,7 +41,7 @@ struct CacheKey {
         key_(key),
         position_in_cache_(position),
         read_reference_count_(0),
-        // EndUse<true> should be called to reset the write_reference_count.
+        // EndUse<true>() should be called to reset the write_reference_count.
         write_reference_count_(1) {
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
