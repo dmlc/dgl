@@ -338,7 +338,8 @@ class S3FifoCachePolicy : public BaseCachePolicy {
   }
 
   int64_t EvictSmallQueue() {
-    while (small_queue_size_-- > small_queue_size_target_) {
+    while (small_queue_size_ > small_queue_size_target_) {
+      --small_queue_size_;
       auto& evicted = small_queue_.back();
       if (evicted.getFreq() > 0 || evicted.InUse()) {
         evicted.ResetFreq();
