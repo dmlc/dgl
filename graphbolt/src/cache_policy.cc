@@ -185,9 +185,8 @@ void BaseCachePolicy::ReadingWritingCompletedImpl(
 }
 
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
-    : ghost_queue_(capacity - capacity / 10),
-      capacity_(capacity),
-      cache_usage_(0),
+    : BaseCachePolicy(capacity),
+      ghost_queue_(capacity - capacity / 10),
       small_queue_size_target_(capacity / 10) {
   TORCH_CHECK(small_queue_size_target_ > 0, "Capacity is not large enough.");
   ghost_set_.reserve(ghost_queue_.Capacity());
@@ -219,7 +218,7 @@ void S3FifoCachePolicy::WritingCompleted(torch::Tensor keys) {
 
 SieveCachePolicy::SieveCachePolicy(int64_t capacity)
     // Ensure that queue_ is constructed first before accessing its `.end()`.
-    : queue_(), hand_(queue_.end()), capacity_(capacity), cache_usage_(0) {
+    : BaseCachePolicy(capacity), queue_(), hand_(queue_.end()) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
 }
@@ -247,8 +246,7 @@ void SieveCachePolicy::WritingCompleted(torch::Tensor keys) {
   ReadingWritingCompletedImpl<true>(*this, keys);
 }
 
-LruCachePolicy::LruCachePolicy(int64_t capacity)
-    : capacity_(capacity), cache_usage_(0) {
+LruCachePolicy::LruCachePolicy(int64_t capacity) : BaseCachePolicy(capacity) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
 }
@@ -277,7 +275,7 @@ void LruCachePolicy::WritingCompleted(torch::Tensor keys) {
 }
 
 ClockCachePolicy::ClockCachePolicy(int64_t capacity)
-    : capacity_(capacity), cache_usage_(0) {
+    : BaseCachePolicy(capacity) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
 }

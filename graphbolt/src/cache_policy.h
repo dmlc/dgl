@@ -114,7 +114,10 @@ struct CacheKey {
 
 class BaseCachePolicy {
  public:
+  BaseCachePolicy(int64_t capacity) : capacity_(capacity), cache_usage_(0) {}
+
   BaseCachePolicy() = default;
+
   /**
    * @brief A virtual base class constructor ensures that the derived class
    * destructor gets called.
@@ -213,6 +216,9 @@ class BaseCachePolicy {
     // The iterators and references are not invalidated.
     // TORCH_CHECK(it == to.begin());
   }
+
+  int64_t capacity_;
+  int64_t cache_usage_;
 };
 
 /**
@@ -363,8 +369,6 @@ class S3FifoCachePolicy : public BaseCachePolicy {
 
   std::list<CacheKey> small_queue_, main_queue_;
   CircularQueue<int64_t> ghost_queue_;
-  int64_t capacity_;
-  int64_t cache_usage_;
   size_t small_queue_size_target_;
   set_t<int64_t> ghost_set_;
   map_t<int64_t, CacheKey*> key_to_cache_key_;
@@ -484,8 +488,6 @@ class SieveCachePolicy : public BaseCachePolicy {
 
   std::list<CacheKey> queue_;
   decltype(queue_)::iterator hand_;
-  int64_t capacity_;
-  int64_t cache_usage_;
   map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
 
@@ -599,8 +601,6 @@ class LruCachePolicy : public BaseCachePolicy {
   }
 
   std::list<CacheKey> queue_;
-  int64_t capacity_;
-  int64_t cache_usage_;
   map_t<int64_t, decltype(queue_)::iterator> key_to_cache_key_;
 };
 
@@ -718,8 +718,6 @@ class ClockCachePolicy : public BaseCachePolicy {
   }
 
   std::list<CacheKey> queue_;
-  int64_t capacity_;
-  int64_t cache_usage_;
   map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
 
