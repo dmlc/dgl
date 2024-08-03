@@ -187,7 +187,8 @@ void BaseCachePolicy::ReadingWritingCompletedImpl(
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
     : BaseCachePolicy(capacity),
       ghost_queue_(capacity - capacity / 10),
-      small_queue_size_target_(capacity / 10) {
+      small_queue_size_target_(capacity / 10),
+      small_queue_size_(0) {
   TORCH_CHECK(small_queue_size_target_ > 0, "Capacity is not large enough.");
   ghost_set_.reserve(ghost_queue_.Capacity());
   key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));

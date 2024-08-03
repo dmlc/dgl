@@ -302,6 +302,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     const auto in_ghost_queue = ghost_set_.erase(key);
     auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
     queue.push_front(CacheKey(key, pos));
+    small_queue_size_ += 1 - in_ghost_queue;
     auto cache_key_ptr = &queue.front();
     key_to_cache_key_[key] = cache_key_ptr;
     return {pos, cache_key_ptr};
@@ -312,6 +313,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     const auto in_ghost_queue = ghost_set_.erase(key);
     auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
     queue.push_front(CacheKey(key));
+    small_queue_size_ += 1 - in_ghost_queue;
     auto cache_key_ptr = &queue.front();
     mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
@@ -336,8 +338,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
   }
 
   int64_t EvictSmallQueue() {
-    for (auto size = small_queue_.size(); size > small_queue_size_target_;
-         size--) {
+    while (small_queue_size_-- > small_queue_size_target_) {
       auto& evicted = small_queue_.back();
       if (evicted.getFreq() > 0 || evicted.InUse()) {
         evicted.ResetFreq();
@@ -370,6 +371,8 @@ class S3FifoCachePolicy : public BaseCachePolicy {
   std::list<CacheKey> small_queue_, main_queue_;
   CircularQueue<int64_t> ghost_queue_;
   size_t small_queue_size_target_;
+  // std::list<>::size() is O(N) before the CXX11 ABI which torch enforces.
+  size_t small_queue_size_;
   set_t<int64_t> ghost_set_;
   map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
