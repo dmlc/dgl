@@ -41,6 +41,7 @@ struct CacheKey {
         key_(key),
         position_in_cache_(position),
         read_reference_count_(0),
+        // EndUse<true> should be called to reset the write_reference_count.
         write_reference_count_(1) {
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
@@ -78,14 +79,8 @@ struct CacheKey {
     return *this;
   }
 
-  template <bool write>
-  CacheKey& StartUse() {
-    if constexpr (write) {
-      TORCH_CHECK(
-          write_reference_count_++ < std::numeric_limits<int16_t>::max());
-    } else {
-      TORCH_CHECK(read_reference_count_++ < std::numeric_limits<int8_t>::max());
-    }
+  CacheKey& StartRead() {
+    TORCH_CHECK(read_reference_count_++ < std::numeric_limits<int8_t>::max());
     return *this;
   }
 
@@ -275,7 +270,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
       if constexpr (write) {
         return &cache_key;
       } else if (!cache_key.BeingWritten()) {
-        return &cache_key.StartUse<write>();
+        return &cache_key.StartRead();
       }
     }
     return nullptr;
@@ -289,9 +284,7 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     if (!inserted) {
       auto& cache_key = it->second->Increment();
       if (!cache_key.BeingWritten()) {
-        // Not being written so we use StartUse<write=false>() and return
-        // true to indicate the key is ready to read.
-        cache_key.StartUse<false>();
+        cache_key.StartRead();
         readable = true;
       }
     }
@@ -318,23 +311,17 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     return &cache_key_ptr->setPos(Evict());
   }
 
-  template <bool write>
-  void Unmark(CacheKey* cache_key_ptr) {
-    cache_key_ptr->EndUse<write>();
-  }
-
  private:
   int64_t EvictMainQueue() {
     while (true) {
       auto& evicted = main_queue_.back();
-      auto it = key_to_cache_key_.find(evicted.getKey());
       if (evicted.getFreq() > 0 || evicted.InUse()) {
         evicted.Decrement();
         auto it = main_queue_.end();
         std::advance(it, -1);
         MoveToFront(main_queue_, main_queue_, it);
       } else {
-        key_to_cache_key_.erase_fast(it);
+        key_to_cache_key_.erase(evicted.getKey());
         const auto evicted_pos = evicted.getPos();
         main_queue_.pop_back();
         return evicted_pos;
@@ -346,15 +333,14 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     for (auto size = small_queue_.size(); size > small_queue_size_target_;
          size--) {
       auto& evicted = small_queue_.back();
-      auto it = key_to_cache_key_.find(evicted.getKey());
       if (evicted.getFreq() > 0 || evicted.InUse()) {
         evicted.ResetFreq();
         auto it = small_queue_.end();
         std::advance(it, -1);
         MoveToFront(small_queue_, main_queue_, it);
       } else {
-        key_to_cache_key_.erase_fast(it);
         const auto evicted_key = evicted.getKey();
+        key_to_cache_key_.erase(evicted_key);
         const auto evicted_pos = evicted.getPos();
         small_queue_.pop_back();
         if (ghost_queue_.IsFull()) {
@@ -437,7 +423,7 @@ class SieveCachePolicy : public BaseCachePolicy {
       if constexpr (write) {
         return &cache_key;
       } else if (!cache_key.BeingWritten()) {
-        return &cache_key.StartUse<write>();
+        return &cache_key.StartRead();
       }
     }
     return nullptr;
@@ -451,9 +437,7 @@ class SieveCachePolicy : public BaseCachePolicy {
     if (!inserted) {
       auto& cache_key = it->second->SetFreq();
       if (!cache_key.BeingWritten()) {
-        // Not being written so we use StartUse<write=false>() and return
-        // true to indicate the key is ready to read.
-        cache_key.StartUse<false>();
+        cache_key.StartRead();
         readable = true;
       }
     }
@@ -474,11 +458,6 @@ class SieveCachePolicy : public BaseCachePolicy {
     auto cache_key_ptr = &queue_.front();
     mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
-  }
-
-  template <bool write>
-  void Unmark(CacheKey* cache_key_ptr) {
-    cache_key_ptr->EndUse<write>();
   }
 
  private:
@@ -564,7 +543,7 @@ class LruCachePolicy : public BaseCachePolicy {
       if constexpr (write) {
         return &cache_key;
       } else if (!cache_key.BeingWritten()) {
-        return &cache_key.StartUse<write>();
+        return &cache_key.StartRead();
       }
     }
     return nullptr;
@@ -579,9 +558,7 @@ class LruCachePolicy : public BaseCachePolicy {
       auto& cache_key = *it->second;
       MoveToFront(queue_, queue_, it->second);
       if (!cache_key.BeingWritten()) {
-        // Not being written so we use StartUse<write=false>() and return
-        // true to indicate the key is ready to read.
-        cache_key.StartUse<false>();
+        cache_key.StartRead();
         readable = true;
       }
     }
@@ -601,11 +578,6 @@ class LruCachePolicy : public BaseCachePolicy {
     mutable_value_ref(it) = queue_.begin();
     auto cache_key_ptr = &*queue_.begin();
     return &cache_key_ptr->setPos(Evict());
-  }
-
-  template <bool write>
-  void Unmark(CacheKey* cache_key_ptr) {
-    cache_key_ptr->EndUse<write>();
   }
 
  private:
@@ -688,7 +660,7 @@ class ClockCachePolicy : public BaseCachePolicy {
       if constexpr (write) {
         return &cache_key;
       } else if (!cache_key.BeingWritten()) {
-        return &cache_key.StartUse<write>();
+        return &cache_key.StartRead();
       }
     }
     return nullptr;
@@ -702,9 +674,7 @@ class ClockCachePolicy : public BaseCachePolicy {
     if (!inserted) {
       auto& cache_key = it->second->SetFreq();
       if (!cache_key.BeingWritten()) {
-        // Not being written so we use StartUse<write=false>() and return
-        // true to indicate the key is ready to read.
-        cache_key.StartUse<false>();
+        cache_key.StartRead();
         readable = true;
       }
     }
@@ -725,11 +695,6 @@ class ClockCachePolicy : public BaseCachePolicy {
     auto cache_key_ptr = &queue_.front();
     mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
-  }
-
-  template <bool write>
-  void Unmark(CacheKey* cache_key_ptr) {
-    cache_key_ptr->EndUse<write>();
   }
 
  private:

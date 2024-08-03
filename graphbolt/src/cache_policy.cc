@@ -179,13 +179,12 @@ void BaseCachePolicy::ReadingWritingCompletedImpl(
   for (int64_t i = 0; i < pointers.size(0); i++) {
     const auto pointer = pointers_ptr[i];
     if (!write || pointer) {
-      policy.template Unmark<write>(pointer);
+      pointer->EndUse<write>();
     }
   }
 }
 
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
-    // We sometimes first insert and then evict. + 1 is to compensate for that.
     : ghost_queue_(capacity - capacity / 10),
       capacity_(capacity),
       cache_usage_(0),
@@ -278,7 +277,6 @@ void LruCachePolicy::WritingCompleted(torch::Tensor keys) {
 }
 
 ClockCachePolicy::ClockCachePolicy(int64_t capacity)
-    // We sometimes first insert and then evict. + 1 is to compensate for that.
     : capacity_(capacity), cache_usage_(0) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
