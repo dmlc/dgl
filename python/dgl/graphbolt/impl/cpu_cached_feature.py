@@ -75,7 +75,9 @@ class CPUCachedFeature(Feature):
         """
         if ids is None:
             return self._fallback_feature.read()
-        return self._feature.query_and_replace(ids, self._fallback_feature.read)
+        return self._feature.query_and_replace(
+            ids.cpu(), self._fallback_feature.read
+        ).to(ids.device)
 
     def read_async(self, ids: torch.Tensor):
         r"""Read the feature by index asynchronously.
