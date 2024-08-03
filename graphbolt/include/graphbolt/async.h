@@ -146,7 +146,7 @@ inline void _parallel_for(
       f(begin_tid, end_tid);
     }
   });
-  _get_thread_pool<pool_type>().run(flow).wait();
+  _get_thread_pool<pool_type>().run(flow).get();
 #else
   std::promise<void> promise;
   std::future<void> future;

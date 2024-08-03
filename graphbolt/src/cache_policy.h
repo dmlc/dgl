@@ -41,6 +41,7 @@ struct CacheKey {
         key_(key),
         position_in_cache_(position),
         read_reference_count_(0),
+        // EndUse<true>() should be called to reset the write_reference_count.
         write_reference_count_(1) {
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
@@ -78,14 +79,8 @@ struct CacheKey {
     return *this;
   }
 
-  template <bool write>
-  CacheKey& StartUse() {
-    if constexpr (write) {
-      TORCH_CHECK(
-          write_reference_count_++ < std::numeric_limits<int16_t>::max());
-    } else {
-      TORCH_CHECK(read_reference_count_++ < std::numeric_limits<int8_t>::max());
-    }
+  CacheKey& StartRead() {
+    TORCH_CHECK(read_reference_count_++ < std::numeric_limits<int8_t>::max());
     return *this;
   }
 
@@ -119,7 +114,10 @@ struct CacheKey {
 
 class BaseCachePolicy {
  public:
+  BaseCachePolicy(int64_t capacity) : capacity_(capacity), cache_usage_(0) {}
+
   BaseCachePolicy() = default;
+
   /**
    * @brief A virtual base class constructor ensures that the derived class
    * destructor gets called.
@@ -203,6 +201,24 @@ class BaseCachePolicy {
   template <bool write, typename CachePolicy>
   static void ReadingWritingCompletedImpl(
       CachePolicy& policy, torch::Tensor pointers);
+
+  template <typename T>
+  static void MoveToFront(
+      std::list<T>& from, std::list<T>& to,
+      typename std::list<T>::iterator it) {
+    std::list<T> temp;
+    // Transfer the element to temp to keep references valid.
+    auto next_it = it;
+    std::advance(next_it, 1);
+    temp.splice(temp.begin(), from, it, next_it);
+    // Move the element to the beginning of the queue.
+    to.splice(to.begin(), temp);
+    // The iterators and references are not invalidated.
+    // TORCH_CHECK(it == to.begin());
+  }
+
+  int64_t capacity_;
+  int64_t cache_usage_;
 };
 
 /**
@@ -252,48 +268,42 @@ class S3FifoCachePolicy : public BaseCachePolicy {
    */
   void WritingCompleted(torch::Tensor pointers);
 
-  friend std::ostream& operator<<(
-      std::ostream& os, const S3FifoCachePolicy& policy) {
-    return os << "small_queue_: " << policy.small_queue_ << "\n"
-              << "main_queue_: " << policy.main_queue_ << "\n"
-              << "cache_usage_: " << policy.cache_usage_ << "\n"
-              << "capacity_: " << policy.capacity_ << "\n";
-  }
-
   template <bool write>
-  std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
+  CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
-      auto& cache_key = *it->second;
-      if (write || !cache_key.BeingWritten())
-        return std::make_pair(
-            cache_key.Increment().StartUse<write>().getPos(), &cache_key);
+      auto& cache_key = it->second->Increment();
+      if constexpr (write) {
+        return &cache_key;
+      } else if (!cache_key.BeingWritten()) {
+        return &cache_key.StartRead();
+      }
     }
-    return std::nullopt;
+    return nullptr;
   }
 
   auto getMapSentinelValue() const { return nullptr; }
 
   std::pair<map_iterator, bool> Emplace(int64_t key) {
-    auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
-    if (it->second != getMapSentinelValue()) {
-      auto& cache_key = *it->second;
+    auto [it, inserted] = key_to_cache_key_.emplace(key, getMapSentinelValue());
+    bool readable = false;
+    if (!inserted) {
+      auto& cache_key = it->second->Increment();
       if (!cache_key.BeingWritten()) {
-        // Not being written so we use StartUse<write=false>() and return
-        // true to indicate the key is ready to read.
-        cache_key.Increment().StartUse<false>();
-        return {it, true};
+        cache_key.StartRead();
+        readable = true;
       }
     }
-    // First time insertion, return false to indicate not ready to read.
-    return {it, false};
+    return {it, readable};
   }
 
   std::pair<int64_t, CacheKey*> Insert(int64_t key) {
     const auto pos = Evict();
     const auto in_ghost_queue = ghost_set_.erase(key);
     auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
-    auto cache_key_ptr = queue.Push(CacheKey(key, pos));
+    queue.push_front(CacheKey(key, pos));
+    small_queue_size_ += 1 - in_ghost_queue;
+    auto cache_key_ptr = &queue.front();
     key_to_cache_key_[key] = cache_key_ptr;
     return {pos, cache_key_ptr};
   }
@@ -302,51 +312,51 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     const auto key = it->first;
     const auto in_ghost_queue = ghost_set_.erase(key);
     auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
-    auto cache_key_ptr = queue.Push(CacheKey(key));
+    queue.push_front(CacheKey(key));
+    small_queue_size_ += 1 - in_ghost_queue;
+    auto cache_key_ptr = &queue.front();
     mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
-  }
-
-  void MarkExistingWriting(map_iterator it) {
-    it->second->Increment().StartUse<true>();
-  }
-
-  template <bool write>
-  void Unmark(CacheKey* cache_key_ptr) {
-    cache_key_ptr->EndUse<write>();
   }
 
  private:
   int64_t EvictMainQueue() {
     while (true) {
-      auto evicted = main_queue_.Pop();
-      auto it = key_to_cache_key_.find(evicted.getKey());
+      auto& evicted = main_queue_.back();
       if (evicted.getFreq() > 0 || evicted.InUse()) {
         evicted.Decrement();
-        mutable_value_ref(it) = main_queue_.Push(evicted);
+        auto it = main_queue_.end();
+        std::advance(it, -1);
+        MoveToFront(main_queue_, main_queue_, it);
       } else {
-        key_to_cache_key_.erase(it);
-        return evicted.getPos();
+        key_to_cache_key_.erase(evicted.getKey());
+        const auto evicted_pos = evicted.getPos();
+        main_queue_.pop_back();
+        return evicted_pos;
       }
     }
   }
 
   int64_t EvictSmallQueue() {
-    for (auto size = small_queue_.Size(); size > small_queue_size_target_;
-         size--) {
-      auto evicted = small_queue_.Pop();
-      auto it = key_to_cache_key_.find(evicted.getKey());
+    while (small_queue_size_ > small_queue_size_target_) {
+      --small_queue_size_;
+      auto& evicted = small_queue_.back();
       if (evicted.getFreq() > 0 || evicted.InUse()) {
-        mutable_value_ref(it) = main_queue_.Push(evicted.ResetFreq());
+        evicted.ResetFreq();
+        auto it = small_queue_.end();
+        std::advance(it, -1);
+        MoveToFront(small_queue_, main_queue_, it);
       } else {
-        key_to_cache_key_.erase(it);
         const auto evicted_key = evicted.getKey();
+        key_to_cache_key_.erase(evicted_key);
+        const auto evicted_pos = evicted.getPos();
+        small_queue_.pop_back();
         if (ghost_queue_.IsFull()) {
           ghost_set_.erase(ghost_queue_.Pop());
         }
         ghost_set_.insert(evicted_key);
         ghost_queue_.Push(evicted_key);
-        return evicted.getPos();
+        return evicted_pos;
       }
     }
     return -1;
@@ -359,11 +369,11 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     return pos >= 0 ? pos : EvictMainQueue();
   }
 
-  CircularQueue<CacheKey> small_queue_, main_queue_;
+  std::list<CacheKey> small_queue_, main_queue_;
   CircularQueue<int64_t> ghost_queue_;
-  int64_t capacity_;
-  int64_t cache_usage_;
-  int64_t small_queue_size_target_;
+  size_t small_queue_size_target_;
+  // std::list<>::size() is O(N) before the CXX11 ABI which torch enforces.
+  size_t small_queue_size_;
   set_t<int64_t> ghost_set_;
   map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
@@ -414,32 +424,32 @@ class SieveCachePolicy : public BaseCachePolicy {
   void WritingCompleted(torch::Tensor pointers);
 
   template <bool write>
-  std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
+  CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
-      auto& cache_key = *it->second;
-      if (write || !cache_key.BeingWritten())
-        return std::make_pair(
-            cache_key.SetFreq().StartUse<write>().getPos(), &cache_key);
+      auto& cache_key = it->second->SetFreq();
+      if constexpr (write) {
+        return &cache_key;
+      } else if (!cache_key.BeingWritten()) {
+        return &cache_key.StartRead();
+      }
     }
-    return std::nullopt;
+    return nullptr;
   }
 
   auto getMapSentinelValue() const { return nullptr; }
 
   std::pair<map_iterator, bool> Emplace(int64_t key) {
-    auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
-    if (it->second != getMapSentinelValue()) {
-      auto& cache_key = *it->second;
+    auto [it, inserted] = key_to_cache_key_.emplace(key, getMapSentinelValue());
+    bool readable = false;
+    if (!inserted) {
+      auto& cache_key = it->second->SetFreq();
       if (!cache_key.BeingWritten()) {
-        // Not being written so we use StartUse<write=false>() and return
-        // true to indicate the key is ready to read.
-        cache_key.SetFreq().StartUse<false>();
-        return {it, true};
+        cache_key.StartRead();
+        readable = true;
       }
     }
-    // First time insertion, return false to indicate not ready to read.
-    return {it, false};
+    return {it, readable};
   }
 
   std::pair<int64_t, CacheKey*> Insert(int64_t key) {
@@ -456,15 +466,6 @@ class SieveCachePolicy : public BaseCachePolicy {
     auto cache_key_ptr = &queue_.front();
     mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
-  }
-
-  void MarkExistingWriting(map_iterator it) {
-    it->second->SetFreq().StartUse<true>();
-  }
-
-  template <bool write>
-  void Unmark(CacheKey* cache_key_ptr) {
-    cache_key_ptr->EndUse<write>();
   }
 
  private:
@@ -491,8 +492,6 @@ class SieveCachePolicy : public BaseCachePolicy {
 
   std::list<CacheKey> queue_;
   decltype(queue_)::iterator hand_;
-  int64_t capacity_;
-  int64_t cache_usage_;
   map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
 
@@ -541,47 +540,35 @@ class LruCachePolicy : public BaseCachePolicy {
    */
   void WritingCompleted(torch::Tensor pointers);
 
-  void MoveToFront(std::list<CacheKey>::iterator it) {
-    std::list<CacheKey> temp;
-    // Transfer the element to temp to keep references valid.
-    auto next_it = it;
-    std::advance(next_it, 1);
-    temp.splice(temp.begin(), queue_, it, next_it);
-    // Move the element to the beginning of the queue.
-    queue_.splice(queue_.begin(), temp);
-    // The iterators and references are not invalidated.
-    TORCH_CHECK(it == queue_.begin());
-  }
-
   template <bool write>
-  std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
+  CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
-      if (write || !cache_key.BeingWritten()) {
-        MoveToFront(it->second);
-        return std::make_pair(cache_key.StartUse<write>().getPos(), &cache_key);
+      MoveToFront(queue_, queue_, it->second);
+      if constexpr (write) {
+        return &cache_key;
+      } else if (!cache_key.BeingWritten()) {
+        return &cache_key.StartRead();
       }
     }
-    return std::nullopt;
+    return nullptr;
   }
 
   auto getMapSentinelValue() { return queue_.end(); }
 
   std::pair<map_iterator, bool> Emplace(int64_t key) {
-    auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
-    if (it->second != getMapSentinelValue()) {
+    auto [it, inserted] = key_to_cache_key_.emplace(key, getMapSentinelValue());
+    bool readable = false;
+    if (!inserted) {
       auto& cache_key = *it->second;
+      MoveToFront(queue_, queue_, it->second);
       if (!cache_key.BeingWritten()) {
-        MoveToFront(it->second);
-        // Not being written so we use StartUse<write=false>() and return
-        // true to indicate the key is ready to read.
-        cache_key.StartUse<false>();
-        return {it, true};
+        cache_key.StartRead();
+        readable = true;
       }
     }
-    // First time insertion, return false to indicate not ready to read.
-    return {it, false};
+    return {it, readable};
   }
 
   std::pair<int64_t, CacheKey*> Insert(int64_t key) {
@@ -599,29 +586,16 @@ class LruCachePolicy : public BaseCachePolicy {
     return &cache_key_ptr->setPos(Evict());
   }
 
-  void MarkExistingWriting(map_iterator it) {
-    MoveToFront(it->second);
-    it->second->StartUse<true>();
-  }
-
-  template <bool write>
-  void Unmark(CacheKey* cache_key_ptr) {
-    cache_key_ptr->EndUse<write>();
-  }
-
  private:
   int64_t Evict() {
     // If the cache has space, get an unused slot otherwise perform eviction.
     if (cache_usage_ < capacity_) return cache_usage_++;
     // Do not evict items that are still in use.
-    for (auto cache_key = queue_.back(); cache_key.InUse();
-         cache_key = queue_.back()) {
+    while (queue_.back().InUse()) {
       auto it = queue_.end();
       std::advance(it, -1);
       // Move the last element to the front without invalidating references.
-      MoveToFront(it);
-      // The check below will hold true. Disabled for performance reasons.
-      // TORCH_CHECK(key_to_cache_key_[cache_key.getKey()] == queue_.begin());
+      MoveToFront(queue_, queue_, it);
     }
     const auto& cache_key = queue_.back();
     TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
@@ -631,8 +605,6 @@ class LruCachePolicy : public BaseCachePolicy {
   }
 
   std::list<CacheKey> queue_;
-  int64_t capacity_;
-  int64_t cache_usage_;
   map_t<int64_t, decltype(queue_)::iterator> key_to_cache_key_;
 };
 
@@ -685,77 +657,71 @@ class ClockCachePolicy : public BaseCachePolicy {
   void WritingCompleted(torch::Tensor pointers);
 
   template <bool write>
-  std::optional<std::pair<int64_t, CacheKey*>> Read(int64_t key) {
+  CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
-      auto& cache_key = *it->second;
-      if (write || !cache_key.BeingWritten())
-        return std::make_pair(
-            cache_key.SetFreq().StartUse<write>().getPos(), &cache_key);
+      auto& cache_key = it->second->SetFreq();
+      if constexpr (write) {
+        return &cache_key;
+      } else if (!cache_key.BeingWritten()) {
+        return &cache_key.StartRead();
+      }
     }
-    return std::nullopt;
+    return nullptr;
   }
 
   auto getMapSentinelValue() const { return nullptr; }
 
   std::pair<map_iterator, bool> Emplace(int64_t key) {
-    auto [it, _] = key_to_cache_key_.emplace(key, getMapSentinelValue());
-    if (it->second != getMapSentinelValue()) {
-      auto& cache_key = *it->second;
+    auto [it, inserted] = key_to_cache_key_.emplace(key, getMapSentinelValue());
+    bool readable = false;
+    if (!inserted) {
+      auto& cache_key = it->second->SetFreq();
       if (!cache_key.BeingWritten()) {
-        // Not being written so we use StartUse<write=false>() and return
-        // true to indicate the key is ready to read.
-        cache_key.SetFreq().StartUse<false>();
-        return {it, true};
+        cache_key.StartRead();
+        readable = true;
       }
     }
-    // First time insertion, return false to indicate not ready to read.
-    return {it, false};
+    return {it, readable};
   }
 
   std::pair<int64_t, CacheKey*> Insert(int64_t key) {
     const auto pos = Evict();
-    auto cache_key_ptr = queue_.Push(CacheKey(key, pos));
+    queue_.push_front(CacheKey(key, pos));
+    auto cache_key_ptr = &queue_.front();
     key_to_cache_key_[key] = cache_key_ptr;
     return {pos, cache_key_ptr};
   }
 
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
-    auto cache_key_ptr = queue_.Push(CacheKey(key));
+    queue_.push_front(CacheKey(key));
+    auto cache_key_ptr = &queue_.front();
     mutable_value_ref(it) = cache_key_ptr;
     return &cache_key_ptr->setPos(Evict());
-  }
-
-  void MarkExistingWriting(map_iterator it) {
-    it->second->SetFreq().StartUse<true>();
-  }
-
-  template <bool write>
-  void Unmark(CacheKey* cache_key_ptr) {
-    cache_key_ptr->EndUse<write>();
   }
 
  private:
   int64_t Evict() {
     // If the cache has space, get an unused slot otherwise perform eviction.
     if (cache_usage_ < capacity_) return cache_usage_++;
-    CacheKey cache_key;
     while (true) {
-      cache_key = queue_.Pop();
+      auto& cache_key = queue_.back();
       if (cache_key.getFreq() || cache_key.InUse()) {
-        key_to_cache_key_[cache_key.getKey()] =
-            queue_.Push(cache_key.ResetFreq());
-      } else
-        break;
+        cache_key.ResetFreq();
+        auto it = queue_.end();
+        std::advance(it, -1);
+        MoveToFront(queue_, queue_, it);
+      } else {
+        TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
+        const auto evicted_pos = cache_key.getPos();
+        queue_.pop_back();
+        return evicted_pos;
+      }
     }
-    TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
-    return cache_key.getPos();
   }
 
-  CircularQueue<CacheKey> queue_;
-  int64_t capacity_;
-  int64_t cache_usage_;
+  std::list<CacheKey> queue_;
   map_t<int64_t, CacheKey*> key_to_cache_key_;
 };
 
