@@ -25,7 +25,10 @@ class CPUCachedFeature(Feature):
     fallback_feature : Feature
         The fallback feature.
     max_cache_size_in_bytes : int
-        The capacity of the cache in bytes.
+        The capacity of the cache in bytes. The size should be a few factors
+        larger than the size of each read request. Otherwise, the caching policy
+        will hang due to all cache entries being read and/or write locked,
+        resulting in a deadlock.
     policy : str
         The cache eviction policy algorithm name. See gb.impl.CPUFeatureCache
         for the list of available policies.
