@@ -34,14 +34,14 @@ namespace graphbolt {
 namespace storage {
 
 struct CacheKey {
-  CacheKey(int64_t key) : CacheKey(key, -1) {}
+  CacheKey(int64_t key) : CacheKey(key, std::numeric_limits<int64_t>::min()) {}
 
   CacheKey(int64_t key, int64_t position)
       : freq_(0),
-        key_(key),
-        position_in_cache_(position),
         // EndUse<true>() should be called to reset the reference count.
-        reference_count_(-1) {
+        reference_count_(-1),
+        key_(key),
+        position_in_cache_(position) {
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
 
@@ -84,16 +84,10 @@ struct CacheKey {
     return *this;
   }
 
-  CacheKey& StartWrite() {
-    TORCH_CHECK(reference_count_ < 0);
-    TORCH_CHECK(reference_count_-- > std::numeric_limits<int16_t>::lowest());
-    return *this;
-  }
-
   template <bool write>
   CacheKey& EndUse() {
     if constexpr (write) {
-      TORCH_CHECK(reference_count_ < 0);
+      TORCH_CHECK(reference_count_ == -1);
       ++reference_count_;
     } else {
       TORCH_CHECK(reference_count_ > 0);
@@ -108,15 +102,16 @@ struct CacheKey {
 
   friend std::ostream& operator<<(std::ostream& os, const CacheKey& key_ref) {
     return os << '(' << key_ref.key_ << ", " << key_ref.freq_ << ", "
-              << key_ref.position_in_cache_ << ")";
+              << key_ref.position_in_cache_ << ", " << key_ref.reference_count_
+              << ")";
   }
 
  private:
   int64_t freq_ : 3;
-  int64_t key_ : 61;
-  int64_t position_in_cache_ : 48;
   // Negative values indicate writing while positive values indicate reading.
-  int64_t reference_count_ : 16;
+  int64_t reference_count_ : 13;
+  int64_t key_ : 48;
+  int64_t position_in_cache_;
 };
 
 class BaseCachePolicy {
