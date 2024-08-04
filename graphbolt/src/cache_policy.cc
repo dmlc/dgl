@@ -169,9 +169,8 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
   return {positions, pointers};
 }
 
-template <bool write, typename CachePolicy>
-void BaseCachePolicy::ReadingWritingCompletedImpl(
-    CachePolicy& policy, torch::Tensor pointers) {
+template <bool write>
+void BaseCachePolicy::ReadingWritingCompletedImpl(torch::Tensor pointers) {
   static_assert(
       sizeof(CacheKey*) == sizeof(int64_t), "You need 64 bit pointers.");
   auto pointers_ptr =
@@ -182,6 +181,14 @@ void BaseCachePolicy::ReadingWritingCompletedImpl(
       pointer->EndUse<write>();
     }
   }
+}
+
+void BaseCachePolicy::ReadingCompleted(torch::Tensor pointers) {
+  ReadingWritingCompletedImpl<false>(pointers);
+}
+
+void BaseCachePolicy::WritingCompleted(torch::Tensor pointers) {
+  ReadingWritingCompletedImpl<true>(pointers);
 }
 
 S3FifoCachePolicy::S3FifoCachePolicy(int64_t capacity)
@@ -209,14 +216,6 @@ std::tuple<torch::Tensor, torch::Tensor> S3FifoCachePolicy::Replace(
   return ReplaceImpl(*this, keys);
 }
 
-void S3FifoCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<false>(*this, keys);
-}
-
-void S3FifoCachePolicy::WritingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<true>(*this, keys);
-}
-
 SieveCachePolicy::SieveCachePolicy(int64_t capacity)
     // Ensure that queue_ is constructed first before accessing its `.end()`.
     : BaseCachePolicy(capacity), queue_(), hand_(queue_.end()) {
@@ -239,14 +238,6 @@ std::tuple<torch::Tensor, torch::Tensor> SieveCachePolicy::Replace(
   return ReplaceImpl(*this, keys);
 }
 
-void SieveCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<false>(*this, keys);
-}
-
-void SieveCachePolicy::WritingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<true>(*this, keys);
-}
-
 LruCachePolicy::LruCachePolicy(int64_t capacity) : BaseCachePolicy(capacity) {
   TORCH_CHECK(capacity > 0, "Capacity needs to be positive.");
   key_to_cache_key_.reserve(kCapacityFactor * (capacity + 1));
@@ -265,14 +256,6 @@ LruCachePolicy::QueryAndReplace(torch::Tensor keys) {
 std::tuple<torch::Tensor, torch::Tensor> LruCachePolicy::Replace(
     torch::Tensor keys) {
   return ReplaceImpl(*this, keys);
-}
-
-void LruCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<false>(*this, keys);
-}
-
-void LruCachePolicy::WritingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<true>(*this, keys);
 }
 
 ClockCachePolicy::ClockCachePolicy(int64_t capacity)
@@ -294,14 +277,6 @@ ClockCachePolicy::QueryAndReplace(torch::Tensor keys) {
 std::tuple<torch::Tensor, torch::Tensor> ClockCachePolicy::Replace(
     torch::Tensor keys) {
   return ReplaceImpl(*this, keys);
-}
-
-void ClockCachePolicy::ReadingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<false>(*this, keys);
-}
-
-void ClockCachePolicy::WritingCompleted(torch::Tensor keys) {
-  ReadingWritingCompletedImpl<true>(*this, keys);
 }
 
 }  // namespace storage

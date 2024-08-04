@@ -162,7 +162,7 @@ class CPUCachedFeature(Feature):
                 missing_values_future = next(fallback_reader, None)
                 yield  # fallback feature stages.
 
-            values_from_cpu_copy_event.wait()
+            values_from_cpu_copy_event.synchronize()
             reading_completed = policy.reading_completed_async(
                 found_pointers, found_offsets
             )
@@ -187,7 +187,6 @@ class CPUCachedFeature(Feature):
 
             reading_completed.wait()
             replace_future.wait()
-            missing_values_copy_event.wait()
             writing_completed = policy.writing_completed_async(
                 missing_pointers, missing_offsets
             )
@@ -219,7 +218,11 @@ class CPUCachedFeature(Feature):
                     return values
 
             yield _Waiter(
-                [writing_completed],
+                [
+                    writing_completed,
+                    values_from_cpu_copy_event,
+                    missing_values_copy_event,
+                ],
                 values_from_cpu,
                 missing_values,
                 index,
