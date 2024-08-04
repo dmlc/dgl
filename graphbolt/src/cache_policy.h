@@ -40,9 +40,8 @@ struct CacheKey {
       : freq_(0),
         key_(key),
         position_in_cache_(position),
-        read_reference_count_(0),
-        // EndUse<true>() should be called to reset the write_reference_count.
-        write_reference_count_(1) {
+        // EndUse<true>() should be called to reset the reference count.
+        reference_count_(-1) {
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
 
@@ -80,23 +79,26 @@ struct CacheKey {
   }
 
   CacheKey& StartRead() {
-    TORCH_CHECK(read_reference_count_++ < std::numeric_limits<int8_t>::max());
+    TORCH_CHECK(reference_count_ >= 0);
+    TORCH_CHECK(reference_count_++ < std::numeric_limits<int16_t>::max());
     return *this;
   }
 
   template <bool write>
   CacheKey& EndUse() {
     if constexpr (write) {
-      --write_reference_count_;
+      TORCH_CHECK(reference_count_ == -1);
+      ++reference_count_;
     } else {
-      --read_reference_count_;
+      TORCH_CHECK(reference_count_ > 0);
+      --reference_count_;
     }
     return *this;
   }
 
-  bool InUse() const { return read_reference_count_ || write_reference_count_; }
+  bool InUse() const { return reference_count_; }
 
-  bool BeingWritten() const { return write_reference_count_; }
+  bool BeingWritten() const { return reference_count_ < 0; }
 
   friend std::ostream& operator<<(std::ostream& os, const CacheKey& key_ref) {
     return os << '(' << key_ref.key_ << ", " << key_ref.freq_ << ", "
@@ -106,10 +108,9 @@ struct CacheKey {
  private:
   int64_t freq_ : 3;
   int64_t key_ : 61;
-  int64_t position_in_cache_ : 40;
-  int64_t read_reference_count_ : 8;
-  // There could be a chain of writes so it is better to have larger bit count.
-  int64_t write_reference_count_ : 16;
+  int64_t position_in_cache_ : 48;
+  // Negative values indicate writing while positive values indicate reading.
+  int64_t reference_count_ : 16;
 };
 
 class BaseCachePolicy {
@@ -167,13 +168,13 @@ class BaseCachePolicy {
    * @brief A reader has finished reading these keys, so they can be evicted.
    * @param pointers The CacheKey pointers in the cache to unmark.
    */
-  virtual void ReadingCompleted(torch::Tensor pointers) = 0;
+  static void ReadingCompleted(torch::Tensor pointers);
 
   /**
    * @brief A writer has finished writing these keys, so they can be evicted.
    * @param pointers The CacheKey pointers in the cache to unmark.
    */
-  virtual void WritingCompleted(torch::Tensor pointers) = 0;
+  static void WritingCompleted(torch::Tensor pointers);
 
  protected:
   template <typename K, typename V>
@@ -198,10 +199,6 @@ class BaseCachePolicy {
   static std::tuple<torch::Tensor, torch::Tensor> ReplaceImpl(
       CachePolicy& policy, torch::Tensor keys);
 
-  template <bool write, typename CachePolicy>
-  static void ReadingWritingCompletedImpl(
-      CachePolicy& policy, torch::Tensor pointers);
-
   template <typename T>
   static void MoveToFront(
       std::list<T>& from, std::list<T>& to,
@@ -219,6 +216,10 @@ class BaseCachePolicy {
 
   int64_t capacity_;
   int64_t cache_usage_;
+
+ private:
+  template <bool write>
+  static void ReadingWritingCompletedImpl(torch::Tensor pointers);
 };
 
 /**
