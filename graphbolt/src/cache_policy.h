@@ -265,14 +265,11 @@ class S3FifoCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->Increment();
-      if constexpr (write) {
-        return &cache_key;
-      } else if (!cache_key.BeingWritten()) {
+      if (!cache_key.BeingWritten()) {
         return &cache_key.StartRead();
       }
     }
@@ -292,17 +289,6 @@ class S3FifoCachePolicy : public BaseCachePolicy {
       }
     }
     return {it, readable};
-  }
-
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    const auto in_ghost_queue = ghost_set_.erase(key);
-    auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
-    queue.push_front(CacheKey(key, pos));
-    small_queue_size_ += 1 - in_ghost_queue;
-    auto cache_key_ptr = &queue.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
   }
 
   CacheKey* Insert(map_iterator it) {
@@ -410,14 +396,11 @@ class SieveCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->SetFreq();
-      if constexpr (write) {
-        return &cache_key;
-      } else if (!cache_key.BeingWritten()) {
+      if (!cache_key.BeingWritten()) {
         return &cache_key.StartRead();
       }
     }
@@ -437,14 +420,6 @@ class SieveCachePolicy : public BaseCachePolicy {
       }
     }
     return {it, readable};
-  }
-
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    auto cache_key_ptr = &queue_.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
   }
 
   CacheKey* Insert(map_iterator it) {
@@ -517,15 +492,12 @@ class LruCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
       MoveToFront(queue_, queue_, it->second);
-      if constexpr (write) {
-        return &cache_key;
-      } else if (!cache_key.BeingWritten()) {
+      if (!cache_key.BeingWritten()) {
         return &cache_key.StartRead();
       }
     }
@@ -548,18 +520,11 @@ class LruCachePolicy : public BaseCachePolicy {
     return {it, readable};
   }
 
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    key_to_cache_key_[key] = queue_.begin();
-    return {pos, &queue_.front()};
-  }
-
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
     queue_.push_front(CacheKey(key));
     mutable_value_ref(it) = queue_.begin();
-    auto cache_key_ptr = &*queue_.begin();
+    auto cache_key_ptr = &queue_.front();
     return &cache_key_ptr->setPos(Evict());
   }
 
@@ -623,14 +588,11 @@ class ClockCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->SetFreq();
-      if constexpr (write) {
-        return &cache_key;
-      } else if (!cache_key.BeingWritten()) {
+      if (!cache_key.BeingWritten()) {
         return &cache_key.StartRead();
       }
     }
@@ -650,14 +612,6 @@ class ClockCachePolicy : public BaseCachePolicy {
       }
     }
     return {it, readable};
-  }
-
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    auto cache_key_ptr = &queue_.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
   }
 
   CacheKey* Insert(map_iterator it) {
