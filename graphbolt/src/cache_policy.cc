@@ -112,6 +112,7 @@ BaseCachePolicy::QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys) {
           } else {
             indices_ptr[--missing_cnt] = i;
             missing_keys_ptr[missing_cnt] = key;
+            // Ensure that even if an offset is added, it stays negative.
             auto position = std::numeric_limits<int64_t>::min();
             CacheKey* cache_key_ptr = nullptr;
             if (it->second == policy.getMapSentinelValue()) {
@@ -153,6 +154,7 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
         position_set.reserve(keys.size(0));
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
+          // Ensure that even if an offset is added, it stays negative.
           auto position = std::numeric_limits<int64_t>::min();
           CacheKey* cache_key_ptr = nullptr;
           const auto [it, _] = policy.Emplace(key);
