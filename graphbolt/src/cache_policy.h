@@ -79,18 +79,15 @@ struct CacheKey {
   }
 
   CacheKey& StartRead() {
-    TORCH_CHECK(reference_count_ >= 0);
-    TORCH_CHECK(reference_count_++ < std::numeric_limits<int16_t>::max());
+    ++reference_count_;
     return *this;
   }
 
   template <bool write>
   CacheKey& EndUse() {
     if constexpr (write) {
-      TORCH_CHECK(reference_count_ == -1);
       ++reference_count_;
     } else {
-      TORCH_CHECK(reference_count_ > 0);
       --reference_count_;
     }
     return *this;
@@ -435,7 +432,7 @@ class SieveCachePolicy : public BaseCachePolicy {
       if (hand_ == queue_.begin()) hand_ = queue_.end();
       --hand_;
     }
-    TORCH_CHECK(key_to_cache_key_.erase(hand_->getKey()));
+    key_to_cache_key_.erase(hand_->getKey());
     const auto pos = hand_->getPos();
     const auto temp = hand_;
     if (hand_ == queue_.begin()) {
@@ -535,7 +532,7 @@ class LruCachePolicy : public BaseCachePolicy {
       MoveToFront(queue_, queue_, it);
     }
     const auto& cache_key = queue_.back();
-    TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
+    key_to_cache_key_.erase(cache_key.getKey());
     const auto pos = cache_key.getPos();
     queue_.pop_back();
     return pos;
@@ -629,7 +626,7 @@ class ClockCachePolicy : public BaseCachePolicy {
         std::advance(it, -1);
         MoveToFront(queue_, queue_, it);
       } else {
-        TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
+        key_to_cache_key_.erase(cache_key.getKey());
         const auto evicted_pos = cache_key.getPos();
         queue_.pop_back();
         return evicted_pos;
