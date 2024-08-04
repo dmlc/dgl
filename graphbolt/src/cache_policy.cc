@@ -112,7 +112,7 @@ BaseCachePolicy::QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys) {
           } else {
             indices_ptr[--missing_cnt] = i;
             missing_keys_ptr[missing_cnt] = key;
-            int64_t position = -1;
+            auto position = std::numeric_limits<int64_t>::min();
             CacheKey* cache_key_ptr = nullptr;
             if (it->second == policy.getMapSentinelValue()) {
               cache_key_ptr = policy.Insert(it);
@@ -121,9 +121,6 @@ BaseCachePolicy::QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys) {
                   // We check for the uniqueness of the positions.
                   std::get<1>(position_set.insert(position)),
                   "Can't insert all, larger cache capacity is needed.");
-            } else {
-              cache_key_ptr = &it->second->StartWrite();
-              position = cache_key_ptr->getPos();
             }
             positions_ptr[missing_cnt] = position;
             pointers_ptr[missing_cnt] = cache_key_ptr;
@@ -156,7 +153,7 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
         position_set.reserve(keys.size(0));
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          int64_t position = -1;
+          auto position = std::numeric_limits<int64_t>::min();
           CacheKey* cache_key_ptr = nullptr;
           const auto [it, _] = policy.Emplace(key);
           if (it->second == policy.getMapSentinelValue()) {
@@ -166,9 +163,6 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
                 // We check for the uniqueness of the positions.
                 std::get<1>(position_set.insert(position)),
                 "Can't insert all, larger cache capacity is needed.");
-          } else {
-            cache_key_ptr = &it->second->StartWrite();
-            position = cache_key_ptr->getPos();
           }
           positions_ptr[i] = position;
           pointers_ptr[i] = cache_key_ptr;
