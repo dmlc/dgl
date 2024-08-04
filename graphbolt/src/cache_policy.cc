@@ -121,6 +121,9 @@ BaseCachePolicy::QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys) {
                   // We check for the uniqueness of the positions.
                   std::get<1>(position_set.insert(position)),
                   "Can't insert all, larger cache capacity is needed.");
+            } else {
+              cache_key_ptr = &it->second->StartWrite();
+              position = cache_key_ptr->getPos();
             }
             positions_ptr[missing_cnt] = position;
             pointers_ptr[missing_cnt] = cache_key_ptr;

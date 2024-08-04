@@ -84,10 +84,16 @@ struct CacheKey {
     return *this;
   }
 
+  CacheKey& StartWrite() {
+    TORCH_CHECK(reference_count_ < 0);
+    TORCH_CHECK(reference_count_-- > std::numeric_limits<int16_t>::lowest());
+    return *this;
+  }
+
   template <bool write>
   CacheKey& EndUse() {
     if constexpr (write) {
-      TORCH_CHECK(reference_count_ == -1);
+      TORCH_CHECK(reference_count_ < 0);
       ++reference_count_;
     } else {
       TORCH_CHECK(reference_count_ > 0);
