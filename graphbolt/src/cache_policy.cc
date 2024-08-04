@@ -55,7 +55,7 @@ BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
         auto missing_keys_ptr = missing_keys.data_ptr<index_t>();
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          auto cache_key_ptr = policy.template Read<false>(key);
+          auto cache_key_ptr = policy.Read(key);
           if (cache_key_ptr) {
             positions_ptr[found_cnt] = cache_key_ptr->getPos();
             found_ptr[found_cnt] = cache_key_ptr;
