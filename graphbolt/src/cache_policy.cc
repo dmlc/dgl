@@ -156,16 +156,21 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
         position_set.reserve(keys.size(0));
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          int64_t pos = -1;
+          int64_t position = -1;
           CacheKey* cache_key_ptr = nullptr;
-          if (!policy.template Read<true>(key)) {
-            std::tie(pos, cache_key_ptr) = policy.Insert(key);
+          const auto [it, _] = policy.Emplace(key);
+          if (it->second == policy.getMapSentinelValue()) {
+            cache_key_ptr = policy.Insert(it);
+            position = cache_key_ptr->getPos();
             TORCH_CHECK(
                 // We check for the uniqueness of the positions.
-                std::get<1>(position_set.insert(pos)),
+                std::get<1>(position_set.insert(position)),
                 "Can't insert all, larger cache capacity is needed.");
+          } else {
+            cache_key_ptr = &it->second->StartWrite();
+            position = cache_key_ptr->getPos();
           }
-          positions_ptr[i] = pos;
+          positions_ptr[i] = position;
           pointers_ptr[i] = cache_key_ptr;
         }
       }));

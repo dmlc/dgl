@@ -294,17 +294,6 @@ class S3FifoCachePolicy : public BaseCachePolicy {
     return {it, readable};
   }
 
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    const auto in_ghost_queue = ghost_set_.erase(key);
-    auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
-    queue.push_front(CacheKey(key, pos));
-    small_queue_size_ += 1 - in_ghost_queue;
-    auto cache_key_ptr = &queue.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
-  }
-
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
     const auto in_ghost_queue = ghost_set_.erase(key);
@@ -439,14 +428,6 @@ class SieveCachePolicy : public BaseCachePolicy {
     return {it, readable};
   }
 
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    auto cache_key_ptr = &queue_.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
-  }
-
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
     queue_.push_front(CacheKey(key));
@@ -548,18 +529,11 @@ class LruCachePolicy : public BaseCachePolicy {
     return {it, readable};
   }
 
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    key_to_cache_key_[key] = queue_.begin();
-    return {pos, &queue_.front()};
-  }
-
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
     queue_.push_front(CacheKey(key));
     mutable_value_ref(it) = queue_.begin();
-    auto cache_key_ptr = &*queue_.begin();
+    auto cache_key_ptr = &queue_.front();
     return &cache_key_ptr->setPos(Evict());
   }
 
@@ -650,14 +624,6 @@ class ClockCachePolicy : public BaseCachePolicy {
       }
     }
     return {it, readable};
-  }
-
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    auto cache_key_ptr = &queue_.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
   }
 
   CacheKey* Insert(map_iterator it) {
