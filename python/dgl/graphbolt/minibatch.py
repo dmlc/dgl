@@ -5,9 +5,18 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 
-from .base import CSCFormatBase, etype_str_to_tuple, expand_indptr
-from .internal import get_attributes, get_nonproperty_attributes
-from .internal_utils import recursive_apply
+from .base import (
+    apply_to,
+    CSCFormatBase,
+    etype_str_to_tuple,
+    expand_indptr,
+    is_object_pinned,
+)
+from .internal_utils import (
+    get_attributes,
+    get_nonproperty_attributes,
+    recursive_apply,
+)
 from .sampled_subgraph import SampledSubgraph
 
 __all__ = ["MiniBatch"]
@@ -347,19 +356,30 @@ class MiniBatch:
         )
         return pyg_data
 
-    def to(self, device: torch.device):  # pylint: disable=invalid-name
+    def to(
+        self, device: torch.device, non_blocking=False
+    ):  # pylint: disable=invalid-name
         """Copy `MiniBatch` to the specified device using reflection."""
 
-        def _to(x):
-            return x.to(device) if hasattr(x, "to") else x
+        copy_fn = lambda x: apply_to(x, device, non_blocking=non_blocking)
 
         transfer_attrs = get_nonproperty_attributes(self)
 
         for attr in transfer_attrs:
             # Only copy member variables.
-            setattr(self, attr, recursive_apply(getattr(self, attr), _to))
+            setattr(self, attr, recursive_apply(getattr(self, attr), copy_fn))
 
         return self
+
+    def pin_memory(self):
+        """Copy `MiniBatch` to the pinned memory using reflection."""
+
+        return self.to("pinned")
+
+    def is_pinned(self) -> bool:
+        """Check whether `SampledSubgraph` is pinned using reflection."""
+
+        return is_object_pinned(self)
 
 
 def _minibatch_str(minibatch: MiniBatch) -> str:

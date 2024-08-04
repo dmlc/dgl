@@ -17,10 +17,13 @@ if (
     )
 
 # pylint: disable=wrong-import-position
-from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import IterDataPipe
+from torch.utils.data import functional_datapipe, IterDataPipe
 
-from .internal_utils import recursive_apply
+from .internal_utils import (
+    get_nonproperty_attributes,
+    recursive_apply,
+    recursive_apply_reduce_all,
+)
 
 __all__ = [
     "CANONICAL_ETYPE_DELIMITER",
@@ -28,7 +31,6 @@ __all__ = [
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
-    "FutureWaiter",
     "Waiter",
     "Bufferer",
     "EndMarker",
@@ -306,10 +308,30 @@ def seed_type_str_to_ntypes(seed_type, seed_size):
     return ntypes
 
 
-def apply_to(x, device):
+def apply_to(x, device, non_blocking=False):
     """Apply `to` function to object x only if it has `to`."""
 
-    return x.to(device) if hasattr(x, "to") else x
+    if device == "pinned" and hasattr(x, "pin_memory"):
+        return x.pin_memory()
+    if not hasattr(x, "to"):
+        return x
+    if not non_blocking:
+        return x.to(device)
+    return x.to(device, non_blocking=True)
+
+
+def is_object_pinned(obj):
+    """Recursively check all members of the object and return True if only if
+    all are pinned."""
+
+    for attr in get_nonproperty_attributes(obj):
+        member_result = recursive_apply_reduce_all(
+            getattr(obj, attr),
+            lambda x: x is None or x.is_pinned(),
+        )
+        if not member_result:
+            return False
+    return True
 
 
 @functional_datapipe("copy_to")
@@ -334,17 +356,22 @@ class CopyTo(IterDataPipe):
         The DataPipe.
     device : torch.device
         The PyTorch CUDA device.
+    non_blocking : bool
+        Whether the copy should be performed without blocking. All elements have
+        to be already in pinned system memory if enabled. Default is False.
     """
 
-    def __init__(self, datapipe, device):
+    def __init__(self, datapipe, device, non_blocking=False):
         super().__init__()
         self.datapipe = datapipe
-        self.device = device
+        self.device = torch.device(device)
+        self.non_blocking = non_blocking
 
     def __iter__(self):
         for data in self.datapipe:
-            data = recursive_apply(data, apply_to, self.device)
-            yield data
+            yield recursive_apply(
+                data, apply_to, self.device, self.non_blocking
+            )
 
 
 @functional_datapipe("mark_end")
@@ -419,18 +446,6 @@ class Waiter(IterDataPipe):
             yield data
 
 
-@functional_datapipe("wait_future")
-class FutureWaiter(IterDataPipe):
-    """Calls the result function of all items and returns their results."""
-
-    def __init__(self, datapipe):
-        self.datapipe = datapipe
-
-    def __iter__(self):
-        for data in self.datapipe:
-            yield data.result()
-
-
 @dataclass
 class CSCFormatBase:
     r"""Basic class representing data in Compressed Sparse Column (CSC) format.
@@ -460,7 +475,9 @@ class CSCFormatBase:
     def __repr__(self) -> str:
         return _csc_format_base_str(self)
 
-    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+    def to(  # pylint: disable=invalid-name
+        self, device: torch.device, non_blocking=False
+    ) -> None:
         """Copy `CSCFormatBase` to the specified device using reflection."""
 
         for attr in dir(self):
@@ -470,11 +487,24 @@ class CSCFormatBase:
                     self,
                     attr,
                     recursive_apply(
-                        getattr(self, attr), lambda x: apply_to(x, device)
+                        getattr(self, attr),
+                        apply_to,
+                        device,
+                        non_blocking=non_blocking,
                     ),
                 )
 
         return self
+
+    def pin_memory(self):
+        """Copy `SampledSubgraph` to the pinned memory using reflection."""
+
+        return self.to("pinned")
+
+    def is_pinned(self) -> bool:
+        """Check whether `SampledSubgraph` is pinned using reflection."""
+
+        return is_object_pinned(self)
 
 
 def _csc_format_base_str(csc_format_base: CSCFormatBase) -> str:

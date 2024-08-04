@@ -1,3 +1,4 @@
+import os
 import re
 import unittest
 from collections.abc import Iterable, Mapping
@@ -12,19 +13,33 @@ from torch.torch_version import TorchVersion
 from . import gb_test_utils
 
 
-@unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
-def test_CopyTo():
+def test_pytorch_cuda_allocator_conf():
+    env = os.getenv("PYTORCH_CUDA_ALLOC_CONF")
+    assert env is not None
+    config_list = env.split(",")
+    assert "expandable_segments:True" in config_list
+
+
+@unittest.skipIf(F._default_context_str != "gpu", "CopyTo needs GPU to test")
+@pytest.mark.parametrize("non_blocking", [False, True])
+def test_CopyTo(non_blocking):
     item_sampler = gb.ItemSampler(
         gb.ItemSet(torch.arange(20), names="seeds"), 4
     )
+    if non_blocking:
+        item_sampler = item_sampler.transform(lambda x: x.pin_memory())
 
     # Invoke CopyTo via class constructor.
     dp = gb.CopyTo(item_sampler, "cuda")
     for data in dp:
         assert data.seeds.device.type == "cuda"
 
+    dp = gb.CopyTo(item_sampler, "cuda", non_blocking)
+    for data in dp:
+        assert data.seeds.device.type == "cuda"
+
     # Invoke CopyTo via functional form.
-    dp = item_sampler.copy_to("cuda")
+    dp = item_sampler.copy_to("cuda", non_blocking)
     for data in dp:
         assert data.seeds.device.type == "cuda"
 

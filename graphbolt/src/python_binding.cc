@@ -107,6 +107,12 @@ TORCH_LIBRARY(graphbolt, m) {
   m.class_<storage::PartitionedCachePolicy>("PartitionedCachePolicy")
       .def("query", &storage::PartitionedCachePolicy::Query)
       .def("query_async", &storage::PartitionedCachePolicy::QueryAsync)
+      .def(
+          "query_and_replace",
+          &storage::PartitionedCachePolicy::QueryAndReplace)
+      .def(
+          "query_and_replace_async",
+          &storage::PartitionedCachePolicy::QueryAndReplaceAsync)
       .def("replace", &storage::PartitionedCachePolicy::Replace)
       .def("replace_async", &storage::PartitionedCachePolicy::ReplaceAsync)
       .def(

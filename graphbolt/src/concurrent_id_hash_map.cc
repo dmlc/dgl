@@ -11,6 +11,7 @@
 #endif  // _MSC_VER
 
 #include <cmath>
+#include <cuda/std/atomic>
 #include <numeric>
 
 namespace {
@@ -29,30 +30,7 @@ namespace graphbolt {
 namespace sampling {
 
 template <typename IdType>
-IdType ConcurrentIdHashMap<IdType>::CompareAndSwap(
-    IdType* ptr, IdType old_val, IdType new_val) {
-#ifdef _MSC_VER
-  if (sizeof(IdType) == 4) {
-    return _InterlockedCompareExchange(
-        reinterpret_cast<long*>(ptr), new_val, old_val);
-  } else if (sizeof(IdType) == 8) {
-    return _InterlockedCompareExchange64(
-        reinterpret_cast<long long*>(ptr), new_val, old_val);
-  } else {
-    LOG(FATAL) << "ID can only be int32 or int64";
-  }
-#elif __GNUC__  // _MSC_VER
-  return __sync_val_compare_and_swap(ptr, old_val, new_val);
-#else           // _MSC_VER
-#error "CompareAndSwap is not supported on this platform."
-#endif  // _MSC_VER
-}
-
-template <typename IdType>
-ConcurrentIdHashMap<IdType>::ConcurrentIdHashMap() : mask_(0) {}
-
-template <typename IdType>
-torch::Tensor ConcurrentIdHashMap<IdType>::Init(
+ConcurrentIdHashMap<IdType>::ConcurrentIdHashMap(
     const torch::Tensor& ids, size_t num_seeds) {
   const IdType* ids_data = ids.data_ptr<IdType>();
   const size_t num_ids = static_cast<size_t>(ids.size(0));
@@ -63,8 +41,8 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
       torch::full({static_cast<int64_t>(capacity * 2)}, -1, ids.options());
 
   // This code block is to fill the ids into hash_map_.
-  auto unique_ids = torch::empty_like(ids);
-  IdType* unique_ids_data = unique_ids.data_ptr<IdType>();
+  unique_ids_ = torch::empty_like(ids);
+  IdType* unique_ids_data = unique_ids_.data_ptr<IdType>();
   // Insert all ids into the hash map.
   torch::parallel_for(0, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     for (int64_t i = s; i < e; i++) {
@@ -72,13 +50,10 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
     }
   });
   // Place the first `num_seeds` ids.
-  unique_ids.slice(0, 0, num_seeds) = ids.slice(0, 0, num_seeds);
+  unique_ids_.slice(0, 0, num_seeds) = ids.slice(0, 0, num_seeds);
 
-  // An auxiliary array indicates whether the corresponding elements
-  // are inserted into hash map or not. Use `int16_t` instead of `bool` as
-  // vector<bool> is unsafe when updating different elements from different
-  // threads. See https://en.cppreference.com/w/cpp/container#Thread_safety.
-  std::vector<int16_t> valid(num_ids);
+  auto valid_tensor = torch::empty(num_ids, ids.options().dtype(torch::kInt8));
+  auto valid = valid_tensor.data_ptr<int8_t>();
 
   const int64_t num_threads = torch::get_num_threads();
   std::vector<size_t> block_offset(num_threads + 1, 0);
@@ -91,6 +66,8 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
           if (MapId(ids_data[i]) == i) {
             count++;
             valid[i] = 1;
+          } else {
+            valid[i] = 0;
           }
         }
         auto thread_id = torch::get_thread_num();
@@ -100,7 +77,7 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
   // Get ExclusiveSum of each block.
   std::partial_sum(
       block_offset.begin() + 1, block_offset.end(), block_offset.begin() + 1);
-  unique_ids = unique_ids.slice(0, 0, num_seeds + block_offset.back());
+  unique_ids_ = unique_ids_.slice(0, 0, num_seeds + block_offset.back());
 
   // Get unique array from ids and set value for hash map.
   torch::parallel_for(
@@ -115,7 +92,6 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
           }
         }
       });
-  return unique_ids;
 }
 
 template <typename IdType>
@@ -205,7 +181,6 @@ inline void ConcurrentIdHashMap<IdType>::InsertAndSet(IdType id, IdType value) {
 template <typename IdType>
 void ConcurrentIdHashMap<IdType>::InsertAndSetMin(IdType id, IdType value) {
   IdType pos = (id & mask_), delta = 1;
-  IdType* hash_map_data = hash_map_.data_ptr<IdType>();
   InsertState state = AttemptInsertAt(pos, id);
   while (state == InsertState::OCCUPIED) {
     Next(&pos, &delta);
@@ -214,25 +189,23 @@ void ConcurrentIdHashMap<IdType>::InsertAndSetMin(IdType id, IdType value) {
 
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType val_pos = getValueIndex(pos);
-  IdType old_val = empty_key;
-  while (old_val == empty_key || old_val > value) {
-    IdType replaced_val =
-        CompareAndSwap(&(hash_map_data[val_pos]), old_val, value);
-    if (old_val == replaced_val) break;
-    old_val = replaced_val;
+  ::cuda::std::atomic_ref value_ref(
+      reinterpret_cast<IdType*>(hash_map_.data_ptr())[val_pos]);
+  for (auto old_val = empty_key; old_val == empty_key || old_val > value;) {
+    // It is more efficient to use weak variant in a loop.
+    if (value_ref.compare_exchange_weak(old_val, value)) break;
   }
 }
 
 template <typename IdType>
 inline typename ConcurrentIdHashMap<IdType>::InsertState
 ConcurrentIdHashMap<IdType>::AttemptInsertAt(int64_t pos, IdType key) {
-  IdType empty_key = static_cast<IdType>(kEmptyKey);
-  IdType* hash_map_data = hash_map_.data_ptr<IdType>();
-  IdType old_val =
-      CompareAndSwap(&(hash_map_data[getKeyIndex(pos)]), empty_key, key);
-  if (old_val == empty_key) {
+  auto expected = static_cast<IdType>(kEmptyKey);
+  ::cuda::std::atomic_ref key_ref(
+      reinterpret_cast<IdType*>(hash_map_.data_ptr())[getKeyIndex(pos)]);
+  if (key_ref.compare_exchange_strong(expected, key)) {
     return InsertState::INSERTED;
-  } else if (old_val == key) {
+  } else if (expected == key) {
     return InsertState::EXISTED;
   } else {
     return InsertState::OCCUPIED;
@@ -241,9 +214,6 @@ ConcurrentIdHashMap<IdType>::AttemptInsertAt(int64_t pos, IdType key) {
 
 template class ConcurrentIdHashMap<int32_t>;
 template class ConcurrentIdHashMap<int64_t>;
-template class ConcurrentIdHashMap<int16_t>;
-template class ConcurrentIdHashMap<int8_t>;
-template class ConcurrentIdHashMap<uint8_t>;
 
 }  // namespace sampling
 }  // namespace graphbolt

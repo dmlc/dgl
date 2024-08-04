@@ -56,8 +56,9 @@ def test_cpu_cached_feature(dtype, policy):
 
     # Test read with ids.
     assert torch.equal(
-        feat_store_a.read(torch.tensor([0])),
-        torch.tensor([[1, 2, 3]], dtype=dtype),
+        # Test read when ids are on a different device.
+        feat_store_a.read(torch.tensor([0], device=F.ctx())),
+        torch.tensor([[1, 2, 3]], dtype=dtype, device=F.ctx()),
     )
     assert torch.equal(
         feat_store_b.read(torch.tensor([1, 1])),
