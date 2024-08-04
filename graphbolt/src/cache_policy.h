@@ -259,16 +259,6 @@ class S3FifoCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  /**
-   * @brief See BaseCachePolicy::ReadingCompleted.
-   */
-  void ReadingCompleted(torch::Tensor pointers);
-
-  /**
-   * @brief See BaseCachePolicy::WritingCompleted.
-   */
-  void WritingCompleted(torch::Tensor pointers);
-
   template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
@@ -414,16 +404,6 @@ class SieveCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  /**
-   * @brief See BaseCachePolicy::ReadingCompleted.
-   */
-  void ReadingCompleted(torch::Tensor pointers);
-
-  /**
-   * @brief See BaseCachePolicy::WritingCompleted.
-   */
-  void WritingCompleted(torch::Tensor pointers);
-
   template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
@@ -531,16 +511,6 @@ class LruCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  /**
-   * @brief See BaseCachePolicy::ReadingCompleted.
-   */
-  void ReadingCompleted(torch::Tensor pointers);
-
-  /**
-   * @brief See BaseCachePolicy::WritingCompleted.
-   */
-  void WritingCompleted(torch::Tensor pointers);
-
   template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
@@ -646,16 +616,6 @@ class ClockCachePolicy : public BaseCachePolicy {
    * @brief See BaseCachePolicy::Replace.
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
-
-  /**
-   * @brief See BaseCachePolicy::ReadingCompleted.
-   */
-  void ReadingCompleted(torch::Tensor pointers);
-
-  /**
-   * @brief See BaseCachePolicy::WritingCompleted.
-   */
-  void WritingCompleted(torch::Tensor pointers);
 
   template <bool write>
   CacheKey* Read(int64_t key) {
