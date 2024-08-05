@@ -96,8 +96,8 @@ struct CacheKey {
   template <bool write>
   CacheKey& EndUse() {
     ::cuda::std::atomic_ref ref(reference_count_);
-    // The EndUse operation needs to synchronize with InUse and BeingWritten
-    // operations. So we have an release-acquire ordering here.
+    // The EndUse operation needs to synchronize with the InUse operation. So we
+    // have an release-acquire ordering between the two.
     // https://en.cppreference.com/w/cpp/atomic/memory_order#Release-Acquire_ordering
     if constexpr (write) {
       ref.fetch_add(1, ::cuda::std::memory_order_release);
@@ -116,9 +116,10 @@ struct CacheKey {
 
   bool BeingWritten() const {
     ::cuda::std::atomic_ref ref(reference_count_);
-    // The operations after a call to this function need to happen after the
-    // load operation. Hence the acquire order.
-    return ref.load(::cuda::std::memory_order_acquire) < 0;
+    // The only operation coming after this op is the StartRead operation. Since
+    // StartRead is a refcount increment operation, it is fine if we don't
+    // synchronize with EndUse ops.
+    return ref.load(::cuda::std::memory_order_relaxed) < 0;
   }
 
   friend std::ostream& operator<<(std::ostream& os, const CacheKey& key_ref) {
