@@ -191,8 +191,6 @@ if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
   set(USE_LIBXSMM OFF)
 endif()
 
-# configure minigun
-add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
 # Source file lists
 file(GLOB DGL_SRC
   src/*.cc
