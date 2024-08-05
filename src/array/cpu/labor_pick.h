@@ -47,6 +47,10 @@ using dgl::random::continuous_seed;
 
 template <typename K, typename V>
 using map_t = tsl::robin_map<K, V>;
+template <typename iterator>
+auto& mutable_value_ref(iterator it) {
+  return it.value();
+}
 
 constexpr double eps = 0.0001;
 
@@ -85,8 +89,10 @@ auto compute_importance_sampling_probabilities(
         const IdxType rid = rows_data[i];
         for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
           const auto ct = c * (weighted && iters == 1 ? A[j] : 1);
-          auto itb = hop_map2.emplace(indices[j], ct);
-          if (!itb.second) itb.first->second = std::max(ct, itb.first->second);
+          auto [it, inserted] = hop_map2.emplace(indices[j], ct);
+          if (!inserted) {
+            mutable_value_ref(it) = std::max(ct, it->second);
+          }
         }
       }
       if (hop_map.empty())
