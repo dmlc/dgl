@@ -26,7 +26,7 @@
 #include <dgl/random.h>
 #include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
-#include <parallel_hashmap/phmap.h>
+#include <tsl/robin_map.h>
 
 #include <algorithm>
 #include <cmath>
@@ -45,6 +45,9 @@ namespace impl {
 
 using dgl::random::continuous_seed;
 
+template <typename K, typename V>
+using map_t = tsl::robin_map<K, V>;
+
 constexpr double eps = 0.0001;
 
 template <typename IdxType, typename FloatType>
@@ -61,7 +64,7 @@ auto compute_importance_sampling_probabilities(
 
   double prev_ex_nodes = max_degree * num_rows;
 
-  phmap::flat_hash_map<IdxType, FloatType> hop_map, hop_map2;
+  map_t<IdxType, FloatType> hop_map, hop_map2;
   for (int iters = 0; iters < importance_sampling || importance_sampling < 0;
        iters++) {
     // NOTE(mfbalin) When the graph is unweighted, the first c values in
@@ -203,7 +206,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     hop_size += act_degree;
   }
 
-  phmap::flat_hash_map<IdxType, FloatType> hop_map;
+  map_t<IdxType, FloatType> hop_map;
 
   if (importance_sampling)
     hop_map = compute_importance_sampling_probabilities<IdxType, FloatType>(
