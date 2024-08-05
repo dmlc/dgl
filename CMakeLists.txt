@@ -335,6 +335,8 @@ if (USE_LIBXSMM)
   message(STATUS "Build with LIBXSMM optimization.")
 endif()
 
+# To compile METIS correct for DGL.
+add_compile_definitions(IDXTYPEWIDTH=64 REALTYPEWIDTH=32)
 if (EXTERNAL_METIS_PATH)
   # To compile METIS correct for DGL.
   if(MSVC)
@@ -363,9 +365,6 @@ else(EXTERNAL_METIS_PATH)
     # So I(Rui) define _POSIX_C_SOURCE to 200809L for GKlib and metis to avoid the error.
     target_compile_definitions(GKlib PRIVATE _POSIX_C_SOURCE=200809L)
     target_compile_definitions(metis PRIVATE _POSIX_C_SOURCE=200809L)
-    # To compile METIS correct for DGL.
-    target_compile_definitions(GKlib PUBLIC IDXTYPEWIDTH=64 REALTYPEWIDTH=32)
-    target_compile_definitions(metis PUBLIC IDXTYPEWIDTH=64 REALTYPEWIDTH=32)
     list(APPEND DGL_LINKER_LIBS metis GKlib)
   endif(NOT MSVC)
 endif(EXTERNAL_METIS_PATH)
