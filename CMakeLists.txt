@@ -340,15 +340,9 @@ else(EXTERNAL_DMLC_PATH)
   set(GOOGLE_TEST 0) # Turn off dmlc-core test
 endif(EXTERNAL_DMLC_PATH)
 
-if(EXTERNAL_PHMAP_PATH)
-  include_directories(SYSTEM ${EXTERNAL_PHMAP_PATH})
-else(EXTERNAL_PHMAP_PATH)
-  target_include_directories(dgl PRIVATE "third_party/phmap")
-endif(EXTERNAL_PHMAP_PATH)
-
-
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
+target_include_directories(dgl PRIVATE "third_party/tsl_robin_map/include")
 
 if(EXTERNAL_NANOFLANN_PATH)
   include_directories(SYSTEM ${EXTERNAL_NANOFLANN_PATH})
@@ -473,7 +467,7 @@ if(BUILD_CPP_TEST)
   include_directories("include")
   include_directories("third_party/dlpack/include")
   include_directories("third_party/dmlc-core/include")
-  include_directories("third_party/phmap")
+  include_directories("third_party/tsl_robin_map/include")
   include_directories("third_party/libxsmm/include")
   include_directories("third_party/pcg/include")
   file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/cpp/*.cc)
