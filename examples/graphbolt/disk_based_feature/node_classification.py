@@ -404,7 +404,11 @@ def main():
         and args.graph_device == "pinned"
     )
 
-    # Load and preprocess dataset.
+    """
+    Load and preprocess on-disk dataset.
+    We inspect the in_memory field of the feature_data in the YAML file and modify
+    it to False. This will make sure the feature_data is loaded as DiskBasedFeature.
+    """
     print("Loading data...")
     disk_based_feature_keys = None
     if args.cpu_cache_size_in_gigabytes > 0:
@@ -417,7 +421,7 @@ def main():
         feature_key = (feature["domain"], feature["type"], feature["name"])
         # Set the in_memory setting to False without modifying YAML file.
         if feature_key in disk_based_feature_keys:
-            feature["in_memory"] = False
+            feature["in_memory"] = True
     dataset = dataset.load()
 
     # Move the dataset to the selected storage.
@@ -437,9 +441,13 @@ def main():
     test_set = dataset.tasks[0].test_set
     all_nodes_set = dataset.all_nodes_set
     args.fanout = list(map(int, args.fanout.split(",")))
-
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
+    """
+    If the CPU cache size is greater than 0, we wrap the DiskBasedFeature
+    to be a CPUCachedFeature. This internally manages the CPU feature cache
+    by the specified cache replacment policy.
+    """
     if args.cpu_cache_size_in_gigabytes > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
     ):
@@ -453,6 +461,12 @@ def main():
         cpu_cache_miss_rate_fn = lambda: cpu_cached_feature._feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
+
+    """
+    If the GPU cache size is greater than 0, we wrap the underlying feature store
+    to be a GPUCachedFeature. This internally manages the GPU feature cache
+    by the specified cache replacment policy.
+    """
     if args.gpu_cache_size_in_gigabytes > 0 and args.feature_device != "cuda":
         features[("node", None, "feat")] = gb.GPUCachedFeature(
             features[("node", None, "feat")],
