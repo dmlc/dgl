@@ -10,7 +10,7 @@ This example demonstrates how to run node classification task with **GraphBolt.D
 
 |     Dataset     | Graph Size | Feature Size | Feature Dim |
 | :-------------: | :--------: | :----------: | :---------: |
-| Ogbn-papers100M |   13 GB   |    53 GB    |     128     |
+| ogbn-papers100M |   13 GB   |    53 GB    |     128     |
 
 ## Results with various caching policies
 
