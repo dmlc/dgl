@@ -102,19 +102,19 @@ class Future : public torch::CustomClassHolder {
  * task to avoid spawning a new OpenMP threadpool on each interop thread.
  */
 template <typename F>
-inline auto async(F function) {
+inline auto async(F&& function) {
   using T = decltype(function());
 #ifdef BUILD_WITH_TASKFLOW
-  auto future = interop_pool().async(function);
+  auto future = interop_pool().async(std::move(function));
 #else
   auto promise = std::make_shared<std::promise<T>>();
   auto future = promise->get_future();
-  at::launch([=]() {
+  at::launch([promise, func = std::move(function)]() {
     if constexpr (std::is_void_v<T>) {
-      function();
+      func();
       promise->set_value();
     } else
-      promise->set_value(function());
+      promise->set_value(func());
   });
 #endif
   return c10::make_intrusive<Future<T>>(std::move(future));
@@ -146,7 +146,7 @@ inline void _parallel_for(
       f(begin_tid, end_tid);
     }
   });
-  _get_thread_pool<pool_type>().run(flow).wait();
+  _get_thread_pool<pool_type>().run(flow).get();
 #else
   std::promise<void> promise;
   std::future<void> future;
