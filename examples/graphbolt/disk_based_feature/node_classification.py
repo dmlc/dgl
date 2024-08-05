@@ -444,9 +444,11 @@ def main():
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
     """
-    If the CPU cache size is greater than 0, we wrap the DiskBasedFeature
-    to be a CPUCachedFeature. This internally manages the CPU feature cache
-    by the specified cache replacment policy.
+    If the CPU cache size is greater than 0, we wrap the DiskBasedFeature to be
+    a CPUCachedFeature. This internally manages the CPU feature cache by the
+    specified cache replacement policy. Note: It is safe to set the CPU cache size
+    larger than 4 times the number of features in a mini-batch. A value smaller
+    than that might cause the feature fetcher to hang at the first iteration.
     """
     if args.cpu_cache_size_in_gigabytes > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
