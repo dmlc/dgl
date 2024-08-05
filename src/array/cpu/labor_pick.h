@@ -26,7 +26,7 @@
 #include <dgl/random.h>
 #include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
-#include <parallel_hashmap/phmap.h>
+#include <tsl/robin_map.h>
 
 #include <algorithm>
 #include <cmath>
@@ -45,6 +45,13 @@ namespace impl {
 
 using dgl::random::continuous_seed;
 
+template <typename K, typename V>
+using map_t = tsl::robin_map<K, V>;
+template <typename iterator>
+auto& mutable_value_ref(iterator it) {
+  return it.value();
+}
+
 constexpr double eps = 0.0001;
 
 template <typename IdxType, typename FloatType>
@@ -61,7 +68,7 @@ auto compute_importance_sampling_probabilities(
 
   double prev_ex_nodes = max_degree * num_rows;
 
-  phmap::flat_hash_map<IdxType, FloatType> hop_map, hop_map2;
+  map_t<IdxType, FloatType> hop_map, hop_map2;
   for (int iters = 0; iters < importance_sampling || importance_sampling < 0;
        iters++) {
     // NOTE(mfbalin) When the graph is unweighted, the first c values in
@@ -83,7 +90,9 @@ auto compute_importance_sampling_probabilities(
         for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
           const auto ct = c * (weighted && iters == 1 ? A[j] : 1);
           auto itb = hop_map2.emplace(indices[j], ct);
-          if (!itb.second) itb.first->second = std::max(ct, itb.first->second);
+          if (!itb.second) {
+            mutable_value_ref(itb.first) = std::max(ct, itb.first->second);
+          }
         }
       }
       if (hop_map.empty())
@@ -203,7 +212,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     hop_size += act_degree;
   }
 
-  phmap::flat_hash_map<IdxType, FloatType> hop_map;
+  map_t<IdxType, FloatType> hop_map;
 
   if (importance_sampling)
     hop_map = compute_importance_sampling_probabilities<IdxType, FloatType>(

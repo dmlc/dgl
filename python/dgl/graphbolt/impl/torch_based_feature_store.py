@@ -140,7 +140,7 @@ class TorchBasedFeature(Feature):
         return index_select(self._tensor, ids)
 
     def read_async(self, ids: torch.Tensor):
-        """Read the feature by index asynchronously.
+        r"""Read the feature by index asynchronously.
 
         Parameters
         ----------
@@ -155,7 +155,7 @@ class TorchBasedFeature(Feature):
             can be accessed by calling `.wait()`. on the returned future object.
             It is undefined behavior to call `.wait()` more than once.
 
-        Example Usage
+        Examples
         --------
         >>> import dgl.graphbolt as gb
         >>> feature = gb.Feature(...)
@@ -413,7 +413,7 @@ class DiskBasedFeature(Feature):
             return index_select(self._tensor, ids)
 
     def read_async(self, ids: torch.Tensor):
-        """Read the feature by index asynchronously.
+        r"""Read the feature by index asynchronously.
 
         Parameters
         ----------
@@ -428,7 +428,7 @@ class DiskBasedFeature(Feature):
             can be accessed by calling `.wait()`. on the returned future object.
             It is undefined behavior to call `.wait()` more than once.
 
-        Example Usage
+        Examples
         --------
         >>> import dgl.graphbolt as gb
         >>> feature = gb.Feature(...)

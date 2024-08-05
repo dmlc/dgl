@@ -85,8 +85,10 @@ OnDiskNpyArray::OnDiskNpyArray(
       static_cast<int64_t>(num_queues_), num_threads.value_or(num_queues_));
   TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
 
+  // We allocate buffers for each existing queue because we might get assigned
+  // any queue in range [0, num_queues_).
   read_tensor_ = torch::empty(
-      ReadBufferSizePerThread() * num_thread_ + block_size_ - 1,
+      ReadBufferSizePerThread() * num_queues_ + block_size_ - 1,
       torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU));
 #else
   throw std::runtime_error("DiskBasedFeature is not available now.");
@@ -173,6 +175,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   // Consume a slot so that parallel_for is called only if there are available
   // queues.
   semaphore_.acquire();
+  std::atomic<int> num_semaphore_acquisitions = 1;
   graphbolt::parallel_for_interop(0, num_thread_, 1, [&](int thread_id, int) {
     // The completion queue might contain 4 * kGroupSize while we may submit
     // 4 * kGroupSize more. No harm in overallocation here.
@@ -182,6 +185,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     {
       // We consume a slot from the semaphore to use a queue.
       semaphore_.acquire();
+      num_semaphore_acquisitions.fetch_add(1, std::memory_order_relaxed);
       std::lock_guard lock(available_queues_mtx_);
       TORCH_CHECK(!available_queues_.empty());
       thread_id = available_queues_.back();
@@ -271,7 +275,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
             *reinterpret_cast<ReadRequest *>(io_uring_cqe_get_data(cqe));
         auto actual_read_len = cqe->res;
         if (actual_read_len < 0) {
-          error_flag.store(3, std::memory_order_relaxed);
+          error_flag.store(actual_read_len, std::memory_order_relaxed);
           break;
         }
         const auto remaining_read_len =
@@ -310,15 +314,23 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     }
     // If this is the first thread exiting, release the master thread's ticket
     // as well by releasing 2 slots. Otherwise, release 1 slot.
-    semaphore_.release(exiting_first.test_and_set() ? 1 : 2);
+    const auto releasing = exiting_first.test_and_set() ? 1 : 2;
+    semaphore_.release(releasing);
+    num_semaphore_acquisitions.fetch_add(-releasing, std::memory_order_relaxed);
   });
-  switch (error_flag.load(std::memory_order_relaxed)) {
+  // If any of the worker threads exit early without being able to release the
+  // semaphore, we make sure to release it for them in the main thread.
+  semaphore_.release(
+      num_semaphore_acquisitions.load(std::memory_order_relaxed));
+  const auto ret_val = error_flag.load(std::memory_order_relaxed);
+  switch (ret_val) {
     case 0:  // Successful.
       return result;
     case 1:
       throw std::out_of_range("IndexError: Index out of range.");
     default:
-      throw std::runtime_error("io_uring error!");
+      throw std::runtime_error(
+          "io_uring error with errno: " + std::to_string(-ret_val));
   }
 }
 
