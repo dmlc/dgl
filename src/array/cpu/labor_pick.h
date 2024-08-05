@@ -89,9 +89,9 @@ auto compute_importance_sampling_probabilities(
         const IdxType rid = rows_data[i];
         for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
           const auto ct = c * (weighted && iters == 1 ? A[j] : 1);
-          auto [it, inserted] = hop_map2.emplace(indices[j], ct);
-          if (!inserted) {
-            mutable_value_ref(it) = std::max(ct, it->second);
+          auto itb = hop_map2.emplace(indices[j], ct);
+          if (!itb.second) {
+            mutable_value_ref(itb.first) = std::max(ct, itb.first->second);
           }
         }
       }
