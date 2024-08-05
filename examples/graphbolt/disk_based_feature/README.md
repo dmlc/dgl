@@ -27,15 +27,15 @@ python node_classification.py --gpu-cache-size-in-gigabytes=0 --cpu-cache-size-i
 Result:
 
 ```
-Training: 1178it [04:10,  4.70it/s, num_nodes=665433, gpu_cache_miss=1, cpu_cache_miss=0.0802]
-Evaluating: 123it [00:16,  7.45it/s, num_nodes=625848, gpu_cache_miss=1, cpu_cache_miss=0.0775]
-Epoch 00, Loss: 1.4154, Approx. Train: 0.5776, Approx. Val: 0.6248, Time: 250.58920621871948s
-Training: 1178it [01:56, 10.11it/s, num_nodes=669761, gpu_cache_miss=1, cpu_cache_miss=0.0558]
-Evaluating: 123it [00:14,  8.30it/s, num_nodes=625985, gpu_cache_miss=1, cpu_cache_miss=0.0553]
-Epoch 01, Loss: 1.1435, Approx. Train: 0.6385, Approx. Val: 0.6523, Time: 116.4649817943573s
-Training: 1178it [01:58,  9.93it/s, num_nodes=663480, gpu_cache_miss=1, cpu_cache_miss=0.0478]
-Evaluating: 123it [00:14,  8.56it/s, num_nodes=624204, gpu_cache_miss=1, cpu_cache_miss=0.0476]
-Epoch 02, Loss: 1.0948, Approx. Train: 0.6516, Approx. Val: 0.6590, Time: 118.57369756698608s
+Training: 1178it [03:00,  6.53it/s, num_nodes=671260, gpu_cache_miss=1, cpu_cache_miss=0.0578]                                               
+Evaluating: 123it [00:16,  7.47it/s, num_nodes=624816, gpu_cache_miss=1, cpu_cache_miss=0.0569]
+Epoch 00, Loss: 1.4173, Approx. Train: 0.5787, Approx. Val: 0.6353, Time: 180.33928060531616s                                                
+Training: 1178it [01:39, 11.79it/s, num_nodes=648380, gpu_cache_miss=1, cpu_cache_miss=0.0451]                                               
+Evaluating: 123it [00:15,  7.90it/s, num_nodes=625373, gpu_cache_miss=1, cpu_cache_miss=0.0451]
+Epoch 01, Loss: 1.1446, Approx. Train: 0.6386, Approx. Val: 0.6382, Time: 99.92613315582275s                                                 
+Training: 1178it [01:36, 12.15it/s, num_nodes=674194, gpu_cache_miss=1, cpu_cache_miss=0.0408]                                               
+Evaluating: 123it [00:15,  8.08it/s, num_nodes=628233, gpu_cache_miss=1, cpu_cache_miss=0.0409]
+Epoch 02, Loss: 1.0975, Approx. Train: 0.6507, Approx. Val: 0.6535, Time: 96.95083212852478s
 ```
 
 ### Performance Comparison on four caching polices
@@ -44,10 +44,10 @@ Below results demonstrate the epoch time with four different caching policies.
 
 | Policy | Epoch 1 (s) | Epoch 2 (s) | Epoch 3 (s) |
 | :-----: | :---------: | :---------: | :---------: |
-|  SIEVE  |   250.589   |   116.465   |   118.574   |
-| S3-FiFO |   263.150   |   179.917   |   177.347   |
-|   LRU   |   265.154   |   157.818   |   157.937   |
-|  CLOCK  |   292.897   |   243.783   |   253.275   |
+|  SIEVE  |   180.339   |   99.926   |   96.951   |
+| S3-FiFO |   181.438   |   110.054   |   108.310   |
+|   LRU   |   194.583   |   138.352   |   138.369   |
+|  CLOCK  |   188.915   |   129.372   |   129.388   |
 
 ## Results with Layer-Neighbor Sampling
 
@@ -64,24 +64,24 @@ python node_classification.py --gpu-cache-size-in-gigabytes=0 --cpu-cache-size-i
 Result:
 
 ```
-Training: 1178it [02:57,  6.63it/s, num_nodes=464607, gpu_cache_miss=1, cpu_cache_miss=0.0803]                     
-Evaluating: 123it [00:15,  7.93it/s, num_nodes=463812, gpu_cache_miss=1, cpu_cache_miss=0.0789]                    
-Epoch 00, Loss: 1.4134, Approx. Train: 0.5790, Approx. Val: 0.6277, Time: 177.58959531784058s                      
-Training: 1178it [01:34, 12.45it/s, num_nodes=476553, gpu_cache_miss=1, cpu_cache_miss=0.0617]                     
-Evaluating: 123it [00:14,  8.45it/s, num_nodes=465260, gpu_cache_miss=1, cpu_cache_miss=0.0616]                    
-Epoch 01, Loss: 1.1470, Approx. Train: 0.6383, Approx. Val: 0.6406, Time: 94.6372172832489s                        
-Training: 1178it [01:31, 12.84it/s, num_nodes=474932, gpu_cache_miss=1, cpu_cache_miss=0.0554]                     
-Evaluating: 123it [00:14,  8.70it/s, num_nodes=464145, gpu_cache_miss=1, cpu_cache_miss=0.0554]                    
-Epoch 02, Loss: 1.0990, Approx. Train: 0.6506, Approx. Val: 0.6492, Time: 91.75295209884644s
+Training: 1178it [02:51,  6.88it/s, num_nodes=463495, gpu_cache_miss=1, cpu_cache_miss=0.0774]                                               
+Evaluating: 123it [00:15,  7.94it/s, num_nodes=465592, gpu_cache_miss=1, cpu_cache_miss=0.0762]
+Epoch 00, Loss: 1.4173, Approx. Train: 0.5774, Approx. Val: 0.6300, Time: 171.11454963684082s                                                
+Training: 1178it [01:34, 12.43it/s, num_nodes=474446, gpu_cache_miss=1, cpu_cache_miss=0.0604]                                               
+Evaluating: 123it [00:14,  8.45it/s, num_nodes=462042, gpu_cache_miss=1, cpu_cache_miss=0.0603]
+Epoch 01, Loss: 1.1463, Approx. Train: 0.6384, Approx. Val: 0.6395, Time: 94.7821741104126s                                                  
+Training: 1178it [01:31, 12.82it/s, num_nodes=479331, gpu_cache_miss=1, cpu_cache_miss=0.0545]                                               
+Evaluating: 123it [00:14,  8.67it/s, num_nodes=463628, gpu_cache_miss=1, cpu_cache_miss=0.0546]
+Epoch 02, Loss: 1.1000, Approx. Train: 0.6501, Approx. Val: 0.6516, Time: 91.8746063709259s
 ```
 
 ### Performance Comparison on different `--batch-dependency`
 
 | batch-dependency | Epoch 1 (s) | Epoch 2 (s) | Epoch 3 (s) |
 | :--------------: | :---------: | :---------: | :---------: |
-|        1        |   177.590   |   94.637   |   91.753   |
-|        64        |   174.810   |   82.209   |   81.020   |
-|       4096       |   241.959   |   76.377   |   77.082   |
+|        1        |   171.114   |   94.782   |   91.875   |
+|        64        |   144.241   |   78.749   |   75.270   |
+|       4096       |   92.494   |   56.111   |   57.647   |
 
 ### Effect of `--layer-dependency`
 
@@ -89,5 +89,22 @@ Below results demonstrate the effect of enabling `--layer-dependency` on epoch t
 
 | layer-dependency | Epoch 1 (s) | Epoch 2 (s) | Epoch 3 (s) |
 | :--------------: | :---------: | :---------: | :---------: |
-|      False      |   177.590   |   94.637   |   91.753   |
-|       True       |   163.657   |   86.158   |   83.115   |
+|      False      |   171.114   |   94.782   |   91.875   |
+|       True       |   159.625   |   86.209   |   83.171   |
+
+### Compared to In-mem Performance
+
+This part trains a three-layer GraphSAGE model for 3 epochs on `ogbn-papers100M` dataset with 20GB CPU cache and 5GB GPU cache, using neighbor sampling. We demonstrate that with sufficient cache memory, the performance of DiskBasedFeature is not bottlenecked by the cache itself and comparable with in-memory feature stores. Note that the first epoch of training initiates the cache, thus taking longer time.
+
+Instruction:
+
+```
+python node_classification.py --gpu-cache-size-in-gigabytes=5 --cpu-cache-size-in-gigabytes=20 --dataset=ogbn-papers100M --epochs=3
+```
+
+Result:
+
+|  Feature Store  | Epoch 1 (s) | Epoch 2 (s) | Epoch 3 (s) |
+| :--------------: | :---------: | :---------: | :---------: |
+| DiskBasedFeature |   143.761   |   32.018   |   31.889   |
+|    In-memory    |   28.861   |   28.330   |   28.305   |
