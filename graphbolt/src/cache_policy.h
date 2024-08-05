@@ -35,7 +35,8 @@ namespace storage {
 
 struct CacheKey {
   auto getKey() const {
-    return (static_cast<int64_t>(key_upper_) << 32) + key_lower_;
+    return (static_cast<int64_t>(key_upper_16_bits_) << 32) +
+           key_lower_32_bits_;
   }
 
   CacheKey(int64_t key) : CacheKey(key, std::numeric_limits<int64_t>::min()) {}
@@ -44,8 +45,8 @@ struct CacheKey {
       : freq_(0),
         // EndUse<true>() should be called to reset the reference count.
         reference_count_(-1),
-        key_upper_(key >> 32),
-        key_lower_(key),
+        key_upper_16_bits_(key >> 32),
+        key_lower_32_bits_(key),
         position_in_cache_(position) {
     TORCH_CHECK(key == getKey());
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
@@ -134,8 +135,8 @@ struct CacheKey {
   // Access only through an std::atomic_ref instance atomically.
   int8_t reference_count_;
   // Keys are restricted to be 48-bit unsigned integers.
-  uint16_t key_upper_;
-  uint32_t key_lower_;
+  uint16_t key_upper_16_bits_;
+  uint32_t key_lower_32_bits_;
   int64_t position_in_cache_;
 };
 
