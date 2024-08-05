@@ -4,7 +4,7 @@ import threading
 import time
 
 from collections import deque
-from typing import final, List, Set, Type
+from typing import final, List, Set, Type  # pylint: disable=no-name-in-module
 
 from torch.utils.data import functional_datapipe, IterDataPipe, MapDataPipe
 from torch.utils.data.graph import DataPipe, DataPipeGraph, traverse_dps
@@ -209,17 +209,19 @@ class _PrefetchData:
 @functional_datapipe("prefetch")
 class PrefetcherIterDataPipe(IterDataPipe):
     r"""
-    Prefetches elements from the source DataPipe and puts them into a buffer (functional name: ``prefetch``).
-    Prefetching performs the operations (e.g. I/O, computations) of the DataPipes up to this one ahead of time
-    and stores the result in the buffer, ready to be consumed by the subsequent DataPipe. It has no effect aside
-    from getting the sample ready ahead of time.
+    Prefetches elements from the source DataPipe and puts them into a buffer
+    (functional name: ``prefetch``). Prefetching performs the operations (e.g.
+    I/O, computations) of the DataPipes up to this one ahead of time and stores
+    the result in the buffer, ready to be consumed by the subsequent DataPipe.
+    It has no effect aside from getting the sample ready ahead of time.
 
     This is used by ``MultiProcessingReadingService`` when the arguments
     ``worker_prefetch_cnt`` (for prefetching at each worker process) or
     ``main_prefetch_cnt`` (for prefetching at the main loop) are greater than 0.
 
-    Beyond the built-in use cases, this can be useful to put after I/O DataPipes that have
-    expensive I/O operations (e.g. takes a long time to request a file from a remote server).
+    Beyond the built-in use cases, this can be useful to put after I/O DataPipes
+    that have expensive I/O operations (e.g. takes a long time to request a file
+    from a remote server).
 
     Args:
         source_datapipe: IterDataPipe from which samples are prefetched
@@ -241,7 +243,9 @@ class PrefetcherIterDataPipe(IterDataPipe):
         self.prefetch_data: Optional[_PrefetchData] = None
 
     @staticmethod
-    def thread_worker(prefetch_data: _PrefetchData):
+    def thread_worker(
+        prefetch_data: _PrefetchData,
+    ):  # pylint: disable=missing-function-docstring
         itr = iter(prefetch_data.source_datapipe)
         while not prefetch_data.stop_iteration:
             # Run if not paused
@@ -253,7 +257,7 @@ class PrefetcherIterDataPipe(IterDataPipe):
                     try:
                         item = next(itr)
                         prefetch_data.prefetch_buffer.append(item)
-                    except Exception as e:
+                    except Exception as e:  # pylint: disable=broad-except
                         prefetch_data.run_prefetcher = False
                         prefetch_data.stop_iteration = True
                         prefetch_data.prefetch_buffer.append(e)
@@ -320,10 +324,10 @@ class PrefetcherIterDataPipe(IterDataPipe):
         self.thread = None
 
     @final
-    def reset(self):
+    def reset(self):  # pylint: disable=missing-function-docstring
         self.shutdown()
 
-    def pause(self):
+    def pause(self):  # pylint: disable=missing-function-docstring
         if self.thread is not None:
             assert self.prefetch_data is not None
             self.prefetch_data.run_prefetcher = False
@@ -333,7 +337,7 @@ class PrefetcherIterDataPipe(IterDataPipe):
                     time.sleep(PRODUCER_SLEEP_INTERVAL * 10)
 
     @final
-    def resume(self):
+    def resume(self):  # pylint: disable=missing-function-docstring
         if (
             self.thread is not None
             and self.prefetch_data is not None
@@ -346,7 +350,7 @@ class PrefetcherIterDataPipe(IterDataPipe):
             self.prefetch_data.paused = False
 
     @final
-    def shutdown(self):
+    def shutdown(self):  # pylint: disable=missing-function-docstring
         if hasattr(self, "prefetch_data") and self.prefetch_data is not None:
             self.prefetch_data.run_prefetcher = False
             self.prefetch_data.stop_iteration = True
