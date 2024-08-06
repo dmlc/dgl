@@ -16,6 +16,7 @@ from .internal import (
     replace_dp,
     traverse_dps,
 )
+from .internal_utils import gb_warning
 from .item_sampler import ItemSampler
 
 
@@ -230,6 +231,11 @@ class DataLoader(torch_data.DataLoader):
         # separate thread.
         if torch.cuda.is_available():
             copiers = find_dps(datapipe_graph, CopyTo)
+            if len(copiers) > 1:
+                gb_warning(
+                    "Multiple CopyTo operations were found in the datapipe graph."
+                    " This case is not officially supported."
+                )
             for copier in copiers:
                 if copier.device.type == "cuda":
                     datapipe_graph = replace_dp(
