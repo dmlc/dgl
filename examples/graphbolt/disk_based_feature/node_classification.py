@@ -102,7 +102,13 @@ def create_dataloader(
     # Sample neighbors for each node in the mini-batch.
     kwargs = (
         {
+            # Layer dependency makes it so that the sampled neighborhoods across layers
+            # become correlated, reducing the total number of sampled unique nodes in a
+            # minibatch, thus reducing the amount of feature data requested.
             "layer_dependency": args.layer_dependency,
+            # Batch dependency makes it so that the sampled neighborhoods across minibatches
+            # become correlated, reducing the total number of sampled unique nodes across
+            # minibatches, thus increasing temporal locality and reducing cache miss rates.
             "batch_dependency": args.batch_dependency,
         }
         if args.sample_mode == "sample_layer_neighbor"
@@ -446,9 +452,12 @@ def main():
     """
     If the CPU cache size is greater than 0, we wrap the DiskBasedFeature to be
     a CPUCachedFeature. This internally manages the CPU feature cache by the
-    specified cache replacement policy. Note: It is safe to set the CPU cache size
-    larger than 4 times the number of features in a mini-batch. A value smaller
-    than that might cause the feature fetcher to hang at the first iteration.
+    specified cache replacement policy. This will reduce the amount of data
+    transferred during disk read operations for this feature.
+    
+    Note: It is advised to set the CPU cache size to be at least 4 times the number
+    of sampled nodes in a mini-batch, otherwise the feature fetcher might get into
+    a deadlock, causing a hang.
     """
     if args.cpu_cache_size_in_gigabytes > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
@@ -466,8 +475,8 @@ def main():
 
     """
     If the GPU cache size is greater than 0, we wrap the underlying feature store
-    to be a GPUCachedFeature. This internally manages the GPU feature cache
-    by the specified cache replacment policy.
+    to be a GPUCachedFeature. This will reduce the amount of data transferred during
+    host-to-device copy operations for this feature.
     """
     if args.gpu_cache_size_in_gigabytes > 0 and args.feature_device != "cuda":
         features[("node", None, "feat")] = gb.GPUCachedFeature(
