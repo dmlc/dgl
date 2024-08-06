@@ -408,11 +408,10 @@ def test_append_with_other_datapipes():
     batch_size = 4
     item_set = gb.ItemSet(torch.arange(0, num_ids), names="seeds")
     data_pipe = gb.ItemSampler(item_set, batch_size)
-    # torchdata.datapipes.iter.Enumerator
-    data_pipe = data_pipe.enumerate()
-    for i, (idx, data) in enumerate(data_pipe):
-        assert i == idx
-        assert len(data.seeds) == batch_size
+    for i, data in enumerate(data_pipe):
+        expected = torch.full((batch_size,), i * batch_size)
+        expected = expected + torch.tensor([0, 1, 2, 3])
+        assert torch.equal(data.seeds, expected)
 
 
 @pytest.mark.parametrize("batch_size", [1, 4])
