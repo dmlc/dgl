@@ -12,7 +12,7 @@ and set the environment variable `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:Fa
 if you want to disable it and set it True to acknowledge and disable the warning.
 """
 cuda_allocator_env = os.getenv("PYTORCH_CUDA_ALLOC_CONF")
-WARNING_STR_TO_BE_SHOWN = None
+warning_string = None
 configs = (
     {}
     if cuda_allocator_env is None
@@ -23,7 +23,7 @@ configs = (
 )
 if "expandable_segments" in configs:
     if configs["expandable_segments"] != "True":
-        WARNING_STR_TO_BE_SHOWN = (
+        warning_string = (
             "You should consider `expandable_segments:True` in the"
             " environment variable `PYTORCH_CUDA_ALLOC_CONF` for lower"
             " memory usage. See "
@@ -35,7 +35,7 @@ else:
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = ",".join(
         [k + ":" + v for k, v in configs.items()]
     )
-    WARNING_STR_TO_BE_SHOWN = CUDA_ALLOCATOR_ENV_WARNING_STR
+    warning_string = CUDA_ALLOCATOR_ENV_WARNING_STR
 del configs
 del cuda_allocator_env
 del CUDA_ALLOCATOR_ENV_WARNING_STR
@@ -104,9 +104,9 @@ if torch.cuda.is_available() and not built_with_cuda():
         "installation instructions at https://www.dgl.ai/pages/start.html"
     )
 
-if torch.cuda.is_available() and WARNING_STR_TO_BE_SHOWN is not None:
-    gb_warning(WARNING_STR_TO_BE_SHOWN)
-del WARNING_STR_TO_BE_SHOWN
+if torch.cuda.is_available() and warning_string is not None:
+    gb_warning(warning_string)
+del warning_string
 
 torch.ops.graphbolt.set_num_io_uring_threads(
     min((torch.get_num_threads() + 1) // 2, 8)
