@@ -4,14 +4,18 @@ from collections import OrderedDict
 
 import torch
 import torch.utils.data as torch_data
-import torchdata.dataloader2.graph as dp_utils
 
 from .base import CopyTo, get_host_to_device_uva_stream
 from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
 from .impl.gpu_graph_cache import GPUGraphCache
 from .impl.neighbor_sampler import SamplePerLayer
 
-from .internal import datapipe_graph_to_adjlist
+from .internal import (
+    datapipe_graph_to_adjlist,
+    find_dps,
+    replace_dp,
+    traverse_dps,
+)
 from .internal_utils import gb_warning
 from .item_sampler import ItemSampler
 
@@ -48,7 +52,7 @@ def construct_gpu_graph_cache(
 
 def _find_and_wrap_parent(datapipe_graph, target_datapipe, wrapper, **kwargs):
     """Find parent of target_datapipe and wrap it with ."""
-    datapipes = dp_utils.find_dps(
+    datapipes = find_dps(
         datapipe_graph,
         target_datapipe,
     )
@@ -57,7 +61,7 @@ def _find_and_wrap_parent(datapipe_graph, target_datapipe, wrapper, **kwargs):
         datapipe_id = id(datapipe)
         for parent_datapipe_id in datapipe_adjlist[datapipe_id][1]:
             parent_datapipe, _ = datapipe_adjlist[parent_datapipe_id]
-            datapipe_graph = dp_utils.replace_dp(
+            datapipe_graph = replace_dp(
                 datapipe_graph,
                 parent_datapipe,
                 wrapper(parent_datapipe, **kwargs),
@@ -158,18 +162,18 @@ class DataLoader(torch_data.DataLoader):
         #    of the FeatureFetcher with a multiprocessing PyTorch DataLoader.
 
         datapipe = datapipe.mark_end()
-        datapipe_graph = dp_utils.traverse_dps(datapipe)
+        datapipe_graph = traverse_dps(datapipe)
 
         # (1) Insert minibatch distribution.
         # TODO(BarclayII): Currently I'm using sharding_filter() as a
         # concept demonstration. Later on minibatch distribution should be
         # merged into ItemSampler to maximize efficiency.
-        item_samplers = dp_utils.find_dps(
+        item_samplers = find_dps(
             datapipe_graph,
             ItemSampler,
         )
         for item_sampler in item_samplers:
-            datapipe_graph = dp_utils.replace_dp(
+            datapipe_graph = replace_dp(
                 datapipe_graph,
                 item_sampler,
                 item_sampler.sharding_filter(),
@@ -187,7 +191,7 @@ class DataLoader(torch_data.DataLoader):
         # (3) Limit the number of UVA threads used if the feature_fetcher has
         # overlapping optimization enabled.
         if num_workers == 0 and torch.cuda.is_available():
-            feature_fetchers = dp_utils.find_dps(
+            feature_fetchers = find_dps(
                 datapipe_graph,
                 FeatureFetcher,
             )
@@ -201,7 +205,7 @@ class DataLoader(torch_data.DataLoader):
             and torch.cuda.is_available()
         ):
             torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
-            samplers = dp_utils.find_dps(
+            samplers = find_dps(
                 datapipe_graph,
                 SamplePerLayer,
             )
@@ -211,7 +215,7 @@ class DataLoader(torch_data.DataLoader):
                     gpu_graph_cache = construct_gpu_graph_cache(
                         sampler, num_gpu_cached_edges, gpu_cache_threshold
                     )
-                datapipe_graph = dp_utils.replace_dp(
+                datapipe_graph = replace_dp(
                     datapipe_graph,
                     sampler,
                     sampler.fetch_and_sample(
@@ -226,7 +230,7 @@ class DataLoader(torch_data.DataLoader):
         # Prefetching enables the data pipeline up to the CopyTo to run in a
         # separate thread.
         if torch.cuda.is_available():
-            copiers = dp_utils.find_dps(datapipe_graph, CopyTo)
+            copiers = find_dps(datapipe_graph, CopyTo)
             if len(copiers) > 1:
                 gb_warning(
                     "Multiple CopyTo operations were found in the datapipe graph."
@@ -234,7 +238,7 @@ class DataLoader(torch_data.DataLoader):
                 )
             for copier in copiers:
                 if copier.device.type == "cuda":
-                    datapipe_graph = dp_utils.replace_dp(
+                    datapipe_graph = replace_dp(
                         datapipe_graph,
                         copier,
                         # Add prefetch so that CPU and GPU can run concurrently.
