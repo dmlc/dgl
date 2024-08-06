@@ -7,7 +7,7 @@ import dgl.graphbolt
 import pytest
 import torch
 
-import torchdata.dataloader2.graph as dp_utils
+from dgl.graphbolt.internal import find_dps, traverse_dps
 
 from . import gb_test_utils
 
@@ -137,13 +137,13 @@ def test_gpu_sampling_DataLoader(
         bufferer_cnt += num_layers
         awaiter_cnt += num_layers
     datapipe = dataloader.dataset
-    datapipe_graph = dp_utils.traverse_dps(datapipe)
-    awaiters = dp_utils.find_dps(
+    datapipe_graph = traverse_dps(datapipe)
+    awaiters = find_dps(
         datapipe_graph,
         dgl.graphbolt.Waiter,
     )
     assert len(awaiters) == awaiter_cnt
-    bufferers = dp_utils.find_dps(
+    bufferers = find_dps(
         datapipe_graph,
         dgl.graphbolt.Bufferer,
     )
