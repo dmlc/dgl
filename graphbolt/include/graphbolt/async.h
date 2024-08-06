@@ -224,6 +224,10 @@ inline void parallel_for(
   _parallel_for<ThreadPool::intraop, false>(begin, end, grain_size, f);
 }
 
+/**
+ * @brief Compared to parallel_for, it expects the passed function to take a
+ * single argument for each iteration.
+ */
 template <typename F>
 inline void parallel_for_each(
     const int64_t begin, const int64_t end, const int64_t grain_size,
@@ -231,6 +235,9 @@ inline void parallel_for_each(
   _parallel_for<ThreadPool::intraop, true>(begin, end, grain_size, f);
 }
 
+/**
+ * @brief Same as parallel_for but uses the interop thread pool.
+ */
 template <typename F>
 inline void parallel_for_interop(
     const int64_t begin, const int64_t end, const int64_t grain_size,
@@ -238,6 +245,10 @@ inline void parallel_for_interop(
   _parallel_for<ThreadPool::interop, false>(begin, end, grain_size, f);
 }
 
+/**
+ * @brief Compared to parallel_for_interop, it expects the passed function to
+ * take a single argument for each iteration.
+ */
 template <typename F>
 inline void parallel_for_each_interop(
     const int64_t begin, const int64_t end, const int64_t grain_size,
