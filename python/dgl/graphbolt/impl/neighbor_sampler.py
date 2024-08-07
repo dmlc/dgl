@@ -453,6 +453,7 @@ class NeighborSamplerImpl(SubgraphSampler):
             return tensor
 
         with torch.cuda.stream(host_to_device_stream):
+            minibatch._indices_needs_offset_subtraction = False
             subgraph = minibatch.sampled_subgraphs[0]
             if isinstance(subgraph.sampled_csc, dict):
                 for etype, pair in subgraph.sampled_csc.items():
@@ -462,6 +463,7 @@ class NeighborSamplerImpl(SubgraphSampler):
                         pair.indices = record_stream(
                             index_select(indices, edge_ids)
                         )
+                        minibatch._indices_needs_offset_subtraction = True
             elif subgraph.sampled_csc.indices is None:
                 subgraph._sampled_edge_ids.record_stream(
                     torch.cuda.current_stream()
@@ -469,6 +471,7 @@ class NeighborSamplerImpl(SubgraphSampler):
                 subgraph.sampled_csc.indices = record_stream(
                     index_select(indices, subgraph._sampled_edge_ids)
                 )
+                minibatch._indices_needs_offset_subtraction = True
             subgraph._sampled_edge_ids = None
             minibatch.wait = torch.cuda.current_stream().record_event().wait
 
@@ -478,12 +481,13 @@ class NeighborSamplerImpl(SubgraphSampler):
     def _subtract_hetero_indices_offset(
         node_type_offset, node_type_to_id, minibatch
     ):
-        subgraph = minibatch.sampled_subgraphs[0]
-        assert isinstance(subgraph.sampled_csc, dict)
-        for etype, pair in subgraph.sampled_csc.items():
-            src_ntype = etype_str_to_tuple(etype)[0]
-            src_ntype_id = node_type_to_id[src_ntype]
-            pair.indices -= node_type_offset[src_ntype_id]
+        if minibatch._indices_needs_offset_subtraction:
+            subgraph = minibatch.sampled_subgraphs[0]
+            for etype, pair in subgraph.sampled_csc.items():
+                src_ntype = etype_str_to_tuple(etype)[0]
+                src_ntype_id = node_type_to_id[src_ntype]
+                pair.indices -= node_type_offset[src_ntype_id]
+        delattr(minibatch, "_indices_needs_offset_subtraction")
 
         return minibatch
 
