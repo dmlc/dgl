@@ -77,9 +77,8 @@ def test_gpu_sampling_DataLoader(
     B = 4
     num_layers = 2
     itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seeds")
-    graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True).to(
-        F.ctx()
-    )
+    graph = gb_test_utils.rand_csc_graph(200, 0.15, bidirection_edge=True)
+    graph = graph.pin_memory_() if overlap_graph_fetch else graph.to(F.ctx())
     features = {}
     keys = [
         ("node", None, "a"),

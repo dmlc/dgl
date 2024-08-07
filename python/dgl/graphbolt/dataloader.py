@@ -215,15 +215,38 @@ class DataLoader(torch_data.DataLoader):
                     gpu_graph_cache = construct_gpu_graph_cache(
                         sampler, num_gpu_cached_edges, gpu_cache_threshold
                     )
-                datapipe_graph = replace_dp(
-                    datapipe_graph,
-                    sampler,
-                    sampler.fetch_and_sample(
-                        gpu_graph_cache,
-                        get_host_to_device_uva_stream(),
-                        1,
-                    ),
-                )
+                if (
+                    sampler.sampler.__name__ == "sample_layer_neighbors"
+                    or gpu_graph_cache is not None
+                ):
+                    # This code path is not faster for sample_neighbors.
+                    datapipe_graph = replace_dp(
+                        datapipe_graph,
+                        sampler,
+                        sampler.fetch_and_sample(
+                            gpu_graph_cache,
+                            get_host_to_device_uva_stream(),
+                            1,
+                        ),
+                    )
+                elif sampler.sampler.__name__ == "sample_neighbors":
+                    # This code path is faster for sample_neighbors.
+                    datapipe_graph = replace_dp(
+                        datapipe_graph,
+                        sampler,
+                        sampler.datapipe.sample_per_layer(
+                            sampler=sampler.sampler,
+                            fanout=sampler.fanout,
+                            replace=sampler.replace,
+                            prob_name=sampler.prob_name,
+                            returning_indices_is_optional=True,
+                        ),
+                    )
+                else:
+                    raise AssertionError(
+                        "overlap_graph_fetch is supported only for "
+                        "sample_neighbor and sample_layer_neighbor."
+                    )
 
         # (4) Cut datapipe at CopyTo and wrap with pinning and prefetching
         # before it. This enables enables non_blocking copies to the device.

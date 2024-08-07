@@ -265,9 +265,28 @@ class SamplePerLayer(MiniBatchTransformer):
         fanout,
         replace,
         prob_name,
-        returning_indices_is_optional,
+        returning_indices_is_optional=False,
     ):
-        super().__init__(datapipe, self._sample_per_layer)
+        graph = sampler.__self__
+        if returning_indices_is_optional and graph.indices.is_pinned():
+            datapipe = datapipe.transform(self._sample_per_layer)
+            datapipe = (
+                datapipe.transform(partial(self._fetch_indices, graph.indices))
+                .buffer()
+                .wait()
+            )
+            if graph.type_per_edge is not None:
+                # Hetero case.
+                datapipe = datapipe.transform(
+                    partial(
+                        self._subtract_hetero_indices_offset,
+                        graph._node_type_offset_list,
+                        graph.node_type_to_id,
+                    )
+                )
+            super().__init__(datapipe)
+        else:
+            super().__init__(datapipe, self._sample_per_layer)
         self.sampler = sampler
         self.fanout = fanout
         self.replace = replace
@@ -289,6 +308,55 @@ class SamplePerLayer(MiniBatchTransformer):
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, subgraph)
+        return minibatch
+
+    @staticmethod
+    def _fetch_indices(indices, minibatch):
+        stream = torch.cuda.current_stream()
+        host_to_device_stream = get_host_to_device_uva_stream()
+        host_to_device_stream.wait_stream(stream)
+
+        def record_stream(tensor):
+            tensor.record_stream(stream)
+            return tensor
+
+        with torch.cuda.stream(host_to_device_stream):
+            minibatch._indices_needs_offset_subtraction = False
+            subgraph = minibatch.sampled_subgraphs[0]
+            if isinstance(subgraph.sampled_csc, dict):
+                for etype, pair in subgraph.sampled_csc.items():
+                    if pair.indices is None:
+                        edge_ids = subgraph._sampled_edge_ids[etype]
+                        edge_ids.record_stream(torch.cuda.current_stream())
+                        pair.indices = record_stream(
+                            index_select(indices, edge_ids)
+                        )
+                        minibatch._indices_needs_offset_subtraction = True
+            elif subgraph.sampled_csc.indices is None:
+                subgraph._sampled_edge_ids.record_stream(
+                    torch.cuda.current_stream()
+                )
+                subgraph.sampled_csc.indices = record_stream(
+                    index_select(indices, subgraph._sampled_edge_ids)
+                )
+                minibatch._indices_needs_offset_subtraction = True
+            subgraph._sampled_edge_ids = None
+            minibatch.wait = torch.cuda.current_stream().record_event().wait
+
+        return minibatch
+
+    @staticmethod
+    def _subtract_hetero_indices_offset(
+        node_type_offset, node_type_to_id, minibatch
+    ):
+        if minibatch._indices_needs_offset_subtraction:
+            subgraph = minibatch.sampled_subgraphs[0]
+            for etype, pair in subgraph.sampled_csc.items():
+                src_ntype = etype_str_to_tuple(etype)[0]
+                src_ntype_id = node_type_to_id[src_ntype]
+                pair.indices -= node_type_offset[src_ntype_id]
+        delattr(minibatch, "_indices_needs_offset_subtraction")
+
         return minibatch
 
 
@@ -442,55 +510,6 @@ class NeighborSamplerImpl(SubgraphSampler):
         minibatch.input_nodes = minibatch._seed_nodes
         return minibatch
 
-    @staticmethod
-    def _fetch_indices(indices, minibatch):
-        stream = torch.cuda.current_stream()
-        host_to_device_stream = get_host_to_device_uva_stream()
-        host_to_device_stream.wait_stream(stream)
-
-        def record_stream(tensor):
-            tensor.record_stream(stream)
-            return tensor
-
-        with torch.cuda.stream(host_to_device_stream):
-            minibatch._indices_needs_offset_subtraction = False
-            subgraph = minibatch.sampled_subgraphs[0]
-            if isinstance(subgraph.sampled_csc, dict):
-                for etype, pair in subgraph.sampled_csc.items():
-                    if pair.indices is None:
-                        edge_ids = subgraph._sampled_edge_ids[etype]
-                        edge_ids.record_stream(torch.cuda.current_stream())
-                        pair.indices = record_stream(
-                            index_select(indices, edge_ids)
-                        )
-                        minibatch._indices_needs_offset_subtraction = True
-            elif subgraph.sampled_csc.indices is None:
-                subgraph._sampled_edge_ids.record_stream(
-                    torch.cuda.current_stream()
-                )
-                subgraph.sampled_csc.indices = record_stream(
-                    index_select(indices, subgraph._sampled_edge_ids)
-                )
-                minibatch._indices_needs_offset_subtraction = True
-            subgraph._sampled_edge_ids = None
-            minibatch.wait = torch.cuda.current_stream().record_event().wait
-
-        return minibatch
-
-    @staticmethod
-    def _subtract_hetero_indices_offset(
-        node_type_offset, node_type_to_id, minibatch
-    ):
-        if minibatch._indices_needs_offset_subtraction:
-            subgraph = minibatch.sampled_subgraphs[0]
-            for etype, pair in subgraph.sampled_csc.items():
-                src_ntype = etype_str_to_tuple(etype)[0]
-                src_ntype_id = node_type_to_id[src_ntype]
-                pair.indices -= node_type_offset[src_ntype_id]
-        delattr(minibatch, "_indices_needs_offset_subtraction")
-
-        return minibatch
-
     # pylint: disable=arguments-differ
     def sampling_stages(
         self,
@@ -507,12 +526,8 @@ class NeighborSamplerImpl(SubgraphSampler):
             partial(self._prepare, graph.node_type_to_id)
         )
         is_labor = sampler.__name__ == "sample_layer_neighbors"
-        returning_indices_is_optional = False
         if is_labor:
             datapipe = datapipe.transform(self._set_seed)
-        elif graph.indices.is_pinned():
-            # Deferred indices fetch is enabled only for sample_neighbors.
-            returning_indices_is_optional = True
         for fanout in reversed(fanouts):
             # Convert fanout to tensor.
             if not isinstance(fanout, torch.Tensor):
@@ -522,25 +537,7 @@ class NeighborSamplerImpl(SubgraphSampler):
                 fanout,
                 replace,
                 prob_name,
-                returning_indices_is_optional,
             )
-            if returning_indices_is_optional:
-                datapipe = (
-                    datapipe.transform(
-                        partial(self._fetch_indices, graph.indices)
-                    )
-                    .buffer()
-                    .wait()
-                )
-                if graph.type_per_edge is not None:
-                    # Hetero case.
-                    datapipe = datapipe.transform(
-                        partial(
-                            self._subtract_hetero_indices_offset,
-                            graph._node_type_offset_list,
-                            graph.node_type_to_id,
-                        )
-                    )
             datapipe = datapipe.compact_per_layer(deduplicate)
             if is_labor and not layer_dependency:
                 datapipe = datapipe.transform(self._increment_seed)

@@ -102,8 +102,9 @@ def test_NeighborSampler_GraphFetch(
         graph, [fanout], False, prob_name=prob_name
     )
     datapipe = datapipe.transform(remove_input_nodes)
+    dataloader = gb.DataLoader(datapipe, overlap_graph_fetch=True)
     gb.seed(123)
-    new_results = list(datapipe)
+    new_results = list(dataloader)
     assert len(expected_results) == len(new_results)
     for a, b in zip(expected_results, new_results):
         assert repr(a) == repr(b)
