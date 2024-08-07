@@ -6,7 +6,12 @@ import torch
 from torch.utils.data import functional_datapipe
 from torch.utils.data.datapipes.iter import Mapper
 
-from ..base import get_host_to_device_uva_stream, index_select, ORIGINAL_EDGE_ID
+from ..base import (
+    etype_str_to_tuple,
+    get_host_to_device_uva_stream,
+    index_select,
+    ORIGINAL_EDGE_ID,
+)
 from ..internal import compact_csc_format, unique_and_compact_csc_formats
 from ..minibatch_transformer import MiniBatchTransformer
 
@@ -448,24 +453,39 @@ class NeighborSamplerImpl(SubgraphSampler):
             return tensor
 
         with torch.cuda.stream(host_to_device_stream):
-            for subgraph in minibatch.sampled_subgraphs:
-                if isinstance(subgraph.sampled_csc, dict):
-                    for etype, pair in subgraph.sampled_csc.items():
-                        if pair.indices is None:
-                            edge_ids = subgraph._sampled_edge_ids[etype]
-                            edge_ids.record_stream(torch.cuda.current_stream())
-                            pair.indices = record_stream(
-                                index_select(indices, edge_ids)
-                            )
-                elif subgraph.sampled_csc.indices is None:
-                    subgraph._sampled_edge_ids.record_stream(
-                        torch.cuda.current_stream()
-                    )
-                    subgraph.sampled_csc.indices = record_stream(
-                        index_select(indices, subgraph._sampled_edge_ids)
-                    )
-                subgraph._sampled_edge_ids = None
+            subgraph = minibatch.sampled_subgraphs[0]
+            if isinstance(subgraph.sampled_csc, dict):
+                for etype, pair in subgraph.sampled_csc.items():
+                    if pair.indices is None:
+                        edge_ids = subgraph._sampled_edge_ids[etype]
+                        edge_ids.record_stream(torch.cuda.current_stream())
+                        pair.indices = record_stream(
+                            index_select(indices, edge_ids)
+                        )
+            elif subgraph.sampled_csc.indices is None:
+                subgraph._sampled_edge_ids.record_stream(
+                    torch.cuda.current_stream()
+                )
+                subgraph.sampled_csc.indices = record_stream(
+                    index_select(indices, subgraph._sampled_edge_ids)
+                )
+            subgraph._sampled_edge_ids = None
             minibatch.wait = torch.cuda.current_stream().record_event().wait
+
+        return minibatch
+
+    @staticmethod
+    def _subtract_hetero_indices_offset(
+        node_type_offset, node_type_to_id, minibatch
+    ):
+        subgraph = minibatch.sampled_subgraphs[0]
+        assert isinstance(subgraph.sampled_csc, dict)
+        for etype, pair in subgraph.sampled_csc.items():
+            src_ntype = etype_str_to_tuple(etype)[0]
+            src_ntype_id = node_type_to_id[src_ntype]
+            pair.indices -= node_type_offset[src_ntype_id]
+
+        return minibatch
 
     # pylint: disable=arguments-differ
     def sampling_stages(
@@ -500,17 +520,28 @@ class NeighborSamplerImpl(SubgraphSampler):
                 prob_name,
                 returning_indices_is_optional,
             )
+            if returning_indices_is_optional:
+                datapipe = (
+                    datapipe.transform(
+                        partial(self._fetch_indices, graph.indices)
+                    )
+                    .buffer()
+                    .wait()
+                )
+                if graph.type_per_edge is not None:
+                    # Hetero case.
+                    datapipe = datapipe.transform(
+                        partial(
+                            self._subtract_hetero_indices_offset,
+                            graph._node_type_offset_list,
+                            graph.node_type_to_id,
+                        )
+                    )
             datapipe = datapipe.compact_per_layer(deduplicate)
             if is_labor and not layer_dependency:
                 datapipe = datapipe.transform(self._increment_seed)
         if is_labor:
             datapipe = datapipe.transform(self._delattr_dependency)
-        if returning_indices_is_optional:
-            datapipe = (
-                datapipe.transform(partial(self._fetch_indices, graph.indices))
-                .buffer()
-                .wait()
-            )
         return datapipe.transform(self._set_input_nodes)
 
 
