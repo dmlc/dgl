@@ -127,8 +127,9 @@ class DataLoader(torch_data.DataLoader):
         instances alive.
     overlap_graph_fetch : bool, optional
         If True, the data loader will overlap the UVA graph fetching operations
-        with the rest of operations by using an alternative CUDA stream. Default
-        is False.
+        with the rest of operations by using an alternative CUDA stream. This
+        option should be enabled if you have moved your graph to the pinned
+        memory for optimal performance. Default is False.
     num_gpu_cached_edges : int, optional
         If positive and overlap_graph_fetch is True, then the GPU will cache
         frequently accessed vertex neighborhoods to reduce the PCI-e bandwidth

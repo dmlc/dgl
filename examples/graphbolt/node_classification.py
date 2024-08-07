@@ -159,7 +159,7 @@ def create_dataloader(
     dataloader = gb.DataLoader(
         datapipe,
         num_workers=num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
+        overlap_graph_fetch=args.storage_device == "pinned",
     )
 
     # Return the fully-initialized DataLoader object.
@@ -380,14 +380,6 @@ def parse_args():
         default="sample_neighbor",
         choices=["sample_neighbor", "sample_layer_neighbor"],
         help="The sampling function when doing layerwise sampling.",
-    )
-    parser.add_argument(
-        "--overlap-graph-fetch",
-        action="store_true",
-        help="An option for enabling overlap_graph_fetch in graphbolt dataloader."
-        "If True, the data loader will overlap the UVA graph fetching operations"
-        "with the rest of operations by using an alternative CUDA stream. Disabled"
-        "by default.",
     )
     return parser.parse_args()
 
