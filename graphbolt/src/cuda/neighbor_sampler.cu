@@ -296,7 +296,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   }();
   auto output_indptr = torch::empty_like(sub_indptr);
   torch::Tensor picked_eids;
-  torch::Tensor output_indices;
+  torch::optional<torch::Tensor> output_indices;
 
   AT_DISPATCH_INDEX_TYPES(
       indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
@@ -519,7 +519,11 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           }
         }
 
-        output_indices = Gather(indices, picked_eids);
+        // TODO @mfbalin: remove true from here once fetching indices later is
+        // setup.
+        if (true || layer || utils::is_on_gpu(indices)) {
+          output_indices = Gather(indices, picked_eids);
+        }
       }));
 
   torch::optional<torch::Tensor> output_type_per_edge;
@@ -565,7 +569,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     }
     auto indices_offsets_device = torch::empty(
         etype_id_to_src_ntype_id.size(0),
-        output_indices.options().dtype(torch::kLong));
+        picked_eids.options().dtype(torch::kLong));
     AT_DISPATCH_INDEX_TYPES(
         node_type_offset->scalar_type(), "SampleNeighborsNodeTypeOffset", ([&] {
           THRUST_CALL(
@@ -628,14 +632,16 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               edge_offsets_pinned_device_pair);
         }));
     edge_offsets_event.record();
-    auto indices_offset_subtract = ExpandIndptrImpl(
-        edge_offsets_device, indices.scalar_type(), indices_offsets_device,
-        output_indices.size(0));
-    // The output_indices is permuted here.
-    std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
-        output_in_degree, sliced_output_indptr, output_indices, permutation,
-        num_rows - 1, output_indices.size(0));
-    output_indices -= indices_offset_subtract;
+    if (output_indices.has_value()) {
+      auto indices_offset_subtract = ExpandIndptrImpl(
+          edge_offsets_device, indices.scalar_type(), indices_offsets_device,
+          output_indices->size(0));
+      // The output_indices is permuted here.
+      std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
+          output_in_degree, sliced_output_indptr, *output_indices, permutation,
+          num_rows - 1, output_indices->size(0));
+      *output_indices -= indices_offset_subtract;
+    }
     auto output_indptr_offsets = torch::empty(
         num_etypes * 2,
         c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));

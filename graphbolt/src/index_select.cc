@@ -109,7 +109,7 @@ std::tuple<torch::Tensor, torch::Tensor> IndexSelectCSC(
   }
   sampling::FusedCSCSamplingGraph g(indptr, indices);
   const auto res = g.InSubgraph(nodes);
-  return std::make_tuple(res->indptr, res->indices);
+  return std::make_tuple(res->indptr, res->indices.value());
 }
 
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
@@ -136,9 +136,8 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
     sampling::FusedCSCSamplingGraph g(indptr, indices);
     const auto res = g.InSubgraph(nodes);
     output_indptr = res->indptr;
-    results.push_back(res->indices);
-    TORCH_CHECK(res->original_edge_ids.has_value());
-    edge_ids = *res->original_edge_ids;
+    results.push_back(res->indices.value());
+    edge_ids = res->original_edge_ids.value();
   }
   if (with_edge_ids) results.push_back(edge_ids);
   return std::make_tuple(output_indptr, results);
