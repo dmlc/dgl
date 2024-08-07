@@ -65,7 +65,7 @@ def test_NeighborSampler_GraphFetch(
         partial(gb.NeighborSampler._prepare, graph.node_type_to_id)
     )
     sample_per_layer = gb.SamplePerLayer(
-        datapipe, graph.sample_neighbors, fanout, False, prob_name
+        datapipe, graph.sample_neighbors, fanout, False, prob_name, False
     )
     compact_per_layer = sample_per_layer.compact_per_layer(True)
     gb.seed(123)

@@ -339,6 +339,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @param layer Boolean indicating whether neighbors should be sampled in a
    * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
    * sampled edges, see arXiv:2210.13339.
+   * @param returning_indices_is_optional Boolean indicating whether returning
+   * indices tensor is optional.
    * @param probs_or_mask An optional edge attribute tensor for probablities
    * or masks. This attribute tensor should contain (unnormalized)
    * probabilities corresponding to each neighboring edge of a node. It must be
@@ -355,6 +357,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       torch::optional<torch::Tensor> seeds,
       torch::optional<std::vector<int64_t>> seed_offsets,
       const std::vector<int64_t>& fanouts, bool replace, bool layer,
+      bool returning_indices_is_optional,
       torch::optional<torch::Tensor> probs_or_mask,
       torch::optional<torch::Tensor> random_seed,
       double seed2_contribution) const;
