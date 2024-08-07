@@ -202,8 +202,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> seeds,
     torch::optional<std::vector<int64_t>> seed_offsets,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids, bool indices_return_is_optional,
-    torch::optional<torch::Tensor> type_per_edge,
+    bool return_eids, torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<torch::Tensor> node_type_offset,
     torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id,
@@ -520,7 +519,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           }
         }
 
-        if (!indices_return_is_optional || utils::is_on_gpu(indices)) {
+        // TODO @mfbalin: remove true from here once fetching indices later is
+        // setup.
+        if (true || layer || utils::is_on_gpu(indices)) {
           output_indices = Gather(indices, picked_eids);
         }
       }));

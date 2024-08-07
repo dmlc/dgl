@@ -56,9 +56,6 @@ namespace ops {
  * sampled edges, see arXiv:2210.13339.
  * @param return_eids Boolean indicating whether edge IDs need to be returned,
  * typically used when edge features are required.
- * @param indices_return_is_optional Boolean indicating whether returning the
- * output indices is optional, typically used if the fetch of indices will
- * happen later.
  * @param type_per_edge A tensor representing the type of each edge, if present.
  * @param probs_or_mask An optional tensor with (unnormalized) probabilities
  * corresponding to each neighboring edge of a node. It must be
@@ -81,7 +78,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> seeds,
     torch::optional<std::vector<int64_t>> seed_offsets,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids, bool indices_return_is_optional,
+    bool return_eids,
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
     torch::optional<torch::Tensor> probs_or_mask = torch::nullopt,
     torch::optional<torch::Tensor> node_type_offset = torch::nullopt,
