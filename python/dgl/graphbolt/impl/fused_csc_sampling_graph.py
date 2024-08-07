@@ -759,7 +759,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts,
             replace=replace,
             probs_or_mask=probs_or_mask,
-            return_eids=True,
         )
         return self._convert_to_sampled_subgraph(
             C_sampled_subgraph, seed_offsets
@@ -811,7 +810,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_or_mask: Optional[torch.Tensor] = None,
-        return_eids: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -850,9 +848,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
-        return_eids: bool, optional
-            Boolean indicating whether to return the original edge IDs of the
-            sampled edges.
 
         Returns
         -------
@@ -867,7 +862,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             False,  # is_labor
-            return_eids,
             probs_or_mask,
             None,  # random_seed, labor parameter
             0,  # seed2_contribution, labor_parameter
@@ -1001,7 +995,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             True,  # is_labor
-            True,  # return_eids
             probs_or_mask,
             random_seed,
             seed2_contribution,
@@ -1097,7 +1090,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             False,  # is_labor
-            True,  # return_eids
             input_nodes_pre_time_window,
             probs_or_mask,
             node_timestamp_attr_name,
@@ -1224,7 +1216,6 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             True,  # is_labor
-            True,  # return_eids
             input_nodes_pre_time_window,
             probs_or_mask,
             node_timestamp_attr_name,
