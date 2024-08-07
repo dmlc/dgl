@@ -298,8 +298,6 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
   const auto num_seeds = nodes.size(0);
   torch::Tensor indptr = torch::empty({num_seeds + 1}, indptr_.dtype());
   std::vector<torch::Tensor> indices_arr(num_seeds);
-  torch::Tensor original_column_node_ids =
-      torch::empty({num_seeds}, nodes.dtype());
   std::vector<torch::Tensor> edge_ids_arr(num_seeds);
   std::vector<torch::Tensor> type_per_edge_arr(num_seeds);
 
@@ -311,8 +309,6 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
         AT_DISPATCH_INDEX_TYPES(
             nodes.scalar_type(), "InSubgraph::nodes", ([&] {
               const auto nodes_data = nodes.data_ptr<index_t>();
-              auto column_ids_data =
-                  original_column_node_ids.data_ptr<index_t>();
               torch::parallel_for(
                   0, num_seeds, kDefaultGrainSize,
                   [&](size_t start, size_t end) {
@@ -321,7 +317,6 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
                       const auto start_idx = indptr_data[node_id];
                       const auto end_idx = indptr_data[node_id + 1];
                       out_indptr_data[i + 1] = end_idx - start_idx;
-                      column_ids_data[i] = node_id;
                       indices_arr[i] = indices_.slice(0, start_idx, end_idx);
                       edge_ids_arr[i] = torch::arange(
                           start_idx, end_idx, indptr_.scalar_type());
@@ -335,8 +330,8 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
       }));
 
   return c10::make_intrusive<FusedSampledSubgraph>(
-      indptr.cumsum(0), torch::cat(indices_arr), original_column_node_ids,
-      torch::arange(0, NumNodes()), torch::cat(edge_ids_arr),
+      indptr.cumsum(0), torch::cat(indices_arr), torch::cat(edge_ids_arr),
+      nodes, torch::arange(0, NumNodes()),
       type_per_edge_
           ? torch::optional<torch::Tensor>{torch::cat(type_per_edge_arr)}
           : torch::nullopt);
@@ -801,7 +796,7 @@ FusedCSCSamplingGraph::SampleNeighborsImpl(
   }
 
   return c10::make_intrusive<FusedSampledSubgraph>(
-      subgraph_indptr, subgraph_indices, seeds, torch::nullopt, picked_eids,
+      subgraph_indptr, subgraph_indices, picked_eids, seeds, torch::nullopt,
       subgraph_type_per_edge, edge_offsets);
 }
 

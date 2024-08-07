@@ -698,7 +698,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   }
 
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-      output_indptr, output_indices, seeds, torch::nullopt, picked_eids,
+      output_indptr, output_indices, picked_eids, seeds, torch::nullopt,
       output_type_per_edge, edge_offsets);
 }
 
