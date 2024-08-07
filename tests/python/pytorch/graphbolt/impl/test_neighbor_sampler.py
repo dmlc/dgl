@@ -44,8 +44,9 @@ def get_hetero_graph():
 @pytest.mark.parametrize("prob_name", [None, "weight", "mask"])
 @pytest.mark.parametrize("sorted", [False, True])
 @pytest.mark.parametrize("num_cached_edges", [0, 10])
+@pytest.mark.parametrize("is_pinned", [False, True])
 def test_NeighborSampler_GraphFetch(
-    hetero, prob_name, sorted, num_cached_edges
+    hetero, prob_name, sorted, num_cached_edges, is_pinned
 ):
     if sorted:
         items = torch.arange(3)
@@ -53,7 +54,8 @@ def test_NeighborSampler_GraphFetch(
         items = torch.tensor([2, 0, 1])
     names = "seeds"
     itemset = gb.ItemSet(items, names=names)
-    graph = get_hetero_graph().to(F.ctx())
+    graph = get_hetero_graph()
+    graph = graph.pin_memory_() if is_pinned else graph.to(F.ctx())
     if hetero:
         itemset = gb.HeteroItemSet({"n3": itemset})
     else:
@@ -65,7 +67,7 @@ def test_NeighborSampler_GraphFetch(
         partial(gb.NeighborSampler._prepare, graph.node_type_to_id)
     )
     sample_per_layer = gb.SamplePerLayer(
-        datapipe, graph.sample_neighbors, fanout, False, prob_name
+        datapipe, graph.sample_neighbors, fanout, False, prob_name, False
     )
     compact_per_layer = sample_per_layer.compact_per_layer(True)
     gb.seed(123)
@@ -88,6 +90,21 @@ def test_NeighborSampler_GraphFetch(
     datapipe = datapipe.compact_per_layer(True)
     gb.seed(123)
     new_results = list(datapipe)
+    assert len(expected_results) == len(new_results)
+    for a, b in zip(expected_results, new_results):
+        assert repr(a) == repr(b)
+
+    def remove_input_nodes(minibatch):
+        minibatch.input_nodes = None
+        return minibatch
+
+    datapipe = item_sampler.sample_neighbor(
+        graph, [fanout], False, prob_name=prob_name
+    )
+    datapipe = datapipe.transform(remove_input_nodes)
+    dataloader = gb.DataLoader(datapipe, overlap_graph_fetch=True)
+    gb.seed(123)
+    new_results = list(dataloader)
     assert len(expected_results) == len(new_results)
     for a, b in zip(expected_results, new_results):
         assert repr(a) == repr(b)
