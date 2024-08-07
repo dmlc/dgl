@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "./expand_indptr.h"
+#include "./index_select.h"
 #include "./macro.h"
 #include "./random.h"
 #include "./shared_memory_helper.h"
@@ -293,48 +294,21 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
       return ops::InSubgraph(indptr_, indices_, nodes, type_per_edge_);
     });
   }
-  using namespace torch::indexing;
-  const int32_t kDefaultGrainSize = 100;
-  const auto num_seeds = nodes.size(0);
-  torch::Tensor indptr = torch::empty({num_seeds + 1}, indptr_.dtype());
-  std::vector<torch::Tensor> indices_arr(num_seeds);
-  std::vector<torch::Tensor> edge_ids_arr(num_seeds);
-  std::vector<torch::Tensor> type_per_edge_arr(num_seeds);
+  std::vector<torch::Tensor> tensors{indices_};
+  if (type_per_edge_.has_value()) {
+    tensors.push_back(*type_per_edge_);
+  }
 
-  AT_DISPATCH_INDEX_TYPES(
-      indptr_.scalar_type(), "InSubgraph::indptr", ([&] {
-        const auto indptr_data = indptr_.data_ptr<index_t>();
-        auto out_indptr_data = indptr.data_ptr<index_t>();
-        out_indptr_data[0] = 0;
-        AT_DISPATCH_INDEX_TYPES(
-            nodes.scalar_type(), "InSubgraph::nodes", ([&] {
-              const auto nodes_data = nodes.data_ptr<index_t>();
-              torch::parallel_for(
-                  0, num_seeds, kDefaultGrainSize,
-                  [&](size_t start, size_t end) {
-                    for (size_t i = start; i < end; ++i) {
-                      const auto node_id = nodes_data[i];
-                      const auto start_idx = indptr_data[node_id];
-                      const auto end_idx = indptr_data[node_id + 1];
-                      out_indptr_data[i + 1] = end_idx - start_idx;
-                      indices_arr[i] = indices_.slice(0, start_idx, end_idx);
-                      edge_ids_arr[i] = torch::arange(
-                          start_idx, end_idx, indptr_.scalar_type());
-                      if (type_per_edge_) {
-                        type_per_edge_arr[i] =
-                            type_per_edge_.value().slice(0, start_idx, end_idx);
-                      }
-                    }
-                  });
-            }));
-      }));
+  auto [output_indptr, results] =
+      ops::IndexSelectCSCBatched(indptr_, tensors, nodes, true, torch::nullopt);
+  torch::optional<torch::Tensor> type_per_edge;
+  if (type_per_edge_.has_value()) {
+    type_per_edge = results.at(1);
+  }
 
   return c10::make_intrusive<FusedSampledSubgraph>(
-      indptr.cumsum(0), torch::cat(indices_arr), torch::cat(edge_ids_arr),
-      nodes, torch::arange(0, NumNodes()),
-      type_per_edge_
-          ? torch::optional<torch::Tensor>{torch::cat(type_per_edge_arr)}
-          : torch::nullopt);
+      output_indptr, results.at(0), results.back(), nodes,
+      torch::arange(0, NumNodes()), type_per_edge);
 }
 
 /**
