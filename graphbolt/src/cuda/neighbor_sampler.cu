@@ -202,7 +202,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> seeds,
     torch::optional<std::vector<int64_t>> seed_offsets,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids, torch::optional<torch::Tensor> type_per_edge,
+    torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<torch::Tensor> node_type_offset,
     torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id,
@@ -697,12 +697,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       output_type_per_edge = Gather(*type_per_edge, picked_eids);
   }
 
-  torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
-  if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
-
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-      output_indptr, output_indices, seeds, torch::nullopt,
-      subgraph_reverse_edge_ids, output_type_per_edge, edge_offsets);
+      output_indptr, output_indices, picked_eids, seeds, torch::nullopt,
+      output_type_per_edge, edge_offsets);
 }
 
 }  //  namespace ops

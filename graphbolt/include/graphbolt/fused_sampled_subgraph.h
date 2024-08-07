@@ -56,21 +56,18 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    */
   FusedSampledSubgraph(
       torch::Tensor indptr, torch::optional<torch::Tensor> indices,
+      torch::Tensor original_edge_ids,
       torch::optional<torch::Tensor> original_column_node_ids,
       torch::optional<torch::Tensor> original_row_node_ids = torch::nullopt,
-      torch::optional<torch::Tensor> original_edge_ids = torch::nullopt,
       torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
       torch::optional<torch::Tensor> etype_offsets = torch::nullopt)
       : indptr(indptr),
         indices(indices),
+        original_edge_ids(original_edge_ids),
         original_column_node_ids(original_column_node_ids),
         original_row_node_ids(original_row_node_ids),
-        original_edge_ids(original_edge_ids),
         type_per_edge(type_per_edge),
-        etype_offsets(etype_offsets) {
-    // If indices will be fetched later, we need original_edge_ids.
-    TORCH_CHECK(indices.has_value() || original_edge_ids.has_value());
-  }
+        etype_offsets(etype_offsets) {}
 
   FusedSampledSubgraph() = default;
 
@@ -94,6 +91,14 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
   torch::optional<torch::Tensor> indices;
 
   /**
+   * @brief Reverse edge ids in the original graph, the edge with id
+   * `original_edge_ids[i]` in the original graph is mapped to `i` in this
+   * subgraph. This is useful when edge features are needed. The edges are
+   * sorted w.r.t. their edge types for the heterogenous case.
+   */
+  torch::Tensor original_edge_ids;
+
+  /**
    * @brief Column's reverse node ids in the original graph. A graph structure
    * can be treated as a coordinated row and column pair, and this is the the
    * mapped ids of the column.
@@ -113,14 +118,6 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * row's.
    */
   torch::optional<torch::Tensor> original_row_node_ids;
-
-  /**
-   * @brief Reverse edge ids in the original graph, the edge with id
-   * `original_edge_ids[i]` in the original graph is mapped to `i` in this
-   * subgraph. This is useful when edge features are needed. The edges are
-   * sorted w.r.t. their edge types for the heterogenous case.
-   */
-  torch::optional<torch::Tensor> original_edge_ids;
 
   /**
    * @brief Type id of each edge, where type id is the corresponding index of

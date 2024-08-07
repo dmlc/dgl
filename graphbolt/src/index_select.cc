@@ -137,7 +137,7 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
     const auto res = g.InSubgraph(nodes);
     output_indptr = res->indptr;
     results.push_back(res->indices.value());
-    edge_ids = res->original_edge_ids.value();
+    edge_ids = res->original_edge_ids;
   }
   if (with_edge_ids) results.push_back(edge_ids);
   return std::make_tuple(output_indptr, results);
