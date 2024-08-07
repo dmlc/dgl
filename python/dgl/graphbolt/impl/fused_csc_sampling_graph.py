@@ -573,23 +573,28 @@ class FusedCSCSamplingGraph(SamplingGraph):
         indices = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
         column = C_sampled_subgraph.original_column_node_ids
-        original_edge_ids = C_sampled_subgraph.original_edge_ids
+        sampled_edge_ids = C_sampled_subgraph.original_edge_ids
         etype_offsets = C_sampled_subgraph.etype_offsets
         if etype_offsets is not None:
             etype_offsets = etype_offsets.tolist()
 
         has_original_eids = (
-            original_edge_ids is not None
-            and self.edge_attributes is not None
+            self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
-        if has_original_eids:
-            original_edge_ids = torch.ops.graphbolt.index_select(
-                self.edge_attributes[ORIGINAL_EDGE_ID], original_edge_ids
+        original_edge_ids = (
+            torch.ops.graphbolt.index_select(
+                self.edge_attributes[ORIGINAL_EDGE_ID], sampled_edge_ids
             )
+            if has_original_eids
+            else sampled_edge_ids
+        )
         if type_per_edge is None and etype_offsets is None:
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
+            if indices is not None:
+                # Only needed to fetch indices.
+                sampled_edge_ids = None
         else:
             offset = self._node_type_offset_list
 
@@ -626,11 +631,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
                         sub_indptr[etype] = torch.cat(
                             (torch.tensor([0], device=indptr.device), cum_edges)
                         )
-                        if original_edge_ids is not None:
-                            original_hetero_edge_ids[etype] = original_edge_ids[
-                                eids
-                            ]
+                        original_hetero_edge_ids[etype] = original_edge_ids[
+                            eids
+                        ]
+                sampled_hetero_edge_ids = None
             else:
+                sampled_hetero_edge_ids = {}
                 edge_offsets = [0]
                 for etype, etype_id in self.edge_type_to_id.items():
                     src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
@@ -647,18 +653,28 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     sub_indptr[etype] = indptr[
                         edge_offsets[etype_id] : edge_offsets[etype_id + 1]
                     ]
-                    sub_indices[etype] = indices[
+                    sub_indices[etype] = (
+                        None
+                        if indices is None
+                        else indices[
+                            etype_offsets[etype_id] : etype_offsets[
+                                etype_id + 1
+                            ]
+                        ]
+                    )
+                    original_hetero_edge_ids[etype] = original_edge_ids[
                         etype_offsets[etype_id] : etype_offsets[etype_id + 1]
                     ]
-                    if original_edge_ids is not None:
-                        original_hetero_edge_ids[etype] = original_edge_ids[
+                    if indices is None:
+                        # Only needed to fetch indices.
+                        sampled_hetero_edge_ids[etype] = sampled_edge_ids[
                             etype_offsets[etype_id] : etype_offsets[
                                 etype_id + 1
                             ]
                         ]
 
-            if original_edge_ids is not None:
-                original_edge_ids = original_hetero_edge_ids
+            original_edge_ids = original_hetero_edge_ids
+            sampled_edge_ids = sampled_hetero_edge_ids
             sampled_csc = {
                 etype: CSCFormatBase(
                     indptr=sub_indptr[etype],
@@ -669,6 +685,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return SampledSubgraphImpl(
             sampled_csc=sampled_csc,
             original_edge_ids=original_edge_ids,
+            _sampled_edge_ids=sampled_edge_ids,
         )
 
     def sample_neighbors(
