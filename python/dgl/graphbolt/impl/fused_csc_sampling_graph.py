@@ -694,6 +694,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        returning_indices_is_optional: bool = False,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -733,6 +734,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        returning_indices_is_optional: bool
+            Boolean indicating whether it is okay for the call to this function
+            to leave the indices tensor uninitialized. In this case, it is the
+            user's responsibility to gather it using the edge ids.
 
         Returns
         -------
@@ -776,6 +781,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts,
             replace=replace,
             probs_or_mask=probs_or_mask,
+            returning_indices_is_optional=returning_indices_is_optional,
         )
         return self._convert_to_sampled_subgraph(
             C_sampled_subgraph, seed_offsets
@@ -827,6 +833,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_or_mask: Optional[torch.Tensor] = None,
+        returning_indices_is_optional: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -865,6 +872,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        returning_indices_is_optional: bool
+            Boolean indicating whether it is okay for the call to this function
+            to leave the indices tensor uninitialized. In this case, it is the
+            user's responsibility to gather it using the edge ids.
 
         Returns
         -------
@@ -879,6 +890,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             False,  # is_labor
+            returning_indices_is_optional,
             probs_or_mask,
             None,  # random_seed, labor parameter
             0,  # seed2_contribution, labor_parameter
@@ -890,6 +902,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        returning_indices_is_optional: bool = False,
         random_seed: torch.Tensor = None,
         seed2_contribution: float = 0.0,
     ) -> SampledSubgraphImpl:
@@ -933,6 +946,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        returning_indices_is_optional: bool
+            Boolean indicating whether it is okay for the call to this function
+            to leave the indices tensor uninitialized. In this case, it is the
+            user's responsibility to gather it using the edge ids.
         random_seed: torch.Tensor, optional
             An int64 tensor with one or two elements.
 
@@ -1012,6 +1029,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             True,  # is_labor
+            returning_indices_is_optional,
             probs_or_mask,
             random_seed,
             seed2_contribution,
