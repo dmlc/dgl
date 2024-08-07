@@ -533,10 +533,7 @@ class NeighborSamplerImpl(SubgraphSampler):
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
             datapipe = datapipe.sample_per_layer(
-                sampler,
-                fanout,
-                replace,
-                prob_name,
+                sampler, fanout, replace, prob_name
             )
             datapipe = datapipe.compact_per_layer(deduplicate)
             if is_labor and not layer_dependency:
