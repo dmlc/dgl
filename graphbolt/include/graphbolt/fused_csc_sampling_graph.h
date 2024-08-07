@@ -339,8 +339,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @param layer Boolean indicating whether neighbors should be sampled in a
    * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
    * sampled edges, see arXiv:2210.13339.
-   * @param return_eids Boolean indicating whether edge IDs need to be returned,
-   * typically used when edge features are required.
+   * @param returning_indices_is_optional Boolean indicating whether returning
+   * indices tensor is optional.
    * @param probs_or_mask An optional edge attribute tensor for probablities
    * or masks. This attribute tensor should contain (unnormalized)
    * probabilities corresponding to each neighboring edge of a node. It must be
@@ -357,7 +357,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       torch::optional<torch::Tensor> seeds,
       torch::optional<std::vector<int64_t>> seed_offsets,
       const std::vector<int64_t>& fanouts, bool replace, bool layer,
-      bool return_eids, torch::optional<torch::Tensor> probs_or_mask,
+      bool returning_indices_is_optional,
+      torch::optional<torch::Tensor> probs_or_mask,
       torch::optional<torch::Tensor> random_seed,
       double seed2_contribution) const;
 
@@ -378,8 +379,6 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @param layer Boolean indicating whether neighbors should be sampled in a
    * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
    * sampled edges, see arXiv:2210.13339.
-   * @param return_eids Boolean indicating whether edge IDs need to be returned,
-   * typically used when edge features are required.
    * @param input_nodes_pre_time_window The time window of the nodes represents
    * a period of time before `input_nodes_timestamp`. If provided, only
    * neighbors and related edges whose timestamps fall within
@@ -400,7 +399,6 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       const torch::Tensor& input_nodes,
       const torch::Tensor& input_nodes_timestamp,
       const std::vector<int64_t>& fanouts, bool replace, bool layer,
-      bool return_eids,
       torch::optional<torch::Tensor> input_nodes_pre_time_window,
       torch::optional<torch::Tensor> probs_or_mask,
       torch::optional<std::string> node_timestamp_attr_name,
@@ -445,8 +443,8 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& seeds,
       torch::optional<std::vector<int64_t>>& seed_offsets,
-      const std::vector<int64_t>& fanouts, bool return_eids,
-      NumPickFn num_pick_fn, PickFn pick_fn) const;
+      const std::vector<int64_t>& fanouts, NumPickFn num_pick_fn,
+      PickFn pick_fn) const;
 
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;

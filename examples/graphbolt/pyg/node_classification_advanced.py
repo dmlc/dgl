@@ -188,16 +188,19 @@ def create_dataloader(
         shuffle=(job == "train"),
         drop_last=(job == "train"),
     )
+    need_copy = True
     # Copy the data to the specified device.
-    if args.graph_device != "cpu":
+    if args.graph_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
+        need_copy = False
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
         graph, fanout if job != "infer" else [-1]
     )
     # Copy the data to the specified device.
-    if args.feature_device != "cpu":
+    if args.feature_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
+        need_copy = False
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(
         features,
@@ -205,7 +208,7 @@ def create_dataloader(
         overlap_fetch=args.overlap_feature_fetch,
     )
     # Copy the data to the specified device.
-    if args.feature_device == "cpu":
+    if need_copy:
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
     return gb.DataLoader(

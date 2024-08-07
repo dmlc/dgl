@@ -25,7 +25,10 @@ class CPUCachedFeature(Feature):
     fallback_feature : Feature
         The fallback feature.
     max_cache_size_in_bytes : int
-        The capacity of the cache in bytes.
+        The capacity of the cache in bytes. The size should be a few factors
+        larger than the size of each read request. Otherwise, the caching policy
+        will hang due to all cache entries being read and/or write locked,
+        resulting in a deadlock.
     policy : str
         The cache eviction policy algorithm name. See gb.impl.CPUFeatureCache
         for the list of available policies.
@@ -75,12 +78,12 @@ class CPUCachedFeature(Feature):
         """
         if ids is None:
             return self._fallback_feature.read()
-        return self._feature.query_and_then_replace(
-            ids, self._fallback_feature.read
-        )
+        return self._feature.query_and_replace(
+            ids.cpu(), self._fallback_feature.read
+        ).to(ids.device)
 
     def read_async(self, ids: torch.Tensor):
-        """Read the feature by index asynchronously.
+        r"""Read the feature by index asynchronously.
 
         Parameters
         ----------
@@ -95,7 +98,7 @@ class CPUCachedFeature(Feature):
             can be accessed by calling `.wait()`. on the returned future object.
             It is undefined behavior to call `.wait()` more than once.
 
-        Example Usage
+        Examples
         --------
         >>> import dgl.graphbolt as gb
         >>> feature = gb.Feature(...)
@@ -121,7 +124,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_then_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids)
 
             yield
 
@@ -159,7 +162,7 @@ class CPUCachedFeature(Feature):
                 missing_values_future = next(fallback_reader, None)
                 yield  # fallback feature stages.
 
-            values_from_cpu_copy_event.wait()
+            values_from_cpu_copy_event.synchronize()
             reading_completed = policy.reading_completed_async(
                 found_pointers, found_offsets
             )
@@ -184,7 +187,6 @@ class CPUCachedFeature(Feature):
 
             reading_completed.wait()
             replace_future.wait()
-            missing_values_copy_event.wait()
             writing_completed = policy.writing_completed_async(
                 missing_pointers, missing_offsets
             )
@@ -216,7 +218,11 @@ class CPUCachedFeature(Feature):
                     return values
 
             yield _Waiter(
-                [writing_completed],
+                [
+                    writing_completed,
+                    values_from_cpu_copy_event,
+                    missing_values_copy_event,
+                ],
                 values_from_cpu,
                 missing_values,
                 index,
@@ -235,7 +241,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_then_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids)
 
             yield
 
@@ -313,7 +319,7 @@ class CPUCachedFeature(Feature):
 
             yield _Waiter([values_copy_event, writing_completed], values)
         else:
-            policy_future = policy.query_and_then_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids)
 
             yield
 

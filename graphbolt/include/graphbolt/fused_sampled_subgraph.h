@@ -55,17 +55,17 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * edges that are sorted w.r.t. edge types.
    */
   FusedSampledSubgraph(
-      torch::Tensor indptr, torch::Tensor indices,
+      torch::Tensor indptr, torch::optional<torch::Tensor> indices,
+      torch::Tensor original_edge_ids,
       torch::optional<torch::Tensor> original_column_node_ids,
       torch::optional<torch::Tensor> original_row_node_ids = torch::nullopt,
-      torch::optional<torch::Tensor> original_edge_ids = torch::nullopt,
       torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
       torch::optional<torch::Tensor> etype_offsets = torch::nullopt)
       : indptr(indptr),
         indices(indices),
+        original_edge_ids(original_edge_ids),
         original_column_node_ids(original_column_node_ids),
         original_row_node_ids(original_row_node_ids),
-        original_edge_ids(original_edge_ids),
         type_per_edge(type_per_edge),
         etype_offsets(etype_offsets) {}
 
@@ -84,8 +84,19 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * original ids. If compacted, the original ids are stored in the
    * `original_row_node_ids` field. The indices are sorted w.r.t. their edge
    * types for the heterogenous case.
+   *
+   * @note This is optional if its fetch operation will be performed later using
+   * the original_edge_ids tensor.
    */
-  torch::Tensor indices;
+  torch::optional<torch::Tensor> indices;
+
+  /**
+   * @brief Reverse edge ids in the original graph, the edge with id
+   * `original_edge_ids[i]` in the original graph is mapped to `i` in this
+   * subgraph. This is useful when edge features are needed. The edges are
+   * sorted w.r.t. their edge types for the heterogenous case.
+   */
+  torch::Tensor original_edge_ids;
 
   /**
    * @brief Column's reverse node ids in the original graph. A graph structure
@@ -107,14 +118,6 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * row's.
    */
   torch::optional<torch::Tensor> original_row_node_ids;
-
-  /**
-   * @brief Reverse edge ids in the original graph, the edge with id
-   * `original_edge_ids[i]` in the original graph is mapped to `i` in this
-   * subgraph. This is useful when edge features are needed. The edges are
-   * sorted w.r.t. their edge types for the heterogenous case.
-   */
-  torch::optional<torch::Tensor> original_edge_ids;
 
   /**
    * @brief Type id of each edge, where type id is the corresponding index of
