@@ -427,7 +427,7 @@ def main():
         feature_key = (feature["domain"], feature["type"], feature["name"])
         # Set the in_memory setting to False without modifying YAML file.
         if feature_key in disk_based_feature_keys:
-            feature["in_memory"] = True
+            feature["in_memory"] = False
     dataset = dataset.load()
 
     # Move the dataset to the selected storage.
