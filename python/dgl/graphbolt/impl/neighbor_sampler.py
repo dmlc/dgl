@@ -253,7 +253,15 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
 class SamplePerLayer(MiniBatchTransformer):
     """Sample neighbor edges from a graph for a single layer."""
 
-    def __init__(self, datapipe, sampler, fanout, replace, prob_name, returning_indices_is_optional):
+    def __init__(
+        self,
+        datapipe,
+        sampler,
+        fanout,
+        replace,
+        prob_name,
+        returning_indices_is_optional,
+    ):
         super().__init__(datapipe, self._sample_per_layer)
         self.sampler = sampler
         self.fanout = fanout
@@ -445,9 +453,7 @@ class NeighborSamplerImpl(SubgraphSampler):
                     for etype, pair in subgraph.sampled_csc.items():
                         if pair.indices is None:
                             edge_ids = subgraph._sampled_edge_ids[etype]
-                            edge_ids.record_stream(
-                                torch.cuda.current_stream()
-                            )
+                            edge_ids.record_stream(torch.cuda.current_stream())
                             pair.indices = record_stream(
                                 index_select(indices, edge_ids)
                             )
@@ -488,7 +494,11 @@ class NeighborSamplerImpl(SubgraphSampler):
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
             datapipe = datapipe.sample_per_layer(
-                sampler, fanout, replace, prob_name, returning_indices_is_optional
+                sampler,
+                fanout,
+                replace,
+                prob_name,
+                returning_indices_is_optional,
             )
             datapipe = datapipe.compact_per_layer(deduplicate)
             if is_labor and not layer_dependency:
