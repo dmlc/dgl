@@ -9,7 +9,7 @@ from dgl import graphbolt as gb
 def _test_query_and_replace(policy1, policy2, keys):
     # Testing query_and_replace equivalence to query and then replace.
     (
-        positions,
+        _,
         index,
         pointers,
         missing_keys,
