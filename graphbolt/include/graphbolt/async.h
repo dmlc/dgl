@@ -120,7 +120,7 @@ inline auto async(F&& function) {
   return c10::make_intrusive<Future<T>>(std::move(future));
 }
 
-template <ThreadPool pool_type, typename F>
+template <ThreadPool pool_type, bool for_each, typename F>
 inline void _parallel_for(
     const int64_t begin, const int64_t end, const int64_t grain_size,
     const F& f) {
@@ -130,7 +130,11 @@ inline void _parallel_for(
   const bool use_parallel =
       (num_iter > grain_size && num_iter > 1 && num_threads > 1);
   if (!use_parallel) {
-    f(begin, end);
+    if constexpr (for_each) {
+      for (int64_t i = begin; i < end; i++) f(i);
+    } else {
+      f(begin, end);
+    }
     return;
   }
   if (grain_size > 0) {
@@ -143,7 +147,11 @@ inline void _parallel_for(
     const int64_t begin_tid = begin + tid * chunk_size;
     if (begin_tid < end) {
       const int64_t end_tid = std::min(end, begin_tid + chunk_size);
-      f(begin_tid, end_tid);
+      if constexpr (for_each) {
+        for (int64_t i = begin_tid; i < end_tid; i++) f(i);
+      } else {
+        f(begin_tid, end_tid);
+      }
     }
   });
   _get_thread_pool<pool_type>().run(flow).get();
@@ -160,7 +168,11 @@ inline void _parallel_for(
       const int64_t end_tid = std::min(end, begin_tid + chunk_size);
       if (tid == 0) {
         // Launch the thread 0's work inline.
-        f(begin_tid, end_tid);
+        if constexpr (for_each) {
+          for (int64_t i = begin_tid; i < end_tid; i++) f(i);
+        } else {
+          f(begin_tid, end_tid);
+        }
         continue;
       }
       if (!future.valid()) {
@@ -170,7 +182,11 @@ inline void _parallel_for(
       at::launch([&f, &err_flag, &eptr, &promise, &num_finished, num_launched,
                   begin_tid, end_tid] {
         try {
-          f(begin_tid, end_tid);
+          if constexpr (for_each) {
+            for (int64_t i = begin_tid; i < end_tid; i++) f(i);
+          } else {
+            f(begin_tid, end_tid);
+          }
         } catch (...) {
           if (!err_flag.test_and_set()) {
             eptr = std::current_exception();
@@ -205,14 +221,39 @@ template <typename F>
 inline void parallel_for(
     const int64_t begin, const int64_t end, const int64_t grain_size,
     const F& f) {
-  _parallel_for<ThreadPool::intraop>(begin, end, grain_size, f);
+  _parallel_for<ThreadPool::intraop, false>(begin, end, grain_size, f);
 }
 
+/**
+ * @brief Compared to parallel_for, it expects the passed function to take a
+ * single argument for each iteration.
+ */
+template <typename F>
+inline void parallel_for_each(
+    const int64_t begin, const int64_t end, const int64_t grain_size,
+    const F& f) {
+  _parallel_for<ThreadPool::intraop, true>(begin, end, grain_size, f);
+}
+
+/**
+ * @brief Same as parallel_for but uses the interop thread pool.
+ */
 template <typename F>
 inline void parallel_for_interop(
     const int64_t begin, const int64_t end, const int64_t grain_size,
     const F& f) {
-  _parallel_for<ThreadPool::interop>(begin, end, grain_size, f);
+  _parallel_for<ThreadPool::interop, false>(begin, end, grain_size, f);
+}
+
+/**
+ * @brief Compared to parallel_for_interop, it expects the passed function to
+ * take a single argument for each iteration.
+ */
+template <typename F>
+inline void parallel_for_each_interop(
+    const int64_t begin, const int64_t end, const int64_t grain_size,
+    const F& f) {
+  _parallel_for<ThreadPool::interop, true>(begin, end, grain_size, f);
 }
 
 }  // namespace graphbolt
