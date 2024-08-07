@@ -144,7 +144,7 @@ def create_dataloader(
     return gb.DataLoader(
         datapipe,
         num_workers=num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch
+        overlap_graph_fetch=args.overlap_graph_fetch,
     )
 
 
