@@ -142,7 +142,7 @@ def create_dataloader(
     dataloader = gb.DataLoader(
         datapipe,
         args.num_workers,
-        overlap_graph_fetch=args.storage_device == "pinned"
+        overlap_graph_fetch=args.storage_device == "pinned",
     )
 
     # Return the fully-initialized DataLoader object.
