@@ -45,6 +45,8 @@ class SampledSubgraphImpl(SampledSubgraph):
     ] = None
     original_row_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
     original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
+    # Used to fetch sampled_csc.indices if it is missing.
+    _sampled_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
 
     def __post_init__(self):
         if isinstance(self.sampled_csc, dict):
@@ -53,22 +55,34 @@ class SampledSubgraphImpl(SampledSubgraph):
                     isinstance(etype, str)
                     and len(etype_str_to_tuple(etype)) == 3
                 ), "Edge type should be a string in format of str:str:str."
-                assert (
-                    pair.indptr is not None and pair.indices is not None
-                ), "Node pair should be have indptr and indice."
-                assert isinstance(pair.indptr, torch.Tensor) and isinstance(
-                    pair.indices, torch.Tensor
-                ), "Nodes in pairs should be of type torch.Tensor."
+                assert pair.indptr is not None and isinstance(
+                    pair.indptr, torch.Tensor
+                ), "Node pair should be have indptr of type torch.Tensor."
+                # For CUDA, indices may be None because it will be fetched later.
+                if not pair.indptr.is_cuda or pair.indices is not None:
+                    assert isinstance(
+                        pair.indices, torch.Tensor
+                    ), "Node pair should be have indices of type torch.Tensor."
+                else:
+                    assert isinstance(
+                        self._sampled_edge_ids.get(etype, None), torch.Tensor
+                    ), "When indices is missing, sampled edge ids needs to be provided."
         else:
-            assert (
-                self.sampled_csc.indptr is not None
-                and self.sampled_csc.indices is not None
-            ), "Node pair should be have indptr and indice."
-            assert isinstance(
+            assert self.sampled_csc.indptr is not None and isinstance(
                 self.sampled_csc.indptr, torch.Tensor
-            ) and isinstance(
-                self.sampled_csc.indices, torch.Tensor
-            ), "Nodes in pairs should be of type torch.Tensor."
+            ), "Node pair should be have torch.Tensor indptr."
+            # For CUDA, indices may be None because it will be fetched later.
+            if (
+                not self.sampled_csc.indptr.is_cuda
+                or self.sampled_csc.indices is not None
+            ):
+                assert isinstance(
+                    self.sampled_csc.indices, torch.Tensor
+                ), "Node pair should have a torch.Tensor indices."
+            else:
+                assert isinstance(
+                    self._sampled_edge_ids, torch.Tensor
+                ), "When indices is missing, sampled edge ids needs to be provided."
 
     def __repr__(self) -> str:
         return _sampled_subgraph_str(self, "SampledSubgraphImpl")
@@ -81,6 +95,8 @@ def _sampled_subgraph_str(sampled_subgraph: SampledSubgraph, classname) -> str:
     attributes.reverse()
 
     for name in attributes:
+        if name in "_sampled_edge_ids":
+            continue
         val = getattr(sampled_subgraph, name)
 
         def _add_indent(_str, indent):
