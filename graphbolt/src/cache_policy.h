@@ -25,8 +25,8 @@
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
 
+#include <cuda/std/atomic>
 #include <limits>
-#include <mutex>
 
 #include "./circular_queue.h"
 
@@ -34,22 +34,27 @@ namespace graphbolt {
 namespace storage {
 
 struct CacheKey {
-  CacheKey(int64_t key) : CacheKey(key, -1) {}
+  auto getKey() const {
+    return (static_cast<int64_t>(key_higher_16_bits_) << 32) +
+           key_lower_32_bits_;
+  }
+
+  CacheKey(int64_t key) : CacheKey(key, std::numeric_limits<int64_t>::min()) {}
 
   CacheKey(int64_t key, int64_t position)
       : freq_(0),
-        key_(key),
-        position_in_cache_(position),
         // EndUse<true>() should be called to reset the reference count.
-        reference_count_(-1) {
+        reference_count_(-1),
+        key_higher_16_bits_(key >> 32),
+        key_lower_32_bits_(key),
+        position_in_cache_(position) {
+    TORCH_CHECK(key == getKey());
     static_assert(sizeof(CacheKey) == 2 * sizeof(int64_t));
   }
 
   CacheKey() = default;
 
   auto getFreq() const { return freq_; }
-
-  auto getKey() const { return key_; }
 
   auto getPos() const { return position_in_cache_; }
 
@@ -79,38 +84,60 @@ struct CacheKey {
   }
 
   CacheKey& StartRead() {
-    TORCH_CHECK(reference_count_ >= 0);
-    TORCH_CHECK(reference_count_++ < std::numeric_limits<int16_t>::max());
+    ::cuda::std::atomic_ref ref(reference_count_);
+    // StartRead runs concurrently only with EndUse. EndUse does not need to see
+    // this modification at all. So we can use the relaxed memory order.
+    const auto old_val = ref.fetch_add(1, ::cuda::std::memory_order_relaxed);
+    TORCH_CHECK(
+        old_val < std::numeric_limits<int8_t>::max(),
+        "There are too many in-flight read requests to the same cache entry!");
     return *this;
   }
 
   template <bool write>
   CacheKey& EndUse() {
+    ::cuda::std::atomic_ref ref(reference_count_);
+    // The EndUse operation needs to synchronize with the InUse operation. So we
+    // have an release-acquire ordering between the two.
+    // https://en.cppreference.com/w/cpp/atomic/memory_order#Release-Acquire_ordering
     if constexpr (write) {
-      TORCH_CHECK(reference_count_ == -1);
-      ++reference_count_;
+      ref.fetch_add(1, ::cuda::std::memory_order_release);
     } else {
-      TORCH_CHECK(reference_count_ > 0);
-      --reference_count_;
+      ref.fetch_add(-1, ::cuda::std::memory_order_release);
     }
     return *this;
   }
 
-  bool InUse() const { return reference_count_; }
+  bool InUse() const {
+    ::cuda::std::atomic_ref ref(reference_count_);
+    // The operations after a call to this function need to happen after the
+    // load operation. Hence the acquire order.
+    return ref.load(::cuda::std::memory_order_acquire);
+  }
 
-  bool BeingWritten() const { return reference_count_ < 0; }
+  bool BeingWritten() const {
+    ::cuda::std::atomic_ref ref(reference_count_);
+    // The only operation coming after this op is the StartRead operation. Since
+    // StartRead is a refcount increment operation, it is fine if we don't
+    // synchronize with EndUse ops.
+    return ref.load(::cuda::std::memory_order_relaxed) < 0;
+  }
 
   friend std::ostream& operator<<(std::ostream& os, const CacheKey& key_ref) {
-    return os << '(' << key_ref.key_ << ", " << key_ref.freq_ << ", "
-              << key_ref.position_in_cache_ << ")";
+    ::cuda::std::atomic_ref ref(key_ref.reference_count_);
+    return os << '(' << key_ref.getKey() << ", " << key_ref.freq_ << ", "
+              << key_ref.position_in_cache_ << ", " << ref.load() << ")";
   }
 
  private:
-  int64_t freq_ : 3;
-  int64_t key_ : 61;
-  int64_t position_in_cache_ : 48;
+  int8_t freq_;
   // Negative values indicate writing while positive values indicate reading.
-  int64_t reference_count_ : 16;
+  // Access only through an std::atomic_ref instance atomically.
+  int8_t reference_count_;
+  // Keys are restricted to be 48-bit unsigned integers.
+  uint16_t key_higher_16_bits_;
+  uint32_t key_lower_32_bits_;
+  int64_t position_in_cache_;
 };
 
 class BaseCachePolicy {
@@ -259,14 +286,11 @@ class S3FifoCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->Increment();
-      if constexpr (write) {
-        return &cache_key;
-      } else if (!cache_key.BeingWritten()) {
+      if (!cache_key.BeingWritten()) {
         return &cache_key.StartRead();
       }
     }
@@ -286,17 +310,6 @@ class S3FifoCachePolicy : public BaseCachePolicy {
       }
     }
     return {it, readable};
-  }
-
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    const auto in_ghost_queue = ghost_set_.erase(key);
-    auto& queue = in_ghost_queue ? main_queue_ : small_queue_;
-    queue.push_front(CacheKey(key, pos));
-    small_queue_size_ += 1 - in_ghost_queue;
-    auto cache_key_ptr = &queue.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
   }
 
   CacheKey* Insert(map_iterator it) {
@@ -404,14 +417,11 @@ class SieveCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->SetFreq();
-      if constexpr (write) {
-        return &cache_key;
-      } else if (!cache_key.BeingWritten()) {
+      if (!cache_key.BeingWritten()) {
         return &cache_key.StartRead();
       }
     }
@@ -433,14 +443,6 @@ class SieveCachePolicy : public BaseCachePolicy {
     return {it, readable};
   }
 
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    auto cache_key_ptr = &queue_.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
-  }
-
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
     queue_.push_front(CacheKey(key));
@@ -459,7 +461,7 @@ class SieveCachePolicy : public BaseCachePolicy {
       if (hand_ == queue_.begin()) hand_ = queue_.end();
       --hand_;
     }
-    TORCH_CHECK(key_to_cache_key_.erase(hand_->getKey()));
+    key_to_cache_key_.erase(hand_->getKey());
     const auto pos = hand_->getPos();
     const auto temp = hand_;
     if (hand_ == queue_.begin()) {
@@ -511,15 +513,12 @@ class LruCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = *it->second;
       MoveToFront(queue_, queue_, it->second);
-      if constexpr (write) {
-        return &cache_key;
-      } else if (!cache_key.BeingWritten()) {
+      if (!cache_key.BeingWritten()) {
         return &cache_key.StartRead();
       }
     }
@@ -542,18 +541,11 @@ class LruCachePolicy : public BaseCachePolicy {
     return {it, readable};
   }
 
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    key_to_cache_key_[key] = queue_.begin();
-    return {pos, &queue_.front()};
-  }
-
   CacheKey* Insert(map_iterator it) {
     const auto key = it->first;
     queue_.push_front(CacheKey(key));
     mutable_value_ref(it) = queue_.begin();
-    auto cache_key_ptr = &*queue_.begin();
+    auto cache_key_ptr = &queue_.front();
     return &cache_key_ptr->setPos(Evict());
   }
 
@@ -569,7 +561,7 @@ class LruCachePolicy : public BaseCachePolicy {
       MoveToFront(queue_, queue_, it);
     }
     const auto& cache_key = queue_.back();
-    TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
+    key_to_cache_key_.erase(cache_key.getKey());
     const auto pos = cache_key.getPos();
     queue_.pop_back();
     return pos;
@@ -617,14 +609,11 @@ class ClockCachePolicy : public BaseCachePolicy {
    */
   std::tuple<torch::Tensor, torch::Tensor> Replace(torch::Tensor keys);
 
-  template <bool write>
   CacheKey* Read(int64_t key) {
     auto it = key_to_cache_key_.find(key);
     if (it != key_to_cache_key_.end()) {
       auto& cache_key = it->second->SetFreq();
-      if constexpr (write) {
-        return &cache_key;
-      } else if (!cache_key.BeingWritten()) {
+      if (!cache_key.BeingWritten()) {
         return &cache_key.StartRead();
       }
     }
@@ -644,14 +633,6 @@ class ClockCachePolicy : public BaseCachePolicy {
       }
     }
     return {it, readable};
-  }
-
-  std::pair<int64_t, CacheKey*> Insert(int64_t key) {
-    const auto pos = Evict();
-    queue_.push_front(CacheKey(key, pos));
-    auto cache_key_ptr = &queue_.front();
-    key_to_cache_key_[key] = cache_key_ptr;
-    return {pos, cache_key_ptr};
   }
 
   CacheKey* Insert(map_iterator it) {
@@ -674,7 +655,7 @@ class ClockCachePolicy : public BaseCachePolicy {
         std::advance(it, -1);
         MoveToFront(queue_, queue_, it);
       } else {
-        TORCH_CHECK(key_to_cache_key_.erase(cache_key.getKey()));
+        key_to_cache_key_.erase(cache_key.getKey());
         const auto evicted_pos = cache_key.getPos();
         queue_.pop_back();
         return evicted_pos;

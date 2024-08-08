@@ -55,7 +55,7 @@ BaseCachePolicy::QueryImpl(CachePolicy& policy, torch::Tensor keys) {
         auto missing_keys_ptr = missing_keys.data_ptr<index_t>();
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          auto cache_key_ptr = policy.template Read<false>(key);
+          auto cache_key_ptr = policy.Read(key);
           if (cache_key_ptr) {
             positions_ptr[found_cnt] = cache_key_ptr->getPos();
             found_ptr[found_cnt] = cache_key_ptr;
@@ -112,7 +112,8 @@ BaseCachePolicy::QueryAndReplaceImpl(CachePolicy& policy, torch::Tensor keys) {
           } else {
             indices_ptr[--missing_cnt] = i;
             missing_keys_ptr[missing_cnt] = key;
-            int64_t position = -1;
+            // Ensure that even if an offset is added, it stays negative.
+            auto position = std::numeric_limits<int64_t>::min();
             CacheKey* cache_key_ptr = nullptr;
             if (it->second == policy.getMapSentinelValue()) {
               cache_key_ptr = policy.Insert(it);
@@ -153,16 +154,19 @@ std::tuple<torch::Tensor, torch::Tensor> BaseCachePolicy::ReplaceImpl(
         position_set.reserve(keys.size(0));
         for (int64_t i = 0; i < keys.size(0); i++) {
           const auto key = keys_ptr[i];
-          int64_t pos = -1;
+          // Ensure that even if an offset is added, it stays negative.
+          auto position = std::numeric_limits<int64_t>::min();
           CacheKey* cache_key_ptr = nullptr;
-          if (!policy.template Read<true>(key)) {
-            std::tie(pos, cache_key_ptr) = policy.Insert(key);
+          const auto [it, _] = policy.Emplace(key);
+          if (it->second == policy.getMapSentinelValue()) {
+            cache_key_ptr = policy.Insert(it);
+            position = cache_key_ptr->getPos();
             TORCH_CHECK(
                 // We check for the uniqueness of the positions.
-                std::get<1>(position_set.insert(pos)),
+                std::get<1>(position_set.insert(position)),
                 "Can't insert all, larger cache capacity is needed.");
           }
-          positions_ptr[i] = pos;
+          positions_ptr[i] = position;
           pointers_ptr[i] = cache_key_ptr;
         }
       }));

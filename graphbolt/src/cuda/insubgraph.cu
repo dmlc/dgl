@@ -43,7 +43,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> InSubgraph(
       output_indptr, sliced_indptr.scalar_type(), sliced_indptr, num_edges);
 
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-      output_indptr, output_indices, nodes, torch::nullopt, edge_ids,
+      output_indptr, output_indices, edge_ids, nodes, torch::nullopt,
       output_type_per_edge);
 }
 

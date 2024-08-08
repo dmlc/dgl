@@ -220,20 +220,17 @@ if include_libs:
 
 # Configure dependencies.
 install_requires = [
-    "numpy>=1.14.0",
-    "scipy>=1.1.0",
     "networkx>=2.1",
-    "requests>=2.19.0",
-    "tqdm",
-    "psutil>=5.8.0",
-    "torchdata>=0.5.0",
-    "pandas",
+    "numpy>=1.14.0",
     "packaging",
-    "pyyaml",
+    "pandas",
+    "psutil>=5.8.0",
     "pydantic>=2.0",
+    "pyyaml",
+    "requests>=2.19.0",
+    "scipy>=1.1.0",
+    "tqdm",
 ]
-if "DGLBACKEND" in os.environ and os.environ["DGLBACKEND"] != "pytorch":
-    install_requires.pop(install_requires.index("torchdata>=0.5.0"))
 
 setup(
     name="dgl" + os.getenv("DGL_PACKAGE_SUFFIX", ""),
