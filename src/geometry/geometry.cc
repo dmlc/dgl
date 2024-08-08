@@ -33,7 +33,9 @@ void FarthestPointSampler(
   ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "FarthestPointSampler", {
     ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(array->dtype, FloatType, XPU, "values", {
-        impl::FarthestPointSampler<XPU, FloatType, IdType>(array, batch_size, sample_points, dist, start_idx, result);
+        impl::FarthestPointSampler<XPU, FloatType, IdType>(
+            array, batch_size, sample_points, dist, start_idx, result
+        );
       });
     });
   });
