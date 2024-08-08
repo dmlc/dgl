@@ -944,12 +944,8 @@ def test_SubgraphSampler_unique_csc_format_Homo_Node_cpu(labor):
     )
 
 
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="Fails due to different result on the CPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_unique_csc_format_Homo_Node_gpu(labor):
+def test_SubgraphSampler_unique_csc_format_Homo_Node(labor):
     torch.manual_seed(1205)
     graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
     graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
@@ -970,7 +966,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_Node_gpu(labor):
         deduplicate=True,
     )
 
-    if torch.cuda.get_device_capability()[0] < 7:
+    if F.ctx() != F.cpu() and torch.cuda.get_device_capability()[0] < 7:
         original_row_node_ids = [
             torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
             torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
@@ -1371,12 +1367,8 @@ def test_SubgraphSampler_unique_csc_format_Homo_Link_cpu(labor):
             )
 
 
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="Fails due to different result on the CPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_unique_csc_format_Homo_Link_gpu(labor):
+def test_SubgraphSampler_unique_csc_format_Homo_Link(labor):
     torch.manual_seed(1205)
     graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
     graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
@@ -1395,7 +1387,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_Link_gpu(labor):
         deduplicate=True,
     )
 
-    if torch.cuda.get_device_capability()[0] < 7:
+    if F.ctx() != F.cpu() and torch.cuda.get_device_capability()[0] < 7:
         original_row_node_ids = [
             torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
             torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
@@ -1752,12 +1744,8 @@ def test_SubgraphSampler_unique_csc_format_Homo_HyperLink_cpu(labor):
             )
 
 
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="Fails due to different result on the CPU.",
-)
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_unique_csc_format_Homo_HyperLink_gpu(labor):
+def test_SubgraphSampler_unique_csc_format_Homo_HyperLink(labor):
     torch.manual_seed(1205)
     graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
     graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
@@ -1776,7 +1764,7 @@ def test_SubgraphSampler_unique_csc_format_Homo_HyperLink_gpu(labor):
         deduplicate=True,
     )
 
-    if torch.cuda.get_device_capability()[0] < 7:
+    if F.ctx() != F.cpu() and torch.cuda.get_device_capability()[0] < 7:
         original_row_node_ids = [
             torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
             torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
