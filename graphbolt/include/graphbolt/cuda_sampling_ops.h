@@ -54,6 +54,8 @@ namespace ops {
  * @param layer Boolean indicating whether neighbors should be sampled in a
  * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
  * sampled edges, see arXiv:2210.13339.
+ * @param returning_indices_is_optional Boolean indicating whether returning
+ * indices tensor is optional.
  * @param type_per_edge A tensor representing the type of each edge, if present.
  * @param probs_or_mask An optional tensor with (unnormalized) probabilities
  * corresponding to each neighboring edge of a node. It must be
@@ -76,6 +78,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> seeds,
     torch::optional<std::vector<int64_t>> seed_offsets,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool returning_indices_is_optional,
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
     torch::optional<torch::Tensor> probs_or_mask = torch::nullopt,
     torch::optional<torch::Tensor> node_type_offset = torch::nullopt,

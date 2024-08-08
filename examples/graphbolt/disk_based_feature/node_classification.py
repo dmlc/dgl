@@ -404,11 +404,7 @@ def main():
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
     args.overlap_feature_fetch = args.feature_device == "pinned"
-    # For now, only sample_layer_neighbor is faster with this option
-    args.overlap_graph_fetch = (
-        args.sample_mode == "sample_layer_neighbor"
-        and args.graph_device == "pinned"
-    )
+    args.overlap_graph_fetch = args.graph_device == "pinned"
 
     """
     Load and preprocess on-disk dataset.
@@ -427,7 +423,7 @@ def main():
         feature_key = (feature["domain"], feature["type"], feature["name"])
         # Set the in_memory setting to False without modifying YAML file.
         if feature_key in disk_based_feature_keys:
-            feature["in_memory"] = True
+            feature["in_memory"] = False
     dataset = dataset.load()
 
     # Move the dataset to the selected storage.

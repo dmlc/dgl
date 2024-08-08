@@ -415,11 +415,7 @@ def main():
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
     args.overlap_feature_fetch = args.feature_device == "pinned"
-    # For now, only sample_layer_neighbor is faster with this option
-    args.overlap_graph_fetch = (
-        args.sample_mode == "sample_layer_neighbor"
-        and args.graph_device == "pinned"
-    )
+    args.overlap_graph_fetch = args.graph_device == "pinned"
 
     # Load and preprocess dataset.
     print("Loading data...")

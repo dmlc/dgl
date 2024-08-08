@@ -127,8 +127,9 @@ class DataLoader(torch_data.DataLoader):
         instances alive.
     overlap_graph_fetch : bool, optional
         If True, the data loader will overlap the UVA graph fetching operations
-        with the rest of operations by using an alternative CUDA stream. Default
-        is False.
+        with the rest of operations by using an alternative CUDA stream. This
+        option should be enabled if you have moved your graph to the pinned
+        memory for optimal performance. Default is False.
     num_gpu_cached_edges : int, optional
         If positive and overlap_graph_fetch is True, then the GPU will cache
         frequently accessed vertex neighborhoods to reduce the PCI-e bandwidth
@@ -141,7 +142,7 @@ class DataLoader(torch_data.DataLoader):
         of the computations can run simultaneously with it. Setting it to a too
         high value will limit the amount of overlap while setting it too low may
         cause the PCI-e bandwidth to not get fully utilized. Manually tuned
-        default is 6144, meaning around 3-4 Streaming Multiprocessors.
+        default is 10240, meaning around 5-7 Streaming Multiprocessors.
     """
 
     def __init__(
@@ -152,7 +153,7 @@ class DataLoader(torch_data.DataLoader):
         overlap_graph_fetch=False,
         num_gpu_cached_edges=0,
         gpu_cache_threshold=1,
-        max_uva_threads=6144,
+        max_uva_threads=10240,
     ):
         # Multiprocessing requires two modifications to the datapipe:
         #
@@ -215,15 +216,38 @@ class DataLoader(torch_data.DataLoader):
                     gpu_graph_cache = construct_gpu_graph_cache(
                         sampler, num_gpu_cached_edges, gpu_cache_threshold
                     )
-                datapipe_graph = replace_dp(
-                    datapipe_graph,
-                    sampler,
-                    sampler.fetch_and_sample(
-                        gpu_graph_cache,
-                        get_host_to_device_uva_stream(),
-                        1,
-                    ),
-                )
+                if (
+                    sampler.sampler.__name__ == "sample_layer_neighbors"
+                    or gpu_graph_cache is not None
+                ):
+                    # This code path is not faster for sample_neighbors.
+                    datapipe_graph = replace_dp(
+                        datapipe_graph,
+                        sampler,
+                        sampler.fetch_and_sample(
+                            gpu_graph_cache,
+                            get_host_to_device_uva_stream(),
+                            1,
+                        ),
+                    )
+                elif sampler.sampler.__name__ == "sample_neighbors":
+                    # This code path is faster for sample_neighbors.
+                    datapipe_graph = replace_dp(
+                        datapipe_graph,
+                        sampler,
+                        sampler.datapipe.sample_per_layer(
+                            sampler=sampler.sampler,
+                            fanout=sampler.fanout,
+                            replace=sampler.replace,
+                            prob_name=sampler.prob_name,
+                            returning_indices_is_optional=True,
+                        ),
+                    )
+                else:
+                    raise AssertionError(
+                        "overlap_graph_fetch is supported only for "
+                        "sample_neighbor and sample_layer_neighbor."
+                    )
 
         # (4) Cut datapipe at CopyTo and wrap with pinning and prefetching
         # before it. This enables enables non_blocking copies to the device.
