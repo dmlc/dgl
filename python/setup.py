@@ -226,14 +226,11 @@ install_requires = [
     "requests>=2.19.0",
     "tqdm",
     "psutil>=5.8.0",
-    "torchdata>=0.5.0",
     "pandas",
     "packaging",
     "pyyaml",
     "pydantic>=2.0",
 ]
-if "DGLBACKEND" in os.environ and os.environ["DGLBACKEND"] != "pytorch":
-    install_requires.pop(install_requires.index("torchdata>=0.5.0"))
 
 setup(
     name="dgl" + os.getenv("DGL_PACKAGE_SUFFIX", ""),
