@@ -139,7 +139,11 @@ def create_dataloader(
     if args.storage_device == "cpu":
         datapipe = datapipe.copy_to(device)
 
-    dataloader = gb.DataLoader(datapipe, args.num_workers)
+    dataloader = gb.DataLoader(
+        datapipe,
+        args.num_workers,
+        overlap_graph_fetch=args.storage_device == "pinned",
+    )
 
     # Return the fully-initialized DataLoader object.
     return dataloader

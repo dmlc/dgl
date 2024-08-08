@@ -157,13 +157,12 @@ def is_authorized(name) {
     'rudongyu', 'classicsong', 'HuXiangkun', 'hetong007', 'kylasa',
     'frozenbugs', 'peizhou001', 'zheng-da', 'czkkkkkk', 'thvasilo',
     // Intern:
-    'keli-wen', 'caojy1998', 'RamonZhou', 'xiangyuzhi', 'Skeleton003', 'yxy235',
-    'hutiechuan', 'pyynb', 'az15240', 'BowenYao18', 'kec020',
+    'pyynb', 'az15240', 'BowenYao18', 'kec020', 'Liu-rj',
     // Friends:
     'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
     'TristonC', 'mfbalin',
     'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
-    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
+    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit', 'CfromBU',
     // Emeritus:
     'VoVAllen',
   ]

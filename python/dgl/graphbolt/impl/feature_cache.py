@@ -92,7 +92,7 @@ class CPUFeatureCache(object):
         missing_index = index[positions.size(0) :]
         return values, missing_index, missing_keys, missing_offsets
 
-    def query_and_then_replace(self, keys, reader_fn):
+    def query_and_replace(self, keys, reader_fn):
         """Queries the cache. Then inserts the keys that are not found by
         reading them by calling `reader_fn(missing_keys)`, which are then
         inserted into the cache using the selected caching policy algorithm
@@ -120,7 +120,7 @@ class CPUFeatureCache(object):
             missing_keys,
             found_offsets,
             missing_offsets,
-        ) = self._policy.query_and_then_replace(keys)
+        ) = self._policy.query_and_replace(keys)
         found_cnt = keys.size(0) - missing_keys.size(0)
         found_positions = positions[:found_cnt]
         values = self._cache.query(found_positions, index, keys.shape[0])

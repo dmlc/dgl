@@ -141,7 +141,11 @@ def create_dataloader(
     # Create a DataLoader from the datapipe.
     # `num_workers`:
     #   The number of worker processes to use for data loading.
-    return gb.DataLoader(datapipe, num_workers=num_workers)
+    return gb.DataLoader(
+        datapipe,
+        num_workers=num_workers,
+        overlap_graph_fetch=args.overlap_graph_fetch,
+    )
 
 
 def extract_embed(node_embed, input_nodes):
@@ -568,9 +572,11 @@ def main(args):
     ) = load_dataset(args.dataset)
 
     # Move the dataset to the pinned memory to enable GPU access.
+    args.overlap_graph_fetch = False
     if device == torch.device("cuda"):
         g.pin_memory_()
         features.pin_memory_()
+        args.overlap_graph_fetch = True
 
     feat_size = features.size("node", "paper", "feat")[0]
 

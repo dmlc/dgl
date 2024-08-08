@@ -202,7 +202,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> seeds,
     torch::optional<std::vector<int64_t>> seed_offsets,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids, torch::optional<torch::Tensor> type_per_edge,
+    bool returning_indices_is_optional,
+    torch::optional<torch::Tensor> type_per_edge,
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<torch::Tensor> node_type_offset,
     torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id,
@@ -296,7 +297,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   }();
   auto output_indptr = torch::empty_like(sub_indptr);
   torch::Tensor picked_eids;
-  torch::Tensor output_indices;
+  torch::optional<torch::Tensor> output_indices;
 
   AT_DISPATCH_INDEX_TYPES(
       indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
@@ -519,7 +520,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           }
         }
 
-        output_indices = Gather(indices, picked_eids);
+        if (!returning_indices_is_optional || utils::is_on_gpu(indices)) {
+          output_indices = Gather(indices, picked_eids);
+        }
       }));
 
   torch::optional<torch::Tensor> output_type_per_edge;
@@ -565,7 +568,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     }
     auto indices_offsets_device = torch::empty(
         etype_id_to_src_ntype_id.size(0),
-        output_indices.options().dtype(torch::kLong));
+        picked_eids.options().dtype(torch::kLong));
     AT_DISPATCH_INDEX_TYPES(
         node_type_offset->scalar_type(), "SampleNeighborsNodeTypeOffset", ([&] {
           THRUST_CALL(
@@ -628,14 +631,16 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
               edge_offsets_pinned_device_pair);
         }));
     edge_offsets_event.record();
-    auto indices_offset_subtract = ExpandIndptrImpl(
-        edge_offsets_device, indices.scalar_type(), indices_offsets_device,
-        output_indices.size(0));
-    // The output_indices is permuted here.
-    std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
-        output_in_degree, sliced_output_indptr, output_indices, permutation,
-        num_rows - 1, output_indices.size(0));
-    output_indices -= indices_offset_subtract;
+    if (output_indices.has_value()) {
+      auto indices_offset_subtract = ExpandIndptrImpl(
+          edge_offsets_device, indices.scalar_type(), indices_offsets_device,
+          output_indices->size(0));
+      // The output_indices is permuted here.
+      std::tie(output_indptr, output_indices) = IndexSelectCSCImpl(
+          output_in_degree, sliced_output_indptr, *output_indices, permutation,
+          num_rows - 1, output_indices->size(0));
+      *output_indices -= indices_offset_subtract;
+    }
     auto output_indptr_offsets = torch::empty(
         num_etypes * 2,
         c10::TensorOptions().dtype(torch::kLong).pinned_memory(true));
@@ -691,12 +696,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
       output_type_per_edge = Gather(*type_per_edge, picked_eids);
   }
 
-  torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
-  if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
-
   return c10::make_intrusive<sampling::FusedSampledSubgraph>(
-      output_indptr, output_indices, seeds, torch::nullopt,
-      subgraph_reverse_edge_ids, output_type_per_edge, edge_offsets);
+      output_indptr, output_indices, picked_eids, seeds, torch::nullopt,
+      output_type_per_edge, edge_offsets);
 }
 
 }  //  namespace ops
