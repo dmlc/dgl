@@ -429,7 +429,7 @@ def compact_csc_format(
                         src_timestamps.get(
                             src_type,
                             torch.tensor(
-                                [], dtype=dst_timestamps[dst_type].dtype
+                                [], dtype=dst_timestamps[dst_type].dtype, device=device
                             ),
                         ),
                         _broadcast_timestamps(
