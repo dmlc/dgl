@@ -1138,7 +1138,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             None,  # random_seed, labor parameter
             0,  # seed2_contribution, labor_parameter
         )
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph, seed_offsets)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, seed_offsets
+        )
 
     def temporal_sample_layer_neighbors(
         self,
@@ -1270,7 +1272,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             random_seed,
             seed2_contribution,
         )
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph, seed_offsets)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, seed_offsets
+        )
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
