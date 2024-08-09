@@ -636,7 +636,7 @@ class NeighborSampler(NeighborSamplerImpl):
         graph,
         fanouts,
         replace=False,
-        prob_name=None,
+        probs_name=None,
         deduplicate=True,
     ):
         super().__init__(
@@ -644,7 +644,7 @@ class NeighborSampler(NeighborSamplerImpl):
             graph,
             fanouts,
             replace,
-            prob_name,
+            probs_name,
             deduplicate,
             graph.sample_neighbors,
         )
