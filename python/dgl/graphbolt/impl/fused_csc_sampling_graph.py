@@ -557,6 +557,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             )
             return (
                 torch.cat(homogeneous_nodes),
+                homogeneous_node_offsets,
                 torch.cat(homogeneous_timestamps),
                 homogeneous_time_windows,
             )
@@ -1040,11 +1041,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
     def temporal_sample_neighbors(
         self,
-        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
-        input_nodes_timestamp: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        seeds: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        seeds_timestamp: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
-        input_nodes_pre_time_window: Optional[
+        seeds_pre_time_window: Optional[
             Union[torch.Tensor, Dict[str, torch.Tensor]]
         ] = None,
         probs_name: Optional[str] = None,
@@ -1055,14 +1056,14 @@ class FusedCSCSamplingGraph(SamplingGraph):
         subgraph.
 
         If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is given,
-        the sampled neighbor or edge of an input node must have a timestamp
-        that is smaller than that of the input node.
+        the sampled neighbor or edge of an seed node must have a timestamp
+        that is smaller than that of the seed node.
 
         Parameters
         ----------
-        nodes: torch.Tensor
+        seeds: torch.Tensor
             IDs of the given seed nodes.
-        input_nodes_timestamp: torch.Tensor
+        seeds_timestamp: torch.Tensor
             Timestamps of the given seed nodes.
         fanouts: torch.Tensor
             The number of edges to be sampled for each node with or without
@@ -1085,12 +1086,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
-        input_nodes_pre_time_window: torch.Tensor
+        seeds_pre_time_window: torch.Tensor
             The time window of the nodes represents a period of time before
-            `input_nodes_timestamp`. If provided, only neighbors and related
-            edges whose timestamps fall within `[input_nodes_timestamp -
-            input_nodes_pre_time_window, input_nodes_timestamp]` will be
-            filtered.
+            `seeds_timestamp`. If provided, only neighbors and related
+            edges whose timestamps fall within `[seeds_timestamp -
+            seeds_pre_time_window, seeds_timestamp]` will be filtered.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities
@@ -1107,40 +1107,48 @@ class FusedCSCSamplingGraph(SamplingGraph):
         SampledSubgraphImpl
             The sampled subgraph.
         """
-        if isinstance(nodes, dict):
+        seed_offsets = None
+        if isinstance(seeds, dict):
             (
-                nodes,
-                input_nodes_timestamp,
-                input_nodes_pre_time_window,
+                seeds,
+                seed_offsets,
+                seeds_timestamp,
+                seeds_pre_time_window,
             ) = self._convert_to_homogeneous_nodes(
-                nodes, input_nodes_timestamp, input_nodes_pre_time_window
+                seeds, seeds_timestamp, seeds_pre_time_window
             )
+        elif seeds is None:
+            seed_offsets = self._indptr_node_type_offset_list
 
         # Ensure nodes is 1-D tensor.
         probs_or_mask = self.edge_attributes[probs_name] if probs_name else None
-        self._check_sampler_arguments(nodes, fanouts, probs_or_mask)
+        self._check_sampler_arguments(seeds, fanouts, probs_or_mask)
         C_sampled_subgraph = self._c_csc_graph.temporal_sample_neighbors(
-            nodes,
-            input_nodes_timestamp,
+            seeds,
+            seed_offsets,
+            seeds_timestamp,
             fanouts.tolist(),
             replace,
             False,  # is_labor
-            input_nodes_pre_time_window,
+            False,  # returning_indices_is_optional
+            seeds_pre_time_window,
             probs_or_mask,
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
             None,  # random_seed, labor parameter
             0,  # seed2_contribution, labor_parameter
         )
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, seed_offsets
+        )
 
     def temporal_sample_layer_neighbors(
         self,
-        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
-        input_nodes_timestamp: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        seeds: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        seeds_timestamp: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
-        input_nodes_pre_time_window: Optional[
+        seeds_pre_time_window: Optional[
             Union[torch.Tensor, Dict[str, torch.Tensor]]
         ] = None,
         probs_name: Optional[str] = None,
@@ -1155,14 +1163,14 @@ class FusedCSCSamplingGraph(SamplingGraph):
         <https://proceedings.neurips.cc/paper_files/paper/2023/file/51f9036d5e7ae822da8f6d4adda1fb39-Paper-Conference.pdf>`__
 
         If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is given,
-        the sampled neighbor or edge of an input node must have a timestamp
-        that is smaller than that of the input node.
+        the sampled neighbor or edge of an seed node must have a timestamp
+        that is smaller than that of the seed node.
 
         Parameters
         ----------
-        nodes: torch.Tensor
+        seeds: torch.Tensor
             IDs of the given seed nodes.
-        input_nodes_timestamp: torch.Tensor
+        seeds_timestamp: torch.Tensor
             Timestamps of the given seed nodes.
         fanouts: torch.Tensor
             The number of edges to be sampled for each node with or without
@@ -1185,11 +1193,11 @@ class FusedCSCSamplingGraph(SamplingGraph):
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
-        input_nodes_pre_time_window: torch.Tensor
+        seeds_pre_time_window: torch.Tensor
             The time window of the nodes represents a period of time before
-            `input_nodes_timestamp`. If provided, only neighbors and related
-            edges whose timestamps fall within `[input_nodes_timestamp -
-            input_nodes_pre_time_window, input_nodes_timestamp]` will be
+            `seeds_timestamp`. If provided, only neighbors and related
+            edges whose timestamps fall within `[seeds_timestamp -
+            seeds_pre_time_window, seeds_timestamp]` will be
             filtered.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute. This
@@ -1233,32 +1241,40 @@ class FusedCSCSamplingGraph(SamplingGraph):
         SampledSubgraphImpl
             The sampled subgraph.
         """
-        if isinstance(nodes, dict):
+        seed_offsets = None
+        if isinstance(seeds, dict):
             (
-                nodes,
-                input_nodes_timestamp,
-                input_nodes_pre_time_window,
+                seeds,
+                seed_offsets,
+                seeds_timestamp,
+                seeds_pre_time_window,
             ) = self._convert_to_homogeneous_nodes(
-                nodes, input_nodes_timestamp, input_nodes_pre_time_window
+                seeds, seeds_timestamp, seeds_pre_time_window
             )
+        elif seeds is None:
+            seed_offsets = self._indptr_node_type_offset_list
 
         # Ensure nodes is 1-D tensor.
         probs_or_mask = self.edge_attributes[probs_name] if probs_name else None
-        self._check_sampler_arguments(nodes, fanouts, probs_or_mask)
+        self._check_sampler_arguments(seeds, fanouts, probs_or_mask)
         C_sampled_subgraph = self._c_csc_graph.temporal_sample_neighbors(
-            nodes,
-            input_nodes_timestamp,
+            seeds,
+            seed_offsets,
+            seeds_timestamp,
             fanouts.tolist(),
             replace,
             True,  # is_labor
-            input_nodes_pre_time_window,
+            False,  # returning_indices_is_optional
+            seeds_pre_time_window,
             probs_or_mask,
             node_timestamp_attr_name,
             edge_timestamp_attr_name,
             random_seed,
             seed2_contribution,
         )
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, seed_offsets
+        )
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
