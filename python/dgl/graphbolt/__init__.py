@@ -89,6 +89,7 @@ from .minibatch_transformer import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
+from .minibatch_provider import *
 from .external_utils import add_reverse_edges, exclude_seed_edges
 from .internal import (
     compact_csc_format,
