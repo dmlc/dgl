@@ -48,6 +48,16 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("wait", &Future<torch::Tensor>::Wait);
   m.class_<Future<std::vector<torch::Tensor>>>("TensorListFuture")
       .def("wait", &Future<std::vector<torch::Tensor>>::Wait);
+  m.class_<Future<c10::intrusive_ptr<FusedSampledSubgraph>>>(
+       "FusedSampledSubgraphFuture")
+      .def("wait", &Future<c10::intrusive_ptr<FusedSampledSubgraph>>::Wait);
+  m.class_<Future<
+      std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>(
+       "UniqueAndCompactBatchedFuture")
+      .def(
+          "wait",
+          &Future<std::vector<
+              std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>::Wait);
   m.class_<storage::OnDiskNpyArray>("OnDiskNpyArray")
       .def("index_select", &storage::OnDiskNpyArray::IndexSelect);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
@@ -75,6 +85,9 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("add_edge_attribute", &FusedCSCSamplingGraph::AddEdgeAttribute)
       .def("in_subgraph", &FusedCSCSamplingGraph::InSubgraph)
       .def("sample_neighbors", &FusedCSCSamplingGraph::SampleNeighbors)
+      .def(
+          "sample_neighbors_async",
+          &FusedCSCSamplingGraph::SampleNeighborsAsync)
       .def(
           "temporal_sample_neighbors",
           &FusedCSCSamplingGraph::TemporalSampleNeighbors)
@@ -150,6 +163,7 @@ TORCH_LIBRARY(graphbolt, m) {
       "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
   m.def("unique_and_compact_batched", &UniqueAndCompactBatched);
+  m.def("unique_and_compact_batched_async", &UniqueAndCompactBatchedAsync);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_async", &ops::IndexSelectAsync);
