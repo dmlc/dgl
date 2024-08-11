@@ -581,6 +581,18 @@ class NeighborSampler(NeighborSamplerImpl):
         Boolean indicating whether seeds between hops will be deduplicated.
         If True, the same elements in seeds will be deleted to only one.
         Otherwise, the same elements will be remained.
+    overlap_fetch : bool, optional
+        If True, the data loader will overlap the UVA graph fetching operations
+        with the rest of operations by using an alternative CUDA stream. This
+        option should be enabled if you have moved your graph to the pinned
+        memory for optimal performance. Default is False.
+    num_gpu_cached_edges : int, optional
+        If positive and overlap_graph_fetch is True, then the GPU will cache
+        frequently accessed vertex neighborhoods to reduce the PCI-e bandwidth
+        demand due to pinned graph accesses.
+    gpu_cache_threshold : int, optional
+        Determines how many times a vertex needs to be accessed before its
+        neighborhood ends up being cached on the GPU.
 
     Examples
     -------
@@ -716,6 +728,18 @@ class LayerNeighborSampler(NeighborSamplerImpl):
         the random variates proportional to :math:`\\frac{1}{\\kappa}`. Implements
         the dependent minibatching approach in `arXiv:2310.12403
         <https://arxiv.org/abs/2310.12403>`__.
+    overlap_fetch : bool, optional
+        If True, the data loader will overlap the UVA graph fetching operations
+        with the rest of operations by using an alternative CUDA stream. This
+        option should be enabled if you have moved your graph to the pinned
+        memory for optimal performance. Default is False.
+    num_gpu_cached_edges : int, optional
+        If positive and overlap_graph_fetch is True, then the GPU will cache
+        frequently accessed vertex neighborhoods to reduce the PCI-e bandwidth
+        demand due to pinned graph accesses.
+    gpu_cache_threshold : int, optional
+        Determines how many times a vertex needs to be accessed before its
+        neighborhood ends up being cached on the GPU.
 
     Examples
     -------

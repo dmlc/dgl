@@ -97,18 +97,6 @@ class DataLoader(torch_data.DataLoader):
         If True, the data loader will not shut down the worker processes after a
         dataset has been consumed once. This allows to maintain the workers
         instances alive.
-    overlap_graph_fetch : bool, optional
-        If True, the data loader will overlap the UVA graph fetching operations
-        with the rest of operations by using an alternative CUDA stream. This
-        option should be enabled if you have moved your graph to the pinned
-        memory for optimal performance. Default is False.
-    num_gpu_cached_edges : int, optional
-        If positive and overlap_graph_fetch is True, then the GPU will cache
-        frequently accessed vertex neighborhoods to reduce the PCI-e bandwidth
-        demand due to pinned graph accesses.
-    gpu_cache_threshold : int, optional
-        Determines how many times a vertex needs to be accessed before its
-        neighborhood ends up being cached on the GPU.
     max_uva_threads : int, optional
         Limits the number of CUDA threads used for UVA copies so that the rest
         of the computations can run simultaneously with it. Setting it to a too
