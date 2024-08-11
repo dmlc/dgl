@@ -512,7 +512,7 @@ class NeighborSamplerImpl(SubgraphSampler):
         if overlap_fetch and num_gpu_cached_edges > 0:
             if graph._gpu_graph_cache is None:
                 graph._initialize_gpu_graph_cache(
-                    num_gpu_cached_edges, gpu_cache_threshold
+                    num_gpu_cached_edges, gpu_cache_threshold, prob_name
                 )
         datapipe = datapipe.transform(
             partial(self._prepare, graph.node_type_to_id)
