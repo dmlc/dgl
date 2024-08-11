@@ -417,6 +417,11 @@ class NeighborSamplerImpl(SubgraphSampler):
         layer_dependency=None,
         batch_dependency=None,
     ):
+        if overlap_fetch and num_gpu_cached_edges > 0:
+            if graph._gpu_graph_cache is None:
+                graph._initialize_gpu_graph_cache(
+                    num_gpu_cached_edges, gpu_cache_threshold, prob_name
+                )
         if sampler.__name__ == "sample_layer_neighbors":
             self._init_seed(batch_dependency)
         super().__init__(
@@ -428,8 +433,6 @@ class NeighborSamplerImpl(SubgraphSampler):
             deduplicate,
             sampler,
             overlap_fetch,
-            num_gpu_cached_edges,
-            gpu_cache_threshold,
             layer_dependency,
         )
 
@@ -505,15 +508,8 @@ class NeighborSamplerImpl(SubgraphSampler):
         deduplicate,
         sampler,
         overlap_fetch,
-        num_gpu_cached_edges,
-        gpu_cache_threshold,
         layer_dependency,
     ):
-        if overlap_fetch and num_gpu_cached_edges > 0:
-            if graph._gpu_graph_cache is None:
-                graph._initialize_gpu_graph_cache(
-                    num_gpu_cached_edges, gpu_cache_threshold, prob_name
-                )
         datapipe = datapipe.transform(
             partial(self._prepare, graph.node_type_to_id)
         )
