@@ -104,13 +104,13 @@ def test_gpu_sampling_DataLoader(
     for i in range(2):
         datapipe = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
         datapipe = datapipe.copy_to(F.ctx())
-        kwargs = {}
-        if i == 0:
-            kwargs = {
-                "overlap_fetch": overlap_graph_fetch,
-                "num_gpu_cached_edges": num_gpu_cached_edges,
-                "gpu_cache_threshold": gpu_cache_threshold,
-            }
+        kwargs = {
+            "overlap_fetch": overlap_graph_fetch,
+            "num_gpu_cached_edges": num_gpu_cached_edges,
+            "gpu_cache_threshold": gpu_cache_threshold,
+        }
+        if i != 0:
+            kwargs = {}
         datapipe = getattr(dgl.graphbolt, sampler_name)(
             datapipe,
             graph,
