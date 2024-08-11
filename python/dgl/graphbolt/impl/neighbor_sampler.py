@@ -24,7 +24,6 @@ __all__ = [
     "NeighborSampler",
     "LayerNeighborSampler",
     "SamplePerLayer",
-    "SamplePerLayerFromFetchedSubgraph",
     "FetchInsubgraphData",
     "ConcatHeteroSeeds",
     "CombineCachedAndFetchedInSubgraph",
@@ -55,9 +54,9 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
     found inside the GPUGraphCache.
     """
 
-    def __init__(self, datapipe, sample_per_layer_obj):
+    def __init__(self, datapipe, prob_name):
         super().__init__(datapipe, self._combine_per_layer)
-        self.prob_name = sample_per_layer_obj.prob_name
+        self.prob_name = prob_name
 
     def _combine_per_layer(self, minibatch):
         subgraph = minibatch._sliced_sampling_graph
@@ -94,9 +93,9 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
 class ConcatHeteroSeeds(Mapper):
     """Concatenates the seeds into a single tensor in the hetero case."""
 
-    def __init__(self, datapipe, sample_per_layer_obj):
+    def __init__(self, datapipe, graph):
         super().__init__(datapipe, self._concat)
-        self.graph = sample_per_layer_obj.sampler.__self__
+        self.graph = graph
 
     def _concat(self, minibatch):
         seeds = minibatch._seed_nodes
@@ -124,20 +123,21 @@ class FetchInsubgraphData(Mapper):
     def __init__(
         self,
         datapipe,
-        sample_per_layer_obj,
-        gpu_graph_cache,
-        stream=None,
+        graph,
+        prob_name,
     ):
-        self.graph = sample_per_layer_obj.sampler.__self__
-        datapipe = datapipe.concat_hetero_seeds(sample_per_layer_obj)
-        if gpu_graph_cache is not None:
-            datapipe = datapipe.fetch_cached_insubgraph_data(gpu_graph_cache)
+        datapipe = datapipe.concat_hetero_seeds(graph)
+        if graph._gpu_graph_cache is not None:
+            datapipe = datapipe.fetch_cached_insubgraph_data(graph._gpu_graph_cache)
+        self.graph = graph
+        self.prob_name = prob_name
         super().__init__(datapipe, self._fetch_per_layer)
-        self.prob_name = sample_per_layer_obj.prob_name
-        self.stream = stream
 
-    def _fetch_per_layer_impl(self, minibatch, stream):
-        with torch.cuda.stream(self.stream):
+    def _fetch_per_layer(self, minibatch):
+        stream = torch.cuda.current_stream()
+        uva_stream = get_host_to_device_uva_stream()
+        uva_stream.wait_stream(stream)
+        with torch.cuda.stream(uva_stream):
             seeds = minibatch._seeds
             seed_offsets = minibatch._seed_offsets
             delattr(minibatch, "_seeds")
@@ -146,7 +146,7 @@ class FetchInsubgraphData(Mapper):
             seeds.record_stream(torch.cuda.current_stream())
 
             def record_stream(tensor):
-                if stream is not None and tensor.is_cuda:
+                if tensor.is_cuda:
                     tensor.record_stream(stream)
                 return tensor
 
@@ -210,48 +210,9 @@ class FetchInsubgraphData(Mapper):
             subgraph._indptr_node_type_offset_list = seed_offsets
             minibatch._sliced_sampling_graph = subgraph
 
-            if self.stream is not None:
-                minibatch.wait = torch.cuda.current_stream().record_event().wait
+            minibatch.wait = torch.cuda.current_stream().record_event().wait
 
             return minibatch
-
-    def _fetch_per_layer(self, minibatch):
-        current_stream = None
-        if self.stream is not None:
-            current_stream = torch.cuda.current_stream()
-            self.stream.wait_stream(current_stream)
-        return self._fetch_per_layer_impl(minibatch, current_stream)
-
-
-@functional_datapipe("sample_per_layer_from_fetched_subgraph")
-class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
-    """Sample neighbor edges from a graph for a single layer."""
-
-    def __init__(self, datapipe, sample_per_layer_obj):
-        super().__init__(datapipe, self._sample_per_layer_from_fetched_subgraph)
-        self.sampler_name = sample_per_layer_obj.sampler.__name__
-        self.fanout = sample_per_layer_obj.fanout
-        self.replace = sample_per_layer_obj.replace
-        self.prob_name = sample_per_layer_obj.prob_name
-
-    def _sample_per_layer_from_fetched_subgraph(self, minibatch):
-        subgraph = minibatch._sliced_sampling_graph
-        delattr(minibatch, "_sliced_sampling_graph")
-        kwargs = {
-            key[1:]: getattr(minibatch, key)
-            for key in ["_random_seed", "_seed2_contribution"]
-            if hasattr(minibatch, key)
-        }
-        sampled_subgraph = getattr(subgraph, self.sampler_name)(
-            None,
-            self.fanout,
-            self.replace,
-            self.prob_name,
-            **kwargs,
-        )
-        minibatch.sampled_subgraphs.insert(0, sampled_subgraph)
-
-        return minibatch
 
 
 @functional_datapipe("sample_per_layer")
@@ -265,10 +226,11 @@ class SamplePerLayer(MiniBatchTransformer):
         fanout,
         replace,
         prob_name,
-        returning_indices_is_optional=False,
+        overlap_fetch,
     ):
         graph = sampler.__self__
-        if returning_indices_is_optional and graph.indices.is_pinned():
+        self.returning_indices_is_optional = False
+        if overlap_fetch and sampler.__name__ == "sample_neighbors" and graph.indices.is_pinned() and graph._gpu_graph_cache is None:
             datapipe = datapipe.transform(self._sample_per_layer)
             datapipe = (
                 datapipe.transform(partial(self._fetch_indices, graph.indices))
@@ -285,13 +247,20 @@ class SamplePerLayer(MiniBatchTransformer):
                     )
                 )
             super().__init__(datapipe)
+            self.returning_indices_is_optional = True
+        elif overlap_fetch:
+            datapipe = datapipe.fetch_insubgraph_data(graph, prob_name)
+            datapipe = datapipe.buffer().wait()
+            if graph._gpu_graph_cache is not None:
+                datapipe = datapipe.combine_cached_and_fetched_insubgraph(prob_name)
+            super().__init__(datapipe, self._sample_per_layer_from_fetched_subgraph)
         else:
             super().__init__(datapipe, self._sample_per_layer)
         self.sampler = sampler
         self.fanout = fanout
         self.replace = replace
         self.prob_name = prob_name
-        self.returning_indices_is_optional = returning_indices_is_optional
+        self.overlap_fetch = overlap_fetch
 
     def _sample_per_layer(self, minibatch):
         kwargs = {
@@ -308,6 +277,25 @@ class SamplePerLayer(MiniBatchTransformer):
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, subgraph)
+        return minibatch
+
+    def _sample_per_layer_from_fetched_subgraph(self, minibatch):
+        subgraph = minibatch._sliced_sampling_graph
+        delattr(minibatch, "_sliced_sampling_graph")
+        kwargs = {
+            key[1:]: getattr(minibatch, key)
+            for key in ["_random_seed", "_seed2_contribution"]
+            if hasattr(minibatch, key)
+        }
+        sampled_subgraph = getattr(subgraph, self.sampler.__name__)(
+            None,
+            self.fanout,
+            self.replace,
+            self.prob_name,
+            **kwargs,
+        )
+        minibatch.sampled_subgraphs.insert(0, sampled_subgraph)
+
         return minibatch
 
     @staticmethod
@@ -398,27 +386,6 @@ class CompactPerLayer(MiniBatchTransformer):
         return minibatch
 
 
-@functional_datapipe("fetch_and_sample")
-class FetcherAndSampler(MiniBatchTransformer):
-    """Overlapped graph sampling operation replacement."""
-
-    def __init__(
-        self,
-        sampler,
-        gpu_graph_cache,
-        stream,
-        buffer_size,
-    ):
-        datapipe = sampler.datapipe.fetch_insubgraph_data(
-            sampler, gpu_graph_cache, stream
-        )
-        datapipe = datapipe.buffer(buffer_size).wait()
-        if gpu_graph_cache is not None:
-            datapipe = datapipe.combine_cached_and_fetched_insubgraph(sampler)
-        datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)
-        super().__init__(datapipe)
-
-
 class NeighborSamplerImpl(SubgraphSampler):
     # pylint: disable=abstract-method
     """Base class for NeighborSamplers."""
@@ -433,6 +400,9 @@ class NeighborSamplerImpl(SubgraphSampler):
         prob_name,
         deduplicate,
         sampler,
+        overlap_fetch,
+        num_gpu_cached_edges,
+        gpu_cache_threshold,
         layer_dependency=None,
         batch_dependency=None,
     ):
@@ -446,6 +416,9 @@ class NeighborSamplerImpl(SubgraphSampler):
             prob_name,
             deduplicate,
             sampler,
+            overlap_fetch,
+            num_gpu_cached_edges,
+            gpu_cache_threshold,
             layer_dependency,
         )
 
@@ -520,8 +493,16 @@ class NeighborSamplerImpl(SubgraphSampler):
         prob_name,
         deduplicate,
         sampler,
+        overlap_fetch,
+        num_gpu_cached_edges,
+        gpu_cache_threshold,
         layer_dependency,
     ):
+        if overlap_fetch and num_gpu_cached_edges > 0:
+            if graph._gpu_graph_cache is None:
+                graph._initialize_gpu_graph_cache(
+                    num_gpu_cached_edges, gpu_cache_threshold
+                )
         datapipe = datapipe.transform(
             partial(self._prepare, graph.node_type_to_id)
         )
@@ -533,7 +514,7 @@ class NeighborSamplerImpl(SubgraphSampler):
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
             datapipe = datapipe.sample_per_layer(
-                sampler, fanout, replace, prob_name
+                sampler, fanout, replace, prob_name, overlap_fetch
             )
             datapipe = datapipe.compact_per_layer(deduplicate)
             if is_labor and not layer_dependency:
@@ -638,6 +619,9 @@ class NeighborSampler(NeighborSamplerImpl):
         replace=False,
         prob_name=None,
         deduplicate=True,
+        overlap_fetch=False,
+        num_gpu_cached_edges=0,
+        gpu_cache_threshold=1,
     ):
         super().__init__(
             datapipe,
@@ -647,6 +631,9 @@ class NeighborSampler(NeighborSamplerImpl):
             prob_name,
             deduplicate,
             graph.sample_neighbors,
+            overlap_fetch,
+            num_gpu_cached_edges,
+            gpu_cache_threshold,
         )
 
 
@@ -776,6 +763,9 @@ class LayerNeighborSampler(NeighborSamplerImpl):
         deduplicate=True,
         layer_dependency=False,
         batch_dependency=1,
+        overlap_fetch=False,
+        num_gpu_cached_edges=0,
+        gpu_cache_threshold=1,
     ):
         super().__init__(
             datapipe,
@@ -785,6 +775,9 @@ class LayerNeighborSampler(NeighborSamplerImpl):
             prob_name,
             deduplicate,
             graph.sample_layer_neighbors,
+            overlap_fetch,
+            num_gpu_cached_edges,
+            gpu_cache_threshold,
             layer_dependency,
             batch_dependency,
         )

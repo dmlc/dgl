@@ -108,6 +108,9 @@ def test_gpu_sampling_DataLoader(
             datapipe,
             graph,
             fanouts=[torch.LongTensor([2]) for _ in range(num_layers)],
+            overlap_fetch=overlap_graph_fetch,
+            num_gpu_cached_edges=num_gpu_cached_edges,
+            gpu_cache_threshold=gpu_cache_threshold,
         )
         if enable_feature_fetch:
             datapipe = dgl.graphbolt.FeatureFetcher(
@@ -119,12 +122,7 @@ def test_gpu_sampling_DataLoader(
             )
         if i == 0:
             dataloaders.append(
-                dgl.graphbolt.DataLoader(
-                    datapipe,
-                    overlap_graph_fetch=overlap_graph_fetch,
-                    num_gpu_cached_edges=num_gpu_cached_edges,
-                    gpu_cache_threshold=gpu_cache_threshold,
-                )
+                dgl.graphbolt.DataLoader(datapipe)
             )
         else:
             dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
