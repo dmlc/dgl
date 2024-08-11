@@ -121,9 +121,7 @@ def test_gpu_sampling_DataLoader(
                 overlap_fetch=overlap_feature_fetch and i == 0,
             )
         if i == 0:
-            dataloaders.append(
-                dgl.graphbolt.DataLoader(datapipe)
-            )
+            dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
         else:
             dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
     dataloader, dataloader2 = dataloaders

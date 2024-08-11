@@ -128,7 +128,9 @@ class FetchInsubgraphData(Mapper):
     ):
         datapipe = datapipe.concat_hetero_seeds(graph)
         if graph._gpu_graph_cache is not None:
-            datapipe = datapipe.fetch_cached_insubgraph_data(graph._gpu_graph_cache)
+            datapipe = datapipe.fetch_cached_insubgraph_data(
+                graph._gpu_graph_cache
+            )
         self.graph = graph
         self.prob_name = prob_name
         super().__init__(datapipe, self._fetch_per_layer)
@@ -230,7 +232,12 @@ class SamplePerLayer(MiniBatchTransformer):
     ):
         graph = sampler.__self__
         self.returning_indices_is_optional = False
-        if overlap_fetch and sampler.__name__ == "sample_neighbors" and graph.indices.is_pinned() and graph._gpu_graph_cache is None:
+        if (
+            overlap_fetch
+            and sampler.__name__ == "sample_neighbors"
+            and graph.indices.is_pinned()
+            and graph._gpu_graph_cache is None
+        ):
             datapipe = datapipe.transform(self._sample_per_layer)
             datapipe = (
                 datapipe.transform(partial(self._fetch_indices, graph.indices))
@@ -252,8 +259,12 @@ class SamplePerLayer(MiniBatchTransformer):
             datapipe = datapipe.fetch_insubgraph_data(graph, prob_name)
             datapipe = datapipe.buffer().wait()
             if graph._gpu_graph_cache is not None:
-                datapipe = datapipe.combine_cached_and_fetched_insubgraph(prob_name)
-            super().__init__(datapipe, self._sample_per_layer_from_fetched_subgraph)
+                datapipe = datapipe.combine_cached_and_fetched_insubgraph(
+                    prob_name
+                )
+            super().__init__(
+                datapipe, self._sample_per_layer_from_fetched_subgraph
+            )
         else:
             super().__init__(datapipe, self._sample_per_layer)
         self.sampler = sampler

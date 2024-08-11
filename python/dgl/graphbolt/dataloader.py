@@ -177,7 +177,6 @@ class DataLoader(torch_data.DataLoader):
             for sampler in samplers:
                 if sampler.overlap_fetch:
                     torch.ops.graphbolt.set_max_uva_threads(max_uva_threads)
-                
 
         # (4) Cut datapipe at CopyTo and wrap with pinning and prefetching
         # before it. This enables enables non_blocking copies to the device.

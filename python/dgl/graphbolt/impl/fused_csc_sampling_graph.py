@@ -315,7 +315,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ):
         """Sets the indptr node type offset list if present."""
         self._indptr_node_type_offset_list_ = indptr_node_type_offset_list
-    
+
     @property
     def _gpu_graph_cache(self) -> Optional[GPUGraphCache]:
         return (
@@ -1442,7 +1442,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return self._apply_to_members(_pin)
 
     def _initialize_gpu_graph_cache(
-        self, num_gpu_cached_edges: int, gpu_cache_threshold: int, prob_name: Optional[str] = None
+        self,
+        num_gpu_cached_edges: int,
+        gpu_cache_threshold: int,
+        prob_name: Optional[str] = None,
     ):
         "Construct a GPUGraphCache given the cache parameters."
         num_gpu_cached_edges = min(num_gpu_cached_edges, self.total_num_edges)

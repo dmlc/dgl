@@ -72,7 +72,9 @@ def test_NeighborSampler_GraphFetch(
     gb.seed(123)
     expected_results = list(compact_per_layer)
     graph._initialize_gpu_graph_cache(num_cached_edges, 1, prob_name)
-    datapipe = datapipe.sample_per_layer(graph.sample_neighbors, fanout, False, prob_name, True)
+    datapipe = datapipe.sample_per_layer(
+        graph.sample_neighbors, fanout, False, prob_name, True
+    )
     datapipe = datapipe.compact_per_layer(True)
     gb.seed(123)
     new_results = list(datapipe)
