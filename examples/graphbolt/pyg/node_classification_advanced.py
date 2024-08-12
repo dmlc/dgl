@@ -195,7 +195,11 @@ def create_dataloader(
         need_copy = False
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1]
+        graph,
+        fanout if job != "infer" else [-1],
+        overlap_fetch=args.overlap_graph_fetch,
+        num_gpu_cached_edges=args.num_gpu_cached_edges,
+        gpu_cache_threshold=args.gpu_graph_caching_threshold,
     )
     # Copy the data to the specified device.
     if args.feature_device != "cpu" and need_copy:
@@ -211,13 +215,7 @@ def create_dataloader(
     if need_copy:
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
-    return gb.DataLoader(
-        datapipe,
-        num_workers=args.num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
-        num_gpu_cached_edges=args.num_gpu_cached_edges,
-        gpu_cache_threshold=args.gpu_graph_caching_threshold,
-    )
+    return gb.DataLoader(datapipe, num_workers=args.num_workers)
 
 
 @torch.compile
