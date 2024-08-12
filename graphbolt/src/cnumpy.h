@@ -161,7 +161,10 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
         }
         // If this is the first thread exiting, release the master thread's
         // ticket as well by releasing 2 slots. Otherwise, release 1 slot.
-        const auto releasing = acquirer_->exiting_first_.test_and_set() ? 1 : 2;
+        const auto releasing =
+            acquirer_->exiting_first_.test_and_set(std::memory_order_relaxed)
+                ? 1
+                : 2;
         semaphore_.release(releasing);
       }
 
@@ -179,7 +182,8 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
     ~QueueAndBufferAcquirer() {
       // If none of the worker threads acquire the semaphore, we make sure to
       // release the ticket taken in the constructor.
-      const auto releasing = exiting_first_.test_and_set() ? 0 : 1;
+      const auto releasing =
+          exiting_first_.test_and_set(std::memory_order_relaxed) ? 0 : 1;
       semaphore_.release(releasing);
     }
 
