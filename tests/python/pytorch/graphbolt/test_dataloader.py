@@ -63,6 +63,7 @@ def test_DataLoader(overlap_feature_fetch):
 @pytest.mark.parametrize("enable_feature_fetch", [True, False])
 @pytest.mark.parametrize("overlap_feature_fetch", [True, False])
 @pytest.mark.parametrize("overlap_graph_fetch", [True, False])
+@pytest.mark.parametrize("asynchronous", [True, False])
 @pytest.mark.parametrize("num_gpu_cached_edges", [0, 1024])
 @pytest.mark.parametrize("gpu_cache_threshold", [1, 3])
 def test_gpu_sampling_DataLoader(
@@ -70,6 +71,7 @@ def test_gpu_sampling_DataLoader(
     enable_feature_fetch,
     overlap_feature_fetch,
     overlap_graph_fetch,
+    asynchronous,
     num_gpu_cached_edges,
     gpu_cache_threshold,
 ):
@@ -108,6 +110,7 @@ def test_gpu_sampling_DataLoader(
             "overlap_fetch": overlap_graph_fetch,
             "num_gpu_cached_edges": num_gpu_cached_edges,
             "gpu_cache_threshold": gpu_cache_threshold,
+            "asynchronous": asynchronous,
         }
         if i != 0:
             kwargs = {}
