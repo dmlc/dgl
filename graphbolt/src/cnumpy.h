@@ -176,6 +176,13 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
       semaphore_.acquire();
     }
 
+    ~QueueAndBufferAcquirer() {
+      // If none of the worker threads acquire the semaphore, we make sure to
+      // release the ticket taken in the constructor.
+      const auto releasing = exiting_first_.test_and_set() ? 0 : 1;
+      semaphore_.release(releasing);
+    }
+
     std::pair<UniqueQueue, char*> get() {
       // We consume a slot from the semaphore to use a queue.
       semaphore_.acquire();
