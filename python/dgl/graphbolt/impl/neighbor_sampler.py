@@ -229,6 +229,7 @@ class SamplePerLayer(MiniBatchTransformer):
         replace,
         prob_name,
         overlap_fetch,
+        use_asynchronous=False,
     ):
         graph = sampler.__self__
         self.returning_indices_is_optional = False
@@ -239,6 +240,9 @@ class SamplePerLayer(MiniBatchTransformer):
             and graph._gpu_graph_cache is None
         ):
             datapipe = datapipe.transform(self._sample_per_layer)
+            if use_asynchronous:
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(self._wait_subgraph_future)
             datapipe = (
                 datapipe.transform(partial(self._fetch_indices, graph.indices))
                 .buffer()
@@ -253,7 +257,6 @@ class SamplePerLayer(MiniBatchTransformer):
                         graph.node_type_to_id,
                     )
                 )
-            super().__init__(datapipe)
             self.returning_indices_is_optional = True
         elif overlap_fetch:
             datapipe = datapipe.fetch_insubgraph_data(graph, prob_name)
@@ -262,16 +265,24 @@ class SamplePerLayer(MiniBatchTransformer):
                 datapipe = datapipe.combine_cached_and_fetched_insubgraph(
                     prob_name
                 )
-            super().__init__(
-                datapipe, self._sample_per_layer_from_fetched_subgraph
+            datapipe = datapipe.transform(
+                self._sample_per_layer_from_fetched_subgraph
             )
+            if use_asynchronous:
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(self._wait_subgraph_future)
         else:
-            super().__init__(datapipe, self._sample_per_layer)
+            datapipe = datapipe.transform(self._sample_per_layer)
+            if use_asynchronous:
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(self._wait_subgraph_future)
+        super().__init__(datapipe)
         self.sampler = sampler
         self.fanout = fanout
         self.replace = replace
         self.prob_name = prob_name
         self.overlap_fetch = overlap_fetch
+        self.use_asynchronous = use_asynchronous
 
     def _sample_per_layer(self, minibatch):
         kwargs = {
@@ -285,6 +296,7 @@ class SamplePerLayer(MiniBatchTransformer):
             self.replace,
             self.prob_name,
             self.returning_indices_is_optional,
+            is_asynchronous=self.use_asynchronous,
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, subgraph)
@@ -303,10 +315,15 @@ class SamplePerLayer(MiniBatchTransformer):
             self.fanout,
             self.replace,
             self.prob_name,
+            is_asynchronous=self.use_asynchronous,
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, sampled_subgraph)
+        return minibatch
 
+    @staticmethod
+    def _wait_subgraph_future(minibatch):
+        minibatch.sampled_subgraphs[0] = minibatch.sampled_subgraphs[0].wait()
         return minibatch
 
     @staticmethod
@@ -363,9 +380,10 @@ class SamplePerLayer(MiniBatchTransformer):
 class CompactPerLayer(MiniBatchTransformer):
     """Compact the sampled edges for a single layer."""
 
-    def __init__(self, datapipe, deduplicate):
-        super().__init__(datapipe, self._compact_per_layer)
+    def __init__(self, datapipe, deduplicate, use_asynchronous=False):
         self.deduplicate = deduplicate
+        self.use_asynchronous = use_asynchronous
+        super().__init__(datapipe, self._compact_per_layer)
 
     def _compact_per_layer(self, minibatch):
         subgraph = minibatch.sampled_subgraphs[0]
@@ -521,7 +539,7 @@ class NeighborSamplerImpl(SubgraphSampler):
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
             datapipe = datapipe.sample_per_layer(
-                sampler, fanout, replace, prob_name, overlap_fetch
+                sampler, fanout, replace, prob_name, overlap_fetch, False
             )
             datapipe = datapipe.compact_per_layer(deduplicate)
             if is_labor and not layer_dependency:

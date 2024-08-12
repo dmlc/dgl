@@ -812,6 +812,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             replace=replace,
             probs_or_mask=probs_or_mask,
             returning_indices_is_optional=returning_indices_is_optional,
+            is_asynchronous=is_asynchronous,
         )
         if is_asynchronous:
             return _SampleNeighborsWaiter(
