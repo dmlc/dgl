@@ -10,6 +10,7 @@ import torch
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
 from ..internal_utils import gb_warning, is_wsl, recursive_apply
 from ..sampling_graph import SamplingGraph
+from .gpu_graph_cache import GPUGraphCache
 from .sampled_subgraph_impl import CSCFormatBase, SampledSubgraphImpl
 
 
@@ -330,6 +331,14 @@ class FusedCSCSamplingGraph(SamplingGraph):
     ):
         """Sets the indptr node type offset list if present."""
         self._indptr_node_type_offset_list_ = indptr_node_type_offset_list
+
+    @property
+    def _gpu_graph_cache(self) -> Optional[GPUGraphCache]:
+        return (
+            self._gpu_graph_cache_
+            if hasattr(self, "_gpu_graph_cache_")
+            else None
+        )
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
@@ -1480,6 +1489,28 @@ class FusedCSCSamplingGraph(SamplingGraph):
             return x
 
         return self._apply_to_members(_pin)
+
+    def _initialize_gpu_graph_cache(
+        self,
+        num_gpu_cached_edges: int,
+        gpu_cache_threshold: int,
+        prob_name: Optional[str] = None,
+    ):
+        "Construct a GPUGraphCache given the cache parameters."
+        num_gpu_cached_edges = min(num_gpu_cached_edges, self.total_num_edges)
+        dtypes = [self.indices.dtype]
+        if self.type_per_edge is not None:
+            dtypes.append(self.type_per_edge.dtype)
+        if self.edge_attributes is not None:
+            probs_or_mask = self.edge_attributes.get(prob_name, None)
+            if probs_or_mask is not None:
+                dtypes.append(probs_or_mask.dtype)
+        self._gpu_graph_cache_ = GPUGraphCache(
+            num_gpu_cached_edges,
+            gpu_cache_threshold,
+            self.csc_indptr.dtype,
+            dtypes,
+        )
 
 
 def fused_csc_sampling_graph(

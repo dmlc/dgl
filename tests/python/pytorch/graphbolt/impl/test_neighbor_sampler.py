@@ -7,7 +7,6 @@ import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
-from dgl.graphbolt.dataloader import construct_gpu_graph_cache
 
 
 def get_hetero_graph():
@@ -72,21 +71,11 @@ def test_NeighborSampler_GraphFetch(
     compact_per_layer = sample_per_layer.compact_per_layer(True)
     gb.seed(123)
     expected_results = list(compact_per_layer)
-    gpu_graph_cache = None
     if num_cached_edges > 0:
-        gpu_graph_cache = construct_gpu_graph_cache(
-            sample_per_layer, num_cached_edges, 1
-        )
-    datapipe = gb.FetchInsubgraphData(
-        datapipe,
-        sample_per_layer,
-        gpu_graph_cache,
+        graph._initialize_gpu_graph_cache(num_cached_edges, 1, prob_name)
+    datapipe = datapipe.sample_per_layer(
+        graph.sample_neighbors, fanout, False, prob_name, True
     )
-    if num_cached_edges > 0:
-        datapipe = gb.CombineCachedAndFetchedInSubgraph(
-            datapipe, sample_per_layer
-        )
-    datapipe = gb.SamplePerLayerFromFetchedSubgraph(datapipe, sample_per_layer)
     datapipe = datapipe.compact_per_layer(True)
     gb.seed(123)
     new_results = list(datapipe)
@@ -99,10 +88,10 @@ def test_NeighborSampler_GraphFetch(
         return minibatch
 
     datapipe = item_sampler.sample_neighbor(
-        graph, [fanout], False, prob_name=prob_name
+        graph, [fanout], False, prob_name=prob_name, overlap_fetch=True
     )
     datapipe = datapipe.transform(remove_input_nodes)
-    dataloader = gb.DataLoader(datapipe, overlap_graph_fetch=True)
+    dataloader = gb.DataLoader(datapipe)
     gb.seed(123)
     new_results = list(dataloader)
     assert len(expected_results) == len(new_results)
@@ -113,6 +102,8 @@ def test_NeighborSampler_GraphFetch(
 @pytest.mark.parametrize("layer_dependency", [False, True])
 @pytest.mark.parametrize("overlap_graph_fetch", [False, True])
 def test_labor_dependent_minibatching(layer_dependency, overlap_graph_fetch):
+    if F._default_context_str != "gpu" and overlap_graph_fetch:
+        pytest.skip("overlap_graph_fetch is only available for GPU.")
     num_edges = 200
     csc_indptr = torch.cat(
         (
@@ -133,12 +124,11 @@ def test_labor_dependent_minibatching(layer_dependency, overlap_graph_fetch):
     datapipe = datapipe.sample_layer_neighbor(
         graph,
         fanouts,
+        overlap_fetch=overlap_graph_fetch,
         layer_dependency=layer_dependency,
         batch_dependency=batch_dependency,
     )
-    dataloader = gb.DataLoader(
-        datapipe, overlap_graph_fetch=overlap_graph_fetch
-    )
+    dataloader = gb.DataLoader(datapipe)
     res = list(dataloader)
     assert len(res) == batch_dependency + 1
     if layer_dependency:
