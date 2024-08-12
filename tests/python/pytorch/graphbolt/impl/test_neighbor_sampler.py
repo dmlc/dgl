@@ -102,6 +102,8 @@ def test_NeighborSampler_GraphFetch(
 @pytest.mark.parametrize("layer_dependency", [False, True])
 @pytest.mark.parametrize("overlap_graph_fetch", [False, True])
 def test_labor_dependent_minibatching(layer_dependency, overlap_graph_fetch):
+    if F._default_context_str != "gpu" and overlap_graph_fetch:
+        pytest.skip("overlap_graph_fetch is only available for GPU.")
     num_edges = 200
     csc_indptr = torch.cat(
         (
