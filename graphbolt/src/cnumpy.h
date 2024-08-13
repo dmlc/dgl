@@ -141,8 +141,8 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   static inline int num_queues_;  // Number of queues.
   static inline std::unique_ptr<::io_uring[], io_uring_queue_destroyer>
       io_uring_queue_;  // io_uring queue.
-  static inline counting_semaphore_t
-      semaphore_;  // Control access to the io_uring queues.
+  static inline counting_semaphore_t semaphore_{
+      0};  // Control access to the io_uring queues.
   static inline std::mutex available_queues_mtx_;  // available_queues_ mutex.
   static inline std::vector<int> available_queues_;
 
