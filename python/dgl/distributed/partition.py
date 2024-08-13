@@ -320,7 +320,7 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
         part_graph_field = "part_graph_graphbolt"
     assert (
         part_graph_field in part_files
-    ), f"the partition does not contain graph structure: {part_graph_field}\n{part_files}"
+    ), f"the partition does not contain graph structure: {part_graph_field}"
     partition_path = relative_to_config(part_files[part_graph_field])
     logging.info(
         "Start to load partition from %s which is "
