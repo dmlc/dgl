@@ -11,6 +11,7 @@ from collections import defaultdict
 from typing import Optional, Set, TYPE_CHECKING
 
 from torch.utils.data.datapipes.iter.combining import _ChildDataPipe
+
 from .utils import IterDataPipe, traverse_dps
 
 if TYPE_CHECKING:
@@ -98,7 +99,11 @@ def to_nodes(dp, *, debug: bool) -> Set[Node]:
             return nodes
 
         child_dp_nodes = set(
-            itertools.chain.from_iterable(node.parents for node in nodes if isinstance(node.dp, _ChildDataPipe))
+            itertools.chain.from_iterable(
+                node.parents
+                for node in nodes
+                if isinstance(node.dp, _ChildDataPipe)
+            )
         )
 
         if not child_dp_nodes:
@@ -106,7 +111,11 @@ def to_nodes(dp, *, debug: bool) -> Set[Node]:
 
         for node in child_dp_nodes:
             fixed_parent_node = Node(
-                type(str(node).lstrip("_"), (IterDataPipe,), dict(dp=node.dp, childs=node.childs))()
+                type(
+                    str(node).lstrip("_"),
+                    (IterDataPipe,),
+                    dict(dp=node.dp, childs=node.childs),
+                )()
             )
             nodes.remove(node)
             nodes.add(fixed_parent_node)
