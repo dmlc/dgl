@@ -336,7 +336,7 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
     )
     logging.info("Finished loading partition from %s.", partition_path)
 
-    gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id)
+    gpb, _, ntypes, etypes = load_partition_book(part_config, part_id)
     ntypes_list = list(ntypes.keys())
     etypes_list = list(etypes.keys())
 
