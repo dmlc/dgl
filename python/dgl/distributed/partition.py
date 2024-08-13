@@ -444,7 +444,7 @@ def load_partition_feats(
     return node_feats, edge_feats
 
 
-def load_partition_book(part_config, part_id,part_metadata=None):
+def load_partition_book(part_config, part_id, part_metadata=None):
     """Load a graph partition book from the partition config file.
 
     Parameters
@@ -1445,8 +1445,10 @@ def gb_convert_single_dgl_partition(
         part_meta = _load_part_config(part_config)
     num_parts = part_meta["num_parts"]
 
-    graph=parts[part_id]
-    gpb, _, ntypes, etypes = load_partition_book(part_config, part_id,part_meta)
+    graph = parts[part_id]
+    gpb, _, ntypes, etypes = load_partition_book(
+        part_config, part_id, part_meta
+    )
 
     is_homo = is_homogeneous(ntypes, etypes)
     node_type_to_id = (
@@ -1553,7 +1555,7 @@ def gb_convert_single_dgl_partition(
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
     )
-    orig_graph_path=os.path.join(
+    orig_graph_path = os.path.join(
         os.path.dirname(part_config),
         part_meta[f"part-{part_id}"]["node_feats"],
     )
@@ -1575,7 +1577,7 @@ def dgl_partition_to_graphbolt(
     graph_formats=None,
     n_jobs=1,
     parts=None,
-    part_meta=None
+    part_meta=None,
 ):
     """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
 
