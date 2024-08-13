@@ -382,7 +382,7 @@ class CompactPerLayer(MiniBatchTransformer):
 
     def __init__(self, datapipe, deduplicate, asynchronous=False):
         self.deduplicate = deduplicate
-        if asynchronous and not deduplicate:
+        if asynchronous and deduplicate:
             datapipe = datapipe.transform(self._compact_per_layer_async)
             datapipe = datapipe.buffer()
             super().__init__(datapipe, self._compact_per_layer_wait_future)
@@ -428,7 +428,8 @@ class CompactPerLayer(MiniBatchTransformer):
         return minibatch
 
     @staticmethod
-    def _compact_per_layer_wait_future(self, minibatch):
+    def _compact_per_layer_wait_future(minibatch):
+        subgraph = minibatch.sampled_subgraphs[0]
         seeds = minibatch._seed_nodes
         original_row_node_ids, compacted_csc_format = minibatch._future.wait()
         delattr(minibatch, "_future")
