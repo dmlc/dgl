@@ -721,7 +721,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         returning_indices_is_optional: bool = False,
-        is_asynchronous: bool = False,
+        async_op: bool = False,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -765,7 +765,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             Boolean indicating whether it is okay for the call to this function
             to leave the indices tensor uninitialized. In this case, it is the
             user's responsibility to gather it using the edge ids.
-        is_asynchronous: bool
+        async_op: bool
             Boolean indicating whether the call is asynchronous. If so, the
             result can be obtained by calling wait on the returned future.
 
@@ -812,9 +812,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             replace=replace,
             probs_or_mask=probs_or_mask,
             returning_indices_is_optional=returning_indices_is_optional,
-            is_asynchronous=is_asynchronous,
+            async_op=async_op,
         )
-        if is_asynchronous:
+        if async_op:
             return _SampleNeighborsWaiter(
                 self._convert_to_sampled_subgraph,
                 C_sampled_subgraph,
@@ -872,7 +872,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_or_mask: Optional[torch.Tensor] = None,
         returning_indices_is_optional: bool = False,
-        is_asynchronous: bool = False,
+        async_op: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -915,7 +915,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             Boolean indicating whether it is okay for the call to this function
             to leave the indices tensor uninitialized. In this case, it is the
             user's responsibility to gather it using the edge ids.
-        is_asynchronous: bool
+        async_op: bool
             Boolean indicating whether the call is asynchronous. If so, the
             result can be obtained by calling wait on the returned future.
 
@@ -928,7 +928,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._check_sampler_arguments(seeds, fanouts, probs_or_mask)
         sampling_fn = (
             self._c_csc_graph.sample_neighbors_async
-            if is_asynchronous
+            if async_op
             else self._c_csc_graph.sample_neighbors
         )
         return sampling_fn(
@@ -952,7 +952,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         returning_indices_is_optional: bool = False,
         random_seed: torch.Tensor = None,
         seed2_contribution: float = 0.0,
-        is_asynchronous: bool = False,
+        async_op: bool = False,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
@@ -1073,7 +1073,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self._check_sampler_arguments(seeds, fanouts, probs_or_mask)
         sampling_fn = (
             self._c_csc_graph.sample_neighbors_async
-            if is_asynchronous
+            if async_op
             else self._c_csc_graph.sample_neighbors
         )
         C_sampled_subgraph = sampling_fn(
@@ -1087,7 +1087,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             random_seed,
             seed2_contribution,
         )
-        if is_asynchronous:
+        if async_op:
             return _SampleNeighborsWaiter(
                 self._convert_to_sampled_subgraph,
                 C_sampled_subgraph,

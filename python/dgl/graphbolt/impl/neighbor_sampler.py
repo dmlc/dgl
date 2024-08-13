@@ -296,7 +296,7 @@ class SamplePerLayer(MiniBatchTransformer):
             self.replace,
             self.prob_name,
             self.returning_indices_is_optional,
-            is_asynchronous=self.asynchronous,
+            async_op=self.asynchronous,
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, subgraph)
@@ -315,7 +315,7 @@ class SamplePerLayer(MiniBatchTransformer):
             self.fanout,
             self.replace,
             self.prob_name,
-            is_asynchronous=self.asynchronous,
+            async_op=self.asynchronous,
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, sampled_subgraph)
@@ -423,7 +423,7 @@ class CompactPerLayer(MiniBatchTransformer):
         seeds = minibatch._seed_nodes
         assert self.deduplicate
         minibatch._future = unique_and_compact_csc_formats(
-            subgraph.sampled_csc, seeds, is_asynchronous=True
+            subgraph.sampled_csc, seeds, async_op=True
         )
         return minibatch
 

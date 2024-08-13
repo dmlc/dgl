@@ -124,7 +124,7 @@ def unique_and_compact_csc_formats(
         torch.Tensor,
         Dict[str, torch.Tensor],
     ],
-    is_asynchronous: bool = False,
+    async_op: bool = False,
 ):
     """
     Compact csc formats and return unique nodes (per type).
@@ -145,7 +145,7 @@ def unique_and_compact_csc_formats(
         - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
         - If `csc_formats` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
-    is_asynchronous: bool
+    async_op: bool
         Boolean indicating whether the call is asynchronous. If so, the result
         can be obtained by calling wait on the returned future.
 
@@ -215,7 +215,7 @@ def unique_and_compact_csc_formats(
     )
     unique_fn = (
         torch.ops.graphbolt.unique_and_compact_batched_async
-        if is_asynchronous
+        if async_op
         else torch.ops.graphbolt.unique_and_compact_batched
     )
     results = unique_fn(indice_list, dst_list, unique_dst_list)
@@ -227,7 +227,7 @@ def unique_and_compact_csc_formats(
 
         def wait(self):
             """Returns the stored value when invoked."""
-            results = self.future.wait() if is_asynchronous else self.future
+            results = self.future.wait() if async_op else self.future
             csc_formats = self.csc_formats
             # Ensure there is no memory leak.
             self.future = self.csc_formats = None
@@ -259,7 +259,7 @@ def unique_and_compact_csc_formats(
             return unique_nodes, compacted_csc_formats
 
     post_processer = _Waiter(results, csc_formats)
-    if is_asynchronous:
+    if async_op:
         return post_processer
     else:
         return post_processer.wait()
