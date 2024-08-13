@@ -18,7 +18,15 @@ from .. import gb_test_utils
 )
 @pytest.mark.parametrize(
     "indices_dtype",
-    [torch.int8, torch.int16, torch.int32, torch.int64],
+    [
+        torch.int8,
+        torch.uint8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.float32,
+        torch.float64,
+    ],
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("is_pinned", [False, True])

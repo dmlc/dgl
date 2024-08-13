@@ -213,7 +213,7 @@ function-naming-style=snake_case
 # op - operators
 # ty - type
 # A, B, C, W - for tensor operators like matmul
-# dp - DataPipes (see https://pytorch.org/data/main/torchdata.datapipes.iter.html)
+# dp - DataPipes (see https://pytorch.org/data/0.7/torchdata.datapipes.iter.html)
 # it - iterators
 good-names=f,i,j,k,u,v,e,n,m,w,x,y,z,s,d,t,r,g,G,hg,sg,fn,ex,Run,_,us,vs,gs,es,op,ty,A,B,C,W,a,b,N,D1,D2,R,dp,it
 

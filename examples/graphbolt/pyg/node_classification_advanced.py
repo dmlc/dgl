@@ -188,16 +188,23 @@ def create_dataloader(
         shuffle=(job == "train"),
         drop_last=(job == "train"),
     )
+    need_copy = True
     # Copy the data to the specified device.
-    if args.graph_device != "cpu":
+    if args.graph_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
+        need_copy = False
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1]
+        graph,
+        fanout if job != "infer" else [-1],
+        overlap_fetch=args.overlap_graph_fetch,
+        num_gpu_cached_edges=args.num_gpu_cached_edges,
+        gpu_cache_threshold=args.gpu_graph_caching_threshold,
     )
     # Copy the data to the specified device.
-    if args.feature_device != "cpu":
+    if args.feature_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
+        need_copy = False
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(
         features,
@@ -205,16 +212,10 @@ def create_dataloader(
         overlap_fetch=args.overlap_feature_fetch,
     )
     # Copy the data to the specified device.
-    if args.feature_device == "cpu":
+    if need_copy:
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
-    return gb.DataLoader(
-        datapipe,
-        num_workers=args.num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
-        num_gpu_cached_edges=args.num_gpu_cached_edges,
-        gpu_cache_threshold=args.gpu_graph_caching_threshold,
-    )
+    return gb.DataLoader(datapipe, num_workers=args.num_workers)
 
 
 @torch.compile
@@ -412,11 +413,7 @@ def main():
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
     args.overlap_feature_fetch = args.feature_device == "pinned"
-    # For now, only sample_layer_neighbor is faster with this option
-    args.overlap_graph_fetch = (
-        args.sample_mode == "sample_layer_neighbor"
-        and args.graph_device == "pinned"
-    )
+    args.overlap_graph_fetch = args.graph_device == "pinned"
 
     # Load and preprocess dataset.
     print("Loading data...")

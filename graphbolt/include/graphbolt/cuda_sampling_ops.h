@@ -54,8 +54,8 @@ namespace ops {
  * @param layer Boolean indicating whether neighbors should be sampled in a
  * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
  * sampled edges, see arXiv:2210.13339.
- * @param return_eids Boolean indicating whether edge IDs need to be returned,
- * typically used when edge features are required.
+ * @param returning_indices_is_optional Boolean indicating whether returning
+ * indices tensor is optional.
  * @param type_per_edge A tensor representing the type of each edge, if present.
  * @param probs_or_mask An optional tensor with (unnormalized) probabilities
  * corresponding to each neighboring edge of a node. It must be
@@ -69,6 +69,16 @@ namespace ops {
  * @param random_seed The random seed for the sampler for layer=True.
  * @param seed2_contribution The contribution of the second random seed, [0, 1)
  * for layer=True.
+ * @param seeds_timestamp The timestamp of the seeds.
+ * @param seeds_pre_time_window The time window of the seeds represents a period
+ * of time before `seeds_timestamp`. If provided, only neighbors and related
+ * edges whose timestamps fall within
+ * `[seeds_timestamp - seeds_pre_time_window, seeds_timestamp]` will be
+ * filtered.
+ * @param node_timestamp An optional tensor that contains the timestamp of nodes
+ * in the graph.
+ * @param edge_timestamp An optional tensor that contains the timestamp of edges
+ * in the graph.
  *
  * @return An intrusive pointer to a FusedSampledSubgraph object containing
  * the sampled graph's information.
@@ -78,7 +88,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> seeds,
     torch::optional<std::vector<int64_t>> seed_offsets,
     const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    bool return_eids,
+    bool returning_indices_is_optional,
     torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
     torch::optional<torch::Tensor> probs_or_mask = torch::nullopt,
     torch::optional<torch::Tensor> node_type_offset = torch::nullopt,
@@ -87,7 +97,14 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Dict<std::string, int64_t>> edge_type_to_id =
         torch::nullopt,
     torch::optional<torch::Tensor> random_seed = torch::nullopt,
-    float seed2_contribution = .0f);
+    float seed2_contribution = .0f,
+    // Optional temporal sampling arguments begin.
+    torch::optional<torch::Tensor> seeds_timestamp = torch::nullopt,
+    torch::optional<torch::Tensor> seeds_pre_time_window = torch::nullopt,
+    torch::optional<torch::Tensor> node_timestamp = torch::nullopt,
+    torch::optional<torch::Tensor> edge_timestamp = torch::nullopt
+    // Optional temporal sampling arguments end.
+);
 
 /**
  * @brief Return the subgraph induced on the inbound edges of the given nodes.

@@ -7,7 +7,7 @@
 #define DGL_ARRAY_CPU_ARRAY_UTILS_H_
 
 #include <dgl/aten/types.h>
-#include <parallel_hashmap/phmap.h>
+#include <tsl/robin_map.h>
 
 #include <unordered_map>
 #include <utility>
@@ -53,8 +53,7 @@ class IdHashMap {
     const int64_t len = ids->shape[0];
     for (int64_t i = 0; i < len; ++i) {
       const IdType id = ids_data[i];
-      // phmap::flat_hash_map::insert assures that an insertion will not happen
-      // if the key already exists.
+      // Insertion will not happen if the key already exists.
       oldv2newv_.insert({id, oldv2newv_.size()});
       filter_[id & kFilterMask] = true;
     }
@@ -106,7 +105,7 @@ class IdHashMap {
   // lookups.
   std::vector<bool> filter_;
   // The hashmap from old vid to new vid
-  phmap::flat_hash_map<IdType, IdType> oldv2newv_;
+  tsl::robin_map<IdType, IdType> oldv2newv_;
 };
 
 /**

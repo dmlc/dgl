@@ -124,7 +124,9 @@ def create_dataloader(
     #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
     # `fanouts`:
     #   The number of neighbors to sample for each node in each layer.
-    datapipe = datapipe.sample_neighbor(graph, fanouts=fanouts)
+    datapipe = datapipe.sample_neighbor(
+        graph, fanouts=fanouts, overlap_fetch=args.overlap_graph_fetch
+    )
 
     # Fetch the features for each node in the mini-batch.
     # `features`:
@@ -568,9 +570,11 @@ def main(args):
     ) = load_dataset(args.dataset)
 
     # Move the dataset to the pinned memory to enable GPU access.
+    args.overlap_graph_fetch = False
     if device == torch.device("cuda"):
         g.pin_memory_()
         features.pin_memory_()
+        args.overlap_graph_fetch = True
 
     feat_size = features.size("node", "paper", "feat")[0]
 

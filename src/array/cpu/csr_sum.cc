@@ -6,7 +6,8 @@
 
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>
-#include <parallel_hashmap/phmap.h>
+#include <tsl/robin_map.h>
+#include <tsl/robin_set.h>
 
 #include <vector>
 
@@ -30,7 +31,7 @@ void CountNNZPerRow(
 
   runtime::parallel_for(0, M, [=](size_t b, size_t e) {
     for (size_t i = b; i < e; ++i) {
-      phmap::flat_hash_set<IdType> set;
+      tsl::robin_set<IdType> set;
       for (int64_t k = 0; k < n; ++k) {
         for (IdType u = A_indptr[k][i]; u < A_indptr[k][i + 1]; ++u)
           set.insert(A_indices[k][u]);
@@ -63,7 +64,7 @@ void ComputeIndicesAndData(
   int64_t n = A_indptr.size();
   runtime::parallel_for(0, M, [=](size_t b, size_t e) {
     for (auto i = b; i < e; ++i) {
-      phmap::flat_hash_map<IdType, DType> map;
+      tsl::robin_map<IdType, DType> map;
       for (int64_t k = 0; k < n; ++k) {
         for (IdType u = A_indptr[k][i]; u < A_indptr[k][i + 1]; ++u) {
           IdType kA = A_indices[k][u];

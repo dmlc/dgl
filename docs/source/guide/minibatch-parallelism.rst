@@ -24,7 +24,7 @@ generate a minibatch, including:
     dataloader = gb.DataLoader(datapipe)
 
 All these stages are implemented in separate
-`IterableDataPipe <https://pytorch.org/data/main/torchdata.datapipes.iter.html>`__
+`IterableDataPipe <https://pytorch.org/data/0.7/torchdata.datapipes.iter.html>`__
 and stacked together with `PyTorch DataLoader <https://pytorch.org/docs/stable/data
 .html#torch.utils.data.DataLoader>`__.
 This design allows us to easily customize the data loading process by
@@ -44,7 +44,7 @@ data movement overheads between processes.
 
 What's more, in order to overlap the data movement and model computation, we
 wrap data pipes before ``copy_to`` with
-`torchdata.datapipes.iter.Perfetcher <https://pytorch.org/data/main/generated/
+`torchdata.datapipes.iter.Perfetcher <https://pytorch.org/data/0.7/generated/
 torchdata.datapipes.iter.Prefetcher.html>`__
 which prefetches elements from previous data pipes and puts them into a buffer.
 Such prefetching is totally transparent to users and requires no extra code. It
