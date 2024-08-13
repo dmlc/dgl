@@ -1,9 +1,11 @@
+# pylint: disable=W,C,R
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
-# Original source: https://github.com/pytorch/data/blob/c0fa044bc68b540a0a13466cf92cf64dd5b7d7be/torchdata/datapipes/utils/_visualization.py
+# Original source:
+# https://github.com/pytorch/data/blob/v0.7.1/torchdata/datapipes/utils/_visualization.py
 
 import itertools
 from collections import defaultdict
