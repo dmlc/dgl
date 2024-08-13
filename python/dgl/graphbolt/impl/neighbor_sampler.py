@@ -382,8 +382,12 @@ class CompactPerLayer(MiniBatchTransformer):
 
     def __init__(self, datapipe, deduplicate, asynchronous=False):
         self.deduplicate = deduplicate
-        self.asynchronous = asynchronous
-        super().__init__(datapipe, self._compact_per_layer)
+        if asynchronous and not deduplicate:
+            datapipe = datapipe.transform(self._compact_per_layer_async)
+            datapipe = datapipe.buffer()
+            super().__init__(datapipe, self._compact_per_layer_wait_future)
+        else:
+            super().__init__(datapipe, self._compact_per_layer)
 
     def _compact_per_layer(self, minibatch):
         subgraph = minibatch.sampled_subgraphs[0]
@@ -410,6 +414,30 @@ class CompactPerLayer(MiniBatchTransformer):
                 original_row_node_ids=original_row_node_ids,
                 original_edge_ids=subgraph.original_edge_ids,
             )
+        minibatch._seed_nodes = original_row_node_ids
+        minibatch.sampled_subgraphs[0] = subgraph
+        return minibatch
+
+    def _compact_per_layer_async(self, minibatch):
+        subgraph = minibatch.sampled_subgraphs[0]
+        seeds = minibatch._seed_nodes
+        assert self.deduplicate
+        minibatch._future = unique_and_compact_csc_formats(
+            subgraph.sampled_csc, seeds, is_asynchronous=True
+        )
+        return minibatch
+
+    @staticmethod
+    def _compact_per_layer_wait_future(self, minibatch):
+        seeds = minibatch._seed_nodes
+        original_row_node_ids, compacted_csc_format = minibatch._future.wait()
+        delattr(minibatch, "_future")
+        subgraph = SampledSubgraphImpl(
+            sampled_csc=compacted_csc_format,
+            original_column_node_ids=seeds,
+            original_row_node_ids=original_row_node_ids,
+            original_edge_ids=subgraph.original_edge_ids,
+        )
         minibatch._seed_nodes = original_row_node_ids
         minibatch.sampled_subgraphs[0] = subgraph
         return minibatch
