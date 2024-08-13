@@ -1446,8 +1446,8 @@ def gb_convert_single_dgl_partition(
     num_parts = part_meta["num_parts"]
 
     graph=parts[part_id]
-    gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id,part_meta)
-    
+    gpb, _, ntypes, etypes = load_partition_book(part_config, part_id,part_meta)
+
     is_homo = is_homogeneous(ntypes, etypes)
     node_type_to_id = (
         None if is_homo else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
@@ -1613,7 +1613,7 @@ def dgl_partition_to_graphbolt(
             "Running in debug mode which means all attributes of DGL partitions"
             " will be saved to the new format."
         )
-    if part_meta is None:    
+    if part_meta is None:
         assert part_config is not None
         part_meta = _load_part_config(part_config)
     assert part_meta is not None
