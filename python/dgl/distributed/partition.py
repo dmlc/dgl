@@ -1313,16 +1313,16 @@ def partition_graph(
 
         if use_graphbolt:
             part_metadata["part-{}".format(part_id)] = {
-            "node_feats": os.path.relpath(node_feat_file, out_path),
-            "edge_feats": os.path.relpath(edge_feat_file, out_path),
-        }
+                "node_feats": os.path.relpath(node_feat_file, out_path),
+                "edge_feats": os.path.relpath(edge_feat_file, out_path),
+            }
         else:
             part_graph_file = os.path.join(part_dir, "graph.dgl")
             part_metadata["part-{}".format(part_id)] = {
-            "node_feats": os.path.relpath(node_feat_file, out_path),
-            "edge_feats": os.path.relpath(edge_feat_file, out_path),
-            "part_graph": os.path.relpath(part_graph_file, out_path),
-        }
+                "node_feats": os.path.relpath(node_feat_file, out_path),
+                "edge_feats": os.path.relpath(edge_feat_file, out_path),
+                "part_graph": os.path.relpath(part_graph_file, out_path),
+            }
             sort_etypes = len(g.etypes) > 1
             _save_graphs(
                 part_graph_file,
@@ -1330,7 +1330,6 @@ def partition_graph(
                 formats=graph_formats,
                 sort_etypes=sort_etypes,
             )
-
 
     part_config = os.path.join(out_path, graph_name + ".json")
     if use_graphbolt:
