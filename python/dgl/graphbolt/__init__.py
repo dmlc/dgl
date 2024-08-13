@@ -79,6 +79,7 @@ load_graphbolt()
 from .base import *
 from .minibatch import *
 from .dataloader import *
+from .datapipes import *
 from .dataset import *
 from .feature_fetcher import *
 from .feature_store import *
