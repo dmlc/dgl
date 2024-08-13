@@ -154,11 +154,10 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
       UniqueQueue& operator=(const UniqueQueue&) = delete;
 
       ~UniqueQueue() {
-        {
-          // We give back the slot we used.
-          std::lock_guard lock(available_queues_mtx_);
-          available_queues_.push_back(thread_id_);
-        }
+        // We give back the slot we used and keep the lock until the semaphore
+        // is released.
+        std::lock_guard lock(available_queues_mtx_);
+        available_queues_.push_back(thread_id_);
         // If this is the first thread exiting, release the master thread's
         // ticket as well by releasing 2 slots. Otherwise, release 1 slot.
         const auto releasing =
