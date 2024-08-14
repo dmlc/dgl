@@ -229,6 +229,7 @@ class SamplePerLayer(MiniBatchTransformer):
         replace,
         prob_name,
         overlap_fetch,
+        asynchronous=False,
     ):
         graph = sampler.__self__
         self.returning_indices_is_optional = False
@@ -239,6 +240,9 @@ class SamplePerLayer(MiniBatchTransformer):
             and graph._gpu_graph_cache is None
         ):
             datapipe = datapipe.transform(self._sample_per_layer)
+            if asynchronous:
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(self._wait_subgraph_future)
             datapipe = (
                 datapipe.transform(partial(self._fetch_indices, graph.indices))
                 .buffer()
@@ -253,7 +257,6 @@ class SamplePerLayer(MiniBatchTransformer):
                         graph.node_type_to_id,
                     )
                 )
-            super().__init__(datapipe)
             self.returning_indices_is_optional = True
         elif overlap_fetch:
             datapipe = datapipe.fetch_insubgraph_data(graph, prob_name)
@@ -262,16 +265,24 @@ class SamplePerLayer(MiniBatchTransformer):
                 datapipe = datapipe.combine_cached_and_fetched_insubgraph(
                     prob_name
                 )
-            super().__init__(
-                datapipe, self._sample_per_layer_from_fetched_subgraph
+            datapipe = datapipe.transform(
+                self._sample_per_layer_from_fetched_subgraph
             )
+            if asynchronous:
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(self._wait_subgraph_future)
         else:
-            super().__init__(datapipe, self._sample_per_layer)
+            datapipe = datapipe.transform(self._sample_per_layer)
+            if asynchronous:
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(self._wait_subgraph_future)
+        super().__init__(datapipe)
         self.sampler = sampler
         self.fanout = fanout
         self.replace = replace
         self.prob_name = prob_name
         self.overlap_fetch = overlap_fetch
+        self.asynchronous = asynchronous
 
     def _sample_per_layer(self, minibatch):
         kwargs = {
@@ -285,6 +296,7 @@ class SamplePerLayer(MiniBatchTransformer):
             self.replace,
             self.prob_name,
             self.returning_indices_is_optional,
+            async_op=self.asynchronous,
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, subgraph)
@@ -303,10 +315,15 @@ class SamplePerLayer(MiniBatchTransformer):
             self.fanout,
             self.replace,
             self.prob_name,
+            async_op=self.asynchronous,
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, sampled_subgraph)
+        return minibatch
 
+    @staticmethod
+    def _wait_subgraph_future(minibatch):
+        minibatch.sampled_subgraphs[0] = minibatch.sampled_subgraphs[0].wait()
         return minibatch
 
     @staticmethod
@@ -363,9 +380,14 @@ class SamplePerLayer(MiniBatchTransformer):
 class CompactPerLayer(MiniBatchTransformer):
     """Compact the sampled edges for a single layer."""
 
-    def __init__(self, datapipe, deduplicate):
-        super().__init__(datapipe, self._compact_per_layer)
+    def __init__(self, datapipe, deduplicate, asynchronous=False):
         self.deduplicate = deduplicate
+        if asynchronous and deduplicate:
+            datapipe = datapipe.transform(self._compact_per_layer_async)
+            datapipe = datapipe.buffer()
+            super().__init__(datapipe, self._compact_per_layer_wait_future)
+        else:
+            super().__init__(datapipe, self._compact_per_layer)
 
     def _compact_per_layer(self, minibatch):
         subgraph = minibatch.sampled_subgraphs[0]
@@ -396,6 +418,31 @@ class CompactPerLayer(MiniBatchTransformer):
         minibatch.sampled_subgraphs[0] = subgraph
         return minibatch
 
+    def _compact_per_layer_async(self, minibatch):
+        subgraph = minibatch.sampled_subgraphs[0]
+        seeds = minibatch._seed_nodes
+        assert self.deduplicate
+        minibatch._future = unique_and_compact_csc_formats(
+            subgraph.sampled_csc, seeds, async_op=True
+        )
+        return minibatch
+
+    @staticmethod
+    def _compact_per_layer_wait_future(minibatch):
+        subgraph = minibatch.sampled_subgraphs[0]
+        seeds = minibatch._seed_nodes
+        original_row_node_ids, compacted_csc_format = minibatch._future.wait()
+        delattr(minibatch, "_future")
+        subgraph = SampledSubgraphImpl(
+            sampled_csc=compacted_csc_format,
+            original_column_node_ids=seeds,
+            original_row_node_ids=original_row_node_ids,
+            original_edge_ids=subgraph.original_edge_ids,
+        )
+        minibatch._seed_nodes = original_row_node_ids
+        minibatch.sampled_subgraphs[0] = subgraph
+        return minibatch
+
 
 class NeighborSamplerImpl(SubgraphSampler):
     # pylint: disable=abstract-method
@@ -414,6 +461,7 @@ class NeighborSamplerImpl(SubgraphSampler):
         overlap_fetch,
         num_gpu_cached_edges,
         gpu_cache_threshold,
+        asynchronous,
         layer_dependency=None,
         batch_dependency=None,
     ):
@@ -433,6 +481,7 @@ class NeighborSamplerImpl(SubgraphSampler):
             deduplicate,
             sampler,
             overlap_fetch,
+            asynchronous,
             layer_dependency,
         )
 
@@ -508,6 +557,7 @@ class NeighborSamplerImpl(SubgraphSampler):
         deduplicate,
         sampler,
         overlap_fetch,
+        asynchronous,
         layer_dependency,
     ):
         datapipe = datapipe.transform(
@@ -521,9 +571,9 @@ class NeighborSamplerImpl(SubgraphSampler):
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
             datapipe = datapipe.sample_per_layer(
-                sampler, fanout, replace, prob_name, overlap_fetch
+                sampler, fanout, replace, prob_name, overlap_fetch, asynchronous
             )
-            datapipe = datapipe.compact_per_layer(deduplicate)
+            datapipe = datapipe.compact_per_layer(deduplicate, asynchronous)
             if is_labor and not layer_dependency:
                 datapipe = datapipe.transform(self._increment_seed)
         if is_labor:
@@ -589,6 +639,10 @@ class NeighborSampler(NeighborSamplerImpl):
     gpu_cache_threshold : int, optional
         Determines how many times a vertex needs to be accessed before its
         neighborhood ends up being cached on the GPU.
+    asynchronous: bool
+        Boolean indicating whether sampling and compaction stages should run
+        in background threads to hide the latency of CPU GPU synchronization.
+        Should be enabled only when sampling on the GPU.
 
     Examples
     -------
@@ -641,6 +695,7 @@ class NeighborSampler(NeighborSamplerImpl):
         overlap_fetch=False,
         num_gpu_cached_edges=0,
         gpu_cache_threshold=1,
+        asynchronous=False,
     ):
         super().__init__(
             datapipe,
@@ -653,6 +708,7 @@ class NeighborSampler(NeighborSamplerImpl):
             overlap_fetch,
             num_gpu_cached_edges,
             gpu_cache_threshold,
+            asynchronous,
         )
 
 
@@ -736,6 +792,10 @@ class LayerNeighborSampler(NeighborSamplerImpl):
     gpu_cache_threshold : int, optional
         Determines how many times a vertex needs to be accessed before its
         neighborhood ends up being cached on the GPU.
+    asynchronous: bool
+        Boolean indicating whether sampling and compaction stages should run
+        in background threads to hide the latency of CPU GPU synchronization.
+        Should be enabled only when sampling on the GPU.
 
     Examples
     -------
@@ -797,6 +857,7 @@ class LayerNeighborSampler(NeighborSamplerImpl):
         overlap_fetch=False,
         num_gpu_cached_edges=0,
         gpu_cache_threshold=1,
+        asynchronous=False,
     ):
         super().__init__(
             datapipe,
@@ -809,6 +870,7 @@ class LayerNeighborSampler(NeighborSamplerImpl):
             overlap_fetch,
             num_gpu_cached_edges,
             gpu_cache_threshold,
+            asynchronous,
             layer_dependency,
             batch_dependency,
         )

@@ -6,6 +6,7 @@
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
+#include <graphbolt/async.h>
 #include <graphbolt/continuous_seed.h>
 #include <graphbolt/fused_sampled_subgraph.h>
 #include <graphbolt/shared_memory.h>
@@ -354,6 +355,16 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * the sampled graph's information.
    */
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
+      torch::optional<torch::Tensor> seeds,
+      torch::optional<std::vector<int64_t>> seed_offsets,
+      const std::vector<int64_t>& fanouts, bool replace, bool layer,
+      bool returning_indices_is_optional,
+      torch::optional<torch::Tensor> probs_or_mask,
+      torch::optional<torch::Tensor> random_seed,
+      double seed2_contribution) const;
+
+  c10::intrusive_ptr<Future<c10::intrusive_ptr<FusedSampledSubgraph>>>
+  SampleNeighborsAsync(
       torch::optional<torch::Tensor> seeds,
       torch::optional<std::vector<int64_t>> seed_offsets,
       const std::vector<int64_t>& fanouts, bool replace, bool layer,

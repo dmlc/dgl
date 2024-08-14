@@ -871,6 +871,23 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
   }
 }
 
+c10::intrusive_ptr<Future<c10::intrusive_ptr<FusedSampledSubgraph>>>
+FusedCSCSamplingGraph::SampleNeighborsAsync(
+    torch::optional<torch::Tensor> seeds,
+    torch::optional<std::vector<int64_t>> seed_offsets,
+    const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool returning_indices_is_optional,
+    torch::optional<torch::Tensor> probs_or_mask,
+    torch::optional<torch::Tensor> random_seed,
+    double seed2_contribution) const {
+  return async([=] {
+    return this->SampleNeighbors(
+        seeds, seed_offsets, fanouts, replace, layer,
+        returning_indices_is_optional, probs_or_mask, random_seed,
+        seed2_contribution);
+  });
+}
+
 c10::intrusive_ptr<FusedSampledSubgraph>
 FusedCSCSamplingGraph::TemporalSampleNeighbors(
     const torch::optional<torch::Tensor>& seeds,
