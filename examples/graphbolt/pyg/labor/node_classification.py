@@ -147,7 +147,10 @@ def create_dataloader(
         else {}
     )
     datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1], **kwargs
+        graph,
+        fanout if job != "infer" else [-1],
+        overlap_fetch=args.overlap_graph_fetch,
+        **kwargs,
     )
     # Copy the data to the specified device.
     if args.feature_device != "cpu" and need_copy:
@@ -163,11 +166,7 @@ def create_dataloader(
     if need_copy:
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
-    return gb.DataLoader(
-        datapipe,
-        num_workers=args.num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
-    )
+    return gb.DataLoader(datapipe, num_workers=args.num_workers)
 
 
 @torch.compile

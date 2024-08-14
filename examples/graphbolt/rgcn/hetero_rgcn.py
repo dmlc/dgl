@@ -124,7 +124,9 @@ def create_dataloader(
     #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
     # `fanouts`:
     #   The number of neighbors to sample for each node in each layer.
-    datapipe = datapipe.sample_neighbor(graph, fanouts=fanouts)
+    datapipe = datapipe.sample_neighbor(
+        graph, fanouts=fanouts, overlap_fetch=args.overlap_graph_fetch
+    )
 
     # Fetch the features for each node in the mini-batch.
     # `features`:
@@ -141,11 +143,7 @@ def create_dataloader(
     # Create a DataLoader from the datapipe.
     # `num_workers`:
     #   The number of worker processes to use for data loading.
-    return gb.DataLoader(
-        datapipe,
-        num_workers=num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
-    )
+    return gb.DataLoader(datapipe, num_workers=num_workers)
 
 
 def extract_embed(node_embed, input_nodes):
