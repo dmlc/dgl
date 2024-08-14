@@ -136,6 +136,8 @@ def test_gpu_sampling_DataLoader(
     if overlap_graph_fetch:
         bufferer_cnt += num_layers
         awaiter_cnt += num_layers
+    if asynchronous:
+        bufferer_cnt += 2 * num_layers
     datapipe = dataloader.dataset
     datapipe_graph = traverse_dps(datapipe)
     awaiters = find_dps(
@@ -147,7 +149,7 @@ def test_gpu_sampling_DataLoader(
         datapipe_graph,
         dgl.graphbolt.Bufferer,
     )
-    # assert len(bufferers) == bufferer_cnt
+    assert len(bufferers) == bufferer_cnt
     # Fixes the randomness of LayerNeighborSampler
     torch.manual_seed(1)
     minibatches = list(dataloader)
