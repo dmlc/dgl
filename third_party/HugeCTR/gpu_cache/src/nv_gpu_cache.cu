@@ -20,7 +20,7 @@
 
 namespace cg = cooperative_groups;
 
-// Overload CUDA atomic for other 64bit unsinged/signed integer type
+// Overload CUDA atomic for other 64bit unsigned/signed integer type
 __forceinline__ __device__ long atomicAdd(long* address, long val) {
   return (long)atomicAdd((unsigned long long*)address, (unsigned long long)val);
 }
