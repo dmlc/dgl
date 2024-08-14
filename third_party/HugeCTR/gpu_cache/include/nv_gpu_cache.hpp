@@ -23,8 +23,8 @@
 
 #include "gpu_cache_api.hpp"
 #ifdef LIBCUDACXX_VERSION
-#include <cuda/std/atomic>
-#include <cuda/std/semaphore>
+#include <cuda/atomic>
+#include <cuda/semaphore>
 #endif
 
 #define SET_ASSOCIATIVITY 2
