@@ -307,8 +307,9 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
   }
 
   return c10::make_intrusive<FusedSampledSubgraph>(
-      output_indptr, results.at(0), results.back(), nodes,
-      torch::arange(0, NumNodes()), type_per_edge);
+      // original_row_node_ids is not computed here and is unused.
+      output_indptr, results.at(0), results.back(), nodes, torch::nullopt,
+      type_per_edge);
 }
 
 /**
