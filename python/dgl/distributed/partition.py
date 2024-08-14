@@ -444,7 +444,7 @@ def load_partition_feats(
     return node_feats, edge_feats
 
 
-def load_partition_book(part_config, part_id):
+def load_partition_book(part_config, part_id, part_metadata=None):
     """Load a graph partition book from the partition config file.
 
     Parameters
@@ -465,7 +465,8 @@ def load_partition_book(part_config, part_id):
     dict
         The edge types
     """
-    part_metadata = _load_part_config(part_config)
+    if part_metadata is None:
+        part_metadata = _load_part_config(part_config)
     assert "num_parts" in part_metadata, "num_parts does not exist."
     assert (
         part_metadata["num_parts"] > part_id
@@ -1310,20 +1311,18 @@ def partition_graph(
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
 
-        #save
         if use_graphbolt:
             part_metadata["part-{}".format(part_id)] = {
-            "node_feats": os.path.relpath(node_feat_file, out_path),
-            "edge_feats": os.path.relpath(edge_feat_file, out_path),
-        }
+                "node_feats": os.path.relpath(node_feat_file, out_path),
+                "edge_feats": os.path.relpath(edge_feat_file, out_path),
+            }
         else:
             part_graph_file = os.path.join(part_dir, "graph.dgl")
-
             part_metadata["part-{}".format(part_id)] = {
-            "node_feats": os.path.relpath(node_feat_file, out_path),
-            "edge_feats": os.path.relpath(edge_feat_file, out_path),
-            "part_graph": os.path.relpath(part_graph_file, out_path),
-        }
+                "node_feats": os.path.relpath(node_feat_file, out_path),
+                "edge_feats": os.path.relpath(edge_feat_file, out_path),
+                "part_graph": os.path.relpath(part_graph_file, out_path),
+            }
             sort_etypes = len(g.etypes) > 1
             _save_graphs(
                 part_graph_file,
@@ -1331,8 +1330,7 @@ def partition_graph(
                 formats=graph_formats,
                 sort_etypes=sort_etypes,
             )
-    
-    
+
     part_config = os.path.join(out_path, graph_name + ".json")
     if use_graphbolt:
         kwargs["graph_formats"] = graph_formats
@@ -1344,12 +1342,6 @@ def partition_graph(
         )
     else:
         _dump_part_config(part_config, part_metadata)
-    
-    print(
-        "Save partitions: {:.3f} seconds, peak memory: {:.3f} GB".format(
-            time.time() - start, get_peak_mem()
-        )
-    )
 
     num_cuts = sim_g.num_edges() - tot_num_inner_edges
     if num_parts == 1:
@@ -1357,6 +1349,12 @@ def partition_graph(
     print(
         "There are {} edges in the graph and {} edge cuts for {} partitions.".format(
             g.num_edges(), num_cuts, num_parts
+        )
+    )
+
+    print(
+        "Save partitions: {:.3f} seconds, peak memory: {:.3f} GB".format(
+            time.time() - start, get_peak_mem()
         )
     )
 
@@ -1408,6 +1406,7 @@ def init_type_per_edge(graph, gpb):
 def gb_convert_single_dgl_partition(# TODO change this
     part_id,
     parts,
+    part_meta,
     graph_formats,
     part_config,
     store_eids,
@@ -1440,18 +1439,15 @@ def gb_convert_single_dgl_partition(# TODO change this
             "Running in debug mode which means all attributes of DGL partitions"
             " will be saved to the new format."
         )
-    
-    part_meta = _load_part_config(part_config)
+    if part_meta is None:
+        part_meta = _load_part_config(part_config)
     num_parts = part_meta["num_parts"]
 
-    if parts!=None:
-        assert len(parts)==num_parts
-        graph=parts[part_id]
-    else:
-        graph, _, _, gpb, _, _, _ = load_partition(
-            part_config, part_id, load_feats=False
-        )
-    gpb, _, ntypes, etypes = load_partition_book(part_config, part_id)
+    graph = parts[part_id]
+    gpb, _, ntypes, etypes = load_partition_book(
+        part_config, part_id, part_meta
+    )
+
     is_homo = is_homogeneous(ntypes, etypes)
     node_type_to_id = (
         None if is_homo else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
@@ -1559,7 +1555,7 @@ def gb_convert_single_dgl_partition(# TODO change this
     )
     orig_graph_path = os.path.join(
         os.path.dirname(part_config),
-        part_meta[f"part-{part_id}"]["part_graph"],
+        part_meta[f"part-{part_id}"]["node_feats"],
     )
     csc_graph_path = os.path.join(
         os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.pt"
@@ -1578,9 +1574,8 @@ def dgl_partition_to_graphbolt(
     graph_formats=None,
     n_jobs=1,
     parts=None,
-    part_meta=None
-):# note
-    
+    part_meta=None,
+):
     """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
 
     This API converts `DGLGraph` partitions to `FusedCSCSamplingGraph` which is
@@ -1617,8 +1612,10 @@ def dgl_partition_to_graphbolt(
             "Running in debug mode which means all attributes of DGL partitions"
             " will be saved to the new format."
         )
-    if part_meta==None:
+    if part_meta is None:
+        assert part_config is not None
         part_meta = _load_part_config(part_config)
+    assert part_meta is not None
     new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
 
@@ -1634,6 +1631,8 @@ def dgl_partition_to_graphbolt(
     # Iterate over partitions.
     convert_with_format = partial(
         gb_convert_single_dgl_partition,
+        parts=parts,
+        part_meta=part_meta,
         graph_formats=graph_formats,
         parts=parts,
         part_config=part_config,
