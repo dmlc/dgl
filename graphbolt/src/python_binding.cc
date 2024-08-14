@@ -22,8 +22,8 @@
 #include "./utils.h"
 
 #ifdef GRAPHBOLT_USE_CUDA
+#include "./cuda/extension/gpu_cache.h"
 #include "./cuda/extension/gpu_graph_cache.h"
-#include "./cuda/gpu_cache.h"
 #endif
 
 namespace graphbolt {

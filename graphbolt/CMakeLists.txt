@@ -130,6 +130,8 @@ if(USE_CUDA)
   set_target_properties(${LIB_GRAPHBOLT_CUDA_NAME} PROPERTIES CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES_FILTERED}")
   set_target_properties(${LIB_GRAPHBOLT_CUDA_NAME} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
   target_include_directories(${LIB_GRAPHBOLT_CUDA_NAME} PRIVATE "../third_party/HugeCTR/gpu_cache/include")
+  # Enables libcudacxx for gpu_cache. 
+  target_compile_definitions(${LIB_GRAPHBOLT_CUDA_NAME} PRIVATE LIBCUDACXX_VERSION)
   message(STATUS "Build graphbolt extension with HugeCTR GPU embedding cache.")
 
   message(STATUS "Use external CCCL library for a consistent API and performance for graphbolt.")
