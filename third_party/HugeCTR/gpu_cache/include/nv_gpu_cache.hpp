@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#define LIBCUDACXX_VERSION
+
 #include <nv_util.h>
 
 #include <cstdio>

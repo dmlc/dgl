@@ -384,8 +384,6 @@ if(USE_CUDA)
   )
   cuda_add_library(gpu_cache STATIC ${gpu_cache_src})
   target_include_directories(gpu_cache PRIVATE "third_party/HugeCTR/gpu_cache/include")
-  target_include_directories(gpu_cache PRIVATE "third_party/cccl/libcudacxx/include")
-  target_compile_definitions(gpu_cache PRIVATE LIBCUDACXX_VERSION)
   target_include_directories(dgl PRIVATE "third_party/HugeCTR/gpu_cache/include")
   list(APPEND DGL_LINKER_LIBS gpu_cache)
   message(STATUS "Build with HugeCTR GPU embedding cache.")
@@ -514,10 +512,6 @@ if(BUILD_GRAPHBOLT)
   string(REPLACE ";" "\\;" CUDA_ARCHITECTURES_ESCAPED "${CUDA_ARCHITECTURES}")
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
   file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
-  if(USE_CUDA)
-    get_target_property(GPU_CACHE_INCLUDE_DIRS gpu_cache INCLUDE_DIRECTORIES)
-  endif(USE_CUDA)
-  string(REPLACE ";" "\\;" GPU_CACHE_INCLUDE_DIRS_ESCAPED "${GPU_CACHE_INCLUDE_DIRS}")
   if(MSVC)
     file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.bat BUILD_SCRIPT)
     add_custom_target(
@@ -528,7 +522,6 @@ if(BUILD_GRAPHBOLT)
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
       USE_CUDA=${USE_CUDA}
       BINDIR=${BINDIR}
-      GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
       CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
@@ -547,7 +540,6 @@ if(BUILD_GRAPHBOLT)
       USE_CUDA=${USE_CUDA}
       USE_LIBURING=${USE_LIBURING}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
-      GPU_CACHE_INCLUDE_DIRS="${GPU_CACHE_INCLUDE_DIRS_ESCAPED}"
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
       CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
@@ -556,7 +548,4 @@ if(BUILD_GRAPHBOLT)
       DEPENDS ${BUILD_SCRIPT}
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
   endif(MSVC)
-  if(USE_CUDA)
-    add_dependencies(graphbolt gpu_cache)
-  endif(USE_CUDA)
 endif(BUILD_GRAPHBOLT)
