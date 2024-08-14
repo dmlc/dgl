@@ -1403,7 +1403,8 @@ def init_type_per_edge(graph, gpb):
     etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
     return etype_ids
 
-def gb_convert_single_dgl_partition(# TODO change this
+
+def gb_convert_single_dgl_partition(
     part_id,
     parts,
     part_meta,
@@ -1565,6 +1566,7 @@ def gb_convert_single_dgl_partition(# TODO change this
     return os.path.relpath(csc_graph_path, os.path.dirname(part_config))
     # Update graph path.
 
+
 def dgl_partition_to_graphbolt(
     part_config,
     *,
@@ -1634,7 +1636,6 @@ def dgl_partition_to_graphbolt(
         parts=parts,
         part_meta=part_meta,
         graph_formats=graph_formats,
-        parts=parts,
         part_config=part_config,
         store_eids=store_eids,
         store_inner_node=store_inner_node,
