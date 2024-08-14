@@ -1106,7 +1106,7 @@ def partition_graph(
                 inner_node_mask = _get_inner_node_mask(parts[i], ntype_id)
                 val.append(
                     F.as_scalar(F.sum(F.astype(inner_node_mask, F.int64), 0))
-                )#note inner_node_mask(tensor[n,bool])->tensor[n,int64]->sum->scalar, compute the num of one partition
+                )
                 inner_nids = F.boolean_mask(
                     parts[i].ndata[NID], inner_node_mask
                 )
@@ -1116,7 +1116,7 @@ def partition_graph(
                         int(F.as_scalar(inner_nids[-1])) + 1,
                     ]
                 )
-            val = np.cumsum(val).tolist()# note computing the cumulative sum of array elements.
+            val = np.cumsum(val).tolist()
             assert val[-1] == g.num_nodes(ntype)
         for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype)
@@ -1136,7 +1136,7 @@ def partition_graph(
                     [int(inner_eids[0]), int(inner_eids[-1]) + 1]
                 )
             val = np.cumsum(val).tolist()
-            assert val[-1] == g.num_edges(etype)# note assure the tot graph can be used
+            assert val[-1] == g.num_edges(etype)
     else:
         node_map_val = {}
         edge_map_val = {}
@@ -1516,7 +1516,7 @@ def gb_convert_single_dgl_partition(# TODO change this
             indptr, dtype=indices.dtype
         )
 
-    # Cast various data to minimum dtype.#note convert to minimun dtype
+    # Cast various data to minimum dtype.
     # Cast 1: indptr.
     indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
     # Cast 2: indices.
