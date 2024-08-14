@@ -1024,6 +1024,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
             A float value between [0, 1) that determines the contribution of the
             second random seed, ``random_seed[-1]``, to generate the random
             variates.
+        async_op: bool
+            Boolean indicating whether the call is asynchronous. If so, the
+            result can be obtained by calling wait on the returned future.
 
         Returns
         -------
