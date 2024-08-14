@@ -639,6 +639,10 @@ class NeighborSampler(NeighborSamplerImpl):
     gpu_cache_threshold : int, optional
         Determines how many times a vertex needs to be accessed before its
         neighborhood ends up being cached on the GPU.
+    asynchronous: bool
+        Boolean indicating whether sampling and compaction stages should run
+        in background threads to hide the latency of CPU GPU synchronization.
+        Should be enabled only when sampling on the GPU.
 
     Examples
     -------
@@ -788,6 +792,10 @@ class LayerNeighborSampler(NeighborSamplerImpl):
     gpu_cache_threshold : int, optional
         Determines how many times a vertex needs to be accessed before its
         neighborhood ends up being cached on the GPU.
+    asynchronous: bool
+        Boolean indicating whether sampling and compaction stages should run
+        in background threads to hide the latency of CPU GPU synchronization.
+        Should be enabled only when sampling on the GPU.
 
     Examples
     -------
