@@ -1444,7 +1444,13 @@ def gb_convert_single_dgl_partition(
         part_meta = _load_part_config(part_config)
     num_parts = part_meta["num_parts"]
 
-    graph = parts[part_id]
+    if parts is None:
+        graph, _, _, gpb, _, _, _ = load_partition(
+            part_config, part_id, load_feats=False
+        )
+    else:
+        graph = parts[part_id]
+        
     gpb, _, ntypes, etypes = load_partition_book(
         part_config, part_id, part_meta
     )
