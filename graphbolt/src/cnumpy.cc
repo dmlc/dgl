@@ -67,9 +67,8 @@ OnDiskNpyArray::OnDiskNpyArray(
     TORCH_CHECK(num_queues_ > 0, "A positive # queues is required.");
     io_uring_queue_ = std::unique_ptr<::io_uring[], io_uring_queue_destroyer>(
         new ::io_uring[num_queues_], io_uring_queue_destroyer{num_queues_});
-    TORCH_CHECK(num_queues_ + 1 <= counting_semaphore_t::max());
-    // The +1 is for the thread that calls parallel_for.
-    semaphore_.release(num_queues_ + 1);
+    TORCH_CHECK(num_queues_ <= counting_semaphore_t::max());
+    semaphore_.release(num_queues_);
     available_queues_.reserve(num_queues_);
     // Init io_uring queue.
     for (int64_t t = 0; t < num_queues_; t++) {
