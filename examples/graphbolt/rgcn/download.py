@@ -9,24 +9,21 @@ from tqdm import tqdm
 GBFACTOR = float(1 << 30)
 
 
-def _get_size(file_path, node_name):
-    if "full" in file_path:
-        return num_nodes["full"][node_name]
-    if "large" in file_path:
-        return num_nodes["large"][node_name]
-    path = f"{file_path}/processed/{node_name}/{node_name}_id_index_mapping.npy"
-    array = np.load(path, allow_pickle=True)
-    return len(array.item())
-
-
-def build_yaml_helper(path, in_memory=True):
+def build_yaml_helper(path, dataset_size, in_memory=True):
+    """The stirng to build the yaml file. (Still need modification)"""
     data = {
         "graph": {
             "nodes": [
-                {"num": _get_size(path, "paper"), "type": "paper"},
-                {"num": _get_size(path, "author"), "type": "author"},
-                {"num": _get_size(path, "institute"), "type": "institution"},
-                {"num": _get_size(path, "fos"), "type": "field_of_study"},
+                {"num": num_nodes[dataset_size]["paper"], "type": "paper"},
+                {"num": num_nodes[dataset_size]["author"], "type": "author"},
+                {
+                    "num": num_nodes[dataset_size]["institute"],
+                    "type": "institution",
+                },
+                {
+                    "num": num_nodes[dataset_size]["fos"],
+                    "type": "field_of_study",
+                },
             ],
             "edges": [
                 {
@@ -170,28 +167,18 @@ def build_yaml_helper(path, in_memory=True):
     return data
 
 
-def build_yaml(original_path, current_path):
-    if "large" in current_path or "full" in current_path:
-        data = build_yaml_helper(original_path, in_memory=False)
-    else:
-        data = build_yaml_helper(original_path)
-    with open(f"{current_path}/metadata.yaml", "w") as file:
-        yaml.dump(data, file, default_flow_style=False)
-
-
-def decide_download(url):
-    d = ur.urlopen(url)
-    size = int(d.info()["Content-Length"]) / GBFACTOR
-    ### confirm if larger than 1GB
-    if size > 1:
-        return (
-            input(
-                "This will download %.2fGB. Will you proceed? (y/N) " % (size)
-            ).lower()
-            == "y"
+def build_yaml(original_path, current_path, dataset_size):
+    """This build the yaml file differently based on the dataset size.
+    The two large datasets are put in disk while the other three smaller versions are in memory.
+    """
+    if "large" == dataset_size or "full" == dataset_size:
+        data = build_yaml_helper(
+            path=original_path, dataset_size=dataset_size, in_memory=False
         )
     else:
-        return True
+        data = build_yaml_helper(path=original_path, dataset_size=dataset_size)
+    with open(f"{current_path}/metadata.yaml", "w") as file:
+        yaml.dump(data=data, stream=file, default_flow_style=False)
 
 
 dataset_urls = {
@@ -222,7 +209,24 @@ md5checksums = {
 }
 
 
+def decide_download(url):
+    """An interactive command line to confirm download."""
+    d = ur.urlopen(url)
+    size = int(d.info()["Content-Length"]) / GBFACTOR
+    ### confirm if larger than 1GB
+    if size > 1:
+        return (
+            input(
+                "This will download %.2fGB. Will you proceed? (y/N) " % (size)
+            ).lower()
+            == "y"
+        )
+    else:
+        return True
+
+
 def check_md5sum(dataset_type, dataset_size, filename):
+    """This is for checking the data correctness of the downloaded datasets."""
     original_md5 = md5checksums[dataset_type][dataset_size]
 
     with open(filename, "rb") as file_to_check:
@@ -238,11 +242,15 @@ def check_md5sum(dataset_type, dataset_size, filename):
 
 
 def download_dataset(path, dataset_type, dataset_size):
+    """This is the script to download all the related datasets."""
+
+    # For large datasets, use the two shell scripts to download.
     if dataset_size in ["large", "full"]:
         command = f"./download_{dataset_size}_igbh.sh"
         subprocess.run(["bash", command], check=True, text=True)
         shutil.move(src=f"igb-{dataset_type}-{dataset_size}", dst=f"{path}")
         return path + "/" + "igb-" + dataset_type + "-" + dataset_size
+    # For the three smaller version, use the url to download.
     else:
         output_directory = path
         if not os.path.exists(
@@ -284,7 +292,7 @@ def download_dataset(path, dataset_type, dataset_size):
                 end=" ->",
             )
             check_md5sum(dataset_type, dataset_size, filename)
-        else:
+        else:  # No need to download the tar file again if it is already downloaded.
             print(
                 "The file igb_"
                 + dataset_type
@@ -295,6 +303,7 @@ def download_dataset(path, dataset_type, dataset_size):
             filename = (
                 path + "/igb_" + dataset_type + "_" + dataset_size + ".tar.gz"
             )
+        # Extract the tar file
         file = tarfile.open(filename)
         file.extractall(output_directory)
         file.close()
@@ -382,6 +391,7 @@ num_edges = {
 
 
 def split_data(label_path, set_dir, dataset_size):
+    """This is for splitting the labels into three sets: train, validation, and test sets."""
     # labels = np.memmap(label_path, dtype='int32', mode='r',  shape=(num_nodes[dataset_size]["paper"], 1))
     labels = np.load(label_path)
 
@@ -416,6 +426,7 @@ def split_data(label_path, set_dir, dataset_size):
 
 
 def add_edges(edges, source, dest, dataset_size):
+    """This is for processing the edges in the graph and convert them to correct shape."""
     for edge in edges:
         print(f"\t Processing {edge} edge...")
 
@@ -428,11 +439,13 @@ def add_edges(edges, source, dest, dataset_size):
         new_edge_array = edge_array.transpose()
 
         assert new_edge_array.shape == (2, num_edges[dataset_size][edge])
+        assert np.array_equal(edge_array, new_edge_array.transpose())
 
-        np.save(new_edge_path, new_edge_array)
+        gb.numpy_save_aligned(new_edge_path, new_edge_array)
 
 
 def process_feat(file_path, node_name, dataset_size):
+    """This is for processing the node features."""
     # array = np.memmap(file_path, dtype='float32', mode='r',  shape=(num_nodes[dataset_size][node_name], 1024))
     array = np.load(file_path)
     assert array.shape == (num_nodes[dataset_size][node_name], 1024)
@@ -441,24 +454,22 @@ def process_feat(file_path, node_name, dataset_size):
     # Assert the shape and elements of the array are correct
     # new_array = np.memmap(file_path, dtype='float32', mode='r',  shape=(num_nodes[dataset_size][node_name], 1024))
     new_array = np.load(file_path)
-    assert array.shape == (num_nodes[dataset_size][node_name], 1024)
+    assert new_array.shape == (num_nodes[dataset_size][node_name], 1024)
     assert np.array_equal(array, new_array)
 
 
 def process_label(file_path, num_class, dataset_size):
+    """This is for processing the node labels."""
     if (
         num_class == 2983 and dataset_size == "full"
     ):  # only this case label number changes
         # array = np.memmap(file_path, dtype='int32', mode='r',  shape=(227130858, 1))
         array = np.load(file_path)
-        assert array.shape == (227130858, 1) or array.shape == (227130858,)
+        assert array.shape[0] == 227130858
     else:
         # array = np.memmap(file_path, dtype='int32', mode='r',  shape=(num_nodes[dataset_size]["paper"], 1))
         array = np.load(file_path)
-        assert array.shape == (
-            num_nodes[dataset_size]["paper"],
-            1,
-        ) or array.shape == (num_nodes[dataset_size]["paper"],)
+        assert array.shape[0] == num_nodes[dataset_size]["paper"]
 
     gb.numpy_save_aligned(file_path, array)
 
@@ -466,21 +477,17 @@ def process_label(file_path, num_class, dataset_size):
     if num_class == 2983 and dataset_size == "full":
         # new_array = np.memmap(file_path, dtype='int32', mode='r',  shape=(227130858, 1))
         new_array = np.load(file_path)
-        assert new_array.shape == (227130858, 1) or new_array.shape == (
-            227130858,
-        )
+        assert new_array.shape[0] == 227130858
         assert np.array_equal(array, new_array)
     else:
         # new_array = np.memmap(file_path, dtype='int32', mode='r',  shape=(num_nodes[dataset_size]["paper"], 1))
         new_array = np.load(file_path)
-        assert new_array.shape == (
-            num_nodes[dataset_size]["paper"],
-            1,
-        ) or new_array.shape == (num_nodes[dataset_size]["paper"],)
+        assert new_array.shape[0] == num_nodes[dataset_size]["paper"]
         assert np.array_equal(array, new_array)
 
 
 def add_nodes(nodes, source, dest, dataset_size):
+    """This is for processing the nodes in the graph and store them in correct format."""
     for node in nodes:
         print(f"\t Processing {node} node feature...")
         old_node_path = source + "/" + node + "/" + "node_feat.npy"
@@ -489,6 +496,7 @@ def add_nodes(nodes, source, dest, dataset_size):
         process_feat(
             file_path=new_node_path, node_name=node, dataset_size=dataset_size
         )
+        # If the node is a paper type, process the labels
         if node == "paper":
             print(f"\t Processing {node} labels...")
             old_label_path_19 = source + "/" + node + "/" + "node_label_19.npy"
@@ -515,7 +523,7 @@ def add_nodes(nodes, source, dest, dataset_size):
 def process_dataset(path, dataset_size):
     print(f"Starting to process the {dataset_size} dataset...")
 
-    # Make the directory for processed dataset
+    # Step 0: Make the directory for processed dataset
     processed_dir = path + "-seeds"
     os.makedirs(name=processed_dir, exist_ok=True)
     original_path = path + "/" + "processed"
@@ -561,7 +569,11 @@ def process_dataset(path, dataset_size):
 
     # Step 4: Build the yaml file
     print("Building yaml file...")
-    build_yaml(original_path=path, current_path=processed_dir)
+    build_yaml(
+        original_path=path,
+        current_path=processed_dir,
+        dataset_size=dataset_size,
+    )
 
     # shutil.rmtree(path)
     print(f"Finished processing the {dataset_size} dataset")
