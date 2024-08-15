@@ -68,6 +68,45 @@ class GPUGraphCache(object):
 
         return keys[index[num_hit:]], replace_functional
 
+    def query_async(self, keys):
+        """Queries the GPU cache.
+
+        Parameters
+        ----------
+        keys : Tensor
+            The keys to query the GPU graph cache with.
+
+        Returns
+        -------
+        A generator object.
+            The returned generator object returns the missing keys on the second
+            invocation and expects the fetched indptr and edge tensors on the
+            next invocation. The third and last invocation returns a future
+            object and the return result can be accessed by calling `.wait()`
+            on the returned future object. It is undefined behavior to call
+            `.wait()` more than once.
+        """
+        future = self._cache.query_async(keys)
+
+        yield
+
+        index, position, num_hit, num_threshold = future.wait()
+
+        self.total_queries += keys.shape[0]
+        self.total_miss += keys.shape[0] - num_hit
+
+        missing_indptr, missing_edge_tensors = yield keys[index[num_hit:]]
+
+        yield self._cache.replace_async(
+            keys,
+            index,
+            position,
+            num_hit,
+            num_threshold,
+            missing_indptr,
+            missing_edge_tensors,
+        )
+
     @property
     def miss_rate(self):
         """Returns the cache miss rate since creation."""
