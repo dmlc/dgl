@@ -69,7 +69,7 @@ class GPUGraphCache(object):
         return keys[index[num_hit:]], replace_functional
 
     def query_async(self, keys):
-        """Queries the GPU cache.
+        """Queries the GPU cache asynchronously.
 
         Parameters
         ----------
