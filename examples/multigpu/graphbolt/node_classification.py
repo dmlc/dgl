@@ -135,7 +135,10 @@ def create_dataloader(
     if args.storage_device != "cpu":
         datapipe = datapipe.copy_to(device)
     datapipe = datapipe.sample_neighbor(
-        graph, args.fanout, overlap_fetch=args.storage_device == "pinned"
+        graph,
+        args.fanout,
+        overlap_fetch=args.storage_device == "pinned",
+        asynchronous=args.storage_device != "cpu",
     )
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     if args.storage_device == "cpu":
