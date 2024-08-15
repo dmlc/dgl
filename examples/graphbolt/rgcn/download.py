@@ -480,6 +480,7 @@ def process_label(file_path, num_class, dataset_size):
         assert new_array.shape[0] == 227130858
         assert np.array_equal(array, new_array)
     else:
+        assert num_class == 19
         # new_array = np.memmap(file_path, dtype='int32', mode='r',  shape=(num_nodes[dataset_size]["paper"], 1))
         new_array = np.load(file_path)
         assert new_array.shape[0] == num_nodes[dataset_size]["paper"]
