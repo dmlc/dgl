@@ -83,7 +83,7 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
         delattr(minibatch, "_async_handle")
 
         return minibatch
-    
+
     def _wait_replace_future(self, minibatch):
         subgraph = minibatch._sliced_sampling_graph
         subgraph.csc_indptr, edge_tensors = minibatch._future.wait()
