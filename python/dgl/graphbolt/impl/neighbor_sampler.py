@@ -32,7 +32,7 @@ __all__ = [
 
 @functional_datapipe("fetch_cached_insubgraph_data")
 class FetchCachedInsubgraphData(Mapper):
-    """Queries the GPUGraphCache and returns the missing seeds and an async
+    """Queries the GPUGraphCache and returns the missing seeds and a generator
     handle that can be called with the fetched graph structure.
     """
 
