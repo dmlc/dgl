@@ -396,7 +396,7 @@ def split_data(label_path, set_dir, dataset_size):
     labels = np.load(label_path)
 
     total_samples = len(labels)
-    train_end = int(0.8 * total_samples)
+    train_end = int(0.6 * total_samples)
     validation_end = int(0.9 * total_samples)
 
     indices = np.arange(total_samples)
