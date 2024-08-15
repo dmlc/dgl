@@ -150,6 +150,7 @@ def create_dataloader(
         graph,
         fanout if job != "infer" else [-1],
         overlap_fetch=args.overlap_graph_fetch,
+        asynchronous=args.graph_device != "cpu",
         **kwargs,
     )
     # Copy the data to the specified device.

@@ -125,7 +125,10 @@ def create_dataloader(
     # `fanouts`:
     #   The number of neighbors to sample for each node in each layer.
     datapipe = datapipe.sample_neighbor(
-        graph, fanouts=fanouts, overlap_fetch=args.overlap_graph_fetch
+        graph,
+        fanouts=fanouts,
+        overlap_fetch=args.overlap_graph_fetch,
+        asynchronous=args.asynchronous,
     )
 
     # Fetch the features for each node in the mini-batch.
@@ -571,10 +574,13 @@ def main(args):
 
     # Move the dataset to the pinned memory to enable GPU access.
     args.overlap_graph_fetch = False
+    args.asynchronous = False
     if device == torch.device("cuda"):
-        g.pin_memory_()
-        features.pin_memory_()
+        g = g.pin_memory_()
+        features = features.pin_memory_()
+        # Enable optimizations for sampling on the GPU.
         args.overlap_graph_fetch = True
+        args.asynchronous = True
 
     feat_size = features.size("node", "paper", "feat")[0]
 
