@@ -150,9 +150,7 @@ class FetchInsubgraphData(MiniBatchTransformer):
         datapipe = datapipe.transform(self._fetch_per_layer)
         datapipe = datapipe.buffer().wait()
         if graph._gpu_graph_cache is not None:
-            datapipe = datapipe.combine_cached_and_fetched_insubgraph(
-                prob_name
-            )
+            datapipe = datapipe.combine_cached_and_fetched_insubgraph(prob_name)
         super().__init__(datapipe)
         self.graph = graph
         self.prob_name = prob_name
