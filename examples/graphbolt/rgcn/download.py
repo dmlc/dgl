@@ -70,7 +70,7 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
                         "type": "paper",
                     }
                 ],
-                "name": "node_classification_19",
+                "name": "node_classification",
                 "train_set": [
                     {
                         "data": [
