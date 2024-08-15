@@ -142,7 +142,12 @@ def create_dataloader(
         node_feature_keys["institution"] = ["feat"]
         node_feature_keys["fos"] = ["feat"]
 
-    datapipe = datapipe.fetch_feature(features, node_feature_keys)
+    datapipe = datapipe.sample_neighbor(
+        graph,
+        fanouts=fanouts,
+        overlap_fetch=args.overlap_graph_fetch,
+        asynchronous=args.asynchronous,
+    )
 
     # Create a DataLoader from the datapipe.
     # `num_workers`:
@@ -576,9 +581,14 @@ def main(args):
     ) = load_dataset(args.dataset)
 
     # Move the dataset to the pinned memory to enable GPU access.
+    args.overlap_graph_fetch = False
+    args.asynchronous = False
     if device == torch.device("cuda"):
-        g.pin_memory_()
-        features.pin_memory_()
+        g = g.pin_memory_()
+        features = features.pin_memory_()
+        # Enable optimizations for sampling on the GPU.
+        args.overlap_graph_fetch = True
+        args.asynchronous = True
 
     feat_size = features.size("node", "paper", "feat")[0]
 
