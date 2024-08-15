@@ -25,6 +25,7 @@
 #include <cub/cub.cuh>
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
+#include <limits>
 #include <numeric>
 #include <type_traits>
 
@@ -235,6 +236,12 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
         return std::make_tuple(
             output_indices, output_positions, num_hit, num_threshold);
       }));
+}
+
+c10::intrusive_ptr<
+    Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>
+GpuGraphCache::QueryAsync(torch::Tensor seeds) {
+  return async([=] { return Query(seeds); });
 }
 
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
@@ -488,6 +495,19 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               return std::make_tuple(output_indptr, output_edge_tensors);
             }));
       }));
+}
+
+c10::intrusive_ptr<
+    Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>>
+GpuGraphCache::ReplaceAsync(
+    torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
+    int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
+    std::vector<torch::Tensor> edge_tensors) {
+  return async([=] {
+    return Replace(
+        seeds, indices, positions, num_hit, num_threshold, indptr,
+        edge_tensors);
+  });
 }
 
 }  // namespace cuda
