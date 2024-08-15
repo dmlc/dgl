@@ -120,6 +120,7 @@ def create_dataloader(
         graph,
         fanout if job != "infer" else [-1],
         overlap_fetch=args.storage_device == "pinned",
+        asynchronous=args.storage_device != "cpu",
     )
 
     ############################################################################

@@ -200,6 +200,7 @@ def create_dataloader(
         overlap_fetch=args.overlap_graph_fetch,
         num_gpu_cached_edges=args.num_gpu_cached_edges,
         gpu_cache_threshold=args.gpu_graph_caching_threshold,
+        asynchronous=args.graph_device != "cpu",
     )
     # Copy the data to the specified device.
     if args.feature_device != "cpu" and need_copy:
