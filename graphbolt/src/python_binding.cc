@@ -109,6 +109,7 @@ TORCH_LIBRARY(graphbolt, m) {
 #ifdef GRAPHBOLT_USE_CUDA
   m.class_<cuda::GpuCache>("GpuCache")
       .def("query", &cuda::GpuCache::Query)
+      .def("query_async", &cuda::GpuCache::QueryAsync)
       .def("replace", &cuda::GpuCache::Replace);
   m.def("gpu_cache", &cuda::GpuCache::Create);
   m.class_<cuda::GpuGraphCache>("GpuGraphCache")
