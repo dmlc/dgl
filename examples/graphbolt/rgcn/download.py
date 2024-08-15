@@ -491,9 +491,7 @@ def split_data(label_path, set_dir, dataset_size, class_num):
     gb.numpy_save_aligned(
         f"{set_dir}/validation_labels_{class_num}.npy", validation_labels
     )
-    gb.numpy_save_aligned(
-        f"{set_dir}/test_labels_{class_num}.npy", test_labels
-    )
+    gb.numpy_save_aligned(f"{set_dir}/test_labels_{class_num}.npy", test_labels)
 
 
 def add_edges(edges, source, dest, dataset_size):
