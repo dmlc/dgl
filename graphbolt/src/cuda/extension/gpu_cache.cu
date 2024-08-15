@@ -19,7 +19,7 @@
  */
 #include <numeric>
 
-#include "./common.h"
+#include "../common.h"
 #include "./gpu_cache.h"
 
 namespace graphbolt {
