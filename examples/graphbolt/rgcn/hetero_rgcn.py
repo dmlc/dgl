@@ -59,6 +59,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn import HeteroEmbedding
 from ogb.lsc import MAG240MEvaluator
+from evaluator import IGB_Evaluator
 from ogb.nodeproppred import Evaluator
 from tqdm import tqdm
 
@@ -124,12 +125,7 @@ def create_dataloader(
     #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
     # `fanouts`:
     #   The number of neighbors to sample for each node in each layer.
-    datapipe = datapipe.sample_neighbor(
-        graph,
-        fanouts=fanouts,
-        overlap_fetch=args.overlap_graph_fetch,
-        asynchronous=args.asynchronous,
-    )
+    datapipe = datapipe.sample_neighbor(graph, fanouts=fanouts)
 
     # Fetch the features for each node in the mini-batch.
     # `features`:
@@ -141,6 +137,11 @@ def create_dataloader(
     if name == "ogb-lsc-mag240m":
         node_feature_keys["author"] = ["feat"]
         node_feature_keys["institution"] = ["feat"]
+    if "igb-heterogeneous" in name:
+        node_feature_keys["author"] = ["feat"]
+        node_feature_keys["institution"] = ["feat"]
+        node_feature_keys["fos"] = ["feat"]
+
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
 
     # Create a DataLoader from the datapipe.
@@ -158,7 +159,7 @@ def extract_embed(node_embed, input_nodes):
 
 def extract_node_features(name, block, data, node_embed, device):
     """Extract the node features from embedding layer or raw features."""
-    if name == "ogbn-mag":
+    if name == "ogbn-mag" or "igb-heterogeneous" in name:
         input_nodes = {
             k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
         }
@@ -424,7 +425,9 @@ def evaluate(
     model.eval()
     category = "paper"
     # An evaluator for the dataset.
-    if name == "ogbn-mag":
+    if "igb-heterogeneous" in name:
+        evaluator = IGB_Evaluator(name=name, num_tasks=1, eval_metric="acc")
+    elif name == "ogbn-mag":
         evaluator = Evaluator(name=name)
     else:
         evaluator = MAG240MEvaluator()
@@ -573,14 +576,9 @@ def main(args):
     ) = load_dataset(args.dataset)
 
     # Move the dataset to the pinned memory to enable GPU access.
-    args.overlap_graph_fetch = False
-    args.asynchronous = False
     if device == torch.device("cuda"):
-        g = g.pin_memory_()
-        features = features.pin_memory_()
-        # Enable optimizations for sampling on the GPU.
-        args.overlap_graph_fetch = True
-        args.asynchronous = True
+        g.pin_memory_()
+        features.pin_memory_()
 
     feat_size = features.size("node", "paper", "feat")[0]
 
@@ -588,7 +586,8 @@ def main(args):
     # `institution` are generated in advance and stored in the feature store.
     # For `ogbn-mag`, we generate the features on the fly.
     embed_layer = None
-    if args.dataset == "ogbn-mag":
+    # if args.dataset == "ogbn-mag":
+    if args.dataset == "ogbn-mag" or "igb-heterogeneous" in args.dataset:
         # Create the embedding layer and move it to the appropriate device.
         embed_layer = rel_graph_embed(g, feat_size).to(device)
         print(
@@ -663,7 +662,10 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="ogbn-mag",
-        choices=["ogbn-mag", "ogb-lsc-mag240m"],
+        # choices=["ogbn-mag", "ogb-lsc-mag240m"],
+        choices=["ogbn-mag", "ogb-lsc-mag240m", "igb-heterogeneous-tiny", 
+                 "igb-heterogeneous-small", "igb-heterogeneous-medium",
+                 "igb-heterogeneous-large", "igb-heterogeneous-full"],
         help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m",
     )
     parser.add_argument("--num_epochs", type=int, default=3)
