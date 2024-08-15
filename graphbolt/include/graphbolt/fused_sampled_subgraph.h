@@ -49,7 +49,8 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * graph.
    * @param original_row_node_ids Column's reverse node ids in the original
    * graph.
-   * @param original_edge_ids Reverse edge ids in the FusedCSCSamplingGraph.
+   * @param original_edge_ids Mapping of subgraph edge IDs to original
+   * FusedCSCSamplingGraph edge IDs.
    * @param type_per_edge Type id of each edge.
    * @param etype_offsets Edge offsets for the sampled edges for the sampled
    * edges that are sorted w.r.t. edge types.
