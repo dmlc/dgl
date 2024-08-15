@@ -56,13 +56,13 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
                         "data": [
                             {
                                 "in_memory": in_memory,
-                                "path": "set/validation_indices.npy",
+                                "path": "set/validation_indices_19.npy",
                                 "name": "seeds",
                                 "format": "numpy",
                             },
                             {
                                 "in_memory": in_memory,
-                                "path": "set/validation_labels.npy",
+                                "path": "set/validation_labels_19.npy",
                                 "name": "labels",
                                 "format": "numpy",
                             },
@@ -70,19 +70,19 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
                         "type": "paper",
                     }
                 ],
-                "name": "node_classification",
+                "name": "node_classification_19",
                 "train_set": [
                     {
                         "data": [
                             {
                                 "in_memory": in_memory,
-                                "path": "set/train_indices.npy",
+                                "path": "set/train_indices_19.npy",
                                 "name": "seeds",
                                 "format": "numpy",
                             },
                             {
                                 "in_memory": in_memory,
-                                "path": "set/train_labels.npy",
+                                "path": "set/train_labels_19.npy",
                                 "name": "labels",
                                 "format": "numpy",
                             },
@@ -95,13 +95,13 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
                         "data": [
                             {
                                 "in_memory": in_memory,
-                                "path": "set/test_indices.npy",
+                                "path": "set/test_indices_19.npy",
                                 "name": "seeds",
                                 "format": "numpy",
                             },
                             {
                                 "in_memory": in_memory,
-                                "path": "set/test_labels.npy",
+                                "path": "set/test_labels_19.npy",
                                 "name": "labels",
                                 "format": "numpy",
                             },
@@ -109,7 +109,68 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
                         "type": "paper",
                     }
                 ],
-            }
+            },
+            {
+                "num_classes": 2983,
+                "validation_set": [
+                    {
+                        "data": [
+                            {
+                                "in_memory": in_memory,
+                                "path": "set/validation_indices_2983.npy",
+                                "name": "seeds",
+                                "format": "numpy",
+                            },
+                            {
+                                "in_memory": in_memory,
+                                "path": "set/validation_labels_2983.npy",
+                                "name": "labels",
+                                "format": "numpy",
+                            },
+                        ],
+                        "type": "paper",
+                    }
+                ],
+                "name": "node_classification_2K",
+                "train_set": [
+                    {
+                        "data": [
+                            {
+                                "in_memory": in_memory,
+                                "path": "set/train_indices_2983.npy",
+                                "name": "seeds",
+                                "format": "numpy",
+                            },
+                            {
+                                "in_memory": in_memory,
+                                "path": "set/train_labels_2983.npy",
+                                "name": "labels",
+                                "format": "numpy",
+                            },
+                        ],
+                        "type": "paper",
+                    }
+                ],
+                "test_set": [
+                    {
+                        "data": [
+                            {
+                                "in_memory": in_memory,
+                                "path": "set/test_indices_2983.npy",
+                                "name": "seeds",
+                                "format": "numpy",
+                            },
+                            {
+                                "in_memory": in_memory,
+                                "path": "set/test_labels_2983.npy",
+                                "name": "labels",
+                                "format": "numpy",
+                            },
+                        ],
+                        "type": "paper",
+                    }
+                ],
+            },
         ],
         "feature_data": [
             {
@@ -390,7 +451,7 @@ num_edges = {
 }
 
 
-def split_data(label_path, set_dir, dataset_size):
+def split_data(label_path, set_dir, dataset_size, class_num):
     """This is for splitting the labels into three sets: train, validation, and test sets."""
     # labels = np.memmap(label_path, dtype='int32', mode='r',  shape=(num_nodes[dataset_size]["paper"], 1))
     labels = np.load(label_path)
@@ -415,14 +476,24 @@ def split_data(label_path, set_dir, dataset_size):
     print(validation_labels, len(validation_labels))
     print(test_labels, len(test_labels))
 
-    gb.numpy_save_aligned(f"{set_dir}/train_indices.npy", train_indices)
     gb.numpy_save_aligned(
-        f"{set_dir}/validation_indices.npy", validation_indices
+        f"{set_dir}/train_indices_{class_num}.npy", train_indices
     )
-    gb.numpy_save_aligned(f"{set_dir}/test_indices.npy", test_indices)
-    gb.numpy_save_aligned(f"{set_dir}/train_labels.npy", train_labels)
-    gb.numpy_save_aligned(f"{set_dir}/validation_labels.npy", validation_labels)
-    gb.numpy_save_aligned(f"{set_dir}/test_labels.npy", test_labels)
+    gb.numpy_save_aligned(
+        f"{set_dir}/validation_indices_{class_num}.npy", validation_indices
+    )
+    gb.numpy_save_aligned(
+        f"{set_dir}/test_indices_{class_num}.npy", test_indices
+    )
+    gb.numpy_save_aligned(
+        f"{set_dir}/train_labels_{class_num}.npy", train_labels
+    )
+    gb.numpy_save_aligned(
+        f"{set_dir}/validation_labels_{class_num}.npy", validation_labels
+    )
+    gb.numpy_save_aligned(
+        f"{set_dir}/test_labels_{class_num}.npy", test_labels
+    )
 
 
 def add_edges(edges, source, dest, dataset_size):
@@ -480,7 +551,6 @@ def process_label(file_path, num_class, dataset_size):
         assert new_array.shape[0] == 227130858
         assert np.array_equal(array, new_array)
     else:
-        assert num_class == 19
         # new_array = np.memmap(file_path, dtype='int32', mode='r',  shape=(num_nodes[dataset_size]["paper"], 1))
         new_array = np.load(file_path)
         assert new_array.shape[0] == num_nodes[dataset_size]["paper"]
@@ -547,7 +617,16 @@ def process_dataset(path, dataset_size):
     set_dir = processed_dir + "/" + "set"
     os.makedirs(name=set_dir, exist_ok=True)
     split_data(
-        label_path=label_file_19, set_dir=set_dir, dataset_size=dataset_size
+        label_path=label_file_19,
+        set_dir=set_dir,
+        dataset_size=dataset_size,
+        class_num=19,
+    )
+    split_data(
+        label_path=label_file_2K,
+        set_dir=set_dir,
+        dataset_size=dataset_size,
+        class_num=2983,
     )
 
     # Step 3: Move edge files
