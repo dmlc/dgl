@@ -125,7 +125,12 @@ def create_dataloader(
     #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
     # `fanouts`:
     #   The number of neighbors to sample for each node in each layer.
-    datapipe = datapipe.sample_neighbor(graph, fanouts=fanouts)
+    datapipe = datapipe.sample_neighbor(
+        graph,
+        fanouts=fanouts,
+        overlap_fetch=args.overlap_graph_fetch,
+        asynchronous=args.asynchronous,
+    )
 
     # Fetch the features for each node in the mini-batch.
     # `features`:
@@ -141,13 +146,7 @@ def create_dataloader(
         node_feature_keys["author"] = ["feat"]
         node_feature_keys["institution"] = ["feat"]
         node_feature_keys["fos"] = ["feat"]
-
-    datapipe = datapipe.sample_neighbor(
-        graph,
-        fanouts=fanouts,
-        overlap_fetch=args.overlap_graph_fetch,
-        asynchronous=args.asynchronous,
-    )
+    datapipe = datapipe.fetch_feature(features, node_feature_keys)
 
     # Create a DataLoader from the datapipe.
     # `num_workers`:
@@ -672,7 +671,6 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="ogbn-mag",
-        # choices=["ogbn-mag", "ogb-lsc-mag240m"],
         choices=["ogbn-mag", "ogb-lsc-mag240m", "igb-heterogeneous-tiny", 
                  "igb-heterogeneous-small", "igb-heterogeneous-medium",
                  "igb-heterogeneous-large", "igb-heterogeneous-full"],
