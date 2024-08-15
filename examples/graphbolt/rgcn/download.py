@@ -6,7 +6,7 @@ import dgl.graphbolt as gb
 import numpy as np
 from tqdm import tqdm
 
-GBFACTOR = float(1 << 30)
+GBFACTOR = 1 << 30
 
 
 def build_yaml_helper(path, dataset_size, in_memory=True):
