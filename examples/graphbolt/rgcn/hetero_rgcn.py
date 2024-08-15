@@ -58,8 +58,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn import HeteroEmbedding
-from ogb.lsc import MAG240MEvaluator
 from evaluator import IGB_Evaluator
+from ogb.lsc import MAG240MEvaluator
 from ogb.nodeproppred import Evaluator
 from tqdm import tqdm
 
@@ -595,7 +595,6 @@ def main(args):
     # `institution` are generated in advance and stored in the feature store.
     # For `ogbn-mag`, we generate the features on the fly.
     embed_layer = None
-    # if args.dataset == "ogbn-mag":
     if args.dataset == "ogbn-mag" or "igb-heterogeneous" in args.dataset:
         # Create the embedding layer and move it to the appropriate device.
         embed_layer = rel_graph_embed(g, feat_size).to(device)
@@ -671,9 +670,15 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="ogbn-mag",
-        choices=["ogbn-mag", "ogb-lsc-mag240m", "igb-heterogeneous-tiny", 
-                 "igb-heterogeneous-small", "igb-heterogeneous-medium",
-                 "igb-heterogeneous-large", "igb-heterogeneous-full"],
+        choices=[
+            "ogbn-mag",
+            "ogb-lsc-mag240m",
+            "igb-heterogeneous-tiny",
+            "igb-heterogeneous-small",
+            "igb-heterogeneous-medium",
+            "igb-heterogeneous-large",
+            "igb-heterogeneous-full",
+        ],
         help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m",
     )
     parser.add_argument("--num_epochs", type=int, default=3)
