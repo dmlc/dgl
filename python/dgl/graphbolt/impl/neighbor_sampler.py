@@ -129,7 +129,7 @@ class ConcatHeteroSeeds(Mapper):
 
 
 @functional_datapipe("fetch_insubgraph_data")
-class FetchInsubgraphData(Mapper):
+class FetchInsubgraphData(MiniBatchTransformer):
     """Fetches the insubgraph and wraps it in a FusedCSCSamplingGraph object. If
     the provided sample_per_layer_obj has a valid prob_name, then it reads the
     probabilies of all the fetched edges. Furthermore, if type_per_array tensor
@@ -147,9 +147,15 @@ class FetchInsubgraphData(Mapper):
             datapipe = datapipe.fetch_cached_insubgraph_data(
                 graph._gpu_graph_cache
             )
+        datapipe = datapipe.transform(self._fetch_per_layer)
+        datapipe = datapipe.buffer().wait()
+        if graph._gpu_graph_cache is not None:
+            datapipe = datapipe.combine_cached_and_fetched_insubgraph(
+                prob_name
+            )
+        super().__init__(datapipe)
         self.graph = graph
         self.prob_name = prob_name
-        super().__init__(datapipe, self._fetch_per_layer)
 
     def _fetch_per_layer(self, minibatch):
         stream = torch.cuda.current_stream()
@@ -276,11 +282,6 @@ class SamplePerLayer(MiniBatchTransformer):
             self.returning_indices_is_optional = True
         elif overlap_fetch:
             datapipe = datapipe.fetch_insubgraph_data(graph, prob_name)
-            datapipe = datapipe.buffer().wait()
-            if graph._gpu_graph_cache is not None:
-                datapipe = datapipe.combine_cached_and_fetched_insubgraph(
-                    prob_name
-                )
             datapipe = datapipe.transform(
                 self._sample_per_layer_from_fetched_subgraph
             )

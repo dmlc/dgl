@@ -25,6 +25,8 @@
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
+#include <mutex>
+
 namespace graphbolt {
 namespace cuda {
 
@@ -120,6 +122,7 @@ class GpuGraphCache : public torch::CustomClassHolder {
   torch::Tensor offset_;          // The original graph's sliced_indptr tensor.
   std::vector<torch::Tensor> cached_edge_tensors_;  // The cached graph
                                                     // structure edge tensors.
+  std::mutex mtx_;  // Protects the data structure and makes it threadsafe.
 };
 
 }  // namespace cuda
