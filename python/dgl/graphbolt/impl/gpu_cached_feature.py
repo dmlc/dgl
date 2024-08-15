@@ -115,7 +115,7 @@ class GPUCachedFeature(Feature):
         >>> result = future.wait()  # result contains the read values.
         """
         future = self._feature.query(ids, async_op=True)
-        
+
         yield
 
         values, missing_index, missing_keys = future.wait()
