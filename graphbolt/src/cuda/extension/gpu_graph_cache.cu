@@ -242,7 +242,7 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
 c10::intrusive_ptr<
     Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>
 GpuGraphCache::QueryAsync(torch::Tensor seeds) {
-  return async([=] { return Query(seeds); });
+  return async([=] { return Query(seeds); }, true);
 }
 
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
@@ -505,11 +505,13 @@ GpuGraphCache::ReplaceAsync(
     torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
     int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
     std::vector<torch::Tensor> edge_tensors) {
-  return async([=] {
-    return Replace(
-        seeds, indices, positions, num_hit, num_threshold, indptr,
-        edge_tensors);
-  });
+  return async(
+      [=] {
+        return Replace(
+            seeds, indices, positions, num_hit, num_threshold, indptr,
+            edge_tensors);
+      },
+      true);
 }
 
 }  // namespace cuda
