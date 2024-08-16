@@ -25,6 +25,7 @@
 #include <cub/cub.cuh>
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
+#include <limits>
 #include <numeric>
 #include <type_traits>
 
@@ -168,6 +169,7 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
       seeds.device().index() == device_id_,
       "Seeds should be on the correct CUDA device.");
   TORCH_CHECK(seeds.sizes().size() == 1, "Keys should be a 1D tensor.");
+  std::lock_guard lock(mtx_);
   auto allocator = cuda::GetAllocator();
   auto index_dtype = cached_edge_tensors_.at(0).scalar_type();
   const dim3 block(kIntBlockSize);
@@ -237,6 +239,12 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
       }));
 }
 
+c10::intrusive_ptr<
+    Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>
+GpuGraphCache::QueryAsync(torch::Tensor seeds) {
+  return async([=] { return Query(seeds); });
+}
+
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
     torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
     int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
@@ -250,6 +258,7 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
   TORCH_CHECK(
       indptr.size(0) == num_nodes - num_hit + 1,
       "(indptr.size(0) == seeds.size(0) - num_hit + 1) failed.");
+  std::lock_guard lock(mtx_);
   const int64_t num_buffers = num_nodes * num_tensors;
   auto allocator = cuda::GetAllocator();
   auto index_dtype = cached_edge_tensors_.at(0).scalar_type();
@@ -488,6 +497,19 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               return std::make_tuple(output_indptr, output_edge_tensors);
             }));
       }));
+}
+
+c10::intrusive_ptr<
+    Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>>
+GpuGraphCache::ReplaceAsync(
+    torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
+    int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
+    std::vector<torch::Tensor> edge_tensors) {
+  return async([=] {
+    return Replace(
+        seeds, indices, positions, num_hit, num_threshold, indptr,
+        edge_tensors);
+  });
 }
 
 }  // namespace cuda

@@ -58,6 +58,17 @@ TORCH_LIBRARY(graphbolt, m) {
           "wait",
           &Future<std::vector<
               std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>::Wait);
+  m.class_<Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>(
+       "GpuGraphCacheQueryFuture")
+      .def(
+          "wait",
+          &Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>::
+              Wait);
+  m.class_<Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>>(
+       "GpuGraphCacheReplaceFuture")
+      .def(
+          "wait",
+          &Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>::Wait);
   m.class_<storage::OnDiskNpyArray>("OnDiskNpyArray")
       .def("index_select", &storage::OnDiskNpyArray::IndexSelect);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
@@ -114,7 +125,9 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("gpu_cache", &cuda::GpuCache::Create);
   m.class_<cuda::GpuGraphCache>("GpuGraphCache")
       .def("query", &cuda::GpuGraphCache::Query)
-      .def("replace", &cuda::GpuGraphCache::Replace);
+      .def("query_async", &cuda::GpuGraphCache::QueryAsync)
+      .def("replace", &cuda::GpuGraphCache::Replace)
+      .def("replace_async", &cuda::GpuGraphCache::ReplaceAsync);
   m.def("gpu_graph_cache", &cuda::GpuGraphCache::Create);
 #endif
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
