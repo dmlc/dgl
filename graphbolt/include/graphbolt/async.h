@@ -179,6 +179,7 @@ inline auto async(F&& function, bool is_cuda = false) {
       }
     }
     if constexpr (std::is_void_v<T>) {
+      func();
       return std::monostate{};
     } else {
       return func();
