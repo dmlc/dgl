@@ -1,12 +1,17 @@
 """Neighbor subgraph samplers for GraphBolt."""
 
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import torch
 from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import Mapper
+from torch.utils.data.datapipes.iter import Mapper
 
+from ..base import (
+    etype_str_to_tuple,
+    get_host_to_device_uva_stream,
+    index_select,
+    ORIGINAL_EDGE_ID,
+)
 from ..internal import compact_csc_format, unique_and_compact_csc_formats
 from ..minibatch_transformer import MiniBatchTransformer
 
@@ -63,6 +68,7 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
         probs_or_mask = subgraph.edge_attribute(self.prob_name)
         if probs_or_mask is not None:
             edge_tensors.append(probs_or_mask)
+        edge_tensors.append(subgraph.edge_attribute(ORIGINAL_EDGE_ID))
 
         subgraph.csc_indptr, edge_tensors = minibatch._replace(
             subgraph.csc_indptr, edge_tensors
@@ -77,6 +83,8 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
         if probs_or_mask is not None:
             subgraph.add_edge_attribute(self.prob_name, edge_tensors[0])
             edge_tensors = edge_tensors[1:]
+        subgraph.add_edge_attribute(ORIGINAL_EDGE_ID, edge_tensors[0])
+        edge_tensors = edge_tensors[1:]
         assert len(edge_tensors) == 0
 
         return minibatch
@@ -119,7 +127,6 @@ class FetchInsubgraphData(Mapper):
         sample_per_layer_obj,
         gpu_graph_cache,
         stream=None,
-        executor=None,
     ):
         self.graph = sample_per_layer_obj.sampler.__self__
         datapipe = datapipe.concat_hetero_seeds(sample_per_layer_obj)
@@ -128,10 +135,6 @@ class FetchInsubgraphData(Mapper):
         super().__init__(datapipe, self._fetch_per_layer)
         self.prob_name = sample_per_layer_obj.prob_name
         self.stream = stream
-        if executor is None:
-            self.executor = ThreadPoolExecutor(max_workers=1)
-        else:
-            self.executor = executor
 
     def _fetch_per_layer_impl(self, minibatch, stream):
         with torch.cuda.stream(self.stream):
@@ -139,6 +142,8 @@ class FetchInsubgraphData(Mapper):
             seed_offsets = minibatch._seed_offsets
             delattr(minibatch, "_seeds")
             delattr(minibatch, "_seed_offsets")
+
+            seeds.record_stream(torch.cuda.current_stream())
 
             def record_stream(tensor):
                 if stream is not None and tensor.is_cuda:
@@ -167,7 +172,7 @@ class FetchInsubgraphData(Mapper):
                 indptr,
                 sliced_tensors,
             ) = torch.ops.graphbolt.index_select_csc_batched(
-                self.graph.csc_indptr, tensors_to_be_sliced, seeds, None
+                self.graph.csc_indptr, tensors_to_be_sliced, seeds, True, None
             )
             for tensor in [indptr] + sliced_tensors:
                 record_stream(tensor)
@@ -185,6 +190,9 @@ class FetchInsubgraphData(Mapper):
             if has_probs_or_mask:
                 probs_or_mask = sliced_tensors[0]
                 sliced_tensors = sliced_tensors[1:]
+
+            edge_ids = sliced_tensors[0]
+            sliced_tensors = sliced_tensors[1:]
             assert len(sliced_tensors) == 0
 
             subgraph = fused_csc_sampling_graph(
@@ -196,7 +204,8 @@ class FetchInsubgraphData(Mapper):
                 edge_type_to_id=self.graph.edge_type_to_id,
             )
             if self.prob_name is not None and probs_or_mask is not None:
-                subgraph.edge_attributes = {self.prob_name: probs_or_mask}
+                subgraph.add_edge_attribute(self.prob_name, probs_or_mask)
+            subgraph.add_edge_attribute(ORIGINAL_EDGE_ID, edge_ids)
 
             subgraph._indptr_node_type_offset_list = seed_offsets
             minibatch._sliced_sampling_graph = subgraph
@@ -211,9 +220,7 @@ class FetchInsubgraphData(Mapper):
         if self.stream is not None:
             current_stream = torch.cuda.current_stream()
             self.stream.wait_stream(current_stream)
-        return self.executor.submit(
-            self._fetch_per_layer_impl, minibatch, current_stream
-        )
+        return self._fetch_per_layer_impl(minibatch, current_stream)
 
 
 @functional_datapipe("sample_per_layer_from_fetched_subgraph")
@@ -251,12 +258,40 @@ class SamplePerLayerFromFetchedSubgraph(MiniBatchTransformer):
 class SamplePerLayer(MiniBatchTransformer):
     """Sample neighbor edges from a graph for a single layer."""
 
-    def __init__(self, datapipe, sampler, fanout, replace, prob_name):
-        super().__init__(datapipe, self._sample_per_layer)
+    def __init__(
+        self,
+        datapipe,
+        sampler,
+        fanout,
+        replace,
+        prob_name,
+        returning_indices_is_optional=False,
+    ):
+        graph = sampler.__self__
+        if returning_indices_is_optional and graph.indices.is_pinned():
+            datapipe = datapipe.transform(self._sample_per_layer)
+            datapipe = (
+                datapipe.transform(partial(self._fetch_indices, graph.indices))
+                .buffer()
+                .wait()
+            )
+            if graph.type_per_edge is not None:
+                # Hetero case.
+                datapipe = datapipe.transform(
+                    partial(
+                        self._subtract_hetero_indices_offset,
+                        graph._node_type_offset_list,
+                        graph.node_type_to_id,
+                    )
+                )
+            super().__init__(datapipe)
+        else:
+            super().__init__(datapipe, self._sample_per_layer)
         self.sampler = sampler
         self.fanout = fanout
         self.replace = replace
         self.prob_name = prob_name
+        self.returning_indices_is_optional = returning_indices_is_optional
 
     def _sample_per_layer(self, minibatch):
         kwargs = {
@@ -269,9 +304,59 @@ class SamplePerLayer(MiniBatchTransformer):
             self.fanout,
             self.replace,
             self.prob_name,
+            self.returning_indices_is_optional,
             **kwargs,
         )
         minibatch.sampled_subgraphs.insert(0, subgraph)
+        return minibatch
+
+    @staticmethod
+    def _fetch_indices(indices, minibatch):
+        stream = torch.cuda.current_stream()
+        host_to_device_stream = get_host_to_device_uva_stream()
+        host_to_device_stream.wait_stream(stream)
+
+        def record_stream(tensor):
+            tensor.record_stream(stream)
+            return tensor
+
+        with torch.cuda.stream(host_to_device_stream):
+            minibatch._indices_needs_offset_subtraction = False
+            subgraph = minibatch.sampled_subgraphs[0]
+            if isinstance(subgraph.sampled_csc, dict):
+                for etype, pair in subgraph.sampled_csc.items():
+                    if pair.indices is None:
+                        edge_ids = subgraph._sampled_edge_ids[etype]
+                        edge_ids.record_stream(torch.cuda.current_stream())
+                        pair.indices = record_stream(
+                            index_select(indices, edge_ids)
+                        )
+                        minibatch._indices_needs_offset_subtraction = True
+            elif subgraph.sampled_csc.indices is None:
+                subgraph._sampled_edge_ids.record_stream(
+                    torch.cuda.current_stream()
+                )
+                subgraph.sampled_csc.indices = record_stream(
+                    index_select(indices, subgraph._sampled_edge_ids)
+                )
+                minibatch._indices_needs_offset_subtraction = True
+            subgraph._sampled_edge_ids = None
+            minibatch.wait = torch.cuda.current_stream().record_event().wait
+
+        return minibatch
+
+    @staticmethod
+    def _subtract_hetero_indices_offset(
+        node_type_offset, node_type_to_id, minibatch
+    ):
+        if minibatch._indices_needs_offset_subtraction:
+            subgraph = minibatch.sampled_subgraphs[0]
+            for etype, pair in subgraph.sampled_csc.items():
+                src_ntype = etype_str_to_tuple(etype)[0]
+                src_ntype_id = node_type_to_id[src_ntype]
+                pair.indices -= node_type_offset[src_ntype_id]
+        delattr(minibatch, "_indices_needs_offset_subtraction")
+
         return minibatch
 
 
@@ -322,13 +407,12 @@ class FetcherAndSampler(MiniBatchTransformer):
         sampler,
         gpu_graph_cache,
         stream,
-        executor,
         buffer_size,
     ):
         datapipe = sampler.datapipe.fetch_insubgraph_data(
-            sampler, gpu_graph_cache, stream, executor
+            sampler, gpu_graph_cache, stream
         )
-        datapipe = datapipe.buffer(buffer_size).wait_future().wait()
+        datapipe = datapipe.buffer(buffer_size).wait()
         if gpu_graph_cache is not None:
             datapipe = datapipe.combine_cached_and_fetched_insubgraph(sampler)
         datapipe = datapipe.sample_per_layer_from_fetched_subgraph(sampler)

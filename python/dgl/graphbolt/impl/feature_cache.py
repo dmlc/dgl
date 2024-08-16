@@ -69,34 +69,89 @@ class CPUFeatureCache(object):
 
         Returns
         -------
-        tuple(Tensor, Tensor, Tensor)
-            A tuple containing (values, missing_indices, missing_keys) where
+        tuple(Tensor, Tensor, Tensor, Tensor)
+            A tuple containing
+            (values, missing_indices, missing_keys, missing_offsets) where
             values[missing_indices] corresponds to cache misses that should be
             filled by quering another source with missing_keys. If keys is
-            pinned, then the returned values tensor is pinned as well.
+            pinned, then the returned values tensor is pinned as well. The
+            missing_offsets tensor has the partition offsets of missing_keys.
         """
         self.total_queries += keys.shape[0]
-        positions, index, missing_keys, found_keys = self._policy.query(keys)
+        (
+            positions,
+            index,
+            missing_keys,
+            found_pointers,
+            found_offsets,
+            missing_offsets,
+        ) = self._policy.query(keys)
         values = self._cache.query(positions, index, keys.shape[0])
-        self._policy.reading_completed(found_keys)
+        self._policy.reading_completed(found_pointers, found_offsets)
         self.total_miss += missing_keys.shape[0]
         missing_index = index[positions.size(0) :]
-        return values, missing_index, missing_keys
+        return values, missing_index, missing_keys, missing_offsets
 
-    def replace(self, keys, values):
+    def query_and_replace(self, keys, reader_fn):
+        """Queries the cache. Then inserts the keys that are not found by
+        reading them by calling `reader_fn(missing_keys)`, which are then
+        inserted into the cache using the selected caching policy algorithm
+        to remove the old entries if it is full.
+
+        Parameters
+        ----------
+        keys : Tensor
+            The keys to query the cache with.
+        reader_fn : reader_fn(keys: torch.Tensor) -> torch.Tensor
+            A function that will take a missing keys tensor and will return
+            their values.
+
+        Returns
+        -------
+        Tensor
+            A tensor containing values corresponding to the keys. Should equal
+            `reader_fn(keys)`, computed in a faster way.
+        """
+        self.total_queries += keys.shape[0]
+        (
+            positions,
+            index,
+            pointers,
+            missing_keys,
+            found_offsets,
+            missing_offsets,
+        ) = self._policy.query_and_replace(keys)
+        found_cnt = keys.size(0) - missing_keys.size(0)
+        found_positions = positions[:found_cnt]
+        values = self._cache.query(found_positions, index, keys.shape[0])
+        found_pointers = pointers[:found_cnt]
+        self._policy.reading_completed(found_pointers, found_offsets)
+        self.total_miss += missing_keys.shape[0]
+        missing_index = index[found_cnt:]
+        missing_values = reader_fn(missing_keys)
+        values[missing_index] = missing_values
+        missing_positions = positions[found_cnt:]
+        self._cache.replace(missing_positions, missing_values)
+        missing_pointers = pointers[found_cnt:]
+        self._policy.writing_completed(missing_pointers, missing_offsets)
+        return values
+
+    def replace(self, keys, values, offsets=None):
         """Inserts key-value pairs into the cache using the selected caching
         policy algorithm to remove old key-value pairs if it is full.
 
         Parameters
         ----------
-        keys: Tensor
+        keys : Tensor
             The keys to insert to the cache.
-        values: Tensor
+        values : Tensor
             The values to insert to the cache.
+        offsets : Tensor, optional
+            The partition offsets of the keys.
         """
-        positions = self._policy.replace(keys)
+        positions, pointers, offsets = self._policy.replace(keys, offsets)
         self._cache.replace(positions, values)
-        self._policy.writing_completed(keys)
+        self._policy.writing_completed(pointers, offsets)
 
     @property
     def miss_rate(self):

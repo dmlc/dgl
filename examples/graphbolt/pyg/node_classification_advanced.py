@@ -55,14 +55,24 @@ import time
 import dgl.graphbolt as gb
 import torch
 
-# Needed until https://github.com/pytorch/pytorch/issues/121197 is resolved to
-# use the `--torch-compile` cmdline option reliably.
+# For torch.compile until https://github.com/pytorch/pytorch/issues/121197 is
+# resolved.
 import torch._inductor.codecache
+
+torch._dynamo.config.cache_size_limit = 32
+
 import torch.nn.functional as F
-import torchmetrics.functional as MF
-from torch.torch_version import TorchVersion
 from torch_geometric.nn import SAGEConv
 from tqdm import tqdm
+
+
+def accuracy(out, labels):
+    assert out.ndim == 2
+    assert out.size(0) == labels.size(0)
+    assert labels.ndim == 1 or (labels.ndim == 2 and labels.size(1) == 1)
+    labels = labels.flatten()
+    predictions = torch.argmax(out, 1)
+    return (labels == predictions).sum(dtype=torch.float64) / labels.size(0)
 
 
 def convert_to_pyg(h, subgraph):
@@ -178,16 +188,19 @@ def create_dataloader(
         shuffle=(job == "train"),
         drop_last=(job == "train"),
     )
+    need_copy = True
     # Copy the data to the specified device.
-    if args.graph_device != "cpu":
+    if args.graph_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
+        need_copy = False
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
         graph, fanout if job != "infer" else [-1]
     )
     # Copy the data to the specified device.
-    if args.feature_device != "cpu":
+    if args.feature_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
+        need_copy = False
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(
         features,
@@ -195,7 +208,7 @@ def create_dataloader(
         overlap_fetch=args.overlap_feature_fetch,
     )
     # Copy the data to the specified device.
-    if args.feature_device == "cpu":
+    if need_copy:
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
     return gb.DataLoader(
@@ -207,26 +220,34 @@ def create_dataloader(
     )
 
 
+@torch.compile
+def train_step(minibatch, optimizer, model, loss_fn):
+    node_features = minibatch.node_features["feat"]
+    labels = minibatch.labels
+    optimizer.zero_grad()
+    out = model(minibatch.sampled_subgraphs, node_features)
+    loss = loss_fn(out, labels)
+    num_correct = accuracy(out, labels) * labels.size(0)
+    loss.backward()
+    optimizer.step()
+    return loss.detach(), num_correct, labels.size(0)
+
+
 def train_helper(dataloader, model, optimizer, loss_fn, num_classes, device):
     model.train()  # Set the model to training mode
     total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
-    total_correct = 0  # Accumulator for the total number of correct predictions
+    # Accumulator for the total number of correct predictions
+    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0  # Accumulator for the total number of samples processed
     num_batches = 0  # Counter for the number of mini-batches processed
     start = time.time()
     for minibatch in tqdm(dataloader, "Training"):
-        node_features = minibatch.node_features["feat"]
-        labels = minibatch.labels
-        optimizer.zero_grad()
-        out = model(minibatch.sampled_subgraphs, node_features)
-        loss = loss_fn(out, labels)
-        total_loss += loss.detach()
-        total_correct += MF.accuracy(
-            out, labels, task="multiclass", num_classes=num_classes
-        ) * labels.size(0)
-        total_samples += labels.size(0)
-        loss.backward()
-        optimizer.step()
+        loss, num_correct, num_samples = train_step(
+            minibatch, optimizer, model, loss_fn
+        )
+        total_loss += loss
+        total_correct += num_correct
+        total_samples += num_samples
         num_batches += 1
     train_loss = total_loss / num_batches
     train_acc = total_correct / total_samples
@@ -258,18 +279,17 @@ def train(train_dataloader, valid_dataloader, num_classes, model, device):
         train_loss, train_acc, duration = train_helper(
             train_dataloader, model, optimizer, loss_fn, num_classes, device
         )
-        val_acc = evaluate(model, valid_dataloader, num_classes)
+        val_acc = evaluate(model, valid_dataloader, device)
         print(
             f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
-            f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}, "
+            f"Approx. Train: {train_acc.item():.4f}, "
+            f"Approx. Val: {val_acc.item():.4f}, "
             f"Time: {duration}s"
         )
 
 
 @torch.no_grad()
-def layerwise_infer(
-    args, graph, features, test_set, all_nodes_set, model, num_classes
-):
+def layerwise_infer(args, graph, features, test_set, all_nodes_set, model):
     model.eval()
     dataloader = create_dataloader(
         graph=graph,
@@ -284,32 +304,29 @@ def layerwise_infer(
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
 
-    return MF.accuracy(
-        pred,
-        label,
-        task="multiclass",
-        num_classes=num_classes,
-    )
+    return accuracy(pred, label)
+
+
+@torch.compile
+def evaluate_step(minibatch, model):
+    node_features = minibatch.node_features["feat"]
+    labels = minibatch.labels
+    out = model(minibatch.sampled_subgraphs, node_features)
+    num_correct = accuracy(out, labels) * labels.size(0)
+    return num_correct, labels.size(0)
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, num_classes):
+def evaluate(model, dataloader, device):
     model.eval()
-    y_hats = []
-    ys = []
+    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
+    total_samples = 0
     for minibatch in tqdm(dataloader, "Evaluating"):
-        node_features = minibatch.node_features["feat"]
-        labels = minibatch.labels
-        out = model(minibatch.sampled_subgraphs, node_features)
-        y_hats.append(out)
-        ys.append(labels)
+        num_correct, num_samples = evaluate_step(minibatch, model)
+        total_correct += num_correct
+        total_samples += num_samples
 
-    return MF.accuracy(
-        torch.cat(y_hats),
-        torch.cat(ys),
-        task="multiclass",
-        num_classes=num_classes,
-    )
+    return total_correct / total_samples
 
 
 def parse_args():
@@ -345,7 +362,7 @@ def parse_args():
     parser.add_argument(
         "--fanout",
         type=str,
-        default="5,10,15",
+        default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
         " identical with the number of layers in your model. Default: 5,10,15",
     )
@@ -386,13 +403,6 @@ def parse_args():
         type=int,
         default=1,
         help="The number of accesses after which a vertex neighborhood will be cached.",
-    )
-    parser.add_argument(
-        "--disable-torch-compile",
-        action="store_true",
-        default=TorchVersion(torch.__version__) < TorchVersion("2.2.0a0"),
-        help="Disables torch.compile() on the trained GNN model because it is "
-        "enabled by default for torch>=2.2.0 without this option.",
     )
     parser.add_argument("--precision", type=str, default="high")
     return parser.parse_args()
@@ -460,9 +470,6 @@ def main():
         in_channels, hidden_channels, num_classes, len(args.fanout)
     ).to(args.device)
     assert len(args.fanout) == len(model.layers)
-    if not args.disable_torch_compile:
-        torch._dynamo.config.cache_size_limit = 32
-        model = torch.compile(model, fullgraph=True, dynamic=True)
 
     train(train_dataloader, valid_dataloader, num_classes, model, args.device)
 
@@ -475,7 +482,6 @@ def main():
         test_set,
         all_nodes_set,
         model,
-        num_classes,
     )
     print(f"Test accuracy {test_acc.item():.4f}")
 
