@@ -154,8 +154,8 @@ inline auto async(F&& function, bool is_cuda = false) {
     stream_data = c10::cuda::getCurrentCUDAStream().pack3();
   }
 #endif
-  using return_t = typename Future<T>::return_type;
-  auto fn = [=, func = std::move(function)]() -> return_t {
+  using return_type = typename Future<T>::return_type;
+  auto fn = [=, func = std::move(function)]() -> return_type {
 #ifdef GRAPHBOLT_USE_CUDA
     // We make sure to use the same CUDA stream as the thread launching the
     // async operation.
@@ -190,10 +190,10 @@ inline auto async(F&& function, bool is_cuda = false) {
 #ifdef BUILD_WITH_TASKFLOW
   auto future = interop_pool().async(std::move(fn));
 #else
-  auto promise = std::make_shared<std::promise<decltype(fn())>>();
+  auto promise = std::make_shared<std::promise<return_type>>();
   auto future = promise->get_future();
   at::launch([promise, func = std::move(fn)]() {
-    if constexpr (std::is_void_v<T>) {
+    if constexpr (std::is_void_v<return_type>) {
       func();
       promise->set_value();
     } else

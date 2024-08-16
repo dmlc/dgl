@@ -71,9 +71,9 @@ UniqueAndCompactBatchedAsync(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor> unique_dst_ids) {
-  return async([=] {
-    return UniqueAndCompactBatched(src_ids, dst_ids, unique_dst_ids);
-  });
+  return async(
+      [=] { return UniqueAndCompactBatched(src_ids, dst_ids, unique_dst_ids); },
+      utils::is_on_gpu(src_ids.at(0)));
 }
 
 }  // namespace sampling
