@@ -207,5 +207,19 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
   return std::make_tuple(output_indptr, results);
 }
 
+c10::intrusive_ptr<
+    Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>>
+IndexSelectCSCBatchedAsync(
+    torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
+    torch::Tensor nodes, bool with_edge_ids,
+    torch::optional<int64_t> output_size) {
+  return async(
+      [=] {
+        return IndexSelectCSCBatched(
+            indptr, indices_list, nodes, with_edge_ids, output_size);
+      },
+      utils::is_on_gpu(nodes));
+}
+
 }  // namespace ops
 }  // namespace graphbolt
