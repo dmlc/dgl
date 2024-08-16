@@ -183,14 +183,6 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
             },
             {
                 "domain": "node",
-                "name": "label",
-                "format": "numpy",
-                "in_memory": in_memory,
-                "path": "data/paper_label_19.npy",
-                "type": "paper",
-            },
-            {
-                "domain": "node",
                 "name": "feat",
                 "format": "numpy",
                 "in_memory": in_memory,
