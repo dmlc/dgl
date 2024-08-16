@@ -132,23 +132,14 @@ def test_gpu_sampling_DataLoader(
     dataloader, dataloader2 = dataloaders
 
     bufferer_cnt = int(enable_feature_fetch and overlap_feature_fetch)
-    awaiter_cnt = 0
     if overlap_graph_fetch:
         bufferer_cnt += num_layers
-        awaiter_cnt += num_layers
-    if asynchronous:
-        bufferer_cnt += 2 * num_layers
-    if overlap_graph_fetch:
-        bufferer_cnt += 0 * num_layers
         if num_gpu_cached_edges > 0:
             bufferer_cnt += 2 * num_layers
+    if asynchronous:
+        bufferer_cnt += 2 * num_layers
     datapipe = dataloader.dataset
     datapipe_graph = traverse_dps(datapipe)
-    awaiters = find_dps(
-        datapipe_graph,
-        dgl.graphbolt.Waiter,
-    )
-    assert len(awaiters) == awaiter_cnt
     bufferers = find_dps(
         datapipe_graph,
         dgl.graphbolt.Bufferer,
