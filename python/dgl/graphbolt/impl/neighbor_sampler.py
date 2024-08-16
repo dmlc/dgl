@@ -356,21 +356,27 @@ class SamplePerLayer(MiniBatchTransformer):
             if isinstance(subgraph.sampled_csc, dict):
                 for etype, pair in subgraph.sampled_csc.items():
                     if pair.indices is None:
-                        edge_ids = subgraph._sampled_edge_ids[etype]
+                        edge_ids = (
+                            subgraph._edge_ids_in_fused_csc_sampling_graph[
+                                etype
+                            ]
+                        )
                         edge_ids.record_stream(torch.cuda.current_stream())
                         pair.indices = record_stream(
                             index_select(indices, edge_ids)
                         )
                         minibatch._indices_needs_offset_subtraction = True
             elif subgraph.sampled_csc.indices is None:
-                subgraph._sampled_edge_ids.record_stream(
+                subgraph._edge_ids_in_fused_csc_sampling_graph.record_stream(
                     torch.cuda.current_stream()
                 )
                 subgraph.sampled_csc.indices = record_stream(
-                    index_select(indices, subgraph._sampled_edge_ids)
+                    index_select(
+                        indices, subgraph._edge_ids_in_fused_csc_sampling_graph
+                    )
                 )
                 minibatch._indices_needs_offset_subtraction = True
-            subgraph._sampled_edge_ids = None
+            subgraph._edge_ids_in_fused_csc_sampling_graph = None
             minibatch.wait = torch.cuda.current_stream().record_event().wait
 
         return minibatch
