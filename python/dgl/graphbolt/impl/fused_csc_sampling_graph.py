@@ -599,7 +599,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         indices = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
         column = C_sampled_subgraph.original_column_node_ids
-        sampled_edge_ids = C_sampled_subgraph.original_edge_ids
+        edge_ids_in_fused_csc_sampling_graph = (
+            C_sampled_subgraph.original_edge_ids
+        )
         etype_offsets = C_sampled_subgraph.etype_offsets
         if etype_offsets is not None:
             etype_offsets = etype_offsets.tolist()
@@ -610,17 +612,18 @@ class FusedCSCSamplingGraph(SamplingGraph):
         )
         original_edge_ids = (
             torch.ops.graphbolt.index_select(
-                self.edge_attributes[ORIGINAL_EDGE_ID], sampled_edge_ids
+                self.edge_attributes[ORIGINAL_EDGE_ID],
+                edge_ids_in_fused_csc_sampling_graph,
             )
             if has_original_eids
-            else sampled_edge_ids
+            else edge_ids_in_fused_csc_sampling_graph
         )
         if type_per_edge is None and etype_offsets is None:
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
             if indices is not None:
                 # Only needed to fetch indices.
-                sampled_edge_ids = None
+                edge_ids_in_fused_csc_sampling_graph = None
         else:
             offset = self._node_type_offset_list
 
@@ -660,9 +663,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
                         original_hetero_edge_ids[etype] = original_edge_ids[
                             eids
                         ]
-                sampled_hetero_edge_ids = None
+                sampled_hetero_edge_ids_in_fused_csc_sampling_graph = None
             else:
-                sampled_hetero_edge_ids = {}
+                sampled_hetero_edge_ids_in_fused_csc_sampling_graph = {}
                 edge_offsets = [0]
                 for etype, etype_id in self.edge_type_to_id.items():
                     src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
@@ -693,14 +696,18 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     ]
                     if indices is None:
                         # Only needed to fetch indices.
-                        sampled_hetero_edge_ids[etype] = sampled_edge_ids[
+                        sampled_hetero_edge_ids_in_fused_csc_sampling_graph[
+                            etype
+                        ] = edge_ids_in_fused_csc_sampling_graph[
                             etype_offsets[etype_id] : etype_offsets[
                                 etype_id + 1
                             ]
                         ]
 
             original_edge_ids = original_hetero_edge_ids
-            sampled_edge_ids = sampled_hetero_edge_ids
+            edge_ids_in_fused_csc_sampling_graph = (
+                sampled_hetero_edge_ids_in_fused_csc_sampling_graph
+            )
             sampled_csc = {
                 etype: CSCFormatBase(
                     indptr=sub_indptr[etype],
@@ -711,7 +718,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         return SampledSubgraphImpl(
             sampled_csc=sampled_csc,
             original_edge_ids=original_edge_ids,
-            _sampled_edge_ids=sampled_edge_ids,
+            _edge_ids_in_fused_csc_sampling_graph=edge_ids_in_fused_csc_sampling_graph,
         )
 
     def sample_neighbors(
