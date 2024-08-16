@@ -32,18 +32,25 @@ __all__ = [
 
 @functional_datapipe("fetch_cached_insubgraph_data")
 class FetchCachedInsubgraphData(Mapper):
-    """Queries the GPUGraphCache and returns the missing seeds and a lambda
-    function that can be called with the fetched graph structure.
+    """Queries the GPUGraphCache and returns the missing seeds and a generator
+    handle that can be called with the fetched graph structure.
     """
 
     def __init__(self, datapipe, gpu_graph_cache):
-        super().__init__(datapipe, self._fetch_per_layer)
+        datapipe = datapipe.transform(self._fetch_per_layer).buffer()
+        super().__init__(datapipe, self._wait_query_future)
         self.cache = gpu_graph_cache
 
     def _fetch_per_layer(self, minibatch):
-        minibatch._seeds, minibatch._replace = self.cache.query(
-            minibatch._seeds
-        )
+        minibatch._async_handle = self.cache.query_async(minibatch._seeds)
+        # Start first stage
+        next(minibatch._async_handle)
+
+        return minibatch
+
+    @staticmethod
+    def _wait_query_future(minibatch):
+        minibatch._seeds = next(minibatch._async_handle)
 
         return minibatch
 
@@ -55,7 +62,8 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
     """
 
     def __init__(self, datapipe, prob_name):
-        super().__init__(datapipe, self._combine_per_layer)
+        datapipe = datapipe.transform(self._combine_per_layer).buffer()
+        super().__init__(datapipe, self._wait_replace_future)
         self.prob_name = prob_name
 
     def _combine_per_layer(self, minibatch):
@@ -69,16 +77,24 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
             edge_tensors.append(probs_or_mask)
         edge_tensors.append(subgraph.edge_attribute(ORIGINAL_EDGE_ID))
 
-        subgraph.csc_indptr, edge_tensors = minibatch._replace(
-            subgraph.csc_indptr, edge_tensors
+        minibatch._future = minibatch._async_handle.send(
+            (subgraph.csc_indptr, edge_tensors)
         )
-        delattr(minibatch, "_replace")
+        delattr(minibatch, "_async_handle")
+
+        return minibatch
+
+    def _wait_replace_future(self, minibatch):
+        subgraph = minibatch._sliced_sampling_graph
+        subgraph.csc_indptr, edge_tensors = minibatch._future.wait()
+        delattr(minibatch, "_future")
 
         subgraph.indices = edge_tensors[0]
         edge_tensors = edge_tensors[1:]
         if subgraph.type_per_edge is not None:
             subgraph.type_per_edge = edge_tensors[0]
             edge_tensors = edge_tensors[1:]
+        probs_or_mask = subgraph.edge_attribute(self.prob_name)
         if probs_or_mask is not None:
             subgraph.add_edge_attribute(self.prob_name, edge_tensors[0])
             edge_tensors = edge_tensors[1:]
@@ -113,7 +129,7 @@ class ConcatHeteroSeeds(Mapper):
 
 
 @functional_datapipe("fetch_insubgraph_data")
-class FetchInsubgraphData(Mapper):
+class FetchInsubgraphData(MiniBatchTransformer):
     """Fetches the insubgraph and wraps it in a FusedCSCSamplingGraph object. If
     the provided sample_per_layer_obj has a valid prob_name, then it reads the
     probabilies of all the fetched edges. Furthermore, if type_per_array tensor
@@ -131,9 +147,13 @@ class FetchInsubgraphData(Mapper):
             datapipe = datapipe.fetch_cached_insubgraph_data(
                 graph._gpu_graph_cache
             )
+        datapipe = datapipe.transform(self._fetch_per_layer)
+        datapipe = datapipe.buffer().wait()
+        if graph._gpu_graph_cache is not None:
+            datapipe = datapipe.combine_cached_and_fetched_insubgraph(prob_name)
+        super().__init__(datapipe)
         self.graph = graph
         self.prob_name = prob_name
-        super().__init__(datapipe, self._fetch_per_layer)
 
     def _fetch_per_layer(self, minibatch):
         stream = torch.cuda.current_stream()
@@ -260,11 +280,6 @@ class SamplePerLayer(MiniBatchTransformer):
             self.returning_indices_is_optional = True
         elif overlap_fetch:
             datapipe = datapipe.fetch_insubgraph_data(graph, prob_name)
-            datapipe = datapipe.buffer().wait()
-            if graph._gpu_graph_cache is not None:
-                datapipe = datapipe.combine_cached_and_fetched_insubgraph(
-                    prob_name
-                )
             datapipe = datapipe.transform(
                 self._sample_per_layer_from_fetched_subgraph
             )

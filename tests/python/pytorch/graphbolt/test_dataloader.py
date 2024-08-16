@@ -138,6 +138,10 @@ def test_gpu_sampling_DataLoader(
         awaiter_cnt += num_layers
     if asynchronous:
         bufferer_cnt += 2 * num_layers
+    if overlap_graph_fetch:
+        bufferer_cnt += 0 * num_layers
+        if num_gpu_cached_edges > 0:
+            bufferer_cnt += 2 * num_layers
     datapipe = dataloader.dataset
     datapipe_graph = traverse_dps(datapipe)
     awaiters = find_dps(
