@@ -191,10 +191,10 @@ class FetchInsubgraphData(MiniBatchTransformer):
                 self.graph.csc_indptr, tensors_to_be_sliced, seeds, True, None
             )
 
-            cuda_event = torch.cuda.current_stream().record_event()
-
         yield
 
+        # graphbolt::async has already recorded a CUDAEvent for us and
+        # called CUDAStreamWaitEvent for us on the current stream.
         indptr, sliced_tensors = future.wait()
 
         for tensor in [indptr] + sliced_tensors:
@@ -232,8 +232,6 @@ class FetchInsubgraphData(MiniBatchTransformer):
 
         subgraph._indptr_node_type_offset_list = seed_offsets
         minibatch._sliced_sampling_graph = subgraph
-
-        cuda_event.wait()
 
         yield minibatch
 
