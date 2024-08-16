@@ -150,8 +150,10 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
    * @brief This class is meant to distribute the available read buffers and the
    * statically declared io_uring queues among the worker threads.
    */
-  struct QueueAndBufferAcquirer {
-    struct UniqueQueue {
+  class QueueAndBufferAcquirer {
+   public:
+    class UniqueQueue {
+     public:
       UniqueQueue(int thread_id) : thread_id_(thread_id) {}
       UniqueQueue(const UniqueQueue&) = delete;
       UniqueQueue& operator=(const UniqueQueue&) = delete;
