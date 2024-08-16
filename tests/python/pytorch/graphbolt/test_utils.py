@@ -117,11 +117,7 @@ def test_exclude_seed_edges_homo_cpu():
             )
 
 
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="Fails due to different result on the CPU.",
-)
-def test_exclude_seed_edges_gpu():
+def test_exclude_seed_edges():
     graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
     graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
     items = torch.LongTensor([[0, 3], [4, 4]])
@@ -138,7 +134,7 @@ def test_exclude_seed_edges_gpu():
         deduplicate=True,
     )
     datapipe = datapipe.transform(partial(gb.exclude_seed_edges))
-    if torch.cuda.get_device_capability()[0] < 7:
+    if F.ctx() != F.cpu() and torch.cuda.get_device_capability()[0] < 7:
         original_row_node_ids = [
             torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
             torch.tensor([0, 3, 4, 2, 5]).to(F.ctx()),
