@@ -4,15 +4,15 @@ import torch
 import torch.utils.data as torch_data
 
 from .base import CopyTo
-from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
-from .impl.neighbor_sampler import SamplePerLayer
 
-from .internal import (
+from .datapipes import (
     datapipe_graph_to_adjlist,
     find_dps,
     replace_dp,
     traverse_dps,
 )
+from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
+from .impl.neighbor_sampler import SamplePerLayer
 from .internal_utils import gb_warning
 from .item_sampler import ItemSampler
 
