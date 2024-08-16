@@ -154,39 +154,39 @@ inline auto async(F&& function, bool is_cuda = false) {
     stream_data = c10::cuda::getCurrentCUDAStream().pack3();
   }
 #endif
-  auto fn = [=, func = std::move(function)]() ->
-      typename Future<T>::return_type {
+  using return_t = typename Future<T>::return_type;
+  auto fn = [=, func = std::move(function)]() -> return_t {
 #ifdef GRAPHBOLT_USE_CUDA
-        // We make sure to use the same CUDA stream as the thread launching the
-        // async operation.
-        if (is_cuda) {
-          auto stream = c10::cuda::CUDAStream::unpack3(
-              stream_data.stream_id, stream_data.device_index,
-              stream_data.device_type);
-          c10::cuda::CUDAStreamGuard guard(stream);
-          at::cuda::CUDAEvent event;
-          // Might be executed on the GPU so we record an event to be able to
-          // synchronize with it later, in case it is executed on an alternative
-          // CUDA stream.
-          if constexpr (std::is_void_v<T>) {
-            func();
-            event.record();
-            return event;
-          } else {
-            auto result = func();
-            event.record();
-            return std::make_pair(std::move(result), std::move(event));
-          }
-        }
-        if constexpr (std::is_void_v<T>) {
-          return std::monostate{};
-        } else {
-          return func();
-        }
+    // We make sure to use the same CUDA stream as the thread launching the
+    // async operation.
+    if (is_cuda) {
+      auto stream = c10::cuda::CUDAStream::unpack3(
+          stream_data.stream_id, stream_data.device_index,
+          stream_data.device_type);
+      c10::cuda::CUDAStreamGuard guard(stream);
+      at::cuda::CUDAEvent event;
+      // Might be executed on the GPU so we record an event to be able to
+      // synchronize with it later, in case it is executed on an alternative
+      // CUDA stream.
+      if constexpr (std::is_void_v<T>) {
+        func();
+        event.record();
+        return event;
+      } else {
+        auto result = func();
+        event.record();
+        return std::make_pair(std::move(result), std::move(event));
+      }
+    }
+    if constexpr (std::is_void_v<T>) {
+      return std::monostate{};
+    } else {
+      return func();
+    }
 #else
-        return func();
+    return func();
 #endif
-      };
+  };
 #ifdef BUILD_WITH_TASKFLOW
   auto future = interop_pool().async(std::move(fn));
 #else
