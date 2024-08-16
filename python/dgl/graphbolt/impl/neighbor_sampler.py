@@ -156,7 +156,7 @@ class FetchInsubgraphData(MiniBatchTransformer):
         minibatch = next(minibatch._async_handle_fetch)
         delattr(minibatch, "_async_handle_fetch")
         return minibatch
-    
+
     def _fetch_per_layer_async(self, minibatch):
         stream = torch.cuda.current_stream()
         uva_stream = get_host_to_device_uva_stream()
