@@ -51,6 +51,7 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
         "tasks": [
             {
                 "num_classes": 19,
+                "name": "node_classification",
                 "validation_set": [
                     {
                         "data": [
@@ -70,7 +71,6 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
                         "type": "paper",
                     }
                 ],
-                "name": "node_classification",
                 "train_set": [
                     {
                         "data": [
@@ -112,6 +112,7 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
             },
             {
                 "num_classes": 2983,
+                "name": "node_classification_2K",
                 "validation_set": [
                     {
                         "data": [
@@ -131,7 +132,6 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
                         "type": "paper",
                     }
                 ],
-                "name": "node_classification_2K",
                 "train_set": [
                     {
                         "data": [
@@ -204,14 +204,6 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
                 "in_memory": in_memory,
                 "path": "data/fos_feat.npy",
                 "type": "fos",
-            },
-            {
-                "domain": "node",
-                "name": "feat",
-                "format": "numpy",
-                "in_memory": in_memory,
-                "path": "data/author_feat.npy",
-                "type": "author",
             },
         ],
         "dataset_name": os.path.basename(path),
