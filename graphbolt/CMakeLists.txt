@@ -46,6 +46,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 
 set(LIB_GRAPHBOLT_NAME "graphbolt_pytorch_${TORCH_VER}")
 option(BUILD_WITH_TASKFLOW "Use taskflow as parallel backend" ON)
+option(USE_OPENMP "Use OpenMP for graphbolt" ON)
+option(USE_LIBURING "Build graphbolt with liburing support" ON)
 
 set(BOLT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(BOLT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -84,6 +86,12 @@ if(BUILD_WITH_TASKFLOW)
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE "../third_party/taskflow")
   target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE BUILD_WITH_TASKFLOW=1)
 endif()
+
+if(USE_OPENMP)
+  find_package(OpenMP REQUIRED)
+  target_link_libraries(${LIB_GRAPHBOLT_NAME} OpenMP::OpenMP_CXX)
+  message(STATUS "Build graphbolt with OpenMP.")
+endif(USE_OPENMP)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   if(USE_LIBURING)
