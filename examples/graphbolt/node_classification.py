@@ -371,9 +371,9 @@ def parse_args():
             "ogbn-arxiv",
             "ogbn-products",
             "ogbn-papers100M",
-            "igb-homogeneous-tiny",
-            "igb-homogeneous-small",
-            "igb-homogeneous-medium",
+            "igb-hom-tiny",
+            "igb-hom-small",
+            "igb-hom-medium",
         ],
         help="The dataset we can use for node classification example. Currently"
         " ogbn-products, ogbn-arxiv, ogbn-papers100M and"
