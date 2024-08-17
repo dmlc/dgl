@@ -573,7 +573,7 @@ def add_nodes(nodes, source, dest, dataset_size):
             new_label_path_2K = dest + "/" + "paper_label_2K.npy"
             os.rename(src=old_label_path_2K, dst=new_label_path_2K)
             process_label(
-                file_path=new_label_path_19,
+                file_path=new_label_path_2K,
                 num_class=2983,
                 dataset_size=dataset_size,
             )
