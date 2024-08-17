@@ -5,7 +5,7 @@ import torch
 from ..base import get_device_to_host_uva_stream, get_host_to_device_uva_stream
 from ..feature_store import Feature
 
-from .feature_cache import CPUFeatureCache
+from .feature_cache import CPUFeatureCache, cpu_cache_policies
 
 __all__ = ["CPUCachedFeature"]
 
@@ -18,7 +18,7 @@ def bytes_to_number_of_items(cache_capacity_in_bytes, single_item):
 
 
 class CPUCachedFeature(Feature):
-    r"""CPU cached feature wrapping a fallback feature.
+    fr"""CPU cached feature wrapping a fallback feature.
 
     Parameters
     ----------
@@ -30,8 +30,8 @@ class CPUCachedFeature(Feature):
         will hang due to all cache entries being read and/or write locked,
         resulting in a deadlock.
     policy : str
-        The cache eviction policy algorithm name. See gb.impl.CPUFeatureCache
-        for the list of available policies.
+        The cache eviction policy algorithm name. The available policies are
+        {cpu_cache_policies.keys()}.
     pin_memory : bool
         Whether the cache storage should be allocated on system pinned memory.
         Default is False.
@@ -94,9 +94,9 @@ class CPUCachedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
         Examples
         --------
