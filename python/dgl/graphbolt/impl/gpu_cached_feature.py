@@ -220,3 +220,8 @@ class GPUCachedFeature(Feature):
         else:
             self._fallback_feature.update(value, ids)
             self._feature.replace(ids, value)
+
+    @property
+    def miss_rate(self):
+        """Returns the cache miss rate since creation."""
+        return self._feature.miss_rate
