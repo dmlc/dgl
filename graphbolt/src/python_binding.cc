@@ -184,6 +184,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("scatter_async", &ops::ScatterAsync);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("index_select_csc_batched", &ops::IndexSelectCSCBatched);
+  m.def("index_select_csc_batched_async", &ops::IndexSelectCSCBatchedAsync);
   m.def("ondisk_npy_array", &storage::OnDiskNpyArray::Create);
   m.def("detect_io_uring", &io_uring::IsAvailable);
   m.def("set_num_io_uring_threads", &io_uring::SetNumThreads);
