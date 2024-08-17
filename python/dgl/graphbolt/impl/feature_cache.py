@@ -1,9 +1,9 @@
 """CPU Feature Cache implementation wrapper for graphbolt."""
 import torch
 
-__all__ = ["CPUFeatureCache", "cpu_cache_policies"]
+__all__ = ["CPUFeatureCache"]
 
-cpu_cache_policies = {
+caching_policies = {
     "s3-fifo": torch.ops.graphbolt.s3_fifo_cache_policy,
     "sieve": torch.ops.graphbolt.sieve_cache_policy,
     "lru": torch.ops.graphbolt.lru_cache_policy,
@@ -41,8 +41,8 @@ class CPUFeatureCache(object):
         if policy is None:
             policy = "sieve"
         assert (
-            policy in cpu_cache_policies
-        ), f"{list(cpu_cache_policies.keys())} are the available caching policies."
+            policy in caching_policies
+        ), f"{list(caching_policies.keys())} are the available caching policies."
         if num_parts is None:
             num_parts = torch.get_num_threads()
         min_num_cache_items = num_parts * (10 if policy == "s3-fifo" else 1)
@@ -52,7 +52,7 @@ class CPUFeatureCache(object):
         # positive size.
         if cache_shape[0] < min_num_cache_items:
             cache_shape = (min_num_cache_items,) + cache_shape[1:]
-        self._policy = cpu_cache_policies[policy](cache_shape[0], num_parts)
+        self._policy = caching_policies[policy](cache_shape[0], num_parts)
         self._cache = torch.ops.graphbolt.feature_cache(
             cache_shape, dtype, pin_memory
         )
