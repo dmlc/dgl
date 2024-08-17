@@ -37,6 +37,7 @@ main
 │
 └───> All nodes set inference & Test set evaluation
 """
+
 import argparse
 import time
 
@@ -309,6 +310,9 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             # in the last layer's computation graph.
             y = data.labels
 
+            if y.dtype != "int64":
+                y = y.long()
+
             y_hat = model(data.blocks, x)
 
             # Compute loss.
@@ -363,7 +367,14 @@ def parse_args():
         "--dataset",
         type=str,
         default="ogbn-products",
-        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        choices=[
+            "ogbn-arxiv",
+            "ogbn-products",
+            "ogbn-papers100M",
+            "igb-homogeneous-tiny",
+            "igb-homogeneous-small",
+            "igb-homogeneous-medium",
+        ],
         help="The dataset we can use for node classification example. Currently"
         " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
     )
