@@ -376,7 +376,8 @@ def parse_args():
             "igb-homogeneous-medium",
         ],
         help="The dataset we can use for node classification example. Currently"
-        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
+        " ogbn-products, ogbn-arxiv, ogbn-papers100M and"
+        " igb-hom-[tiny|small|medium] datasets are supported.",
     )
     parser.add_argument(
         "--mode",
