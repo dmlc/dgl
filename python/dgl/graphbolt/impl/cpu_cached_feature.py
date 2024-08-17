@@ -5,7 +5,7 @@ import torch
 from ..base import get_device_to_host_uva_stream, get_host_to_device_uva_stream
 from ..feature_store import Feature
 
-from .feature_cache import CPUFeatureCache, cpu_cache_policies
+from .feature_cache import cpu_cache_policies, CPUFeatureCache
 
 __all__ = ["CPUCachedFeature"]
 
@@ -18,7 +18,7 @@ def bytes_to_number_of_items(cache_capacity_in_bytes, single_item):
 
 
 class CPUCachedFeature(Feature):
-    fr"""CPU cached feature wrapping a fallback feature.
+    rf"""CPU cached feature wrapping a fallback feature.
 
     Parameters
     ----------
