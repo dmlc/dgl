@@ -310,9 +310,6 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             # in the last layer's computation graph.
             y = data.labels
 
-            if y.dtype != "int64":
-                y = y.long()
-
             y_hat = model(data.blocks, x)
 
             # Compute loss.

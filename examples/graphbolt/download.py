@@ -25,7 +25,16 @@ def build_yaml_helper(path, dataset_size, in_memory=True):
         ],
         "graph": {
             "edges": [
-                {"format": "numpy", "path": "edges/paper__cites__paper.npy"}
+                {
+                    "format": "numpy",
+                    "path": "edges/paper__cites__paper.npy",
+                    # "type": "paper:cites:paper"
+                },
+                # {
+                #     "format": "numpy",
+                #     "path": "edges/paper__cites__paper_rev.npy",
+                #     "type": "paper:rev_cites:paper"
+                # },
             ],
             "nodes": [{"num": num_nodes[dataset_size]["paper"]}],
         },
@@ -228,20 +237,21 @@ def check_md5sum(dataset_type, dataset_size, filename):
 
 def download_dataset(path, dataset_type, dataset_size):
     """This is the script to download all the related datasets."""
+    _dataset_type = dataset_type[:3]
 
     # For large datasets, use the two shell scripts to download.
     if dataset_size in ["large", "full"]:
         command = f"./download_{dataset_size}_igbh.sh"
         subprocess.run(["bash", command], check=True, text=True)
-        shutil.move(src=f"igb-{dataset_type}-{dataset_size}", dst=f"{path}")
-        return path + "/" + "igb-" + dataset_type + "-" + dataset_size
+        shutil.move(src=f"igb-{_dataset_type}-{dataset_size}", dst=f"{path}")
+        return path + "/" + "igb-" + _dataset_type + "-" + dataset_size
     # For the three smaller version, use the url to download.
     else:
         output_directory = path
         if not os.path.exists(
             output_directory
             + "igb_"
-            + dataset_type
+            + _dataset_type
             + "_"
             + dataset_size
             + ".tar.gz"
@@ -256,7 +266,7 @@ def download_dataset(path, dataset_type, dataset_size):
                 filename = (
                     path
                     + "/igb_"
-                    + dataset_type
+                    + _dataset_type
                     + "_"
                     + dataset_size
                     + ".tar.gz"
@@ -273,20 +283,20 @@ def download_dataset(path, dataset_type, dataset_size):
                         )
                         f.write(chunk)
             print(
-                "Downloaded" + " igb_" + dataset_type + "_" + dataset_size,
+                "Downloaded" + " igb_" + _dataset_type + "_" + dataset_size,
                 end=" ->",
             )
             check_md5sum(dataset_type, dataset_size, filename)
         else:  # No need to download the tar file again if it is already downloaded.
             print(
                 "The file igb_"
-                + dataset_type
+                + _dataset_type
                 + "_"
                 + dataset_size
                 + ".tar.gz already exists, directly extracting..."
             )
             filename = (
-                path + "/igb_" + dataset_type + "_" + dataset_size + ".tar.gz"
+                path + "/igb_" + _dataset_type + "_" + dataset_size + ".tar.gz"
             )
         # Extract the tar file
         file = tarfile.open(filename)
@@ -301,10 +311,15 @@ def download_dataset(path, dataset_type, dataset_size):
         # os.remove(filename)
         os.rename(
             output_directory + "/" + dataset_size,
-            output_directory + "/" + "igb-" + dataset_type + "-" + dataset_size,
+            output_directory
+            + "/"
+            + "igb-"
+            + _dataset_type
+            + "-"
+            + dataset_size,
         )
         return (
-            output_directory + "/" + "igb-" + dataset_type + "-" + dataset_size
+            output_directory + "/" + "igb-" + _dataset_type + "-" + dataset_size
         )
 
 
@@ -363,9 +378,9 @@ def split_data(label_path, set_dir, dataset_size, class_num):
     print(validation_indices)
     print(test_indices)
 
-    train_labels = labels[:train_end]
-    validation_labels = labels[train_end:validation_end]
-    test_labels = labels[validation_end:]
+    train_labels = labels[:train_end].astype(np.int64)
+    validation_labels = labels[train_end:validation_end].astype(np.int64)
+    test_labels = labels[validation_end:].astype(np.int64)
     print(train_labels, len(train_labels))
     print(validation_labels, len(validation_labels))
     print(test_labels, len(test_labels))
@@ -395,16 +410,21 @@ def add_edges(edges, source, dest, dataset_size):
 
         old_edge_path = source + "/" + edge + "/" + "edge_index.npy"
         new_edge_path = dest + "/" + edge + ".npy"
+        rev_edge_path = dest + "/" + edge + "_rev.npy"
         os.rename(src=old_edge_path, dst=new_edge_path)
 
         # edge_array = np.memmap(new_edge_path, dtype='int32', mode='r',  shape=(num_edges[dataset_size][edge], 2))
         edge_array = np.load(new_edge_path)
         new_edge_array = edge_array.transpose()
+        rev_edge_array = new_edge_array[:, ::-1]
 
         assert new_edge_array.shape == (2, num_edges[dataset_size][edge])
-        assert np.array_equal(edge_array, new_edge_array.transpose())
+        assert rev_edge_array.shape == (2, num_edges[dataset_size][edge])
+        assert np.array_equal(new_edge_array, edge_array.transpose())
+        assert np.array_equal(rev_edge_array, new_edge_array[:, ::-1])
 
         gb.numpy_save_aligned(new_edge_path, new_edge_array)
+        gb.numpy_save_aligned(rev_edge_path, rev_edge_array)
 
 
 def process_feat(file_path, node_name, dataset_size):
