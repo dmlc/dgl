@@ -118,6 +118,7 @@ if(USE_CUDA)
   file(GLOB BOLT_CUDA_EXTENSION_SRC
     ${BOLT_DIR}/cuda/extension/*.cu
     ${BOLT_DIR}/cuda/extension/*.cc
+    ../third_party/HugeCTR/gpu_cache/src/nv_gpu_cache.cu
   )
   # Until https://github.com/NVIDIA/cccl/issues/1083 is resolved, we need to
   # compile the cuda/extension folder with Volta+ CUDA architectures.
@@ -128,16 +129,16 @@ if(USE_CUDA)
   set_target_properties(${LIB_GRAPHBOLT_CUDA_NAME} PROPERTIES CUDA_STANDARD 17)
   set_target_properties(${LIB_GRAPHBOLT_CUDA_NAME} PROPERTIES CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES_FILTERED}")
   set_target_properties(${LIB_GRAPHBOLT_CUDA_NAME} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+  # Enables libcudacxx for gpu_cache. 
+  target_compile_definitions(${LIB_GRAPHBOLT_CUDA_NAME} PRIVATE LIBCUDACXX_VERSION)
+  include_directories(AFTER "../third_party/HugeCTR/gpu_cache/include")
+  message(STATUS "Build graphbolt extension with HugeCTR GPU embedding cache.")
+
   message(STATUS "Use external CCCL library for a consistent API and performance for graphbolt.")
   include_directories(BEFORE
                       "../third_party/cccl/thrust"
                       "../third_party/cccl/cub"
                       "../third_party/cuco/include")
-
-  message(STATUS "Use HugeCTR gpu_cache for graphbolt with INCLUDE_DIRS $ENV{GPU_CACHE_INCLUDE_DIRS}.")
-  target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE $ENV{GPU_CACHE_INCLUDE_DIRS})
-  target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${GPU_CACHE_BUILD_DIR})
-  target_link_libraries(${LIB_GRAPHBOLT_NAME} gpu_cache)
   
   get_property(archs TARGET ${LIB_GRAPHBOLT_NAME} PROPERTY CUDA_ARCHITECTURES)
   message(STATUS "CUDA_ARCHITECTURES for graphbolt: ${archs}")

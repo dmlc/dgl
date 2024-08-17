@@ -21,11 +21,11 @@
 #ifndef GRAPHBOLT_GPU_GRAPH_CACHE_H_
 #define GRAPHBOLT_GPU_GRAPH_CACHE_H_
 
+#include <graphbolt/async.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
-#include <limits>
-#include <type_traits>
+#include <mutex>
 
 namespace graphbolt {
 namespace cuda {
@@ -69,6 +69,10 @@ class GpuGraphCache : public torch::CustomClassHolder {
   std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> Query(
       torch::Tensor seeds);
 
+  c10::intrusive_ptr<
+      Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>
+  QueryAsync(torch::Tensor seeds);
+
   /**
    * @brief After the graph structure for the missing node ids are fetched, it
    * inserts the node ids which passes the threshold and returns the final
@@ -96,6 +100,13 @@ class GpuGraphCache : public torch::CustomClassHolder {
       int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
       std::vector<torch::Tensor> edge_tensors);
 
+  c10::intrusive_ptr<
+      Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>>
+  ReplaceAsync(
+      torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
+      int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
+      std::vector<torch::Tensor> edge_tensors);
+
   static c10::intrusive_ptr<GpuGraphCache> Create(
       const int64_t num_edges, const int64_t threshold,
       torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes);
@@ -111,6 +122,7 @@ class GpuGraphCache : public torch::CustomClassHolder {
   torch::Tensor offset_;          // The original graph's sliced_indptr tensor.
   std::vector<torch::Tensor> cached_edge_tensors_;  // The cached graph
                                                     // structure edge tensors.
+  std::mutex mtx_;  // Protects the data structure and makes it threadsafe.
 };
 
 }  // namespace cuda

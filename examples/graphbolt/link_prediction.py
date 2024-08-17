@@ -182,7 +182,10 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
     datapipe = datapipe.sample_neighbor(
-        graph, args.fanout if is_train else [-1]
+        graph,
+        args.fanout if is_train else [-1],
+        overlap_fetch=args.storage_device == "pinned",
+        asynchronous=args.storage_device != "cpu",
     )
 
     ############################################################################

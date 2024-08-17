@@ -7,6 +7,7 @@
 #ifndef GRAPHBOLT_UNIQUE_AND_COMPACT_H_
 #define GRAPHBOLT_UNIQUE_AND_COMPACT_H_
 
+#include <graphbolt/async.h>
 #include <torch/torch.h>
 
 namespace graphbolt {
@@ -52,6 +53,13 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
+    const std::vector<torch::Tensor>& src_ids,
+    const std::vector<torch::Tensor>& dst_ids,
+    const std::vector<torch::Tensor> unique_dst_ids);
+
+c10::intrusive_ptr<Future<
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+UniqueAndCompactBatchedAsync(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor> unique_dst_ids);

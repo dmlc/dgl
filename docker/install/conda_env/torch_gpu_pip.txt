@@ -16,7 +16,6 @@ requests[security]==2.28
 scikit-learn
 scipy
 torch==2.3.0+cu121
-torchdata
 torcheval
 torchmetrics
 torch_geometric

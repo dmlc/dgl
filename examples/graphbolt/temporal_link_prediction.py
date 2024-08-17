@@ -121,6 +121,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
         shuffle=is_train,
     )
 
+    if args.storage_device != "cpu":
+        datapipe = datapipe.copy_to(device=args.device)
+
     ############################################################################
     # [Input]:
     # 'datapipe' is either 'ItemSampler' or 'UniformNegativeSampler' depending
@@ -250,7 +253,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         default="cpu-cuda",
-        choices=["cpu-cpu", "cpu-cuda"],
+        choices=["cpu-cpu", "cpu-cuda", "cuda-cuda"],
         help="Dataset storage placement and Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )

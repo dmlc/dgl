@@ -47,6 +47,9 @@ class gpu_cache_api {
   // Dump API, i.e. dump some slabsets' keys from the cache
   virtual void Dump(key_type* d_keys, size_t* d_dump_counter, const size_t start_set_index,
                     const size_t end_set_index, cudaStream_t stream) = 0;
+
+  // Record all the lookup stream of a specific cache for Update/Replace sync
+  virtual void Record(cudaStream_t stream) = 0;
 };
 
 }  // namespace gpu_cache

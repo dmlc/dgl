@@ -114,7 +114,11 @@ class GPUCachedFeature(Feature):
         >>> assert stage + 1 == feature.read_async_num_stages(ids.device)
         >>> result = future.wait()  # result contains the read values.
         """
-        values, missing_index, missing_keys = self._feature.query(ids)
+        future = self._feature.query(ids, async_op=True)
+
+        yield
+
+        values, missing_index, missing_keys = future.wait()
 
         fallback_reader = self._fallback_feature.read_async(missing_keys)
         fallback_num_stages = self._fallback_feature.read_async_num_stages(
@@ -175,7 +179,7 @@ class GPUCachedFeature(Feature):
             The number of stages of the read_async operation.
         """
         assert ids_device.type == "cuda"
-        return self._fallback_feature.read_async_num_stages(ids_device)
+        return 1 + self._fallback_feature.read_async_num_stages(ids_device)
 
     def size(self):
         """Get the size of the feature.

@@ -8,8 +8,6 @@
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/unique_and_compact.h>
 
-#include <unordered_map>
-
 #include "./concurrent_id_hash_map.h"
 #include "./macro.h"
 #include "./utils.h"
@@ -65,6 +63,17 @@ UniqueAndCompactBatched(
         UniqueAndCompact(src_ids[i], dst_ids[i], unique_dst_ids[i]));
   }
   return results;
+}
+
+c10::intrusive_ptr<Future<
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+UniqueAndCompactBatchedAsync(
+    const std::vector<torch::Tensor>& src_ids,
+    const std::vector<torch::Tensor>& dst_ids,
+    const std::vector<torch::Tensor> unique_dst_ids) {
+  return async(
+      [=] { return UniqueAndCompactBatched(src_ids, dst_ids, unique_dst_ids); },
+      utils::is_on_gpu(src_ids.at(0)));
 }
 
 }  // namespace sampling

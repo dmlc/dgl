@@ -14,13 +14,16 @@ class GPUCache(object):
         self.total_miss = 0
         self.total_queries = 0
 
-    def query(self, keys):
+    def query(self, keys, async_op=False):
         """Queries the GPU cache.
 
         Parameters
         ----------
         keys : Tensor
             The keys to query the GPU cache with.
+        async_op: bool
+            Boolean indicating whether the call is asynchronous. If so, the
+            result can be obtained by calling wait on the returned future.
 
         Returns
         -------
@@ -29,10 +32,29 @@ class GPUCache(object):
             values[missing_indices] corresponds to cache misses that should be
             filled by quering another source with missing_keys.
         """
-        self.total_queries += keys.shape[0]
-        values, missing_index, missing_keys = self._cache.query(keys)
-        self.total_miss += missing_keys.shape[0]
-        return values, missing_index, missing_keys
+
+        class _Waiter:
+            def __init__(self, gpu_cache, future):
+                self.gpu_cache = gpu_cache
+                self.future = future
+
+            def wait(self):
+                """Returns the stored value when invoked."""
+                gpu_cache = self.gpu_cache
+                values, missing_index, missing_keys = (
+                    self.future.wait() if async_op else self.future
+                )
+                # Ensure there is no leak.
+                self.gpu_cache = self.future = None
+
+                gpu_cache.total_queries += values.shape[0]
+                gpu_cache.total_miss += missing_keys.shape[0]
+                return values, missing_index, missing_keys
+
+        if async_op:
+            return _Waiter(self, self._cache.query_async(keys))
+        else:
+            return _Waiter(self, self._cache.query(keys)).wait()
 
     def replace(self, keys, values):
         """Inserts key-value pairs into the GPU cache using the Least-Recently
