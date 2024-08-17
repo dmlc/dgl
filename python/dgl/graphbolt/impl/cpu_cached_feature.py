@@ -18,7 +18,7 @@ def bytes_to_number_of_items(cache_capacity_in_bytes, single_item):
 
 
 class CPUCachedFeature(Feature):
-    rf"""CPU cached feature wrapping a fallback feature.
+    r"""CPU cached feature wrapping a fallback feature.
 
     Parameters
     ----------
