@@ -46,7 +46,9 @@ class SampledSubgraphImpl(SampledSubgraph):
     original_row_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
     original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
     # Used to fetch sampled_csc.indices if it is missing.
-    _sampled_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
+    _edge_ids_in_fused_csc_sampling_graph: Union[
+        Dict[str, torch.Tensor], torch.Tensor
+    ] = None
 
     def __post_init__(self):
         if isinstance(self.sampled_csc, dict):
@@ -65,7 +67,10 @@ class SampledSubgraphImpl(SampledSubgraph):
                     ), "Node pair should be have indices of type torch.Tensor."
                 else:
                     assert isinstance(
-                        self._sampled_edge_ids.get(etype, None), torch.Tensor
+                        self._edge_ids_in_fused_csc_sampling_graph.get(
+                            etype, None
+                        ),
+                        torch.Tensor,
                     ), "When indices is missing, sampled edge ids needs to be provided."
         else:
             assert self.sampled_csc.indptr is not None and isinstance(
@@ -81,7 +86,7 @@ class SampledSubgraphImpl(SampledSubgraph):
                 ), "Node pair should have a torch.Tensor indices."
             else:
                 assert isinstance(
-                    self._sampled_edge_ids, torch.Tensor
+                    self._edge_ids_in_fused_csc_sampling_graph, torch.Tensor
                 ), "When indices is missing, sampled edge ids needs to be provided."
 
     def __repr__(self) -> str:
@@ -95,7 +100,7 @@ def _sampled_subgraph_str(sampled_subgraph: SampledSubgraph, classname) -> str:
     attributes.reverse()
 
     for name in attributes:
-        if name in "_sampled_edge_ids":
+        if name in "_edge_ids_in_fused_csc_sampling_graph":
             continue
         val = getattr(sampled_subgraph, name)
 

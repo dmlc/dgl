@@ -76,6 +76,16 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> GpuCache::Query(
   return std::make_tuple(values, missing_index, missing_keys);
 }
 
+c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> GpuCache::QueryAsync(
+    torch::Tensor keys) {
+  return async(
+      [=] {
+        auto [values, missing_index, missing_keys] = Query(keys);
+        return std::vector{values, missing_index, missing_keys};
+      },
+      true);
+}
+
 void GpuCache::Replace(torch::Tensor keys, torch::Tensor values) {
   TORCH_CHECK(keys.device().is_cuda(), "Keys should be on a CUDA device.");
   TORCH_CHECK(

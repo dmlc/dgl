@@ -58,6 +58,17 @@ TORCH_LIBRARY(graphbolt, m) {
           "wait",
           &Future<std::vector<
               std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>::Wait);
+  m.class_<Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>(
+       "GpuGraphCacheQueryFuture")
+      .def(
+          "wait",
+          &Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>::
+              Wait);
+  m.class_<Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>>(
+       "GpuGraphCacheReplaceFuture")
+      .def(
+          "wait",
+          &Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>::Wait);
   m.class_<storage::OnDiskNpyArray>("OnDiskNpyArray")
       .def("index_select", &storage::OnDiskNpyArray::IndexSelect);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
@@ -109,11 +120,14 @@ TORCH_LIBRARY(graphbolt, m) {
 #ifdef GRAPHBOLT_USE_CUDA
   m.class_<cuda::GpuCache>("GpuCache")
       .def("query", &cuda::GpuCache::Query)
+      .def("query_async", &cuda::GpuCache::QueryAsync)
       .def("replace", &cuda::GpuCache::Replace);
   m.def("gpu_cache", &cuda::GpuCache::Create);
   m.class_<cuda::GpuGraphCache>("GpuGraphCache")
       .def("query", &cuda::GpuGraphCache::Query)
-      .def("replace", &cuda::GpuGraphCache::Replace);
+      .def("query_async", &cuda::GpuGraphCache::QueryAsync)
+      .def("replace", &cuda::GpuGraphCache::Replace)
+      .def("replace_async", &cuda::GpuGraphCache::ReplaceAsync);
   m.def("gpu_graph_cache", &cuda::GpuGraphCache::Create);
 #endif
   m.def("fused_csc_sampling_graph", &FusedCSCSamplingGraph::Create);
@@ -170,6 +184,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("scatter_async", &ops::ScatterAsync);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("index_select_csc_batched", &ops::IndexSelectCSCBatched);
+  m.def("index_select_csc_batched_async", &ops::IndexSelectCSCBatchedAsync);
   m.def("ondisk_npy_array", &storage::OnDiskNpyArray::Create);
   m.def("detect_io_uring", &io_uring::IsAvailable);
   m.def("set_num_io_uring_threads", &io_uring::SetNumThreads);

@@ -64,7 +64,12 @@ def load_graphbolt():
     path = os.path.join(dirname, "graphbolt", basename)
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f"Cannot find DGL C++ graphbolt library at {path}"
+            f"Unable to locate the DGL C++ GraphBolt library at {path}. This "
+            "error typically occurs due to a version mismatch between the "
+            "installed DGL and the PyTorch version you are currently using. "
+            "Please ensure that your DGL installation is compatible with your "
+            "PyTorch version. For more information, refer to the installation "
+            "guide at https://www.dgl.ai/pages/start.html."
         )
 
     try:
@@ -79,6 +84,7 @@ load_graphbolt()
 from .base import *
 from .minibatch import *
 from .dataloader import *
+from .datapipes import *
 from .dataset import *
 from .feature_fetcher import *
 from .feature_store import *
