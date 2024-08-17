@@ -5,7 +5,7 @@ import torch
 from ..base import get_device_to_host_uva_stream, get_host_to_device_uva_stream
 from ..feature_store import Feature
 
-from .feature_cache import cpu_cache_policies, CPUFeatureCache
+from .feature_cache import CPUFeatureCache
 
 __all__ = ["CPUCachedFeature"]
 
@@ -31,7 +31,7 @@ class CPUCachedFeature(Feature):
         resulting in a deadlock.
     policy : str
         The cache eviction policy algorithm name. The available policies are
-        {cpu_cache_policies.keys()}.
+        ["s3-fifo", "sieve", "lru", "clock"]. Default is "sieve".
     pin_memory : bool
         Whether the cache storage should be allocated on system pinned memory.
         Default is False.
