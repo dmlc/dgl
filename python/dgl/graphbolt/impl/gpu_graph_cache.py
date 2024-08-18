@@ -21,7 +21,9 @@ class GPUGraphCache(object):
         Whether the graph to be cached has original edge ids.
     """
 
-    def __init__(self, num_edges, threshold, indptr_dtype, dtypes, has_original_edge_ids):
+    def __init__(
+        self, num_edges, threshold, indptr_dtype, dtypes, has_original_edge_ids
+    ):
         major, _ = torch.cuda.get_device_capability()
         assert (
             major >= 7
@@ -59,7 +61,9 @@ class GPUGraphCache(object):
         ) = self._cache.query(keys)
         self.total_miss += keys.shape[0] - num_hit
 
-        def replace_functional(missing_indptr, missing_edge_tensors, with_edge_ids):
+        def replace_functional(
+            missing_indptr, missing_edge_tensors, with_edge_ids
+        ):
             return self._cache.replace(
                 keys,
                 index,
