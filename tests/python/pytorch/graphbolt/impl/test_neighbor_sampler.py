@@ -28,7 +28,7 @@ def get_hetero_graph(include_original_edge_ids):
     if include_original_edge_ids:
         edge_attributes[gb.ORIGINAL_EDGE_ID] = torch.arange(
             indices.size(0), 0, -1
-        )
+        ) - 1
     node_type_offset = torch.LongTensor([0, 1, 3, 6])
     return gb.fused_csc_sampling_graph(
         indptr,
