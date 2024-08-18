@@ -64,7 +64,7 @@ def test_gpu_graph_cache(indptr_dtype, dtype, cache_size, with_edge_ids):
             indptr, edge_tensors, missing_keys, with_edge_ids, None
         )
         output_indptr, output_edge_tensors = replace(
-            missing_indptr, missing_edge_tensors, with_edge_ids
+            missing_indptr, missing_edge_tensors
         )
 
         (

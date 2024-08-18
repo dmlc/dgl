@@ -60,11 +60,10 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
     found inside the GPUGraphCache.
     """
 
-    def __init__(self, datapipe, prob_name, has_original_edge_ids):
+    def __init__(self, datapipe, prob_name):
         datapipe = datapipe.transform(self._combine_per_layer).buffer()
         super().__init__(datapipe, self._wait_replace_future)
         self.prob_name = prob_name
-        self.has_original_edge_ids = has_original_edge_ids
 
     def _combine_per_layer(self, minibatch):
         subgraph = minibatch._sliced_sampling_graph
@@ -78,7 +77,7 @@ class CombineCachedAndFetchedInSubgraph(Mapper):
         edge_tensors.append(subgraph.edge_attribute(ORIGINAL_EDGE_ID))
 
         minibatch._future = minibatch._async_handle.send(
-            (subgraph.csc_indptr, edge_tensors, not self.has_original_edge_ids)
+            (subgraph.csc_indptr, edge_tensors)
         )
         delattr(minibatch, "_async_handle")
 
@@ -127,14 +126,8 @@ class FetchInsubgraphData(MiniBatchTransformer):
         datapipe = datapipe.transform(self._fetch_per_layer_stage_1)
         datapipe = datapipe.buffer()
         datapipe = datapipe.transform(self._fetch_per_layer_stage_2)
-        self.has_original_edge_ids = (
-            graph.edge_attributes is not None
-            and ORIGINAL_EDGE_ID in graph.edge_attributes
-        )
         if graph._gpu_graph_cache is not None:
-            datapipe = datapipe.combine_cached_and_fetched_insubgraph(
-                prob_name, self.has_original_edge_ids
-            )
+            datapipe = datapipe.combine_cached_and_fetched_insubgraph(prob_name)
         super().__init__(datapipe)
         self.graph = graph
         self.prob_name = prob_name
@@ -185,6 +178,7 @@ class FetchInsubgraphData(MiniBatchTransformer):
                 has_type_per_edge = True
 
             has_probs_or_mask = False
+            has_original_edge_ids = False
             if self.graph.edge_attributes is not None:
                 probs_or_mask = self.graph.edge_attributes.get(
                     self.prob_name, None
@@ -197,7 +191,7 @@ class FetchInsubgraphData(MiniBatchTransformer):
                 )
                 if original_edge_ids is not None:
                     tensors_to_be_sliced.append(original_edge_ids)
-                    assert self.has_original_edge_ids
+                    has_original_edge_ids = True
 
             # Slices the batched tensors.
             future = torch.ops.graphbolt.index_select_csc_batched_async(
@@ -205,7 +199,7 @@ class FetchInsubgraphData(MiniBatchTransformer):
                 tensors_to_be_sliced,
                 seeds,
                 # When there are no edge ids, we assume it is arange(num_edges).
-                not self.has_original_edge_ids,
+                not has_original_edge_ids,
                 None,
             )
 

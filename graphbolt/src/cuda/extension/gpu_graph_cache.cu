@@ -252,7 +252,8 @@ GpuGraphCache::QueryAsync(torch::Tensor seeds) {
 std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
     torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
     int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
-    std::vector<torch::Tensor> edge_tensors, bool with_edge_ids) {
+    std::vector<torch::Tensor> edge_tensors) {
+  const auto with_edge_ids = offset_.has_value();
   // The last element of edge_tensors has the edge ids.
   const auto num_tensors = edge_tensors.size() - with_edge_ids;
   TORCH_CHECK(
@@ -530,12 +531,12 @@ c10::intrusive_ptr<
 GpuGraphCache::ReplaceAsync(
     torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
     int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
-    std::vector<torch::Tensor> edge_tensors, bool with_edge_ids) {
+    std::vector<torch::Tensor> edge_tensors) {
   return async(
       [=] {
         return Replace(
             seeds, indices, positions, num_hit, num_threshold, indptr,
-            edge_tensors, with_edge_ids);
+            edge_tensors);
       },
       true);
 }

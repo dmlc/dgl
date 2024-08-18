@@ -47,6 +47,8 @@ class GpuGraphCache : public torch::CustomClassHolder {
    * @param indptr_dtype The node id datatype.
    * @param dtypes The dtypes of the edge tensors to be cached. dtypes[0] is
    * reserved for the indices edge tensor holding node ids.
+   * @param has_original_edge_ids Whether the graph to be cached has original
+   * edge ids.
    */
   GpuGraphCache(
       const int64_t num_edges, const int64_t threshold,
@@ -99,14 +101,14 @@ class GpuGraphCache : public torch::CustomClassHolder {
   std::tuple<torch::Tensor, std::vector<torch::Tensor>> Replace(
       torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
       int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
-      std::vector<torch::Tensor> edge_tensors, bool with_edge_ids);
+      std::vector<torch::Tensor> edge_tensors);
 
   c10::intrusive_ptr<
       Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>>
   ReplaceAsync(
       torch::Tensor seeds, torch::Tensor indices, torch::Tensor positions,
       int64_t num_hit, int64_t num_threshold, torch::Tensor indptr,
-      std::vector<torch::Tensor> edge_tensors, bool with_edge_ids);
+      std::vector<torch::Tensor> edge_tensors);
 
   static c10::intrusive_ptr<GpuGraphCache> Create(
       const int64_t num_edges, const int64_t threshold,

@@ -48,9 +48,8 @@ class GPUGraphCache(object):
             A tuple containing (missing_keys, replace_fn) where replace_fn is a
             function that should be called with the graph structure
             corresponding to the missing keys. Its arguments are
-            (Tensor, list(Tensor), bool), where the first tensor is the missing
-            indptr, second list is the missing edge tensors and the boolean
-            indicates whether the edge ids are considered `arange(num_edges)`.
+            (Tensor, list(Tensor)), where the first tensor is the missing indptr
+            and the second list is the missing edge tensors.
         """
         self.total_queries += keys.shape[0]
         (
@@ -61,9 +60,7 @@ class GPUGraphCache(object):
         ) = self._cache.query(keys)
         self.total_miss += keys.shape[0] - num_hit
 
-        def replace_functional(
-            missing_indptr, missing_edge_tensors, with_edge_ids
-        ):
+        def replace_functional(missing_indptr, missing_edge_tensors):
             return self._cache.replace(
                 keys,
                 index,
@@ -72,7 +69,6 @@ class GPUGraphCache(object):
                 num_threshold,
                 missing_indptr,
                 missing_edge_tensors,
-                with_edge_ids,
             )
 
         return keys[index[num_hit:]], replace_functional
@@ -104,9 +100,7 @@ class GPUGraphCache(object):
         self.total_queries += keys.shape[0]
         self.total_miss += keys.shape[0] - num_hit
 
-        missing_indptr, missing_edge_tensors, with_edge_ids = yield keys[
-            index[num_hit:]
-        ]
+        missing_indptr, missing_edge_tensors = yield keys[index[num_hit:]]
 
         yield self._cache.replace_async(
             keys,
@@ -116,7 +110,6 @@ class GPUGraphCache(object):
             num_threshold,
             missing_indptr,
             missing_edge_tensors,
-            with_edge_ids,
         )
 
     @property
