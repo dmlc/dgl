@@ -17,15 +17,19 @@ class GPUGraphCache(object):
         The dtype of the indptr tensor of the graph.
     dtypes : list[torch.dtype]
         The dtypes of the edge tensors that are going to be cached.
+    has_original_edge_ids : bool
+        Whether the graph to be cached has original edge ids.
     """
 
-    def __init__(self, num_edges, threshold, indptr_dtype, dtypes):
+    def __init__(
+        self, num_edges, threshold, indptr_dtype, dtypes, has_original_edge_ids
+    ):
         major, _ = torch.cuda.get_device_capability()
         assert (
             major >= 7
         ), "GPUGraphCache is supported only on CUDA compute capability >= 70 (Volta)."
         self._cache = torch.ops.graphbolt.gpu_graph_cache(
-            num_edges, threshold, indptr_dtype, dtypes
+            num_edges, threshold, indptr_dtype, dtypes, has_original_edge_ids
         )
         self.total_miss = 0
         self.total_queries = 0
@@ -44,7 +48,8 @@ class GPUGraphCache(object):
             A tuple containing (missing_keys, replace_fn) where replace_fn is a
             function that should be called with the graph structure
             corresponding to the missing keys. Its arguments are
-            (Tensor, list(Tensor)).
+            (Tensor, list(Tensor)), where the first tensor is the missing indptr
+            and the second list is the missing edge tensors.
         """
         self.total_queries += keys.shape[0]
         (
