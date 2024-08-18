@@ -263,32 +263,27 @@ class SamplePerLayer(MiniBatchTransformer):
         asynchronous=False,
     ):
         graph = sampler.__self__
-        self.returning_indices_is_optional = False
+        self.returning_indices_and_original_edge_ids_are_optional = False
         original_edge_ids = (
             None
             if graph.edge_attributes is None
             else graph.edge_attributes.get(ORIGINAL_EDGE_ID, None)
         )
-        self.fetching_original_edge_ids_is_optional = (
-            overlap_fetch
-            and original_edge_ids is not None
-            and original_edge_ids.is_pinned()
-        )
-        fetch_indices_and_original_edge_ids_fn = partial(
-            self._fetch_indices_and_original_edge_ids,
-            graph.indices,
-            original_edge_ids,
-        )
         if (
             overlap_fetch
             and sampler.__name__ == "sample_neighbors"
-            and graph.indices.is_pinned()
+            and (graph.indices.is_pinned() or (original_edge_ids is not None and original_edge_ids.is_pinned()))
             and graph._gpu_graph_cache is None
         ):
             datapipe = datapipe.transform(self._sample_per_layer)
             if asynchronous:
                 datapipe = datapipe.buffer()
                 datapipe = datapipe.transform(self._wait_subgraph_future)
+            fetch_indices_and_original_edge_ids_fn = partial(
+                self._fetch_indices_and_original_edge_ids,
+                graph.indices,
+                original_edge_ids,
+            )
             datapipe = (
                 datapipe.transform(fetch_indices_and_original_edge_ids_fn)
                 .buffer()
@@ -303,7 +298,7 @@ class SamplePerLayer(MiniBatchTransformer):
                         graph.node_type_to_id,
                     )
                 )
-            self.returning_indices_is_optional = True
+            self.returning_indices_and_original_edge_ids_are_optional = True
         elif overlap_fetch:
             datapipe = datapipe.fetch_insubgraph_data(graph, prob_name)
             datapipe = datapipe.transform(
@@ -336,8 +331,7 @@ class SamplePerLayer(MiniBatchTransformer):
             self.fanout,
             self.replace,
             self.prob_name,
-            self.returning_indices_is_optional,
-            self.fetching_original_edge_ids_is_optional,
+            self.returning_indices_and_original_edge_ids_are_optional,
             async_op=self.asynchronous,
             **kwargs,
         )
