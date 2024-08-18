@@ -1707,7 +1707,7 @@ def test_sample_neighbors_hetero_single_fanout(labor):
     u, i = torch.randint(20, size=(1000,)), torch.randint(10, size=(1000,))
     graph = dgl.heterograph({("u", "w", "i"): (u, i), ("i", "b", "u"): (i, u)})
 
-    graph = dgl.graphbolt.from_dglgraph(graph).to(F.ctx())
+    graph = gb.from_dglgraph(graph).to(F.ctx())
 
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
 
