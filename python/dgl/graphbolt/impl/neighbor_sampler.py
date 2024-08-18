@@ -312,12 +312,6 @@ class SamplePerLayer(MiniBatchTransformer):
             if asynchronous:
                 datapipe = datapipe.buffer()
                 datapipe = datapipe.transform(self._wait_subgraph_future)
-            if self.fetching_original_edge_ids_is_optional:
-                datapipe = (
-                    datapipe.transform(fetch_indices_and_original_edge_ids_fn)
-                    .buffer()
-                    .wait()
-                )
         else:
             datapipe = datapipe.transform(self._sample_per_layer)
             if asynchronous:
@@ -363,8 +357,6 @@ class SamplePerLayer(MiniBatchTransformer):
             self.fanout,
             self.replace,
             self.prob_name,
-            False,
-            self.fetching_original_edge_ids_is_optional,
             async_op=self.asynchronous,
             **kwargs,
         )
