@@ -797,7 +797,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         returning_indices_and_original_edge_ids_are_optional: bool
             Boolean indicating whether it is okay for the call to this function
             to leave the indices and the original edge ids tensors
-            uninitialized. In this case, it is the user's responsibility to 
+            uninitialized. In this case, it is the user's responsibility to
             gather them using _edge_ids_in_fused_csc_sampling_graph if either is
             missing.
         async_op: bool
@@ -1035,7 +1035,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         returning_indices_and_original_edge_ids_are_optional: bool
             Boolean indicating whether it is okay for the call to this function
             to leave the indices and the original edge ids tensors
-            uninitialized. In this case, it is the user's responsibility to 
+            uninitialized. In this case, it is the user's responsibility to
             gather them using _edge_ids_in_fused_csc_sampling_graph if either is
             missing.
         random_seed: torch.Tensor, optional

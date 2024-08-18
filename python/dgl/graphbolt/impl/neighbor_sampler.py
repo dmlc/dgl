@@ -272,7 +272,13 @@ class SamplePerLayer(MiniBatchTransformer):
         if (
             overlap_fetch
             and sampler.__name__ == "sample_neighbors"
-            and (graph.indices.is_pinned() or (original_edge_ids is not None and original_edge_ids.is_pinned()))
+            and (
+                graph.indices.is_pinned()
+                or (
+                    original_edge_ids is not None
+                    and original_edge_ids.is_pinned()
+                )
+            )
             and graph._gpu_graph_cache is None
         ):
             datapipe = datapipe.transform(self._sample_per_layer)
