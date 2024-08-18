@@ -721,7 +721,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                         ]
                     )
                     if indices is None or original_edge_ids is None:
-                        # Only needed to fetch indices.
+                        # Only needed to fetch indices or original edge ids.
                         sampled_hetero_edge_ids_in_fused_csc_sampling_graph[
                             etype
                         ] = edge_ids_in_fused_csc_sampling_graph[
