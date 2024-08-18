@@ -401,17 +401,19 @@ class SamplePerLayer(MiniBatchTransformer):
                         subgraph.original_edge_ids[etype] = record_stream(
                             index_select(orig_edge_ids, edge_ids)
                         )
-            elif subgraph.sampled_csc.indices is None:
-                subgraph._edge_ids_in_fused_csc_sampling_graph.record_stream(
-                    torch.cuda.current_stream()
-                )
-                subgraph.sampled_csc.indices = record_stream(
-                    index_select(
-                        indices, subgraph._edge_ids_in_fused_csc_sampling_graph
+            else:
+                if subgraph.sampled_csc.indices is None:
+                    subgraph._edge_ids_in_fused_csc_sampling_graph.record_stream(
+                        torch.cuda.current_stream()
                     )
-                )
-                # homo case does not need subtraction of offsets from indices.
-                minibatch._indices_needs_offset_subtraction = False
+                    subgraph.sampled_csc.indices = record_stream(
+                        index_select(
+                            indices,
+                            subgraph._edge_ids_in_fused_csc_sampling_graph,
+                        )
+                    )
+                    # homo case does not need subtraction of offsets from indices.
+                    minibatch._indices_needs_offset_subtraction = False
                 if (
                     orig_edge_ids is not None
                     and subgraph.original_edge_ids is None
