@@ -416,12 +416,12 @@ def add_edges(edges, source, dest, dataset_size):
         # edge_array = np.memmap(new_edge_path, dtype='int32', mode='r',  shape=(num_edges[dataset_size][edge], 2))
         edge_array = np.load(new_edge_path)
         new_edge_array = edge_array.transpose()
-        rev_edge_array = new_edge_array[:, ::-1]
+        rev_edge_array = np.ascontiguousarray(new_edge_array[::-1])
 
         assert new_edge_array.shape == (2, num_edges[dataset_size][edge])
         assert rev_edge_array.shape == (2, num_edges[dataset_size][edge])
         assert np.array_equal(new_edge_array, edge_array.transpose())
-        assert np.array_equal(rev_edge_array, new_edge_array[:, ::-1])
+        assert np.array_equal(rev_edge_array, new_edge_array[::-1])
 
         gb.numpy_save_aligned(new_edge_path, new_edge_array)
         gb.numpy_save_aligned(rev_edge_path, rev_edge_array)
