@@ -418,8 +418,6 @@ class SamplePerLayer(MiniBatchTransformer):
                             subgraph._edge_ids_in_fused_csc_sampling_graph,
                         )
                     )
-                    # homo case does not need subtraction of offsets from indices.
-                    minibatch._indices_needs_offset_subtraction = False
                 if (
                     orig_edge_ids is not None
                     and subgraph.original_edge_ids is None
