@@ -1556,15 +1556,21 @@ class FusedCSCSamplingGraph(SamplingGraph):
         dtypes = [self.indices.dtype]
         if self.type_per_edge is not None:
             dtypes.append(self.type_per_edge.dtype)
+        has_original_edge_ids = False
         if self.edge_attributes is not None:
             probs_or_mask = self.edge_attributes.get(prob_name, None)
             if probs_or_mask is not None:
                 dtypes.append(probs_or_mask.dtype)
+            original_edge_ids = self.edge_attributes.get(ORIGINAL_EDGE_ID, None)
+            if original_edge_ids is not None:
+                dtypes.append(original_edge_ids.dtype)
+                has_original_edge_ids = True
         self._gpu_graph_cache_ = GPUGraphCache(
             num_gpu_cached_edges,
             gpu_cache_threshold,
             self.csc_indptr.dtype,
             dtypes,
+            has_original_edge_ids,
         )
 
 

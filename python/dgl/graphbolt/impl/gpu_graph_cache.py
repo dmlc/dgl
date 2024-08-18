@@ -17,15 +17,17 @@ class GPUGraphCache(object):
         The dtype of the indptr tensor of the graph.
     dtypes : list[torch.dtype]
         The dtypes of the edge tensors that are going to be cached.
+    has_original_edge_ids : bool
+        Whether the graph to be cached has original edge ids.
     """
 
-    def __init__(self, num_edges, threshold, indptr_dtype, dtypes):
+    def __init__(self, num_edges, threshold, indptr_dtype, dtypes, has_original_edge_ids):
         major, _ = torch.cuda.get_device_capability()
         assert (
             major >= 7
         ), "GPUGraphCache is supported only on CUDA compute capability >= 70 (Volta)."
         self._cache = torch.ops.graphbolt.gpu_graph_cache(
-            num_edges, threshold, indptr_dtype, dtypes
+            num_edges, threshold, indptr_dtype, dtypes, has_original_edge_ids
         )
         self.total_miss = 0
         self.total_queries = 0
@@ -44,7 +46,9 @@ class GPUGraphCache(object):
             A tuple containing (missing_keys, replace_fn) where replace_fn is a
             function that should be called with the graph structure
             corresponding to the missing keys. Its arguments are
-            (Tensor, list(Tensor)).
+            (Tensor, list(Tensor), bool), where the first tensor is the missing
+            indptr, second list is the missing edge tensors and the boolean
+            indicates whether the edge ids are considered `arange(num_edges)`.
         """
         self.total_queries += keys.shape[0]
         (
@@ -55,7 +59,7 @@ class GPUGraphCache(object):
         ) = self._cache.query(keys)
         self.total_miss += keys.shape[0] - num_hit
 
-        def replace_functional(missing_indptr, missing_edge_tensors):
+        def replace_functional(missing_indptr, missing_edge_tensors, with_edge_ids):
             return self._cache.replace(
                 keys,
                 index,
@@ -64,6 +68,7 @@ class GPUGraphCache(object):
                 num_threshold,
                 missing_indptr,
                 missing_edge_tensors,
+                with_edge_ids,
             )
 
         return keys[index[num_hit:]], replace_functional
@@ -95,7 +100,9 @@ class GPUGraphCache(object):
         self.total_queries += keys.shape[0]
         self.total_miss += keys.shape[0] - num_hit
 
-        missing_indptr, missing_edge_tensors = yield keys[index[num_hit:]]
+        missing_indptr, missing_edge_tensors, with_edge_ids = yield keys[
+            index[num_hit:]
+        ]
 
         yield self._cache.replace_async(
             keys,
@@ -105,6 +112,7 @@ class GPUGraphCache(object):
             num_threshold,
             missing_indptr,
             missing_edge_tensors,
+            with_edge_ids,
         )
 
     @property
