@@ -75,6 +75,7 @@ def submit_jobs(args) -> str:
     argslist += "--log-level {} ".format(args.log_level)
     argslist += "--save-orig-nids " if args.save_orig_nids else ""
     argslist += "--save-orig-eids " if args.save_orig_eids else ""
+    argslist += "--use-graphbolt" if args.use_graphbolt else ""
     argslist += (
         f"--graph-formats {args.graph_formats} " if args.graph_formats else ""
     )
@@ -86,7 +87,6 @@ def submit_jobs(args) -> str:
     launch_cmd = get_launch_cmd(args)
     launch_cmd += '"' + udf_cmd + '"'
 
-    print(launch_cmd)
     os.system(launch_cmd)
 
 
@@ -158,6 +158,11 @@ def main():
         "--save-orig-eids",
         action="store_true",
         help="Save original edge IDs into files",
+    )
+    parser.add_argument(
+        "--use-graphbolt",
+        action="store_true",
+        help="Use GraphBolt for distributed train.",
     )
     parser.add_argument(
         "--graph-formats",

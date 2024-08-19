@@ -128,7 +128,7 @@ def gen_node_data(
         schema_map[constants.STR_NODE_TYPE],
         get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
-            sum(schema_map[constants.STR_NUM_NODES_PER_TYPE]),
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
         ),
         num_chunks=num_parts,
     )
@@ -1116,7 +1116,7 @@ def gen_dist_partitions(rank, world_size, params):
         schema_map[constants.STR_NODE_TYPE],
         get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
-            sum(schema_map[constants.STR_NUM_NODES_PER_TYPE]),
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
         ),
     )
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
@@ -1357,7 +1357,10 @@ def gen_dist_partitions(rank, world_size, params):
             sort_etypes,
             params.use_graphbolt,
         )
-        memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
+        if params.use_graphbolt:
+            memory_snapshot("DiskWriteGrapgboltObjectsComplete: ", rank)
+        else:
+            memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
         # get the meta-data
         json_metadata = create_metadata_json(
@@ -1371,6 +1374,7 @@ def gen_dist_partitions(rank, world_size, params):
             ntypes_map,
             etypes_map,
             params.output,
+            params.use_graphbolt,
         )
         output_meta_json[
             "local-part-id-" + str(local_part_id * world_size + rank)

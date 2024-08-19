@@ -116,31 +116,25 @@ def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
 
 def _get_inner_node_mask(graph, ntype_id, use_graphbolt=False):
     if use_graphbolt:
-        if graph.node_type_offset is not None:
-            node_offsets = graph.node_type_offset
-            cls = (
-                torch.searchsorted(
-                    node_offsets, graph.edge_attributes[EID], side="right"
-                )
-                - 1
-            )
+        if NTYPE in graph.node_attributes:
             dtype = F.dtype(graph.node_attributes["inner_node"])
             return (
                 graph.node_attributes["inner_node"]
-                * F.astype(cls == ntype_id, dtype)
+                * F.astype(graph.node_attributes[NTYPE] == ntype_id, dtype)
                 == 1
             )
         else:
             return graph.node_attributes["inner_node"] == 1
-    if NTYPE in graph.ndata:
-        dtype = F.dtype(graph.ndata["inner_node"])
-        return (
-            graph.ndata["inner_node"]
-            * F.astype(graph.ndata[NTYPE] == ntype_id, dtype)
-            == 1
-        )
     else:
-        return graph.ndata["inner_node"] == 1
+        if NTYPE in graph.ndata:
+            dtype = F.dtype(graph.ndata["inner_node"])
+            return (
+                graph.ndata["inner_node"]
+                * F.astype(graph.ndata[NTYPE] == ntype_id, dtype)
+                == 1
+            )
+        else:
+            return graph.ndata["inner_node"] == 1
 
 
 def _get_inner_edge_mask(graph, etype_id, use_graphbolt=False):
@@ -347,9 +341,10 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
         "part-{}".format(part_id) in part_metadata
     ), "part-{} does not exist".format(part_id)
     part_files = part_metadata["part-{}".format(part_id)]
-    part_graph_field = "part_graph"
     if use_graphbolt:
         part_graph_field = "part_graph_graphbolt"
+    else:
+        part_graph_field = "part_graph"
     assert (
         part_graph_field in part_files
     ), f"the partition does not contain graph structure: {part_graph_field}"

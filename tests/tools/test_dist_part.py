@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import tempfile
 
 import dgl
@@ -202,6 +203,106 @@ def test_chunk_graph_arbitrary_chunks(
     )
 
 
+def _test_pipeline_graphbolt(
+    num_chunks,
+    num_parts,
+    world_size,
+    graph_formats=None,
+    data_fmt="numpy",
+    num_chunks_nodes=None,
+    num_chunks_edges=None,
+    num_chunks_node_data=None,
+    num_chunks_edge_data=None,
+    use_verify_partitions=False,
+):
+    if num_parts % world_size != 0:
+        # num_parts should be a multiple of world_size
+        return
+
+    with tempfile.TemporaryDirectory() as root_dir:
+        g = create_chunked_dataset(
+            root_dir,
+            num_chunks,
+            data_fmt=data_fmt,
+            num_chunks_nodes=num_chunks_nodes,
+            num_chunks_edges=num_chunks_edges,
+            num_chunks_node_data=num_chunks_node_data,
+            num_chunks_edge_data=num_chunks_edge_data,
+        )
+
+        # Step1: graph partition
+        in_dir = os.path.join(root_dir, "chunked-data")
+        output_dir = os.path.join(root_dir, "parted_data")
+        os.system(
+            "/opt/conda/envs/pytorch/bin/python tools/partition_algo/random_partition.py "
+            "--in_dir {} --out_dir {} --num_partitions {}".format(
+                in_dir, output_dir, num_parts
+            )
+        )
+        for ntype in ["author", "institution", "paper"]:
+            fname = os.path.join(output_dir, "{}.txt".format(ntype))
+            with open(fname, "r") as f:
+                header = f.readline().rstrip()
+                assert isinstance(int(header), int)
+
+        # Step2: data dispatch
+        partition_dir = os.path.join(root_dir, "parted_data")
+        out_dir = os.path.join(root_dir, "partitioned")
+        ip_config = os.path.join(root_dir, "ip_config.txt")
+        with open(ip_config, "w") as f:
+            for i in range(world_size):
+                f.write(f"127.0.0.{i + 1}\n")
+
+        cmd = "/opt/conda/envs/pytorch/bin/python tools/dispatch_data.py"
+        cmd += f" --in-dir {in_dir}"
+        cmd += f" --partitions-dir {partition_dir}"
+        cmd += f" --out-dir {out_dir}"
+        cmd += f" --ip-config {ip_config}"
+        cmd += " --ssh-port 22"
+        cmd += " --process-group-timeout 60"
+        cmd += " --save-orig-nids"
+        cmd += " --save-orig-eids"
+        cmd += " --use-graphbolt"
+        cmd += f" --graph-formats {graph_formats}" if graph_formats else ""
+        os.system(cmd)
+
+        # check if verify_partitions.py is used for validation.
+        if use_verify_partitions:
+            cmd = "/opt/conda/envs/pytorch/bin/python tools/verify_partitions.py "
+            cmd += f" --orig-dataset-dir {in_dir}"
+            cmd += f" --part-graph {out_dir}"
+            cmd += f" --partitions-dir {output_dir}"
+            os.system(cmd)
+            return
+
+        # read original node/edge IDs
+        def read_orig_ids(fname):
+            orig_ids = {}
+            for i in range(num_parts):
+                ids_path = os.path.join(out_dir, f"part{i}", fname)
+                part_ids = load_tensors(ids_path)
+                for type, data in part_ids.items():
+                    if type not in orig_ids:
+                        orig_ids[type] = data
+                    else:
+                        orig_ids[type] = torch.cat((orig_ids[type], data))
+            return orig_ids
+
+        orig_nids = read_orig_ids("orig_nids.dgl")
+        orig_eids = read_orig_ids("orig_eids.dgl")
+
+        # load partitions and verify
+        part_config = os.path.join(out_dir, "metadata.json")
+        for i in range(num_parts):
+            part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
+                part_config, i, use_graphbolt=True
+            )
+            verify_partition_data_types(part_g, use_graphbolt=True)
+            verify_graph_feats(
+                g, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids, use_graphbolt=True
+            )
+
+
 def _test_pipeline(
     num_chunks,
     num_parts,
@@ -234,7 +335,7 @@ def _test_pipeline(
         in_dir = os.path.join(root_dir, "chunked-data")
         output_dir = os.path.join(root_dir, "parted_data")
         os.system(
-            "python3 tools/partition_algo/random_partition.py "
+            "/opt/conda/envs/pytorch/bin/python tools/partition_algo/random_partition.py "
             "--in_dir {} --out_dir {} --num_partitions {}".format(
                 in_dir, output_dir, num_parts
             )
@@ -253,7 +354,7 @@ def _test_pipeline(
             for i in range(world_size):
                 f.write(f"127.0.0.{i + 1}\n")
 
-        cmd = "python3 tools/dispatch_data.py"
+        cmd = "/opt/conda/envs/pytorch/bin/python tools/dispatch_data.py"
         cmd += f" --in-dir {in_dir}"
         cmd += f" --partitions-dir {partition_dir}"
         cmd += f" --out-dir {out_dir}"
@@ -267,7 +368,7 @@ def _test_pipeline(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = "python3 tools/verify_partitions.py "
+            cmd = "/opt/conda/envs/pytorch/bin/python tools/verify_partitions.py "
             cmd += f" --orig-dataset-dir {in_dir}"
             cmd += f" --part-graph {out_dir}"
             cmd += f" --partitions-dir {output_dir}"
@@ -310,6 +411,10 @@ def _test_pipeline(
 def test_pipeline_basics(num_chunks, num_parts, world_size):
     _test_pipeline(num_chunks, num_parts, world_size)
     _test_pipeline(
+        num_chunks, num_parts, world_size, use_verify_partitions=False
+    )
+    _test_pipeline_graphbolt(num_chunks, num_parts, world_size)
+    _test_pipeline_graphbolt(
         num_chunks, num_parts, world_size, use_verify_partitions=False
     )
 
@@ -359,6 +464,13 @@ def test_pipeline_arbitrary_chunks(
         num_chunks_node_data=num_chunks_node_data,
         num_chunks_edge_data=num_chunks_edge_data,
     )
+    _test_pipeline_graphbolt(
+        num_chunks,
+        num_parts,
+        world_size,
+        num_chunks_node_data=num_chunks_node_data,
+        num_chunks_edge_data=num_chunks_edge_data,
+    )
 
 
 @pytest.mark.parametrize(
@@ -371,6 +483,7 @@ def test_pipeline_formats(graph_formats):
 @pytest.mark.parametrize("data_fmt", ["numpy", "parquet"])
 def test_pipeline_feature_format(data_fmt):
     _test_pipeline(4, 4, 4, data_fmt=data_fmt)
+    _test_pipeline_graphbolt(4, 4, 4, data_fmt=data_fmt)
 
 
 def test_utils_generate_read_list():
@@ -379,3 +492,94 @@ def test_utils_generate_read_list():
     assert np.array_equal(read_list[1], np.array([3, 4, 5]))
     assert np.array_equal(read_list[2], np.array([6, 7]))
     assert np.array_equal(read_list[3], np.array([8, 9]))
+
+
+if __name__ == "__main__":
+    test_pipeline_basics(4, 4, 2)
+    # num_chunks=4
+    # num_parts=4
+    # world_size=2
+    # data_fmt="numpy"
+    # graph_formats=None
+    # with tempfile.TemporaryDirectory() as root_dir:
+    #     g = create_chunked_dataset(
+    #         root_dir,
+    #         num_chunks,
+    #         data_fmt=data_fmt,
+    #         num_chunks_nodes=None,
+    #         num_chunks_edges=None,
+    #         num_chunks_node_data=None,
+    #         num_chunks_edge_data=None,
+    #     )
+
+    #     # Step1: graph partition
+    #     in_dir = os.path.join(root_dir, "chunked-data")
+    #     output_dir = os.path.join(root_dir, "parted_data")
+    #     os.system(
+    #         "/opt/conda/envs/pytorch/bin/python tools/partition_algo/random_partition.py "
+    #         "--in_dir {} --out_dir {} --num_partitions {}".format(
+    #             in_dir, output_dir, num_parts
+    #         )
+    #     )
+    #     for ntype in ["author", "institution", "paper"]:
+    #         fname = os.path.join(output_dir, "{}.txt".format(ntype))
+    #         with open(fname, "r") as f:
+    #             header = f.readline().rstrip()
+    #             assert isinstance(int(header), int)
+
+    #     # Step2: data dispatch
+    #     partition_dir = os.path.join(root_dir, "parted_data")
+    #     out_dir = os.path.join(root_dir, "partitioned")
+    #     ip_config = os.path.join(root_dir, "ip_config.txt")
+    #     with open(ip_config, "w") as f:
+    #         f.write(f"172.31.8.126\n")
+    #         f.write(f"172.31.8.78\n")
+
+    #     cmd = "/opt/conda/envs/pytorch/bin/python tools/dispatch_data.py"
+    #     cmd += f" --in-dir {in_dir}"
+    #     cmd += f" --partitions-dir {partition_dir}"
+    #     cmd += f" --out-dir {out_dir}"
+    #     cmd += f" --ip-config {ip_config}"
+    #     cmd += " --ssh-port 22"
+    #     cmd += " --process-group-timeout 60"
+    #     cmd += " --save-orig-nids"
+    #     cmd += " --save-orig-eids"
+    #     cmd += f" --graph-formats {graph_formats}" if graph_formats else ""
+    #     print(cmd)
+    #     os.system(cmd)
+
+    #     # check if verify_partitions.py is used for validation.
+    #     if False:
+    #         cmd = "python3 tools/verify_partitions.py "
+    #         cmd += f" --orig-dataset-dir {in_dir}"
+    #         cmd += f" --part-graph {out_dir}"
+    #         cmd += f" --partitions-dir {output_dir}"
+    #         os.system(cmd)
+    #     else:
+    #         # read original node/edge IDs
+    #         def read_orig_ids(fname):
+    #             orig_ids = {}
+    #             for i in range(num_parts):
+    #                 ids_path = os.path.join(out_dir, f"part{i}", fname)
+    #                 part_ids = load_tensors(ids_path)
+    #                 for type, data in part_ids.items():
+    #                     if type not in orig_ids:
+    #                         orig_ids[type] = data
+    #                     else:
+    #                         orig_ids[type] = torch.cat((orig_ids[type], data))
+    #             return orig_ids
+
+    #         orig_nids = read_orig_ids("orig_nids.dgl")
+    #         orig_eids = read_orig_ids("orig_eids.dgl")
+
+    #         # load partitions and verify
+    #         part_config = os.path.join(out_dir, "metadata.json")
+    #         for i in range(num_parts):
+    #             part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
+    #                 part_config, i
+    #             )
+    #             verify_partition_data_types(part_g)
+    #             verify_partition_formats(part_g, graph_formats)
+    #             verify_graph_feats(
+    #                 g, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids
+    #             )

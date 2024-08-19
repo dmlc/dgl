@@ -8,6 +8,8 @@ import time
 import constants
 
 import dgl
+import dgl.graphbolt as gb
+import dgl.sparse as dglsp
 import numpy as np
 import pandas as pd
 import pyarrow
@@ -164,6 +166,12 @@ def _get_unique_invidx(srcids, dstids, nids, low_mem=True):
     return uniques, idxes, srcids, dstids
 
 
+# Utility functions.
+def is_homogeneous(ntypes, etypes):
+    """Checks if the provided ntypes and etypes form a homogeneous graph."""
+    return len(ntypes) == 1 and len(etypes) == 1
+
+
 def create_dgl_object(
     schema,
     part_id,
@@ -174,6 +182,7 @@ def create_dgl_object(
     edge_typecounts,
     return_orig_nids=False,
     return_orig_eids=False,
+    use_graphbolt=False,
 ):
     """
     This function creates dgl objects for a given graph partition, as in function
@@ -450,56 +459,152 @@ def create_dgl_object(
     )
 
     # create the graph here now.
-    part_graph = dgl.graph(
-        data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids)
-    )
-    part_graph.edata[dgl.EID] = th.arange(
-        edgeid_offset,
-        edgeid_offset + part_graph.num_edges(),
-        dtype=th.int64,
-    )
-    part_graph.edata[dgl.ETYPE] = th.as_tensor(
-        etype_ids, dtype=RESERVED_FIELD_DTYPE[dgl.ETYPE]
-    )
-    part_graph.edata["inner_edge"] = th.ones(
-        part_graph.num_edges(), dtype=RESERVED_FIELD_DTYPE["inner_edge"]
-    )
+    # create the graph here now.
+    if use_graphbolt:
+        edge_attr = {}
+        num_edges=len(part_local_dst_id)
+        edge_attr[dgl.EID] = th.arange(
+            edgeid_offset,
+            edgeid_offset + num_edges,
+            dtype=th.int64,
+        )
+        type_per_edge = th.as_tensor(
+            etype_ids, dtype=RESERVED_FIELD_DTYPE[dgl.ETYPE]
+        )
+        edge_attr["inner_edge"] = th.ones(
+            num_edges, dtype=RESERVED_FIELD_DTYPE["inner_edge"]
+        )
 
-    # compute per_type_ids and ntype for all the nodes in the graph.
-    global_ids = np.concatenate([global_src_id, global_dst_id, global_homo_nid])
-    part_global_ids = global_ids[idx]
-    part_global_ids = part_global_ids[reshuffle_nodes]
-    ntype, per_type_ids = id_map(part_global_ids)
+        # compute per_type_ids and ntype for all the nodes in the graph.
+        global_ids = np.concatenate(
+            [global_src_id, global_dst_id, global_homo_nid]
+        )
+        part_global_ids = global_ids[idx]
+        part_global_ids = part_global_ids[reshuffle_nodes]
+        ntype, per_type_ids = id_map(part_global_ids)
 
-    # continue with the graph creation
-    part_graph.ndata[dgl.NTYPE] = th.as_tensor(
-        ntype, dtype=RESERVED_FIELD_DTYPE[dgl.NTYPE]
-    )
-    part_graph.ndata[dgl.NID] = th.as_tensor(uniq_ids[reshuffle_nodes])
-    part_graph.ndata["inner_node"] = th.as_tensor(
-        inner_nodes[reshuffle_nodes], dtype=RESERVED_FIELD_DTYPE["inner_node"]
-    )
+        # continue with the graph creation
+        node_attr = {}
+        node_attr[dgl.NTYPE] = th.as_tensor(
+            ntype, dtype=RESERVED_FIELD_DTYPE[dgl.NTYPE]
+        )
+        node_attr[dgl.NID] = th.as_tensor(uniq_ids[reshuffle_nodes])
+        node_attr["inner_node"] = th.as_tensor(
+            inner_nodes[reshuffle_nodes],
+            dtype=RESERVED_FIELD_DTYPE["inner_node"],
+        )
 
-    orig_nids = None
-    orig_eids = None
-    if return_orig_nids:
-        orig_nids = {}
-        for ntype, ntype_id in ntypes_map.items():
-            mask = th.logical_and(
-                part_graph.ndata[dgl.NTYPE] == ntype_id,
-                part_graph.ndata["inner_node"],
-            )
-            orig_nids[ntype] = th.as_tensor(per_type_ids[mask])
-    if return_orig_eids:
-        orig_eids = {}
-        for etype, etype_id in etypes_map.items():
-            mask = th.logical_and(
-                part_graph.edata[dgl.ETYPE] == etype_id,
-                part_graph.edata["inner_edge"],
-            )
-            orig_eids[_etype_tuple_to_str(etype)] = th.as_tensor(
-                global_edge_id[mask]
-            )
+        is_homo = is_homogeneous(ntypes, etypes)
+        orig_nids = None
+        orig_eids = None
+        if return_orig_nids:
+            orig_nids = {}
+            for ntype, ntype_id in ntypes_map.items():
+                mask = th.logical_and(
+                    node_attr[dgl.NTYPE] == ntype_id,
+                    node_attr["inner_node"],
+                )
+                orig_nids[ntype] = th.as_tensor(per_type_ids[mask])
+        if return_orig_eids:
+            orig_eids = {}
+            for etype, etype_id in etypes_map.items():
+                mask = th.logical_and(
+                    type_per_edge == etype_id,
+                    edge_attr["inner_edge"],
+                )
+                orig_eids[_etype_tuple_to_str(etype)] = th.as_tensor(
+                    global_edge_id[mask]
+                )
+        edge_type_to_id = (
+            None
+            if is_homo
+            else {
+                gb.etype_tuple_to_str(etype): etid for etype, etid in etypes_map.items()
+            }
+        )
+        
+        # !use dgl.sparse to translate coo to csc
+        part_local_src_id, part_local_dst_id = th.tensor(part_local_src_id, dtype=th.int64), th.tensor(part_local_dst_id,dtype=th.int64)
+        size = max(part_local_src_id.max(), part_local_dst_id.max()) + 1
+        adj_matrix = dglsp.from_coo(part_local_src_id, part_local_dst_id, shape=(size,size))
+        print(adj_matrix)
+        indptr, indices, _ = adj_matrix.csc()
+        del adj_matrix
+
+        part_graph = gb.fused_csc_sampling_graph(
+            indptr,
+            indices,
+            node_type_offset=None,
+            type_per_edge=type_per_edge,
+            node_attributes=node_attr,
+            edge_attributes=edge_attr,
+            node_type_to_id=ntypes_map,
+            edge_type_to_id=edge_type_to_id,
+        )
+        return (
+            part_graph,
+            node_map_val,
+            edge_map_val,
+            ntypes_map,
+            etypes_map,
+            orig_nids,
+            orig_eids,
+        )
+
+    else:
+        part_graph = dgl.graph(
+            data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids)
+        )
+        part_graph.edata[dgl.EID] = th.arange(
+            edgeid_offset,
+            edgeid_offset + part_graph.num_edges(),
+            dtype=th.int64,
+        )
+        part_graph.edata[dgl.ETYPE] = th.as_tensor(
+            etype_ids, dtype=RESERVED_FIELD_DTYPE[dgl.ETYPE]
+        )
+        part_graph.edata["inner_edge"] = th.ones(
+            part_graph.num_edges(), dtype=RESERVED_FIELD_DTYPE["inner_edge"]
+        )
+
+        # compute per_type_ids and ntype for all the nodes in the graph.
+        global_ids = np.concatenate(
+            [global_src_id, global_dst_id, global_homo_nid]
+        )
+        part_global_ids = global_ids[idx]
+        part_global_ids = part_global_ids[reshuffle_nodes]
+        ntype, per_type_ids = id_map(part_global_ids)
+
+        # continue with the graph creation
+        part_graph.ndata[dgl.NTYPE] = th.as_tensor(
+            ntype, dtype=RESERVED_FIELD_DTYPE[dgl.NTYPE]
+        )
+        part_graph.ndata[dgl.NID] = th.as_tensor(uniq_ids[reshuffle_nodes])
+        part_graph.ndata["inner_node"] = th.as_tensor(
+            inner_nodes[reshuffle_nodes],
+            dtype=RESERVED_FIELD_DTYPE["inner_node"],
+        )
+
+        orig_nids = None
+        orig_eids = None
+        if return_orig_nids:
+            orig_nids = {}
+            for ntype, ntype_id in ntypes_map.items():
+                mask = th.logical_and(
+                    part_graph.ndata[dgl.NTYPE] == ntype_id,
+                    part_graph.ndata["inner_node"],
+                )
+                orig_nids[ntype] = th.as_tensor(per_type_ids[mask])
+        if return_orig_eids:
+            orig_eids = {}
+            for etype, etype_id in etypes_map.items():
+                mask = th.logical_and(
+                    part_graph.edata[dgl.ETYPE] == etype_id,
+                    part_graph.edata["inner_edge"],
+                )
+                orig_eids[_etype_tuple_to_str(etype)] = th.as_tensor(
+                    global_edge_id[mask]
+                )
 
     return (
         part_graph,
@@ -523,6 +628,7 @@ def create_metadata_json(
     ntypes_map,
     etypes_map,
     output_dir,
+    use_graphbolt,
 ):
     """
     Auxiliary function to create json file for the graph partition metadata
@@ -549,6 +655,8 @@ def create_metadata_json(
         map between edge type(string)  and edge_type_id(int)
     output_dir : string
         directory where the output files are to be stored
+    use_graphbolt : bool
+        whether to use graphbolt or not
 
     Returns:
     --------
@@ -572,10 +680,14 @@ def create_metadata_json(
     part_dir = "part" + str(part_id)
     node_feat_file = os.path.join(part_dir, "node_feat.dgl")
     edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
-    part_graph_file = os.path.join(part_dir, "graph.dgl")
+    if use_graphbolt:
+        part_graph_file = os.path.join(part_dir, "fused_csc_sampling_graph.pt")
+    else:
+        part_graph_file = os.path.join(part_dir, "graph.dgl")
+    part_graph_type="part_graph_graphbolt" if use_graphbolt else "part_graph"
     part_metadata["part-{}".format(part_id)] = {
         "node_feats": node_feat_file,
         "edge_feats": edge_feat_file,
-        "part_graph": part_graph_file,
+        part_graph_type: part_graph_file,
     }
     return part_metadata

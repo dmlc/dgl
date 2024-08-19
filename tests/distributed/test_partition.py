@@ -242,7 +242,7 @@ def verify_graph_feats(
             orig_id = orig_nids[ntype][inner_type_nids]
             local_nids = gpb.nid2localnid(inner_type_nids, gpb.partid, ntype)
 
-            for name in g.node_attributes[ntype].data:
+            for name in g.nodes[ntype].data:
                 if name in [dgl.NID, "inner_node"]:
                     continue
                 true_feats = F.gather_row(g.nodes[ntype].data[name], orig_id)
@@ -1532,9 +1532,9 @@ def test_partition_graph_graphbolt_hetero(
                 assert len(orig_eids1) == len(orig_eids2)
                 assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
             parts.append(part_g)
-            # verify_graph_feats(
-            #     hg, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids, use_graphbolt=True
-            # )
+            verify_graph_feats(
+                hg, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids, use_graphbolt=True
+            )
 
             shuffled_labels.append(node_feats[test_ntype + "/labels"])
             shuffled_elabels.append(
