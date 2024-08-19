@@ -170,7 +170,8 @@ class DataLoader(torch_data.DataLoader):
         # before it. This enables enables non_blocking copies to the device.
         # Prefetching enables the data pipeline up to the CopyTo to run in a
         # separate thread.
-        if torch.cuda.is_available():
+        always_enable_prefetch = True
+        if torch.cuda.is_available() or always_enable_prefetch:
             copiers = find_dps(datapipe_graph, CopyTo)
             if len(copiers) > 1:
                 gb_warning(
@@ -178,7 +179,7 @@ class DataLoader(torch_data.DataLoader):
                     " This case is not officially supported."
                 )
             for copier in copiers:
-                if copier.device.type == "cuda":
+                if copier.device.type == "cuda" or always_enable_prefetch:
                     datapipe_graph = replace_dp(
                         datapipe_graph,
                         copier,
