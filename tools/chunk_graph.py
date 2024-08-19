@@ -197,7 +197,7 @@ def chunk_graph(
 
 if __name__ == "__main__":
     logging.basicConfig(level="INFO")
-    input_dir = "/data"
+    input_dir = "/home/ubuntu/workspace/MAG240MDataset/mag240m_kddcup2021"
     output_dir = "/chunked-data"
     (g,), _ = dgl.load_graphs(os.path.join(input_dir, "graph.dgl"))
     chunk_graph(

@@ -1,9 +1,10 @@
 import os
 
 import dgl
+import dgl.backend as F
+import dgl.graphbolt as gb
 
 import numpy as np
-import dgl.backend as F
 from dgl.data.utils import load_tensors
 from dgl.distributed.partition import (
     _etype_str_to_tuple,
@@ -12,7 +13,6 @@ from dgl.distributed.partition import (
     _get_inner_node_mask,
     RESERVED_FIELD_DTYPE,
 )
-import dgl.graphbolt as gb
 from distpartitioning import constants
 from distpartitioning.utils import get_idranges
 
@@ -80,7 +80,14 @@ def verify_partition_formats(part_g, formats):
 
 
 def verify_graph_feats(
-    g, gpb, part, node_feats, edge_feats, orig_nids, orig_eids, use_graphbolt=False
+    g,
+    gpb,
+    part,
+    node_feats,
+    edge_feats,
+    orig_nids,
+    orig_eids,
+    use_graphbolt=False,
 ):
     """Verify the node/edge features of the partitioned graph with
     the original graph

@@ -1533,7 +1533,14 @@ def test_partition_graph_graphbolt_hetero(
                 assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
             parts.append(part_g)
             verify_graph_feats(
-                hg, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids, use_graphbolt=True
+                hg,
+                gpb,
+                part_g,
+                node_feats,
+                edge_feats,
+                orig_nids,
+                orig_eids,
+                use_graphbolt=True,
             )
 
             shuffled_labels.append(node_feats[test_ntype + "/labels"])
