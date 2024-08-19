@@ -1702,6 +1702,21 @@ def test_sample_neighbors_homo(
     assert subgraph.original_row_node_ids is None
 
 
+@pytest.mark.parametrize("labor", [False, True])
+def test_sample_neighbors_hetero_single_fanout(labor):
+    u, i = torch.randint(20, size=(1000,)), torch.randint(10, size=(1000,))
+    graph = dgl.heterograph({("u", "w", "i"): (u, i), ("i", "b", "u"): (i, u)})
+
+    graph = gb.from_dglgraph(graph).to(F.ctx())
+
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    for i in range(11):
+        nodes = {"u": torch.randint(10, (100,), device=F.ctx())}
+        sampler(nodes, fanouts=torch.tensor([-1]))
+    # Should reach here without crashing.
+
+
 @pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("labor", [False, True])

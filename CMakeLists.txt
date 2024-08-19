@@ -20,7 +20,6 @@ dgl_option(BUILD_TYPE "Type of the build: dev, dogfood or release" "dev")
 message(STATUS "Build for ${BUILD_TYPE}")
 
 dgl_option(USE_CUDA "Build with CUDA" OFF)
-dgl_option(USE_LIBURING "Build with liburing" ON)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter for building sub-components" python3)
 
 # Conda build related options.
@@ -129,11 +128,11 @@ if (${BUILD_TYPE} STREQUAL "dev")
   endif()
 else()
   if (MSVC)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /DNDEBUG")
   else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG")
   endif()
 endif()
 
@@ -186,48 +185,11 @@ else(MSVC)
   endif(NOT APPLE)
 endif(MSVC)
 
-if(USE_OPENMP)
-  include(FindOpenMP)
-  if(OPENMP_FOUND)
-    set(CMAKE_C_FLAGS "${OpenMP_C_FLAGS} ${CMAKE_C_FLAGS}")
-    set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
-  endif(OPENMP_FOUND)
-  message(STATUS "Build with OpenMP.")
-endif(USE_OPENMP)
-
 if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
   message(STATUS "Disabling LIBXSMM on ${CMAKE_SYSTEM_PROCESSOR}.")
   set(USE_LIBXSMM OFF)
 endif()
 
-if(USE_LIBXSMM)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_LIBXSMM -DDGL_CPU_LLC_SIZE=40000000 -D__BLAS=0")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_LIBXSMM -DDGL_CPU_LLC_SIZE=40000000 -D__BLAS=0")
-  message(STATUS "Build with LIBXSMM optimization.")
-endif(USE_LIBXSMM)
-
-if ((NOT MSVC) AND USE_EPOLL)
-  INCLUDE(CheckIncludeFile)
-  check_include_file("sys/epoll.h" EPOLL_AVAILABLE)
-  if (EPOLL_AVAILABLE)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_EPOLL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_EPOLL")
-  else()
-    message(WARNING "EPOLL is not available on this platform...")
-  endif()
-endif ()
-
-# To compile METIS correct for DGL.
-if(MSVC)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /DIDXTYPEWIDTH=64 /DREALTYPEWIDTH=32")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DIDXTYPEWIDTH=64 /DREALTYPEWIDTH=32")
-else(MSVC)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
-endif(MSVC)
-
-# configure minigun
-add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
 # Source file lists
 file(GLOB DGL_SRC
   src/*.cc
@@ -256,6 +218,12 @@ else()
 endif()
 list(APPEND DGL_SRC ${DGL_RPC_SRC})
 
+if(USE_OPENMP)
+  find_package(OpenMP REQUIRED)
+  list(APPEND DGL_LINKER_LIBS OpenMP::OpenMP_CXX)
+  message(STATUS "Build with OpenMP.")
+endif(USE_OPENMP)
+
 # Configure cuda
 if(USE_CUDA)
   file(GLOB_RECURSE DGL_CUDA_SRC
@@ -278,6 +246,16 @@ if(USE_CUDA)
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
+
+if ((NOT MSVC) AND USE_EPOLL)
+  INCLUDE(CheckIncludeFile)
+  check_include_file("sys/epoll.h" EPOLL_AVAILABLE)
+  if (EPOLL_AVAILABLE)
+    target_compile_definitions(dgl PRIVATE USE_EPOLL)
+  else()
+    message(WARNING "EPOLL is not available on this platform...")
+  endif()
+endif ()
 
 # include directories
 target_include_directories(dgl PRIVATE "include")
@@ -351,18 +329,26 @@ else(EXTERNAL_NANOFLANN_PATH)
 endif(EXTERNAL_NANOFLANN_PATH)
 
 if (USE_LIBXSMM)
+  target_compile_definitions(dgl PRIVATE USE_LIBXSMM DGL_CPU_LLC_SIZE=40000000 __BLAS=0)
   target_include_directories(dgl PRIVATE "third_party/libxsmm/include")
+  message(STATUS "Build with LIBXSMM optimization.")
 endif()
 
+# To compile METIS correct for DGL.
+add_compile_definitions(IDXTYPEWIDTH=64 REALTYPEWIDTH=32)
 if (EXTERNAL_METIS_PATH)
+  # To compile METIS correct for DGL.
+  if(MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /DIDXTYPEWIDTH=64 /DREALTYPEWIDTH=32")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DIDXTYPEWIDTH=64 /DREALTYPEWIDTH=32")
+  else(MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+  endif(MSVC)
   find_package(METIS REQUIRED)
-  if (NOT METIS_FOUND)
-    message(FATAL_ERROR "Failed to find METIS library")
-  else()
-    message(STATUS "Found METIS library")
-    target_include_directories(dgl SYSTEM PUBLIC ${METIS_INCLUDE_DIR})
-    list(APPEND DGL_LINKER_LIBS ${METIS_LIBRARIES})
-  endif()
+  message(STATUS "Found METIS library")
+  target_include_directories(dgl SYSTEM PUBLIC ${METIS_INCLUDE_DIR})
+  list(APPEND DGL_LINKER_LIBS ${METIS_LIBRARIES})
 else(EXTERNAL_METIS_PATH)
   target_include_directories(dgl PRIVATE "third_party/METIS/include")
   # Compile METIS
@@ -391,8 +377,6 @@ endif()
 
 # Compile gpu_cache
 if(USE_CUDA)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_GPU_CACHE")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_GPU_CACHE")
   # Manually build gpu_cache because CMake always builds it as shared
   file(GLOB gpu_cache_src
     third_party/HugeCTR/gpu_cache/src/nv_gpu_cache.cu
@@ -406,7 +390,7 @@ endif(USE_CUDA)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
-  add_definitions(-DPARALLEL_ALGORITHMS)
+  target_compile_definitions(dgl PRIVATE PARALLEL_ALGORITHMS)
 endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
