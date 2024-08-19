@@ -1441,7 +1441,7 @@ def init_type_per_edge(graph, gpb):
 def load_parts(part_config, part_id, parts):
     """load parts from variable or dist."""
     if parts is None:
-        graph, _, _, gpb, _, _, _ = load_partition(
+        graph, _, _, _, _, _, _ = load_partition(
             part_config, part_id, load_feats=False
         )
     else:
