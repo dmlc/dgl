@@ -177,7 +177,8 @@ class FetchInsubgraphData(MiniBatchTransformer):
                 tensors_to_be_sliced.append(self.graph.type_per_edge)
                 has_type_per_edge = True
 
-            has_probs_or_mask = None
+            has_probs_or_mask = False
+            has_original_edge_ids = False
             if self.graph.edge_attributes is not None:
                 probs_or_mask = self.graph.edge_attributes.get(
                     self.prob_name, None
@@ -185,10 +186,21 @@ class FetchInsubgraphData(MiniBatchTransformer):
                 if probs_or_mask is not None:
                     tensors_to_be_sliced.append(probs_or_mask)
                     has_probs_or_mask = True
+                original_edge_ids = self.graph.edge_attributes.get(
+                    ORIGINAL_EDGE_ID, None
+                )
+                if original_edge_ids is not None:
+                    tensors_to_be_sliced.append(original_edge_ids)
+                    has_original_edge_ids = True
 
             # Slices the batched tensors.
             future = torch.ops.graphbolt.index_select_csc_batched_async(
-                self.graph.csc_indptr, tensors_to_be_sliced, seeds, True, None
+                self.graph.csc_indptr,
+                tensors_to_be_sliced,
+                seeds,
+                # When there are no edge ids, we assume it is arange(num_edges).
+                not has_original_edge_ids,
+                None,
             )
 
         yield
@@ -251,19 +263,35 @@ class SamplePerLayer(MiniBatchTransformer):
         asynchronous=False,
     ):
         graph = sampler.__self__
-        self.returning_indices_is_optional = False
+        self.returning_indices_and_original_edge_ids_are_optional = False
+        original_edge_ids = (
+            None
+            if graph.edge_attributes is None
+            else graph.edge_attributes.get(ORIGINAL_EDGE_ID, None)
+        )
         if (
             overlap_fetch
             and sampler.__name__ == "sample_neighbors"
-            and graph.indices.is_pinned()
+            and (
+                graph.indices.is_pinned()
+                or (
+                    original_edge_ids is not None
+                    and original_edge_ids.is_pinned()
+                )
+            )
             and graph._gpu_graph_cache is None
         ):
             datapipe = datapipe.transform(self._sample_per_layer)
             if asynchronous:
                 datapipe = datapipe.buffer()
                 datapipe = datapipe.transform(self._wait_subgraph_future)
+            fetch_indices_and_original_edge_ids_fn = partial(
+                self._fetch_indices_and_original_edge_ids,
+                graph.indices,
+                original_edge_ids,
+            )
             datapipe = (
-                datapipe.transform(partial(self._fetch_indices, graph.indices))
+                datapipe.transform(fetch_indices_and_original_edge_ids_fn)
                 .buffer()
                 .wait()
             )
@@ -276,7 +304,7 @@ class SamplePerLayer(MiniBatchTransformer):
                         graph.node_type_to_id,
                     )
                 )
-            self.returning_indices_is_optional = True
+            self.returning_indices_and_original_edge_ids_are_optional = True
         elif overlap_fetch:
             datapipe = datapipe.fetch_insubgraph_data(graph, prob_name)
             datapipe = datapipe.transform(
@@ -309,7 +337,7 @@ class SamplePerLayer(MiniBatchTransformer):
             self.fanout,
             self.replace,
             self.prob_name,
-            self.returning_indices_is_optional,
+            self.returning_indices_and_original_edge_ids_are_optional,
             async_op=self.asynchronous,
             **kwargs,
         )
@@ -341,7 +369,7 @@ class SamplePerLayer(MiniBatchTransformer):
         return minibatch
 
     @staticmethod
-    def _fetch_indices(indices, minibatch):
+    def _fetch_indices_and_original_edge_ids(indices, orig_edge_ids, minibatch):
         stream = torch.cuda.current_stream()
         host_to_device_stream = get_host_to_device_uva_stream()
         host_to_device_stream.wait_stream(stream)
@@ -366,16 +394,43 @@ class SamplePerLayer(MiniBatchTransformer):
                             index_select(indices, edge_ids)
                         )
                         minibatch._indices_needs_offset_subtraction = True
-            elif subgraph.sampled_csc.indices is None:
-                subgraph._edge_ids_in_fused_csc_sampling_graph.record_stream(
-                    torch.cuda.current_stream()
-                )
-                subgraph.sampled_csc.indices = record_stream(
-                    index_select(
-                        indices, subgraph._edge_ids_in_fused_csc_sampling_graph
+                    if (
+                        orig_edge_ids is not None
+                        and subgraph.original_edge_ids[etype] is None
+                    ):
+                        edge_ids = (
+                            subgraph._edge_ids_in_fused_csc_sampling_graph[
+                                etype
+                            ]
+                        )
+                        edge_ids.record_stream(torch.cuda.current_stream())
+                        subgraph.original_edge_ids[etype] = record_stream(
+                            index_select(orig_edge_ids, edge_ids)
+                        )
+            else:
+                if subgraph.sampled_csc.indices is None:
+                    subgraph._edge_ids_in_fused_csc_sampling_graph.record_stream(
+                        torch.cuda.current_stream()
                     )
-                )
-                minibatch._indices_needs_offset_subtraction = True
+                    subgraph.sampled_csc.indices = record_stream(
+                        index_select(
+                            indices,
+                            subgraph._edge_ids_in_fused_csc_sampling_graph,
+                        )
+                    )
+                if (
+                    orig_edge_ids is not None
+                    and subgraph.original_edge_ids is None
+                ):
+                    subgraph._edge_ids_in_fused_csc_sampling_graph.record_stream(
+                        torch.cuda.current_stream()
+                    )
+                    subgraph.original_edge_ids = record_stream(
+                        index_select(
+                            orig_edge_ids,
+                            subgraph._edge_ids_in_fused_csc_sampling_graph,
+                        )
+                    )
             subgraph._edge_ids_in_fused_csc_sampling_graph = None
             minibatch.wait = torch.cuda.current_stream().record_event().wait
 
