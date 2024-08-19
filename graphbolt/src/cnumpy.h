@@ -18,11 +18,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <cuda/std/semaphore>
-#include <fstream>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace graphbolt {
@@ -142,10 +141,71 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   static inline int num_queues_;  // Number of queues.
   static inline std::unique_ptr<::io_uring[], io_uring_queue_destroyer>
       io_uring_queue_;  // io_uring queue.
-  static inline counting_semaphore_t
-      semaphore_;  // Control access to the io_uring queues.
+  static inline counting_semaphore_t semaphore_{
+      0};  // Control access to the io_uring queues.
   static inline std::mutex available_queues_mtx_;  // available_queues_ mutex.
   static inline std::vector<int> available_queues_;
+
+  struct QueueAndBufferAcquirer {
+    struct UniqueQueue {
+      UniqueQueue(QueueAndBufferAcquirer* acquirer, int thread_id)
+          : acquirer_(acquirer), thread_id_(thread_id) {}
+      UniqueQueue(const UniqueQueue&) = delete;
+      UniqueQueue& operator=(const UniqueQueue&) = delete;
+
+      ~UniqueQueue() {
+        {
+          // We give back the slot we used.
+          std::lock_guard lock(available_queues_mtx_);
+          available_queues_.push_back(thread_id_);
+        }
+        // If this is the first thread exiting, release the master thread's
+        // ticket as well by releasing 2 slots. Otherwise, release 1 slot.
+        const auto releasing =
+            acquirer_->exiting_first_.test_and_set(std::memory_order_relaxed)
+                ? 1
+                : 2;
+        semaphore_.release(releasing);
+      }
+
+      ::io_uring& get() const { return io_uring_queue_[thread_id_]; }
+
+     private:
+      QueueAndBufferAcquirer* acquirer_;
+      int thread_id_;
+    };
+
+    QueueAndBufferAcquirer(OnDiskNpyArray* array) : array_(array) {
+      semaphore_.acquire();
+    }
+
+    ~QueueAndBufferAcquirer() {
+      // If none of the worker threads acquire the semaphore, we make sure to
+      // release the ticket taken in the constructor.
+      const auto releasing =
+          exiting_first_.test_and_set(std::memory_order_relaxed) ? 0 : 1;
+      semaphore_.release(releasing);
+    }
+
+    std::pair<UniqueQueue, char*> get() {
+      // We consume a slot from the semaphore to use a queue.
+      semaphore_.acquire();
+      const auto thread_id = [&] {
+        std::lock_guard lock(available_queues_mtx_);
+        TORCH_CHECK(!available_queues_.empty());
+        const auto thread_id = available_queues_.back();
+        available_queues_.pop_back();
+        return thread_id;
+      }();
+      return {
+          std::piecewise_construct, std::make_tuple(this, thread_id),
+          std::make_tuple(array_->ReadBuffer(thread_id))};
+    }
+
+   private:
+    const OnDiskNpyArray* array_;
+    std::atomic_flag exiting_first_ = ATOMIC_FLAG_INIT;
+  };
 
 #endif  // HAVE_LIBRARY_LIBURING
 };

@@ -1,6 +1,5 @@
 """Utility functions for sampling."""
 
-import copy
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -386,9 +385,11 @@ def compact_csc_format(
     else:
         compacted_csc_formats = {}
         src_timestamps = None
-        original_row_ids = copy.deepcopy(dst_nodes)
+        original_row_ids = {key: val.clone() for key, val in dst_nodes.items()}
         if has_timestamp:
-            src_timestamps = copy.deepcopy(dst_timestamps)
+            src_timestamps = {
+                key: val.clone() for key, val in dst_timestamps.items()
+            }
         for etype, csc_format in csc_formats.items():
             src_type, _, dst_type = etype_str_to_tuple(etype)
             assert len(dst_nodes.get(dst_type, [])) + 1 == len(
@@ -429,7 +430,9 @@ def compact_csc_format(
                         src_timestamps.get(
                             src_type,
                             torch.tensor(
-                                [], dtype=dst_timestamps[dst_type].dtype
+                                [],
+                                dtype=dst_timestamps[dst_type].dtype,
+                                device=device,
                             ),
                         ),
                         _broadcast_timestamps(

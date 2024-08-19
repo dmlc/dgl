@@ -472,8 +472,8 @@ def exchange_feature(
         )
 
     # exchange actual data here.
-    logging.debug(f"Rank: {rank} {featdata_key.shape=}")
     if featdata_key is not None:
+        logging.debug(f"Rank: {rank} {featdata_key.shape=}")
         feat_dims_dtype = list(featdata_key.shape)
         assert (
             len(featdata_key.shape) == 2 or len(featdata_key.shape) == 1
