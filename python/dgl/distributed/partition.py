@@ -1722,4 +1722,3 @@ def dgl_partition_to_graphbolt(
 
     _dump_part_config(part_config, new_part_meta)
     print(f"Converted partitions to GraphBolt format into {part_config}")
-    
