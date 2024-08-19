@@ -5,6 +5,7 @@ import tempfile
 import dgl
 
 import dgl.backend as F
+import dgl.sparse as dglsp
 import numpy as np
 import pytest
 import torch as th
@@ -35,12 +36,19 @@ from scipy import sparse as spsp
 from utils import reset_envs
 
 
-def _verify_partition_data_types(part_g):
-    for k, dtype in RESERVED_FIELD_DTYPE.items():
-        if k in part_g.ndata:
-            assert part_g.ndata[k].dtype == dtype
-        if k in part_g.edata:
-            assert part_g.edata[k].dtype == dtype
+def _verify_partition_data_types(part_g, use_graphbolt=False):
+    if not use_graphbolt:
+        for k, dtype in RESERVED_FIELD_DTYPE.items():
+            if k in part_g.ndata:
+                assert part_g.ndata[k].dtype == dtype
+            if k in part_g.edata:
+                assert part_g.edata[k].dtype == dtype
+    else:
+        for k, dtype in RESERVED_FIELD_DTYPE.items():
+            if k in part_g.node_attributes:
+                assert part_g.node_attributes[k].dtype == dtype
+            if k in part_g.edge_attributes:
+                assert part_g.edge_attributes[k].dtype == dtype
 
 
 def _verify_partition_formats(part_g, formats):
@@ -81,11 +89,58 @@ def create_random_hetero():
     return dgl.heterograph(edges, num_nodes)
 
 
-def verify_hetero_graph(g, parts):
+def verify_hetero_graph(g, parts, use_graphbolt=False):
+    if use_graphbolt:
+        num_nodes = {ntype: 0 for ntype in g.ntypes}
+        num_edges = {etype: 0 for etype in g.canonical_etypes}
+        for part in parts:
+            for etype in g.canonical_etypes:
+                etype_id = g.get_etype_id(etype)
+                inner_edge_mask = _get_inner_edge_mask(
+                    part, etype_id, use_graphbolt
+                )
+                num_inner_edges = F.sum(F.astype(inner_edge_mask, F.int64), 0)
+                num_edges[etype] += num_inner_edges
+
+        # Verify the number of edges are correct.
+        for etype in g.canonical_etypes:
+            print(
+                "edge {}: {}, {}".format(
+                    etype, g.num_edges(etype), num_edges[etype]
+                )
+            )
+            assert g.num_edges(etype) == num_edges[etype]
+
+        nids = {ntype: [] for ntype in g.ntypes}
+        eids = {etype: [] for etype in g.canonical_etypes}
+        for part in parts:
+            eid = th.arange(len(part.edge_attributes[dgl.EID]))
+            etype_arr = F.gather_row(part.type_per_edge, eid)
+            eid_type = F.gather_row(part.edge_attributes[dgl.EID], eid)
+            for etype in g.canonical_etypes:
+                etype_id = g.get_etype_id(etype)
+                eids[etype].append(
+                    F.boolean_mask(eid_type, etype_arr == etype_id)
+                )
+                # Make sure edge Ids fall into a range.
+                inner_edge_mask = _get_inner_edge_mask(
+                    part, etype_id, use_graphbolt
+                )
+                inner_eids = np.sort(
+                    F.asnumpy(
+                        F.boolean_mask(
+                            part.edge_attributes[dgl.EID], inner_edge_mask
+                        )
+                    )
+                )
+                assert np.all(
+                    inner_eids == np.arange(inner_eids[0], inner_eids[-1] + 1)
+                )
+        return
+
     num_nodes = {ntype: 0 for ntype in g.ntypes}
     num_edges = {etype: 0 for etype in g.canonical_etypes}
     for part in parts:
-        assert len(g.ntypes) == len(F.unique(part.ndata[dgl.NTYPE]))
         assert len(g.canonical_etypes) == len(F.unique(part.edata[dgl.ETYPE]))
         for ntype in g.ntypes:
             ntype_id = g.get_ntype_id(ntype)
@@ -161,47 +216,107 @@ def verify_hetero_graph(g, parts):
 
 
 def verify_graph_feats(
-    g, gpb, part, node_feats, edge_feats, orig_nids, orig_eids
+    g,
+    gpb,
+    part,
+    node_feats,
+    edge_feats,
+    orig_nids,
+    orig_eids,
+    use_graphbolt=False,
 ):
-    for ntype in g.ntypes:
-        ntype_id = g.get_ntype_id(ntype)
-        inner_node_mask = _get_inner_node_mask(part, ntype_id)
-        inner_nids = F.boolean_mask(part.ndata[dgl.NID], inner_node_mask)
-        ntype_ids, inner_type_nids = gpb.map_to_per_ntype(inner_nids)
-        partid = gpb.nid2partid(inner_type_nids, ntype)
-        assert np.all(F.asnumpy(ntype_ids) == ntype_id)
-        assert np.all(F.asnumpy(partid) == gpb.partid)
-
-        orig_id = orig_nids[ntype][inner_type_nids]
-        local_nids = gpb.nid2localnid(inner_type_nids, gpb.partid, ntype)
-
-        for name in g.nodes[ntype].data:
-            if name in [dgl.NID, "inner_node"]:
-                continue
-            true_feats = F.gather_row(g.nodes[ntype].data[name], orig_id)
-            ndata = F.gather_row(node_feats[ntype + "/" + name], local_nids)
-            assert np.all(F.asnumpy(ndata == true_feats))
-
-    for etype in g.canonical_etypes:
-        etype_id = g.get_etype_id(etype)
-        inner_edge_mask = _get_inner_edge_mask(part, etype_id)
-        inner_eids = F.boolean_mask(part.edata[dgl.EID], inner_edge_mask)
-        etype_ids, inner_type_eids = gpb.map_to_per_etype(inner_eids)
-        partid = gpb.eid2partid(inner_type_eids, etype)
-        assert np.all(F.asnumpy(etype_ids) == etype_id)
-        assert np.all(F.asnumpy(partid) == gpb.partid)
-
-        orig_id = orig_eids[etype][inner_type_eids]
-        local_eids = gpb.eid2localeid(inner_type_eids, gpb.partid, etype)
-
-        for name in g.edges[etype].data:
-            if name in [dgl.EID, "inner_edge"]:
-                continue
-            true_feats = F.gather_row(g.edges[etype].data[name], orig_id)
-            edata = F.gather_row(
-                edge_feats[_etype_tuple_to_str(etype) + "/" + name], local_eids
+    if use_graphbolt:
+        for ntype in g.ntypes:
+            ntype_id = g.get_ntype_id(ntype)
+            inner_node_mask = _get_inner_node_mask(
+                part, ntype_id, use_graphbolt
             )
-            assert np.all(F.asnumpy(edata == true_feats))
+            inner_nids = F.boolean_mask(
+                part.node_attributes[dgl.NID], inner_node_mask
+            )
+            ntype_ids, inner_type_nids = gpb.map_to_per_ntype(inner_nids)
+            partid = gpb.nid2partid(inner_type_nids, ntype)
+            assert np.all(F.asnumpy(ntype_ids) == ntype_id)
+            assert np.all(F.asnumpy(partid) == gpb.partid)
+
+            orig_id = orig_nids[ntype][inner_type_nids]
+            local_nids = gpb.nid2localnid(inner_type_nids, gpb.partid, ntype)
+
+            for name in g.node_attributes[ntype].data:
+                if name in [dgl.NID, "inner_node"]:
+                    continue
+                true_feats = F.gather_row(g.nodes[ntype].data[name], orig_id)
+                ndata = F.gather_row(node_feats[ntype + "/" + name], local_nids)
+                assert np.all(F.asnumpy(ndata == true_feats))
+
+        for etype in g.canonical_etypes:
+            etype_id = g.get_etype_id(etype)
+            inner_edge_mask = _get_inner_edge_mask(
+                part, etype_id, use_graphbolt
+            )
+            inner_eids = F.boolean_mask(
+                part.edge_attributes[dgl.EID], inner_edge_mask
+            )
+            etype_ids, inner_type_eids = gpb.map_to_per_etype(inner_eids)
+            partid = gpb.eid2partid(inner_type_eids, etype)
+            assert np.all(F.asnumpy(etype_ids) == etype_id)
+            assert np.all(F.asnumpy(partid) == gpb.partid)
+
+            orig_id = orig_eids[etype][inner_type_eids]
+            local_eids = gpb.eid2localeid(inner_type_eids, gpb.partid, etype)
+
+            for name in g.edges[etype].data:
+                if name in [dgl.EID, "inner_edge"]:
+                    continue
+                true_feats = F.gather_row(g.edges[etype].data[name], orig_id)
+                edata = F.gather_row(
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name],
+                    local_eids,
+                )
+                assert np.all(F.asnumpy(edata == true_feats))
+    else:
+        for ntype in g.ntypes:
+            ntype_id = g.get_ntype_id(ntype)
+            inner_node_mask = _get_inner_node_mask(
+                part, ntype_id, use_graphbolt
+            )
+            inner_nids = F.boolean_mask(part.ndata[dgl.NID], inner_node_mask)
+            ntype_ids, inner_type_nids = gpb.map_to_per_ntype(inner_nids)
+            partid = gpb.nid2partid(inner_type_nids, ntype)
+            assert np.all(F.asnumpy(ntype_ids) == ntype_id)
+            assert np.all(F.asnumpy(partid) == gpb.partid)
+
+            orig_id = orig_nids[ntype][inner_type_nids]
+            local_nids = gpb.nid2localnid(inner_type_nids, gpb.partid, ntype)
+
+            for name in g.nodes[ntype].data:
+                if name in [dgl.NID, "inner_node"]:
+                    continue
+                true_feats = F.gather_row(g.nodes[ntype].data[name], orig_id)
+                ndata = F.gather_row(node_feats[ntype + "/" + name], local_nids)
+                assert np.all(F.asnumpy(ndata == true_feats))
+
+        for etype in g.canonical_etypes:
+            etype_id = g.get_etype_id(etype)
+            inner_edge_mask = _get_inner_edge_mask(part, etype_id)
+            inner_eids = F.boolean_mask(part.edata[dgl.EID], inner_edge_mask)
+            etype_ids, inner_type_eids = gpb.map_to_per_etype(inner_eids)
+            partid = gpb.eid2partid(inner_type_eids, etype)
+            assert np.all(F.asnumpy(etype_ids) == etype_id)
+            assert np.all(F.asnumpy(partid) == gpb.partid)
+
+            orig_id = orig_eids[etype][inner_type_eids]
+            local_eids = gpb.eid2localeid(inner_type_eids, gpb.partid, etype)
+
+            for name in g.edges[etype].data:
+                if name in [dgl.EID, "inner_edge"]:
+                    continue
+                true_feats = F.gather_row(g.edges[etype].data[name], orig_id)
+                edata = F.gather_row(
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name],
+                    local_eids,
+                )
+                assert np.all(F.asnumpy(edata == true_feats))
 
 
 def check_hetero_partition(
@@ -245,7 +360,7 @@ def check_hetero_partition(
     shuffled_labels = []
     shuffled_elabels = []
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition(
+        part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
             "/tmp/partition/test.json", i, load_feats=load_feats
         )
         _verify_partition_data_types(part_g)
@@ -1075,17 +1190,12 @@ def test_not_sorted_node_edge_map():
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-@pytest.mark.parametrize("store_eids", [True, False])
-@pytest.mark.parametrize("store_inner_node", [True, False])
-@pytest.mark.parametrize("store_inner_edge", [True, False])
 @pytest.mark.parametrize("debug_mode", [True, False])
 def test_partition_graph_graphbolt_homo(
     part_method,
     num_parts,
-    store_eids,
-    store_inner_node,
-    store_inner_edge,
     debug_mode,
+    num_trainers_per_machine=1,
 ):
     reset_envs()
     if debug_mode:
@@ -1093,148 +1203,361 @@ def test_partition_graph_graphbolt_homo(
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_graph(1000)
         graph_name = "test"
-        partition_graph(
+        g.ndata["labels"] = F.arange(0, g.num_nodes())
+        g.ndata["feats"] = F.tensor(
+            np.random.randn(g.num_nodes(), 10), F.float32
+        )
+        g.edata["feats"] = F.tensor(
+            np.random.randn(g.num_edges(), 10), F.float32
+        )
+        g.update_all(fn.copy_u("feats", "msg"), fn.sum("msg", "h"))
+        g.update_all(fn.copy_e("feats", "msg"), fn.sum("msg", "eh"))
+
+        orig_nids, orig_eids = partition_graph(
             g,
             graph_name,
             num_parts,
             test_dir,
             part_method=part_method,
             use_graphbolt=True,
-            store_eids=store_eids,
-            store_inner_node=store_inner_node,
-            store_inner_edge=store_inner_edge,
+            store_eids=True,
+            store_inner_node=True,
+            store_inner_edge=True,
+            return_mapping=True,
         )
+        part_sizes = []
+        shuffled_labels = []
+        shuffled_edata = []
         part_config = os.path.join(test_dir, f"{graph_name}.json")
-        for part_id in range(num_parts):
-            orig_g = dgl.load_graphs(
-                os.path.join(test_dir, f"part{part_id}/graph.dgl")
-            )[0][0]
-            new_g = load_partition(
-                part_config, part_id, load_feats=False, use_graphbolt=True
-            )[0]
-            orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
-            assert th.equal(orig_indptr, new_g.csc_indptr)
-            assert th.equal(orig_indices, new_g.indices)
-            assert new_g.node_type_offset is None
-            assert th.equal(
-                orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+        for i in range(num_parts):
+            part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
+                part_config, i, load_feats=True, use_graphbolt=True
             )
-            if store_inner_node or debug_mode:
-                assert th.equal(
-                    orig_g.ndata["inner_node"],
-                    new_g.node_attributes["inner_node"],
-                )
-            else:
-                assert "inner_node" not in new_g.node_attributes
-            if store_eids or debug_mode:
-                assert th.equal(
-                    orig_g.edata[dgl.EID][orig_eids],
-                    new_g.edge_attributes[dgl.EID],
-                )
-            else:
-                assert dgl.EID not in new_g.edge_attributes
-            if store_inner_edge or debug_mode:
-                assert th.equal(
-                    orig_g.edata["inner_edge"][orig_eids],
-                    new_g.edge_attributes["inner_edge"],
-                )
-            else:
-                assert "inner_edge" not in new_g.edge_attributes
-            assert new_g.type_per_edge is None
-            assert new_g.node_type_to_id is None
-            assert new_g.edge_type_to_id is None
+            if num_trainers_per_machine > 1:
+                for ntype in g.ntypes:
+                    name = ntype + "/trainer_id"
+                    assert name in node_feats
+                    part_ids = F.floor_div(
+                        node_feats[name], num_trainers_per_machine
+                    )
+                    assert np.all(F.asnumpy(part_ids) == i)
+
+                for etype in g.canonical_etypes:
+                    name = _etype_tuple_to_str(etype) + "/trainer_id"
+                    assert name in edge_feats
+                    part_ids = F.floor_div(
+                        edge_feats[name], num_trainers_per_machine
+                    )
+                    assert np.all(F.asnumpy(part_ids) == i)
+
+            # Check the metadata
+            assert gpb._num_nodes() == g.num_nodes()
+            assert gpb._num_edges() == g.num_edges()
+
+            assert gpb.num_partitions() == num_parts
+            gpb_meta = gpb.metadata()
+            assert len(gpb_meta) == num_parts
+            assert len(gpb.partid2nids(i)) == gpb_meta[i]["num_nodes"]
+            assert len(gpb.partid2eids(i)) == gpb_meta[i]["num_edges"]
+            part_sizes.append(
+                (gpb_meta[i]["num_nodes"], gpb_meta[i]["num_edges"])
+            )
+
+            nid = F.boolean_mask(
+                part_g.node_attributes[dgl.NID],
+                part_g.node_attributes["inner_node"],
+            )
+            local_nid = gpb.nid2localnid(nid, i)
+            assert F.dtype(local_nid) in (F.int64, F.int32)
+            assert np.all(F.asnumpy(local_nid) == np.arange(0, len(local_nid)))
+            eid = F.boolean_mask(
+                part_g.edge_attributes[dgl.EID],
+                part_g.edge_attributes["inner_edge"],
+            )
+            local_eid = gpb.eid2localeid(eid, i)
+            assert F.dtype(local_eid) in (F.int64, F.int32)
+            assert np.all(
+                np.sort(F.asnumpy(local_eid)) == np.arange(0, len(local_eid))
+            )
+
+            # Check the node map.
+            local_nodes = F.boolean_mask(
+                part_g.node_attributes[dgl.NID],
+                part_g.node_attributes["inner_node"],
+            )
+            llocal_nodes = F.nonzero_1d(part_g.node_attributes["inner_node"])
+            local_nodes1 = gpb.partid2nids(i)
+            assert F.dtype(local_nodes1) in (F.int32, F.int64)
+            assert np.all(
+                np.sort(F.asnumpy(local_nodes))
+                == np.sort(F.asnumpy(local_nodes1))
+            )
+            assert np.all(
+                F.asnumpy(llocal_nodes) == np.arange(len(llocal_nodes))
+            )
+
+            # Check the edge map.
+            local_edges = F.boolean_mask(
+                part_g.edge_attributes[dgl.EID],
+                part_g.edge_attributes["inner_edge"],
+            )
+            llocal_edges = F.nonzero_1d(part_g.edge_attributes["inner_edge"])
+            local_edges1 = gpb.partid2eids(i)
+            assert F.dtype(local_edges1) in (F.int32, F.int64)
+            assert np.all(
+                np.sort(F.asnumpy(local_edges))
+                == np.sort(F.asnumpy(local_edges1))
+            )
+            assert np.all(
+                F.asnumpy(llocal_edges) == np.arange(len(llocal_edges))
+            )
+
+            # Verify the mapping between the reshuffled IDs and the original IDs.
+            indices, indptr = part_g.indices, part_g.csc_indptr
+            adj_matrix = dglsp.from_csc(indptr, indices)
+            part_src_ids, part_dst_ids = adj_matrix.coo()
+            part_src_ids = F.gather_row(
+                part_g.node_attributes[dgl.NID], part_src_ids
+            )
+            part_dst_ids = F.gather_row(
+                part_g.node_attributes[dgl.NID], part_dst_ids
+            )
+            part_eids = part_g.edge_attributes[dgl.EID]
+            orig_src_ids = F.gather_row(orig_nids, part_src_ids)
+            orig_dst_ids = F.gather_row(orig_nids, part_dst_ids)
+            orig_eids1 = F.gather_row(orig_eids, part_eids)
+            orig_eids2 = g.edge_ids(orig_src_ids, orig_dst_ids)
+            assert F.shape(orig_eids1)[0] == F.shape(orig_eids2)[0]
+            assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
+
+            local_orig_nids = orig_nids[part_g.node_attributes[dgl.NID]]
+            local_orig_eids = orig_eids[part_g.edge_attributes[dgl.EID]]
+            part_g.node_attributes["feats"] = F.gather_row(
+                g.ndata["feats"], local_orig_nids
+            )
+            part_g.edge_attributes["feats"] = F.gather_row(
+                g.edata["feats"], local_orig_eids
+            )
+            local_nodes = orig_nids[local_nodes]
+            local_edges = orig_eids[local_edges]
+
+            # part_g.update_all(fn.copy_u("feats", "msg"), fn.sum("msg", "h"))
+            # part_g.update_all(fn.copy_e("feats", "msg"), fn.sum("msg", "eh"))
+            # part_g.node_attributes["h"] = adj_matrix@part_g.node_attributes["h"]
+
+            # assert F.allclose(
+            #     F.gather_row(g.ndata["h"], local_nodes),
+            #     F.gather_row(part_g.node_attributes["h"], llocal_nodes),
+            # )
+            # assert F.allclose(
+            #     F.gather_row(g.ndata["eh"], local_nodes),
+            #     F.gather_row(part_g.node_attributes["eh"], llocal_nodes),
+            # )
+
+            for name in ["labels", "feats"]:
+                assert "_N/" + name in node_feats
+                assert node_feats["_N/" + name].shape[0] == len(local_nodes)
+                true_feats = F.gather_row(g.ndata[name], local_nodes)
+                ndata = F.gather_row(node_feats["_N/" + name], local_nid)
+                assert np.all(F.asnumpy(true_feats) == F.asnumpy(ndata))
+            for name in ["feats"]:
+                efeat_name = _etype_tuple_to_str(DEFAULT_ETYPE) + "/" + name
+                assert efeat_name in edge_feats
+                assert edge_feats[efeat_name].shape[0] == len(local_edges)
+                true_feats = F.gather_row(g.edata[name], local_edges)
+                edata = F.gather_row(edge_feats[efeat_name], local_eid)
+                assert np.all(F.asnumpy(true_feats) == F.asnumpy(edata))
+
+            # This only works if node/edge IDs are shuffled.
+            shuffled_labels.append(node_feats["_N/labels"])
+            shuffled_edata.append(edge_feats["_N:_E:_N/feats"])
+
+        # Verify that we can reconstruct node/edge data for original IDs.
+        shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
+        shuffled_edata = F.asnumpy(F.cat(shuffled_edata, 0))
+        orig_labels = np.zeros(
+            shuffled_labels.shape, dtype=shuffled_labels.dtype
+        )
+        orig_edata = np.zeros(shuffled_edata.shape, dtype=shuffled_edata.dtype)
+        orig_labels[F.asnumpy(orig_nids)] = shuffled_labels
+        orig_edata[F.asnumpy(orig_eids)] = shuffled_edata
+        assert np.all(orig_labels == F.asnumpy(g.ndata["labels"]))
+        assert np.all(orig_edata == F.asnumpy(g.edata["feats"]))
+
+        node_map = []
+        edge_map = []
+        for i, (num_nodes, num_edges) in enumerate(part_sizes):
+            node_map.append(np.ones(num_nodes) * i)
+            edge_map.append(np.ones(num_edges) * i)
+        node_map = np.concatenate(node_map)
+        edge_map = np.concatenate(edge_map)
+        nid2pid = gpb.nid2partid(F.arange(0, len(node_map)))
+        assert F.dtype(nid2pid) in (F.int32, F.int64)
+        assert np.all(F.asnumpy(nid2pid) == node_map)
+        eid2pid = gpb.eid2partid(F.arange(0, len(edge_map)))
+        assert F.dtype(eid2pid) in (F.int32, F.int64)
+        assert np.all(F.asnumpy(eid2pid) == edge_map)
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-@pytest.mark.parametrize("store_eids", [True, False])
-@pytest.mark.parametrize("store_inner_node", [True, False])
-@pytest.mark.parametrize("store_inner_edge", [True, False])
 @pytest.mark.parametrize("debug_mode", [True, False])
 def test_partition_graph_graphbolt_hetero(
     part_method,
     num_parts,
-    store_eids,
-    store_inner_node,
-    store_inner_edge,
     debug_mode,
     n_jobs=1,
+    num_trainers_per_machine=1,
 ):
+    test_ntype = "n1"
+    test_etype = ("n1", "r1", "n2")
     reset_envs()
     if debug_mode:
         os.environ["DGL_DIST_DEBUG"] = "1"
     with tempfile.TemporaryDirectory() as test_dir:
-        g = create_random_hetero()
+        hg = create_random_hetero()
         graph_name = "test"
-        partition_graph(
-            g,
+        hg.nodes[test_ntype].data["labels"] = F.arange(
+            0, hg.num_nodes(test_ntype)
+        )
+        hg.nodes[test_ntype].data["feats"] = F.tensor(
+            np.random.randn(hg.num_nodes(test_ntype), 10), F.float32
+        )
+        hg.edges[test_etype].data["feats"] = F.tensor(
+            np.random.randn(hg.num_edges(test_etype), 10), F.float32
+        )
+        hg.edges[test_etype].data["labels"] = F.arange(
+            0, hg.num_edges(test_etype)
+        )
+        num_hops = 1
+        orig_nids, orig_eids = partition_graph(
+            hg,
             graph_name,
             num_parts,
             test_dir,
             part_method=part_method,
+            return_mapping=True,
+            num_trainers_per_machine=1,
             use_graphbolt=True,
-            store_eids=store_eids,
-            store_inner_node=store_inner_node,
-            store_inner_edge=store_inner_edge,
+            store_eids=True,
+            store_inner_node=True,
+            store_inner_edge=True,
             n_jobs=n_jobs,
         )
+        assert len(orig_nids) == len(hg.ntypes)
+        assert len(orig_eids) == len(hg.canonical_etypes)
+        for ntype in hg.ntypes:
+            assert len(orig_nids[ntype]) == hg.num_nodes(ntype)
+        for etype in hg.canonical_etypes:
+            assert len(orig_eids[etype]) == hg.num_edges(etype)
+        parts = []
+        shuffled_labels = []
+        shuffled_elabels = []
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         for part_id in range(num_parts):
-            orig_g = dgl.load_graphs(
-                os.path.join(test_dir, f"part{part_id}/graph.dgl")
-            )[0][0]
-            new_g = load_partition(
-                part_config, part_id, load_feats=False, use_graphbolt=True
-            )[0]
-            orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
-            assert th.equal(orig_indptr, new_g.csc_indptr)
-            assert th.equal(orig_indices, new_g.indices)
-            assert th.equal(
-                orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+            part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
+                part_config, part_id, load_feats=True, use_graphbolt=True
             )
-            if store_inner_node or debug_mode:
-                assert th.equal(
-                    orig_g.ndata["inner_node"],
-                    new_g.node_attributes["inner_node"],
-                )
-            else:
-                assert "inner_node" not in new_g.node_attributes
-            if debug_mode:
-                assert th.equal(
-                    orig_g.ndata[dgl.NTYPE], new_g.node_attributes[dgl.NTYPE]
-                )
-            else:
-                assert dgl.NTYPE not in new_g.node_attributes
-            if store_eids or debug_mode:
-                assert th.equal(
-                    orig_g.edata[dgl.EID][orig_eids],
-                    new_g.edge_attributes[dgl.EID],
-                )
-            else:
-                assert dgl.EID not in new_g.edge_attributes
-            if store_inner_edge or debug_mode:
-                assert th.equal(
-                    orig_g.edata["inner_edge"],
-                    new_g.edge_attributes["inner_edge"],
-                )
-            else:
-                assert "inner_edge" not in new_g.edge_attributes
-            if debug_mode:
-                assert th.equal(
-                    orig_g.edata[dgl.ETYPE][orig_eids],
-                    new_g.edge_attributes[dgl.ETYPE],
-                )
-            else:
-                assert dgl.ETYPE not in new_g.edge_attributes
-            assert th.equal(
-                orig_g.edata[dgl.ETYPE][orig_eids], new_g.type_per_edge
-            )
+            if num_trainers_per_machine > 1:
+                for ntype in hg.ntypes:
+                    name = ntype + "/trainer_id"
+                    assert name in node_feats
+                    part_ids = F.floor_div(
+                        node_feats[name], num_trainers_per_machine
+                    )
+                    assert np.all(F.asnumpy(part_ids) == part_id)
 
-            for node_type, type_id in new_g.node_type_to_id.items():
-                assert g.get_ntype_id(node_type) == type_id
-            for edge_type, type_id in new_g.edge_type_to_id.items():
-                assert g.get_etype_id(_etype_str_to_tuple(edge_type)) == type_id
-            assert new_g.node_type_offset is None
+                for etype in hg.canonical_etypes:
+                    name = _etype_tuple_to_str(etype) + "/trainer_id"
+                    assert name in edge_feats
+                    part_ids = F.floor_div(
+                        edge_feats[name], num_trainers_per_machine
+                    )
+                    assert np.all(F.asnumpy(part_ids) == part_id)
+
+            # Verify the mapping between the reshuffled IDs and the original IDs.
+            # These are partition-local IDs.
+            indices, indptr = part_g.indices, part_g.csc_indptr
+            csc_matrix = dglsp.from_csc(indptr, indices)
+            part_src_ids, part_dst_ids = csc_matrix.coo()
+            # These are reshuffled global homogeneous IDs.
+            part_src_ids = F.gather_row(
+                part_g.node_attributes[dgl.NID], part_src_ids
+            )
+            part_dst_ids = F.gather_row(
+                part_g.node_attributes[dgl.NID], part_dst_ids
+            )
+            part_eids = part_g.edge_attributes[dgl.EID]
+            # These are reshuffled per-type IDs.
+            src_ntype_ids, part_src_ids = gpb.map_to_per_ntype(part_src_ids)
+            dst_ntype_ids, part_dst_ids = gpb.map_to_per_ntype(part_dst_ids)
+            etype_ids, part_eids = gpb.map_to_per_etype(part_eids)
+            # `IdMap` is in int64 by default.
+            assert src_ntype_ids.dtype == F.int64
+            assert dst_ntype_ids.dtype == F.int64
+            assert etype_ids.dtype == F.int64
+            with pytest.raises(dgl.utils.internal.InconsistentDtypeException):
+                gpb.map_to_per_ntype(F.tensor([0], F.int32))
+            with pytest.raises(dgl.utils.internal.InconsistentDtypeException):
+                gpb.map_to_per_etype(F.tensor([0], F.int32))
+            # These are original per-type IDs.
+            for etype_id, etype in enumerate(hg.canonical_etypes):
+                part_src_ids1 = F.boolean_mask(
+                    part_src_ids, etype_ids == etype_id
+                )
+                src_ntype_ids1 = F.boolean_mask(
+                    src_ntype_ids, etype_ids == etype_id
+                )
+                part_dst_ids1 = F.boolean_mask(
+                    part_dst_ids, etype_ids == etype_id
+                )
+                dst_ntype_ids1 = F.boolean_mask(
+                    dst_ntype_ids, etype_ids == etype_id
+                )
+                part_eids1 = F.boolean_mask(part_eids, etype_ids == etype_id)
+                assert np.all(F.asnumpy(src_ntype_ids1 == src_ntype_ids1[0]))
+                assert np.all(F.asnumpy(dst_ntype_ids1 == dst_ntype_ids1[0]))
+                src_ntype = hg.ntypes[F.as_scalar(src_ntype_ids1[0])]
+                dst_ntype = hg.ntypes[F.as_scalar(dst_ntype_ids1[0])]
+                orig_src_ids1 = F.gather_row(
+                    orig_nids[src_ntype], part_src_ids1
+                )
+                orig_dst_ids1 = F.gather_row(
+                    orig_nids[dst_ntype], part_dst_ids1
+                )
+                orig_eids1 = F.gather_row(orig_eids[etype], part_eids1)
+                orig_eids2 = hg.edge_ids(
+                    orig_src_ids1, orig_dst_ids1, etype=etype
+                )
+                assert len(orig_eids1) == len(orig_eids2)
+                assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
+            parts.append(part_g)
+            # verify_graph_feats(
+            #     hg, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids, use_graphbolt=True
+            # )
+
+            shuffled_labels.append(node_feats[test_ntype + "/labels"])
+            shuffled_elabels.append(
+                edge_feats[_etype_tuple_to_str(test_etype) + "/labels"]
+            )
+        verify_hetero_graph(hg, parts, True)
+
+        shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
+        shuffled_elabels = F.asnumpy(F.cat(shuffled_elabels, 0))
+        orig_labels = np.zeros(
+            shuffled_labels.shape, dtype=shuffled_labels.dtype
+        )
+        orig_elabels = np.zeros(
+            shuffled_elabels.shape, dtype=shuffled_elabels.dtype
+        )
+        orig_labels[F.asnumpy(orig_nids[test_ntype])] = shuffled_labels
+        orig_elabels[F.asnumpy(orig_eids[test_etype])] = shuffled_elabels
+        assert np.all(
+            orig_labels == F.asnumpy(hg.nodes[test_ntype].data["labels"])
+        )
+        assert np.all(
+            orig_elabels == F.asnumpy(hg.edges[test_etype].data["labels"])
+        )
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
@@ -1461,9 +1784,6 @@ def test_partition_graph_graphbolt_hetero_multi(
         part_method="random",
         num_parts=num_parts,
         n_jobs=4,
-        store_eids=True,
-        store_inner_node=True,
-        store_inner_edge=True,
         debug_mode=False,
     )
 

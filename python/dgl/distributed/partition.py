@@ -88,7 +88,7 @@ def _dump_part_config(part_config, part_metadata):
         json.dump(part_metadata, outfile, sort_keys=False, indent=4)
 
 
-def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
+def _process_graphs(g_list, formats=None, sort_etypes=False):
     """Preprocess partitions before saving:
     1. format data types.
     2. sort csc/csr by tag.
@@ -106,10 +106,32 @@ def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
             g = sort_csr_by_tag(g, tag=g.edata[ETYPE], tag_type="edge")
         if "csc" in formats:
             g = sort_csc_by_tag(g, tag=g.edata[ETYPE], tag_type="edge")
+    return g_list
+
+
+def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
+    g_list = _process_graphs(g_list, formats=formats, sort_etypes=sort_etypes)
     save_graphs(filename, g_list, formats=formats)
 
 
-def _get_inner_node_mask(graph, ntype_id):
+def _get_inner_node_mask(graph, ntype_id, use_graphbolt=False):
+    if use_graphbolt:
+        if graph.node_type_offset is not None:
+            node_offsets = graph.node_type_offset
+            cls = (
+                torch.searchsorted(
+                    node_offsets, graph.edge_attributes[EID], side="right"
+                )
+                - 1
+            )
+            dtype = F.dtype(graph.node_attributes["inner_node"])
+            return (
+                graph.node_attributes["inner_node"]
+                * F.astype(cls == ntype_id, dtype)
+                == 1
+            )
+        else:
+            return graph.node_attributes["inner_node"] == 1
     if NTYPE in graph.ndata:
         dtype = F.dtype(graph.ndata["inner_node"])
         return (
@@ -121,7 +143,17 @@ def _get_inner_node_mask(graph, ntype_id):
         return graph.ndata["inner_node"] == 1
 
 
-def _get_inner_edge_mask(graph, etype_id):
+def _get_inner_edge_mask(graph, etype_id, use_graphbolt=False):
+    if use_graphbolt:
+        if graph.type_per_edge is not None:
+            dtype = F.dtype(graph.edge_attributes["inner_edge"])
+            return (
+                graph.edge_attributes["inner_edge"]
+                * F.astype(graph.type_per_edge == etype_id, dtype)
+                == 1
+            )
+        else:
+            return graph.edge_attributes["inner_edge"] == 1
     if ETYPE in graph.edata:
         dtype = F.dtype(graph.edata["inner_edge"])
         return (
@@ -1316,6 +1348,8 @@ def partition_graph(
                 "node_feats": os.path.relpath(node_feat_file, out_path),
                 "edge_feats": os.path.relpath(edge_feat_file, out_path),
             }
+            sort_etypes = len(g.etypes) > 1
+            part = _process_graphs([part], graph_formats, sort_etypes)[0]
         else:
             part_graph_file = os.path.join(part_dir, "graph.dgl")
             part_metadata["part-{}".format(part_id)] = {
@@ -1404,6 +1438,17 @@ def init_type_per_edge(graph, gpb):
     return etype_ids
 
 
+def load_parts(part_config, part_id, parts):
+    """load parts from variable or dist."""
+    if parts is None:
+        graph, _, _, gpb, _, _, _ = load_partition(
+            part_config, part_id, load_feats=False
+        )
+    else:
+        graph = parts[part_id]
+    return graph
+
+
 def gb_convert_single_dgl_partition(
     part_id,
     parts,
@@ -1444,12 +1489,7 @@ def gb_convert_single_dgl_partition(
         part_meta = _load_part_config(part_config)
     num_parts = part_meta["num_parts"]
 
-    if parts is None:
-        graph, _, _, gpb, _, _, _ = load_partition(
-            part_config, part_id, load_feats=False
-        )
-    else:
-        graph = parts[part_id]
+    graph = load_parts(part_config, part_id, parts)
 
     gpb, _, ntypes, etypes = load_partition_book(
         part_config, part_id, part_meta
