@@ -128,7 +128,7 @@ def gen_node_data(
         schema_map[constants.STR_NODE_TYPE],
         get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
-            schema_map[constants.STR_NUM_NODES_PER_TYPE],
+            sum(schema_map[constants.STR_NUM_NODES_PER_TYPE]),
         ),
         num_chunks=num_parts,
     )
@@ -1116,7 +1116,7 @@ def gen_dist_partitions(rank, world_size, params):
         schema_map[constants.STR_NODE_TYPE],
         get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
-            schema_map[constants.STR_NUM_NODES_PER_TYPE],
+            sum(schema_map[constants.STR_NUM_NODES_PER_TYPE]),
         ),
     )
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
@@ -1336,6 +1336,7 @@ def gen_dist_partitions(rank, world_size, params):
             edge_typecounts,
             params.save_orig_nids,
             params.save_orig_eids,
+            params.use_graphbolt,
         )
         sort_etypes = len(etypes_map) > 1
         local_node_features = prepare_local_data(
@@ -1354,6 +1355,7 @@ def gen_dist_partitions(rank, world_size, params):
             orig_eids,
             graph_formats,
             sort_etypes,
+            params.use_graphbolt,
         )
         memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
