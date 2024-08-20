@@ -258,7 +258,9 @@ def train_step(minibatch, optimizer, model, loss_fn):
     optimizer.zero_grad()
     out = model(minibatch.sampled_subgraphs, node_features)[category]
     loss = loss_fn(out, labels)
-    num_correct = accuracy(out, labels) * labels.size(0)
+    # https://github.com/pytorch/pytorch/issues/133942
+    # num_correct = accuracy(out, labels) * labels.size(0)
+    num_correct = torch.zeros(1, dtype=torch.float64, device=out.device)
     loss.backward()
     optimizer.step()
     return loss.detach(), num_correct, labels.size(0)
