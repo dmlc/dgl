@@ -146,12 +146,21 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
   static inline std::mutex available_queues_mtx_;  // available_queues_ mutex.
   static inline std::vector<int> available_queues_;
 
-  struct QueueAndBufferAcquirer {
-    struct UniqueQueue {
+  /**
+   * @brief This class is meant to distribute the available read buffers and the
+   * statically declared io_uring queues among the worker threads.
+   */
+  class QueueAndBufferAcquirer {
+   public:
+    class UniqueQueue {
+     public:
       UniqueQueue(int thread_id) : thread_id_(thread_id) {}
       UniqueQueue(const UniqueQueue&) = delete;
       UniqueQueue& operator=(const UniqueQueue&) = delete;
 
+      /**
+       * @brief Returns the queue back to the pool.
+       */
       ~UniqueQueue() {
         {
           // We give back the slot we used.
@@ -161,6 +170,9 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
         semaphore_.release();
       }
 
+      /**
+       * @brief Returns the raw io_uring queue.
+       */
       ::io_uring& get() const { return io_uring_queue_[thread_id_]; }
 
      private:
@@ -179,6 +191,14 @@ class OnDiskNpyArray : public torch::CustomClassHolder {
       }
     }
 
+    /**
+     * @brief Returns the secured io_uring queue and the read buffer as a pair.
+     * The raw io_uring queue can be accessed by calling `.get()` on the
+     * returned UniqueQueue object.
+     *
+     * @note The returned UniqueQueue object manages the lifetime of the
+     * io_uring queue. Its destructor returns the queue back to the pool.
+     */
     std::pair<UniqueQueue, char*> get() {
       // We consume a slot from the semaphore to use a queue.
       if (entering_first_.test_and_set(std::memory_order_relaxed)) {

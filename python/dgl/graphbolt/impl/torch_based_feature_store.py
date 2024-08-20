@@ -151,9 +151,9 @@ class TorchBasedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
         Examples
         --------
@@ -424,9 +424,9 @@ class DiskBasedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
         Examples
         --------
@@ -520,7 +520,7 @@ class DiskBasedFeature(Feature):
         return self
 
     def pin_memory_(self):  # pylint: disable=invalid-name
-        """Placeholder `DiskBasedFeature` pin_memory_ implementation. It is a no-op."""
+        r"""Placeholder `DiskBasedFeature` pin_memory_ implementation. It is a no-op."""
         gb_warning(
             "`DiskBasedFeature.pin_memory_()` is not supported. Leaving unmodified."
         )
