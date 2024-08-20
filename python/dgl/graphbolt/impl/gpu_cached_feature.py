@@ -17,7 +17,8 @@ def num_cache_items(cache_capacity_in_bytes, single_item):
 
 
 class GPUCachedFeature(Feature):
-    r"""GPU cached feature wrapping a fallback feature.
+    r"""GPU cached feature wrapping a fallback feature. It uses the least
+    recently used (LRU) algorithm as the cache eviction policy.
 
     Places the GPU cache to torch.cuda.current_device().
 
@@ -100,9 +101,9 @@ class GPUCachedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
         Examples
         --------
@@ -219,3 +220,8 @@ class GPUCachedFeature(Feature):
         else:
             self._fallback_feature.update(value, ids)
             self._feature.replace(ids, value)
+
+    @property
+    def miss_rate(self):
+        """Returns the cache miss rate since creation."""
+        return self._feature.miss_rate
