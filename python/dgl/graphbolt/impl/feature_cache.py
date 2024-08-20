@@ -155,7 +155,9 @@ class CPUFeatureCache(object):
         offset : int
             The offset to be added to the keys. Default is 0.
         """
-        positions, pointers, offsets = self._policy.replace(keys, offsets, offset)
+        positions, pointers, offsets = self._policy.replace(
+            keys, offsets, offset
+        )
         self._cache.replace(positions, values)
         self._policy.writing_completed(pointers, offsets)
 
