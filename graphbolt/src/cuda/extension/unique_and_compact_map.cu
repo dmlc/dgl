@@ -99,8 +99,12 @@ __global__ void _MapIdsBatched(
 
       auto slot = map.find(key);
       auto new_id = slot->second;
-      if (index) new_id = index[new_id];
-      mapped_ids[i] = new_id - unique_ids_offsets[batch_index];
+      if (index) {
+        new_id = index[new_id];
+      } else {
+        new_id -= unique_ids_offsets[batch_index];
+      }
+      mapped_ids[i] = new_id;
     }
 
     i += stride;
@@ -284,14 +288,18 @@ UniqueAndCompactBatchedHashMapBased(
               unique_ids_offsets_dev.data_ptr<int64_t>();
         }
         at::cuda::CUDAEvent unique_ids_offsets_event;
+        unique_ids_offsets_event.record();
         torch::optional<torch::Tensor> index;
         if (part_ids) {
+          unique_ids_offsets_event.synchronize();
+          const auto num_unique =
+              unique_ids_offsets.data_ptr<int64_t>()[num_batches];
+          unique_ids = unique_ids.slice(0, 0, num_unique);
+          part_ids = part_ids->slice(0, 0, num_unique);
           std::tie(
               unique_ids, index, unique_ids_offsets, unique_ids_offsets_event) =
               cuda::RankSortImpl(
                   unique_ids, *part_ids, unique_ids_offsets_dev, world_size);
-        } else {
-          unique_ids_offsets_event.record();
         }
         auto mapped_ids =
             torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());

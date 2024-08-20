@@ -687,7 +687,7 @@ def _partition_to_graphbolt(
         part_config=part_config, part_id=part_i, part_metadata=part_metadata
     )
     graph = parts[part_i]
-    csc_graph = gb_convert_single_dgl_partition(
+    csc_graph = _convert_dgl_partition_to_gb(
         ntypes=ntypes,
         etypes=etypes,
         gpb=gpb,
@@ -1702,7 +1702,7 @@ def _create_attributes_gb(
     return node_attributes, edge_attributes, type_per_edge
 
 
-def gb_convert_single_dgl_partition(
+def _convert_dgl_partition_to_gb(
     ntypes,
     etypes,
     gpb,
@@ -1820,30 +1820,30 @@ def gb_convert_single_dgl_partition(
     return csc_graph
 
 
-def _convert_partition_to_graphbolt(
-    part_config,
+def gb_convert_single_dgl_partition(
     part_id,
-    graph_formats=None,
-    store_eids=False,
-    store_inner_node=False,
-    store_inner_edge=False,
+    graph_formats,
+    part_config,
+    store_eids=True,
+    store_inner_node=True,
+    store_inner_edge=True,
 ):
     """
     The pipeline converting signle partition to graphbolt.
 
     Parameters
     ----------
-    part_config : str
-        The path of the partition config file.
     part_id : int
         The partition ID.
-    graph_formats : str or list[str], optional
+    graph_formats : str or list[str]
         Save partitions in specified formats. It could be any combination of
         `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
         it is not necessary to specify this argument. It's mainly for
         specifying `coo` format to save edge ID mapping and destination node
         IDs. If not specified, whether to save `coo` format is determined by
         the availability of the format in DGL partitions. Default: None.
+    part_config : str
+        The path of the partition config file.
     store_eids : bool, optional
         Whether to store edge IDs in the new graph. Default: True.
     store_inner_node : bool, optional
@@ -1861,7 +1861,7 @@ def _convert_partition_to_graphbolt(
     )
     part = _load_part(part_config, part_id)
     part_meta = copy.deepcopy(_load_part_config(part_config))
-    csc_graph = gb_convert_single_dgl_partition(
+    csc_graph = _convert_dgl_partition_to_gb(
         graph=part,
         ntypes=ntypes,
         etypes=etypes,
@@ -1896,7 +1896,7 @@ def _convert_partition_to_graphbolt_wrapper(
 
     # Iterate over partitions.
     convert_with_format = partial(
-        _convert_partition_to_graphbolt,
+        gb_convert_single_dgl_partition,
         part_config=part_config,
         graph_formats=graph_formats,
         store_eids=store_eids,
