@@ -1105,7 +1105,7 @@ def partition_graph(
                 inner_node_mask = _get_inner_node_mask(parts[i], ntype_id)
                 val.append(
                     F.as_scalar(F.sum(F.astype(inner_node_mask, F.int64), 0))
-                )#note inner_node_mask(tensor[n,bool])->tensor[n,int64]->sum->scalar, compute the num of one partition
+                )
                 inner_nids = F.boolean_mask(
                     parts[i].ndata[NID], inner_node_mask
                 )
@@ -1115,7 +1115,7 @@ def partition_graph(
                         int(F.as_scalar(inner_nids[-1])) + 1,
                     ]
                 )
-            val = np.cumsum(val).tolist()# note computing the cumulative sum of array elements.
+            val = np.cumsum(val).tolist()
             assert val[-1] == g.num_nodes(ntype)
         for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype)
@@ -1135,7 +1135,7 @@ def partition_graph(
                     [int(inner_eids[0]), int(inner_eids[-1]) + 1]
                 )
             val = np.cumsum(val).tolist()
-            assert val[-1] == g.num_edges(etype)# note assure the tot graph can be used
+            assert val[-1] == g.num_edges(etype)
     else:
         node_map_val = {}
         edge_map_val = {}
@@ -1305,51 +1305,31 @@ def partition_graph(
         part_dir = os.path.join(out_path, "part" + str(part_id))
         node_feat_file = os.path.join(part_dir, "node_feat.dgl")
         edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
-
-        os.makedirs(part_dir, mode=0o775, exist_ok=True)
-        save_tensors(node_feat_file, node_feats)
-        save_tensors(edge_feat_file, edge_feats)
-
-        #save
-        if use_graphbolt:
-            part_metadata["part-{}".format(part_id)] = {
-            "node_feats": os.path.relpath(node_feat_file, out_path),
-            "edge_feats": os.path.relpath(edge_feat_file, out_path),
-        }
-        else:
-            part_graph_file = os.path.join(part_dir, "graph.dgl")
-
-            part_metadata["part-{}".format(part_id)] = {
+        part_graph_file = os.path.join(part_dir, "graph.dgl")
+        part_metadata["part-{}".format(part_id)] = {
             "node_feats": os.path.relpath(node_feat_file, out_path),
             "edge_feats": os.path.relpath(edge_feat_file, out_path),
             "part_graph": os.path.relpath(part_graph_file, out_path),
         }
-            sort_etypes = len(g.etypes) > 1
-            _save_graphs(
-                part_graph_file,
-                [part],
-                formats=graph_formats,
-                sort_etypes=sort_etypes,
-            )
-    
-    
-    part_config = os.path.join(out_path, graph_name + ".json")
-    if use_graphbolt:
-        kwargs["graph_formats"] = graph_formats
-        dgl_partition_to_graphbolt(
-            part_config,
-            parts=parts,
-            part_meta=part_metadata,
-            **kwargs,
+        os.makedirs(part_dir, mode=0o775, exist_ok=True)
+        save_tensors(node_feat_file, node_feats)
+        save_tensors(edge_feat_file, edge_feats)
+
+        sort_etypes = len(g.etypes) > 1
+        _save_graphs(
+            part_graph_file,
+            [part],
+            formats=graph_formats,
+            sort_etypes=sort_etypes,
         )
-    else:
-        _dump_part_config(part_config, part_metadata)
-    
     print(
         "Save partitions: {:.3f} seconds, peak memory: {:.3f} GB".format(
             time.time() - start, get_peak_mem()
         )
     )
+
+    part_config = os.path.join(out_path, graph_name + ".json")
+    _dump_part_config(part_config, part_metadata)
 
     num_cuts = sim_g.num_edges() - tot_num_inner_edges
     if num_parts == 1:
@@ -1359,6 +1339,13 @@ def partition_graph(
             g.num_edges(), num_cuts, num_parts
         )
     )
+
+    if use_graphbolt:
+        kwargs["graph_formats"] = graph_formats
+        dgl_partition_to_graphbolt(
+            part_config,
+            **kwargs,
+        )
 
     if return_mapping:
         return orig_nids, orig_eids
@@ -1405,9 +1392,9 @@ def init_type_per_edge(graph, gpb):
     etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
     return etype_ids
 
-def gb_convert_single_dgl_partition(# TODO change this
+
+def gb_convert_single_dgl_partition(
     part_id,
-    parts,
     graph_formats,
     part_config,
     store_eids,
@@ -1440,18 +1427,14 @@ def gb_convert_single_dgl_partition(# TODO change this
             "Running in debug mode which means all attributes of DGL partitions"
             " will be saved to the new format."
         )
-    
+
     part_meta = _load_part_config(part_config)
     num_parts = part_meta["num_parts"]
 
-    if parts!=None:
-        assert len(parts)==num_parts
-        graph=parts[part_id]
-    else:
-        graph, _, _, gpb, _, _, _ = load_partition(
-            part_config, part_id, load_feats=False
-        )
-    gpb, _, ntypes, etypes = load_partition_book(part_config, part_id)
+    graph, _, _, gpb, _, _, _ = load_partition(
+        part_config, part_id, load_feats=False
+    )
+    _, _, ntypes, etypes = load_partition_book(part_config, part_id)
     is_homo = is_homogeneous(ntypes, etypes)
     node_type_to_id = (
         None if is_homo else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
@@ -1520,7 +1503,7 @@ def gb_convert_single_dgl_partition(# TODO change this
             indptr, dtype=indices.dtype
         )
 
-    # Cast various data to minimum dtype.#note convert to minimun dtype
+    # Cast various data to minimum dtype.
     # Cast 1: indptr.
     indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
     # Cast 2: indices.
@@ -1569,6 +1552,7 @@ def gb_convert_single_dgl_partition(# TODO change this
     return os.path.relpath(csc_graph_path, os.path.dirname(part_config))
     # Update graph path.
 
+
 def dgl_partition_to_graphbolt(
     part_config,
     *,
@@ -1577,10 +1561,7 @@ def dgl_partition_to_graphbolt(
     store_inner_edge=False,
     graph_formats=None,
     n_jobs=1,
-    parts=None,
-    part_meta=None
-):# note
-    
+):
     """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
 
     This API converts `DGLGraph` partitions to `FusedCSCSamplingGraph` which is
@@ -1617,8 +1598,7 @@ def dgl_partition_to_graphbolt(
             "Running in debug mode which means all attributes of DGL partitions"
             " will be saved to the new format."
         )
-    if part_meta==None:
-        part_meta = _load_part_config(part_config)
+    part_meta = _load_part_config(part_config)
     new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
 
@@ -1635,7 +1615,6 @@ def dgl_partition_to_graphbolt(
     convert_with_format = partial(
         gb_convert_single_dgl_partition,
         graph_formats=graph_formats,
-        parts=parts,
         part_config=part_config,
         store_eids=store_eids,
         store_inner_node=store_inner_node,
