@@ -268,9 +268,7 @@ def _test_pipeline_graphbolt(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = (
-                "python3 tools/verify_partitions.py "
-            )
+            cmd = "python3 tools/verify_partitions.py "
             cmd += f" --orig-dataset-dir {in_dir}"
             cmd += f" --part-graph {out_dir}"
             cmd += f" --partitions-dir {output_dir}"
@@ -377,9 +375,7 @@ def _test_pipeline(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = (
-                "python3 tools/verify_partitions.py "
-            )
+            cmd = "python3 tools/verify_partitions.py "
             cmd += f" --orig-dataset-dir {in_dir}"
             cmd += f" --part-graph {out_dir}"
             cmd += f" --partitions-dir {output_dir}"

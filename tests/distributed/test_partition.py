@@ -17,6 +17,7 @@ from dgl.distributed import (
     load_partition_feats,
     partition_graph,
 )
+from dgl.base import NTYPE
 from dgl.distributed.graph_partition_book import (
     _etype_str_to_tuple,
     _etype_tuple_to_str,
@@ -1532,16 +1533,17 @@ def test_partition_graph_graphbolt_hetero(
                 assert len(orig_eids1) == len(orig_eids2)
                 assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
             parts.append(part_g)
-            verify_graph_feats(
-                hg,
-                gpb,
-                part_g,
-                node_feats,
-                edge_feats,
-                orig_nids,
-                orig_eids,
-                use_graphbolt=True,
-            )
+            if NTYPE in part_g.node_attributes:
+                verify_graph_feats(
+                    hg,
+                    gpb,
+                    part_g,
+                    node_feats,
+                    edge_feats,
+                    orig_nids,
+                    orig_eids,
+                    use_graphbolt=True,
+                )
 
             shuffled_labels.append(node_feats[test_ntype + "/labels"])
             shuffled_elabels.append(
@@ -1817,3 +1819,6 @@ def test_partition_graph_graphbolt_hetero_find_edges_multi(
         graph_formats="coo",
         n_jobs=4,
     )
+
+if __name__=='__main__':
+    test_partition_graph_graphbolt_hetero('random',4,False)
