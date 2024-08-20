@@ -20,6 +20,7 @@
 #include "./partitioned_cache_policy.h"
 
 #include <algorithm>
+#include <limits>
 #include <numeric>
 
 #include "./utils.h"
@@ -27,7 +28,29 @@
 namespace graphbolt {
 namespace storage {
 
-constexpr int kIntGrainSize = 64;
+constexpr int kIntGrainSize = 256;
+
+torch::Tensor AddOffset(torch::Tensor keys, int64_t offset) {
+  if (offset == 0) return keys;
+  const auto numel = keys.size(0);
+  auto output =
+      torch::empty(numel, keys.options().pinned_memory(utils::is_pinned(keys)));
+  AT_DISPATCH_INDEX_TYPES(
+      keys.scalar_type(), "AddOffset", ([&] {
+        auto keys_ptr = keys.data_ptr<index_t>();
+        auto output_ptr = output.data_ptr<index_t>();
+        graphbolt::parallel_for_each(0, numel, kIntGrainSize, [&](int64_t i) {
+          const auto result = keys_ptr[i] + offset;
+          if constexpr (!std::is_same_v<index_t, int64_t>) {
+            TORCH_CHECK(
+                std::numeric_limits<index_t>::min() <= result &&
+                result <= std::numeric_limits<index_t>::max());
+          }
+          output_ptr[i] = static_cast<index_t>(result);
+        });
+      }));
+  return output;
+}
 
 template <typename CachePolicy>
 PartitionedCachePolicy::PartitionedCachePolicy(
@@ -117,7 +140,8 @@ PartitionedCachePolicy::Partition(torch::Tensor keys) {
 std::tuple<
     torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
     torch::Tensor>
-PartitionedCachePolicy::Query(torch::Tensor keys) {
+PartitionedCachePolicy::Query(torch::Tensor keys, const int64_t offset) {
+  keys = AddOffset(keys, offset);
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
     auto [positions, output_indices, missing_keys, found_pointers] =
@@ -133,6 +157,7 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
     found_and_missing_offsets_ptr[3] = missing_keys.size(0);
     auto found_offsets = found_and_missing_offsets.slice(0, 0, 2);
     auto missing_offsets = found_and_missing_offsets.slice(0, 2);
+    missing_keys = AddOffset(missing_keys, -offset);
     return {positions,      output_indices, missing_keys,
             found_pointers, found_offsets,  missing_offsets};
   };
@@ -211,17 +236,18 @@ PartitionedCachePolicy::Query(torch::Tensor keys) {
         num_missing * missing_keys.element_size());
   });
   auto found_offsets = result_offsets_tensor.slice(0, 0, policies_.size() + 1);
+  missing_keys = AddOffset(missing_keys, -offset);
   return std::make_tuple(
       positions, output_indices, missing_keys, found_pointers, found_offsets,
       missing_offsets);
 }
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
-PartitionedCachePolicy::QueryAsync(torch::Tensor keys) {
+PartitionedCachePolicy::QueryAsync(torch::Tensor keys, const int64_t offset) {
   return async([=] {
     auto
         [positions, output_indices, missing_keys, found_pointers, found_offsets,
-         missing_offsets] = Query(keys);
+         missing_offsets] = Query(keys, offset);
     return std::vector{positions,      output_indices, missing_keys,
                        found_pointers, found_offsets,  missing_offsets};
   });
@@ -230,7 +256,9 @@ PartitionedCachePolicy::QueryAsync(torch::Tensor keys) {
 std::tuple<
     torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor,
     torch::Tensor>
-PartitionedCachePolicy::QueryAndReplace(torch::Tensor keys) {
+PartitionedCachePolicy::QueryAndReplace(
+    torch::Tensor keys, const int64_t offset) {
+  keys = AddOffset(keys, offset);
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
     auto [positions, output_indices, pointers, missing_keys] =
@@ -246,6 +274,7 @@ PartitionedCachePolicy::QueryAndReplace(torch::Tensor keys) {
     found_and_missing_offsets_ptr[3] = missing_keys.size(0);
     auto found_offsets = found_and_missing_offsets.slice(0, 0, 2);
     auto missing_offsets = found_and_missing_offsets.slice(0, 2);
+    missing_keys = AddOffset(missing_keys, -offset);
     return {positions,    output_indices, pointers,
             missing_keys, found_offsets,  missing_offsets};
   }
@@ -336,17 +365,19 @@ PartitionedCachePolicy::QueryAndReplace(torch::Tensor keys) {
         num_missing * missing_keys.element_size());
   });
   auto found_offsets = result_offsets_tensor.slice(0, 0, policies_.size() + 1);
+  missing_keys = AddOffset(missing_keys, -offset);
   return std::make_tuple(
       positions, output_indices, pointers, missing_keys, found_offsets,
       missing_offsets);
 }
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
-PartitionedCachePolicy::QueryAndReplaceAsync(torch::Tensor keys) {
+PartitionedCachePolicy::QueryAndReplaceAsync(
+    torch::Tensor keys, const int64_t offset) {
   return async([=] {
     auto
         [positions, output_indices, pointers, missing_keys, found_offsets,
-         missing_offsets] = QueryAndReplace(keys);
+         missing_offsets] = QueryAndReplace(keys, offset);
     return std::vector{positions,    output_indices, pointers,
                        missing_keys, found_offsets,  missing_offsets};
   });
@@ -354,7 +385,9 @@ PartitionedCachePolicy::QueryAndReplaceAsync(torch::Tensor keys) {
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 PartitionedCachePolicy::Replace(
-    torch::Tensor keys, torch::optional<torch::Tensor> offsets) {
+    torch::Tensor keys, torch::optional<torch::Tensor> offsets,
+    const int64_t offset) {
+  keys = AddOffset(keys, offset);
   if (policies_.size() == 1) {
     std::lock_guard lock(mtx_);
     auto [positions, pointers] = policies_[0]->Replace(keys);
@@ -419,9 +452,10 @@ PartitionedCachePolicy::Replace(
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>>
 PartitionedCachePolicy::ReplaceAsync(
-    torch::Tensor keys, torch::optional<torch::Tensor> offsets) {
+    torch::Tensor keys, torch::optional<torch::Tensor> offsets,
+    const int64_t offset) {
   return async([=] {
-    auto [positions, pointers, offsets_out] = Replace(keys, offsets);
+    auto [positions, pointers, offsets_out] = Replace(keys, offsets, offset);
     return std::vector{positions, pointers, offsets_out};
   });
 }

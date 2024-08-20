@@ -61,6 +61,7 @@ class CPUCachedFeature(Feature):
             pin_memory=pin_memory,
         )
         self._is_pinned = pin_memory
+        self._offset = 0
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -79,7 +80,7 @@ class CPUCachedFeature(Feature):
         if ids is None:
             return self._fallback_feature.read()
         return self._feature.query_and_replace(
-            ids.cpu(), self._fallback_feature.read
+            ids.cpu(), self._fallback_feature.read, self._offset
         ).to(ids.device)
 
     def read_async(self, ids: torch.Tensor):
@@ -124,7 +125,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -241,7 +242,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -319,7 +320,7 @@ class CPUCachedFeature(Feature):
 
             yield _Waiter([values_copy_event, writing_completed], values)
         else:
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -448,4 +449,4 @@ class CPUCachedFeature(Feature):
             )
         else:
             self._fallback_feature.update(value, ids)
-            self._feature.replace(ids, value)
+            self._feature.replace(ids, value, None, self._offset)

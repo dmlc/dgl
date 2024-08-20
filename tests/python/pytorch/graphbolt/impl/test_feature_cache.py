@@ -7,6 +7,7 @@ from dgl import graphbolt as gb
 
 
 def _test_query_and_replace(policy1, policy2, keys):
+    offset = 111111
     # Testing query_and_replace equivalence to query and then replace.
     (
         _,
@@ -15,7 +16,7 @@ def _test_query_and_replace(policy1, policy2, keys):
         missing_keys,
         found_offsets,
         missing_offsets,
-    ) = policy1.query_and_replace(keys)
+    ) = policy1.query_and_replace(keys, offset)
     found_cnt = keys.size(0) - missing_keys.size(0)
     found_pointers = pointers[:found_cnt]
     policy1.reading_completed(found_pointers, found_offsets)
@@ -29,10 +30,10 @@ def _test_query_and_replace(policy1, policy2, keys):
         found_pointers2,
         found_offsets2,
         missing_offsets2,
-    ) = policy2.query(keys)
+    ) = policy2.query(keys, offset)
     policy2.reading_completed(found_pointers2, found_offsets2)
     (_, missing_pointers2, missing_offsets2) = policy2.replace(
-        missing_keys2, missing_offsets2
+        missing_keys2, missing_offsets2, offset
     )
     policy2.writing_completed(missing_pointers2, missing_offsets2)
 
