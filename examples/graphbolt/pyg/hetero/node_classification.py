@@ -3,34 +3,34 @@ This script is a PyG counterpart of ``/examples/graphbolt/rgcn/hetero_rgcn.py``.
 """
 
 import argparse
-import itertools
-import sys
 import time
 
-import dgl
 import dgl.graphbolt as gb
-import dgl.nn as dglnn
-
-import psutil
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ogb.lsc import MAG240MEvaluator
-from ogb.nodeproppred import Evaluator
+from torch_geometric.nn import SimpleConv
 from tqdm import tqdm
 
 
+def accuracy(out, labels):
+    assert out.ndim == 2
+    assert out.size(0) == labels.size(0)
+    assert labels.ndim == 1 or (labels.ndim == 2 and labels.size(1) == 1)
+    labels = labels.flatten()
+    predictions = torch.argmax(out, 1)
+    return (labels == predictions).sum(dtype=torch.float64) / labels.size(0)
+
+
 def create_dataloader(
-    name,
     graph,
     features,
-    item_set,
-    device,
+    itemset,
     batch_size,
-    fanouts,
-    shuffle,
-    num_workers,
+    fanout,
+    device,
+    job,
 ):
     """Create a GraphBolt dataloader for training, validation or testing."""
 
@@ -43,55 +43,71 @@ def create_dataloader(
     #   The number of nodes to sample in each mini-batch.
     # `shuffle`:
     #   Whether to shuffle the items in the dataset before sampling.
-    datapipe = gb.ItemSampler(item_set, batch_size=batch_size, shuffle=shuffle)
-
-    # Move the mini-batch to the appropriate device.
-    # `device`:
-    #   The device to move the mini-batch to.
-    datapipe = datapipe.copy_to(device)
-
-    # Sample neighbors for each seed node in the mini-batch.
-    # `graph`:
-    #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
-    # `fanouts`:
-    #   The number of neighbors to sample for each node in each layer.
+    datapipe = gb.ItemSampler(
+        itemset,
+        batch_size=batch_size,
+        shuffle=(job == "train"),
+        drop_last=(job == "train"),
+    )
+    need_copy = True
+    # Copy the data to the specified device.
+    if args.graph_device != "cpu" and need_copy:
+        datapipe = datapipe.copy_to(device=device)
+        need_copy = False
+    # Sample neighbors for each node in the mini-batch.
     datapipe = datapipe.sample_neighbor(
         graph,
-        fanouts=fanouts,
+        fanout if job != "infer" else [-1],
         overlap_fetch=args.overlap_graph_fetch,
-        asynchronous=args.asynchronous,
+        asynchronous=args.graph_device != "cpu",
     )
+    # Copy the data to the specified device.
+    if args.feature_device != "cpu" and need_copy:
+        datapipe = datapipe.copy_to(device=device)
+        need_copy = False
 
-    # Fetch the features for each node in the mini-batch.
-    # `features`:
-    #   The feature store from which to fetch the features.
-    # `node_feature_keys`:
-    #   The node features to fetch. This is a dictionary where the keys are
-    #   node types and the values are lists of feature names.
-    node_feature_keys = {"paper": ["feat"]}
-    if name == "ogb-lsc-mag240m":
-        node_feature_keys["author"] = ["feat"]
-        node_feature_keys["institution"] = ["feat"]
+    if args.dataset == "ogb-lsc-mag240m":
+        node_feature_keys = {
+            "paper": ["feat"],
+            "author": ["feat"],
+            "institution": ["feat"],
+        }
+    # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
 
-    # Create a DataLoader from the datapipe.
-    # `num_workers`:
-    #   The number of worker processes to use for data loading.
-    return gb.DataLoader(datapipe, num_workers=num_workers)
+    # Copy the data to the specified device.
+    if need_copy:
+        datapipe = datapipe.copy_to(device=device)
+    # Create and return a DataLoader to handle data loading.
+    return gb.DataLoader(datapipe, num_workers=args.num_workers)
 
 
-def extract_node_features(block, data, device):
-    """Extract the node features from embedding layer or raw features."""
-    node_features = {
-        ntype: data.node_features[(ntype, "feat")]
-        for ntype in block.srctypes
-    }
-    # Original feature data are stored in float16 while model weights are
-    # float32, so we need to convert the features to float32.
-    node_features = {
-        k: v.to(device).float() for k, v in node_features.items()
-    }
-    return node_features
+def convert_to_pyg(h, subgraph):
+    #####################################################################
+    # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
+    #
+    #   We convert the provided sampled edges in CSC format from GraphBolt and
+    #   convert to COO via using gb.expand_indptr.
+    #####################################################################
+    h_dst_dict = {}
+    edge_index_dict = {}
+    sizes_dict = {}
+    for etype, sampled_csc in subgraph.sampled_csc.items():
+        src = sampled_csc.indices
+        dst = gb.expand_indptr(
+            sampled_csc.indptr,
+            dtype=src.dtype,
+            output_size=src.size(0),
+        )
+        edge_index = torch.stack([src, dst], dim=0).long()
+        dst_size = sampled_csc.indptr.size(0) - 1
+        # h and h[:dst_size] correspond to source and destination features resp.
+        src_ntype, _, dst_ntype = gb.etype_str_to_tuple(etype)
+        h_dst_dict[dst_ntype] = h[dst_ntype][:dst_size]
+        edge_index_dict[etype] = edge_index
+        sizes_dict[etype] = (h[src_ntype].size(0), dst_size)
+
+    return (h, h_dst_dict), edge_index_dict, sizes_dict
 
 
 class RelGraphConvLayer(nn.Module):
@@ -100,15 +116,13 @@ class RelGraphConvLayer(nn.Module):
         in_size,
         out_size,
         ntypes,
-        relation_names,
-        activation=None,
+        etypes,
+        activation,
         dropout=0.0,
     ):
-        super(RelGraphConvLayer, self).__init__()
+        super().__init__()
         self.in_size = in_size
         self.out_size = out_size
-        self.ntypes = ntypes
-        self.relation_names = relation_names
         self.activation = activation
 
         ########################################################################
@@ -119,13 +133,8 @@ class RelGraphConvLayer(nn.Module):
         # is equivalent to averaging the received messages. weight=False and
         # bias=False as we will use our own weight matrices defined later.
         ########################################################################
-        self.conv = dglnn.HeteroGraphConv(
-            {
-                rel: dglnn.GraphConv(
-                    in_size, out_size, norm="right", weight=False, bias=False
-                )
-                for rel in relation_names
-            }
+        self.convs = nn.ModuleDict(
+            {etype: SimpleConv(aggr="mean") for etype in etypes}
         )
 
         # Create a separate Linear layer for each relationship. Each
@@ -133,8 +142,8 @@ class RelGraphConvLayer(nn.Module):
         # features before performing convolution.
         self.weight = nn.ModuleDict(
             {
-                rel_name: nn.Linear(in_size, out_size, bias=False)
-                for rel_name in self.relation_names
+                etype: nn.Linear(in_size, out_size, bias=False)
+                for etype in etypes
             }
         )
 
@@ -144,55 +153,12 @@ class RelGraphConvLayer(nn.Module):
         # representations. Note that this does not imply the existence of self-loop
         # edges in the graph. It is similar to residual connection.
         self.loop_weights = nn.ModuleDict(
-            {
-                ntype: nn.Linear(in_size, out_size, bias=True)
-                for ntype in self.ntypes
-            }
-        )
-
-        self.loop_weights = nn.ModuleDict(
-            {
-                ntype: nn.Linear(in_size, out_size, bias=True)
-                for ntype in self.ntypes
-            }
+            {ntype: nn.Linear(in_size, out_size, bias=True) for ntype in ntypes}
         )
 
         self.dropout = nn.Dropout(dropout)
-        # Initialize parameters of the model.
-        self.reset_parameters()
 
-    def reset_parameters(self):
-        for layer in self.weight.values():
-            layer.reset_parameters()
-
-        for layer in self.loop_weights.values():
-            layer.reset_parameters()
-
-    def forward(self, g, inputs):
-        """
-        Parameters
-        ----------
-        g : DGLGraph
-            Input graph.
-        inputs : dict[str, torch.Tensor]
-            Node feature for each node type.
-
-        Returns
-        -------
-        dict[str, torch.Tensor]
-            New node features for each node type.
-        """
-        # Create a deep copy of the graph g with features saved in local
-        # frames to prevent side effects from modifying the graph.
-        g = g.local_var()
-
-        # Create a dictionary of weights for each relationship. The weights
-        # are retrieved from the Linear layers defined earlier.
-        weight_dict = {
-            rel_name: {"weight": self.weight[rel_name].weight.T}
-            for rel_name in self.relation_names
-        }
-
+    def forward(self, subgraph, x):
         # Create a dictionary of node features for the destination nodes in
         # the graph. We slice the node features according to the number of
         # destination nodes of each type. This is necessary because when
@@ -200,300 +166,246 @@ class RelGraphConvLayer(nn.Module):
         # only on the destination nodes' features. By doing so, we ensure the
         # feature dimensions match and prevent any misuse of incorrect node
         # features.
-        inputs_dst = {
-            k: v[: g.number_of_dst_nodes(k)] for k, v in inputs.items()
-        }
-        # Apply the convolution operation on the graph. mod_kwargs are
-        # additional arguments for each relation function defined in the
-        # HeteroGraphConv. In this case, it's the weights for each relation.
-        hs = self.conv(g, inputs, mod_kwargs=weight_dict)
+        (h, h_dst), edge_index, size = convert_to_pyg(x, subgraph)
 
-        def _apply(ntype, h):
+        h_out = {}
+        for etype in edge_index:
+            src_ntype, _, dst_ntype = gb.etype_str_to_tuple(etype)
+            # h_dst is unused in SimpleConv.
+            t = self.convs[etype]((h[src_ntype], h_dst[dst_ntype]), edge_index[etype], size=size[etype])
+            t = self.weight[etype](t)
+            if dst_ntype in h_out:
+                h_out[dst_ntype] += t
+            else:
+                h_out[dst_ntype] = t
+
+        def _apply(ntype, x):
             # Apply the `loop_weight` to the input node features, effectively
             # acting as a residual connection. This allows the model to refine
             # node embeddings based on its current features.
-            h = h + self.loop_weights[ntype](inputs_dst[ntype])
-            if self.activation:
-                h = self.activation(h)
-            return self.dropout(h)
+            x = x + self.loop_weights[ntype](h_dst[ntype])
+            return self.dropout(self.activation(x))
 
         # Apply the function defined above for each node type. This will update
         # the node features using the `loop_weights`, apply the activation
         # function and dropout.
-        return {ntype: _apply(ntype, h) for ntype, h in hs.items()}
+        return {ntype: _apply(ntype, h) for ntype, h in h_out.items()}
 
 
 class EntityClassify(nn.Module):
-    def __init__(self, graph, in_size, out_size):
+    def __init__(self, graph, in_size, hidden_size, out_size, n_layers):
         super(EntityClassify, self).__init__()
-        self.in_size = in_size
-        self.hidden_size = 64
-        self.out_size = out_size
-
-        # Generate and sort a list of unique edge types from the input graph.
-        # eg. ['writes', 'cites']
-        etypes = list(graph.edge_type_to_id.keys())
-        etypes = [gb.etype_str_to_tuple(etype)[1] for etype in etypes]
-        self.relation_names = etypes
-        self.relation_names.sort()
-        self.dropout = 0.5
-        ntypes = list(graph.node_type_to_id.keys())
         self.layers = nn.ModuleList()
-
-        # First layer: transform input features to hidden features. Use ReLU
-        # as the activation function and apply dropout for regularization.
-        self.layers.append(
-            RelGraphConvLayer(
-                self.in_size,
-                self.hidden_size,
-                ntypes,
-                self.relation_names,
-                activation=F.relu,
-                dropout=self.dropout,
+        sizes = [in_size] + [hidden_size] * (n_layers - 1) + [out_size]
+        for i in range(n_layers):
+            self.layers.append(
+                RelGraphConvLayer(
+                    sizes[i],
+                    sizes[i + 1],
+                    graph.node_type_to_id.keys(),
+                    graph.edge_type_to_id.keys(),
+                    activation=F.relu if i != n_layers - 1 else lambda x: x,
+                    dropout=0.5,
+                )
             )
-        )
 
-        # Second layer: transform hidden features to output features. No
-        # activation function is applied at this stage.
-        self.layers.append(
-            RelGraphConvLayer(
-                self.hidden_size,
-                self.out_size,
-                ntypes,
-                self.relation_names,
-                activation=None,
-            )
-        )
-
-    def reset_parameters(self):
-        # Reset the parameters of each layer.
-        for layer in self.layers:
-            layer.reset_parameters()
-
-    def forward(self, blocks, h):
-        for layer, block in zip(self.layers, blocks):
-            h = layer(block, h)
+    def forward(self, subgraphs, h):
+        for layer, subgraph in zip(self.layers, subgraphs):
+            h = layer(subgraph, h)
         return h
 
 
+@torch.compile
+def evaluate_step(minibatch, model):
+    category = "paper"
+    node_features = {
+        ntype: feat.float()
+        for (ntype, name), feat in minibatch.node_features.items()
+        if name == "feat"
+    }
+    labels = minibatch.labels[category].long()
+    out = model(minibatch.sampled_subgraphs, node_features)[category]
+    num_correct = accuracy(out, labels) * labels.size(0)
+    return num_correct, labels.size(0)
+
+
 @torch.no_grad()
-def evaluate(
-    name,
-    g,
-    model,
-    device,
-    item_set,
-    features,
-    num_workers,
-):
-    # Switches the model to evaluation mode.
+def evaluate(model, dataloader, device):
     model.eval()
+    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
+    total_samples = 0
+    for minibatch in tqdm(dataloader, desc="Evaluating"):
+        num_correct, num_samples = evaluate_step(minibatch, model)
+        total_correct += num_correct
+        total_samples += num_samples
+    
+    return total_correct / total_samples
+
+
+@torch.compile
+def train_step(minibatch, optimizer, model, loss_fn):
     category = "paper"
-    # An evaluator for the dataset.
-    if name == "ogbn-mag":
-        evaluator = Evaluator(name=name)
-    else:
-        evaluator = MAG240MEvaluator()
+    node_features = {
+        ntype: feat.float()
+        for (ntype, name), feat in minibatch.node_features.items()
+        if name == "feat"
+    }
+    labels = minibatch.labels[category].long()
+    optimizer.zero_grad()
+    out = model(minibatch.sampled_subgraphs, node_features)[category]
+    loss = loss_fn(out, labels)
+    num_correct = accuracy(out, labels) * labels.size(0)
+    loss.backward()
+    optimizer.step()
+    return loss.detach(), num_correct, labels.size(0)
 
-    num_etype = len(g.num_edges)
-    data_loader = create_dataloader(
-        name,
-        g,
-        features,
-        item_set,
-        device,
-        batch_size=4096,
-        fanouts=[torch.full((num_etype,), 25), torch.full((num_etype,), 10)],
-        shuffle=False,
-        num_workers=num_workers,
-    )
+def train_helper(dataloader, model, optimizer, loss_fn, device):
+    model.train()
+    total_loss = torch.zeros(1, device=device)
+    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
+    total_samples = 0
+    start = time.time()
+    for minibatch in tqdm(dataloader, "Training"):
+        loss, num_correct, num_samples = train_step(minibatch, optimizer, model, loss_fn)
+        total_loss += loss * num_samples
+        total_correct += num_correct
+        total_samples += num_samples
+    loss = total_loss / total_samples
+    acc = total_correct / total_samples
+    end = time.time()
+    return loss, acc, end - start
 
-    # To store the predictions.
-    y_hats = list()
-    y_true = list()
+def train(train_dataloader, valid_dataloader, model, device):
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    loss_fn = nn.CrossEntropyLoss()
 
-    for data in tqdm(data_loader, desc="Inference"):
-        # Convert MiniBatch to DGL Blocks and move them to the target device.
-        blocks = [block.to(device) for block in data.blocks]
-        node_features = extract_node_features(blocks[0], data, device)
-
-        # Generate predictions.
-        logits = model(blocks, node_features)
-
-        logits = logits[category]
-
-        # Apply softmax to the logits and get the prediction by selecting the
-        # argmax.
-        y_hat = logits.log_softmax(dim=-1).argmax(dim=1, keepdims=True)
-        y_hats.append(y_hat.cpu())
-        y_true.append(data.labels[category].long())
-
-    y_pred = torch.cat(y_hats, dim=0)
-    y_true = torch.cat(y_true, dim=0)
-    y_true = torch.unsqueeze(y_true, 1)
-
-    if name == "ogb-lsc-mag240m":
-        y_pred = y_pred.view(-1)
-        y_true = y_true.view(-1)
-
-    return evaluator.eval({"y_true": y_true, "y_pred": y_pred})["acc"]
-
-
-def train(
-    name,
-    g,
-    model,
-    optimizer,
-    train_set,
-    valid_set,
-    device,
-    features,
-    num_workers,
-    num_epochs,
-):
-    print("Start to train...")
-    category = "paper"
-
-    num_etype = len(g.num_edges)
-    data_loader = create_dataloader(
-        name,
-        g,
-        features,
-        train_set,
-        device,
-        batch_size=1024,
-        fanouts=[torch.full((num_etype,), 25), torch.full((num_etype,), 10)],
-        shuffle=True,
-        num_workers=num_workers,
-    )
-
-    # Typically, the best Validation performance is obtained after
-    # the 1st or 2nd epoch. This is why the max epoch is set to 3.
-    for epoch in range(num_epochs):
-        num_train = len(train_set)
-        t0 = time.time()
-        model.train()
-
-        total_loss = 0
-
-        for data in tqdm(data_loader, desc=f"Training~Epoch {epoch + 1:02d}"):
-            # Convert MiniBatch to DGL Blocks and move them to the target
-            # device.
-            blocks = [block.to(device) for block in data.blocks]
-
-            # Fetch the number of seed nodes in the batch.
-            num_seeds = blocks[-1].num_dst_nodes(category)
-
-            # Extract the node features from embedding layer or raw features.
-            node_features = extract_node_features(blocks[0], data, device)
-
-            # Reset gradients.
-            optimizer.zero_grad()
-            # Generate predictions.
-            logits = model(blocks, node_features)[category]
-
-            y_hat = logits.log_softmax(dim=-1)
-            loss = F.nll_loss(y_hat, data.labels[category].long())
-            loss.backward()
-            optimizer.step()
-
-            total_loss += loss.item() * num_seeds
-
-        t1 = time.time()
-        loss = total_loss / num_train
-
-        # Evaluate the model on the val/test set.
-
-        print("Evaluating the model on the validation set.")
-        valid_acc = evaluate(
-            name, g, model, node_embed, device, valid_set, features, num_workers
+    for epoch in range(args.epochs):
+        train_loss, train_acc, duration = train_helper(
+            train_dataloader, model, optimizer, loss_fn, device
         )
-        print("Finish evaluating on validation set.")
-
+        val_acc = evaluate(model, valid_dataloader, device)
         print(
-            f"Epoch: {epoch + 1:02d}, "
-            f"Loss: {loss:.4f}, "
-            f"Valid accuracy: {100 * valid_acc:.2f}%, "
-            f"Time {t1 - t0:.4f}"
+            f"Epoch: {epoch:02d}, Loss: {train_loss.item():.4f}, "
+            f"Approx. Train: {train_acc.item():.4f}, "
+            f"Approx. Val: {val_acc.item():.4f}, "
+            f"Time: {duration}s"
         )
 
 
-def main(args):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def main():
+    torch.set_float32_matmul_precision(args.precision)
+    if not torch.cuda.is_available():
+        args.mode = "cpu-cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.graph_device, args.feature_device, args.device = args.mode.split("-")
+    args.overlap_feature_fetch = args.feature_device == "pinned"
+    args.overlap_graph_fetch = args.graph_device == "pinned"
 
     # Load dataset.
     dataset = gb.BuiltinDataset(args.dataset).load()
-    print(f"Loaded dataset: {dataset.tasks[0].metadata['name']}")
+    print("Dataset loaded")
 
-    g = dataset.graph
-    features = dataset.feature
+    # Move the dataset to the selected storage.
+    graph = (
+        dataset.graph.pin_memory_()
+        if args.graph_device == "pinned"
+        else dataset.graph.to(args.graph_device)
+    )
+    features = (
+        dataset.feature.pin_memory_()
+        if args.feature_device == "pinned"
+        else dataset.feature.to(args.feature_device)
+    )
+
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
-    num_classes = dataset.tasks[0].metadata["num_classes"]
+    args.fanout = list(map(int, args.fanout.split(",")))
 
-    # Move the dataset to the pinned memory to enable GPU access.
-    args.overlap_graph_fetch = False
-    args.asynchronous = False
-    if device == torch.device("cuda"):
-        g = g.pin_memory_()
-        features = features.pin_memory_()
-        # Enable optimizations for sampling on the GPU.
-        args.overlap_graph_fetch = True
-        args.asynchronous = True
+    num_classes = dataset.tasks[0].metadata["num_classes"]
+    num_etypes = len(graph.num_edges)
+
+    train_dataloader, valid_dataloader, test_dataloader = (
+        create_dataloader(
+            graph=graph,
+            features=features,
+            itemset=itemset,
+            batch_size=args.batch_size,
+            fanout=[torch.full((num_etypes,), fanout) for fanout in args.fanout],
+            device=args.device,
+            job=job,
+        )
+        for itemset, job in zip([train_set, valid_set, test_set], ["train", "evaluate", "evaluate"])
+    )
 
     feat_size = features.size("node", "paper", "feat")[0]
+    hidden_channels = 256
 
     # Initialize the entity classification model.
-    model = EntityClassify(g, feat_size, num_classes).to(device)
+    model = EntityClassify(graph, feat_size, hidden_channels, num_classes, 3).to(
+        args.device
+    )
 
     print(
         "Number of model parameters: "
         f"{sum(p.numel() for p in model.parameters())}"
     )
 
-    model.reset_parameters()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-
-    train(
-        args.dataset,
-        g,
-        model,
-        optimizer,
-        train_set,
-        valid_set,
-        device,
-        features,
-        args.num_workers,
-        args.num_epochs,
-    )
+    train(train_dataloader, valid_dataloader, model, args.device)
 
     print("Testing...")
-    test_acc = evaluate(
-        args.dataset,
-        g,
-        model,
-        device,
-        test_set,
-        features,
-        args.num_workers,
+    test_acc = evaluate(model, test_dataloader, args.device)
+    print(f"Test accuracy {test_acc.item():.4f}")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="GraphBolt PyG R-SAGE")
+    parser.add_argument(
+        "--epochs", type=int, default=10, help="Number of training epochs."
     )
-    print(f"Test accuracy {test_acc*100:.4f}")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="GraphBolt RGCN")
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=0.003,
+        help="Learning rate for optimization.",
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=1024, help="Batch size for training."
+    )
+    parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument(
         "--dataset",
         type=str,
-        default="ogbn-mag",
-        choices=["ogbn-mag", "ogb-lsc-mag240m"],
-        help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m",
+        default="ogb-lsc-mag240m",
+        choices=["ogb-lsc-mag240m"],
+        help="Dataset name. Possible values: ogb-lsc-mag240m",
     )
-    parser.add_argument("--num_epochs", type=int, default=3)
-    parser.add_argument("--num_workers", type=int, default=0)
-    parser.add_argument("--num_gpus", type=int, default=1)
+    parser.add_argument(
+        "--fanout",
+        type=str,
+        default="10,25",
+        help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
+        " identical with the number of layers in your model. Default: ",
+    )
+    parser.add_argument(
+        "--mode",
+        default="pinned-pinned-cuda",
+        choices=[
+            "cpu-cpu-cpu",
+            "cpu-cpu-cuda",
+            "cpu-pinned-cuda",
+            "pinned-pinned-cuda",
+            "cuda-pinned-cuda",
+            "cuda-cuda-cuda",
+        ],
+        help="Graph storage - feature storage - Train device: 'cpu' for CPU and RAM,"
+        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
+    )
 
-    args = parser.parse_args()
+    parser.add_argument("--precision", type=str, default="high")
+    return parser.parse_args()
 
-    main(args)
+
+if __name__ == "__main__":
+    args = parse_args()
+    main()
