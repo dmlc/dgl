@@ -172,7 +172,11 @@ class RelGraphConvLayer(nn.Module):
         for etype in edge_index:
             src_ntype, _, dst_ntype = gb.etype_str_to_tuple(etype)
             # h_dst is unused in SimpleConv.
-            t = self.convs[etype]((h[src_ntype], h_dst[dst_ntype]), edge_index[etype], size=size[etype])
+            t = self.convs[etype](
+                (h[src_ntype], h_dst[dst_ntype]),
+                edge_index[etype],
+                size=size[etype],
+            )
             t = self.weight[etype](t)
             if dst_ntype in h_out:
                 h_out[dst_ntype] += t
@@ -238,7 +242,7 @@ def evaluate(model, dataloader, device):
         num_correct, num_samples = evaluate_step(minibatch, model)
         total_correct += num_correct
         total_samples += num_samples
-    
+
     return total_correct / total_samples
 
 
@@ -259,6 +263,7 @@ def train_step(minibatch, optimizer, model, loss_fn):
     optimizer.step()
     return loss.detach(), num_correct, labels.size(0)
 
+
 def train_helper(dataloader, model, optimizer, loss_fn, device):
     model.train()
     total_loss = torch.zeros(1, device=device)
@@ -266,7 +271,9 @@ def train_helper(dataloader, model, optimizer, loss_fn, device):
     total_samples = 0
     start = time.time()
     for minibatch in tqdm(dataloader, "Training"):
-        loss, num_correct, num_samples = train_step(minibatch, optimizer, model, loss_fn)
+        loss, num_correct, num_samples = train_step(
+            minibatch, optimizer, model, loss_fn
+        )
         total_loss += loss * num_samples
         total_correct += num_correct
         total_samples += num_samples
@@ -274,6 +281,7 @@ def train_helper(dataloader, model, optimizer, loss_fn, device):
     acc = total_correct / total_samples
     end = time.time()
     return loss, acc, end - start
+
 
 def train(train_dataloader, valid_dataloader, model, device):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -331,20 +339,24 @@ def main():
             features=features,
             itemset=itemset,
             batch_size=args.batch_size,
-            fanout=[torch.full((num_etypes,), fanout) for fanout in args.fanout],
+            fanout=[
+                torch.full((num_etypes,), fanout) for fanout in args.fanout
+            ],
             device=args.device,
             job=job,
         )
-        for itemset, job in zip([train_set, valid_set, test_set], ["train", "evaluate", "evaluate"])
+        for itemset, job in zip(
+            [train_set, valid_set, test_set], ["train", "evaluate", "evaluate"]
+        )
     )
 
     feat_size = features.size("node", "paper", "feat")[0]
     hidden_channels = 256
 
     # Initialize the entity classification model.
-    model = EntityClassify(graph, feat_size, hidden_channels, num_classes, 3).to(
-        args.device
-    )
+    model = EntityClassify(
+        graph, feat_size, hidden_channels, num_classes, 3
+    ).to(args.device)
 
     print(
         "Number of model parameters: "
