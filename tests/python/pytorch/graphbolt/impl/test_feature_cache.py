@@ -29,15 +29,15 @@ def _test_query_and_replace(policy1, policy2, keys, offset):
         found_pointers2,
         found_offsets2,
         missing_offsets2,
-    ) = policy2.query(keys, offset)
+    ) = policy2.query(keys + offset, 0)
     policy2.reading_completed(found_pointers2, found_offsets2)
     (_, missing_pointers2, missing_offsets2) = policy2.replace(
-        missing_keys2, missing_offsets2, offset
+        missing_keys2, missing_offsets2, 0
     )
     policy2.writing_completed(missing_pointers2, missing_offsets2)
 
     assert torch.equal(index, index2)
-    assert torch.equal(missing_keys, missing_keys2)
+    assert torch.equal(missing_keys, missing_keys2 - offset)
 
 
 @pytest.mark.parametrize("offsets", [False, True])
