@@ -30,8 +30,8 @@ class CPUCachedFeature(Feature):
         will hang due to all cache entries being read and/or write locked,
         resulting in a deadlock.
     policy : str
-        The cache eviction policy algorithm name. See gb.impl.CPUFeatureCache
-        for the list of available policies.
+        The cache eviction policy algorithm name. The available policies are
+        ["s3-fifo", "sieve", "lru", "clock"]. Default is "sieve".
     pin_memory : bool
         Whether the cache storage should be allocated on system pinned memory.
         Default is False.
@@ -94,9 +94,9 @@ class CPUCachedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
         Examples
         --------
@@ -449,3 +449,8 @@ class CPUCachedFeature(Feature):
         else:
             self._fallback_feature.update(value, ids)
             self._feature.replace(ids, value)
+
+    @property
+    def miss_rate(self):
+        """Returns the cache miss rate since creation."""
+        return self._feature.miss_rate
