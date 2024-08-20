@@ -63,6 +63,7 @@ class GPUCachedFeature(Feature):
         feat0 = fallback_feature.read(torch.tensor([0]))
         cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
         self._feature = GPUCache((cache_size,) + feat0.shape[1:], feat0.dtype)
+        self._offset = 0
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -83,8 +84,12 @@ class GPUCachedFeature(Feature):
         """
         if ids is None:
             return self._fallback_feature.read()
-        values, missing_index, missing_keys = self._feature.query(ids)
-        missing_values = self._fallback_feature.read(missing_keys)
+        values, missing_index, missing_keys = self._feature.query(
+            ids if self._offset == 0 else ids + self._offset
+        )
+        missing_values = self._fallback_feature.read(
+            missing_keys if self._offset == 0 else missing_keys - self._offset
+        )
         values[missing_index] = missing_values
         self._feature.replace(missing_keys, missing_values)
         return values
@@ -115,13 +120,17 @@ class GPUCachedFeature(Feature):
         >>> assert stage + 1 == feature.read_async_num_stages(ids.device)
         >>> result = future.wait()  # result contains the read values.
         """
-        future = self._feature.query(ids, async_op=True)
+        future = self._feature.query(
+            ids if self._offset == 0 else ids + self._offset, async_op=True
+        )
 
         yield
 
         values, missing_index, missing_keys = future.wait()
 
-        fallback_reader = self._fallback_feature.read_async(missing_keys)
+        fallback_reader = self._fallback_feature.read_async(
+            missing_keys if self._offset == 0 else missing_keys - self._offset
+        )
         fallback_num_stages = self._fallback_feature.read_async_num_stages(
             missing_keys.device
         )
