@@ -23,16 +23,23 @@
 #include <ATen/Parallel.h>
 #include <torch/script.h>
 
-#include <atomic>
-#include <exception>
 #include <future>
 #include <memory>
 #include <mutex>
-#include <type_traits>
 
 #ifdef BUILD_WITH_TASKFLOW
 #include <taskflow/algorithm/for_each.hpp>
 #include <taskflow/taskflow.hpp>
+#else
+#include <atomic>
+#include <exception>
+#include <type_traits>
+#endif
+
+#ifdef GRAPHBOLT_USE_CUDA
+#include <c10/cuda/CUDAGuard.h>
+#include <c10/cuda/CUDAStream.h>
+#include <torch/csrc/api/include/torch/cuda.h>
 #endif
 
 namespace graphbolt {
@@ -104,12 +111,33 @@ class Future : public torch::CustomClassHolder {
 template <typename F>
 inline auto async(F&& function) {
   using T = decltype(function());
+#ifdef GRAPHBOLT_USE_CUDA
+  const auto is_cuda_available = torch::cuda::is_available();
+  struct c10::StreamData3 stream_data;
+  if (is_cuda_available) {
+    stream_data = c10::cuda::getCurrentCUDAStream().pack3();
+  }
+#endif
+  auto fn = [=, func = std::move(function)] {
+#ifdef GRAPHBOLT_USE_CUDA
+    // We make sure to use the same CUDA stream as the thread launching the
+    // async operation.
+    if (is_cuda_available) {
+      auto stream = c10::cuda::CUDAStream::unpack3(
+          stream_data.stream_id, stream_data.device_index,
+          stream_data.device_type);
+      c10::cuda::CUDAStreamGuard guard(stream);
+      return func();
+    }
+#endif
+    return func();
+  };
 #ifdef BUILD_WITH_TASKFLOW
-  auto future = interop_pool().async(std::move(function));
+  auto future = interop_pool().async(std::move(fn));
 #else
   auto promise = std::make_shared<std::promise<T>>();
   auto future = promise->get_future();
-  at::launch([promise, func = std::move(function)]() {
+  at::launch([promise, func = std::move(fn)]() {
     if constexpr (std::is_void_v<T>) {
       func();
       promise->set_value();

@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "./expand_indptr.h"
+#include "./index_select.h"
 #include "./macro.h"
 #include "./random.h"
 #include "./shared_memory_helper.h"
@@ -293,48 +294,22 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
       return ops::InSubgraph(indptr_, indices_, nodes, type_per_edge_);
     });
   }
-  using namespace torch::indexing;
-  const int32_t kDefaultGrainSize = 100;
-  const auto num_seeds = nodes.size(0);
-  torch::Tensor indptr = torch::empty({num_seeds + 1}, indptr_.dtype());
-  std::vector<torch::Tensor> indices_arr(num_seeds);
-  std::vector<torch::Tensor> edge_ids_arr(num_seeds);
-  std::vector<torch::Tensor> type_per_edge_arr(num_seeds);
+  std::vector<torch::Tensor> tensors{indices_};
+  if (type_per_edge_.has_value()) {
+    tensors.push_back(*type_per_edge_);
+  }
 
-  AT_DISPATCH_INDEX_TYPES(
-      indptr_.scalar_type(), "InSubgraph::indptr", ([&] {
-        const auto indptr_data = indptr_.data_ptr<index_t>();
-        auto out_indptr_data = indptr.data_ptr<index_t>();
-        out_indptr_data[0] = 0;
-        AT_DISPATCH_INDEX_TYPES(
-            nodes.scalar_type(), "InSubgraph::nodes", ([&] {
-              const auto nodes_data = nodes.data_ptr<index_t>();
-              torch::parallel_for(
-                  0, num_seeds, kDefaultGrainSize,
-                  [&](size_t start, size_t end) {
-                    for (size_t i = start; i < end; ++i) {
-                      const auto node_id = nodes_data[i];
-                      const auto start_idx = indptr_data[node_id];
-                      const auto end_idx = indptr_data[node_id + 1];
-                      out_indptr_data[i + 1] = end_idx - start_idx;
-                      indices_arr[i] = indices_.slice(0, start_idx, end_idx);
-                      edge_ids_arr[i] = torch::arange(
-                          start_idx, end_idx, indptr_.scalar_type());
-                      if (type_per_edge_) {
-                        type_per_edge_arr[i] =
-                            type_per_edge_.value().slice(0, start_idx, end_idx);
-                      }
-                    }
-                  });
-            }));
-      }));
+  auto [output_indptr, results] =
+      ops::IndexSelectCSCBatched(indptr_, tensors, nodes, true, torch::nullopt);
+  torch::optional<torch::Tensor> type_per_edge;
+  if (type_per_edge_.has_value()) {
+    type_per_edge = results.at(1);
+  }
 
   return c10::make_intrusive<FusedSampledSubgraph>(
-      indptr.cumsum(0), torch::cat(indices_arr), torch::cat(edge_ids_arr),
-      nodes, torch::arange(0, NumNodes()),
-      type_per_edge_
-          ? torch::optional<torch::Tensor>{torch::cat(type_per_edge_arr)}
-          : torch::nullopt);
+      // original_row_node_ids is not computed here and is unused.
+      output_indptr, results.at(0), results.back(), nodes, torch::nullopt,
+      type_per_edge);
 }
 
 /**
@@ -507,7 +482,7 @@ template <TemporalOption Temporal, typename NumPickFn, typename PickFn>
 c10::intrusive_ptr<FusedSampledSubgraph>
 FusedCSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& seeds,
-    torch::optional<std::vector<int64_t>>& seed_offsets,
+    const torch::optional<std::vector<int64_t>>& seed_offsets,
     const std::vector<int64_t>& fanouts, NumPickFn num_pick_fn,
     PickFn pick_fn) const {
   const int64_t num_seeds = seeds.size(0);
@@ -896,19 +871,75 @@ c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
   }
 }
 
+c10::intrusive_ptr<Future<c10::intrusive_ptr<FusedSampledSubgraph>>>
+FusedCSCSamplingGraph::SampleNeighborsAsync(
+    torch::optional<torch::Tensor> seeds,
+    torch::optional<std::vector<int64_t>> seed_offsets,
+    const std::vector<int64_t>& fanouts, bool replace, bool layer,
+    bool returning_indices_is_optional,
+    torch::optional<torch::Tensor> probs_or_mask,
+    torch::optional<torch::Tensor> random_seed,
+    double seed2_contribution) const {
+  return async([=] {
+    return this->SampleNeighbors(
+        seeds, seed_offsets, fanouts, replace, layer,
+        returning_indices_is_optional, probs_or_mask, random_seed,
+        seed2_contribution);
+  });
+}
+
 c10::intrusive_ptr<FusedSampledSubgraph>
 FusedCSCSamplingGraph::TemporalSampleNeighbors(
-    const torch::Tensor& input_nodes,
-    const torch::Tensor& input_nodes_timestamp,
-    const std::vector<int64_t>& fanouts, bool replace, bool layer,
-    torch::optional<torch::Tensor> input_nodes_pre_time_window,
+    const torch::optional<torch::Tensor>& seeds,
+    const torch::optional<std::vector<int64_t>>& seed_offsets,
+    const torch::Tensor& seeds_timestamp, const std::vector<int64_t>& fanouts,
+    bool replace, bool layer, bool returning_indices_is_optional,
+    torch::optional<torch::Tensor> seeds_pre_time_window,
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<std::string> node_timestamp_attr_name,
     torch::optional<std::string> edge_timestamp_attr_name,
     torch::optional<torch::Tensor> random_seed,
     double seed2_contribution) const {
-  torch::optional<std::vector<int64_t>> seed_offsets = torch::nullopt;
-  // 1. Get probs_or_mask.
+  // 1. Get the timestamp attribute for nodes of the graph
+  const auto node_timestamp = this->NodeAttribute(node_timestamp_attr_name);
+  // 2. Get the timestamp attribute for edges of the graph
+  const auto edge_timestamp = this->EdgeAttribute(edge_timestamp_attr_name);
+  // If seeds does not have a value, then we expect all arguments to be resident
+  // on the GPU. If seeds has a value, then we expect them to be accessible from
+  // GPU. This is required for the dispatch to work when CUDA is not available.
+  if (((!seeds.has_value() && utils::is_on_gpu(indptr_) &&
+        utils::is_on_gpu(indices_) &&
+        (!probs_or_mask.has_value() ||
+         utils::is_on_gpu(probs_or_mask.value())) &&
+        (!type_per_edge_.has_value() ||
+         utils::is_on_gpu(type_per_edge_.value()))) ||
+       (seeds.has_value() && utils::is_on_gpu(seeds.value()) &&
+        utils::is_accessible_from_gpu(indptr_) &&
+        utils::is_accessible_from_gpu(indices_) &&
+        (!probs_or_mask.has_value() ||
+         utils::is_accessible_from_gpu(probs_or_mask.value())) &&
+        (!type_per_edge_.has_value() ||
+         utils::is_accessible_from_gpu(type_per_edge_.value())))) &&
+      utils::is_accessible_from_gpu(seeds_timestamp) &&
+      (!seeds_pre_time_window.has_value() ||
+       utils::is_accessible_from_gpu(*seeds_pre_time_window)) &&
+      (!node_timestamp.has_value() ||
+       utils::is_accessible_from_gpu(*node_timestamp)) &&
+      (!edge_timestamp.has_value() ||
+       utils::is_accessible_from_gpu(*edge_timestamp)) &&
+      !replace) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+        c10::DeviceType::CUDA, "SampleNeighbors", {
+          return ops::SampleNeighbors(
+              indptr_, indices_, seeds, seed_offsets, fanouts, replace, layer,
+              returning_indices_is_optional, type_per_edge_, probs_or_mask,
+              node_type_offset_, node_type_to_id_, edge_type_to_id_,
+              random_seed, seed2_contribution, seeds_timestamp,
+              seeds_pre_time_window, node_timestamp, edge_timestamp);
+        });
+  }
+  TORCH_CHECK(seeds.has_value(), "Nodes can not be None for CPU.");
+  // 3. Get probs_or_mask.
   if (probs_or_mask.has_value()) {
     // Note probs will be passed as input for 'torch.multinomial' in deeper
     // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
@@ -918,10 +949,6 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
       probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
     }
   }
-  // 2. Get the timestamp attribute for nodes of the graph
-  auto node_timestamp = this->NodeAttribute(node_timestamp_attr_name);
-  // 3. Get the timestamp attribute for edges of the graph
-  auto edge_timestamp = this->EdgeAttribute(edge_timestamp_attr_name);
   // 4. Call SampleNeighborsImpl
   if (layer) {
     if (random_seed.has_value() && random_seed->numel() >= 2) {
@@ -930,15 +957,15 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
           {random_seed.value(), static_cast<float>(seed2_contribution)},
           NumNodes()};
       return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
-          input_nodes, seed_offsets, fanouts,
+          *seeds, seed_offsets, fanouts,
           GetTemporalNumPickFn(
-              input_nodes_timestamp, indices_, fanouts, replace, type_per_edge_,
-              input_nodes_pre_time_window, probs_or_mask, node_timestamp,
+              seeds_timestamp, indices_, fanouts, replace, type_per_edge_,
+              seeds_pre_time_window, probs_or_mask, node_timestamp,
               edge_timestamp),
           GetTemporalPickFn(
-              input_nodes_timestamp, indices_, fanouts, replace,
-              indptr_.options(), type_per_edge_, input_nodes_pre_time_window,
-              probs_or_mask, node_timestamp, edge_timestamp, args));
+              seeds_timestamp, indices_, fanouts, replace, indptr_.options(),
+              type_per_edge_, seeds_pre_time_window, probs_or_mask,
+              node_timestamp, edge_timestamp, args));
     } else {
       auto args = [&] {
         if (random_seed.has_value() && random_seed->numel() == 1) {
@@ -953,27 +980,27 @@ FusedCSCSamplingGraph::TemporalSampleNeighbors(
         }
       }();
       return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
-          input_nodes, seed_offsets, fanouts,
+          *seeds, seed_offsets, fanouts,
           GetTemporalNumPickFn(
-              input_nodes_timestamp, indices_, fanouts, replace, type_per_edge_,
-              input_nodes_pre_time_window, probs_or_mask, node_timestamp,
+              seeds_timestamp, indices_, fanouts, replace, type_per_edge_,
+              seeds_pre_time_window, probs_or_mask, node_timestamp,
               edge_timestamp),
           GetTemporalPickFn(
-              input_nodes_timestamp, indices_, fanouts, replace,
-              indptr_.options(), type_per_edge_, input_nodes_pre_time_window,
-              probs_or_mask, node_timestamp, edge_timestamp, args));
+              seeds_timestamp, indices_, fanouts, replace, indptr_.options(),
+              type_per_edge_, seeds_pre_time_window, probs_or_mask,
+              node_timestamp, edge_timestamp, args));
     }
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl<TemporalOption::TEMPORAL>(
-        input_nodes, seed_offsets, fanouts,
+        *seeds, seed_offsets, fanouts,
         GetTemporalNumPickFn(
-            input_nodes_timestamp, this->indices_, fanouts, replace,
-            type_per_edge_, input_nodes_pre_time_window, probs_or_mask,
-            node_timestamp, edge_timestamp),
+            seeds_timestamp, this->indices_, fanouts, replace, type_per_edge_,
+            seeds_pre_time_window, probs_or_mask, node_timestamp,
+            edge_timestamp),
         GetTemporalPickFn(
-            input_nodes_timestamp, this->indices_, fanouts, replace,
-            indptr_.options(), type_per_edge_, input_nodes_pre_time_window,
+            seeds_timestamp, this->indices_, fanouts, replace,
+            indptr_.options(), type_per_edge_, seeds_pre_time_window,
             probs_or_mask, node_timestamp, edge_timestamp, args));
   }
 }

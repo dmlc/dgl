@@ -124,6 +124,8 @@ __global__ void _ComputeRandoms(
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
   const auto labor = indices != nullptr;
+  const float_t inf =
+      static_cast<float_t>(std::numeric_limits<float>::infinity());
 
   while (i < num_edges) {
     const auto row_position = csr_rows[i];
@@ -133,9 +135,8 @@ __global__ void _ComputeRandoms(
     const auto prob =
         sliced_weights ? sliced_weights[i] : static_cast<weights_t>(1);
     const auto exp_rnd = -__logf(rnd);
-    const float_t adjusted_rnd = prob > 0
-                                     ? static_cast<float_t>(exp_rnd / prob)
-                                     : std::numeric_limits<float_t>::infinity();
+    const float_t adjusted_rnd =
+        prob > 0 ? static_cast<float_t>(exp_rnd / prob) : inf;
     random_arr[i] = adjusted_rnd;
     edge_ids[i] = row_offset;
 
@@ -208,8 +209,14 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
     torch::optional<torch::Tensor> node_type_offset,
     torch::optional<torch::Dict<std::string, int64_t>> node_type_to_id,
     torch::optional<torch::Dict<std::string, int64_t>> edge_type_to_id,
-    torch::optional<torch::Tensor> random_seed_tensor,
-    float seed2_contribution) {
+    torch::optional<torch::Tensor> random_seed_tensor, float seed2_contribution,
+    // Optional temporal sampling arguments begin.
+    torch::optional<torch::Tensor> seeds_timestamp,
+    torch::optional<torch::Tensor> seeds_pre_time_window,
+    torch::optional<torch::Tensor> node_timestamp,
+    torch::optional<torch::Tensor> edge_timestamp
+    // Optional temporal sampling arguments end.
+) {
   // When seed_offsets.has_value() in the hetero case, we compute the output of
   // sample_neighbors _convert_to_sampled_subgraph in a fused manner so that
   // _convert_to_sampled_subgraph only has to perform slices over the returned
@@ -238,6 +245,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   auto in_degree_and_sliced_indptr = SliceCSCIndptr(indptr, seeds);
   auto in_degree = std::get<0>(in_degree_and_sliced_indptr);
   auto sliced_indptr = std::get<1>(in_degree_and_sliced_indptr);
+  const auto homo_in_degree = in_degree;
+  const auto homo_sliced_indptr = sliced_indptr;
   auto max_in_degree = torch::empty(
       1,
       c10::TensorOptions().dtype(in_degree.scalar_type()).pinned_memory(true));
@@ -287,6 +296,94 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   if (seeds.has_value() && !probs_or_mask.has_value() && fanouts.size() <= 1) {
     sub_indptr = ExclusiveCumSum(in_degree);
   }
+  torch::optional<torch::Tensor> homo_coo_rows;
+  if (seeds_timestamp.has_value()) {
+    // Temporal sampling is enabled.
+    const auto homo_sub_indptr =
+        fanouts.size() > 1 ? ExclusiveCumSum(homo_in_degree) : sub_indptr;
+    homo_coo_rows = ExpandIndptrImpl(
+        homo_sub_indptr, indices.scalar_type(), torch::nullopt, num_edges);
+    num_edges = homo_coo_rows->size(0);
+    const auto is_probs_initialized = sliced_probs_or_mask.has_value();
+    if (!is_probs_initialized) {
+      sliced_probs_or_mask =
+          torch::empty(*num_edges, sub_indptr.options().dtype(torch::kBool));
+    }
+    GRAPHBOLT_DISPATCH_ALL_TYPES(
+        sliced_probs_or_mask->scalar_type(),
+        "SampleNeighborsTemporalProbsOrMask", ([&] {
+          const scalar_t* input_probs_ptr =
+              is_probs_initialized ? sliced_probs_or_mask->data_ptr<scalar_t>()
+                                   : nullptr;
+          auto output_probs_ptr = sliced_probs_or_mask->data_ptr<scalar_t>();
+          using timestamp_t = int64_t;
+          const auto seeds_timestamp_ptr =
+              seeds_timestamp->data_ptr<timestamp_t>();
+          const timestamp_t* seeds_pre_time_window_ptr =
+              seeds_pre_time_window.has_value()
+                  ? seeds_pre_time_window->data_ptr<timestamp_t>()
+                  : nullptr;
+          const timestamp_t* node_timestamp_ptr =
+              node_timestamp.has_value()
+                  ? node_timestamp->data_ptr<timestamp_t>()
+                  : nullptr;
+          const timestamp_t* edge_timestamp_ptr =
+              edge_timestamp.has_value()
+                  ? edge_timestamp->data_ptr<timestamp_t>()
+                  : nullptr;
+          AT_DISPATCH_INDEX_TYPES(
+              homo_coo_rows->scalar_type(),
+              "SampleNeighborsTemporalMaskIndices", ([&] {
+                const auto coo_rows_ptr = homo_coo_rows->data_ptr<index_t>();
+                const auto indices_ptr = indices.data_ptr<index_t>();
+                AT_DISPATCH_INDEX_TYPES(
+                    homo_sliced_indptr.scalar_type(),
+                    "SampleNeighborsTemporalMaskIndptr", ([&] {
+                      const auto sliced_indptr_data =
+                          homo_sliced_indptr.data_ptr<index_t>();
+                      const auto sub_indptr_data =
+                          homo_sub_indptr.data_ptr<index_t>();
+                      CUB_CALL(
+                          DeviceFor::Bulk, *num_edges,
+                          [=] __device__(int64_t i) {
+                            const auto row = coo_rows_ptr[i];
+                            const auto seed_timestamp =
+                                seeds_timestamp_ptr[row];
+                            const auto row_offset = i - sub_indptr_data[row];
+                            const auto in_idx =
+                                sliced_indptr_data[row] + row_offset;
+                            bool mask = true;
+                            if (node_timestamp_ptr) {
+                              const auto index = indices_ptr[in_idx];
+                              const auto neighbor_timestamp =
+                                  node_timestamp_ptr[index];
+                              mask &= neighbor_timestamp < seed_timestamp;
+                              if (seeds_pre_time_window_ptr) {
+                                mask &= neighbor_timestamp >
+                                        seed_timestamp -
+                                            seeds_pre_time_window_ptr[row];
+                              }
+                            }
+                            if (edge_timestamp_ptr) {
+                              const auto edge_timestamp =
+                                  edge_timestamp_ptr[in_idx];
+                              mask &= edge_timestamp < seed_timestamp;
+                              if (seeds_pre_time_window_ptr) {
+                                mask &= edge_timestamp >
+                                        seed_timestamp -
+                                            seeds_pre_time_window_ptr[row];
+                              }
+                            }
+                            const scalar_t prob = input_probs_ptr
+                                                      ? input_probs_ptr[i]
+                                                      : scalar_t{1};
+                            output_probs_ptr[i] =
+                                prob * static_cast<scalar_t>(mask);
+                          });
+                    }));
+              }));
+        }));
+  }
   const continuous_seed random_seed = [&] {
     if (random_seed_tensor.has_value()) {
       return continuous_seed(random_seed_tensor.value(), seed2_contribution);
@@ -302,14 +399,14 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
   AT_DISPATCH_INDEX_TYPES(
       indptr.scalar_type(), "SampleNeighborsIndptr", ([&] {
         using indptr_t = index_t;
-        if (probs_or_mask.has_value()) {  // Count nonzero probs into in_degree.
+        if (sliced_probs_or_mask.has_value()) {
+          // Count nonzero probs into in_degree.
           GRAPHBOLT_DISPATCH_ALL_TYPES(
-              probs_or_mask.value().scalar_type(),
+              sliced_probs_or_mask->scalar_type(),
               "SampleNeighborsPositiveProbs", ([&] {
                 using probs_t = scalar_t;
                 auto is_nonzero = thrust::make_transform_iterator(
-                    sliced_probs_or_mask.value().data_ptr<probs_t>(),
-                    IsPositive{});
+                    sliced_probs_or_mask->data_ptr<probs_t>(), IsPositive{});
                 CUB_CALL(
                     DeviceSegmentedReduce::Sum, is_nonzero,
                     in_degree.data_ptr<indptr_t>(), num_rows,
@@ -333,9 +430,14 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
 
         // This operation is placed after num_sampled_edges copy is started to
         // hide the latency of copy synchronization later.
-        auto coo_rows = ExpandIndptrImpl(
-            sub_indptr, indices.scalar_type(), torch::nullopt, num_edges);
-        num_edges = coo_rows.size(0);
+        torch::Tensor coo_rows;
+        if (!homo_coo_rows.has_value() || fanouts.size() > 1) {
+          coo_rows = ExpandIndptrImpl(
+              sub_indptr, indices.scalar_type(), torch::nullopt, num_edges);
+          num_edges = coo_rows.size(0);
+        } else {
+          coo_rows = *homo_coo_rows;
+        }
 
         // Find the smallest integer type to store the edge id offsets. We synch
         // the CUDAEvent so that the access is safe.
@@ -343,7 +445,7 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
           max_in_degree_event.synchronize();
           return cuda::NumberOfBits(max_in_degree.data_ptr<indptr_t>()[0]);
         };
-        if (layer || probs_or_mask.has_value()) {
+        if (layer || sliced_probs_or_mask.has_value()) {
           const int num_bits = compute_num_bits();
           std::array<int, 4> type_bits = {8, 16, 32, 64};
           const auto type_index =
@@ -374,9 +476,9 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                     indices.scalar_type(), "SampleNeighborsIndices", ([&] {
                       using indices_t = index_t;
                       auto probs_or_mask_scalar_type = torch::kFloat32;
-                      if (probs_or_mask.has_value()) {
+                      if (sliced_probs_or_mask.has_value()) {
                         probs_or_mask_scalar_type =
-                            probs_or_mask.value().scalar_type();
+                            sliced_probs_or_mask->scalar_type();
                       }
                       GRAPHBOLT_DISPATCH_ALL_TYPES(
                           probs_or_mask_scalar_type, "SampleNeighborsProbs",
@@ -384,8 +486,8 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                             using probs_t = scalar_t;
                             probs_t* sliced_probs_ptr = nullptr;
                             if (sliced_probs_or_mask.has_value()) {
-                              sliced_probs_ptr = sliced_probs_or_mask.value()
-                                                     .data_ptr<probs_t>();
+                              sliced_probs_ptr =
+                                  sliced_probs_or_mask->data_ptr<probs_t>();
                             }
                             const indices_t* indices_ptr =
                                 layer ? indices.data_ptr<indices_t>() : nullptr;

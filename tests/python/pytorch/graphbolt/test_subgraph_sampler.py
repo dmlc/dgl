@@ -14,14 +14,6 @@ import torch
 from . import gb_test_utils
 
 
-# Skip all tests on GPU when sampling with TemporalNeighborSampler.
-def _check_sampler_type(sampler_type):
-    if F._default_context_str != "cpu" and _is_temporal(sampler_type):
-        pytest.skip(
-            "TemporalNeighborSampler sampling tests are only supported on CPU."
-        )
-
-
 def _check_sampler_len(sampler, lenExp):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
@@ -199,7 +191,6 @@ def test_NeighborSampler_fanouts(labor):
     ],
 )
 def test_SubgraphSampler_Node(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
@@ -231,7 +222,6 @@ def test_SubgraphSampler_Node(sampler_type):
     ],
 )
 def test_SubgraphSampler_Link(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
@@ -268,7 +258,6 @@ def test_SubgraphSampler_Link(sampler_type):
     ],
 )
 def test_SubgraphSampler_Link_With_Negative(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
@@ -302,7 +291,6 @@ def test_SubgraphSampler_Link_With_Negative(sampler_type):
     ],
 )
 def test_SubgraphSampler_HyperLink(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True).to(
         F.ctx()
     )
@@ -339,7 +327,6 @@ def test_SubgraphSampler_HyperLink(sampler_type):
     ],
 )
 def test_SubgraphSampler_Node_Hetero(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(3)
     names = "seeds"
@@ -375,7 +362,6 @@ def test_SubgraphSampler_Node_Hetero(sampler_type):
     ],
 )
 def test_SubgraphSampler_Link_Hetero(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
     first_names = "seeds"
@@ -435,7 +421,6 @@ def test_SubgraphSampler_Link_Hetero(sampler_type):
     ],
 )
 def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
     first_names = "seeds"
@@ -485,7 +470,6 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(sampler_type):
     ],
 )
 def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
     first_names = "seeds"
@@ -535,7 +519,6 @@ def test_SubgraphSampler_Link_Hetero_Unknown_Etype(sampler_type):
     ],
 )
 def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     first_items = torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T
     first_names = "seeds"
@@ -586,7 +569,6 @@ def test_SubgraphSampler_Link_Hetero_With_Negative_Unknown_Etype(sampler_type):
     ],
 )
 def test_SubgraphSampler_HyperLink_Hetero(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.LongTensor([[2, 0, 1, 1, 2], [0, 1, 1, 0, 0]])
     names = "seeds"
@@ -646,7 +628,6 @@ def test_SubgraphSampler_HyperLink_Hetero(sampler_type):
     [False, True],
 )
 def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
-    _check_sampler_type(sampler_type)
     if F._default_context_str == "gpu" and replace == True:
         pytest.skip("Sampling with replacement not yet supported on GPU.")
     num_nodes = 5
@@ -748,7 +729,6 @@ def test_SubgraphSampler_Random_Hetero_Graph(sampler_type, replace):
     ],
 )
 def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
     )
@@ -758,10 +738,14 @@ def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
     names = "seeds"
     if _is_temporal(sampler_type):
         graph.node_attributes = {
-            "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.csc_indptr.numel() - 1, dtype=torch.int64
+            ).to(F.ctx())
         }
         graph.edge_attributes = {
-            "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.indices.numel(), dtype=torch.int64
+            ).to(F.ctx())
         }
         items = (items, torch.randint(1, 10, (3,)))
         names = (names, "timestamp")
@@ -822,16 +806,19 @@ def test_SubgraphSampler_without_deduplication_Homo_Node(sampler_type):
     ],
 )
 def test_SubgraphSampler_without_deduplication_Hetero_Node(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2)
     names = "seeds"
     if _is_temporal(sampler_type):
         graph.node_attributes = {
-            "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.csc_indptr.numel() - 1, dtype=torch.int64, device=F.ctx()
+            )
         }
         graph.edge_attributes = {
-            "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.indices.numel(), dtype=torch.int64, device=F.ctx()
+            )
         }
         items = (items, torch.randint(1, 10, (2,)))
         names = (names, "timestamp")
@@ -1084,7 +1071,6 @@ def test_SubgraphSampler_unique_csc_format_Hetero_Node(labor):
     ],
 )
 def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items_n1 = torch.tensor([0])
     items_n2 = torch.tensor([1])
@@ -1160,7 +1146,6 @@ def test_SubgraphSampler_Hetero_multifanout_per_layer(sampler_type):
     ],
 )
 def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
     )
@@ -1170,10 +1155,14 @@ def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
     names = "seeds"
     if _is_temporal(sampler_type):
         graph.node_attributes = {
-            "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.csc_indptr.numel() - 1, dtype=torch.int64
+            ).to(F.ctx())
         }
         graph.edge_attributes = {
-            "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.indices.numel(), dtype=torch.int64
+            ).to(F.ctx())
         }
         items = (items, torch.randint(1, 10, (2,)))
         names = (names, "timestamp")
@@ -1227,16 +1216,19 @@ def test_SubgraphSampler_without_deduplication_Homo_Link(sampler_type):
     ],
 )
 def test_SubgraphSampler_without_deduplication_Hetero_Link(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(2).view(1, 2)
     names = "seeds"
     if _is_temporal(sampler_type):
         graph.node_attributes = {
-            "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.csc_indptr.numel() - 1, dtype=torch.int64
+            ).to(F.ctx())
         }
         graph.edge_attributes = {
-            "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.indices.numel(), dtype=torch.int64
+            ).to(F.ctx())
         }
         items = (items, torch.randint(1, 10, (1,)))
         names = (names, "timestamp")
@@ -1542,7 +1534,6 @@ def test_SubgraphSampler_unique_csc_format_Hetero_Link(labor):
     ],
 )
 def test_SubgraphSampler_without_deduplication_Homo_HyperLink(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = dgl.graph(
         ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
     )
@@ -1551,10 +1542,14 @@ def test_SubgraphSampler_without_deduplication_Homo_HyperLink(sampler_type):
     names = "seeds"
     if _is_temporal(sampler_type):
         graph.node_attributes = {
-            "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.csc_indptr.numel() - 1, dtype=torch.int64
+            ).to(F.ctx())
         }
         graph.edge_attributes = {
-            "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.indices.numel(), dtype=torch.int64
+            ).to(F.ctx())
         }
         items = (items, torch.randint(1, 10, (2,)))
         names = (names, "timestamp")
@@ -1608,16 +1603,19 @@ def test_SubgraphSampler_without_deduplication_Homo_HyperLink(sampler_type):
     ],
 )
 def test_SubgraphSampler_without_deduplication_Hetero_HyperLink(sampler_type):
-    _check_sampler_type(sampler_type)
     graph = get_hetero_graph().to(F.ctx())
     items = torch.arange(3).view(1, 3)
     names = "seeds"
     if _is_temporal(sampler_type):
         graph.node_attributes = {
-            "timestamp": torch.zeros(graph.csc_indptr.numel() - 1).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.csc_indptr.numel() - 1, dtype=torch.int64
+            ).to(F.ctx())
         }
         graph.edge_attributes = {
-            "timestamp": torch.zeros(graph.indices.numel()).to(F.ctx())
+            "timestamp": torch.zeros(
+                graph.indices.numel(), dtype=torch.int64
+            ).to(F.ctx())
         }
         items = (items, torch.randint(1, 10, (1,)))
         names = (names, "timestamp")

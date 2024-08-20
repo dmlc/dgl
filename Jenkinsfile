@@ -162,7 +162,7 @@ def is_authorized(name) {
     'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
     'TristonC', 'mfbalin',
     'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
-    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
+    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit', 'CfromBU',
     // Emeritus:
     'VoVAllen',
   ]
