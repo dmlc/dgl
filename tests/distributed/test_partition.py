@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 import torch as th
 from dgl import function as fn
+from dgl.base import NTYPE
 from dgl.distributed import (
     dgl_partition_to_graphbolt,
     load_partition,
@@ -17,7 +18,6 @@ from dgl.distributed import (
     load_partition_feats,
     partition_graph,
 )
-from dgl.base import NTYPE
 from dgl.distributed.graph_partition_book import (
     _etype_str_to_tuple,
     _etype_tuple_to_str,
@@ -1819,6 +1819,3 @@ def test_partition_graph_graphbolt_hetero_find_edges_multi(
         graph_formats="coo",
         n_jobs=4,
     )
-
-if __name__=='__main__':
-    test_partition_graph_graphbolt_hetero('random',4,False)
