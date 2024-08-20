@@ -3,14 +3,12 @@ from functools import partial
 
 import backend as F
 
-import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
-from dgl.graphbolt.dataloader import construct_gpu_graph_cache
 
 
-def get_hetero_graph():
+def get_hetero_graph(include_original_edge_ids):
     # COO graph:
     # [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
     # [2, 4, 2, 3, 0, 1, 1, 0, 0, 1]
@@ -27,6 +25,10 @@ def get_hetero_graph():
         ),
         "mask": torch.BoolTensor([1, 0, 1, 0, 1, 1, 1, 0, 1, 1]),
     }
+    if include_original_edge_ids:
+        edge_attributes[gb.ORIGINAL_EDGE_ID] = (
+            torch.arange(indices.size(0), 0, -1) - 1
+        )
     node_type_offset = torch.LongTensor([0, 1, 3, 6])
     return gb.fused_csc_sampling_graph(
         indptr,
@@ -45,8 +47,9 @@ def get_hetero_graph():
 @pytest.mark.parametrize("sorted", [False, True])
 @pytest.mark.parametrize("num_cached_edges", [0, 10])
 @pytest.mark.parametrize("is_pinned", [False, True])
+@pytest.mark.parametrize("has_orig_edge_ids", [False, True])
 def test_NeighborSampler_GraphFetch(
-    hetero, prob_name, sorted, num_cached_edges, is_pinned
+    hetero, prob_name, sorted, num_cached_edges, is_pinned, has_orig_edge_ids
 ):
     if sorted:
         items = torch.arange(3)
@@ -54,7 +57,7 @@ def test_NeighborSampler_GraphFetch(
         items = torch.tensor([2, 0, 1])
     names = "seeds"
     itemset = gb.ItemSet(items, names=names)
-    graph = get_hetero_graph()
+    graph = get_hetero_graph(has_orig_edge_ids)
     graph = graph.pin_memory_() if is_pinned else graph.to(F.ctx())
     if hetero:
         itemset = gb.HeteroItemSet({"n3": itemset})
@@ -72,21 +75,11 @@ def test_NeighborSampler_GraphFetch(
     compact_per_layer = sample_per_layer.compact_per_layer(True)
     gb.seed(123)
     expected_results = list(compact_per_layer)
-    gpu_graph_cache = None
     if num_cached_edges > 0:
-        gpu_graph_cache = construct_gpu_graph_cache(
-            sample_per_layer, num_cached_edges, 1
-        )
-    datapipe = gb.FetchInsubgraphData(
-        datapipe,
-        sample_per_layer,
-        gpu_graph_cache,
+        graph._initialize_gpu_graph_cache(num_cached_edges, 1, prob_name)
+    datapipe = datapipe.sample_per_layer(
+        graph.sample_neighbors, fanout, False, prob_name, True
     )
-    if num_cached_edges > 0:
-        datapipe = gb.CombineCachedAndFetchedInSubgraph(
-            datapipe, sample_per_layer
-        )
-    datapipe = gb.SamplePerLayerFromFetchedSubgraph(datapipe, sample_per_layer)
     datapipe = datapipe.compact_per_layer(True)
     gb.seed(123)
     new_results = list(datapipe)
@@ -99,10 +92,10 @@ def test_NeighborSampler_GraphFetch(
         return minibatch
 
     datapipe = item_sampler.sample_neighbor(
-        graph, [fanout], False, prob_name=prob_name
+        graph, [fanout], False, prob_name=prob_name, overlap_fetch=True
     )
     datapipe = datapipe.transform(remove_input_nodes)
-    dataloader = gb.DataLoader(datapipe, overlap_graph_fetch=True)
+    dataloader = gb.DataLoader(datapipe)
     gb.seed(123)
     new_results = list(dataloader)
     assert len(expected_results) == len(new_results)
@@ -113,6 +106,8 @@ def test_NeighborSampler_GraphFetch(
 @pytest.mark.parametrize("layer_dependency", [False, True])
 @pytest.mark.parametrize("overlap_graph_fetch", [False, True])
 def test_labor_dependent_minibatching(layer_dependency, overlap_graph_fetch):
+    if F._default_context_str != "gpu" and overlap_graph_fetch:
+        pytest.skip("overlap_graph_fetch is only available for GPU.")
     num_edges = 200
     csc_indptr = torch.cat(
         (
@@ -133,12 +128,11 @@ def test_labor_dependent_minibatching(layer_dependency, overlap_graph_fetch):
     datapipe = datapipe.sample_layer_neighbor(
         graph,
         fanouts,
+        overlap_fetch=overlap_graph_fetch,
         layer_dependency=layer_dependency,
         batch_dependency=batch_dependency,
     )
-    dataloader = gb.DataLoader(
-        datapipe, overlap_graph_fetch=overlap_graph_fetch
-    )
+    dataloader = gb.DataLoader(datapipe)
     res = list(dataloader)
     assert len(res) == batch_dependency + 1
     if layer_dependency:

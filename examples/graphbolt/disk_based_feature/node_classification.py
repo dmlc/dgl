@@ -115,7 +115,10 @@ def create_dataloader(
         else {}
     )
     datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1], **kwargs
+        graph,
+        fanout if job != "infer" else [-1],
+        overlap_fetch=args.overlap_graph_fetch,
+        **kwargs,
     )
     # Copy the data to the specified device.
     if args.feature_device != "cpu":
@@ -130,11 +133,7 @@ def create_dataloader(
     if args.feature_device == "cpu":
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
-    return gb.DataLoader(
-        datapipe,
-        num_workers=args.num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
-    )
+    return gb.DataLoader(datapipe, num_workers=args.num_workers)
 
 
 def train_step(minibatch, optimizer, model, loss_fn):
@@ -404,11 +403,7 @@ def main():
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
     args.overlap_feature_fetch = args.feature_device == "pinned"
-    # For now, only sample_layer_neighbor is faster with this option
-    args.overlap_graph_fetch = (
-        args.sample_mode == "sample_layer_neighbor"
-        and args.graph_device == "pinned"
-    )
+    args.overlap_graph_fetch = args.graph_device == "pinned"
 
     """
     Load and preprocess on-disk dataset.
@@ -469,7 +464,7 @@ def main():
             args.feature_device == "pinned",
         )
         cpu_cached_feature = features[("node", None, "feat")]
-        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature._feature.miss_rate
+        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
 
@@ -484,7 +479,7 @@ def main():
             int(args.gpu_cache_size_in_gigabytes * 1024 * 1024 * 1024),
         )
         gpu_cached_feature = features[("node", None, "feat")]
-        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature._feature.miss_rate
+        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature.miss_rate
     else:
         gpu_cache_miss_rate_fn = lambda: 1
 

@@ -23,16 +23,25 @@
 #include <ATen/Parallel.h>
 #include <torch/script.h>
 
-#include <atomic>
-#include <exception>
 #include <future>
 #include <memory>
 #include <mutex>
-#include <type_traits>
+#include <variant>
 
 #ifdef BUILD_WITH_TASKFLOW
 #include <taskflow/algorithm/for_each.hpp>
 #include <taskflow/taskflow.hpp>
+#else
+#include <atomic>
+#include <exception>
+#include <type_traits>
+#endif
+
+#ifdef GRAPHBOLT_USE_CUDA
+#include <ATen/cuda/CUDAEvent.h>
+#include <c10/cuda/CUDAGuard.h>
+#include <c10/cuda/CUDAStream.h>
+#include <torch/csrc/api/include/torch/cuda.h>
 #endif
 
 namespace graphbolt {
@@ -85,15 +94,50 @@ inline int get_num_interop_threads() {
 
 template <typename T>
 class Future : public torch::CustomClassHolder {
+#ifdef GRAPHBOLT_USE_CUDA
+  using T_no_event = std::conditional_t<std::is_void_v<T>, std::monostate, T>;
+  using T_with_event = std::conditional_t<
+      std::is_void_v<T>, at::cuda::CUDAEvent,
+      std::pair<T, at::cuda::CUDAEvent>>;
+  using future_type = std::future<std::variant<T_no_event, T_with_event>>;
+#else
+  using future_type = std::future<T>;
+#endif
+
  public:
-  Future(std::future<T>&& future) : future_(std::move(future)) {}
+#ifdef GRAPHBOLT_USE_CUDA
+  using return_type = std::variant<T_no_event, T_with_event>;
+#else
+  using return_type = T;
+#endif
+
+  Future(future_type&& future) : future_(std::move(future)) {}
 
   Future() = default;
 
-  T Wait() { return future_.get(); }
+  T Wait() {
+#ifdef GRAPHBOLT_USE_CUDA
+    auto result = future_.get();
+    if constexpr (std::is_void_v<T>) {
+      if (std::holds_alternative<T_with_event>(result)) {
+        auto&& event = std::get<T_with_event>(result);
+        event.block(c10::cuda::getCurrentCUDAStream());
+      }
+      return;
+    } else if (std::holds_alternative<T_with_event>(result)) {
+      auto&& [value, event] = std::get<T_with_event>(result);
+      event.block(c10::cuda::getCurrentCUDAStream());
+      return value;
+    } else {
+      return std::get<T_no_event>(result);
+    }
+#else
+    return future_.get();
+#endif
+  }
 
  private:
-  std::future<T> future_;
+  future_type future_;
 };
 
 /**
@@ -102,15 +146,55 @@ class Future : public torch::CustomClassHolder {
  * task to avoid spawning a new OpenMP threadpool on each interop thread.
  */
 template <typename F>
-inline auto async(F&& function) {
+inline auto async(F&& function, bool is_cuda = false) {
   using T = decltype(function());
-#ifdef BUILD_WITH_TASKFLOW
-  auto future = interop_pool().async(std::move(function));
-#else
-  auto promise = std::make_shared<std::promise<T>>();
-  auto future = promise->get_future();
-  at::launch([promise, func = std::move(function)]() {
+#ifdef GRAPHBOLT_USE_CUDA
+  struct c10::StreamData3 stream_data;
+  if (is_cuda) {
+    stream_data = c10::cuda::getCurrentCUDAStream().pack3();
+  }
+#endif
+  using return_type = typename Future<T>::return_type;
+  auto fn = [=, func = std::move(function)]() -> return_type {
+#ifdef GRAPHBOLT_USE_CUDA
+    // We make sure to use the same CUDA stream as the thread launching the
+    // async operation.
+    if (is_cuda) {
+      auto stream = c10::cuda::CUDAStream::unpack3(
+          stream_data.stream_id, stream_data.device_index,
+          stream_data.device_type);
+      c10::cuda::CUDAStreamGuard guard(stream);
+      at::cuda::CUDAEvent event;
+      // Might be executed on the GPU so we record an event to be able to
+      // synchronize with it later, in case it is executed on an alternative
+      // CUDA stream.
+      if constexpr (std::is_void_v<T>) {
+        func();
+        event.record();
+        return event;
+      } else {
+        auto result = func();
+        event.record();
+        return std::make_pair(std::move(result), std::move(event));
+      }
+    }
     if constexpr (std::is_void_v<T>) {
+      func();
+      return std::monostate{};
+    } else {
+      return func();
+    }
+#else
+    return func();
+#endif
+  };
+#ifdef BUILD_WITH_TASKFLOW
+  auto future = interop_pool().async(std::move(fn));
+#else
+  auto promise = std::make_shared<std::promise<return_type>>();
+  auto future = promise->get_future();
+  at::launch([promise, func = std::move(fn)]() {
+    if constexpr (std::is_void_v<return_type>) {
       func();
       promise->set_value();
     } else

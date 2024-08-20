@@ -21,6 +21,7 @@
 #ifndef GRAPHBOLT_GPU_CACHE_H_
 #define GRAPHBOLT_GPU_CACHE_H_
 
+#include <graphbolt/async.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
@@ -51,6 +52,9 @@ class GpuCache : public torch::CustomClassHolder {
   GpuCache() = default;
 
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Query(
+      torch::Tensor keys);
+
+  c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> QueryAsync(
       torch::Tensor keys);
 
   void Replace(torch::Tensor keys, torch::Tensor values);
