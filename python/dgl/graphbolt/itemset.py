@@ -177,8 +177,8 @@ class ItemSet:
                         f"{type(self).__name__} index out of range."
                     )
                 return torch.tensor(index, dtype=dtype)
-            elif isinstance(index, Iterable):
-                return index.type(dtype).clone().detach()
+            elif isinstance(index, torch.Tensor):
+                return index.to(dtype)
             else:
                 raise TypeError(
                     f"{type(self).__name__} indices must be int, slice, or "
