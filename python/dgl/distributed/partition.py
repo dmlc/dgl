@@ -88,7 +88,7 @@ def _dump_part_config(part_config, part_metadata):
         json.dump(part_metadata, outfile, sort_keys=False, indent=4)
 
 
-def _process_graphs(g_list, formats=None, sort_etypes=False):
+def _process_partitions(g_list, formats=None, sort_etypes=False):
     """Preprocess partitions before saving:
     1. format data types.
     2. sort csc/csr by tag.
@@ -110,7 +110,9 @@ def _process_graphs(g_list, formats=None, sort_etypes=False):
 
 
 def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
-    g_list = _process_graphs(g_list, formats=formats, sort_etypes=sort_etypes)
+    g_list = _process_partitions(
+        g_list, formats=formats, sort_etypes=sort_etypes
+    )
     save_graphs(filename, g_list, formats=formats)
 
 
@@ -471,7 +473,106 @@ def load_partition_feats(
     return node_feats, edge_feats
 
 
-def load_partition_book(part_config, part_id, part_metadata=None):
+def _load_partition_book_from_metadata(part_metadata, part_id):
+    assert "num_parts" in part_metadata, "num_parts does not exist."
+    assert (
+        part_metadata["num_parts"] > part_id
+    ), "part {} is out of range (#parts: {})".format(
+        part_id, part_metadata["num_parts"]
+    )
+    num_parts = part_metadata["num_parts"]
+    assert (
+        "num_nodes" in part_metadata
+    ), "cannot get the number of nodes of the global graph."
+    assert (
+        "num_edges" in part_metadata
+    ), "cannot get the number of edges of the global graph."
+    assert "node_map" in part_metadata, "cannot get the node map."
+    assert "edge_map" in part_metadata, "cannot get the edge map."
+    assert "graph_name" in part_metadata, "cannot get the graph name"
+
+    # If this is a range partitioning, node_map actually stores a list, whose elements
+    # indicate the boundary of range partitioning. Otherwise, node_map stores a filename
+    # that contains node map in a NumPy array.
+    node_map = part_metadata["node_map"]
+    edge_map = part_metadata["edge_map"]
+    if isinstance(node_map, dict):
+        for key in node_map:
+            is_range_part = isinstance(node_map[key], list)
+            break
+    elif isinstance(node_map, list):
+        is_range_part = True
+        node_map = {DEFAULT_NTYPE: node_map}
+    else:
+        is_range_part = False
+    if isinstance(edge_map, list):
+        edge_map = {DEFAULT_ETYPE: edge_map}
+
+    ntypes = {DEFAULT_NTYPE: 0}
+    etypes = {DEFAULT_ETYPE: 0}
+    if "ntypes" in part_metadata:
+        ntypes = part_metadata["ntypes"]
+    if "etypes" in part_metadata:
+        etypes = part_metadata["etypes"]
+
+    if isinstance(node_map, dict):
+        for key in node_map:
+            assert key in ntypes, "The node type {} is invalid".format(key)
+    if isinstance(edge_map, dict):
+        for key in edge_map:
+            assert key in etypes, "The edge type {} is invalid".format(key)
+
+    if not is_range_part:
+        raise TypeError("Only RangePartitionBook is supported currently.")
+
+    node_map = _get_part_ranges(node_map)
+    edge_map = _get_part_ranges(edge_map)
+
+    # Format dtype of node/edge map if dtype is specified.
+    def _format_node_edge_map(part_metadata, map_type, data):
+        key = f"{map_type}_map_dtype"
+        if key not in part_metadata:
+            return data
+        dtype = part_metadata[key]
+        assert dtype in ["int32", "int64"], (
+            f"The {map_type} map dtype should be either int32 or int64, "
+            f"but got {dtype}."
+        )
+        for key in data:
+            data[key] = data[key].astype(dtype)
+        return data
+
+    node_map = _format_node_edge_map(part_metadata, "node", node_map)
+    edge_map = _format_node_edge_map(part_metadata, "edge", edge_map)
+
+    # Sort the node/edge maps by the node/edge type ID.
+    node_map = dict(sorted(node_map.items(), key=lambda x: ntypes[x[0]]))
+    edge_map = dict(sorted(edge_map.items(), key=lambda x: etypes[x[0]]))
+
+    def _assert_is_sorted(id_map):
+        id_ranges = np.array(list(id_map.values()))
+        ids = []
+        for i in range(num_parts):
+            ids.append(id_ranges[:, i, :])
+        ids = np.array(ids).flatten()
+        assert np.all(
+            ids[:-1] <= ids[1:]
+        ), f"The node/edge map is not sorted: {ids}"
+
+    _assert_is_sorted(node_map)
+    _assert_is_sorted(edge_map)
+
+    return (
+        RangePartitionBook(
+            part_id, num_parts, node_map, edge_map, ntypes, etypes
+        ),
+        part_metadata["graph_name"],
+        ntypes,
+        etypes,
+    )
+
+
+def load_partition_book(part_config, part_id):
     """Load a graph partition book from the partition config file.
 
     Parameters
@@ -492,8 +593,7 @@ def load_partition_book(part_config, part_id, part_metadata=None):
     dict
         The edge types
     """
-    if part_metadata is None:
-        part_metadata = _load_part_config(part_config)
+    part_metadata = _load_part_config(part_config)
     assert "num_parts" in part_metadata, "num_parts does not exist."
     assert (
         part_metadata["num_parts"] > part_id
@@ -1338,32 +1438,29 @@ def partition_graph(
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
 
-        if use_graphbolt:
-            part_metadata["part-{}".format(part_id)] = {
-                "node_feats": os.path.relpath(node_feat_file, out_path),
-                "edge_feats": os.path.relpath(edge_feat_file, out_path),
-            }
-            sort_etypes = len(g.etypes) > 1
-            part = _process_graphs([part], graph_formats, sort_etypes)[0]
-        else:
+        part_metadata["part-{}".format(part_id)] = {
+            "node_feats": os.path.relpath(node_feat_file, out_path),
+            "edge_feats": os.path.relpath(edge_feat_file, out_path),
+        }
+        sort_etypes = len(g.etypes) > 1
+        if not use_graphbolt:
             part_graph_file = os.path.join(part_dir, "graph.dgl")
-            part_metadata["part-{}".format(part_id)] = {
-                "node_feats": os.path.relpath(node_feat_file, out_path),
-                "edge_feats": os.path.relpath(edge_feat_file, out_path),
-                "part_graph": os.path.relpath(part_graph_file, out_path),
-            }
-            sort_etypes = len(g.etypes) > 1
+            part_metadata["part-{}".format(part_id)][
+                "part_graph"
+            ] = os.path.relpath(part_graph_file, out_path)
             _save_graphs(
                 part_graph_file,
                 [part],
                 formats=graph_formats,
                 sort_etypes=sort_etypes,
             )
+        else:
+            part = _process_partitions([part], graph_formats, sort_etypes)[0]
 
     part_config = os.path.join(out_path, graph_name + ".json")
     if use_graphbolt:
         kwargs["graph_formats"] = graph_formats
-        dgl_partition_to_graphbolt(
+        _dgl_partition_to_graphbolt(
             part_config,
             parts=parts,
             part_meta=part_metadata,
@@ -1433,7 +1530,7 @@ def init_type_per_edge(graph, gpb):
     return etype_ids
 
 
-def load_parts(part_config, part_id, parts):
+def _load_parts(part_config, part_id, parts):
     """load parts from variable or dist."""
     if parts is None:
         graph, _, _, _, _, _, _ = load_partition(
@@ -1484,10 +1581,12 @@ def gb_convert_single_dgl_partition(
         part_meta = _load_part_config(part_config)
     num_parts = part_meta["num_parts"]
 
-    graph = load_parts(part_config, part_id, parts)
+    graph = _load_parts(part_config, part_id, parts)
 
-    gpb, _, ntypes, etypes = load_partition_book(
-        part_config, part_id, part_meta
+    gpb, _, ntypes, etypes = (
+        load_partition_book(part_config, part_id)
+        if part_meta is None
+        else _load_partition_book_from_metadata(part_meta, part_id)
     )
 
     is_homo = is_homogeneous(ntypes, etypes)
@@ -1595,12 +1694,12 @@ def gb_convert_single_dgl_partition(
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
     )
-    orig_graph_path = os.path.join(
+    orig_feats_path = os.path.join(
         os.path.dirname(part_config),
         part_meta[f"part-{part_id}"]["node_feats"],
     )
     csc_graph_path = os.path.join(
-        os.path.dirname(orig_graph_path), "fused_csc_sampling_graph.pt"
+        os.path.dirname(orig_feats_path), "fused_csc_sampling_graph.pt"
     )
     torch.save(csc_graph, csc_graph_path)
 
@@ -1608,60 +1707,17 @@ def gb_convert_single_dgl_partition(
     # Update graph path.
 
 
-def dgl_partition_to_graphbolt(
+def convert_partition_to_graphbolt(
+    part_meta,
+    graph_formats,
     part_config,
-    *,
-    store_eids=True,
-    store_inner_node=False,
-    store_inner_edge=False,
-    graph_formats=None,
-    n_jobs=1,
+    store_eids,
+    store_inner_node,
+    store_inner_edge,
+    n_jobs,
+    num_parts,
     parts=None,
-    part_meta=None,
 ):
-    """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
-
-    This API converts `DGLGraph` partitions to `FusedCSCSamplingGraph` which is
-    dedicated for sampling in `GraphBolt`. New graphs will be stored alongside
-    original graph as `fused_csc_sampling_graph.pt`.
-
-    In the near future, partitions are supposed to be saved as
-    `FusedCSCSamplingGraph` directly. At that time, this API should be deprecated.
-
-    Parameters
-    ----------
-    part_config : str
-        The partition configuration JSON file.
-    store_eids : bool, optional
-        Whether to store edge IDs in the new graph. Default: True.
-    store_inner_node : bool, optional
-        Whether to store inner node mask in the new graph. Default: False.
-    store_inner_edge : bool, optional
-        Whether to store inner edge mask in the new graph. Default: False.
-    graph_formats : str or list[str], optional
-        Save partitions in specified formats. It could be any combination of
-        `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
-        it is not necessary to specify this argument. It's mainly for
-        specifying `coo` format to save edge ID mapping and destination node
-        IDs. If not specified, whether to save `coo` format is determined by
-        the availability of the format in DGL partitions. Default: None.
-    n_jobs: int
-        Number of parallel jobs to run during partition conversion. Max parallelism
-        is determined by the partition count.
-    """
-    debug_mode = "DGL_DIST_DEBUG" in os.environ
-    if debug_mode:
-        dgl_warning(
-            "Running in debug mode which means all attributes of DGL partitions"
-            " will be saved to the new format."
-        )
-    if part_meta is None:
-        assert part_config is not None
-        part_meta = _load_part_config(part_config)
-    assert part_meta is not None
-    new_part_meta = copy.deepcopy(part_meta)
-    num_parts = part_meta["num_parts"]
-
     # [Rui] DGL partitions are always saved as homogeneous graphs even though
     # the original graph is heterogeneous. But heterogeneous information like
     # node/edge types are saved as node/edge data alongside with partitions.
@@ -1705,15 +1761,104 @@ def dgl_partition_to_graphbolt(
 
     for part_id in range(num_parts):
         # Update graph path.
-        new_part_meta[f"part-{part_id}"][
+        part_meta[f"part-{part_id}"][
             "part_graph_graphbolt"
         ] = rel_path_results[part_id]
 
     # Save dtype info into partition config.
     # [TODO][Rui] Always use int64_t for node/edge IDs in GraphBolt. See more
     # details in #7175.
-    new_part_meta["node_map_dtype"] = "int64"
-    new_part_meta["edge_map_dtype"] = "int64"
+    part_meta["node_map_dtype"] = "int64"
+    part_meta["edge_map_dtype"] = "int64"
 
-    _dump_part_config(part_config, new_part_meta)
+    _dump_part_config(part_config, part_meta)
     print(f"Converted partitions to GraphBolt format into {part_config}")
+
+def _dgl_partition_to_graphbolt(
+    part_config,
+    part_meta,
+    parts,
+    *,
+    store_eids=True,
+    store_inner_node=False,
+    store_inner_edge=False,
+    graph_formats=None,
+    n_jobs=1,
+):
+    debug_mode = "DGL_DIST_DEBUG" in os.environ
+    if debug_mode:
+        dgl_warning(
+            "Running in debug mode which means all attributes of DGL partitions"
+            " will be saved to the new format."
+        )
+    new_part_meta = copy.deepcopy(part_meta)
+    num_parts = part_meta["num_parts"]
+    convert_partition_to_graphbolt(new_part_meta,
+                                  graph_formats,
+                                  part_config,
+                                  store_eids,
+                                  store_inner_node,
+                                  store_inner_edge,
+                                  n_jobs,
+                                  num_parts,
+                                  parts=parts,
+                                  )
+    
+
+def dgl_partition_to_graphbolt(
+    part_config,
+    *,
+    store_eids=True,
+    store_inner_node=False,
+    store_inner_edge=False,
+    graph_formats=None,
+    n_jobs=1,
+):
+    """Convert partitions of dgl to FusedCSCSamplingGraph of GraphBolt.
+
+    This API converts `DGLGraph` partitions to `FusedCSCSamplingGraph` which is
+    dedicated for sampling in `GraphBolt`. New graphs will be stored alongside
+    original graph as `fused_csc_sampling_graph.pt`.
+
+    In the near future, partitions are supposed to be saved as
+    `FusedCSCSamplingGraph` directly. At that time, this API should be deprecated.
+
+    Parameters
+    ----------
+    part_config : str
+        The partition configuration JSON file.
+    store_eids : bool, optional
+        Whether to store edge IDs in the new graph. Default: True.
+    store_inner_node : bool, optional
+        Whether to store inner node mask in the new graph. Default: False.
+    store_inner_edge : bool, optional
+        Whether to store inner edge mask in the new graph. Default: False.
+    graph_formats : str or list[str], optional
+        Save partitions in specified formats. It could be any combination of
+        `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
+        it is not necessary to specify this argument. It's mainly for
+        specifying `coo` format to save edge ID mapping and destination node
+        IDs. If not specified, whether to save `coo` format is determined by
+        the availability of the format in DGL partitions. Default: None.
+    n_jobs: int
+        Number of parallel jobs to run during partition conversion. Max parallelism
+        is determined by the partition count.
+    """
+    debug_mode = "DGL_DIST_DEBUG" in os.environ
+    if debug_mode:
+        dgl_warning(
+            "Running in debug mode which means all attributes of DGL partitions"
+            " will be saved to the new format."
+        )
+    part_meta = _load_part_config(part_config)
+    new_part_meta = copy.deepcopy(part_meta)
+    num_parts = part_meta["num_parts"]
+    convert_partition_to_graphbolt(new_part_meta,
+                                  graph_formats,
+                                  part_config,
+                                  store_eids,
+                                  store_inner_node,
+                                  store_inner_edge,
+                                  n_jobs,
+                                  num_parts,
+                                  )
