@@ -6,6 +6,7 @@
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
+#include <graphbolt/async.h>
 #include <graphbolt/continuous_seed.h>
 #include <graphbolt/fused_sampled_subgraph.h>
 #include <graphbolt/shared_memory.h>
@@ -362,14 +363,26 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
       torch::optional<torch::Tensor> random_seed,
       double seed2_contribution) const;
 
+  c10::intrusive_ptr<Future<c10::intrusive_ptr<FusedSampledSubgraph>>>
+  SampleNeighborsAsync(
+      torch::optional<torch::Tensor> seeds,
+      torch::optional<std::vector<int64_t>> seed_offsets,
+      const std::vector<int64_t>& fanouts, bool replace, bool layer,
+      bool returning_indices_is_optional,
+      torch::optional<torch::Tensor> probs_or_mask,
+      torch::optional<torch::Tensor> random_seed,
+      double seed2_contribution) const;
+
   /**
    * @brief Sample neighboring edges of the given nodes with a temporal
    * constraint. If `node_timestamp_attr_name` or `edge_timestamp_attr_name` is
    * given, the sampled neighbors or edges of an input node must have a
    * timestamp that is smaller than that of the input node.
    *
-   * @param nodes The nodes from which to sample neighbors.
-   * @param input_nodes_timestamp The timestamp of the nodes.
+   * @param seeds The seeds nodes from which to sample neighbors.
+   * @param seed_offsets The offsets of the given seeds,
+   * seeds[seed_offsets[i]: seed_offsets[i + 1]] has node type id i.
+   * @param seeds_timestamp The timestamp of the nodes.
    * @param fanouts The number of edges to be sampled for each node with or
    * without considering edge types, following the same rules as in
    * SampleNeighbors.
@@ -379,11 +392,13 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @param layer Boolean indicating whether neighbors should be sampled in a
    * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
    * sampled edges, see arXiv:2210.13339.
-   * @param input_nodes_pre_time_window The time window of the nodes represents
-   * a period of time before `input_nodes_timestamp`. If provided, only
+   * @param returning_indices_is_optional Boolean indicating whether returning
+   * indices tensor is optional.
+   * @param seeds_pre_time_window The time window of the seed nodes represents
+   * a period of time before `seeds_timestamp`. If provided, only
    * neighbors and related edges whose timestamps fall within
-   * `[input_nodes_timestamp - input_nodes_pre_time_window,
-   * input_nodes_timestamp]` will be filtered.
+   * `[seeds_timestamp - seeds_pre_time_window, seeds_timestamp]` will be
+   * filtered.
    * @param probs_or_mask An optional edge attribute tensor for probablities
    * or masks, following the same rules as in SampleNeighbors.
    * @param node_timestamp_attr_name An optional string specifying the name of
@@ -396,10 +411,11 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    *
    */
   c10::intrusive_ptr<FusedSampledSubgraph> TemporalSampleNeighbors(
-      const torch::Tensor& input_nodes,
-      const torch::Tensor& input_nodes_timestamp,
-      const std::vector<int64_t>& fanouts, bool replace, bool layer,
-      torch::optional<torch::Tensor> input_nodes_pre_time_window,
+      const torch::optional<torch::Tensor>& seeds,
+      const torch::optional<std::vector<int64_t>>& seed_offsets,
+      const torch::Tensor& seeds_timestamp, const std::vector<int64_t>& fanouts,
+      bool replace, bool layer, bool returning_indices_is_optional,
+      torch::optional<torch::Tensor> seeds_pre_time_window,
       torch::optional<torch::Tensor> probs_or_mask,
       torch::optional<std::string> node_timestamp_attr_name,
       torch::optional<std::string> edge_timestamp_attr_name,
@@ -442,7 +458,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
   template <TemporalOption Temporal, typename NumPickFn, typename PickFn>
   c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& seeds,
-      torch::optional<std::vector<int64_t>>& seed_offsets,
+      const torch::optional<std::vector<int64_t>>& seed_offsets,
       const std::vector<int64_t>& fanouts, NumPickFn num_pick_fn,
       PickFn pick_fn) const;
 

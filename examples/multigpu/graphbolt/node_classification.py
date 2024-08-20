@@ -134,16 +134,17 @@ def create_dataloader(
     ############################################################################
     if args.storage_device != "cpu":
         datapipe = datapipe.copy_to(device)
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph,
+        args.fanout,
+        overlap_fetch=args.storage_device == "pinned",
+        asynchronous=args.storage_device != "cpu",
+    )
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     if args.storage_device == "cpu":
         datapipe = datapipe.copy_to(device)
 
-    dataloader = gb.DataLoader(
-        datapipe,
-        args.num_workers,
-        overlap_graph_fetch=args.storage_device == "pinned",
-    )
+    dataloader = gb.DataLoader(datapipe, args.num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader

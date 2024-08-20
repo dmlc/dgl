@@ -1,6 +1,5 @@
 """Utility functions for sampling."""
 
-import copy
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -125,6 +124,7 @@ def unique_and_compact_csc_formats(
         torch.Tensor,
         Dict[str, torch.Tensor],
     ],
+    async_op: bool = False,
 ):
     """
     Compact csc formats and return unique nodes (per type).
@@ -145,6 +145,9 @@ def unique_and_compact_csc_formats(
         - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
         - If `csc_formats` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
+    async_op: bool
+        Boolean indicating whether the call is asynchronous. If so, the result
+        can be obtained by calling wait on the returned future.
 
     Returns
     -------
@@ -200,8 +203,6 @@ def unique_and_compact_csc_formats(
     indices = {ntype: torch.cat(nodes) for ntype, nodes in indices.items()}
 
     ntypes = set(indices.keys())
-    unique_nodes = {}
-    compacted_indices = {}
     dtype = list(indices.values())[0].dtype
     default_tensor = torch.tensor([], dtype=dtype, device=device)
     indice_list = []
@@ -212,30 +213,56 @@ def unique_and_compact_csc_formats(
     dst_list = [torch.tensor([], dtype=dtype, device=device)] * len(
         unique_dst_list
     )
-    results = torch.ops.graphbolt.unique_and_compact_batched(
-        indice_list, dst_list, unique_dst_list
+    unique_fn = (
+        torch.ops.graphbolt.unique_and_compact_batched_async
+        if async_op
+        else torch.ops.graphbolt.unique_and_compact_batched
     )
-    for i, ntype in enumerate(ntypes):
-        unique_nodes[ntype], compacted_indices[ntype], _ = results[i]
+    results = unique_fn(indice_list, dst_list, unique_dst_list)
 
-    compacted_csc_formats = {}
-    # Map back with the same order.
-    for etype, csc_format in csc_formats.items():
-        num_elem = csc_format.indices.size(0)
-        src_type, _, _ = etype_str_to_tuple(etype)
-        indice = compacted_indices[src_type][:num_elem]
-        indptr = csc_format.indptr
-        compacted_csc_formats[etype] = CSCFormatBase(
-            indptr=indptr, indices=indice
-        )
-        compacted_indices[src_type] = compacted_indices[src_type][num_elem:]
+    class _Waiter:
+        def __init__(self, future, csc_formats):
+            self.future = future
+            self.csc_formats = csc_formats
 
-    # Return singleton for a homogeneous graph.
-    if is_homogeneous:
-        compacted_csc_formats = list(compacted_csc_formats.values())[0]
-        unique_nodes = list(unique_nodes.values())[0]
+        def wait(self):
+            """Returns the stored value when invoked."""
+            results = self.future.wait() if async_op else self.future
+            csc_formats = self.csc_formats
+            # Ensure there is no memory leak.
+            self.future = self.csc_formats = None
 
-    return unique_nodes, compacted_csc_formats
+            unique_nodes = {}
+            compacted_indices = {}
+            for i, ntype in enumerate(ntypes):
+                unique_nodes[ntype], compacted_indices[ntype], _ = results[i]
+
+            compacted_csc_formats = {}
+            # Map back with the same order.
+            for etype, csc_format in csc_formats.items():
+                num_elem = csc_format.indices.size(0)
+                src_type, _, _ = etype_str_to_tuple(etype)
+                indice = compacted_indices[src_type][:num_elem]
+                indptr = csc_format.indptr
+                compacted_csc_formats[etype] = CSCFormatBase(
+                    indptr=indptr, indices=indice
+                )
+                compacted_indices[src_type] = compacted_indices[src_type][
+                    num_elem:
+                ]
+
+            # Return singleton for a homogeneous graph.
+            if is_homogeneous:
+                compacted_csc_formats = list(compacted_csc_formats.values())[0]
+                unique_nodes = list(unique_nodes.values())[0]
+
+            return unique_nodes, compacted_csc_formats
+
+    post_processer = _Waiter(results, csc_formats)
+    if async_op:
+        return post_processer
+    else:
+        return post_processer.wait()
 
 
 def _broadcast_timestamps(csc, dst_timestamps):
@@ -386,9 +413,11 @@ def compact_csc_format(
     else:
         compacted_csc_formats = {}
         src_timestamps = None
-        original_row_ids = copy.deepcopy(dst_nodes)
+        original_row_ids = {key: val.clone() for key, val in dst_nodes.items()}
         if has_timestamp:
-            src_timestamps = copy.deepcopy(dst_timestamps)
+            src_timestamps = {
+                key: val.clone() for key, val in dst_timestamps.items()
+            }
         for etype, csc_format in csc_formats.items():
             src_type, _, dst_type = etype_str_to_tuple(etype)
             assert len(dst_nodes.get(dst_type, [])) + 1 == len(
@@ -429,7 +458,9 @@ def compact_csc_format(
                         src_timestamps.get(
                             src_type,
                             torch.tensor(
-                                [], dtype=dst_timestamps[dst_type].dtype
+                                [],
+                                dtype=dst_timestamps[dst_type].dtype,
+                                device=device,
                             ),
                         ),
                         _broadcast_timestamps(
