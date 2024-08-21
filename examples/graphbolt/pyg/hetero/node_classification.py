@@ -366,7 +366,7 @@ def parse_args():
     parser.add_argument(
         "--lr",
         type=float,
-        default=0.003,
+        default=0.001,
         help="Learning rate for optimization.",
     )
     parser.add_argument(
@@ -383,9 +383,9 @@ def parse_args():
     parser.add_argument(
         "--fanout",
         type=str,
-        default="10,25",
+        default="25,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
-        " identical with the number of layers in your model. Default: ",
+        " identical with the number of layers in your model. Default: 25,10",
     )
     parser.add_argument(
         "--mode",
