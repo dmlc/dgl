@@ -250,8 +250,10 @@ def evaluate(
         total_correct += num_correct
         total_samples += num_samples
         if step % 15 == 0:
+            num_nodes = sum(id.size(0) for id in minibatch.node_ids().values())
             dataloader.set_postfix(
                 {
+                    "num_nodes": num_nodes,
                     "gpu_cache_miss": gpu_cache_miss_rate_fn(),
                     "cpu_cache_miss": cpu_cache_miss_rate_fn(),
                 }
@@ -304,8 +306,10 @@ def train_helper(
         total_samples += num_samples
         if step % 15 == 0:
             # log every 15 steps for performance.
+            num_nodes = sum(id.size(0) for id in minibatch.node_ids().values())
             dataloader.set_postfix(
                 {
+                    "num_nodes": num_nodes,
                     "gpu_cache_miss": gpu_cache_miss_rate_fn(),
                     "cpu_cache_miss": cpu_cache_miss_rate_fn(),
                 }
