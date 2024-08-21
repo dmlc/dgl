@@ -26,13 +26,11 @@ class GPUCachedFeature(Feature):
     fallback_feature : Feature
         The fallback feature.
     cache : GPUFeatureCache
-        Whether a previously constructed GPUFeatureCache instance should be
-        used. This is useful if multiple features should share the same cache
-        instance.
+        A GPUFeatureCache instance to serve as the cache backend.
     offset : int, optional
-        If a valid cache parameter is given, the offset value to use to separate
-        the keys mapping to multiple features. Typically it will be a value from
-        FusedCSCSamplingGraph.node_type_offset.
+        The offset value to add to the given ids before using the cache. This
+        parameter is useful if multiple `GPUCachedFeature`s are sharing a single
+        GPUFeatureCache object.
 
     Examples
     --------
