@@ -369,6 +369,7 @@ def parse_args():
         default=0.001,
         help="Learning rate for optimization.",
     )
+    parser.add_argument("--num-hidden", type=int, default=1024)
     parser.add_argument(
         "--batch-size", type=int, default=1024, help="Batch size for training."
     )
@@ -524,7 +525,7 @@ def main():
     )
 
     feat_size = features.size("node", "paper", "feat")[0]
-    hidden_channels = 256
+    hidden_channels = args.num_hidden
 
     # Initialize the entity classification model.
     model = EntityClassify(
