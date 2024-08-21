@@ -44,8 +44,8 @@ def test_basic_feature_store_homo():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size("node", None, "a") == torch.Size([3])
-    assert feature_store.size("node", None, "b") == torch.Size([2, 2])
+    assert feature_store.size("node", None, "a") == a.size()
+    assert feature_store.size("node", None, "b") == b.size()
 
     # Test get metadata of the feature.
     assert feature_store.metadata("node", None, "a") == metadata
@@ -102,8 +102,8 @@ def test_basic_feature_store_hetero():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size("node", "author", "a") == torch.Size([3])
-    assert feature_store.size("edge", "paper:cites", "b") == torch.Size([2, 1])
+    assert feature_store.size("node", "author", "a") == a.size()
+    assert feature_store.size("edge", "paper:cites", "b") == b.size()
 
     # Test get metadata of the feature.
     assert feature_store.metadata("node", "author", "a") == metadata

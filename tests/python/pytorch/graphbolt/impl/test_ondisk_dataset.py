@@ -2607,8 +2607,8 @@ def test_OnDiskDataset_homogeneous(
         assert tasks[0].metadata["num_classes"] == num_classes
         assert tasks[0].metadata["name"] == "link_prediction"
 
-        assert dataset.feature.size("node", None, "feat")[0] == num_classes
-        assert dataset.feature.size("edge", None, "feat")[0] == num_classes
+        assert dataset.feature.size("node", None, "feat")[1] == num_classes
+        assert dataset.feature.size("edge", None, "feat")[1] == num_classes
 
         for itemset in [
             tasks[0].train_set,
@@ -2695,8 +2695,8 @@ def test_OnDiskDataset_heterogeneous(
         assert tasks[0].metadata["num_classes"] == num_classes
         assert tasks[0].metadata["name"] == "node_classification"
 
-        assert dataset.feature.size("node", "user", "feat")[0] == num_classes
-        assert dataset.feature.size("node", "item", "feat")[0] == num_classes
+        assert dataset.feature.size("node", "user", "feat")[1] == num_classes
+        assert dataset.feature.size("node", "item", "feat")[1] == num_classes
 
         for itemset in [
             tasks[0].train_set,

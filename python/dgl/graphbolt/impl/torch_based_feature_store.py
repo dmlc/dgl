@@ -66,7 +66,7 @@ class TorchBasedFeature(Feature):
     tensor([[0, 1, 2, 3, 4],
             [1, 1, 1, 1, 1]])
     >>> feature.size()
-    torch.Size([5])
+    torch.Size([2, 5])
 
     2. The feature is on disk. Note that you can use gb.numpy_save_aligned as a
     replacement for np.save to potentially get increased performance.
@@ -237,7 +237,7 @@ class TorchBasedFeature(Feature):
         torch.Size
             The size of the feature.
         """
-        return self._tensor.size()[1:]
+        return self._tensor.size()
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature store.
@@ -260,9 +260,9 @@ class TorchBasedFeature(Feature):
                 f"ids and value must have the same length, "
                 f"but got {ids.shape[0]} and {value.shape[0]}."
             )
-            assert self.size() == value.size()[1:], (
+            assert self.size()[1:] == value.size()[1:], (
                 f"The size of the feature is {self.size()}, "
-                f"while the size of the value is {value.size()[1:]}."
+                f"while the size of the value is {value.size()}."
             )
             if self._tensor.is_pinned() and value.is_cuda and ids.is_cuda:
                 raise NotImplementedError(
@@ -371,7 +371,7 @@ class DiskBasedFeature(Feature):
     >>> feature.read(torch.tensor([0]))
     tensor([[0, 1, 2, 3, 4]])
     >>> feature.size()
-    torch.Size([5])
+    torch.Size([2, 5])
     """
 
     def __init__(self, path: str, metadata: Dict = None, num_threads=None):
@@ -491,7 +491,7 @@ class DiskBasedFeature(Feature):
         torch.Size
             The size of the feature.
         """
-        return self._tensor.size()[1:]
+        return self._tensor.size()
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Disk based feature does not support update for now."""

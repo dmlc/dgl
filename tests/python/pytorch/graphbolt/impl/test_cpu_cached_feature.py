@@ -82,8 +82,8 @@ def test_cpu_cached_feature(dtype, policy):
     assert feat_store_a._feature.miss_rate == feat_store_a.miss_rate
 
     # Test get the size of the entire feature with ids.
-    assert feat_store_a.size() == torch.Size([3])
-    assert feat_store_b.size() == torch.Size([2, 2])
+    assert feat_store_a.size() == a.size()
+    assert feat_store_b.size() == b.size()
 
     # Test update the entire feature.
     feat_store_a.update(torch.tensor([[0, 1, 2], [3, 5, 2]], dtype=dtype))

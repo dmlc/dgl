@@ -80,8 +80,8 @@ def test_torch_based_feature(in_memory):
         )
 
         # Test get the size of the entire feature.
-        assert feature_a.size() == torch.Size([3])
-        assert feature_b.size() == torch.Size([2, 2])
+        assert feature_a.size() == torch.Size([1, 3])
+        assert feature_b.size() == torch.Size([3, 2, 2])
 
         # Test get metadata of the feature.
         assert feature_a.metadata() == metadata
@@ -299,10 +299,8 @@ def test_torch_based_feature_store(in_memory):
         )
 
         # Test get the size of the entire feature.
-        assert feature_store.size("node", "paper", "a") == torch.Size([3])
-        assert feature_store.size(
-            "edge", "paper:cites:paper", "b"
-        ) == torch.Size([2, 2])
+        assert feature_store.size("node", "paper", "a") == a.size()
+        assert feature_store.size("edge", "paper:cites:paper", "b") == b.size()
 
         # Test get the keys of the features.
         assert feature_store.keys() == [
@@ -343,7 +341,7 @@ def test_torch_based_feature_store(in_memory):
             torch.tensor([[1, 2, 4], [2, 5, 3]]),
         )
         # Test get the size of the entire feature.
-        assert feature_store.size("node", None, "a") == torch.Size([3])
+        assert feature_store.size("node", None, "a") == torch.Size([2, 3])
 
         feature_store = None
 
