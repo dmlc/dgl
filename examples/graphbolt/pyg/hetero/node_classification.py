@@ -418,13 +418,13 @@ def parse_args():
         "--cpu-cache-size",
         type=float,
         default=0,
-        help="The capacity of the CPU cache in GiB.",
+        help="The capacity of the CPU feature cache in GiB.",
     )
     parser.add_argument(
         "--gpu-cache-size",
         type=float,
         default=0,
-        help="The capacity of the GPU cache in GiB.",
+        help="The capacity of the GPU feature cache in GiB.",
     )
     parser.add_argument(
         "--num-gpu-cached-edges",
