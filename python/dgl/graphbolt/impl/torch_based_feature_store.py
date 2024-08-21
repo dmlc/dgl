@@ -239,6 +239,16 @@ class TorchBasedFeature(Feature):
         """
         return self._tensor.size()[1:]
 
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        return self._tensor.size()[0]
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature store.
 
@@ -492,6 +502,16 @@ class DiskBasedFeature(Feature):
             The size of the feature.
         """
         return self._tensor.size()[1:]
+
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        return self._tensor.size()[0]
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Disk based feature does not support update for now."""

@@ -59,13 +59,24 @@ class CPUFeatureCache(object):
         self.total_miss = 0
         self.total_queries = 0
 
-    def query(self, keys):
+    def is_pinned(self):
+        """Returns True if the cache storage is pinned."""
+        return self._cache.tensor.is_pinned()
+
+    @property
+    def max_size_in_bytes(self):
+        """Return the size taken by the cache in bytes."""
+        return self._cache.tensor.nbytes
+
+    def query(self, keys, offset=0):
         """Queries the cache.
 
         Parameters
         ----------
         keys : Tensor
             The keys to query the cache with.
+        offset : int
+            The offset to be added to the keys. Default is 0.
 
         Returns
         -------
@@ -85,14 +96,14 @@ class CPUFeatureCache(object):
             found_pointers,
             found_offsets,
             missing_offsets,
-        ) = self._policy.query(keys)
+        ) = self._policy.query(keys, offset)
         values = self._cache.query(positions, index, keys.shape[0])
         self._policy.reading_completed(found_pointers, found_offsets)
         self.total_miss += missing_keys.shape[0]
         missing_index = index[positions.size(0) :]
         return values, missing_index, missing_keys, missing_offsets
 
-    def query_and_replace(self, keys, reader_fn):
+    def query_and_replace(self, keys, reader_fn, offset=0):
         """Queries the cache. Then inserts the keys that are not found by
         reading them by calling `reader_fn(missing_keys)`, which are then
         inserted into the cache using the selected caching policy algorithm
@@ -105,6 +116,8 @@ class CPUFeatureCache(object):
         reader_fn : reader_fn(keys: torch.Tensor) -> torch.Tensor
             A function that will take a missing keys tensor and will return
             their values.
+        offset : int
+            The offset to be added to the keys. Default is 0.
 
         Returns
         -------
@@ -120,7 +133,7 @@ class CPUFeatureCache(object):
             missing_keys,
             found_offsets,
             missing_offsets,
-        ) = self._policy.query_and_replace(keys)
+        ) = self._policy.query_and_replace(keys, offset)
         found_cnt = keys.size(0) - missing_keys.size(0)
         found_positions = positions[:found_cnt]
         values = self._cache.query(found_positions, index, keys.shape[0])
@@ -136,7 +149,7 @@ class CPUFeatureCache(object):
         self._policy.writing_completed(missing_pointers, missing_offsets)
         return values
 
-    def replace(self, keys, values, offsets=None):
+    def replace(self, keys, values, offsets=None, offset=0):
         """Inserts key-value pairs into the cache using the selected caching
         policy algorithm to remove old key-value pairs if it is full.
 
@@ -148,8 +161,12 @@ class CPUFeatureCache(object):
             The values to insert to the cache.
         offsets : Tensor, optional
             The partition offsets of the keys.
+        offset : int
+            The offset to be added to the keys. Default is 0.
         """
-        positions, pointers, offsets = self._policy.replace(keys, offsets)
+        positions, pointers, offsets = self._policy.replace(
+            keys, offsets, offset
+        )
         self._cache.replace(positions, values)
         self._policy.writing_completed(pointers, offsets)
 
