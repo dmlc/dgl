@@ -87,7 +87,6 @@ struct FeatureCache : public torch::CustomClassHolder {
       const std::vector<int64_t>& shape, torch::ScalarType dtype,
       bool pin_memory);
 
- private:
   torch::Tensor tensor_;
 };
 

@@ -5,7 +5,7 @@ import torch
 from ..base import get_device_to_host_uva_stream, get_host_to_device_uva_stream
 from ..feature_store import Feature
 
-from .feature_cache import CPUFeatureCache
+from .cpu_feature_cache import CPUFeatureCache
 
 __all__ = ["CPUCachedFeature"]
 

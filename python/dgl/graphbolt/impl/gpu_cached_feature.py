@@ -4,7 +4,7 @@ import torch
 
 from ..feature_store import Feature
 
-from .gpu_cache import GPUCache
+from .gpu_feature_cache import GPUFeatureCache
 
 __all__ = ["GPUCachedFeature"]
 
@@ -62,7 +62,9 @@ class GPUCachedFeature(Feature):
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
         cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
-        self._feature = GPUCache((cache_size,) + feat0.shape[1:], feat0.dtype)
+        self._feature = GPUFeatureCache(
+            (cache_size,) + feat0.shape[1:], feat0.dtype
+        )
         self._offset = 0
 
     def read(self, ids: torch.Tensor = None):
@@ -223,7 +225,7 @@ class GPUCachedFeature(Feature):
                 value.shape[0],
             )
             self._feature = None  # Destroy the existing cache first.
-            self._feature = GPUCache(
+            self._feature = GPUFeatureCache(
                 (cache_size,) + feat0.shape[1:], feat0.dtype
             )
         else:
