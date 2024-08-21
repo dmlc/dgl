@@ -170,23 +170,22 @@ class DataLoader(torch_data.DataLoader):
         # before it. This enables enables non_blocking copies to the device.
         # Prefetching enables the data pipeline up to the CopyTo to run in a
         # separate thread.
-        if torch.cuda.is_available():
-            copiers = find_dps(datapipe_graph, CopyTo)
-            if len(copiers) > 1:
-                gb_warning(
-                    "Multiple CopyTo operations were found in the datapipe graph."
-                    " This case is not officially supported."
-                )
-            for copier in copiers:
-                if copier.device.type == "cuda":
-                    datapipe_graph = replace_dp(
-                        datapipe_graph,
-                        copier,
-                        # Add prefetch so that CPU and GPU can run concurrently.
-                        copier.datapipe.prefetch(2).copy_to(
-                            copier.device, non_blocking=True
-                        ),
-                    )
+        copiers = find_dps(datapipe_graph, CopyTo)
+        if len(copiers) > 1:
+            gb_warning(
+                "Multiple CopyTo operations were found in the datapipe graph."
+                " This case is not officially supported."
+            )
+        for copier in copiers:
+            # We enable the prefetch at all times for good CPU only performance.
+            datapipe_graph = replace_dp(
+                datapipe_graph,
+                copier,
+                # Add prefetch so that CPU and GPU can run concurrently.
+                copier.datapipe.prefetch(2).copy_to(
+                    copier.device, non_blocking=True
+                ),
+            )
 
         # The stages after feature fetching is still done in the main process.
         # So we set num_workers to 0 here.

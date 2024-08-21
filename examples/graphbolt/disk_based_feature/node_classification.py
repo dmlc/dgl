@@ -464,7 +464,7 @@ def main():
             args.feature_device == "pinned",
         )
         cpu_cached_feature = features[("node", None, "feat")]
-        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature._feature.miss_rate
+        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
 
@@ -479,7 +479,7 @@ def main():
             int(args.gpu_cache_size_in_gigabytes * 1024 * 1024 * 1024),
         )
         gpu_cached_feature = features[("node", None, "feat")]
-        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature._feature.miss_rate
+        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature.miss_rate
     else:
         gpu_cache_miss_rate_fn = lambda: 1
 

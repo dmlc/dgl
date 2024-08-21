@@ -230,6 +230,10 @@ macro(dgl_config_cuda linker_libs)
     string(CONCAT CXX_HOST_FLAGS ${CXX_HOST_FLAGS} ",/MD")
   endif()
   list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "${CXX_HOST_FLAGS}")
+  if(USE_OPENMP)
+    # Needed by CUDA disjoint union source file.
+    list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "${OpenMP_CXX_FLAGS}")
+  endif(USE_OPENMP)
 
   # 1. Add arch flags
   dgl_select_nvcc_arch_flags(NVCC_FLAGS_ARCH)

@@ -4,7 +4,7 @@ import torch
 
 from ..feature_store import Feature
 
-from .gpu_cache import GPUCache
+from .gpu_feature_cache import GPUFeatureCache
 
 __all__ = ["GPUCachedFeature"]
 
@@ -17,7 +17,8 @@ def num_cache_items(cache_capacity_in_bytes, single_item):
 
 
 class GPUCachedFeature(Feature):
-    r"""GPU cached feature wrapping a fallback feature.
+    r"""GPU cached feature wrapping a fallback feature. It uses the least
+    recently used (LRU) algorithm as the cache eviction policy.
 
     Places the GPU cache to torch.cuda.current_device().
 
@@ -61,7 +62,10 @@ class GPUCachedFeature(Feature):
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
         cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
-        self._feature = GPUCache((cache_size,) + feat0.shape[1:], feat0.dtype)
+        self._feature = GPUFeatureCache(
+            (cache_size,) + feat0.shape[1:], feat0.dtype
+        )
+        self._offset = 0
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -82,8 +86,12 @@ class GPUCachedFeature(Feature):
         """
         if ids is None:
             return self._fallback_feature.read()
-        values, missing_index, missing_keys = self._feature.query(ids)
-        missing_values = self._fallback_feature.read(missing_keys)
+        values, missing_index, missing_keys = self._feature.query(
+            ids if self._offset == 0 else ids + self._offset
+        )
+        missing_values = self._fallback_feature.read(
+            missing_keys if self._offset == 0 else missing_keys - self._offset
+        )
         values[missing_index] = missing_values
         self._feature.replace(missing_keys, missing_values)
         return values
@@ -100,9 +108,9 @@ class GPUCachedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
         Examples
         --------
@@ -114,13 +122,17 @@ class GPUCachedFeature(Feature):
         >>> assert stage + 1 == feature.read_async_num_stages(ids.device)
         >>> result = future.wait()  # result contains the read values.
         """
-        future = self._feature.query(ids, async_op=True)
+        future = self._feature.query(
+            ids if self._offset == 0 else ids + self._offset, async_op=True
+        )
 
         yield
 
         values, missing_index, missing_keys = future.wait()
 
-        fallback_reader = self._fallback_feature.read_async(missing_keys)
+        fallback_reader = self._fallback_feature.read_async(
+            missing_keys if self._offset == 0 else missing_keys - self._offset
+        )
         fallback_num_stages = self._fallback_feature.read_async_num_stages(
             missing_keys.device
         )
@@ -191,6 +203,16 @@ class GPUCachedFeature(Feature):
         """
         return self._fallback_feature.size()
 
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        return self._fallback_feature.count()
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
 
@@ -213,9 +235,14 @@ class GPUCachedFeature(Feature):
                 value.shape[0],
             )
             self._feature = None  # Destroy the existing cache first.
-            self._feature = GPUCache(
+            self._feature = GPUFeatureCache(
                 (cache_size,) + feat0.shape[1:], feat0.dtype
             )
         else:
             self._fallback_feature.update(value, ids)
             self._feature.replace(ids, value)
+
+    @property
+    def miss_rate(self):
+        """Returns the cache miss rate since creation."""
+        return self._feature.miss_rate

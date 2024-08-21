@@ -83,10 +83,13 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
         total_miss = feat_store_b._feature.total_miss
         feat_store_b.read(torch.tensor([0, 1]).to("cuda"))
         assert total_miss == feat_store_b._feature.total_miss
+    assert feat_store_a._feature.miss_rate == feat_store_a.miss_rate
 
-    # Test get the size of the entire feature with ids.
+    # Test get the size and count of the entire feature.
     assert feat_store_a.size() == torch.Size([3])
     assert feat_store_b.size() == torch.Size([2, 2])
+    assert feat_store_a.count() == a.size(0)
+    assert feat_store_b.count() == b.size(0)
 
     # Test update the entire feature.
     feat_store_a.update(

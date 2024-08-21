@@ -47,10 +47,13 @@ class GpuGraphCache : public torch::CustomClassHolder {
    * @param indptr_dtype The node id datatype.
    * @param dtypes The dtypes of the edge tensors to be cached. dtypes[0] is
    * reserved for the indices edge tensor holding node ids.
+   * @param has_original_edge_ids Whether the graph to be cached has original
+   * edge ids.
    */
   GpuGraphCache(
       const int64_t num_edges, const int64_t threshold,
-      torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes);
+      torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes,
+      bool has_original_edge_ids);
 
   GpuGraphCache() = default;
 
@@ -109,7 +112,8 @@ class GpuGraphCache : public torch::CustomClassHolder {
 
   static c10::intrusive_ptr<GpuGraphCache> Create(
       const int64_t num_edges, const int64_t threshold,
-      torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes);
+      torch::ScalarType indptr_dtype, std::vector<torch::ScalarType> dtypes,
+      bool has_original_edge_ids);
 
  private:
   void* map_;                     // pointer to the hash table.
@@ -119,7 +123,8 @@ class GpuGraphCache : public torch::CustomClassHolder {
   int64_t num_nodes_;             // The number of cached nodes in the cache.
   int64_t num_edges_;             // The number of cached edges in the cache.
   torch::Tensor indptr_;          // The cached graph structure indptr tensor.
-  torch::Tensor offset_;          // The original graph's sliced_indptr tensor.
+  torch::optional<torch::Tensor>
+      offset_;  // The original graph's sliced_indptr tensor.
   std::vector<torch::Tensor> cached_edge_tensors_;  // The cached graph
                                                     // structure edge tensors.
   std::mutex mtx_;  // Protects the data structure and makes it threadsafe.

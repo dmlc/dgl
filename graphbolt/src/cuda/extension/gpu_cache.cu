@@ -78,10 +78,12 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> GpuCache::Query(
 
 c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> GpuCache::QueryAsync(
     torch::Tensor keys) {
-  return async([=] {
-    auto [values, missing_index, missing_keys] = Query(keys);
-    return std::vector{values, missing_index, missing_keys};
-  });
+  return async(
+      [=] {
+        auto [values, missing_index, missing_keys] = Query(keys);
+        return std::vector{values, missing_index, missing_keys};
+      },
+      true);
 }
 
 void GpuCache::Replace(torch::Tensor keys, torch::Tensor values) {

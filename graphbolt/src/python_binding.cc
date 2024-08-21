@@ -167,6 +167,7 @@ TORCH_LIBRARY(graphbolt, m) {
       "clock_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::ClockCachePolicy>);
   m.class_<storage::FeatureCache>("FeatureCache")
+      .def_readonly("tensor", &storage::FeatureCache::tensor_)
       .def("index_select", &storage::FeatureCache::IndexSelect)
       .def("query", &storage::FeatureCache::Query)
       .def("query_async", &storage::FeatureCache::QueryAsync)
@@ -184,6 +185,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("scatter_async", &ops::ScatterAsync);
   m.def("index_select_csc", &ops::IndexSelectCSC);
   m.def("index_select_csc_batched", &ops::IndexSelectCSCBatched);
+  m.def("index_select_csc_batched_async", &ops::IndexSelectCSCBatchedAsync);
   m.def("ondisk_npy_array", &storage::OnDiskNpyArray::Create);
   m.def("detect_io_uring", &io_uring::IsAvailable);
   m.def("set_num_io_uring_threads", &io_uring::SetNumThreads);

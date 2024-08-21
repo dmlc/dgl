@@ -5,7 +5,7 @@ import torch
 from ..base import get_device_to_host_uva_stream, get_host_to_device_uva_stream
 from ..feature_store import Feature
 
-from .feature_cache import CPUFeatureCache
+from .cpu_feature_cache import CPUFeatureCache
 
 __all__ = ["CPUCachedFeature"]
 
@@ -30,8 +30,8 @@ class CPUCachedFeature(Feature):
         will hang due to all cache entries being read and/or write locked,
         resulting in a deadlock.
     policy : str
-        The cache eviction policy algorithm name. See gb.impl.CPUFeatureCache
-        for the list of available policies.
+        The cache eviction policy algorithm name. The available policies are
+        ["s3-fifo", "sieve", "lru", "clock"]. Default is "sieve".
     pin_memory : bool
         Whether the cache storage should be allocated on system pinned memory.
         Default is False.
@@ -61,6 +61,7 @@ class CPUCachedFeature(Feature):
             pin_memory=pin_memory,
         )
         self._is_pinned = pin_memory
+        self._offset = 0
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -79,7 +80,7 @@ class CPUCachedFeature(Feature):
         if ids is None:
             return self._fallback_feature.read()
         return self._feature.query_and_replace(
-            ids.cpu(), self._fallback_feature.read
+            ids.cpu(), self._fallback_feature.read, self._offset
         ).to(ids.device)
 
     def read_async(self, ids: torch.Tensor):
@@ -94,9 +95,9 @@ class CPUCachedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
         Examples
         --------
@@ -124,7 +125,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -241,7 +242,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -319,7 +320,7 @@ class CPUCachedFeature(Feature):
 
             yield _Waiter([values_copy_event, writing_completed], values)
         else:
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -421,6 +422,16 @@ class CPUCachedFeature(Feature):
         """
         return self._fallback_feature.size()
 
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        return self._fallback_feature.count()
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
 
@@ -448,4 +459,9 @@ class CPUCachedFeature(Feature):
             )
         else:
             self._fallback_feature.update(value, ids)
-            self._feature.replace(ids, value)
+            self._feature.replace(ids, value, None, self._offset)
+
+    @property
+    def miss_rate(self):
+        """Returns the cache miss rate since creation."""
+        return self._feature.miss_rate
