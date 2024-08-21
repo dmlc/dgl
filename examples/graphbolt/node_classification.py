@@ -410,7 +410,7 @@ def main(args):
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    in_size = features.size("node", None, "feat")[0]
+    in_size = features.size("node", None, "feat")[1]
     hidden_size = 256
     out_size = num_classes
 

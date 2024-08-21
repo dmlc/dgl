@@ -297,7 +297,7 @@ def run(rank, world_size, args, devices, dataset):
     args.fanout = list(map(int, args.fanout.split(",")))
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    in_size = feature.size("node", None, "feat")[0]
+    in_size = feature.size("node", None, "feat")[1]
     hidden_size = 256
     out_size = num_classes
 

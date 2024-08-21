@@ -582,7 +582,7 @@ def main(args):
         args.overlap_graph_fetch = True
         args.asynchronous = True
 
-    feat_size = features.size("node", "paper", "feat")[0]
+    feat_size = features.size("node", "paper", "feat")[1]
 
     # As `ogb-lsc-mag240m` is a large dataset, features of `author` and
     # `institution` are generated in advance and stored in the feature store.

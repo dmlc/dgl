@@ -247,7 +247,7 @@ if __name__ == "__main__":
     features = dataset.feature
 
     # Create GraphSAGE model.
-    in_size = features.size("node", None, "feat")[0]
+    in_size = features.size("node", None, "feat")[1]
     num_classes = dataset.tasks[0].metadata["num_classes"]
     out_size = num_classes
     model = SAGE(in_size, 256, out_size).to(device)

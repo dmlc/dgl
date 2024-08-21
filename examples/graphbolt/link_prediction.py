@@ -399,7 +399,7 @@ def main(args):
     train_set = dataset.tasks[0].train_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
-    in_size = features.size("node", None, "feat")[0]
+    in_size = features.size("node", None, "feat")[1]
     hidden_channels = 256
     args.device = torch.device(args.device)
     model = SAGE(in_size, hidden_channels).to(args.device)

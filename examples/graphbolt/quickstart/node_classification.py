@@ -125,7 +125,7 @@ if __name__ == "__main__":
         dataset.graph.pin_memory_()
         dataset.feature.pin_memory_()
 
-    in_size = dataset.feature.size("node", None, "feat")[0]
+    in_size = dataset.feature.size("node", None, "feat")[1]
     out_size = dataset.tasks[0].metadata["num_classes"]
     model = GCN(in_size, out_size).to(device)
 

@@ -257,7 +257,7 @@ def main():
         device,
         job="infer",
     )
-    in_channels = feature.size("node", None, "feat")[0]
+    in_channels = feature.size("node", None, "feat")[1]
     hidden_channels = 256
     model = GraphSAGE(in_channels, hidden_channels, num_classes).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)

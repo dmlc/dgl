@@ -212,7 +212,7 @@ if __name__ == "__main__":
         args.batch_size,
         args.num_workers,
     )
-    in_size = dataset.feature.size("node", None, "feat")[0]
+    in_size = dataset.feature.size("node", None, "feat")[1]
     model = SAGE(in_size, 256, datamodule.num_classes)
 
     # Train.

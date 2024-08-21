@@ -166,7 +166,7 @@ if __name__ == "__main__":
         dataset.graph.pin_memory_()
         dataset.feature.pin_memory_()
 
-    in_size = dataset.feature.size("node", None, "feat")[0]
+    in_size = dataset.feature.size("node", None, "feat")[1]
     model = GraphSAGE(in_size).to(device)
 
     # Model training.

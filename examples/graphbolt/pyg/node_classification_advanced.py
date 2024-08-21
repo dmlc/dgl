@@ -459,7 +459,7 @@ def main():
         for itemset, job in zip([train_set, valid_set], ["train", "evaluate"])
     )
 
-    in_channels = features.size("node", None, "feat")[0]
+    in_channels = features.size("node", None, "feat")[1]
     hidden_channels = 256
     model = GraphSAGE(
         in_channels, hidden_channels, num_classes, len(args.fanout)
