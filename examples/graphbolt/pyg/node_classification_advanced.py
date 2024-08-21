@@ -441,7 +441,7 @@ def main():
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
     if args.gpu_cache_size > 0 and args.feature_device != "cuda":
-        features._features[("node", None, "feat")] = gb.GPUCachedFeature(
+        features._features[("node", None, "feat")] = gb.gpu_cached_feature(
             features._features[("node", None, "feat")],
             args.gpu_cache_size,
         )

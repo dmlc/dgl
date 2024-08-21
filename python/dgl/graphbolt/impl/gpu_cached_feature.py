@@ -1,19 +1,18 @@
 """GPU cached feature for GraphBolt."""
+from typing import Dict, Union
 
 import torch
 
-from ..feature_store import Feature
+from ..feature_store import (
+    bytes_to_number_of_items,
+    Feature,
+    FeatureKey,
+    wrap_with_cached_feature,
+)
 
 from .gpu_feature_cache import GPUFeatureCache
 
-__all__ = ["GPUCachedFeature"]
-
-
-def num_cache_items(cache_capacity_in_bytes, single_item):
-    """Returns the number of rows to be cached."""
-    item_bytes = single_item.nbytes
-    # Round up so that we never get a size of 0, unless bytes is 0.
-    return (cache_capacity_in_bytes + item_bytes - 1) // item_bytes
+__all__ = ["GPUCachedFeature", "gpu_cached_feature"]
 
 
 class GPUCachedFeature(Feature):
@@ -26,8 +25,14 @@ class GPUCachedFeature(Feature):
     ----------
     fallback_feature : Feature
         The fallback feature.
-    max_cache_size_in_bytes : int
-        The capacity of the GPU cache in bytes.
+    cache : GPUFeatureCache
+        Whether a previously constructed GPUFeatureCache instance should be
+        used. This is useful if multiple features should share the same cache
+        instance.
+    offset : int, optional
+        If a valid cache parameter is given, the offset value to use to separate
+        the keys mapping to multiple features. Typically it will be a value from
+        FusedCSCSamplingGraph.node_type_offset.
 
     Examples
     --------
@@ -36,7 +41,7 @@ class GPUCachedFeature(Feature):
     >>> torch_feat = torch.arange(10).reshape(2, -1).to("cuda")
     >>> cache_size = 5
     >>> fallback_feature = gb.TorchBasedFeature(torch_feat)
-    >>> feature = gb.GPUCachedFeature(fallback_feature, cache_size)
+    >>> feature = gb.gpu_cached_feature(fallback_feature, cache_size)
     >>> feature.read()
     tensor([[0, 1, 2, 3, 4],
             [5, 6, 7, 8, 9]], device='cuda:0')
@@ -48,24 +53,25 @@ class GPUCachedFeature(Feature):
     tensor([[0, 1, 2, 3, 4],
             [1, 1, 1, 1, 1]], device='cuda:0')
     >>> feature.size()
-    torch.Size([5])
+    torch.Size([2, 5])
     """
 
-    def __init__(self, fallback_feature: Feature, max_cache_size_in_bytes: int):
+    _cache_type = GPUFeatureCache
+
+    def __init__(
+        self,
+        fallback_feature: Feature,
+        cache: GPUFeatureCache,
+        offset: int = 0,
+    ):
         super(GPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
             f"The fallback_feature must be an instance of Feature, but got "
             f"{type(fallback_feature)}."
         )
         self._fallback_feature = fallback_feature
-        self.max_cache_size_in_bytes = max_cache_size_in_bytes
-        # Fetching the feature dimension from the underlying feature.
-        feat0 = fallback_feature.read(torch.tensor([0]))
-        cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
-        self._feature = GPUFeatureCache(
-            (cache_size,) + feat0.shape[1:], feat0.dtype
-        )
-        self._offset = 0
+        self._feature = cache
+        self._offset = offset
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -231,11 +237,11 @@ class GPUCachedFeature(Feature):
             feat0 = value[:1]
             self._fallback_feature.update(value)
             cache_size = min(
-                num_cache_items(self.max_cache_size_in_bytes, feat0),
+                bytes_to_number_of_items(self.max_cache_size_in_bytes, feat0),
                 value.shape[0],
             )
             self._feature = None  # Destroy the existing cache first.
-            self._feature = GPUFeatureCache(
+            self._feature = self._cache_type(
                 (cache_size,) + feat0.shape[1:], feat0.dtype
             )
         else:
@@ -243,6 +249,35 @@ class GPUCachedFeature(Feature):
             self._feature.replace(ids, value)
 
     @property
+    def max_cache_size_in_bytes(self):
+        return self._feature.max_size_in_bytes
+
+    @property
     def miss_rate(self):
         """Returns the cache miss rate since creation."""
         return self._feature.miss_rate
+
+
+def gpu_cached_feature(
+    fallback_features: Union[Feature, Dict[FeatureKey, Feature]],
+    max_cache_size_in_bytes: int,
+) -> Union[GPUCachedFeature, Dict[FeatureKey, GPUCachedFeature]]:
+    r"""GPU cached feature wrapping a fallback feature. It uses the least
+    recently used (LRU) algorithm as the cache eviction policy.
+
+    Places the GPU cache to torch.cuda.current_device().
+
+    Parameters
+    ----------
+    fallback_features : Union[Feature, Dict[FeatureKey, Feature]]
+        The fallback feature(s).
+    max_cache_size_in_bytes : int
+        The capacity of the GPU cache in bytes.
+    Returns
+    -------
+    Union[GPUCachedFeature, Dict[FeatureKey, GPUCachedFeature]]
+        The feature(s) wrapped with GPUCachedFeature.
+    """
+    return wrap_with_cached_feature(
+        GPUCachedFeature, fallback_features, max_cache_size_in_bytes
+    )
