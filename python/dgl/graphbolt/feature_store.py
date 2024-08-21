@@ -338,8 +338,8 @@ def wrap_with_cached_feature(
         cache_size = bytes_to_number_of_items(max_cache_size_in_bytes, feat0)
         if cache is None:
             cache = cached_feature_type._cache_type(
-                (cache_size,) + feat0.shape[1:],
-                feat0.dtype,
+                cache_shape=(cache_size,) + feat0.shape[1:],
+                dtype=feat0.dtype,
                 *args,
                 **kwargs,
             )
