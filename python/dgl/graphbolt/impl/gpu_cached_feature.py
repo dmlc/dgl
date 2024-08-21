@@ -237,7 +237,7 @@ class GPUCachedFeature(Feature):
             feat0 = value[:1]
             self._fallback_feature.update(value)
             cache_size = min(
-                bytes_to_number_of_items(self.max_cache_size_in_bytes, feat0),
+                bytes_to_number_of_items(self.cache_size_in_bytes, feat0),
                 value.shape[0],
             )
             self._feature = None  # Destroy the existing cache first.
@@ -249,7 +249,8 @@ class GPUCachedFeature(Feature):
             self._feature.replace(ids, value)
 
     @property
-    def max_cache_size_in_bytes(self):
+    def cache_size_in_bytes(self):
+        """Return the size taken by the cache in bytes."""
         return self._feature.max_size_in_bytes
 
     @property
