@@ -55,10 +55,12 @@ def create_dataloader(
         datapipe = datapipe.copy_to(device=device)
         need_copy = False
     # Sample neighbors for each node in the mini-batch.
-    datapipe = datapipe.sample_neighbor(
+    datapipe = getattr(datapipe, args.sample_mode)(
         graph,
         fanout if job != "infer" else [-1],
         overlap_fetch=args.overlap_graph_fetch,
+        num_gpu_cached_edges=args.num_gpu_cached_edges,
+        gpu_cache_threshold=args.gpu_graph_caching_threshold,
         asynchronous=args.graph_device != "cpu",
     )
     # Copy the data to the specified device.
@@ -400,6 +402,12 @@ def parse_args():
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     parser.add_argument(
+        "--sample-mode",
+        default="sample_neighbor",
+        choices=["sample_neighbor", "sample_layer_neighbor"],
+        help="The sampling function when doing layerwise sampling.",
+    )
+    parser.add_argument(
         "--cpu-feature-cache-policy",
         type=str,
         default=None,
@@ -418,7 +426,18 @@ def parse_args():
         default=0,
         help="The capacity of the GPU cache in GiB.",
     )
-
+    parser.add_argument(
+        "--num-gpu-cached-edges",
+        type=int,
+        default=0,
+        help="The number of edges to be cached from the graph on the GPU.",
+    )
+    parser.add_argument(
+        "--gpu-graph-caching-threshold",
+        type=int,
+        default=1,
+        help="The number of accesses after which a vertex neighborhood will be cached.",
+    )
     parser.add_argument("--precision", type=str, default="high")
     return parser.parse_args()
 
