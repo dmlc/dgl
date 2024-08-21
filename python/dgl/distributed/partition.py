@@ -1761,9 +1761,9 @@ def convert_partition_to_graphbolt(
 
     for part_id in range(num_parts):
         # Update graph path.
-        part_meta[f"part-{part_id}"][
-            "part_graph_graphbolt"
-        ] = rel_path_results[part_id]
+        part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = rel_path_results[
+            part_id
+        ]
 
     # Save dtype info into partition config.
     # [TODO][Rui] Always use int64_t for node/edge IDs in GraphBolt. See more
@@ -1773,6 +1773,7 @@ def convert_partition_to_graphbolt(
 
     _dump_part_config(part_config, part_meta)
     print(f"Converted partitions to GraphBolt format into {part_config}")
+
 
 def _dgl_partition_to_graphbolt(
     part_config,
@@ -1793,17 +1794,18 @@ def _dgl_partition_to_graphbolt(
         )
     new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
-    convert_partition_to_graphbolt(new_part_meta,
-                                  graph_formats,
-                                  part_config,
-                                  store_eids,
-                                  store_inner_node,
-                                  store_inner_edge,
-                                  n_jobs,
-                                  num_parts,
-                                  parts=parts,
-                                  )
-    
+    convert_partition_to_graphbolt(
+        new_part_meta,
+        graph_formats,
+        part_config,
+        store_eids,
+        store_inner_node,
+        store_inner_edge,
+        n_jobs,
+        num_parts,
+        parts=parts,
+    )
+
 
 def dgl_partition_to_graphbolt(
     part_config,
@@ -1853,12 +1855,13 @@ def dgl_partition_to_graphbolt(
     part_meta = _load_part_config(part_config)
     new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
-    convert_partition_to_graphbolt(new_part_meta,
-                                  graph_formats,
-                                  part_config,
-                                  store_eids,
-                                  store_inner_node,
-                                  store_inner_edge,
-                                  n_jobs,
-                                  num_parts,
-                                  )
+    convert_partition_to_graphbolt(
+        new_part_meta,
+        graph_formats,
+        part_config,
+        store_eids,
+        store_inner_node,
+        store_inner_edge,
+        n_jobs,
+        num_parts,
+    )

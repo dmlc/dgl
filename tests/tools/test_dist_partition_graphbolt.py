@@ -190,5 +190,3 @@ def test_pipeline_arbitrary_chunks(
 @pytest.mark.parametrize("data_fmt", ["numpy", "parquet"])
 def test_pipeline_feature_format(data_fmt):
     _test_pipeline_graphbolt(4, 4, 4, data_fmt=data_fmt)
-
-test_pipeline_basics(4,4,4)
