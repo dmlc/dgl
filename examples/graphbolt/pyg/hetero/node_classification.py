@@ -234,14 +234,28 @@ def evaluate_step(minibatch, model):
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, device):
+def evaluate(
+    model,
+    dataloader,
+    gpu_cache_miss_rate_fn,
+    cpu_cache_miss_rate_fn,
+    device,
+):
     model.eval()
     total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0
-    for minibatch in tqdm(dataloader, desc="Evaluating"):
+    dataloader = tqdm(dataloader, desc="Evaluating")
+    for step, minibatch in enumerate(dataloader):
         num_correct, num_samples = evaluate_step(minibatch, model)
         total_correct += num_correct
         total_samples += num_samples
+        if step % 15 == 0:
+            dataloader.set_postfix(
+                {
+                    "gpu_cache_miss": gpu_cache_miss_rate_fn(),
+                    "cpu_cache_miss": cpu_cache_miss_rate_fn(),
+                }
+            )
 
     return total_correct / total_samples
 
@@ -266,110 +280,76 @@ def train_step(minibatch, optimizer, model, loss_fn):
     return loss.detach(), num_correct, labels.size(0)
 
 
-def train_helper(dataloader, model, optimizer, loss_fn, device):
+def train_helper(
+    dataloader,
+    model,
+    optimizer,
+    loss_fn,
+    gpu_cache_miss_rate_fn,
+    cpu_cache_miss_rate_fn,
+    device,
+):
     model.train()
     total_loss = torch.zeros(1, device=device)
     total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0
     start = time.time()
-    for minibatch in tqdm(dataloader, "Training"):
+    dataloader = tqdm(dataloader, "Training")
+    for step, minibatch in enumerate(dataloader):
         loss, num_correct, num_samples = train_step(
             minibatch, optimizer, model, loss_fn
         )
         total_loss += loss * num_samples
         total_correct += num_correct
         total_samples += num_samples
+        if step % 15 == 0:
+            # log every 15 steps for performance.
+            dataloader.set_postfix(
+                {
+                    "gpu_cache_miss": gpu_cache_miss_rate_fn(),
+                    "cpu_cache_miss": cpu_cache_miss_rate_fn(),
+                }
+            )
     loss = total_loss / total_samples
     acc = total_correct / total_samples
     end = time.time()
     return loss, acc, end - start
 
 
-def train(train_dataloader, valid_dataloader, model, device):
+def train(
+    train_dataloader,
+    valid_dataloader,
+    model,
+    gpu_cache_miss_rate_fn,
+    cpu_cache_miss_rate_fn,
+    device,
+):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     loss_fn = nn.CrossEntropyLoss()
 
     for epoch in range(args.epochs):
         train_loss, train_acc, duration = train_helper(
-            train_dataloader, model, optimizer, loss_fn, device
+            train_dataloader,
+            model,
+            optimizer,
+            loss_fn,
+            gpu_cache_miss_rate_fn,
+            cpu_cache_miss_rate_fn,
+            device,
         )
-        val_acc = evaluate(model, valid_dataloader, device)
+        val_acc = evaluate(
+            model,
+            valid_dataloader,
+            gpu_cache_miss_rate_fn,
+            cpu_cache_miss_rate_fn,
+            device,
+        )
         print(
             f"Epoch: {epoch:02d}, Loss: {train_loss.item():.4f}, "
             f"Approx. Train: {train_acc.item():.4f}, "
             f"Approx. Val: {val_acc.item():.4f}, "
             f"Time: {duration}s"
         )
-
-
-def main():
-    torch.set_float32_matmul_precision(args.precision)
-    if not torch.cuda.is_available():
-        args.mode = "cpu-cpu-cpu"
-    print(f"Training in {args.mode} mode.")
-    args.graph_device, args.feature_device, args.device = args.mode.split("-")
-    args.overlap_feature_fetch = args.feature_device == "pinned"
-    args.overlap_graph_fetch = args.graph_device == "pinned"
-
-    # Load dataset.
-    dataset = gb.BuiltinDataset(args.dataset).load()
-    print("Dataset loaded")
-
-    # Move the dataset to the selected storage.
-    graph = (
-        dataset.graph.pin_memory_()
-        if args.graph_device == "pinned"
-        else dataset.graph.to(args.graph_device)
-    )
-    features = (
-        dataset.feature.pin_memory_()
-        if args.feature_device == "pinned"
-        else dataset.feature.to(args.feature_device)
-    )
-
-    train_set = dataset.tasks[0].train_set
-    valid_set = dataset.tasks[0].validation_set
-    test_set = dataset.tasks[0].test_set
-    args.fanout = list(map(int, args.fanout.split(",")))
-
-    num_classes = dataset.tasks[0].metadata["num_classes"]
-    num_etypes = len(graph.num_edges)
-
-    train_dataloader, valid_dataloader, test_dataloader = (
-        create_dataloader(
-            graph=graph,
-            features=features,
-            itemset=itemset,
-            batch_size=args.batch_size,
-            fanout=[
-                torch.full((num_etypes,), fanout) for fanout in args.fanout
-            ],
-            device=args.device,
-            job=job,
-        )
-        for itemset, job in zip(
-            [train_set, valid_set, test_set], ["train", "evaluate", "evaluate"]
-        )
-    )
-
-    feat_size = features.size("node", "paper", "feat")[0]
-    hidden_channels = 256
-
-    # Initialize the entity classification model.
-    model = EntityClassify(
-        graph, feat_size, hidden_channels, num_classes, 3
-    ).to(args.device)
-
-    print(
-        "Number of model parameters: "
-        f"{sum(p.numel() for p in model.parameters())}"
-    )
-
-    train(train_dataloader, valid_dataloader, model, args.device)
-
-    print("Testing...")
-    test_acc = evaluate(model, test_dataloader, args.device)
-    print(f"Test accuracy {test_acc.item():.4f}")
 
 
 def parse_args():
@@ -415,9 +395,142 @@ def parse_args():
         help="Graph storage - feature storage - Train device: 'cpu' for CPU and RAM,"
         " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
+    parser.add_argument(
+        "--cpu-feature-cache-policy",
+        type=str,
+        default=None,
+        choices=["s3-fifo", "sieve", "lru", "clock"],
+        help="The cache policy for the CPU feature cache.",
+    )
+    parser.add_argument(
+        "--cpu-cache-size",
+        type=float,
+        default=0,
+        help="The capacity of the CPU cache in GiB.",
+    )
+    parser.add_argument(
+        "--gpu-cache-size",
+        type=float,
+        default=0,
+        help="The capacity of the GPU cache in GiB.",
+    )
 
     parser.add_argument("--precision", type=str, default="high")
     return parser.parse_args()
+
+
+def main():
+    torch.set_float32_matmul_precision(args.precision)
+    if not torch.cuda.is_available():
+        args.mode = "cpu-cpu-cpu"
+    print(f"Training in {args.mode} mode.")
+    args.graph_device, args.feature_device, args.device = args.mode.split("-")
+    args.overlap_feature_fetch = args.feature_device == "pinned"
+    args.overlap_graph_fetch = args.graph_device == "pinned"
+
+    # Load dataset.
+    dataset = gb.BuiltinDataset(args.dataset).load()
+    print("Dataset loaded")
+
+    # Move the dataset to the selected storage.
+    graph = (
+        dataset.graph.pin_memory_()
+        if args.graph_device == "pinned"
+        else dataset.graph.to(args.graph_device)
+    )
+    features = (
+        dataset.feature.pin_memory_()
+        if args.feature_device == "pinned"
+        else dataset.feature.to(args.feature_device)
+    )
+
+    train_set = dataset.tasks[0].train_set
+    valid_set = dataset.tasks[0].validation_set
+    test_set = dataset.tasks[0].test_set
+    args.fanout = list(map(int, args.fanout.split(",")))
+
+    num_classes = dataset.tasks[0].metadata["num_classes"]
+    num_etypes = len(graph.num_edges)
+
+    feats_on_disk = {
+        k: features[k]
+        for k in features.keys()
+        if k[2] == "feat" and isinstance(features[k], gb.DiskBasedFeature)
+    }
+
+    if args.cpu_cache_size > 0 and len(feats_on_disk) > 0:
+        cached_features = gb.cpu_cached_feature(
+            feats_on_disk,
+            int(args.cpu_cache_size * (2**30)),
+            args.cpu_feature_cache_policy,
+            args.feature_device == "pinned",
+        )
+        for k, feature in cached_features.items():
+            features[k] = feature
+            cpu_cache_miss_rate_fn = lambda: feature.miss_rate
+    else:
+        cpu_cache_miss_rate_fn = lambda: 1
+
+    if args.gpu_cache_size > 0 and args.feature_device != "cuda":
+        feats = {k: features[k] for k in features.keys() if k[2] == "feat"}
+        cached_features = gb.gpu_cached_feature(
+            feats,
+            int(args.gpu_cache_size * (2**30)),
+        )
+        for k, feature in cached_features.items():
+            features[k] = feature
+            gpu_cache_miss_rate_fn = lambda: feature.miss_rate
+    else:
+        gpu_cache_miss_rate_fn = lambda: 1
+
+    train_dataloader, valid_dataloader, test_dataloader = (
+        create_dataloader(
+            graph=graph,
+            features=features,
+            itemset=itemset,
+            batch_size=args.batch_size,
+            fanout=[
+                torch.full((num_etypes,), fanout) for fanout in args.fanout
+            ],
+            device=args.device,
+            job=job,
+        )
+        for itemset, job in zip(
+            [train_set, valid_set, test_set], ["train", "evaluate", "evaluate"]
+        )
+    )
+
+    feat_size = features.size("node", "paper", "feat")[0]
+    hidden_channels = 256
+
+    # Initialize the entity classification model.
+    model = EntityClassify(
+        graph, feat_size, hidden_channels, num_classes, 3
+    ).to(args.device)
+
+    print(
+        "Number of model parameters: "
+        f"{sum(p.numel() for p in model.parameters())}"
+    )
+
+    train(
+        train_dataloader,
+        valid_dataloader,
+        model,
+        gpu_cache_miss_rate_fn,
+        cpu_cache_miss_rate_fn,
+        args.device,
+    )
+
+    print("Testing...")
+    test_acc = evaluate(
+        model,
+        test_dataloader,
+        gpu_cache_miss_rate_fn,
+        cpu_cache_miss_rate_fn,
+        args.device,
+    )
+    print(f"Test accuracy {test_acc.item():.4f}")
 
 
 if __name__ == "__main__":
