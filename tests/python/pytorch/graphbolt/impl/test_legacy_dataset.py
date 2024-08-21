@@ -23,7 +23,9 @@ def test_LegacyDataset_homo_node_pred():
     num_nodes = 2708
     assert dataset.graph.num_nodes == num_nodes
     assert len(dataset.all_nodes_set) == num_nodes
-    assert dataset.feature.size("node", None, "feat") == torch.Size([num_nodes, 1433])
+    assert dataset.feature.size("node", None, "feat") == torch.Size(
+        [num_nodes, 1433]
+    )
     assert (
         dataset.feature.read(
             "node", None, "feat", torch.tensor([num_nodes - 1])
