@@ -422,6 +422,16 @@ class CPUCachedFeature(Feature):
         """
         return self._fallback_feature.size()
 
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        return self._fallback_feature.count()
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
 

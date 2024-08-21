@@ -93,6 +93,16 @@ class Feature:
         """
         raise NotImplementedError
 
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        raise NotImplementedError
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
 
@@ -193,6 +203,29 @@ class FeatureStore:
             The size of the specified feature in the feature store.
         """
         return self.__getitem__((domain, type_name, feature_name)).size()
+
+    def count(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+    ):
+        """Get the count the specified feature in the feature store.
+
+        Parameters
+        ----------
+        domain : str
+            The domain of the feature such as "node", "edge" or "graph".
+        type_name : str
+            The node or edge type name.
+        feature_name : str
+            The feature name.
+        Returns
+        -------
+        int
+            The count of the specified feature in the feature store.
+        """
+        return self.__getitem__((domain, type_name, feature_name)).count()
 
     def metadata(
         self,
