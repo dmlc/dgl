@@ -31,7 +31,6 @@ dependencies:
     - scikit-learn
     - scipy
     - torch==__TORCH_VERSION__
-    - torchdata>=0.5.0
     - torcheval
     - torchmetrics
     - torch_geometric

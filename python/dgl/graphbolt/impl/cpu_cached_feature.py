@@ -25,10 +25,13 @@ class CPUCachedFeature(Feature):
     fallback_feature : Feature
         The fallback feature.
     max_cache_size_in_bytes : int
-        The capacity of the cache in bytes.
+        The capacity of the cache in bytes. The size should be a few factors
+        larger than the size of each read request. Otherwise, the caching policy
+        will hang due to all cache entries being read and/or write locked,
+        resulting in a deadlock.
     policy : str
-        The cache eviction policy algorithm name. See gb.impl.CPUFeatureCache
-        for the list of available policies.
+        The cache eviction policy algorithm name. The available policies are
+        ["s3-fifo", "sieve", "lru", "clock"]. Default is "sieve".
     pin_memory : bool
         Whether the cache storage should be allocated on system pinned memory.
         Default is False.
@@ -58,6 +61,7 @@ class CPUCachedFeature(Feature):
             pin_memory=pin_memory,
         )
         self._is_pinned = pin_memory
+        self._offset = 0
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -75,10 +79,12 @@ class CPUCachedFeature(Feature):
         """
         if ids is None:
             return self._fallback_feature.read()
-        return self._feature.query_and_replace(ids, self._fallback_feature.read)
+        return self._feature.query_and_replace(
+            ids.cpu(), self._fallback_feature.read, self._offset
+        ).to(ids.device)
 
     def read_async(self, ids: torch.Tensor):
-        """Read the feature by index asynchronously.
+        r"""Read the feature by index asynchronously.
 
         Parameters
         ----------
@@ -89,11 +95,11 @@ class CPUCachedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
-        Example Usage
+        Examples
         --------
         >>> import dgl.graphbolt as gb
         >>> feature = gb.Feature(...)
@@ -119,7 +125,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -157,7 +163,7 @@ class CPUCachedFeature(Feature):
                 missing_values_future = next(fallback_reader, None)
                 yield  # fallback feature stages.
 
-            values_from_cpu_copy_event.wait()
+            values_from_cpu_copy_event.synchronize()
             reading_completed = policy.reading_completed_async(
                 found_pointers, found_offsets
             )
@@ -182,7 +188,6 @@ class CPUCachedFeature(Feature):
 
             reading_completed.wait()
             replace_future.wait()
-            missing_values_copy_event.wait()
             writing_completed = policy.writing_completed_async(
                 missing_pointers, missing_offsets
             )
@@ -214,7 +219,11 @@ class CPUCachedFeature(Feature):
                     return values
 
             yield _Waiter(
-                [writing_completed],
+                [
+                    writing_completed,
+                    values_from_cpu_copy_event,
+                    missing_values_copy_event,
+                ],
                 values_from_cpu,
                 missing_values,
                 index,
@@ -233,7 +242,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -311,7 +320,7 @@ class CPUCachedFeature(Feature):
 
             yield _Waiter([values_copy_event, writing_completed], values)
         else:
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -440,4 +449,9 @@ class CPUCachedFeature(Feature):
             )
         else:
             self._fallback_feature.update(value, ids)
-            self._feature.replace(ids, value)
+            self._feature.replace(ids, value, None, self._offset)
+
+    @property
+    def miss_rate(self):
+        """Returns the cache miss rate since creation."""
+        return self._feature.miss_rate

@@ -36,7 +36,8 @@ import torch
     ],
 )
 @pytest.mark.parametrize("cache_size", [4, 9, 11])
-def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
+@pytest.mark.parametrize("with_edge_ids", [True, False])
+def test_gpu_graph_cache(indptr_dtype, dtype, cache_size, with_edge_ids):
     indices_dtype = torch.int32
     indptr = torch.tensor([0, 3, 6, 10], dtype=indptr_dtype, pin_memory=True)
     indices = torch.arange(0, indptr[-1], dtype=indices_dtype, pin_memory=True)
@@ -48,6 +49,7 @@ def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
         2,
         indptr.dtype,
         [e.dtype for e in edge_tensors],
+        not with_edge_ids,
     )
 
     for i in range(10):
@@ -59,7 +61,7 @@ def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
             missing_indptr,
             missing_edge_tensors,
         ) = torch.ops.graphbolt.index_select_csc_batched(
-            indptr, edge_tensors, missing_keys, True, None
+            indptr, edge_tensors, missing_keys, with_edge_ids, None
         )
         output_indptr, output_edge_tensors = replace(
             missing_indptr, missing_edge_tensors
@@ -69,7 +71,7 @@ def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
             reference_indptr,
             reference_edge_tensors,
         ) = torch.ops.graphbolt.index_select_csc_batched(
-            indptr, edge_tensors, keys, True, None
+            indptr, edge_tensors, keys, with_edge_ids, None
         )
 
         assert torch.equal(output_indptr, reference_indptr)

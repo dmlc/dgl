@@ -56,8 +56,9 @@ def test_cpu_cached_feature(dtype, policy):
 
     # Test read with ids.
     assert torch.equal(
-        feat_store_a.read(torch.tensor([0])),
-        torch.tensor([[1, 2, 3]], dtype=dtype),
+        # Test read when ids are on a different device.
+        feat_store_a.read(torch.tensor([0], device=F.ctx())),
+        torch.tensor([[1, 2, 3]], dtype=dtype, device=F.ctx()),
     )
     assert torch.equal(
         feat_store_b.read(torch.tensor([1, 1])),
@@ -78,6 +79,7 @@ def test_cpu_cached_feature(dtype, policy):
     total_miss = feat_store_b._feature.total_miss
     feat_store_b.read(torch.tensor([0, 1]))
     assert total_miss == feat_store_b._feature.total_miss
+    assert feat_store_a._feature.miss_rate == feat_store_a.miss_rate
 
     # Test get the size of the entire feature with ids.
     assert feat_store_a.size() == torch.Size([3])

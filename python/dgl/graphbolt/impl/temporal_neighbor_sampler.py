@@ -61,15 +61,16 @@ class TemporalNeighborSamplerImpl(SubgraphSampler):
                 )
                 for ntype in ntypes
             }
+            empty_tensor = torch.tensor(
+                [], dtype=torch.int64, device=first_val.device
+            )
             seeds_timestamp = {
-                ntype: seeds_timestamp.get(ntype, torch.LongTensor([]))
+                ntype: seeds_timestamp.get(ntype, empty_tensor)
                 for ntype in ntypes
             }
             if seeds_pre_time_window:
                 seeds_pre_time_window = {
-                    ntype: seeds_pre_time_window.get(
-                        ntype, torch.LongTensor([])
-                    )
+                    ntype: seeds_pre_time_window.get(ntype, empty_tensor)
                     for ntype in ntypes
                 }
         for hop in range(num_layers):

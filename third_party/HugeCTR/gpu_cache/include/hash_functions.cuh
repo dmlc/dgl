@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#include <cstdint>
+
 // MurmurHash3_32 implementation from
 // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 //-----------------------------------------------------------------------------
