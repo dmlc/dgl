@@ -82,8 +82,8 @@ def test_torch_based_feature(in_memory):
         # Test get the size and count of the entire feature.
         assert feature_a.size() == torch.Size([3])
         assert feature_b.size() == torch.Size([2, 2])
-        assert feature_a.count() == a.size(0)
-        assert feature_b.count() == b.size(0)
+        assert feature_a.count() == 1
+        assert feature_b.count() == 3
 
         # Test get metadata of the feature.
         assert feature_a.metadata() == metadata
