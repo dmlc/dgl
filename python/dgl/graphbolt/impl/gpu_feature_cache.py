@@ -1,4 +1,7 @@
 """HugeCTR gpu_cache wrapper for graphbolt."""
+from functools import reduce
+from operator import mul
+
 import torch
 
 
@@ -11,6 +14,8 @@ class GPUCache(object):
             major >= 7
         ), "GPUCache is supported only on CUDA compute capability >= 70 (Volta)."
         self._cache = torch.ops.graphbolt.gpu_cache(cache_shape, dtype)
+        element_size = torch.tensor([], dtype=dtype).element_size()
+        self.max_size_in_bytes = reduce(mul, cache_shape) * element_size
         self.total_miss = 0
         self.total_queries = 0
 

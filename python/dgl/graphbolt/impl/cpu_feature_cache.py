@@ -59,6 +59,13 @@ class CPUFeatureCache(object):
         self.total_miss = 0
         self.total_queries = 0
 
+    def is_pinned(self):
+        return self._cache.tensor.is_pinned()
+
+    @property
+    def max_size_in_bytes(self):
+        return self._cache.tensor.nbytes
+
     def query(self, keys, offset=0):
         """Queries the cache.
 
