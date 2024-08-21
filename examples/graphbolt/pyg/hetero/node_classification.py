@@ -465,9 +465,9 @@ def main():
             args.cpu_feature_cache_policy,
             args.feature_device == "pinned",
         )
-        for k, feature in cached_features.items():
-            features[k] = feature
-            cpu_cache_miss_rate_fn = lambda: feature.miss_rate
+        for k, cpu_cached_feature in cached_features.items():
+            features[k] = cpu_cached_feature
+            cpu_cache_miss_rate_fn = lambda: cpu_cached_feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
 
@@ -477,9 +477,9 @@ def main():
             feats,
             int(args.gpu_cache_size * (2**30)),
         )
-        for k, feature in cached_features.items():
-            features[k] = feature
-            gpu_cache_miss_rate_fn = lambda: feature.miss_rate
+        for k, gpu_cached_feature in cached_features.items():
+            features[k] = gpu_cached_feature
+            gpu_cache_miss_rate_fn = lambda: gpu_cached_feature.miss_rate
     else:
         gpu_cache_miss_rate_fn = lambda: 1
 
