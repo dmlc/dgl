@@ -1707,7 +1707,7 @@ def gb_convert_single_dgl_partition(
     # Update graph path.
 
 
-def convert_partition_to_graphbolt(
+def _convert_partition_to_graphbolt(
     part_meta,
     graph_formats,
     part_config,
@@ -1794,7 +1794,7 @@ def _dgl_partition_to_graphbolt(
         )
     new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
-    convert_partition_to_graphbolt(
+    _convert_partition_to_graphbolt(
         new_part_meta,
         graph_formats,
         part_config,
@@ -1855,7 +1855,7 @@ def dgl_partition_to_graphbolt(
     part_meta = _load_part_config(part_config)
     new_part_meta = copy.deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
-    convert_partition_to_graphbolt(
+    _convert_partition_to_graphbolt(
         new_part_meta,
         graph_formats,
         part_config,
