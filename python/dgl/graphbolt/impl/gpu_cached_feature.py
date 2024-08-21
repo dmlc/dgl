@@ -51,7 +51,7 @@ class GPUCachedFeature(Feature):
     tensor([[0, 1, 2, 3, 4],
             [1, 1, 1, 1, 1]], device='cuda:0')
     >>> feature.size()
-    torch.Size([2, 5])
+    torch.Size([5])
     """
 
     _cache_type = GPUFeatureCache
