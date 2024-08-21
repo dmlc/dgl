@@ -472,8 +472,8 @@ def exchange_feature(
         )
 
     # exchange actual data here.
-    logging.debug(f"Rank: {rank} {featdata_key.shape=}")
     if featdata_key is not None:
+        logging.debug(f"Rank: {rank} {featdata_key.shape=}")
         feat_dims_dtype = list(featdata_key.shape)
         assert (
             len(featdata_key.shape) == 2 or len(featdata_key.shape) == 1
@@ -1336,6 +1336,7 @@ def gen_dist_partitions(rank, world_size, params):
             edge_typecounts,
             params.save_orig_nids,
             params.save_orig_eids,
+            params.use_graphbolt,
         )
         sort_etypes = len(etypes_map) > 1
         local_node_features = prepare_local_data(
@@ -1354,8 +1355,12 @@ def gen_dist_partitions(rank, world_size, params):
             orig_eids,
             graph_formats,
             sort_etypes,
+            params.use_graphbolt,
         )
-        memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
+        if params.use_graphbolt:
+            memory_snapshot("DiskWriteGrapgboltObjectsComplete: ", rank)
+        else:
+            memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
         # get the meta-data
         json_metadata = create_metadata_json(
@@ -1369,6 +1374,7 @@ def gen_dist_partitions(rank, world_size, params):
             ntypes_map,
             etypes_map,
             params.output,
+            params.use_graphbolt,
         )
         output_meta_json[
             "local-part-id-" + str(local_part_id * world_size + rank)

@@ -95,6 +95,11 @@ if __name__ == "__main__":
         help="Save original edge IDs into files",
     )
     parser.add_argument(
+        "--use-graphbolt",
+        action="store_true",
+        help="Use GraphBolt for distributed partition.",
+    )
+    parser.add_argument(
         "--graph-formats",
         default=None,
         type=str,
