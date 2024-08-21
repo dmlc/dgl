@@ -109,19 +109,40 @@ def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
     save_graphs(filename, g_list, formats=formats)
 
 
-def _get_inner_node_mask(graph, ntype_id):
-    if NTYPE in graph.ndata:
-        dtype = F.dtype(graph.ndata["inner_node"])
-        return (
-            graph.ndata["inner_node"]
-            * F.astype(graph.ndata[NTYPE] == ntype_id, dtype)
-            == 1
-        )
+def _get_inner_node_mask(graph, ntype_id, use_graphbolt=False):
+    if use_graphbolt:
+        if NTYPE in graph.node_attributes:
+            dtype = F.dtype(graph.node_attributes["inner_node"])
+            return (
+                graph.node_attributes["inner_node"]
+                * F.astype(graph.node_attributes[NTYPE] == ntype_id, dtype)
+                == 1
+            )
+        else:
+            return graph.node_attributes["inner_node"] == 1
     else:
-        return graph.ndata["inner_node"] == 1
+        if NTYPE in graph.ndata:
+            dtype = F.dtype(graph.ndata["inner_node"])
+            return (
+                graph.ndata["inner_node"]
+                * F.astype(graph.ndata[NTYPE] == ntype_id, dtype)
+                == 1
+            )
+        else:
+            return graph.ndata["inner_node"] == 1
 
 
-def _get_inner_edge_mask(graph, etype_id):
+def _get_inner_edge_mask(graph, etype_id, use_graphbolt=False):
+    if use_graphbolt:
+        if graph.type_per_edge is not None:
+            dtype = F.dtype(graph.edge_attributes["inner_edge"])
+            return (
+                graph.edge_attributes["inner_edge"]
+                * F.astype(graph.type_per_edge == etype_id, dtype)
+                == 1
+            )
+        else:
+            return graph.edge_attributes["inner_edge"] == 1
     if ETYPE in graph.edata:
         dtype = F.dtype(graph.edata["inner_edge"])
         return (
