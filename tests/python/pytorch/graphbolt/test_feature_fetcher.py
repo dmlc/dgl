@@ -3,7 +3,7 @@ from functools import partial
 
 import dgl.graphbolt as gb
 import torch
-from torchdata.datapipes.iter import Mapper
+from torch.utils.data.datapipes.iter import Mapper
 
 from . import gb_test_utils
 
