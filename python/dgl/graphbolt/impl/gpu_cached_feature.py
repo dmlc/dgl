@@ -62,7 +62,9 @@ class GPUCachedFeature(Feature):
         # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
         cache_size = num_cache_items(max_cache_size_in_bytes, feat0)
-        self._feature = GPUFeatureCache((cache_size,) + feat0.shape[1:], feat0.dtype)
+        self._feature = GPUFeatureCache(
+            (cache_size,) + feat0.shape[1:], feat0.dtype
+        )
         self._offset = 0
 
     def read(self, ids: torch.Tensor = None):
