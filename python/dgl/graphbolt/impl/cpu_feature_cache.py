@@ -60,10 +60,12 @@ class CPUFeatureCache(object):
         self.total_queries = 0
 
     def is_pinned(self):
+        """Returns True if the cache storage is pinned."""
         return self._cache.tensor.is_pinned()
 
     @property
     def max_size_in_bytes(self):
+        """Return the size taken by the cache in bytes."""
         return self._cache.tensor.nbytes
 
     def query(self, keys, offset=0):
