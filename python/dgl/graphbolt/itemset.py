@@ -182,7 +182,7 @@ class ItemSet:
             else:
                 raise TypeError(
                     f"{type(self).__name__} indices must be int, slice, or "
-                    f"iterable of int, not {type(index)}."
+                    f"torch.Tensor, not {type(index)}."
                 )
         elif self._num_items == 1:
             return self._items[0][index]
