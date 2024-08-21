@@ -4,7 +4,7 @@ import torch
 import torch.utils.data as torch_data
 
 from .base import CopyTo
-
+from .minibatch_transformer import MiniBatchTransformer
 from .datapipes import (
     datapipe_graph_to_adjlist,
     find_dps,
@@ -75,7 +75,7 @@ class MultiprocessingWrapper(torch_data.IterDataPipe):
         yield from self.dataloader
 
 
-class DataLoader(torch_data.DataLoader):
+class DataLoader(MiniBatchTransformer):
     """Multiprocessing DataLoader.
 
     Iterates over the data pipeline with everything before feature fetching
@@ -189,4 +189,4 @@ class DataLoader(torch_data.DataLoader):
 
         # The stages after feature fetching is still done in the main process.
         # So we set num_workers to 0 here.
-        super().__init__(datapipe, batch_size=None, num_workers=0)
+        super().__init__(datapipe)
