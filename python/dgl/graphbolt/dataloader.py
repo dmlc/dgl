@@ -4,7 +4,6 @@ import torch
 import torch.utils.data as torch_data
 
 from .base import CopyTo
-from .minibatch_transformer import MiniBatchTransformer
 from .datapipes import (
     datapipe_graph_to_adjlist,
     find_dps,
@@ -15,6 +14,7 @@ from .feature_fetcher import FeatureFetcher, FeatureFetcherStartMarker
 from .impl.neighbor_sampler import SamplePerLayer
 from .internal_utils import gb_warning
 from .item_sampler import ItemSampler
+from .minibatch_transformer import MiniBatchTransformer
 
 
 __all__ = [
