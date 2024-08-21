@@ -449,6 +449,7 @@ class CPUCachedFeature(Feature):
             self._feature.replace(ids, value, None, self._offset)
 
     def is_pinned(self):
+        """Returns True if the cache storage is pinned."""
         return self._feature.is_pinned()
 
     @property
