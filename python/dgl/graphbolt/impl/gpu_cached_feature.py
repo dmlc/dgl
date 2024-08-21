@@ -17,7 +17,8 @@ __all__ = ["GPUCachedFeature", "gpu_cached_feature"]
 
 class GPUCachedFeature(Feature):
     r"""GPU cached feature wrapping a fallback feature. It uses the least
-    recently used (LRU) algorithm as the cache eviction policy.
+    recently used (LRU) algorithm as the cache eviction policy. Use
+    `gpu_feature_cache` to construct an instance of this class.
 
     Places the GPU cache to torch.cuda.current_device().
 
