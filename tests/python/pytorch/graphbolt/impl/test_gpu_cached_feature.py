@@ -48,8 +48,8 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
     cache_size_a *= a[:1].element_size() * a[:1].numel()
     cache_size_b *= b[:1].element_size() * b[:1].numel()
 
-    feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), cache_size_a)
-    feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), cache_size_b)
+    feat_store_a = gb.gpu_cached_feature(gb.TorchBasedFeature(a), cache_size_a)
+    feat_store_b = gb.gpu_cached_feature(gb.TorchBasedFeature(b), cache_size_b)
 
     # Test read the entire feature.
     assert torch.equal(feat_store_a.read(), a.to("cuda"))
@@ -142,7 +142,7 @@ def test_gpu_cached_feature_read_async(dtype, pin_memory):
 
     cache_size = 256 * a[:1].nbytes
 
-    feat_store = gb.GPUCachedFeature(gb.TorchBasedFeature(a), cache_size)
+    feat_store = gb.gpu_cached_feature(gb.TorchBasedFeature(a), cache_size)
 
     # Test read with ids.
     ids1 = torch.tensor([0, 15, 71, 101], device=F.ctx())
@@ -189,12 +189,12 @@ def test_gpu_cached_nested_feature_async(dtype):
         path = to_on_disk_numpy(test_dir, "tensor", a)
 
         disk_store = gb.DiskBasedFeature(path=path)
-        feat_store1 = gb.GPUCachedFeature(disk_store, cache_size)
-        feat_store2 = gb.GPUCachedFeature(
-            gb.CPUCachedFeature(disk_store, cache_size * 2), cache_size
+        feat_store1 = gb.gpu_cached_feature(disk_store, cache_size)
+        feat_store2 = gb.gpu_cached_feature(
+            gb.cpu_cached_feature(disk_store, cache_size * 2), cache_size
         )
-        feat_store3 = gb.GPUCachedFeature(
-            gb.CPUCachedFeature(disk_store, cache_size * 2, pin_memory=True),
+        feat_store3 = gb.gpu_cached_feature(
+            gb.cpu_cached_feature(disk_store, cache_size * 2, pin_memory=True),
             cache_size,
         )
 

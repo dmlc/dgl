@@ -457,7 +457,7 @@ def main():
     if args.cpu_cache_size_in_gigabytes > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
     ):
-        features[("node", None, "feat")] = gb.CPUCachedFeature(
+        features[("node", None, "feat")] = gb.cpu_cached_feature(
             features[("node", None, "feat")],
             int(args.cpu_cache_size_in_gigabytes * 1024 * 1024 * 1024),
             args.cpu_feature_cache_policy,
@@ -474,7 +474,7 @@ def main():
     host-to-device copy operations for this feature.
     """
     if args.gpu_cache_size_in_gigabytes > 0 and args.feature_device != "cuda":
-        features[("node", None, "feat")] = gb.GPUCachedFeature(
+        features[("node", None, "feat")] = gb.gpu_cached_feature(
             features[("node", None, "feat")],
             int(args.gpu_cache_size_in_gigabytes * 1024 * 1024 * 1024),
         )
