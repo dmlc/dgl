@@ -33,16 +33,6 @@ def create_dataloader(
     job,
 ):
     """Create a GraphBolt dataloader for training, validation or testing."""
-
-    ###########################################################################
-    # Initialize the ItemSampler to sample mini-batches from the dataset.
-    # `item_set`:
-    #   The set of items to sample from. This is typically the
-    #   training, validation or test set.
-    # `batch_size`:
-    #   The number of nodes to sample in each mini-batch.
-    # `shuffle`:
-    #   Whether to shuffle the items in the dataset before sampling.
     datapipe = gb.ItemSampler(
         itemset,
         batch_size=batch_size,
@@ -546,6 +536,7 @@ def main():
         args.device,
     )
 
+    # Labels are currently unavailable for mag240M so the test acc will be 0.
     print("Testing...")
     test_acc = evaluate(
         model,
