@@ -117,14 +117,9 @@ class RelGraphConvLayer(nn.Module):
         self.out_size = out_size
         self.activation = activation
 
-        ########################################################################
-        # (HIGHLIGHT) HeteroGraphConv is a graph convolution operator over
-        # heterogeneous graphs. A dictionary is passed where the key is the
-        # relation name and the value is the instance of GraphConv. norm="right"
-        # is to divide the aggregated messages by each node’s in-degrees, which
-        # is equivalent to averaging the received messages. weight=False and
-        # bias=False as we will use our own weight matrices defined later.
-        ########################################################################
+        # Create a separate convolution layer for each relationship. PyG's
+        # SimpleConv does not have any weights and only performs message passing
+        # and aggregation.
         self.convs = nn.ModuleDict(
             {etype: SimpleConv(aggr="mean") for etype in etypes}
         )
