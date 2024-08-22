@@ -376,13 +376,13 @@ def parse_args():
         "--cpu-cache-size-in-gigabytes",
         type=float,
         default=0,
-        help="The capacity of the CPU cache, the number of features to store.",
+        help="The capacity of the CPU cache in GiB.",
     )
     parser.add_argument(
         "--gpu-cache-size-in-gigabytes",
         type=float,
         default=0,
-        help="The capacity of the GPU cache, the number of features to store.",
+        help="The capacity of the GPU cache in GiB.",
     )
     parser.add_argument("--early-stopping-patience", type=int, default=25)
     parser.add_argument(

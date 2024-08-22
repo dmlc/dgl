@@ -333,13 +333,13 @@ def evaluate(
     model.eval()
     total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0
-    val_dataloader_tqdm = tqdm(dataloader, "Evaluating")
-    for step, minibatch in enumerate(val_dataloader_tqdm):
+    dataloader = tqdm(dataloader, "Evaluating")
+    for step, minibatch in enumerate(dataloader):
         num_correct, num_samples = evaluate_step(minibatch, model, eval_fn)
         total_correct += num_correct
         total_samples += num_samples
         if step % 25 == 0:
-            val_dataloader_tqdm.set_postfix(
+            dataloader.set_postfix(
                 {
                     "num_nodes": minibatch.node_ids().size(0),
                     "gpu_cache_miss": gpu_cache_miss_rate_fn(),
