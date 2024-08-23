@@ -1437,7 +1437,6 @@ def partition_graph(
                 store_inner_node=False,
                 store_inner_edge=False,
                 graph_formats=None,
-                n_jobs=1,
             ):
                 rel_path_result = gb_convert_single_dgl_partition(
                     part_id,
@@ -1456,6 +1455,7 @@ def partition_graph(
             part = _process_partitions([part], graph_formats, sort_etypes)[0]
             # save FusedCSCSamplingGraph
             kwargs["graph_formats"] = graph_formats
+            kwargs.pop("n_jobs", None)
             _partition_to_graphbolt(part_config, part_metadata, parts, **kwargs)
         else:
             part_graph_file = os.path.join(part_dir, "graph.dgl")
