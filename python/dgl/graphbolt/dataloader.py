@@ -122,32 +122,33 @@ class DataLoader(MiniBatchTransformer):
         datapipe = datapipe.mark_end()
         datapipe_graph = traverse_dps(datapipe)
 
-        # (1) Insert minibatch distribution.
-        # TODO(BarclayII): Currently I'm using sharding_filter() as a
-        # concept demonstration. Later on minibatch distribution should be
-        # merged into ItemSampler to maximize efficiency.
-        item_samplers = find_dps(
-            datapipe_graph,
-            ItemSampler,
-        )
-        for item_sampler in item_samplers:
-            datapipe_graph = replace_dp(
+        if num_workers > 0:
+            # (1) Insert minibatch distribution.
+            # TODO(BarclayII): Currently I'm using sharding_filter() as a
+            # concept demonstration. Later on minibatch distribution should be
+            # merged into ItemSampler to maximize efficiency.
+            item_samplers = find_dps(
                 datapipe_graph,
-                item_sampler,
-                item_sampler.sharding_filter(),
+                ItemSampler,
+            )
+            for item_sampler in item_samplers:
+                datapipe_graph = replace_dp(
+                    datapipe_graph,
+                    item_sampler,
+                    item_sampler.sharding_filter(),
+                )
+
+            # (2) Cut datapipe at FeatureFetcher and wrap.
+            datapipe_graph = _find_and_wrap_parent(
+                datapipe_graph,
+                FeatureFetcherStartMarker,
+                MultiprocessingWrapper,
+                num_workers=num_workers,
+                persistent_workers=persistent_workers,
             )
 
-        # (2) Cut datapipe at FeatureFetcher and wrap.
-        datapipe_graph = _find_and_wrap_parent(
-            datapipe_graph,
-            FeatureFetcherStartMarker,
-            MultiprocessingWrapper,
-            num_workers=num_workers,
-            persistent_workers=persistent_workers,
-        )
-
-        # (3) Limit the number of UVA threads used if the feature_fetcher has
-        # overlapping optimization enabled.
+        # (3) Limit the number of UVA threads used if the feature_fetcher
+        # or any of the samplers have overlapping optimization enabled.
         if num_workers == 0 and torch.cuda.is_available():
             feature_fetchers = find_dps(
                 datapipe_graph,
@@ -187,6 +188,4 @@ class DataLoader(MiniBatchTransformer):
                 ),
             )
 
-        # The stages after feature fetching is still done in the main process.
-        # So we set num_workers to 0 here.
         super().__init__(datapipe)
