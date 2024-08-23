@@ -364,6 +364,7 @@ def run(rank, world_size, args, devices, dataset):
 
     if rank == 0:
         print(f"Test Accuracy {test_acc.item():.4f}")
+    dist.destroy_process_group()
 
 
 def parse_args():
