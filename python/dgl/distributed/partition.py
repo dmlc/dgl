@@ -1432,6 +1432,7 @@ def partition_graph(
                 part_config,
                 part_meta,
                 parts,
+                part_i,
                 *,
                 store_eids=True,
                 store_inner_node=False,
@@ -1439,7 +1440,7 @@ def partition_graph(
                 graph_formats=None,
             ):
                 rel_path_result = gb_convert_single_dgl_partition(
-                    part_id,
+                    part_i,
                     parts,
                     part_metadata,
                     part_config=part_config,
@@ -1448,7 +1449,7 @@ def partition_graph(
                     store_inner_node=store_inner_node,
                     graph_formats=graph_formats,
                 )
-                part_meta[f"part-{part_id}"][
+                part_meta[f"part-{part_i}"][
                     "part_graph_graphbolt"
                 ] = rel_path_result
 
