@@ -200,4 +200,4 @@ Utilities
     compact_csc_format
     unique_and_compact
     unique_and_compact_csc_formats
-
+    numpy_save_aligned
