@@ -81,7 +81,7 @@ class CPUCachedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            ``read_async_num_stages(ids.device)``th invocation. The return result
+            ``read\_async\_num\_stages(ids.device)``th invocation. The return result
             can be accessed by calling ``.wait()``. on the returned future object.
             It is undefined behavior to call ``.wait()`` more than once.
 
