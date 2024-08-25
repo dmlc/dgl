@@ -56,7 +56,9 @@ collection of features.
     TorchBasedFeature
     TorchBasedFeatureStore
     DiskBasedFeature
+    cpu_cached_feature
     CPUCachedFeature
+    gpu_cached_feature
     GPUCachedFeature
 
 

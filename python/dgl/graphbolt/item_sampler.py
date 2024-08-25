@@ -330,12 +330,11 @@ class ItemSampler(IterDataPipe):
             self._drop_uneven_inputs,
         )
         if self._shuffle:
-            g = torch.Generator()
-            g.manual_seed(self._seed + self._epoch)
+            g = torch.Generator().manual_seed(self._seed + self._epoch)
             permutation = torch.randperm(total, generator=g)
+            indices = permutation[start_offset : start_offset + assigned_count]
         else:
-            permutation = torch.arange(total)
-        indices = permutation[start_offset : start_offset + assigned_count]
+            indices = torch.arange(start_offset, start_offset + assigned_count)
         for i in range(0, assigned_count, self._batch_size):
             if output_count <= 0:
                 break

@@ -179,10 +179,10 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     CircularQueue<ReadRequest> read_queue(8 * kGroupSize);
     int64_t num_submitted = 0;
     int64_t num_completed = 0;
-    auto [acquired_queue_handle, my_read_buffer2] = queue_source.get();
+    auto [acquired_queue_handle, read_buffer_source2] = queue_source.get();
     auto &io_uring_queue = acquired_queue_handle.get();
     // Capturing structured binding is available only in C++20, so we rename.
-    auto my_read_buffer = my_read_buffer2;
+    auto read_buffer_source = read_buffer_source2;
     auto submit_fn = [&](int64_t submission_minimum_batch_size) {
       if (read_queue.Size() < submission_minimum_batch_size) return;
       TORCH_CHECK(  // Check for sqe overflow.
@@ -200,8 +200,8 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
     };
     for (int64_t read_buffer_slot = 0; true;) {
       auto request_read_buffer = [&]() {
-        return my_read_buffer + (aligned_length_ + block_size_) *
-                                    (read_buffer_slot++ % (8 * kGroupSize));
+        return read_buffer_source + (aligned_length_ + block_size_) *
+                                        (read_buffer_slot++ % (8 * kGroupSize));
       };
       const auto num_requested_items = std::max(
           std::min(

@@ -1,48 +1,44 @@
 """CPU cached feature for GraphBolt."""
+from typing import Dict, Optional, Union
 
 import torch
 
 from ..base import get_device_to_host_uva_stream, get_host_to_device_uva_stream
-from ..feature_store import Feature
+from ..feature_store import (
+    bytes_to_number_of_items,
+    Feature,
+    FeatureKey,
+    wrap_with_cached_feature,
+)
 
-from .feature_cache import CPUFeatureCache
+from .cpu_feature_cache import CPUFeatureCache
 
-__all__ = ["CPUCachedFeature"]
-
-
-def bytes_to_number_of_items(cache_capacity_in_bytes, single_item):
-    """Returns the number of rows to be cached."""
-    item_bytes = single_item.nbytes
-    # Round up so that we never get a size of 0, unless bytes is 0.
-    return (cache_capacity_in_bytes + item_bytes - 1) // item_bytes
+__all__ = ["CPUCachedFeature", "cpu_cached_feature"]
 
 
 class CPUCachedFeature(Feature):
-    r"""CPU cached feature wrapping a fallback feature.
+    r"""CPU cached feature wrapping a fallback feature. Use `cpu_feature_cache`
+    to construct an instance of this class.
 
     Parameters
     ----------
     fallback_feature : Feature
         The fallback feature.
-    max_cache_size_in_bytes : int
-        The capacity of the cache in bytes. The size should be a few factors
-        larger than the size of each read request. Otherwise, the caching policy
-        will hang due to all cache entries being read and/or write locked,
-        resulting in a deadlock.
-    policy : str
-        The cache eviction policy algorithm name. See gb.impl.CPUFeatureCache
-        for the list of available policies.
-    pin_memory : bool
-        Whether the cache storage should be allocated on system pinned memory.
-        Default is False.
+    cache : CPUFeatureCache
+        A CPUFeatureCache instance to serve as the cache backend.
+    offset : int, optional
+        The offset value to add to the given ids before using the cache. This
+        parameter is useful if multiple `CPUCachedFeature`s are sharing a single
+        CPUFeatureCache object.
     """
+
+    _cache_type = CPUFeatureCache
 
     def __init__(
         self,
         fallback_feature: Feature,
-        max_cache_size_in_bytes: int,
-        policy: str = None,
-        pin_memory: bool = False,
+        cache: CPUFeatureCache,
+        offset: int = 0,
     ):
         super(CPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
@@ -50,17 +46,8 @@ class CPUCachedFeature(Feature):
             f"{type(fallback_feature)}."
         )
         self._fallback_feature = fallback_feature
-        self.max_cache_size_in_bytes = max_cache_size_in_bytes
-        # Fetching the feature dimension from the underlying feature.
-        feat0 = fallback_feature.read(torch.tensor([0]))
-        cache_size = bytes_to_number_of_items(max_cache_size_in_bytes, feat0)
-        self._feature = CPUFeatureCache(
-            (cache_size,) + feat0.shape[1:],
-            feat0.dtype,
-            policy=policy,
-            pin_memory=pin_memory,
-        )
-        self._is_pinned = pin_memory
+        self._feature = cache
+        self._offset = offset
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
@@ -79,7 +66,7 @@ class CPUCachedFeature(Feature):
         if ids is None:
             return self._fallback_feature.read()
         return self._feature.query_and_replace(
-            ids.cpu(), self._fallback_feature.read
+            ids.cpu(), self._fallback_feature.read, self._offset
         ).to(ids.device)
 
     def read_async(self, ids: torch.Tensor):
@@ -94,9 +81,9 @@ class CPUCachedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
         Examples
         --------
@@ -110,7 +97,7 @@ class CPUCachedFeature(Feature):
         """
         policy = self._feature._policy
         cache = self._feature._cache
-        if ids.is_cuda and self._is_pinned:
+        if ids.is_cuda and self.is_pinned():
             ids_device = ids.device
             current_stream = torch.cuda.current_stream()
             device_to_host_stream = get_device_to_host_uva_stream()
@@ -124,7 +111,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -241,7 +228,7 @@ class CPUCachedFeature(Feature):
             yield  # first stage is done.
 
             ids_copy_event.synchronize()
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -319,7 +306,7 @@ class CPUCachedFeature(Feature):
 
             yield _Waiter([values_copy_event, writing_completed], values)
         else:
-            policy_future = policy.query_and_replace_async(ids)
+            policy_future = policy.query_and_replace_async(ids, self._offset)
 
             yield
 
@@ -421,6 +408,16 @@ class CPUCachedFeature(Feature):
         """
         return self._fallback_feature.size()
 
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        return self._fallback_feature.count()
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
 
@@ -439,13 +436,64 @@ class CPUCachedFeature(Feature):
             feat0 = value[:1]
             self._fallback_feature.update(value)
             cache_size = min(
-                bytes_to_number_of_items(self.max_cache_size_in_bytes, feat0),
+                bytes_to_number_of_items(self.cache_size_in_bytes, feat0),
                 value.shape[0],
             )
             self._feature = None  # Destroy the existing cache first.
-            self._feature = CPUFeatureCache(
+            self._feature = self._cache_type(
                 (cache_size,) + feat0.shape[1:], feat0.dtype
             )
         else:
             self._fallback_feature.update(value, ids)
-            self._feature.replace(ids, value)
+            self._feature.replace(ids, value, None, self._offset)
+
+    def is_pinned(self):
+        """Returns True if the cache storage is pinned."""
+        return self._feature.is_pinned()
+
+    @property
+    def cache_size_in_bytes(self):
+        """Return the size taken by the cache in bytes."""
+        return self._feature.max_size_in_bytes
+
+    @property
+    def miss_rate(self):
+        """Returns the cache miss rate since creation."""
+        return self._feature.miss_rate
+
+
+def cpu_cached_feature(
+    fallback_features: Union[Feature, Dict[FeatureKey, Feature]],
+    max_cache_size_in_bytes: int,
+    policy: Optional[str] = None,
+    pin_memory: bool = False,
+) -> Union[CPUCachedFeature, Dict[FeatureKey, CPUCachedFeature]]:
+    r"""CPU cached feature wrapping a fallback feature.
+
+    Parameters
+    ----------
+    fallback_features : Union[Feature, Dict[FeatureKey, Feature]]
+        The fallback feature(s).
+    max_cache_size_in_bytes : int
+        The capacity of the cache in bytes. The size should be a few factors
+        larger than the size of each read request. Otherwise, the caching policy
+        will hang due to all cache entries being read and/or write locked,
+        resulting in a deadlock.
+    policy : str, optional
+        The cache eviction policy algorithm name. The available policies are
+        ["s3-fifo", "sieve", "lru", "clock"]. Default is "sieve".
+    pin_memory : bool, optional
+        Whether the cache storage should be allocated on system pinned memory.
+        Default is False.
+    Returns
+    -------
+    Union[CPUCachedFeature, Dict[FeatureKey, CPUCachedFeature]]
+        New feature(s) wrapped with CPUCachedFeature.
+    """
+    return wrap_with_cached_feature(
+        CPUCachedFeature,
+        fallback_features,
+        max_cache_size_in_bytes,
+        policy=policy,
+        pin_memory=pin_memory,
+    )
