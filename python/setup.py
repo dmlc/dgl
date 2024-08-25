@@ -230,6 +230,7 @@ install_requires = [
     "requests>=2.19.0",
     "scipy>=1.1.0",
     "tqdm",
+    "torch<=2.4.0",
 ]
 
 setup(
