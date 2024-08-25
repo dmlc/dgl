@@ -138,8 +138,7 @@ def test_gpu_sampling_DataLoader(
             bufferer_cnt += 2 * num_layers
     if asynchronous:
         bufferer_cnt += 2 * num_layers
-    datapipe = dataloader.dataset
-    datapipe_graph = traverse_dps(datapipe)
+    datapipe_graph = traverse_dps(dataloader)
     bufferers = find_dps(
         datapipe_graph,
         dgl.graphbolt.Bufferer,

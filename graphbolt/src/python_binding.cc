@@ -167,6 +167,8 @@ TORCH_LIBRARY(graphbolt, m) {
       "clock_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::ClockCachePolicy>);
   m.class_<storage::FeatureCache>("FeatureCache")
+      .def("is_pinned", &storage::FeatureCache::IsPinned)
+      .def_property("nbytes", &storage::FeatureCache::NumBytes)
       .def("index_select", &storage::FeatureCache::IndexSelect)
       .def("query", &storage::FeatureCache::Query)
       .def("query_async", &storage::FeatureCache::QueryAsync)
