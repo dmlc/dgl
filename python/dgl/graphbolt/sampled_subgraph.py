@@ -19,6 +19,7 @@ from .internal_utils import recursive_apply
 
 __all__ = ["SampledSubgraph"]
 
+
 class PyGLayerData(NamedTuple):
     """A named tuple class to represent the inputs to a PyG model layer.
     The fields are x (input features), edge_index and size (source and destination sizes.)
@@ -250,7 +251,7 @@ class SampledSubgraph:
         ----------
         x : Union[torch.Tensor, Dict[str, torch.Tensor]]
             The input node features to the GNN layer.
-        
+
         Returns
         -------
         PyGLayerData
@@ -268,7 +269,9 @@ class SampledSubgraph:
             edge_index = torch.stack([src, dst], dim=0).long()
             dst_size = self.sampled_csc.indptr.size(0) - 1
             # h and h[:dst_size] correspond to source and destination features resp.
-            return PyGLayerData((x, x[:dst_size]), edge_index, (x.size(0), dst_size))
+            return PyGLayerData(
+                (x, x[:dst_size]), edge_index, (x.size(0), dst_size)
+            )
         else:
             # Heterogenous
             x_dst_dict = {}
