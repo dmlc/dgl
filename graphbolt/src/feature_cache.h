@@ -41,6 +41,10 @@ struct FeatureCache : public torch::CustomClassHolder {
       const std::vector<int64_t>& shape, torch::ScalarType dtype,
       bool pin_memory);
 
+  bool IsPinned() const { return tensor_.is_pinned(); }
+
+  int64_t NumBytes() const { return tensor_.numel() * tensor_.element_size(); }
+
   /**
    * @brief The cache query function. Allocates an empty tensor `values` with
    * size as the first dimension and runs
@@ -87,6 +91,7 @@ struct FeatureCache : public torch::CustomClassHolder {
       const std::vector<int64_t>& shape, torch::ScalarType dtype,
       bool pin_memory);
 
+ private:
   torch::Tensor tensor_;
 };
 
