@@ -2016,6 +2016,3 @@ def test_partition_graph_graphbolt_hetero_find_edges_multi(
         graph_formats="coo",
         n_jobs=4,
     )
-
-if __name__ == '__main__':
-    test_partition_graph_graphbolt_hetero('metis',4,True,False,False,False)
