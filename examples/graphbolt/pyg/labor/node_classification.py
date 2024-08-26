@@ -333,13 +333,13 @@ def evaluate(
     model.eval()
     total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0
-    val_dataloader_tqdm = tqdm(dataloader, "Evaluating")
-    for step, minibatch in enumerate(val_dataloader_tqdm):
+    dataloader = tqdm(dataloader, "Evaluating")
+    for step, minibatch in enumerate(dataloader):
         num_correct, num_samples = evaluate_step(minibatch, model, eval_fn)
         total_correct += num_correct
         total_samples += num_samples
         if step % 25 == 0:
-            val_dataloader_tqdm.set_postfix(
+            dataloader.set_postfix(
                 {
                     "num_nodes": minibatch.node_ids().size(0),
                     "gpu_cache_miss": gpu_cache_miss_rate_fn(),
@@ -494,23 +494,23 @@ def main():
     if args.num_cpu_cached_features > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
     ):
-        features[("node", None, "feat")] = gb.CPUCachedFeature(
+        features[("node", None, "feat")] = gb.cpu_cached_feature(
             features[("node", None, "feat")],
             args.num_cpu_cached_features * feature_num_bytes,
             args.cpu_feature_cache_policy,
             args.feature_device == "pinned",
         )
         cpu_cached_feature = features[("node", None, "feat")]
-        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature._feature.miss_rate
+        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
     if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
-        features[("node", None, "feat")] = gb.GPUCachedFeature(
+        features[("node", None, "feat")] = gb.gpu_cached_feature(
             features[("node", None, "feat")],
             args.num_gpu_cached_features * feature_num_bytes,
         )
         gpu_cached_feature = features[("node", None, "feat")]
-        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature._feature.miss_rate
+        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature.miss_rate
     else:
         gpu_cache_miss_rate_fn = lambda: 1
 

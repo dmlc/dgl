@@ -23,19 +23,32 @@ __all__ = [
 
 
 class _SampleNeighborsWaiter:
-    def __init__(self, fn, future, seed_offsets):
+    def __init__(
+        self, fn, future, seed_offsets, fetching_original_edge_ids_is_optional
+    ):
         self.fn = fn
         self.future = future
         self.seed_offsets = seed_offsets
+        self.fetching_original_edge_ids_is_optional = (
+            fetching_original_edge_ids_is_optional
+        )
 
     def wait(self):
         """Returns the stored value when invoked."""
         fn = self.fn
         C_sampled_subgraph = self.future.wait()
         seed_offsets = self.seed_offsets
+        fetching_original_edge_ids_is_optional = (
+            self.fetching_original_edge_ids_is_optional
+        )
         # Ensure there is no memory leak.
         self.fn = self.future = self.seed_offsets = None
-        return fn(C_sampled_subgraph, seed_offsets)
+        self.fetching_original_edge_ids_is_optional = None
+        return fn(
+            C_sampled_subgraph,
+            seed_offsets,
+            fetching_original_edge_ids_is_optional,
+        )
 
 
 class FusedCSCSamplingGraph(SamplingGraph):
@@ -592,6 +605,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         self,
         C_sampled_subgraph: torch.ScriptObject,
         seed_offsets: Optional[list] = None,
+        fetching_original_edge_ids_is_optional: bool = False,
     ) -> SampledSubgraphImpl:
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'SampledSubgraphImpl'."""
@@ -611,9 +625,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
         original_edge_ids = (
-            torch.ops.graphbolt.index_select(
-                self.edge_attributes[ORIGINAL_EDGE_ID],
-                edge_ids_in_fused_csc_sampling_graph,
+            (
+                torch.ops.graphbolt.index_select(
+                    self.edge_attributes[ORIGINAL_EDGE_ID],
+                    edge_ids_in_fused_csc_sampling_graph,
+                )
+                if not fetching_original_edge_ids_is_optional
+                or not edge_ids_in_fused_csc_sampling_graph.is_cuda
+                or not self.edge_attributes[ORIGINAL_EDGE_ID].is_pinned()
+                else None
             )
             if has_original_eids
             else edge_ids_in_fused_csc_sampling_graph
@@ -621,8 +641,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         if type_per_edge is None and etype_offsets is None:
             # The sampled graph is already a homogeneous graph.
             sampled_csc = CSCFormatBase(indptr=indptr, indices=indices)
-            if indices is not None:
-                # Only needed to fetch indices.
+            if indices is not None and original_edge_ids is not None:
+                # Only needed to fetch indices or original_edge_ids.
                 edge_ids_in_fused_csc_sampling_graph = None
         else:
             offset = self._node_type_offset_list
@@ -691,11 +711,17 @@ class FusedCSCSamplingGraph(SamplingGraph):
                             ]
                         ]
                     )
-                    original_hetero_edge_ids[etype] = original_edge_ids[
-                        etype_offsets[etype_id] : etype_offsets[etype_id + 1]
-                    ]
-                    if indices is None:
-                        # Only needed to fetch indices.
+                    original_hetero_edge_ids[etype] = (
+                        None
+                        if original_edge_ids is None
+                        else original_edge_ids[
+                            etype_offsets[etype_id] : etype_offsets[
+                                etype_id + 1
+                            ]
+                        ]
+                    )
+                    if indices is None or original_edge_ids is None:
+                        # Only needed to fetch indices or original edge ids.
                         sampled_hetero_edge_ids_in_fused_csc_sampling_graph[
                             etype
                         ] = edge_ids_in_fused_csc_sampling_graph[
@@ -727,7 +753,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-        returning_indices_is_optional: bool = False,
+        returning_indices_and_original_edge_ids_are_optional: bool = False,
         async_op: bool = False,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
@@ -768,10 +794,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
-        returning_indices_is_optional: bool
+        returning_indices_and_original_edge_ids_are_optional: bool
             Boolean indicating whether it is okay for the call to this function
-            to leave the indices tensor uninitialized. In this case, it is the
-            user's responsibility to gather it using the edge ids.
+            to leave the indices and the original edge ids tensors
+            uninitialized. In this case, it is the user's responsibility to
+            gather them using _edge_ids_in_fused_csc_sampling_graph if either is
+            missing.
         async_op: bool
             Boolean indicating whether the call is asynchronous. If so, the
             result can be obtained by calling wait on the returned future.
@@ -818,7 +846,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts,
             replace=replace,
             probs_or_mask=probs_or_mask,
-            returning_indices_is_optional=returning_indices_is_optional,
+            returning_indices_is_optional=returning_indices_and_original_edge_ids_are_optional,
             async_op=async_op,
         )
         if async_op:
@@ -826,10 +854,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 self._convert_to_sampled_subgraph,
                 C_sampled_subgraph,
                 seed_offsets,
+                returning_indices_and_original_edge_ids_are_optional,
             )
         else:
             return self._convert_to_sampled_subgraph(
-                C_sampled_subgraph, seed_offsets
+                C_sampled_subgraph,
+                seed_offsets,
+                returning_indices_and_original_edge_ids_are_optional,
             )
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_or_mask):
@@ -956,7 +987,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-        returning_indices_is_optional: bool = False,
+        returning_indices_and_original_edge_ids_are_optional: bool = False,
         random_seed: torch.Tensor = None,
         seed2_contribution: float = 0.0,
         async_op: bool = False,
@@ -1001,10 +1032,12 @@ class FusedCSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
-        returning_indices_is_optional: bool
+        returning_indices_and_original_edge_ids_are_optional: bool
             Boolean indicating whether it is okay for the call to this function
-            to leave the indices tensor uninitialized. In this case, it is the
-            user's responsibility to gather it using the edge ids.
+            to leave the indices and the original edge ids tensors
+            uninitialized. In this case, it is the user's responsibility to
+            gather them using _edge_ids_in_fused_csc_sampling_graph if either is
+            missing.
         random_seed: torch.Tensor, optional
             An int64 tensor with one or two elements.
 
@@ -1092,7 +1125,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             True,  # is_labor
-            returning_indices_is_optional,
+            returning_indices_and_original_edge_ids_are_optional,
             probs_or_mask,
             random_seed,
             seed2_contribution,
@@ -1102,10 +1135,13 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 self._convert_to_sampled_subgraph,
                 C_sampled_subgraph,
                 seed_offsets,
+                returning_indices_and_original_edge_ids_are_optional,
             )
         else:
             return self._convert_to_sampled_subgraph(
-                C_sampled_subgraph, seed_offsets
+                C_sampled_subgraph,
+                seed_offsets,
+                returning_indices_and_original_edge_ids_are_optional,
             )
 
     def temporal_sample_neighbors(
@@ -1512,15 +1548,21 @@ class FusedCSCSamplingGraph(SamplingGraph):
         dtypes = [self.indices.dtype]
         if self.type_per_edge is not None:
             dtypes.append(self.type_per_edge.dtype)
+        has_original_edge_ids = False
         if self.edge_attributes is not None:
             probs_or_mask = self.edge_attributes.get(prob_name, None)
             if probs_or_mask is not None:
                 dtypes.append(probs_or_mask.dtype)
+            original_edge_ids = self.edge_attributes.get(ORIGINAL_EDGE_ID, None)
+            if original_edge_ids is not None:
+                dtypes.append(original_edge_ids.dtype)
+                has_original_edge_ids = True
         self._gpu_graph_cache_ = GPUGraphCache(
             num_gpu_cached_edges,
             gpu_cache_threshold,
             self.csc_indptr.dtype,
             dtypes,
+            has_original_edge_ids,
         )
 
 

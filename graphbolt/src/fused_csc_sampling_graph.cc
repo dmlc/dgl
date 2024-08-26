@@ -430,9 +430,10 @@ auto GetPickFn(
           type_per_edge.value(), probs_or_mask, args, picked_data_ptr,
           seed_offset, subgraph_indptr_ptr, etype_id_to_num_picked_offset);
     } else {
+      picked_data_ptr += subgraph_indptr_ptr[seed_offset];
       int64_t num_sampled = Pick(
           offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
-          args, picked_data_ptr + subgraph_indptr_ptr[seed_offset]);
+          args, picked_data_ptr);
       if (type_per_edge) {
         std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
       }
@@ -880,12 +881,15 @@ FusedCSCSamplingGraph::SampleNeighborsAsync(
     torch::optional<torch::Tensor> probs_or_mask,
     torch::optional<torch::Tensor> random_seed,
     double seed2_contribution) const {
-  return async([=] {
-    return this->SampleNeighbors(
-        seeds, seed_offsets, fanouts, replace, layer,
-        returning_indices_is_optional, probs_or_mask, random_seed,
-        seed2_contribution);
-  });
+  return async(
+      [=] {
+        return this->SampleNeighbors(
+            seeds, seed_offsets, fanouts, replace, layer,
+            returning_indices_is_optional, probs_or_mask, random_seed,
+            seed2_contribution);
+      },
+      (seeds.has_value() && utils::is_on_gpu(*seeds)) ||
+          utils::is_on_gpu(indptr_));
 }
 
 c10::intrusive_ptr<FusedSampledSubgraph>

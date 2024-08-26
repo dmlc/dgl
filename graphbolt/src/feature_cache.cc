@@ -66,7 +66,12 @@ torch::Tensor FeatureCache::IndexSelect(torch::Tensor positions) {
 }
 
 void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
+  TORCH_CHECK(positions.size(0) == values.size(0));
+  if (values.numel() == 0) return;
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
+  TORCH_CHECK(
+      row_bytes == tensor_.slice(0, 0, 1).numel() * tensor_.element_size(),
+      "The # bytes of a single row should match the cache's.");
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
   const auto positions_ptr = positions.data_ptr<int64_t>();
