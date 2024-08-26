@@ -1327,7 +1327,9 @@ def _verify_mapping(
             (np.ones(len(part_g.indices), dtype=float), indices, indptr)
         )
         coo_matrix = csc_matrix.tocoo()
-        part_src_ids, part_dst_ids = th.tensor(coo_matrix.row), th.tensor(coo_matrix.col)
+        part_src_ids, part_dst_ids = th.tensor(coo_matrix.row), th.tensor(
+            coo_matrix.col
+        )
         part_src_ids = F.gather_row(
             part_g.node_attributes[dgl.NID], part_src_ids
         )
@@ -1556,7 +1558,9 @@ def _verify_graphbolt_mapping_IDs(
         (np.ones(len(part_g.indices), dtype=float), indices, indptr)
     )
     coo_matrix = csc_matrix.tocoo()
-    part_src_ids, part_dst_ids = th.tensor(coo_matrix.row), th.tensor(coo_matrix.col)
+    part_src_ids, part_dst_ids = th.tensor(coo_matrix.row), th.tensor(
+        coo_matrix.col
+    )
     # These are reshuffled global homogeneous IDs.
     part_src_ids = F.gather_row(part_g.node_attributes[dgl.NID], part_src_ids)
     part_dst_ids = F.gather_row(part_g.node_attributes[dgl.NID], part_dst_ids)
