@@ -56,9 +56,7 @@ collection of features.
     TorchBasedFeature
     TorchBasedFeatureStore
     DiskBasedFeature
-    cpu_cached_feature
     CPUCachedFeature
-    gpu_cached_feature
     GPUCachedFeature
 
 
@@ -186,6 +184,8 @@ Utilities
     :toctree: ../../generated/
     :nosignatures:
 
+    cpu_cached_feature
+    gpu_cached_feature
     fused_csc_sampling_graph
     load_from_shared_memory
     from_dglgraph
