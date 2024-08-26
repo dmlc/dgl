@@ -15,7 +15,7 @@ cuda_allocator_env = os.getenv("PYTORCH_CUDA_ALLOC_CONF")
 WARNING_STR_TO_BE_SHOWN = None
 configs = (
     {}
-    if cuda_allocator_env is None
+    if cuda_allocator_env is None or len(cuda_allocator_env) == 0
     else {
         kv_pair.split(":")[0]: kv_pair.split(":")[1]
         for kv_pair in cuda_allocator_env.split(",")
