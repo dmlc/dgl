@@ -11,7 +11,9 @@ import torch
 @unittest.skipIf(
     F._default_context_str != "gpu"
     or torch.cuda.get_device_capability()[0] < 7,
-    reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
+    reason="Pinned tests are available only on GPU."
+            if F._default_context_str != "gpu" else
+            "GPUCachedFeature requires a Volta or later generation NVIDIA GPU."
 )
 @pytest.mark.parametrize(
     "indptr_dtype",
