@@ -130,6 +130,7 @@ def _get_inner_node_mask(graph, ntype_id, use_graphbolt=False):
 
 def _get_inner_edge_mask(graph, etype_id, use_graphbolt=False):
     edata = graph.edge_attributes if use_graphbolt else graph.edata
+    assert "inner_edge" in edata, "'inner_edge' is not edges\' data"
     etype = (
         graph.type_per_edge
         if use_graphbolt
