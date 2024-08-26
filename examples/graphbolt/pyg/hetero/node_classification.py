@@ -74,34 +74,6 @@ def create_dataloader(
     return gb.DataLoader(datapipe, num_workers=args.num_workers)
 
 
-def convert_to_pyg(h, subgraph):
-    #####################################################################
-    # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
-    #
-    #   We convert the provided sampled edges in CSC format from GraphBolt and
-    #   convert to COO via using gb.expand_indptr.
-    #####################################################################
-    h_dst_dict = {}
-    edge_index_dict = {}
-    sizes_dict = {}
-    for etype, sampled_csc in subgraph.sampled_csc.items():
-        src = sampled_csc.indices
-        dst = gb.expand_indptr(
-            sampled_csc.indptr,
-            dtype=src.dtype,
-            output_size=src.size(0),
-        )
-        edge_index = torch.stack([src, dst], dim=0).long()
-        dst_size = sampled_csc.indptr.size(0) - 1
-        # h and h[:dst_size] correspond to source and destination features resp.
-        src_ntype, _, dst_ntype = gb.etype_str_to_tuple(etype)
-        h_dst_dict[dst_ntype] = h[dst_ntype][:dst_size]
-        edge_index_dict[etype] = edge_index
-        sizes_dict[etype] = (h[src_ntype].size(0), dst_size)
-
-    return (h, h_dst_dict), edge_index_dict, sizes_dict
-
-
 class RelGraphConvLayer(nn.Module):
     def __init__(
         self,
@@ -153,7 +125,7 @@ class RelGraphConvLayer(nn.Module):
         # only on the destination nodes' features. By doing so, we ensure the
         # feature dimensions match and prevent any misuse of incorrect node
         # features.
-        (h, h_dst), edge_index, size = convert_to_pyg(x, subgraph)
+        (h, h_dst), edge_index, size = subgraph.to_pyg(x)
 
         h_out = {}
         for etype in edge_index:
