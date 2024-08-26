@@ -1,7 +1,7 @@
 """Graphbolt sampled subgraph."""
 
 # pylint: disable= invalid-name
-from typing import Dict, Tuple, Union
+from typing import Dict, NamedTuple, Tuple, Union
 
 import torch
 
@@ -18,6 +18,15 @@ from .internal_utils import recursive_apply
 
 
 __all__ = ["SampledSubgraph"]
+
+class PyGLayerData(NamedTuple):
+    """A named tuple class to represent the inputs to a PyG model layer.
+    The fields are x (input features), edge_index and size (source and destination sizes.)
+    """
+
+    x: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    edge_index: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    size: Union[Tuple[int, int], Dict[str, Tuple[int, int]]]
 
 
 class SampledSubgraph:
@@ -241,6 +250,12 @@ class SampledSubgraph:
         ----------
         x : Union[torch.Tensor, Dict[str, torch.Tensor]]
             The input node features to the GNN layer.
+        
+        Returns
+        -------
+        PyGLayerData
+            A named tuple class with `x`, `edge_index` and `size` fields.
+            Typically, a PyG GNN layer will accept these parameters.
         """
         if isinstance(x, torch.Tensor):
             # Homogenous
@@ -253,7 +268,7 @@ class SampledSubgraph:
             edge_index = torch.stack([src, dst], dim=0).long()
             dst_size = self.sampled_csc.indptr.size(0) - 1
             # h and h[:dst_size] correspond to source and destination features resp.
-            return (x, x[:dst_size]), edge_index, (x.size(0), dst_size)
+            return PyGLayerData((x, x[:dst_size]), edge_index, (x.size(0), dst_size))
         else:
             # Heterogenous
             x_dst_dict = {}
@@ -274,7 +289,7 @@ class SampledSubgraph:
                 edge_index_dict[etype] = edge_index
                 sizes_dict[etype] = (x[src_ntype].size(0), dst_size)
 
-            return (x, x_dst_dict), edge_index_dict, sizes_dict
+            return PyGLayerData((x, x_dst_dict), edge_index_dict, sizes_dict)
 
     def to(
         self, device: torch.device, non_blocking=False
