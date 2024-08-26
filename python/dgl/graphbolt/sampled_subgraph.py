@@ -270,7 +270,8 @@ class SampledSubgraph:
         -------
         Union[PyGLayerData, PyGLayerHeteroData]
             A named tuple class with `x`, `edge_index` and `size` fields.
-            Typically, a PyG GNN layer will accept these parameters.
+            Typically, a PyG GNN layer's forward method will accept these as
+            arguments.
         """
         if isinstance(x, torch.Tensor):
             # Homogenous
