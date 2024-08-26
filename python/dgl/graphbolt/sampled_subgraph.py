@@ -255,7 +255,9 @@ class SampledSubgraph:
                 )
             return calling_class(*_slice_subgraph(self, index))
 
-    def to_pyg(self, x: Union[torch.Tensor, Dict[str, torch.Tensor]]):
+    def to_pyg(
+        self, x: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    ) -> Union[PyGLayerData, PyGLayerHeteroData]:
         """
         Process layer inputs so that they can be consumed by a PyG model layer.
 
@@ -266,7 +268,7 @@ class SampledSubgraph:
 
         Returns
         -------
-        PyGLayerData
+        Union[PyGLayerData, PyGLayerHeteroData]
             A named tuple class with `x`, `edge_index` and `size` fields.
             Typically, a PyG GNN layer will accept these parameters.
         """
