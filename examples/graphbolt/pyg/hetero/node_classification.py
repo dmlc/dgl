@@ -486,7 +486,7 @@ def main():
 
     # Initialize the entity classification model.
     model = EntityClassify(
-        graph, feat_size, hidden_channels, num_classes, 3
+        graph, feat_size, hidden_channels, num_classes, len(args.fanout)
     ).to(args.device)
 
     print(
