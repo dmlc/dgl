@@ -5,7 +5,6 @@ import tempfile
 import dgl
 
 import dgl.backend as F
-import dgl.sparse as dglsp
 import numpy as np
 import pytest
 import torch as th
@@ -1323,9 +1322,12 @@ def _verify_mapping(
 
     if store_eids:
         # Verify the mapping between the reshuffled IDs and the original IDs.
-        indices, indptr = part_g.indices, part_g.csc_indptr
-        adj_matrix = dglsp.from_csc(indptr, indices)
-        part_src_ids, part_dst_ids = adj_matrix.coo()
+        indices, indptr = part_g.indices.numpy(), part_g.csc_indptr.numpy()
+        csc_matrix = spsp.csc_matrix(
+            (np.ones(len(part_g.indices), dtype=float), indices, indptr)
+        )
+        coo_matrix = csc_matrix.tocoo()
+        part_src_ids, part_dst_ids = th.tensor(coo_matrix.row), th.tensor(coo_matrix.col)
         part_src_ids = F.gather_row(
             part_g.node_attributes[dgl.NID], part_src_ids
         )
@@ -1549,9 +1551,12 @@ def _verify_graphbolt_mapping_IDs(
     """
     # Verify the mapping between the reshuffled IDs and the original IDs.
     # These are partition-local IDs.
-    indices, indptr = part_g.indices, part_g.csc_indptr
-    csc_matrix = dglsp.from_csc(indptr, indices)
-    part_src_ids, part_dst_ids = csc_matrix.coo()
+    indices, indptr = part_g.indices.numpy(), part_g.csc_indptr.numpy()
+    csc_matrix = spsp.csc_matrix(
+        (np.ones(len(part_g.indices), dtype=float), indices, indptr)
+    )
+    coo_matrix = csc_matrix.tocoo()
+    part_src_ids, part_dst_ids = th.tensor(coo_matrix.row), th.tensor(coo_matrix.col)
     # These are reshuffled global homogeneous IDs.
     part_src_ids = F.gather_row(part_g.node_attributes[dgl.NID], part_src_ids)
     part_dst_ids = F.gather_row(part_g.node_attributes[dgl.NID], part_dst_ids)
