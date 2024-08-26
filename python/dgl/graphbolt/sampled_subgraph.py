@@ -233,6 +233,49 @@ class SampledSubgraph:
                 )
             return calling_class(*_slice_subgraph(self, index))
 
+    def to_pyg(self, x: Union[torch.Tensor, Dict[str, torch.Tensor]]):
+        """
+        Process layer inputs so that they can be consumed by a PyG model layer.
+
+        Parameters
+        ----------
+        x : Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The input node features to the GNN layer.
+        """
+        if isinstance(x, torch.Tensor):
+            # Homogenous
+            src = self.sampled_csc.indices
+            dst = expand_indptr(
+                self.sampled_csc.indptr,
+                dtype=src.dtype,
+                output_size=src.size(0),
+            )
+            edge_index = torch.stack([src, dst], dim=0).long()
+            dst_size = self.sampled_csc.indptr.size(0) - 1
+            # h and h[:dst_size] correspond to source and destination features resp.
+            return (x, x[:dst_size]), edge_index, (x.size(0), dst_size)
+        else:
+            # Heterogenous
+            x_dst_dict = {}
+            edge_index_dict = {}
+            sizes_dict = {}
+            for etype, sampled_csc in self.sampled_csc.items():
+                src = sampled_csc.indices
+                dst = expand_indptr(
+                    sampled_csc.indptr,
+                    dtype=src.dtype,
+                    output_size=src.size(0),
+                )
+                edge_index = torch.stack([src, dst], dim=0).long()
+                dst_size = sampled_csc.indptr.size(0) - 1
+                # h and h[:dst_size] correspond to source and destination features resp.
+                src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
+                x_dst_dict[dst_ntype] = x[dst_ntype][:dst_size]
+                edge_index_dict[etype] = edge_index
+                sizes_dict[etype] = (x[src_ntype].size(0), dst_size)
+
+            return (x, x_dst_dict), edge_index_dict, sizes_dict
+
     def to(
         self, device: torch.device, non_blocking=False
     ) -> None:  # pylint: disable=invalid-name
