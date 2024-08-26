@@ -195,6 +195,7 @@ Utilities
     seed
     index_select
     expand_indptr
+    indptr_edge_ids
     add_reverse_edges
     exclude_seed_edges
     compact_csc_format
