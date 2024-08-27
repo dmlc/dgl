@@ -17,7 +17,7 @@ __all__ = ["CPUCachedFeature", "cpu_cached_feature"]
 
 
 class CPUCachedFeature(Feature):
-    r"""CPU cached feature wrapping a fallback feature. Use `cpu_feature_cache`
+    r"""CPU cached feature wrapping a fallback feature. Use `cpu_cached_feature`
     to construct an instance of this class.
 
     Parameters
