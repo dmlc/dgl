@@ -177,12 +177,12 @@ class ItemSet:
                         f"{type(self).__name__} index out of range."
                     )
                 return torch.tensor(index, dtype=dtype)
-            elif isinstance(index, Iterable):
-                return torch.tensor(index, dtype=dtype)
+            elif isinstance(index, torch.Tensor):
+                return index.to(dtype)
             else:
                 raise TypeError(
                     f"{type(self).__name__} indices must be int, slice, or "
-                    f"iterable of int, not {type(index)}."
+                    f"torch.Tensor, not {type(index)}."
                 )
         elif self._num_items == 1:
             return self._items[0][index]

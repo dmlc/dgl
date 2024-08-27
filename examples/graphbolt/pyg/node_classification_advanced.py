@@ -75,25 +75,6 @@ def accuracy(out, labels):
     return (labels == predictions).sum(dtype=torch.float64) / labels.size(0)
 
 
-def convert_to_pyg(h, subgraph):
-    #####################################################################
-    # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
-    #
-    #   We convert the provided sampled edges in CSC format from GraphBolt and
-    #   convert to COO via using gb.expand_indptr.
-    #####################################################################
-    src = subgraph.sampled_csc.indices
-    dst = gb.expand_indptr(
-        subgraph.sampled_csc.indptr,
-        dtype=src.dtype,
-        output_size=src.size(0),
-    )
-    edge_index = torch.stack([src, dst], dim=0).long()
-    dst_size = subgraph.sampled_csc.indptr.size(0) - 1
-    # h and h[:dst_size] correspond to source and destination features resp.
-    return (h, h[:dst_size]), edge_index, (h.size(0), dst_size)
-
-
 class GraphSAGE(torch.nn.Module):
     #####################################################################
     # (HIGHLIGHT) Define the GraphSAGE model architecture.
@@ -123,7 +104,7 @@ class GraphSAGE(torch.nn.Module):
             #   given features to get src and dst features to use the PyG layers
             #   in the more efficient bipartite mode.
             #####################################################################
-            h, edge_index, size = convert_to_pyg(h, subgraph)
+            h, edge_index, size = subgraph.to_pyg(h)
             h = layer(h, edge_index, size=size)
             if i != len(subgraphs) - 1:
                 h = F.relu(h)
@@ -146,8 +127,8 @@ class GraphSAGE(torch.nn.Module):
             )
             for data in tqdm(dataloader, "Inferencing"):
                 # len(data.sampled_subgraphs) = 1
-                h, edge_index, size = convert_to_pyg(
-                    data.node_features["feat"], data.sampled_subgraphs[0]
+                h, edge_index, size = data.sampled_subgraphs[0].to_pyg(
+                    data.node_features["feat"]
                 )
                 hidden_x = layer(h, edge_index, size=size)
                 if not is_last_layer:
