@@ -287,10 +287,8 @@ def train(dataloader, model, device):
     # - The function returns the average loss and accuracy for the epoch.
     #
     # Parameters:
-    #   model: The GraphSAGE model.
     #   dataloader: DataLoader that provides mini-batches of graph data.
-    #   optimizer: Optimizer used for updating model parameters.
-    #   loss_fn: Loss function used for training.
+    #   model: The GraphSAGE model.
     #   device: The device (CPU/GPU) to run the training on.
     #####################################################################
 
