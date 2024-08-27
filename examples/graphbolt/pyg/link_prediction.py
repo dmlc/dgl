@@ -81,8 +81,8 @@ main
 └───> Validation and test set evaluation
 """
 import argparse
-from functools import partial
 import time
+from functools import partial
 
 import dgl.graphbolt as gb
 import torch
@@ -95,8 +95,8 @@ torch._dynamo.config.cache_size_limit = 32
 
 import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv
-from tqdm import tqdm
 from torchmetrics.retrieval import RetrievalMRR
+from tqdm import tqdm
 
 
 class GraphSAGE(torch.nn.Module):
@@ -232,14 +232,16 @@ def create_dataloader(
     # Create and return a DataLoader to handle data loading.
     return gb.DataLoader(datapipe, num_workers=args.num_workers)
 
+
 @torch.compile
 def predictions_step(model, h_src, h_dst):
     return model.predictor(h_src * h_dst).squeeze()
 
+
 def compute_predictions(model, node_emb, seeds, device):
     """Compute the predictions for given source and destination nodes.
 
-    This function computes the predictions for a set of node pairs, dividing the 
+    This function computes the predictions for a set of node pairs, dividing the
     task into batches to handle potentially large graphs.
     """
 
@@ -259,6 +261,7 @@ def compute_predictions(model, node_emb, seeds, device):
         # Compute prediction scores using the model.
         preds[start:end] = predictions_step(model, h_src, h_dst)
     return preds
+
 
 @torch.no_grad()
 def evaluate(model, graph, features, all_nodes_set, valid_set, test_set):
@@ -314,9 +317,7 @@ def train_helper(dataloader, model, optimizer, device):
     total_samples = 0  # Accumulator for the total number of samples processed
     start = time.time()
     for step, minibatch in tqdm(enumerate(dataloader), "Training"):
-        loss, num_samples = train_step(
-            minibatch, optimizer, model
-        )
+        loss, num_samples = train_step(minibatch, optimizer, model)
         total_loss += loss * num_samples
         total_samples += num_samples
         if step + 1 == args.early_stop:
@@ -486,9 +487,9 @@ def main():
 
     in_channels = features.size("node", None, "feat")[0]
     hidden_channels = 256
-    model = GraphSAGE(
-        in_channels, hidden_channels, len(args.fanout)
-    ).to(args.device)
+    model = GraphSAGE(in_channels, hidden_channels, len(args.fanout)).to(
+        args.device
+    )
     assert len(args.fanout) == len(model.layers)
 
     train(train_dataloader, model, args.device)
