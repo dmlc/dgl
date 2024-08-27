@@ -96,7 +96,7 @@ torch._dynamo.config.cache_size_limit = 32
 import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv
 from torchmetrics.retrieval import RetrievalMRR
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 
 class GraphSAGE(torch.nn.Module):
@@ -251,7 +251,7 @@ def compute_predictions(model, node_emb, seeds, device):
     # dataset is 1000.
     eval_size = args.eval_batch_size * 1001
     # Loop over node pairs in batches.
-    for start in tqdm.trange(0, seeds_src.shape[0], eval_size, desc="Evaluate"):
+    for start in trange(0, seeds_src.shape[0], eval_size, desc="Evaluate"):
         end = min(start + eval_size, seeds_src.shape[0])
 
         # Fetch embeddings for current batch of source and destination nodes.
@@ -279,7 +279,7 @@ def evaluate(model, graph, features, all_nodes_set, valid_set, test_set):
     )
 
     # Compute node embeddings for the entire graph.
-    node_emb = model.inference(graph, features, dataloader, args.storage_device)
+    node_emb = model.inference(graph, features, dataloader, args.feature_device)
     results = []
 
     # Loop over both validation and test sets.
@@ -410,7 +410,7 @@ def parse_args():
     )
     parser.add_argument(
         "--mode",
-        default="cuda-cuda-cuda",
+        default="pinned-pinned-cuda",
         choices=[
             "cpu-cpu-cpu",
             "cpu-cpu-cuda",
