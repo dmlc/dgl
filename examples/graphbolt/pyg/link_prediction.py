@@ -272,7 +272,7 @@ def evaluate(model, graph, features, all_nodes_set, valid_set, test_set):
         graph,
         features,
         all_nodes_set,
-        args.batch_size,
+        args.eval_batch_size,
         [-1],
         args.device,
         job="infer",
@@ -370,6 +370,8 @@ def parse_args():
         help="Learning rate for optimization.",
     )
     parser.add_argument("--neg-ratio", type=int, default=1)
+    parser.add_argument("--train-batch-size", type=int, default=512)
+    parser.add_argument("--eval-batch-size", type=int, default=1024)
     parser.add_argument(
         "--batch-size", type=int, default=1024, help="Batch size for training."
     )
@@ -467,8 +469,6 @@ def main():
     all_nodes_set = dataset.all_nodes_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
-    num_classes = dataset.tasks[0].metadata["num_classes"]
-
     if args.gpu_cache_size > 0 and args.feature_device != "cuda":
         features._features[("node", None, "feat")] = gb.gpu_cached_feature(
             features._features[("node", None, "feat")],
@@ -479,7 +479,7 @@ def main():
         graph=graph,
         features=features,
         itemset=train_set,
-        batch_size=args.batch_size,
+        batch_size=args.train_batch_size,
         fanout=args.fanout,
         device=args.device,
         job="train",
