@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 import torch as th
 from dgl import function as fn
-from dgl.base import NTYPE
 from dgl.distributed import (
     dgl_partition_to_graphbolt,
     load_partition,
@@ -89,18 +88,36 @@ def create_random_hetero():
     return dgl.heterograph(edges, num_nodes)
 
 
+def _verify_augument_for_graphbolt(
+    parts, store_inner_node, store_inner_edge, store_eids, debug_mode
+):
+    if not debug_mode:
+        for part in parts:
+            if store_inner_edge:
+                assert "inner_edge" in part.edge_attributes
+            else:
+                assert "inner_edge" not in part.edge_attributes
+            if store_inner_node:
+                assert "inner_node" in part.node_attributes
+            else:
+                assert "inner_node" not in part.node_attributes
+            if store_eids:
+                assert dgl.EID in part.edge_attributes
+            else:
+                assert dgl.EID not in part.edge_attributes
+
+
 def _verify_hetero_graph_elements_number(
     g,
     parts,
-    store_inner_node,
     store_inner_edge,
     use_graphbolt,
+    debug_mode,
 ):
     """
     check list:
         make sure edge type are correct.
         make sure the number of nodes in each node type are correct.
-        make sure the argument store_inner_edge and store_inner_node work.
     """
     num_nodes = {ntype: 0 for ntype in g.ntypes}
     num_edges = {etype: 0 for etype in g.canonical_etypes}
@@ -108,7 +125,7 @@ def _verify_hetero_graph_elements_number(
         edata = part.edge_attributes if use_graphbolt else part.edata
         if dgl.ETYPE in edata:
             assert len(g.canonical_etypes) == len(F.unique(edata[dgl.ETYPE]))
-        if not use_graphbolt:
+        if debug_mode or not use_graphbolt:
             for ntype in g.ntypes:
                 ntype_id = g.get_ntype_id(ntype)
                 inner_node_mask = _get_inner_node_mask(
@@ -126,7 +143,7 @@ def _verify_hetero_graph_elements_number(
                 num_edges[etype] += num_inner_edges
 
     # Verify the number of nodes are correct.
-    if not use_graphbolt:
+    if debug_mode or not use_graphbolt:
         for ntype in g.ntypes:
             print(
                 "node {}: {}, {}".format(
@@ -134,8 +151,6 @@ def _verify_hetero_graph_elements_number(
                 )
             )
             assert g.num_nodes(ntype) == num_nodes[ntype]
-    elif store_inner_node:
-        assert "inner_node" in parts[0].node_attributes
     # Verify the number of edges are correct.
     if store_inner_edge or not use_graphbolt:
         for etype in g.canonical_etypes:
@@ -145,8 +160,6 @@ def _verify_hetero_graph_elements_number(
                 )
             )
             assert g.num_edges(etype) == num_edges[etype]
-    elif not store_inner_edge:
-        assert "inner_edge" not in parts[0].edge_attributes
 
 
 def _verify_hetero_graph_attributes(
@@ -162,7 +175,6 @@ def _verify_hetero_graph_attributes(
         make sure inner nodes have Ids fall into a range.
         make sure all nodes is included.
         make sure all edges is included.
-        make sure store_eids performs its function.
     """
     if store_eids or not use_graphbolt:
         nids = {ntype: [] for ntype in g.ntypes}
@@ -224,9 +236,6 @@ def _verify_hetero_graph_attributes(
                 uniq_ids = F.unique(eids_type)
                 # We should get all nodes.
                 assert len(uniq_ids) == g.num_edges(etype)
-            # TODO(zhengda) this doesn't check 'part_id'
-    elif not store_eids:
-        assert dgl.EID not in parts[0].edge_attributes
 
 
 def _verify_hetero_graph(
@@ -234,15 +243,15 @@ def _verify_hetero_graph(
     parts,
     use_graphbolt=False,
     store_eids=False,
-    store_inner_node=False,
     store_inner_edge=False,
+    debug_mode=False,
 ):
     _verify_hetero_graph_elements_number(
         g,
         parts,
         store_inner_edge=store_inner_edge,
-        store_inner_node=store_inner_node,
         use_graphbolt=use_graphbolt,
+        debug_mode=debug_mode,
     )
     _verify_hetero_graph_attributes(
         g,
@@ -445,7 +454,6 @@ def check_hetero_partition(
             edge_feats[_etype_tuple_to_str(test_etype) + "/labels"]
         )
     _verify_hetero_graph(hg, parts)
-
     shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
     shuffled_elabels = F.asnumpy(F.cat(shuffled_elabels, 0))
     orig_labels = np.zeros(shuffled_labels.shape, dtype=shuffled_labels.dtype)
@@ -912,8 +920,6 @@ def test_dgl_partition_to_graphbolt_homo(
                     orig_g.ndata["inner_node"],
                     new_g.node_attributes["inner_node"],
                 )
-            else:
-                assert "inner_node" not in new_g.node_attributes
             if store_eids or debug_mode:
                 assert orig_g.edata[dgl.EID].dtype == th.int64
                 assert new_g.edge_attributes[dgl.EID].dtype == th.int64
@@ -921,8 +927,6 @@ def test_dgl_partition_to_graphbolt_homo(
                     orig_g.edata[dgl.EID][orig_eids],
                     new_g.edge_attributes[dgl.EID],
                 )
-            else:
-                assert dgl.EID not in new_g.edge_attributes
             if store_inner_edge or debug_mode:
                 assert orig_g.edata["inner_edge"].dtype == th.uint8
                 assert new_g.edge_attributes["inner_edge"].dtype == th.uint8
@@ -930,8 +934,6 @@ def test_dgl_partition_to_graphbolt_homo(
                     orig_g.edata["inner_edge"][orig_eids],
                     new_g.edge_attributes["inner_edge"],
                 )
-            else:
-                assert "inner_edge" not in new_g.edge_attributes
             assert new_g.type_per_edge is None
             assert new_g.node_type_to_id is None
             assert new_g.edge_type_to_id is None
@@ -1038,16 +1040,12 @@ def test_dgl_partition_to_graphbolt_hetero(
                     orig_g.ndata["inner_node"],
                     new_g.node_attributes["inner_node"],
                 )
-            else:
-                assert "inner_node" not in new_g.node_attributes
             if debug_mode:
                 assert orig_g.ndata[dgl.NTYPE].dtype == th.int32
                 assert new_g.node_attributes[dgl.NTYPE].dtype == th.int8
                 assert th.equal(
                     orig_g.ndata[dgl.NTYPE], new_g.node_attributes[dgl.NTYPE]
                 )
-            else:
-                assert dgl.NTYPE not in new_g.node_attributes
             if store_eids or debug_mode:
                 assert orig_g.edata[dgl.EID].dtype == th.int64
                 assert new_g.edge_attributes[dgl.EID].dtype == th.int64
@@ -1055,8 +1053,6 @@ def test_dgl_partition_to_graphbolt_hetero(
                     orig_g.edata[dgl.EID][orig_eids],
                     new_g.edge_attributes[dgl.EID],
                 )
-            else:
-                assert dgl.EID not in new_g.edge_attributes
             if store_inner_edge or debug_mode:
                 assert orig_g.edata["inner_edge"].dtype == th.uint8
                 assert new_g.edge_attributes["inner_edge"].dtype == th.uint8
@@ -1064,8 +1060,6 @@ def test_dgl_partition_to_graphbolt_hetero(
                     orig_g.edata["inner_edge"],
                     new_g.edge_attributes["inner_edge"],
                 )
-            else:
-                assert "inner_edge" not in new_g.edge_attributes
             if debug_mode:
                 assert orig_g.edata[dgl.ETYPE].dtype == th.int32
                 assert new_g.edge_attributes[dgl.ETYPE].dtype == th.int8
@@ -1073,8 +1067,6 @@ def test_dgl_partition_to_graphbolt_hetero(
                     orig_g.edata[dgl.ETYPE][orig_eids],
                     new_g.edge_attributes[dgl.ETYPE],
                 )
-            else:
-                assert dgl.ETYPE not in new_g.edge_attributes
             assert th.equal(
                 orig_g.edata[dgl.ETYPE][orig_eids], new_g.type_per_edge
             )
@@ -1196,7 +1188,7 @@ def test_not_sorted_node_edge_map():
         assert gpb.local_etype_offset == [0, 500, 1100, 1800, 2600]
 
 
-def _verify_metadata(
+def _verify_metadata_homo_graphbolt(
     g,
     gpb,
     part_g,
@@ -1250,7 +1242,47 @@ def _verify_metadata(
         return None, None
 
 
-def _verify_mapping(
+def _get_part_IDs(part_g):
+    # These are partition-local IDs.
+    num_columns = part_g.csc_indptr.diff()
+    part_src_ids = part_g.indices
+    part_dst_ids = th.arange(part_g.total_num_nodes).repeat_interleave(
+        num_columns
+    )
+    # These are reshuffled global homogeneous IDs.
+    part_src_ids = F.gather_row(part_g.node_attributes[dgl.NID], part_src_ids)
+    part_dst_ids = F.gather_row(part_g.node_attributes[dgl.NID], part_dst_ids)
+    return part_src_ids, part_dst_ids
+
+
+def _verify_orig_IDs(
+    g,
+    orig_nids,
+    orig_eids,
+    part_eids,
+    part_src_ids,
+    part_dst_ids,
+    src_ntype=None,
+    dst_ntype=None,
+    etype=None,
+):
+    if src_ntype is not None and dst_ntype is not None:
+        orig_src_nid = orig_nids[src_ntype]
+        orig_dst_nid = orig_nids[dst_ntype]
+    else:
+        orig_src_nid = orig_nids
+        orig_dst_nid = orig_nids
+    orig_src_ids = F.gather_row(orig_src_nid, part_src_ids)
+    orig_dst_ids = F.gather_row(orig_dst_nid, part_dst_ids)
+    if etype is not None:
+        orig_eids = orig_eids[etype]
+    orig_eids = F.gather_row(orig_eids, part_eids)
+    orig_eids = g.edge_ids(orig_src_ids, orig_dst_ids, etype=etype)
+    assert len(orig_eids) == len(orig_eids)
+    assert np.all(F.asnumpy(orig_eids) == F.asnumpy(orig_eids))
+
+
+def _verify_homo_graphbolt_mapping_ID(
     g,
     part_g,
     part_i,
@@ -1322,27 +1354,11 @@ def _verify_mapping(
 
     if store_eids:
         # Verify the mapping between the reshuffled IDs and the original IDs.
-        indices, indptr = part_g.indices.numpy(), part_g.csc_indptr.numpy()
-        csc_matrix = spsp.csc_matrix(
-            (np.ones(len(part_g.indices), dtype=float), indices, indptr)
-        )
-        coo_matrix = csc_matrix.tocoo()
-        part_src_ids, part_dst_ids = th.tensor(coo_matrix.row), th.tensor(
-            coo_matrix.col
-        )
-        part_src_ids = F.gather_row(
-            part_g.node_attributes[dgl.NID], part_src_ids
-        )
-        part_dst_ids = F.gather_row(
-            part_g.node_attributes[dgl.NID], part_dst_ids
-        )
+        part_src_ids, part_dst_ids = _get_part_IDs(part_g)
         part_eids = part_g.edge_attributes[dgl.EID]
-        orig_src_ids = F.gather_row(orig_nids, part_src_ids)
-        orig_dst_ids = F.gather_row(orig_nids, part_dst_ids)
-        orig_eids1 = F.gather_row(orig_eids, part_eids)
-        orig_eids2 = g.edge_ids(orig_src_ids, orig_dst_ids)
-        assert F.shape(orig_eids1)[0] == F.shape(orig_eids2)[0]
-        assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
+        _verify_orig_IDs(
+            g, orig_nids, orig_eids, part_eids, part_src_ids, part_dst_ids
+        )
 
         local_orig_nids = orig_nids[part_g.node_attributes[dgl.NID]]
         local_orig_eids = orig_eids[part_g.edge_attributes[dgl.EID]]
@@ -1352,8 +1368,6 @@ def _verify_mapping(
         part_g.edge_attributes["feats"] = F.gather_row(
             g.edata["feats"], local_orig_eids
         )
-    else:
-        assert dgl.EID not in part_g.edge_attributes
 
     return node_feats["_N/labels"], edge_feats["_N:_E:_N/feats"]
 
@@ -1416,19 +1430,17 @@ def test_partition_graph_graphbolt_homo(
             return_mapping=True,
         )
         if debug_mode:
-            store_eids = True
-            store_inner_node = True
-            store_inner_edge = True
+            store_eids = store_inner_node = store_inner_edge = True
         part_sizes = []
         shuffled_labels = []
         shuffled_edata = []
         part_config = os.path.join(test_dir, f"{graph_name}.json")
+        parts = []
         for part_i in range(num_parts):
             part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
                 part_config, part_i, load_feats=True, use_graphbolt=True
             )
-
-            local_eid, local_nid = _verify_metadata(
+            local_eid, local_nid = _verify_metadata_homo_graphbolt(
                 g,
                 gpb,
                 part_g,
@@ -1440,7 +1452,7 @@ def test_partition_graph_graphbolt_homo(
                 store_eids,
             )
 
-            node_feat, edge_feat = _verify_mapping(
+            node_feat, edge_feat = _verify_homo_graphbolt_mapping_ID(
                 g,
                 part_g,
                 part_i,
@@ -1457,6 +1469,7 @@ def test_partition_graph_graphbolt_homo(
             )
             shuffled_labels.append(node_feat)
             shuffled_edata.append(edge_feat)
+            parts.append(part_g)
 
             verify_graph_feats(
                 g,
@@ -1472,8 +1485,10 @@ def test_partition_graph_graphbolt_homo(
                 use_graphbolt=True,
                 is_homo=True,
             )
-
-        _verify_reconstrunt_data(
+        _verify_augument_for_graphbolt(
+            parts, store_inner_node, store_inner_edge, store_eids, debug_mode
+        )
+        _verify_homo_graphbolt_shuffled_data(
             g,
             gpb,
             orig_nids,
@@ -1484,7 +1499,7 @@ def test_partition_graph_graphbolt_homo(
         )
 
 
-def _vertify_original_IDs(g, orig_nids, orig_eids):
+def _verify_original_IDs_type(g, orig_nids, orig_eids):
     """
     check list:
         make sure nodes and edges' data types are correct
@@ -1494,11 +1509,13 @@ def _vertify_original_IDs(g, orig_nids, orig_eids):
     assert len(orig_eids) == len(g.canonical_etypes)
     for ntype in g.ntypes:
         assert len(orig_nids[ntype]) == g.num_nodes(ntype)
+        assert F.dtype(orig_nids[ntype]) in (F.int64, F.int32)
     for etype in g.canonical_etypes:
         assert len(orig_eids[etype]) == g.num_edges(etype)
+        assert F.dtype(orig_eids[etype]) in (F.int64, F.int32)
 
 
-def _verify_reconstrunt_data(
+def _verify_homo_graphbolt_shuffled_data(
     g, gpb, orig_nids, orig_eids, part_sizes, shuffled_labels, shuffled_edata
 ):
     """
@@ -1532,38 +1549,21 @@ def _verify_reconstrunt_data(
     assert np.all(F.asnumpy(eid2pid) == edge_map)
 
 
-def _verify_graphbolt_mapping_IDs(
+def _verify_hetero_graphbolt_mapping_type(
     g,
     part_g,
     gpb,
     orig_nids,
     orig_eids,
-    node_feats,
-    edge_feats,
-    test_ntype,
-    test_etype,
-    store_eids,
-    store_inner_node,
-    store_inner_edge,
+    store_eids=False,
 ):
     """
     check list:
-        make sure nodes and edges' ids have correct type.
+        make sure nodes and edges have correct type.
         make sure nodes and edges have corrert map ids.
     """
     # Verify the mapping between the reshuffled IDs and the original IDs.
-    # These are partition-local IDs.
-    indices, indptr = part_g.indices.numpy(), part_g.csc_indptr.numpy()
-    csc_matrix = spsp.csc_matrix(
-        (np.ones(len(part_g.indices), dtype=float), indices, indptr)
-    )
-    coo_matrix = csc_matrix.tocoo()
-    part_src_ids, part_dst_ids = th.tensor(coo_matrix.row), th.tensor(
-        coo_matrix.col
-    )
-    # These are reshuffled global homogeneous IDs.
-    part_src_ids = F.gather_row(part_g.node_attributes[dgl.NID], part_src_ids)
-    part_dst_ids = F.gather_row(part_g.node_attributes[dgl.NID], part_dst_ids)
+    part_src_ids, part_dst_ids = _get_part_IDs(part_g)
     # These are reshuffled per-type IDs.
     src_ntype_ids, part_src_ids = gpb.map_to_per_ntype(part_src_ids)
     dst_ntype_ids, part_dst_ids = gpb.map_to_per_ntype(part_dst_ids)
@@ -1597,31 +1597,24 @@ def _verify_graphbolt_mapping_IDs(
             assert np.all(F.asnumpy(dst_ntype_ids1 == dst_ntype_ids1[0]))
             src_ntype = g.ntypes[F.as_scalar(src_ntype_ids1[0])]
             dst_ntype = g.ntypes[F.as_scalar(dst_ntype_ids1[0])]
+
+            _verify_orig_IDs(
+                g,
+                orig_nids,
+                orig_eids,
+                part_eids1,
+                part_src_ids1,
+                part_dst_ids1,
+                src_ntype,
+                dst_ntype,
+                etype,
+            )
             orig_src_ids1 = F.gather_row(orig_nids[src_ntype], part_src_ids1)
             orig_dst_ids1 = F.gather_row(orig_nids[dst_ntype], part_dst_ids1)
             orig_eids1 = F.gather_row(orig_eids[etype], part_eids1)
             orig_eids2 = g.edge_ids(orig_src_ids1, orig_dst_ids1, etype=etype)
             assert len(orig_eids1) == len(orig_eids2)
             assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
-    else:
-        assert dgl.EID not in part_g.edge_attributes
-    verify_graph_feats(
-        g,
-        gpb,
-        part_g,
-        node_feats,
-        edge_feats,
-        orig_nids,
-        orig_eids,
-        store_eids,
-        store_inner_edge=store_inner_edge,
-        store_inner_node=store_inner_node,
-        use_graphbolt=True,
-    )
-
-    shuffled_label = node_feats[test_ntype + "/labels"]
-    shuffled_elabel = edge_feats[_etype_tuple_to_str(test_etype) + "/labels"]
-    return part_g, shuffled_label, shuffled_elabel
 
 
 def _verify_labels(
@@ -1667,7 +1660,7 @@ def test_partition_graph_graphbolt_hetero(
 ):
     """
     check list:
-        _vertify_original_IDs:
+        _verify_original_IDs_type:
             number of edges and nodes' type and number of them in each type
 
         _verify_graphbolt_mapping_IDs:
@@ -1687,7 +1680,6 @@ def test_partition_graph_graphbolt_hetero(
         os.environ["DGL_DIST_DEBUG"] = "1"
     with tempfile.TemporaryDirectory() as test_dir:
         hg = create_random_hetero()
-        # TODO create graph data
         graph_name = "test"
         hg.nodes[test_ntype].data["labels"] = F.arange(
             0, hg.num_nodes(test_ntype)
@@ -1715,12 +1707,10 @@ def test_partition_graph_graphbolt_hetero(
             store_inner_edge=store_inner_edge,
             n_jobs=n_jobs,
         )
-        _vertify_original_IDs(hg, orig_nids, orig_eids)
+        _verify_original_IDs_type(hg, orig_nids, orig_eids)
 
         if debug_mode:
-            store_eids = True
-            store_inner_node = True
-            store_inner_edge = True
+            store_eids = store_inner_node = store_inner_edge = True
 
         parts = []
         shuffled_labels = []
@@ -1731,25 +1721,32 @@ def test_partition_graph_graphbolt_hetero(
             part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
                 part_config, part_id, load_feats=True, use_graphbolt=True
             )
-            # TODO verify mapping IDs
-            (
-                part_g,
-                shuffled_label,
-                shuffled_elabel,
-            ) = _verify_graphbolt_mapping_IDs(
+            _verify_hetero_graphbolt_mapping_type(
                 hg,
                 part_g,
                 gpb,
                 orig_nids,
                 orig_eids,
+                store_eids=store_eids,
+            )
+            verify_graph_feats(
+                hg,
+                gpb,
+                part_g,
                 node_feats,
                 edge_feats,
-                test_ntype,
-                test_etype,
-                store_eids=store_eids,
-                store_inner_node=store_inner_node,
+                orig_nids,
+                orig_eids,
+                store_eids,
                 store_inner_edge=store_inner_edge,
+                store_inner_node=store_inner_node,
+                use_graphbolt=True,
             )
+
+            shuffled_label = node_feats[test_ntype + "/labels"]
+            shuffled_elabel = edge_feats[
+                _etype_tuple_to_str(test_etype) + "/labels"
+            ]
             parts.append(part_g)
             shuffled_labels.append(shuffled_label)
             shuffled_elabels.append(shuffled_elabel)
@@ -1758,8 +1755,11 @@ def test_partition_graph_graphbolt_hetero(
             parts,
             True,
             store_eids=store_eids,
-            store_inner_node=store_inner_node,
             store_inner_edge=store_inner_edge,
+            debug_mode=debug_mode,
+        )
+        _verify_augument_for_graphbolt(
+            parts, store_inner_node, store_inner_edge, store_eids, debug_mode
         )
         _verify_labels(
             hg,
