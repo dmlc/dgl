@@ -181,7 +181,7 @@ def test_exclude_seed_edges_gpu(use_datapipe, async_op):
         ]
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            if async_op and not datapipe:
+            if async_op and not use_datapipe:
                 sampled_subgraph = sampled_subgraph.wait()
             assert torch.equal(
                 sampled_subgraph.original_row_node_ids,
