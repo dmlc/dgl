@@ -79,7 +79,7 @@ class DistSAGE(nn.Module):
             # Create sampler
             sampler = dgl.dataloading.NeighborSampler([-1])
             # Create dataloader
-            dataloader = dgl.dataloading.DistNodeDataLoader(
+            dataloader = dgl.distributed.DistNodeDataLoader(
                 g,
                 nodes,
                 sampler,
@@ -203,7 +203,7 @@ def run(args, device, data):
     # Create dataloader
     exclude = "reverse_id" if args.remove_edge else None
     reverse_eids = th.arange(g.num_edges()) if args.remove_edge else None
-    dataloader = dgl.dataloading.DistEdgeDataLoader(
+    dataloader = dgl.distributed.DistEdgeDataLoader(
         g,
         train_eids,
         sampler,
