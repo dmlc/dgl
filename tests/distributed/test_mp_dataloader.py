@@ -260,7 +260,7 @@ def start_dist_neg_dataloader(
     num_negs = 5
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10])
     negative_sampler = dgl.dataloading.negative_sampler.Uniform(num_negs)
-    dataloader = dgl.dataloading.DistEdgeDataLoader(
+    dataloader = dgl.distributed.DistEdgeDataLoader(
         dist_graph,
         train_eid,
         sampler,
@@ -457,6 +457,7 @@ def start_node_dataloader(
     use_graphbolt=False,
     return_eids=False,
     prob_or_mask=None,
+    use_deprecated_dataloader=False,
 ):
     dgl.distributed.initialize(ip_config, use_graphbolt=use_graphbolt)
     gpb = None
@@ -514,7 +515,12 @@ def start_node_dataloader(
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
-        dataloader = dgl.dataloading.DistNodeDataLoader(
+        dataloader_cls = (
+            dgl.dataloading.DistNodeDataLoader
+            if use_deprecated_dataloader
+            else dgl.distributed.DistNodeDataLoader
+        )
+        dataloader = dataloader_cls(
             dist_graph,
             train_nid,
             sampler,
@@ -577,6 +583,7 @@ def start_edge_dataloader(
     reverse_etypes,
     negative,
     prob_or_mask,
+    use_deprecated_dataloader=False,
 ):
     dgl.distributed.initialize(ip_config, use_graphbolt=use_graphbolt)
     gpb = None
@@ -622,7 +629,12 @@ def start_edge_dataloader(
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
-        dataloader = dgl.dataloading.DistEdgeDataLoader(
+        dataloader_cls = (
+            dgl.dataloading.DistEdgeDataLoader
+            if use_deprecated_dataloader
+            else dgl.distributed.DistEdgeDataLoader
+        )
+        dataloader = dataloader_cls(
             dist_graph,
             train_eid,
             sampler,
@@ -766,6 +778,7 @@ def check_dataloader(
     reverse_etypes=None,
     negative=False,
     prob_or_mask=None,
+    use_deprecated_dataloader=False,
 ):
     with tempfile.TemporaryDirectory() as test_dir:
         ip_config = "ip_config.txt"
@@ -827,6 +840,7 @@ def check_dataloader(
                     use_graphbolt,
                     return_eids,
                     prob_or_mask,
+                    use_deprecated_dataloader,
                 ),
             )
             p.start()
@@ -849,6 +863,7 @@ def check_dataloader(
                     reverse_etypes,
                     negative,
                     prob_or_mask,
+                    use_deprecated_dataloader,
                 ),
             )
             p.start()
@@ -1063,11 +1078,11 @@ def start_multiple_dataloaders(
     dl_iters = []
     for _ in range(num_dataloaders):
         if dataloader_type == "node":
-            dataloader = dgl.dataloading.DistNodeDataLoader(
+            dataloader = dgl.distributed.DistNodeDataLoader(
                 dist_g, train_ids, sampler, batch_size=batch_size
             )
         else:
-            dataloader = dgl.dataloading.DistEdgeDataLoader(
+            dataloader = dgl.distributed.DistEdgeDataLoader(
                 dist_g, train_ids, sampler, batch_size=batch_size
             )
         dataloaders.append(dataloader)
@@ -1150,3 +1165,16 @@ def test_multiple_dist_dataloaders(
             p.join()
             assert p.exitcode == 0
     reset_envs()
+
+
+@pytest.mark.parametrize("dataloader_type", ["node", "edge"])
+def test_deprecated_dataloader(dataloader_type):
+    reset_envs()
+    g = CitationGraphDataset("cora")[0]
+    check_dataloader(
+        g,
+        1,
+        0,
+        dataloader_type,
+        use_deprecated_dataloader=True,
+    )
