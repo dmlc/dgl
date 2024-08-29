@@ -410,11 +410,11 @@ def _exclude_homo_edges(
         raise NotImplementedError(
             "Values out of range int32 are not supported yet"
         )
-    if not async_op:
+    if async_op:
+        torch.ops.graphbolt.is_not_in_index_async(val, val_to_exclude)
+    else:
         mask = ~isin(val, val_to_exclude)
         return torch.nonzero(mask, as_tuple=True)[0]
-    else:
-        return torch.ops.graphbolt.is_not_in_index_async(val, val_to_exclude)
 
 
 def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):
