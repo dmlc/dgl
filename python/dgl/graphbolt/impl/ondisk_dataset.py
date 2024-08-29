@@ -979,6 +979,16 @@ class BuiltinDataset(OnDiskDataset):
         .. note::
             Reverse edges are added to the original graph.
 
+    **igb-hom-[tiny|small|medium]**
+        The igb-hom-[tiny|small|medium] dataset is a homogeneous citation network,
+        which is designed for developers to train and evaluate GNN models with high 
+        fidelity. See more details in `igb-hom-[tiny|small|medium] 
+        <https://mlcommons.org/2024/06/gnn-for-mlperf-training-v4/>`_.
+
+        .. note::
+            Self edges are added to the original graph.
+            Node features are stored as float32.
+
     Parameters
     ----------
     name : str
