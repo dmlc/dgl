@@ -981,9 +981,9 @@ class BuiltinDataset(OnDiskDataset):
 
     **igb-hom-[tiny|small|medium]**
         The igb-hom-[tiny|small|medium] dataset is a homogeneous citation network,
-        which is designed for developers to train and evaluate GNN models with 
-        high fidelity. See more details in `igb-hom-[tiny|small|medium] 
-        <https://mlcommons.org/2024/06/gnn-for-mlperf-training-v4/>`_.
+        which is designed for developers to train and evaluate GNN models with
+        high fidelity. See more details in `igb-hom-[tiny|small|medium]
+        <https://github.com/IllinoisGraphBenchmark/IGB-Datasets>`_.
 
         .. note::
             Self edges are added to the original graph.
