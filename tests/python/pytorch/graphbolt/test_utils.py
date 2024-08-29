@@ -142,7 +142,9 @@ def test_exclude_seed_edges_gpu(use_datapipe, async_op):
     if use_datapipe:
         datapipe = datapipe.exclude_seed_edges(asynchronous=async_op)
     else:
-        datapipe = datapipe.transform(partial(gb.exclude_seed_edges, async_op=async_op))
+        datapipe = datapipe.transform(
+            partial(gb.exclude_seed_edges, async_op=async_op)
+        )
     if torch.cuda.get_device_capability()[0] < 7:
         original_row_node_ids = [
             torch.tensor([0, 3, 4, 2, 5, 7]).to(F.ctx()),
