@@ -1,4 +1,5 @@
 """DGL PyTorch DataLoaders"""
+
 import atexit
 import inspect
 import itertools
@@ -24,7 +25,6 @@ from .._ffi.base import is_tensor_adaptor_enabled
 from ..base import dgl_warning, DGLError, EID, NID
 from ..batch import batch as batch_graphs
 from ..cuda import GPUCache
-from ..distributed import DistGraph
 from ..frame import LazyFeature
 from ..heterograph import DGLGraph
 from ..storages import wrap_storage
@@ -970,11 +970,6 @@ class DataLoader(torch.utils.data.DataLoader):
             super().__init__(**kwargs)
             return
 
-        if isinstance(graph, DistGraph):
-            raise TypeError(
-                "Please use dgl.dataloading.DistNodeDataLoader or "
-                "dgl.datalaoding.DistEdgeDataLoader for DistGraphs."
-            )
         # (BarclayII) I hoped that pin_prefetcher can be merged into PyTorch's native
         # pin_memory argument.  But our neighbor samplers and subgraph samplers
         # return indices, which could be CUDA tensors (e.g. during UVA sampling)

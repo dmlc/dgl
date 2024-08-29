@@ -260,7 +260,7 @@ def start_dist_neg_dataloader(
     num_negs = 5
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10])
     negative_sampler = dgl.dataloading.negative_sampler.Uniform(num_negs)
-    dataloader = dgl.dataloading.DistEdgeDataLoader(
+    dataloader = dgl.distributed.DistEdgeDataLoader(
         dist_graph,
         train_eid,
         sampler,
@@ -514,7 +514,7 @@ def start_node_dataloader(
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
-        dataloader = dgl.dataloading.DistNodeDataLoader(
+        dataloader = dgl.distributed.DistNodeDataLoader(
             dist_graph,
             train_nid,
             sampler,
@@ -622,7 +622,7 @@ def start_edge_dataloader(
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
-        dataloader = dgl.dataloading.DistEdgeDataLoader(
+        dataloader = dgl.distributed.DistEdgeDataLoader(
             dist_graph,
             train_eid,
             sampler,
@@ -1063,11 +1063,11 @@ def start_multiple_dataloaders(
     dl_iters = []
     for _ in range(num_dataloaders):
         if dataloader_type == "node":
-            dataloader = dgl.dataloading.DistNodeDataLoader(
+            dataloader = dgl.distributed.DistNodeDataLoader(
                 dist_g, train_ids, sampler, batch_size=batch_size
             )
         else:
-            dataloader = dgl.dataloading.DistEdgeDataLoader(
+            dataloader = dgl.distributed.DistEdgeDataLoader(
                 dist_g, train_ids, sampler, batch_size=batch_size
             )
         dataloaders.append(dataloader)
