@@ -1475,6 +1475,10 @@ class GraphDataLoader(torch.utils.data.DataLoader):
 
 
 class DistNodeDataLoader:
+    """Deprecated. Please use :class:`~dgl.distributed.DistNodeDataLoader`
+    instead.
+    """
+
     def __new__(cls, *args, **kwargs):
         dgl_warning(
             "dgl.dataloading.DistNodeDataLoader has been moved to "
@@ -1482,12 +1486,16 @@ class DistNodeDataLoader:
             "and will be removed soon. Please update your code to use the new "
             "class."
         )
-        from ..distributed import DistNodeDataLoader
+        from ..distributed import DistNodeDataLoader as NewDistNodeDataLoader
 
-        return DistNodeDataLoader(*args, **kwargs)
+        return NewDistNodeDataLoader(*args, **kwargs)
 
 
 class DistEdgeDataLoader:
+    """Deprecated. Please use :class:`~dgl.distributed.DistEdgeDataLoader`
+    instead.
+    """
+
     def __new__(cls, *args, **kwargs):
         dgl_warning(
             "dgl.dataloading.DistEdgeDataLoader has been moved to "
@@ -1495,6 +1503,6 @@ class DistEdgeDataLoader:
             "and will be removed soon. Please update your code to use the new "
             "class."
         )
-        from ..distributed import DistEdgeDataLoader
+        from ..distributed import DistEdgeDataLoader as NewDistEdgeDataLoader
 
-        return DistEdgeDataLoader(*args, **kwargs)
+        return NewDistEdgeDataLoader(*args, **kwargs)
