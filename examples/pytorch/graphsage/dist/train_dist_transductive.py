@@ -61,8 +61,9 @@ def load_embs(standalone, emb_layer, g):
     num_nodes = nodes.shape[0]
     for i in range((num_nodes + 1023) // 1024):
         idx = nodes[
-            i
-            * 1024 : (i + 1) * 1024 if (i + 1) * 1024 < num_nodes else num_nodes
+            i * 1024 : (i + 1) * 1024
+            if (i + 1) * 1024 < num_nodes
+            else num_nodes
         ]
         embeds = emb_layer(idx).cpu()
         x[idx] = embeds
