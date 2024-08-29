@@ -19,8 +19,8 @@
  */
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
-#include <thrust/copy.h>
-#include <thrust/remove.h>
+
+#include <cub/cub.cuh>
 
 #include "./common.h"
 
@@ -49,17 +49,19 @@ torch::Tensor Nonzero(torch::Tensor mask, bool logical_not) {
   auto result = torch::empty_like(mask, torch::kInt64);
   auto mask_ptr = mask.data_ptr<bool>();
   auto result_ptr = result.data_ptr<int64_t>();
-  int64_t* result_end;
+  auto allocator = cuda::GetAllocator();
+  auto num_copied = allocator.AllocateStorage<int64_t>(1);
   if (logical_not) {
-    result_end = THRUST_CALL(
-        remove_copy_if, iota, iota + mask.numel(), mask_ptr, result_ptr,
-        thrust::identity<bool>());
+    CUB_CALL(
+        DeviceSelect::FlaggedIf, iota, mask_ptr, result_ptr, num_copied.get(),
+        mask.numel(), thrust::logical_not<bool>{});
   } else {
-    result_end = THRUST_CALL(
-        copy_if, iota, iota + mask.numel(), mask_ptr, result_ptr,
-        thrust::identity<bool>());
+    CUB_CALL(
+        DeviceSelect::Flagged, iota, mask_ptr, result_ptr, num_copied.get(),
+        mask.numel());
   }
-  return result.slice(0, 0, result_end - result_ptr);
+  cuda::CopyScalar num_copied_cpu(num_copied.get());
+  return result.slice(0, 0, static_cast<int64_t>(num_copied_cpu));
 }
 
 }  // namespace ops
