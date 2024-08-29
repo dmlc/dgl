@@ -7,6 +7,7 @@
 #ifndef GRAPHBOLT_ISIN_H_
 #define GRAPHBOLT_ISIN_H_
 
+#include <graphbolt/async.h>
 #include <torch/torch.h>
 
 namespace graphbolt {
@@ -25,9 +26,25 @@ namespace sampling {
  * @return
  * A boolean tensor of the same shape as elements that is True for elements
  * in test_elements and False otherwise.
- *
  */
 torch::Tensor IsIn(
+    const torch::Tensor& elements, const torch::Tensor& test_elements);
+
+/**
+ * @brief Tests if each element of elements is not in test_elements. Returns an
+ * int64_t tensor of the same shape as elements containing the indexes of the
+ * elements not found in test_elements.
+ *
+ * @param elements        Input elements
+ * @param test_elements   Values against which to test for each input element.
+ *
+ * @return An int64_t tensor of the same shape as elements containing indexes of
+ * elements not found in test_elements.
+ */
+torch::Tensor IsNotInIndex(
+    const torch::Tensor& elements, const torch::Tensor& test_elements);
+
+c10::intrusive_ptr<Future<torch::Tensor>> IsNotInIndexAsync(
     const torch::Tensor& elements, const torch::Tensor& test_elements);
 
 }  // namespace sampling

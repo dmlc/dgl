@@ -79,9 +79,21 @@ Sort(torch::Tensor input, int num_bits = 0);
  * @return
  * A boolean tensor of the same shape as elements that is True for elements
  * in test_elements and False otherwise.
- *
  */
 torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements);
+
+/**
+ * @brief Returns the indexes of the nonzero elements in the given boolean mask
+ * if logical_not is false. Otherwise, returns the indexes of the zero elements
+ * instead.
+ *
+ * @param mask        Input boolean mask.
+ * @param logical_not Whether mask should be treated as ~mask.
+ *
+ * @return An int64_t tensor of the same shape as mask containing the indexes
+ * of the selected elements.
+ */
+torch::Tensor Nonzero(torch::Tensor mask, bool logical_not);
 
 /**
  * @brief Select columns for a sparse matrix in a CSC format according to nodes

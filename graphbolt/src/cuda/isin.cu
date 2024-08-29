@@ -19,6 +19,8 @@
  */
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
+#include <thrust/copy.h>
+#include <thrust/remove.h>
 
 #include "./common.h"
 
@@ -40,6 +42,24 @@ torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements) {
             result.data_ptr<bool>());
       }));
   return result;
+}
+
+torch::Tensor Nonzero(torch::Tensor mask, bool logical_not) {
+  thrust::counting_iterator<int64_t> iota(0);
+  auto result = torch::empty_like(mask, torch::kInt64);
+  auto mask_ptr = mask.data_ptr<bool>();
+  auto result_ptr = result.data_ptr<int64_t>();
+  int64_t* result_end;
+  if (logical_not) {
+    result_end = THRUST_CALL(
+        remove_copy_if, iota, iota + mask.numel(), mask_ptr, result_ptr,
+        thrust::identity<bool>());
+  } else {
+    result_end = THRUST_CALL(
+        copy_if, iota, iota + mask.numel(), mask_ptr, result_ptr,
+        thrust::identity<bool>());
+  }
+  return result.slice(0, 0, result_end - result_ptr);
 }
 
 }  // namespace ops
