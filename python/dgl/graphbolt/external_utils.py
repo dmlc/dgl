@@ -24,6 +24,10 @@ class SeedEdgesExcluder(MiniBatchTransformer):
         Whether reverse edges should be excluded as well. Default is False.
     reverse_etypes_mapping : Dict[str, str] = None
         The mapping from the original edge types to their reverse edge types.
+    asynchronous: bool
+        Boolean indicating whether edge exclusion stages should run on
+        background threads to hide the latency of CPU GPU synchronization.
+        Should be enabled only when sampling on the GPU.
     """
 
     def __init__(
@@ -31,16 +35,16 @@ class SeedEdgesExcluder(MiniBatchTransformer):
         datapipe,
         include_reverse_edges: bool = False,
         reverse_etypes_mapping: Dict[str, str] = None,
-        is_asynchronous=False,
+        asynchronous=False,
     ):
         exclude_seed_edges_fn = partial(
             exclude_seed_edges,
             include_reverse_edges=include_reverse_edges,
             reverse_etypes_mapping=reverse_etypes_mapping,
-            async_op=is_asynchronous,
+            async_op=asynchronous,
         )
         datapipe = datapipe.transform(exclude_seed_edges_fn)
-        if is_asynchronous:
+        if asynchronous:
             datapipe = datapipe.buffer()
             datapipe = datapipe.transform(self._wait_for_sampled_subgraphs)
         super().__init__(datapipe)
