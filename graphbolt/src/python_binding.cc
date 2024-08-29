@@ -181,6 +181,8 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("unique_and_compact_batched", &UniqueAndCompactBatched);
   m.def("unique_and_compact_batched_async", &UniqueAndCompactBatchedAsync);
   m.def("isin", &IsIn);
+  m.def("is_not_in_index", &IsNotInIndex);
+  m.def("is_not_in_index_async", &IsNotInIndexAsync);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_async", &ops::IndexSelectAsync);
   m.def("scatter_async", &ops::ScatterAsync);

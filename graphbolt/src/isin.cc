@@ -56,5 +56,22 @@ torch::Tensor IsIn(
     return IsInCPU(elements, test_elements);
   }
 }
+
+torch::Tensor IsNotInIndex(
+    const torch::Tensor& elements, const torch::Tensor& test_elements) {
+  auto mask = IsIn(elements, test_elements);
+  if (utils::is_on_gpu(mask)) {
+    GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
+        c10::DeviceType::CUDA, "NonzeroOperation",
+        { return ops::Nonzero(mask, true); });
+  }
+  return torch::nonzero(torch::logical_not(mask)).squeeze(1);
+}
+
+c10::intrusive_ptr<Future<torch::Tensor>> IsNotInIndexAsync(
+    const torch::Tensor& elements, const torch::Tensor& test_elements) {
+  return async([=] { return IsNotInIndex(elements, test_elements); });
+}
+
 }  // namespace sampling
 }  // namespace graphbolt

@@ -202,8 +202,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # the negative samples.
     ############################################################################
     if is_train and args.exclude_edges:
-        datapipe = datapipe.transform(
-            partial(gb.exclude_seed_edges, include_reverse_edges=True)
+        datapipe = datapipe.exclude_seed_edges(
+            include_reverse_edges=True,
+            asynchronous=args.storage_device != "cpu",
         )
 
     ############################################################################
