@@ -204,7 +204,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     if is_train and args.exclude_edges:
         datapipe = datapipe.exclude_seed_edges(
             include_reverse_edges=True,
-            asynchronous=args.graph_device != "cpu",
+            asynchronous=args.storage_device != "cpu",
         )
 
     ############################################################################
