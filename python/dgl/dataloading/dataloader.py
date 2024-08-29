@@ -1472,3 +1472,29 @@ class GraphDataLoader(torch.utils.data.DataLoader):
             self.dist_sampler.set_epoch(epoch)
         else:
             raise DGLError("set_epoch is only available when use_ddp is True.")
+
+
+class DistNodeDataLoader:
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "dgl.dataloading.DistNodeDataLoader has been moved to "
+            "dgl.distributed.DistNodeDataLoader. This old class is deprecated "
+            "and will be removed soon. Please update your code to use the new "
+            "class."
+        )
+        from ..distributed import DistNodeDataLoader
+
+        return DistNodeDataLoader(*args, **kwargs)
+
+
+class DistEdgeDataLoader:
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "dgl.dataloading.DistEdgeDataLoader has been moved to "
+            "dgl.distributed.DistEdgeDataLoader. This old class is deprecated "
+            "and will be removed soon. Please update your code to use the new "
+            "class."
+        )
+        from ..distributed import DistEdgeDataLoader
+
+        return DistEdgeDataLoader(*args, **kwargs)
