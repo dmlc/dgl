@@ -339,9 +339,6 @@ def parse_args():
             "igb-hom-tiny",
             "igb-hom-small",
             "igb-hom-medium",
-            "reddit",
-            "yelp",
-            "flickr",
         ],
     )
     parser.add_argument("--root", type=str, default="datasets")
