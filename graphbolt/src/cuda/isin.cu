@@ -20,6 +20,8 @@
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
 
+#include <cub/cub.cuh>
+
 #include "./common.h"
 
 namespace graphbolt {
@@ -40,6 +42,26 @@ torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements) {
             result.data_ptr<bool>());
       }));
   return result;
+}
+
+torch::Tensor Nonzero(torch::Tensor mask, bool logical_not) {
+  thrust::counting_iterator<int64_t> iota(0);
+  auto result = torch::empty_like(mask, torch::kInt64);
+  auto mask_ptr = mask.data_ptr<bool>();
+  auto result_ptr = result.data_ptr<int64_t>();
+  auto allocator = cuda::GetAllocator();
+  auto num_copied = allocator.AllocateStorage<int64_t>(1);
+  if (logical_not) {
+    CUB_CALL(
+        DeviceSelect::FlaggedIf, iota, mask_ptr, result_ptr, num_copied.get(),
+        mask.numel(), thrust::logical_not<bool>{});
+  } else {
+    CUB_CALL(
+        DeviceSelect::Flagged, iota, mask_ptr, result_ptr, num_copied.get(),
+        mask.numel());
+  }
+  cuda::CopyScalar num_copied_cpu(num_copied.get());
+  return result.slice(0, 0, static_cast<int64_t>(num_copied_cpu));
 }
 
 }  // namespace ops

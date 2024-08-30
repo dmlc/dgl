@@ -163,8 +163,9 @@ def create_dataloader(
         asynchronous=args.graph_device != "cpu",
     )
     if job == "train" and args.exclude_edges:
-        datapipe = datapipe.transform(
-            partial(gb.exclude_seed_edges, include_reverse_edges=True)
+        datapipe = datapipe.exclude_seed_edges(
+            include_reverse_edges=True,
+            asynchronous=args.graph_device != "cpu",
         )
     # Copy the data to the specified device.
     if args.feature_device != "cpu" and need_copy:
