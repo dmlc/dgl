@@ -3,6 +3,7 @@ import time
 from contextlib import contextmanager
 
 import dgl
+import dgl.distributed
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 
