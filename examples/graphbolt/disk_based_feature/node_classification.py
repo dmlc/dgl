@@ -336,9 +336,9 @@ def parse_args():
             "ogbn-arxiv",
             "ogbn-products",
             "ogbn-papers100M",
-            "reddit",
-            "yelp",
-            "flickr",
+            "igb-hom-tiny",
+            "igb-hom-small",
+            "igb-hom-medium",
         ],
     )
     parser.add_argument("--root", type=str, default="datasets")
