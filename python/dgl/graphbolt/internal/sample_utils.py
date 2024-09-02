@@ -218,7 +218,7 @@ def unique_and_compact_csc_formats(
         if async_op
         else torch.ops.graphbolt.unique_and_compact_batched
     )
-    results = unique_fn(indice_list, dst_list, unique_dst_list)
+    results = unique_fn(indice_list, dst_list, unique_dst_list, 0, 1)
 
     class _Waiter:
         def __init__(self, future, csc_formats):
