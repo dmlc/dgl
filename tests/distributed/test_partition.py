@@ -89,17 +89,16 @@ def create_random_hetero():
 
 
 def _verify_argument_for_graphbolt(
-    parts, store_inner_node, store_inner_edge, store_eids, debug_mode
+    parts, store_inner_node, store_inner_edge, store_eids
 ):
     """
     check list:
         make sure arguments work.
     """
-    if not debug_mode:
-        for part in parts:
-            assert store_inner_edge == ("inner_edge" in part.edge_attributes)
-            assert store_inner_node == ("inner_node" in part.node_attributes)
-            assert store_eids == (dgl.EID in part.edge_attributes)
+    for part in parts:
+        assert store_inner_edge == ("inner_edge" in part.edge_attributes)
+        assert store_inner_node == ("inner_node" in part.node_attributes)
+        assert store_eids == (dgl.EID in part.edge_attributes)
 
 
 def _verify_hetero_graph_node_edge_num(
@@ -1731,7 +1730,7 @@ def _verify_graphbolt_part(
         )
 
     _verify_argument_for_graphbolt(
-        parts, store_inner_node, store_inner_edge, store_eids, debug_mode
+        parts, store_inner_node, store_inner_edge, store_eids
     )
     _verify_shuffled_data_gb(
         g,
