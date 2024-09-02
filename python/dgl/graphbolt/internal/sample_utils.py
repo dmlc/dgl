@@ -44,7 +44,7 @@ def unique_and_compact(
         nodes = torch.cat(nodes)
         empty_tensor = nodes.new_empty(0)
         unique, compacted, _ = torch.ops.graphbolt.unique_and_compact(
-            nodes, empty_tensor, empty_tensor
+            nodes, empty_tensor, empty_tensor, 0, 1
         )
         compacted = compacted.split(nums)
         return unique, list(compacted)
