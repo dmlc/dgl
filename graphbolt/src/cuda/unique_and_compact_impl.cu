@@ -61,7 +61,7 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatchedSortBased(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
+    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits = 0) {
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
   auto scalar_type = src_ids.at(0).scalar_type();
@@ -276,7 +276,7 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
+    const std::vector<torch::Tensor>& unique_dst_ids) {
   if (cuda::compute_capability() >= 70) {
     // Utilizes a hash table based implementation, the mapped id of a vertex
     // will be monotonically increasing as the first occurrence index of it in
@@ -287,15 +287,13 @@ UniqueAndCompactBatched(
   // Utilizes a sort based algorithm, the mapped id of a vertex part of the
   // src_ids but not part of the unique_dst_ids will be monotonically increasing
   // as the actual vertex id increases. Thus, it is deterministic.
-  return UniqueAndCompactBatchedSortBased(
-      src_ids, dst_ids, unique_dst_ids, num_bits);
+  return UniqueAndCompactBatchedSortBased(src_ids, dst_ids, unique_dst_ids);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
-    const torch::Tensor unique_dst_ids, int num_bits) {
-  return UniqueAndCompactBatched(
-      {src_ids}, {dst_ids}, {unique_dst_ids}, num_bits)[0];
+    const torch::Tensor unique_dst_ids) {
+  return UniqueAndCompactBatched({src_ids}, {dst_ids}, {unique_dst_ids})[0];
 }
 
 }  // namespace ops
