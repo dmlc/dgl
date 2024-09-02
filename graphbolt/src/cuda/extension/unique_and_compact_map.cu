@@ -17,11 +17,13 @@
  * @file cuda/unique_and_compact_map.cu
  * @brief Unique and compact operator implementation on CUDA using hash table.
  */
+#include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/gather.h>
 
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
+#include <limits>
 #include <numeric>
 
 #include "../common.h"
@@ -31,13 +33,25 @@
 namespace graphbolt {
 namespace ops {
 
+// Returns the rotated part id so that current rank's part id is 0.
+template <typename index_t>
+__device__ inline auto partition_assignment(
+    index_t id, uint32_t rank, uint32_t world_size) {
+  // Consider using a faster implementation in the future.
+  constexpr uint64_t kCurandSeed = 999961;  // Any random number.
+  curandStatePhilox4_32_10_t rng;
+  curand_init(kCurandSeed, 0, id, &rng);
+  return (curand(&rng) - rank) % world_size;
+}
+
 // Support graphs with up to 2^kNodeIdBits nodes.
 constexpr int kNodeIdBits = 40;
 
 template <typename index_t, typename map_t>
 __global__ void _InsertAndSetMinBatched(
     const int64_t num_edges, const int32_t* const indexes, index_t** pointers,
-    const int64_t* const offsets, map_t map) {
+    const int64_t* const offsets, const uint32_t rank,
+    const uint32_t world_size, map_t map) {
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
 
@@ -47,13 +61,17 @@ __global__ void _InsertAndSetMinBatched(
     const int64_t node_id = pointers[tensor_index][tensor_offset];
     const auto batch_index = tensor_index / 2;
     const int64_t key = node_id | (batch_index << kNodeIdBits);
+    const int64_t priority =
+        i + (world_size > 1
+                 ? num_edges * partition_assignment(key, rank, world_size)
+                 : 0);
 
-    auto [slot, is_new_key] = map.insert_and_find(cuco::pair{key, i});
+    auto [slot, is_new_key] = map.insert_and_find(cuco::pair{key, priority});
 
     if (!is_new_key) {
       auto ref = ::cuda::atomic_ref<int64_t, ::cuda::thread_scope_device>{
           slot->second};
-      ref.fetch_min(i, ::cuda::memory_order_relaxed);
+      ref.fetch_min(priority, ::cuda::memory_order_relaxed);
     }
 
     i += stride;
@@ -63,7 +81,8 @@ __global__ void _InsertAndSetMinBatched(
 template <typename index_t, typename map_t>
 __global__ void _IsInsertedBatched(
     const int64_t num_edges, const int32_t* const indexes, index_t** pointers,
-    const int64_t* const offsets, map_t map, int64_t* valid) {
+    const int64_t* const offsets, const uint32_t rank,
+    const uint32_t world_size, map_t map, int64_t* valid) {
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
 
@@ -73,9 +92,13 @@ __global__ void _IsInsertedBatched(
     const int64_t node_id = pointers[tensor_index][tensor_offset];
     const auto batch_index = tensor_index / 2;
     const int64_t key = node_id | (batch_index << kNodeIdBits);
+    const int64_t priority =
+        i + (world_size > 1
+                 ? num_edges * partition_assignment(key, rank, world_size)
+                 : 0);
 
     auto slot = map.find(key);
-    valid[i] = slot->second == i;
+    valid[i] = slot->second == priority;
 
     i += stride;
   }
@@ -148,7 +171,11 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> >
 UniqueAndCompactBatchedHashMapBased(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids) {
+    const std::vector<torch::Tensor>& unique_dst_ids, const int64_t rank,
+    const int64_t world_size) {
+  TORCH_CHECK(
+      rank < world_size, "rank needs to be smaller than the world_size.");
+  TORCH_CHECK(world_size <= std::numeric_limits<uint32_t>::max());
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
   auto scalar_type = src_ids.at(0).scalar_type();
@@ -224,13 +251,15 @@ UniqueAndCompactBatchedHashMapBased(
         CUDA_KERNEL_CALL(
             _InsertAndSetMinBatched, grid, block, 0,
             offsets_ptr[2 * num_batches], indexes.data_ptr<int32_t>(),
-            pointers_dev_ptr, offsets_dev_ptr, map.ref(cuco::insert_and_find));
+            pointers_dev_ptr, offsets_dev_ptr, static_cast<uint32_t>(rank),
+            static_cast<uint32_t>(world_size), map.ref(cuco::insert_and_find));
         auto valid = torch::empty(
             offsets_ptr[2 * num_batches] + 1,
             src_ids[0].options().dtype(torch::kInt64));
         CUDA_KERNEL_CALL(
             _IsInsertedBatched, grid, block, 0, offsets_ptr[2 * num_batches],
             indexes.data_ptr<int32_t>(), pointers_dev_ptr, offsets_dev_ptr,
+            static_cast<uint32_t>(rank), static_cast<uint32_t>(world_size),
             map.ref(cuco::find), valid.data_ptr<int64_t>());
         valid = ExclusiveCumSum(valid);
         auto unique_ids_offsets = torch::empty(
