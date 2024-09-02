@@ -276,14 +276,19 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids) {
+    const std::vector<torch::Tensor>& unique_dst_ids, const int64_t rank,
+    const int64_t world_size) {
   if (cuda::compute_capability() >= 70) {
     // Utilizes a hash table based implementation, the mapped id of a vertex
     // will be monotonically increasing as the first occurrence index of it in
     // torch.cat([unique_dst_ids, src_ids]). Thus, it is deterministic.
     return UniqueAndCompactBatchedHashMapBased(
-        src_ids, dst_ids, unique_dst_ids);
+        src_ids, dst_ids, unique_dst_ids, rank, world_size);
   }
+  TORCH_CHECK(
+      world_size <= 1,
+      "Cooperative Minibatching (arXiv:2310.12403) is not supported on "
+      "pre-Volta generation GPUs.");
   // Utilizes a sort based algorithm, the mapped id of a vertex part of the
   // src_ids but not part of the unique_dst_ids will be monotonically increasing
   // as the actual vertex id increases. Thus, it is deterministic.
@@ -292,8 +297,10 @@ UniqueAndCompactBatched(
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
-    const torch::Tensor unique_dst_ids) {
-  return UniqueAndCompactBatched({src_ids}, {dst_ids}, {unique_dst_ids})[0];
+    const torch::Tensor unique_dst_ids, const int64_t rank,
+    const int64_t world_size) {
+  return UniqueAndCompactBatched(
+      {src_ids}, {dst_ids}, {unique_dst_ids}, rank, world_size)[0];
 }
 
 }  // namespace ops
