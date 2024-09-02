@@ -157,7 +157,31 @@ def _verify_hetero_graph_node_edge_num(
             assert g.num_edges(etype) == num_edges[etype]
 
 
-def _verify_node_id_range(g, part, nids):
+def _verify_edge_id_range_hetero_gb(
+    g, part, eids, use_graphbolt, store_inner_edge
+):
+    edata = part.edge_attributes if use_graphbolt else part.edata
+    etype = part.type_per_edge if use_graphbolt else edata[dgl.ETYPE]
+    eid = th.arange(len(edata[dgl.EID]))
+    etype_arr = F.gather_row(etype, eid)
+    eid_arr = F.gather_row(edata[dgl.EID], eid)
+    for etype in g.canonical_etypes:
+        etype_id = g.get_etype_id(etype)
+        eids[etype].append(F.boolean_mask(eid_arr, etype_arr == etype_id))
+        # Make sure edge Ids fall into a range.
+        if store_inner_edge or not use_graphbolt:
+            inner_edge_mask = _get_inner_edge_mask(
+                part, etype_id, use_graphbolt=use_graphbolt
+            )
+            inner_eids = np.sort(
+                F.asnumpy(F.boolean_mask(edata[dgl.EID], inner_edge_mask))
+            )
+            assert np.all(
+                inner_eids == np.arange(inner_eids[0], inner_eids[-1] + 1)
+            )
+
+
+def _verify_node_id_range_hetero_gb(g, part, nids):
     """
     check list:
         make sure inner nodes have Ids fall into a range.
@@ -179,7 +203,7 @@ def _verify_node_id_range(g, part, nids):
         nids[ntype].append(inner_nids)
 
 
-def _verify_node_edge_included(g, nids, eids):
+def _verify_node_edge_included_hetero_gb(g, nids, eids):
     for ntype in nids:
         nids_type = F.cat(nids[ntype], 0)
         uniq_ids = F.unique(nids_type)
@@ -193,7 +217,7 @@ def _verify_node_edge_included(g, nids, eids):
         assert len(uniq_ids) == g.num_edges(etype)
 
 
-def _verify_hetero_graph_attributes(
+def _verify_graph_attributes_hetero_gb(
     g,
     parts,
     store_inner_edge,
@@ -209,31 +233,15 @@ def _verify_hetero_graph_attributes(
     nids = {ntype: [] for ntype in g.ntypes}
     eids = {etype: [] for etype in g.canonical_etypes}
     for part in parts:
-        edata = part.edge_attributes if use_graphbolt else part.edata
-        etype = part.type_per_edge if use_graphbolt else edata[dgl.ETYPE]
-        eid = th.arange(len(edata[dgl.EID]))
-        etype_arr = F.gather_row(etype, eid)
-        eid_arr = F.gather_row(edata[dgl.EID], eid)
-        for etype in g.canonical_etypes:
-            etype_id = g.get_etype_id(etype)
-            eids[etype].append(F.boolean_mask(eid_arr, etype_arr == etype_id))
-            # Make sure edge Ids fall into a range.
-            if store_inner_edge or not use_graphbolt:
-                inner_edge_mask = _get_inner_edge_mask(
-                    part, etype_id, use_graphbolt=use_graphbolt
-                )
-                inner_eids = np.sort(
-                    F.asnumpy(F.boolean_mask(edata[dgl.EID], inner_edge_mask))
-                )
-                assert np.all(
-                    inner_eids == np.arange(inner_eids[0], inner_eids[-1] + 1)
-                )
+        _verify_edge_id_range_hetero_gb(
+            g, part, eids, use_graphbolt, store_inner_edge
+        )
 
         if not use_graphbolt:
-            _verify_node_id_range(g, part, nids)
+            _verify_node_id_range_hetero_gb(g, part, nids)
 
     if not use_graphbolt:
-        _verify_node_edge_included(g, nids, eids)
+        _verify_node_edge_included_hetero_gb(g, nids, eids)
 
 
 def _verify_hetero_graph(
@@ -252,7 +260,7 @@ def _verify_hetero_graph(
         debug_mode=debug_mode,
     )
     if store_eids or not use_graphbolt:
-        _verify_hetero_graph_attributes(
+        _verify_graph_attributes_hetero_gb(
             g,
             parts,
             store_inner_edge=store_inner_edge,
