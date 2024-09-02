@@ -299,7 +299,7 @@ torch::Tensor IndptrEdgeIdsImpl(
  */
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
-    const torch::Tensor unique_dst_ids, int num_bits = 0);
+    const torch::Tensor unique_dst_ids);
 
 /**
  * @brief Batched version of UniqueAndCompact. The ith element of the return
@@ -310,7 +310,7 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits = 0);
+    const std::vector<torch::Tensor>& unique_dst_ids);
 
 }  //  namespace ops
 }  //  namespace graphbolt
