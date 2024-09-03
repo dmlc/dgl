@@ -208,7 +208,9 @@ UniqueAndCompactBatchedHashMapBased(
             index_it,
             ::cuda::proclaim_return_type<
                 ::cuda::std::tuple<int64_t*, index_t, int32_t, bool, bool>>(
-                [=, map = map.ref(cuco::find)] __device__(auto it) {
+                [=, map = map.ref(cuco::find)] __device__(auto it)
+                    -> ::cuda::std::tuple<
+                        int64_t*, index_t, int32_t, bool, bool> {
                   const auto i = it.key;
                   const auto tensor_index = it.value;
                   const auto tensor_offset = i - offsets_dev_ptr[tensor_index];
