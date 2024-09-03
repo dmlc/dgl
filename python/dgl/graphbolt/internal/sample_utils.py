@@ -44,7 +44,7 @@ def unique_and_compact(
         nodes = torch.cat(nodes)
         empty_tensor = nodes.new_empty(0)
         unique, compacted, _ = torch.ops.graphbolt.unique_and_compact(
-            nodes, empty_tensor, empty_tensor
+            nodes, empty_tensor, empty_tensor, 0, 1
         )
         compacted = compacted.split(nums)
         return unique, list(compacted)
@@ -218,7 +218,7 @@ def unique_and_compact_csc_formats(
         if async_op
         else torch.ops.graphbolt.unique_and_compact_batched
     )
-    results = unique_fn(indice_list, dst_list, unique_dst_list)
+    results = unique_fn(indice_list, dst_list, unique_dst_list, 0, 1)
 
     class _Waiter:
         def __init__(self, future, csc_formats):
