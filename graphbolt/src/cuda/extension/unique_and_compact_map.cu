@@ -26,6 +26,7 @@
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
 #include <cuda/std/utility>
+#include <cuda/stream_ref>
 #include <limits>
 #include <numeric>
 
@@ -189,7 +190,7 @@ UniqueAndCompactBatchedHashMapBased(
             {},
             {},
             cuda::CUDAWorkspaceAllocator<cuco::pair<int64_t, int64_t> >{},
-            cuco::cuda_stream_ref{stream},
+            ::cuda::stream_ref{stream},
         };
         C10_CUDA_KERNEL_LAUNCH_CHECK();  // Check the map constructor's success.
         const dim3 block(BLOCK_SIZE);
