@@ -244,7 +244,7 @@ UniqueAndCompactBatchedHashMapBased(
                   unique_ids_ptr[i] = node_id;
                   if (part_ids_ptr) {
                     part_ids_ptr[i] =
-                        cuda::PartitionAssignment(node_id, rank, world_size);
+                        cuda::rank_assignment(node_id, rank, world_size);
                   }
                   if (is_i_equal_batch_offset) {
                     const auto batch_index = ::cuda::std::get<2>(t);

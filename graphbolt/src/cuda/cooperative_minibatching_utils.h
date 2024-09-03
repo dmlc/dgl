@@ -36,7 +36,7 @@ namespace cuda {
  * @return The rank of the GPU the given id is mapped to.
  */
 template <typename index_t>
-__device__ inline auto PartitionAssignment(
+__device__ inline auto rank_assignment(
     index_t id, uint32_t rank, uint32_t world_size) {
   // Consider using a faster implementation in the future.
   constexpr uint64_t kCurandSeed = 999961;  // Any random number.
