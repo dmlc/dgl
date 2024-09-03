@@ -297,7 +297,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model, prob_
     num_edges = graph.total_num_edges
     if prob_name is not None:
         prob_data = torch.rand(num_edges, device=args.device)
-        if prob_name == "weight":
+        if prob_name == "prob":
             prob_data[torch.randperm(num_edges, device=args.device)[: int(num_edges * 0.5)]] = 0.0
         elif prob_name == "mask":
             prob_data = prob_data > 0.2
@@ -446,7 +446,7 @@ def main(args):
     assert len(args.fanout) == len(model.layers)
     model = model.to(args.device)
 
-    prob_name = None # options: None | "mask" | "weight"
+    prob_name = None # options: None | "mask" | "prob"
 
     # Model training.
     print("Training...")
