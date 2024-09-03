@@ -62,14 +62,17 @@ OnDiskNpyArray::OnDiskNpyArray(
 
   std::call_once(call_once_flag_, [&] {
     // Get system max interop thread count.
-    num_queues_ = torch::get_num_interop_threads();
+    num_queues_ =
+        io_uring::num_threads.value_or(torch::get_num_interop_threads());
     TORCH_CHECK(num_queues_ > 0, "A positive # queues is required.");
     io_uring_queue_ = std::unique_ptr<::io_uring[], io_uring_queue_destroyer>(
         new ::io_uring[num_queues_], io_uring_queue_destroyer{num_queues_});
-    mtx_ = std::make_unique<std::mutex[]>(num_queues_);
-
+    TORCH_CHECK(num_queues_ <= counting_semaphore_t::max());
+    semaphore_.release(num_queues_);
+    available_queues_.reserve(num_queues_);
     // Init io_uring queue.
     for (int64_t t = 0; t < num_queues_; t++) {
+      available_queues_.push_back(t);
       TORCH_CHECK(
           ::io_uring_queue_init(2 * kGroupSize, &io_uring_queue_[t], 0) == 0);
       // We have allocated 2 * kGroupSize submission queue entries and
@@ -78,13 +81,13 @@ OnDiskNpyArray::OnDiskNpyArray(
   });
 
   num_thread_ = std::min(
-      static_cast<int64_t>(num_queues_),
-      num_threads.value_or(
-          io_uring::num_threads.value_or((torch::get_num_threads() + 1) / 2)));
+      static_cast<int64_t>(num_queues_), num_threads.value_or(num_queues_));
   TORCH_CHECK(num_thread_ > 0, "A positive # threads is required.");
 
+  // We allocate buffers for each existing queue because we might get assigned
+  // any queue in range [0, num_queues_).
   read_tensor_ = torch::empty(
-      ReadBufferSizePerThread() * num_thread_ + block_size_ - 1,
+      ReadBufferSizePerThread() * num_queues_ + block_size_ - 1,
       torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU));
 #else
   throw std::runtime_error("DiskBasedFeature is not available now.");
@@ -167,14 +170,19 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
   // Indicator for index error.
   std::atomic<int> error_flag{};
   std::atomic<int64_t> work_queue{};
-  auto worker_fn = [&](const int thread_id) {
-    auto &io_uring_queue = io_uring_queue_[thread_id];
-    auto my_read_buffer = ReadBuffer(thread_id);
+  // Construct a QueueAndBufferAcquirer object so that the worker threads can
+  // share the available queues and buffers.
+  QueueAndBufferAcquirer queue_source(this);
+  graphbolt::parallel_for_each_interop(0, num_thread_, 1, [&](int) {
     // The completion queue might contain 4 * kGroupSize while we may submit
     // 4 * kGroupSize more. No harm in overallocation here.
     CircularQueue<ReadRequest> read_queue(8 * kGroupSize);
     int64_t num_submitted = 0;
     int64_t num_completed = 0;
+    auto [acquired_queue_handle, read_buffer_source2] = queue_source.get();
+    auto &io_uring_queue = acquired_queue_handle.get();
+    // Capturing structured binding is available only in C++20, so we rename.
+    auto read_buffer_source = read_buffer_source2;
     auto submit_fn = [&](int64_t submission_minimum_batch_size) {
       if (read_queue.Size() < submission_minimum_batch_size) return;
       TORCH_CHECK(  // Check for sqe overflow.
@@ -190,12 +198,10 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
         read_queue.PopN(submitted);
       }
     };
-    // Make sure we have sole control of this thread's queue.
-    std::lock_guard io_uring_queue_lock(mtx_[thread_id]);
     for (int64_t read_buffer_slot = 0; true;) {
       auto request_read_buffer = [&]() {
-        return my_read_buffer + (aligned_length_ + block_size_) *
-                                    (read_buffer_slot++ % (8 * kGroupSize));
+        return read_buffer_source + (aligned_length_ + block_size_) *
+                                        (read_buffer_slot++ % (8 * kGroupSize));
       };
       const auto num_requested_items = std::max(
           std::min(
@@ -259,7 +265,7 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
             *reinterpret_cast<ReadRequest *>(io_uring_cqe_get_data(cqe));
         auto actual_read_len = cqe->res;
         if (actual_read_len < 0) {
-          error_flag.store(3, std::memory_order_relaxed);
+          error_flag.store(actual_read_len, std::memory_order_relaxed);
           break;
         }
         const auto remaining_read_len =
@@ -291,26 +297,22 @@ torch::Tensor OnDiskNpyArray::IndexSelectIOUringImpl(torch::Tensor index) {
       io_uring_cq_advance(&io_uring_queue, num_cqes_seen);
       num_completed += num_cqes_seen;
     }
-  };
-  std::vector<c10::intrusive_ptr<Future<void>>> futures;
-  for (int t = 0; t < num_thread_; t++) {
-    futures.emplace_back(async([&worker_fn, t] { worker_fn(t); }));
-  }
-  // Wait for the launched work to finish.
-  for (auto &future : futures) future->Wait();
-  switch (error_flag.load(std::memory_order_relaxed)) {
+  });
+  const auto ret_val = error_flag.load(std::memory_order_relaxed);
+  switch (ret_val) {
     case 0:  // Successful.
       return result;
     case 1:
       throw std::out_of_range("IndexError: Index out of range.");
     default:
-      throw std::runtime_error("io_uring error!");
+      throw std::runtime_error(
+          "io_uring error with errno: " + std::to_string(-ret_val));
   }
 }
 
 c10::intrusive_ptr<Future<torch::Tensor>> OnDiskNpyArray::IndexSelectIOUring(
     torch::Tensor index) {
-  return async([=] { return IndexSelectIOUringImpl(index); });
+  return async([=, this] { return IndexSelectIOUringImpl(index); });
 }
 
 #endif  // HAVE_LIBRARY_LIBURING

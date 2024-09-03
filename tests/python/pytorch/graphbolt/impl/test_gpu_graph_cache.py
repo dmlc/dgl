@@ -11,7 +11,9 @@ import torch
 @unittest.skipIf(
     F._default_context_str != "gpu"
     or torch.cuda.get_device_capability()[0] < 7,
-    reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
+    reason="GPUCachedFeature tests are available only on GPU."
+    if F._default_context_str != "gpu"
+    else "GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
 )
 @pytest.mark.parametrize(
     "indptr_dtype",
@@ -36,7 +38,8 @@ import torch
     ],
 )
 @pytest.mark.parametrize("cache_size", [4, 9, 11])
-def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
+@pytest.mark.parametrize("with_edge_ids", [True, False])
+def test_gpu_graph_cache(indptr_dtype, dtype, cache_size, with_edge_ids):
     indices_dtype = torch.int32
     indptr = torch.tensor([0, 3, 6, 10], dtype=indptr_dtype, pin_memory=True)
     indices = torch.arange(0, indptr[-1], dtype=indices_dtype, pin_memory=True)
@@ -48,6 +51,7 @@ def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
         2,
         indptr.dtype,
         [e.dtype for e in edge_tensors],
+        not with_edge_ids,
     )
 
     for i in range(10):
@@ -55,24 +59,22 @@ def test_gpu_graph_cache(indptr_dtype, dtype, cache_size):
             torch.arange(2, dtype=indices_dtype, device=F.ctx()) + i * 2
         ) % (indptr.size(0) - 1)
         missing_keys, replace = g.query(keys)
-        missing_edge_tensors = []
-        for e in edge_tensors:
-            missing_indptr, missing_e = torch.ops.graphbolt.index_select_csc(
-                indptr, e, missing_keys, None
-            )
-            missing_edge_tensors.append(missing_e)
-
+        (
+            missing_indptr,
+            missing_edge_tensors,
+        ) = torch.ops.graphbolt.index_select_csc_batched(
+            indptr, edge_tensors, missing_keys, with_edge_ids, None
+        )
         output_indptr, output_edge_tensors = replace(
             missing_indptr, missing_edge_tensors
         )
 
-        reference_edge_tensors = []
-        for e in edge_tensors:
-            (
-                reference_indptr,
-                reference_e,
-            ) = torch.ops.graphbolt.index_select_csc(indptr, e, keys, None)
-            reference_edge_tensors.append(reference_e)
+        (
+            reference_indptr,
+            reference_edge_tensors,
+        ) = torch.ops.graphbolt.index_select_csc_batched(
+            indptr, edge_tensors, keys, with_edge_ids, None
+        )
 
         assert torch.equal(output_indptr, reference_indptr)
         assert len(output_edge_tensors) == len(reference_edge_tensors)

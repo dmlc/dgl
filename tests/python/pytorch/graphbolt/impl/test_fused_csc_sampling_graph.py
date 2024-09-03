@@ -813,15 +813,23 @@ def test_in_subgraph_hetero():
     assert in_subgraph.original_column_node_ids is None
     assert in_subgraph.original_row_node_ids is None
     assert torch.equal(
-        in_subgraph.original_edge_ids,
-        torch.tensor([3, 4, 9, 10, 11, 7, 8], device=F.ctx()),
+        in_subgraph.original_edge_ids["N0:R0:N0"],
+        torch.tensor([], device=F.ctx()),
+    )
+    assert torch.equal(
+        in_subgraph.original_edge_ids["N0:R1:N1"],
+        torch.tensor([9, 7], device=F.ctx()),
+    )
+    assert torch.equal(
+        in_subgraph.original_edge_ids["N1:R2:N0"],
+        torch.tensor([3, 4], device=F.ctx()),
+    )
+    assert torch.equal(
+        in_subgraph.original_edge_ids["N1:R3:N1"],
+        torch.tensor([10, 11, 8], device=F.ctx()),
     )
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("replace", [False, True])
@@ -836,6 +844,8 @@ def test_temporal_sample_neighbors_homo(
     use_node_timestamp,
     use_edge_timestamp,
 ):
+    if replace and F._default_context_str == "gpu":
+        pytest.skip("Sampling with replacement not yet implemented on the GPU.")
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -855,7 +865,7 @@ def test_temporal_sample_neighbors_homo(
     assert len(indptr) == total_num_nodes + 1
 
     # Construct FusedCSCSamplingGraph.
-    graph = gb.fused_csc_sampling_graph(indptr, indices)
+    graph = gb.fused_csc_sampling_graph(indptr, indices).to(F.ctx())
 
     # Generate subgraph via sample neighbors.
     fanouts = torch.LongTensor([2])
@@ -866,15 +876,17 @@ def test_temporal_sample_neighbors_homo(
     )
 
     seed_list = [1, 3, 4]
-    seed_timestamp = torch.randint(0, 100, (len(seed_list),), dtype=torch.int64)
+    seed_timestamp = torch.randint(
+        0, 100, (len(seed_list),), dtype=torch.int64, device=F.ctx()
+    )
     if use_node_timestamp:
         node_timestamp = torch.randint(
-            0, 100, (total_num_nodes,), dtype=torch.int64
+            0, 100, (total_num_nodes,), dtype=torch.int64, device=F.ctx()
         )
         graph.node_attributes = {"timestamp": node_timestamp}
     if use_edge_timestamp:
         edge_timestamp = torch.randint(
-            0, 100, (total_num_edges,), dtype=torch.int64
+            0, 100, (total_num_edges,), dtype=torch.int64, device=F.ctx()
         )
         graph.edge_attributes = {"timestamp": edge_timestamp}
 
@@ -924,7 +936,7 @@ def test_temporal_sample_neighbors_homo(
             available_neighbors.append(neighbors)
         return available_neighbors
 
-    nodes = torch.tensor(seed_list, dtype=indices_dtype)
+    nodes = torch.tensor(seed_list, dtype=indices_dtype, device=F.ctx())
     subgraph = sampler(
         nodes,
         seed_timestamp,
@@ -935,6 +947,7 @@ def test_temporal_sample_neighbors_homo(
     )
     sampled_count = torch.diff(subgraph.sampled_csc.indptr).tolist()
     available_neighbors = _get_available_neighbors()
+    assert len(available_neighbors) == len(sampled_count)
     for i, count in enumerate(sampled_count):
         if not replace:
             expect_count = min(fanouts[0], len(available_neighbors[i]))
@@ -946,10 +959,6 @@ def test_temporal_sample_neighbors_homo(
         assert set(neighbors.tolist()).issubset(set(available_neighbors[i]))
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("indices_dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("replace", [False, True])
@@ -964,6 +973,8 @@ def test_temporal_sample_neighbors_hetero(
     use_node_timestamp,
     use_edge_timestamp,
 ):
+    if replace and F._default_context_str == "gpu":
+        pytest.skip("Sampling with replacement not yet implemented on the GPU.")
     """Original graph in COO:
     "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
     "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
@@ -994,7 +1005,7 @@ def test_temporal_sample_neighbors_hetero(
         type_per_edge=type_per_edge,
         node_type_to_id=ntypes,
         edge_type_to_id=etypes,
-    )
+    ).to(F.ctx())
 
     # Generate subgraph via sample neighbors.
     fanouts = torch.LongTensor([-1, -1])
@@ -1005,8 +1016,8 @@ def test_temporal_sample_neighbors_hetero(
     )
 
     seeds = {
-        "n1": torch.tensor([0], dtype=indices_dtype),
-        "n2": torch.tensor([0], dtype=indices_dtype),
+        "n1": torch.tensor([0], dtype=indices_dtype, device=F.ctx()),
+        "n2": torch.tensor([0], dtype=indices_dtype, device=F.ctx()),
     }
     per_etype_destination_nodes = {
         "n1:e1:n2": torch.tensor([1], dtype=indices_dtype),
@@ -1014,17 +1025,17 @@ def test_temporal_sample_neighbors_hetero(
     }
 
     seed_timestamp = {
-        "n1": torch.randint(0, 100, (1,), dtype=torch.int64),
-        "n2": torch.randint(0, 100, (1,), dtype=torch.int64),
+        "n1": torch.randint(0, 100, (1,), dtype=torch.int64, device=F.ctx()),
+        "n2": torch.randint(0, 100, (1,), dtype=torch.int64, device=F.ctx()),
     }
     if use_node_timestamp:
         node_timestamp = torch.randint(
-            0, 100, (total_num_nodes,), dtype=torch.int64
+            0, 100, (total_num_nodes,), dtype=torch.int64, device=F.ctx()
         )
         graph.node_attributes = {"timestamp": node_timestamp}
     if use_edge_timestamp:
         edge_timestamp = torch.randint(
-            0, 100, (total_num_edges,), dtype=torch.int64
+            0, 100, (total_num_edges,), dtype=torch.int64, device=F.ctx()
         )
         graph.edge_attributes = {"timestamp": edge_timestamp}
 
@@ -1680,6 +1691,7 @@ def test_sample_neighbors_homo(
     # Verify in subgraph.
     sampled_indptr_num = subgraph.sampled_csc.indptr.size(0)
     sampled_num = subgraph.sampled_csc.indices.size(0)
+    assert sampled_num == len(subgraph.original_edge_ids)
     if nodes is None:
         assert sampled_indptr_num == indptr.shape[0]
         assert sampled_num == 10
@@ -1688,7 +1700,21 @@ def test_sample_neighbors_homo(
         assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is None
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_sample_neighbors_hetero_single_fanout(labor):
+    u, i = torch.randint(20, size=(1000,)), torch.randint(10, size=(1000,))
+    graph = dgl.heterograph({("u", "w", "i"): (u, i), ("i", "b", "u"): (i, u)})
+
+    graph = gb.from_dglgraph(graph).to(F.ctx())
+
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    for i in range(11):
+        nodes = {"u": torch.randint(10, (100,), device=F.ctx())}
+        sampler(nodes, fanouts=torch.tensor([-1]))
+    # Should reach here without crashing.
 
 
 @pytest.mark.parametrize("indptr_dtype", [torch.int32, torch.int64])
@@ -1753,9 +1779,9 @@ def test_sample_neighbors_hetero(indptr_dtype, indices_dtype, labor):
         assert torch.equal(
             subgraph.sampled_csc[etype].indices.sort()[0], pairs.indices
         )
+        assert len(pairs.indices) == len(subgraph.original_edge_ids[etype])
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is None
 
     # Sample on single node type.
     nodes = {"n1": torch.tensor([0], dtype=indices_dtype, device=F.ctx())}
@@ -1780,9 +1806,9 @@ def test_sample_neighbors_hetero(indptr_dtype, indices_dtype, labor):
         assert torch.equal(
             subgraph.sampled_csc[etype].indices.sort()[0], pairs.indices
         )
+        assert len(pairs.indices) == len(subgraph.original_edge_ids[etype])
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
-    assert subgraph.original_edge_ids is None
 
 
 @pytest.mark.parametrize(

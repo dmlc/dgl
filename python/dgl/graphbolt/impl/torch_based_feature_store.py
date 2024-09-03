@@ -140,7 +140,7 @@ class TorchBasedFeature(Feature):
         return index_select(self._tensor, ids)
 
     def read_async(self, ids: torch.Tensor):
-        """Read the feature by index asynchronously.
+        r"""Read the feature by index asynchronously.
 
         Parameters
         ----------
@@ -151,11 +151,11 @@ class TorchBasedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``\ th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
-        Example Usage
+        Examples
         --------
         >>> import dgl.graphbolt as gb
         >>> feature = gb.Feature(...)
@@ -238,6 +238,16 @@ class TorchBasedFeature(Feature):
             The size of the feature.
         """
         return self._tensor.size()[1:]
+
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        return self._tensor.size()[0]
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature store.
@@ -413,7 +423,7 @@ class DiskBasedFeature(Feature):
             return index_select(self._tensor, ids)
 
     def read_async(self, ids: torch.Tensor):
-        """Read the feature by index asynchronously.
+        r"""Read the feature by index asynchronously.
 
         Parameters
         ----------
@@ -424,11 +434,11 @@ class DiskBasedFeature(Feature):
         -------
         A generator object.
             The returned generator object returns a future on
-            `read_async_num_stages(ids.device)`th invocation. The return result
-            can be accessed by calling `.wait()`. on the returned future object.
-            It is undefined behavior to call `.wait()` more than once.
+            ``read_async_num_stages(ids.device)``\ th invocation. The return result
+            can be accessed by calling ``.wait()``. on the returned future object.
+            It is undefined behavior to call ``.wait()`` more than once.
 
-        Example Usage
+        Examples
         --------
         >>> import dgl.graphbolt as gb
         >>> feature = gb.Feature(...)
@@ -493,6 +503,16 @@ class DiskBasedFeature(Feature):
         """
         return self._tensor.size()[1:]
 
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
+        """
+        return self._tensor.size()[0]
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Disk based feature does not support update for now."""
         raise NotImplementedError
@@ -520,7 +540,7 @@ class DiskBasedFeature(Feature):
         return self
 
     def pin_memory_(self):  # pylint: disable=invalid-name
-        """Placeholder `DiskBasedFeature` pin_memory_ implementation. It is a no-op."""
+        r"""Placeholder `DiskBasedFeature` pin_memory_ implementation. It is a no-op."""
         gb_warning(
             "`DiskBasedFeature.pin_memory_()` is not supported. Leaving unmodified."
         )

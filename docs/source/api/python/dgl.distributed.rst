@@ -70,6 +70,10 @@ Distributed DataLoader
 
 .. autoclass:: DistDataLoader
 
+.. autoclass:: DistNodeDataLoader
+
+.. autoclass:: DistEdgeDataLoader
+
 .. _api-distributed-sampling-ops:
 Distributed Graph Sampling Operators
 ```````````````````````````````````````

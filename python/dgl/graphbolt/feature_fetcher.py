@@ -215,8 +215,6 @@ class FeatureFetcher(MiniBatchTransformer):
         if self.edge_feature_keys and num_layers > 0:
             for i in range(num_layers):
                 original_edge_ids = data.edge_ids(i)
-                if original_edge_ids is None:
-                    continue
                 if is_heterogeneous:
                     # Convert edge type to string.
                     original_edge_ids = {

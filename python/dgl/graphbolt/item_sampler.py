@@ -6,7 +6,7 @@ from typing import Callable, Iterator, Optional, Union
 import numpy as np
 import torch
 import torch.distributed as dist
-from torchdata.datapipes.iter import IterDataPipe
+from torch.utils.data import IterDataPipe
 
 from .internal import calculate_range
 from .internal_utils import gb_warning
@@ -112,9 +112,9 @@ class ItemSampler(IterDataPipe):
     pairs with negative sources/destinations.
 
     Note: This class `ItemSampler` is not decorated with
-    `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
+    `torch.utils.data.functional_datapipe` on purpose. This indicates it
     does not support function-like call. But any iterable datapipes from
-    `torchdata` can be further appended.
+    `torch.utils.data.datapipes` can be further appended.
 
     Parameters
     ----------
@@ -195,7 +195,7 @@ class ItemSampler(IterDataPipe):
         compacted_seeds=None, blocks=None,)
 
     5. Further process batches with other datapipes such as
-    :class:`torchdata.datapipes.iter.Mapper`.
+    :class:`torch.utils.data.datapipes.iter.Mapper`.
 
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
     >>> data_pipe = gb.ItemSampler(item_set, 4)
@@ -330,12 +330,11 @@ class ItemSampler(IterDataPipe):
             self._drop_uneven_inputs,
         )
         if self._shuffle:
-            g = torch.Generator()
-            g.manual_seed(self._seed + self._epoch)
+            g = torch.Generator().manual_seed(self._seed + self._epoch)
             permutation = torch.randperm(total, generator=g)
+            indices = permutation[start_offset : start_offset + assigned_count]
         else:
-            permutation = torch.arange(total)
-        indices = permutation[start_offset : start_offset + assigned_count]
+            indices = torch.arange(start_offset, start_offset + assigned_count)
         for i in range(0, assigned_count, self._batch_size):
             if output_count <= 0:
                 break
@@ -365,9 +364,9 @@ class DistributedItemSampler(ItemSampler):
     of items.
 
     Note: This class `DistributedItemSampler` is not decorated with
-    `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
+    `torch.utils.data.functional_datapipe` on purpose. This indicates it
     does not support function-like call. But any iterable datapipes from
-    `torchdata` can be further appended.
+    `torch.utils.data.datapipes` can be further appended.
 
     Parameters
     ----------

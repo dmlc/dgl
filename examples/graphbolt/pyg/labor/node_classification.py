@@ -2,61 +2,68 @@ import argparse
 import time
 
 from copy import deepcopy
+from functools import partial
 
 import dgl.graphbolt as gb
 import torch
 
-# Needed until https://github.com/pytorch/pytorch/issues/121197 is resolved to
-# use the `--torch-compile` cmdline option reliably.
+# For torch.compile until https://github.com/pytorch/pytorch/issues/121197 is
+# resolved.
 import torch._inductor.codecache
+
+torch._dynamo.config.cache_size_limit = 32
+
 import torch.nn as nn
-import torch.nn.functional as F
 import torchmetrics.functional as MF
 from load_dataset import load_dataset
-from sage_conv import SAGEConv
-from torch.torch_version import TorchVersion
+from sage_conv import SAGEConv as CustomSAGEConv
+from torch_geometric.nn import SAGEConv
 from tqdm import tqdm
 
 
-def convert_to_pyg(h, subgraph):
-    #####################################################################
-    # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
-    #
-    #   We convert the provided sampled edges in CSC format from GraphBolt and
-    #   convert to COO via using gb.expand_indptr.
-    #####################################################################
-    src = subgraph.sampled_csc.indices
-    dst = gb.expand_indptr(
-        subgraph.sampled_csc.indptr,
-        dtype=src.dtype,
-        output_size=src.size(0),
-    )
-    edge_index = torch.stack([src, dst], dim=0).long()
-    dst_size = subgraph.sampled_csc.indptr.size(0) - 1
-    # h and h[:dst_size] correspond to source and destination features resp.
-    return (h, h[:dst_size]), edge_index, (h.size(0), dst_size)
+def accuracy(out, labels):
+    assert out.ndim == 2
+    assert out.size(0) == labels.size(0)
+    assert labels.ndim == 1 or (labels.ndim == 2 and labels.size(1) == 1)
+    labels = labels.flatten()
+    predictions = torch.argmax(out, 1)
+    return (labels == predictions).sum(dtype=torch.float64) / labels.size(0)
 
 
 class GraphSAGE(torch.nn.Module):
-    def __init__(self, in_size, hidden_size, out_size, n_layers, dropout):
+    def __init__(
+        self, in_size, hidden_size, out_size, n_layers, dropout, variant
+    ):
         super().__init__()
+        assert variant in ["original", "custom"]
         self.layers = torch.nn.ModuleList()
-        sizes = [in_size] + [hidden_size] * n_layers
-        for i in range(n_layers):
-            self.layers.append(SAGEConv(sizes[i], sizes[i + 1]))
-        self.linear = nn.Linear(hidden_size, out_size)
+        if variant == "custom":
+            sizes = [in_size] + [hidden_size] * n_layers
+            for i in range(n_layers):
+                self.layers.append(CustomSAGEConv(sizes[i], sizes[i + 1]))
+            self.linear = nn.Linear(hidden_size, out_size)
+            self.activation = nn.GELU()
+        else:
+            sizes = [in_size] + [hidden_size] * (n_layers - 1) + [out_size]
+            for i in range(n_layers):
+                self.layers.append(SAGEConv(sizes[i], sizes[i + 1]))
+            self.activation = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         self.hidden_size = hidden_size
         self.out_size = out_size
+        self.variant = variant
 
     def forward(self, subgraphs, x):
         h = x
-        for layer, subgraph in zip(self.layers, subgraphs):
-            h, edge_index, size = convert_to_pyg(h, subgraph)
+        for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
+            h, edge_index, size = subgraph.to_pyg(h)
             h = layer(h, edge_index, size=size)
-            h = F.gelu(h)
-            h = self.dropout(h)
-        return self.linear(h)
+            if self.variant == "custom":
+                h = self.activation(h)
+                h = self.dropout(h)
+            elif i != len(subgraphs) - 1:
+                h = self.activation(h)
+        return self.linear(h) if self.variant == "custom" else h
 
     def inference(self, graph, features, dataloader, storage_device):
         """Conduct layer-wise inference to get all the node embeddings."""
@@ -75,13 +82,16 @@ class GraphSAGE(torch.nn.Module):
             )
             for data in tqdm(dataloader, "Inferencing"):
                 # len(data.sampled_subgraphs) = 1
-                h, edge_index, size = convert_to_pyg(
-                    data.node_features["feat"], data.sampled_subgraphs[0]
+                h, edge_index, size = data.sampled_subgraphs[0].to_pyg(
+                    data.node_features["feat"]
                 )
                 hidden_x = layer(h, edge_index, size=size)
-                hidden_x = F.gelu(hidden_x)
-                if is_last_layer:
-                    hidden_x = self.linear(hidden_x)
+                if self.variant == "custom":
+                    hidden_x = self.activation(hidden_x)
+                    if is_last_layer:
+                        hidden_x = self.linear(hidden_x)
+                elif not is_last_layer:
+                    hidden_x = self.activation(hidden_x)
                 # By design, our output nodes are contiguous.
                 y[data.seeds[0] : data.seeds[-1] + 1] = hidden_x.to(
                     buffer_device
@@ -103,9 +113,11 @@ def create_dataloader(
         shuffle=(job == "train"),
         drop_last=(job == "train"),
     )
+    need_copy = True
     # Copy the data to the specified device.
-    if args.graph_device != "cpu":
+    if args.graph_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
+        need_copy = False
     # Sample neighbors for each node in the mini-batch.
     kwargs = (
         {
@@ -116,11 +128,16 @@ def create_dataloader(
         else {}
     )
     datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1], **kwargs
+        graph,
+        fanout if job != "infer" else [-1],
+        overlap_fetch=args.overlap_graph_fetch,
+        asynchronous=args.graph_device != "cpu",
+        **kwargs,
     )
     # Copy the data to the specified device.
-    if args.feature_device != "cpu":
+    if args.feature_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
+        need_copy = False
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(
         features,
@@ -128,14 +145,24 @@ def create_dataloader(
         overlap_fetch=args.overlap_feature_fetch,
     )
     # Copy the data to the specified device.
-    if args.feature_device == "cpu":
+    if need_copy:
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
-    return gb.DataLoader(
-        datapipe,
-        num_workers=args.num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
-    )
+    return gb.DataLoader(datapipe, num_workers=args.num_workers)
+
+
+@torch.compile
+def train_step(minibatch, optimizer, model, loss_fn, multilabel, eval_fn):
+    node_features = minibatch.node_features["feat"]
+    labels = minibatch.labels
+    optimizer.zero_grad()
+    out = model(minibatch.sampled_subgraphs, node_features)
+    label_dtype = out.dtype if multilabel else None
+    loss = loss_fn(out, labels.to(label_dtype))
+    num_correct = eval_fn(out, labels) * labels.size(0)
+    loss.backward()
+    optimizer.step()
+    return loss.detach(), num_correct, labels.size(0)
 
 
 def train_helper(
@@ -144,38 +171,36 @@ def train_helper(
     optimizer,
     loss_fn,
     multilabel,
-    kwargs,
+    eval_fn,
     gpu_cache_miss_rate_fn,
     cpu_cache_miss_rate_fn,
     device,
 ):
     model.train()  # Set the model to training mode
     total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
-    total_correct = 0  # Accumulator for the total number of correct predictions
+    # Accumulator for the total number of correct predictions
+    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0  # Accumulator for the total number of samples processed
     num_batches = 0  # Counter for the number of mini-batches processed
     start = time.time()
     dataloader = tqdm(dataloader, "Training")
-    for minibatch in dataloader:
-        node_features = minibatch.node_features["feat"]
-        labels = minibatch.labels
-        optimizer.zero_grad()
-        out = model(minibatch.sampled_subgraphs, node_features)
-        label_dtype = out.dtype if multilabel else None
-        loss = loss_fn(out, labels.to(label_dtype))
-        total_loss += loss.detach()
-        total_correct += MF.f1_score(out, labels, **kwargs) * labels.size(0)
-        total_samples += labels.size(0)
-        loss.backward()
-        optimizer.step()
-        num_batches += 1
-        dataloader.set_postfix(
-            {
-                "num_nodes": node_features.size(0),
-                "gpu_cache_miss": gpu_cache_miss_rate_fn(),
-                "cpu_cache_miss": cpu_cache_miss_rate_fn(),
-            }
+    for step, minibatch in enumerate(dataloader):
+        loss, num_correct, num_samples = train_step(
+            minibatch, optimizer, model, loss_fn, multilabel, eval_fn
         )
+        total_loss += loss
+        total_correct += num_correct
+        total_samples += num_samples
+        num_batches += 1
+        if step % 25 == 0:
+            # log every 25 steps for performance.
+            dataloader.set_postfix(
+                {
+                    "num_nodes": minibatch.node_ids().size(0),
+                    "gpu_cache_miss": gpu_cache_miss_rate_fn(),
+                    "cpu_cache_miss": cpu_cache_miss_rate_fn(),
+                }
+            )
     train_loss = total_loss / num_batches
     train_acc = total_correct / total_samples
     end = time.time()
@@ -187,7 +212,7 @@ def train(
     valid_dataloader,
     model,
     multilabel,
-    kwargs,
+    eval_fn,
     gpu_cache_miss_rate_fn,
     cpu_cache_miss_rate_fn,
     device,
@@ -206,7 +231,7 @@ def train(
             optimizer,
             loss_fn,
             multilabel,
-            kwargs,
+            eval_fn,
             gpu_cache_miss_rate_fn,
             cpu_cache_miss_rate_fn,
             device,
@@ -214,9 +239,10 @@ def train(
         val_acc = evaluate(
             model,
             valid_dataloader,
-            kwargs,
+            eval_fn,
             gpu_cache_miss_rate_fn,
             cpu_cache_miss_rate_fn,
+            device,
         )
         if val_acc > best_model_acc:
             best_model_acc = val_acc
@@ -224,7 +250,8 @@ def train(
             best_model_epoch = epoch
         print(
             f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
-            f"Approx. Train: {train_acc:.4f}, Approx. Val: {val_acc:.4f}, "
+            f"Approx. Train: {train_acc.item():.4f}, "
+            f"Approx. Val: {val_acc.item():.4f}, "
             f"Time: {duration}s"
         )
         if best_model_epoch + args.early_stopping_patience < epoch:
@@ -240,7 +267,7 @@ def layerwise_infer(
     itemsets,
     all_nodes_set,
     model,
-    kwargs,
+    eval_fn,
 ):
     model.eval()
     dataloader = create_dataloader(
@@ -257,39 +284,51 @@ def layerwise_infer(
     metrics = {}
     for split_name, itemset in itemsets.items():
         nid, labels = itemset[:]
-        acc = MF.f1_score(
+        acc = eval_fn(
             pred[nid.to(pred.device)],
             labels.to(pred.device),
-            **kwargs,
         )
         metrics[split_name] = acc.item()
 
     return metrics
 
 
+@torch.compile
+def evaluate_step(minibatch, model, eval_fn):
+    node_features = minibatch.node_features["feat"]
+    labels = minibatch.labels
+    out = model(minibatch.sampled_subgraphs, node_features)
+    num_correct = eval_fn(out, labels) * labels.size(0)
+    return num_correct, labels.size(0)
+
+
 @torch.no_grad()
 def evaluate(
-    model, dataloader, kwargs, gpu_cache_miss_rate_fn, cpu_cache_miss_rate_fn
+    model,
+    dataloader,
+    eval_fn,
+    gpu_cache_miss_rate_fn,
+    cpu_cache_miss_rate_fn,
+    device,
 ):
     model.eval()
-    y_hats = []
-    ys = []
-    val_dataloader_tqdm = tqdm(dataloader, "Evaluating")
-    for minibatch in val_dataloader_tqdm:
-        node_features = minibatch.node_features["feat"]
-        labels = minibatch.labels
-        out = model(minibatch.sampled_subgraphs, node_features)
-        y_hats.append(out)
-        ys.append(labels)
-        val_dataloader_tqdm.set_postfix(
-            {
-                "num_nodes": node_features.size(0),
-                "gpu_cache_miss": gpu_cache_miss_rate_fn(),
-                "cpu_cache_miss": cpu_cache_miss_rate_fn(),
-            }
-        )
+    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
+    total_samples = 0
+    dataloader = tqdm(dataloader, "Evaluating")
+    for step, minibatch in enumerate(dataloader):
+        num_correct, num_samples = evaluate_step(minibatch, model, eval_fn)
+        total_correct += num_correct
+        total_samples += num_samples
+        if step % 25 == 0:
+            dataloader.set_postfix(
+                {
+                    "num_nodes": minibatch.node_ids().size(0),
+                    "gpu_cache_miss": gpu_cache_miss_rate_fn(),
+                    "cpu_cache_miss": cpu_cache_miss_rate_fn(),
+                }
+            )
 
-    return MF.f1_score(torch.cat(y_hats), torch.cat(ys), **kwargs)
+    return total_correct / total_samples
 
 
 def parse_args():
@@ -324,6 +363,9 @@ def parse_args():
             "ogbn-arxiv",
             "ogbn-products",
             "ogbn-papers100M",
+            "igb-hom-tiny",
+            "igb-hom-small",
+            "igb-hom-medium",
             "reddit",
             "yelp",
             "flickr",
@@ -347,8 +389,8 @@ def parse_args():
             "cuda-pinned-cuda",
             "cuda-cuda-cuda",
         ],
-        help="Graph storage - feature storage - Train device: 'cpu' for CPU and RAM,"
-        " 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
+        help="Graph storage - feature storage - Train device: 'cpu' for CPU and"
+        " RAM, 'pinned' for pinned memory in RAM, 'cuda' for GPU and GPU memory.",
     )
     parser.add_argument("--layer-dependency", action="store_true")
     parser.add_argument("--batch-dependency", type=int, default=1)
@@ -379,11 +421,11 @@ def parse_args():
         help="The sampling function when doing layerwise sampling.",
     )
     parser.add_argument(
-        "--disable-torch-compile",
-        action="store_true",
-        default=TorchVersion(torch.__version__) < TorchVersion("2.2.0a0"),
-        help="Disables torch.compile() on the trained GNN model because it is "
-        "enabled by default for torch>=2.2.0 without this option.",
+        "--sage-model-variant",
+        default="custom",
+        choices=["custom", "original"],
+        help="The custom SAGE GNN model provides higher accuracy with lower"
+        " runtime performance.",
     )
     parser.add_argument("--precision", type=str, default="high")
     return parser.parse_args()
@@ -396,11 +438,7 @@ def main():
     print(f"Training in {args.mode} mode.")
     args.graph_device, args.feature_device, args.device = args.mode.split("-")
     args.overlap_feature_fetch = args.feature_device == "pinned"
-    # For now, only sample_layer_neighbor is faster with this option
-    args.overlap_graph_fetch = (
-        args.sample_mode == "sample_layer_neighbor"
-        and args.graph_device == "pinned"
-    )
+    args.overlap_graph_fetch = args.graph_device == "pinned"
 
     # Load and preprocess dataset.
     print("Loading data...")
@@ -440,23 +478,23 @@ def main():
     if args.num_cpu_cached_features > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
     ):
-        features[("node", None, "feat")] = gb.CPUCachedFeature(
+        features[("node", None, "feat")] = gb.cpu_cached_feature(
             features[("node", None, "feat")],
             args.num_cpu_cached_features * feature_num_bytes,
             args.cpu_feature_cache_policy,
             args.feature_device == "pinned",
         )
         cpu_cached_feature = features[("node", None, "feat")]
-        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature._feature.miss_rate
+        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
     if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
-        features[("node", None, "feat")] = gb.GPUCachedFeature(
+        features[("node", None, "feat")] = gb.gpu_cached_feature(
             features[("node", None, "feat")],
             args.num_gpu_cached_features * feature_num_bytes,
         )
         gpu_cached_feature = features[("node", None, "feat")]
-        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature._feature.miss_rate
+        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature.miss_rate
     else:
         gpu_cache_miss_rate_fn = lambda: 1
 
@@ -480,24 +518,28 @@ def main():
         num_classes,
         len(args.fanout),
         args.dropout,
+        args.sage_model_variant,
     ).to(args.device)
     assert len(args.fanout) == len(model.layers)
-    if not args.disable_torch_compile:
-        torch._dynamo.config.cache_size_limit = 32
-        model = torch.compile(model, fullgraph=True, dynamic=True)
 
-    kwargs = {
-        "num_labels" if multilabel else "num_classes": num_classes,
-        "task": "multilabel" if multilabel else "multiclass",
-        "validate_args": False,
-    }
+    eval_fn = (
+        partial(
+            # TODO @mfbalin: Find an implementation that does not synchronize.
+            MF.f1_score,
+            task="multilabel",
+            num_labels=num_classes,
+            validate_args=False,
+        )
+        if multilabel
+        else accuracy
+    )
 
     best_model = train(
         train_dataloader,
         valid_dataloader,
         model,
         multilabel,
-        kwargs,
+        eval_fn,
         gpu_cache_miss_rate_fn,
         cpu_cache_miss_rate_fn,
         args.device,
@@ -514,7 +556,7 @@ def main():
         itemsets,
         all_nodes_set,
         model,
-        kwargs,
+        eval_fn,
     )
     print("Final accuracy values:")
     print(final_acc)

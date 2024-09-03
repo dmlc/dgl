@@ -134,7 +134,7 @@ def copy_or_convert_data(
         if is_feature and get_npy_dim(input_path) == 1:
             data = data.reshape(-1, 1)
         # If the data does not need to be modified, just copy the file.
-        elif not within_int32:
+        elif not within_int32 and data.numpy().flags["C_CONTIGUOUS"]:
             shutil.copyfile(input_path, output_path)
             return
     else:
@@ -142,32 +142,6 @@ def copy_or_convert_data(
         if is_feature and data.dim() == 1:
             data = data.reshape(-1, 1)
     save_data(data, output_path, output_format)
-
-
-def get_nonproperty_attributes(_obj) -> list:
-    """Get attributes of the class except for the properties."""
-    attributes = [
-        attribute
-        for attribute in dir(_obj)
-        if not attribute.startswith("__")
-        and (
-            not hasattr(type(_obj), attribute)
-            or not isinstance(getattr(type(_obj), attribute), property)
-        )
-        and not callable(getattr(_obj, attribute))
-    ]
-    return attributes
-
-
-def get_attributes(_obj) -> list:
-    """Get attributes of the class."""
-    attributes = [
-        attribute
-        for attribute in dir(_obj)
-        if not attribute.startswith("__")
-        and not callable(getattr(_obj, attribute))
-    ]
-    return attributes
 
 
 def read_edges(dataset_dir, edge_fmt, edge_path):

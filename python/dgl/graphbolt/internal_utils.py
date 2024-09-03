@@ -113,6 +113,70 @@ def recursive_apply(data, fn, *args, **kwargs):
         return fn(data, *args, **kwargs)
 
 
+def recursive_apply_reduce_all(data, fn, *args, **kwargs):
+    """Recursively apply a function to every element in a container and reduce
+    the boolean results with all.
+
+    If the input data is a list or any sequence other than a string, returns
+    True if and only if the given function returns True for all elements.
+
+    If the input data is a dict or any mapping, returns True if and only if the
+    given function returns True for values.
+
+    If the input data is a nested container, the result will be reduced over the
+    nested structure where each element is tested recursively.
+
+    The first argument of the function will be passed with the individual elements from
+    the input data, followed by the arguments in :attr:`args` and :attr:`kwargs`.
+
+    Parameters
+    ----------
+    data : any
+        Any object.
+    fn : callable
+        Any function returning a boolean.
+    args, kwargs :
+        Additional arguments and keyword-arguments passed to the function.
+    """
+    if isinstance(data, Mapping):
+        return all(
+            recursive_apply_reduce_all(v, fn, *args, **kwargs)
+            for v in data.values()
+        )
+    elif isinstance(data, tuple) or is_listlike(data):
+        return all(
+            recursive_apply_reduce_all(v, fn, *args, **kwargs) for v in data
+        )
+    else:
+        return fn(data, *args, **kwargs)
+
+
+def get_nonproperty_attributes(_obj) -> list:
+    """Get attributes of the class except for the properties."""
+    attributes = [
+        attribute
+        for attribute in dir(_obj)
+        if not attribute.startswith("__")
+        and (
+            not hasattr(type(_obj), attribute)
+            or not isinstance(getattr(type(_obj), attribute), property)
+        )
+        and not callable(getattr(_obj, attribute))
+    ]
+    return attributes
+
+
+def get_attributes(_obj) -> list:
+    """Get attributes of the class."""
+    attributes = [
+        attribute
+        for attribute in dir(_obj)
+        if not attribute.startswith("__")
+        and not callable(getattr(_obj, attribute))
+    ]
+    return attributes
+
+
 def download(
     url,
     path=None,

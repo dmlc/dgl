@@ -47,13 +47,11 @@ torch::Tensor FeatureCache::Query(
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
   const auto positions_ptr = positions.data_ptr<int64_t>();
   const auto indices_ptr = indices.data_ptr<int64_t>();
-  torch::parallel_for(
-      0, positions.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
-        for (int64_t i = begin; i < end; i++) {
-          std::memcpy(
-              values_ptr + indices_ptr[i] * row_bytes,
-              tensor_ptr + positions_ptr[i] * row_bytes, row_bytes);
-        }
+  graphbolt::parallel_for_each(
+      0, positions.size(0), kIntGrainSize, [&](const int64_t i) {
+        std::memcpy(
+            values_ptr + indices_ptr[i] * row_bytes,
+            tensor_ptr + positions_ptr[i] * row_bytes, row_bytes);
       });
   return values;
 }
@@ -68,16 +66,22 @@ torch::Tensor FeatureCache::IndexSelect(torch::Tensor positions) {
 }
 
 void FeatureCache::Replace(torch::Tensor positions, torch::Tensor values) {
+  TORCH_CHECK(positions.size(0) == values.size(0));
+  if (values.numel() == 0) return;
   const auto row_bytes = values.slice(0, 0, 1).numel() * values.element_size();
+  TORCH_CHECK(
+      row_bytes == tensor_.slice(0, 0, 1).numel() * tensor_.element_size(),
+      "The # bytes of a single row should match the cache's.");
   auto values_ptr = reinterpret_cast<std::byte*>(values.data_ptr());
   const auto tensor_ptr = reinterpret_cast<std::byte*>(tensor_.data_ptr());
   const auto positions_ptr = positions.data_ptr<int64_t>();
-  torch::parallel_for(
-      0, positions.size(0), kIntGrainSize, [&](int64_t begin, int64_t end) {
-        for (int64_t i = begin; i < end; i++) {
+  graphbolt::parallel_for_each(
+      0, positions.size(0), kIntGrainSize, [&](const int64_t i) {
+        const auto position = positions_ptr[i];
+        if (position >= 0) {
           std::memcpy(
-              tensor_ptr + positions_ptr[i] * row_bytes,
-              values_ptr + i * row_bytes, row_bytes);
+              tensor_ptr + position * row_bytes, values_ptr + i * row_bytes,
+              row_bytes);
         }
       });
 }

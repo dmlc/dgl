@@ -49,23 +49,24 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * graph.
    * @param original_row_node_ids Column's reverse node ids in the original
    * graph.
-   * @param original_edge_ids Reverse edge ids in the original graph.
+   * @param original_edge_ids Mapping of subgraph edge IDs to original
+   * FusedCSCSamplingGraph edge IDs.
    * @param type_per_edge Type id of each edge.
    * @param etype_offsets Edge offsets for the sampled edges for the sampled
    * edges that are sorted w.r.t. edge types.
    */
   FusedSampledSubgraph(
-      torch::Tensor indptr, torch::Tensor indices,
+      torch::Tensor indptr, torch::optional<torch::Tensor> indices,
+      torch::Tensor original_edge_ids,
       torch::optional<torch::Tensor> original_column_node_ids,
       torch::optional<torch::Tensor> original_row_node_ids = torch::nullopt,
-      torch::optional<torch::Tensor> original_edge_ids = torch::nullopt,
       torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
       torch::optional<torch::Tensor> etype_offsets = torch::nullopt)
       : indptr(indptr),
         indices(indices),
+        original_edge_ids(original_edge_ids),
         original_column_node_ids(original_column_node_ids),
         original_row_node_ids(original_row_node_ids),
-        original_edge_ids(original_edge_ids),
         type_per_edge(type_per_edge),
         etype_offsets(etype_offsets) {}
 
@@ -84,8 +85,26 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * original ids. If compacted, the original ids are stored in the
    * `original_row_node_ids` field. The indices are sorted w.r.t. their edge
    * types for the heterogenous case.
+   *
+   * @note This is optional if its fetch operation will be performed later using
+   * the original_edge_ids tensor.
    */
-  torch::Tensor indices;
+  torch::optional<torch::Tensor> indices;
+
+  /**
+   * @brief Mapping of subgraph edge IDs to original FusedCSCSamplingGraph
+   * edge IDs.
+   *
+   * In this subgraph, the edge at index i corresponds to the edge with ID
+   * original_edge_ids[i] in the original FusedCSCSamplingGraph. Edges are
+   * sorted by type for heterogeneous graphs.
+   *
+   * Note: To retrieve the actual original edge IDs for feature fetching, use
+   * the `_ORIGINAL_EDGE_ID` edge attribute in FusedCSCSamplingGraph to map the
+   * `original_edge_ids` agin, as IDs may have been remapped during conversion
+   * to FusedCSCSamplingGraph.
+   */
+  torch::Tensor original_edge_ids;
 
   /**
    * @brief Column's reverse node ids in the original graph. A graph structure
@@ -107,14 +126,6 @@ struct FusedSampledSubgraph : torch::CustomClassHolder {
    * row's.
    */
   torch::optional<torch::Tensor> original_row_node_ids;
-
-  /**
-   * @brief Reverse edge ids in the original graph, the edge with id
-   * `original_edge_ids[i]` in the original graph is mapped to `i` in this
-   * subgraph. This is useful when edge features are needed. The edges are
-   * sorted w.r.t. their edge types for the heterogenous case.
-   */
-  torch::optional<torch::Tensor> original_edge_ids;
 
   /**
    * @brief Type id of each edge, where type id is the corresponding index of

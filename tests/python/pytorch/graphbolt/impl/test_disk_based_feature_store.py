@@ -82,9 +82,11 @@ def test_disk_based_feature():
         ind_c = torch.randint(low=0, high=c.size(0), size=(4111,))
         assert_equal(feature_c.read(ind_c), c[ind_c])
 
-        # Test get the size of the entire feature.
+        # Test get the size and count of the entire feature.
         assert feature_a.size() == torch.Size([3])
         assert feature_b.size() == torch.Size([2, 2])
+        assert feature_a.count() == a.size(0)
+        assert feature_b.count() == b.size(0)
 
         # Test get metadata of the feature.
         assert feature_a.metadata() == metadata

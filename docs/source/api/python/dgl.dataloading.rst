@@ -26,8 +26,6 @@ DataLoaders
 
     DataLoader
     GraphDataLoader
-    DistNodeDataLoader
-    DistEdgeDataLoader
 
 .. _api-dataloading-neighbor-sampling:
 
