@@ -17,7 +17,6 @@
  * @file cuda/unique_and_compact_map.cu
  * @brief Unique and compact operator implementation on CUDA using hash table.
  */
-#include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/iterator/tabulate_output_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
@@ -32,6 +31,7 @@
 #include <numeric>
 
 #include "../common.h"
+#include "../cooperative_minibatching_utils.h"
 #include "../utils.h"
 #include "./unique_and_compact.h"
 
@@ -40,17 +40,6 @@ namespace ops {
 
 using part_t = uint8_t;
 constexpr auto kPartDType = torch::kUInt8;
-
-// Returns the rotated part id so that current rank's part id is 0.
-template <typename index_t>
-__device__ inline auto partition_assignment(
-    index_t id, uint32_t rank, uint32_t world_size) {
-  // Consider using a faster implementation in the future.
-  constexpr uint64_t kCurandSeed = 999961;  // Any random number.
-  curandStatePhilox4_32_10_t rng;
-  curand_init(kCurandSeed, 0, id, &rng);
-  return (curand(&rng) - rank) % world_size;
-}
 
 // Support graphs with up to 2^kNodeIdBits nodes.
 constexpr int kNodeIdBits = 40;
@@ -255,7 +244,7 @@ UniqueAndCompactBatchedHashMapBased(
                   unique_ids_ptr[i] = node_id;
                   if (part_ids_ptr) {
                     part_ids_ptr[i] =
-                        partition_assignment(node_id, rank, world_size);
+                        cuda::PartitionAssignment(node_id, rank, world_size);
                   }
                   if (is_i_equal_batch_offset) {
                     const auto batch_index = ::cuda::std::get<2>(t);
