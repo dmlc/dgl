@@ -20,9 +20,14 @@
 #include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/gather.h>
+#include <thrust/iterator/tabulate_output_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/transform_output_iterator.h>
 
+#include <cub/cub.cuh>
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
+#include <cuda/std/utility>
 #include <limits>
 #include <numeric>
 
@@ -32,6 +37,9 @@
 
 namespace graphbolt {
 namespace ops {
+
+using part_t = uint8_t;
+constexpr auto kPartDType = torch::kUInt8;
 
 // Returns the rotated part id so that current rank's part id is 0.
 template <typename index_t>
@@ -50,55 +58,24 @@ constexpr int kNodeIdBits = 40;
 template <typename index_t, typename map_t>
 __global__ void _InsertAndSetMinBatched(
     const int64_t num_edges, const int32_t* const indexes, index_t** pointers,
-    const int64_t* const offsets, const uint32_t rank,
-    const uint32_t world_size, map_t map) {
+    const int64_t* const offsets, map_t map) {
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
 
   while (i < num_edges) {
-    const int64_t tensor_index = indexes[i];
+    const auto tensor_index = indexes[i];
     const auto tensor_offset = i - offsets[tensor_index];
     const int64_t node_id = pointers[tensor_index][tensor_offset];
-    const auto batch_index = tensor_index / 2;
+    const int64_t batch_index = tensor_index / 2;
     const int64_t key = node_id | (batch_index << kNodeIdBits);
-    const int64_t priority =
-        i + (world_size > 1
-                 ? num_edges * partition_assignment(key, rank, world_size)
-                 : 0);
 
-    auto [slot, is_new_key] = map.insert_and_find(cuco::pair{key, priority});
+    auto [slot, is_new_key] = map.insert_and_find(cuco::pair{key, i});
 
     if (!is_new_key) {
       auto ref = ::cuda::atomic_ref<int64_t, ::cuda::thread_scope_device>{
           slot->second};
-      ref.fetch_min(priority, ::cuda::memory_order_relaxed);
+      ref.fetch_min(i, ::cuda::memory_order_relaxed);
     }
-
-    i += stride;
-  }
-}
-
-template <typename index_t, typename map_t>
-__global__ void _IsInsertedBatched(
-    const int64_t num_edges, const int32_t* const indexes, index_t** pointers,
-    const int64_t* const offsets, const uint32_t rank,
-    const uint32_t world_size, map_t map, int64_t* valid) {
-  int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
-  const int stride = gridDim.x * blockDim.x;
-
-  while (i < num_edges) {
-    const int64_t tensor_index = indexes[i];
-    const auto tensor_offset = i - offsets[tensor_index];
-    const int64_t node_id = pointers[tensor_index][tensor_offset];
-    const auto batch_index = tensor_index / 2;
-    const int64_t key = node_id | (batch_index << kNodeIdBits);
-    const int64_t priority =
-        i + (world_size > 1
-                 ? num_edges * partition_assignment(key, rank, world_size)
-                 : 0);
-
-    auto slot = map.find(key);
-    valid[i] = slot->second == priority;
 
     i += stride;
   }
@@ -116,10 +93,10 @@ __global__ void _GetInsertedBatched(
     const auto valid_i = valid[i];
 
     if (valid_i + 1 == valid[i + 1]) {
-      const int64_t tensor_index = indexes[i];
+      const auto tensor_index = indexes[i];
       const auto tensor_offset = i - offsets[tensor_index];
       const int64_t node_id = pointers[tensor_index][tensor_offset];
-      const auto batch_index = tensor_index / 2;
+      const int64_t batch_index = tensor_index / 2;
       const int64_t key = node_id | (batch_index << kNodeIdBits);
 
       auto slot = map.find(key);
@@ -137,12 +114,13 @@ template <typename index_t, typename map_t>
 __global__ void _MapIdsBatched(
     const int num_batches, const int64_t num_edges,
     const int32_t* const indexes, index_t** pointers,
-    const int64_t* const offsets, map_t map, index_t* mapped_ids) {
+    const int64_t* const offsets, const int64_t* const valid, map_t map,
+    index_t* mapped_ids) {
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = gridDim.x * blockDim.x;
 
   while (i < num_edges) {
-    const int64_t tensor_index = indexes[i];
+    const auto tensor_index = indexes[i];
     int64_t batch_index;
 
     if (tensor_index >= 2 * num_batches) {
@@ -158,9 +136,10 @@ __global__ void _MapIdsBatched(
       const auto tensor_offset = i - offsets[tensor_index];
       const int64_t node_id = pointers[tensor_index][tensor_offset];
       const int64_t key = node_id | (batch_index << kNodeIdBits);
+      const auto batch_offset = offsets[batch_index * 2];
 
       auto slot = map.find(key);
-      mapped_ids[i] = slot->second;
+      mapped_ids[i] = slot->second - valid[batch_offset];
     }
 
     i += stride;
@@ -251,16 +230,57 @@ UniqueAndCompactBatchedHashMapBased(
         CUDA_KERNEL_CALL(
             _InsertAndSetMinBatched, grid, block, 0,
             offsets_ptr[2 * num_batches], indexes.data_ptr<int32_t>(),
-            pointers_dev_ptr, offsets_dev_ptr, static_cast<uint32_t>(rank),
-            static_cast<uint32_t>(world_size), map.ref(cuco::insert_and_find));
+            pointers_dev_ptr, offsets_dev_ptr, map.ref(cuco::insert_and_find));
         auto valid = torch::empty(
             offsets_ptr[2 * num_batches] + 1,
             src_ids[0].options().dtype(torch::kInt64));
-        CUDA_KERNEL_CALL(
-            _IsInsertedBatched, grid, block, 0, offsets_ptr[2 * num_batches],
-            indexes.data_ptr<int32_t>(), pointers_dev_ptr, offsets_dev_ptr,
-            static_cast<uint32_t>(rank), static_cast<uint32_t>(world_size),
-            map.ref(cuco::find), valid.data_ptr<int64_t>());
+        auto valid_ptr = valid.data_ptr<int64_t>();
+        auto unique_ids =
+            torch::empty(offsets_ptr[2 * num_batches], src_ids[0].options());
+        cub::ArgIndexInputIterator index_it(indexes.data_ptr<int32_t>());
+        auto input_it = thrust::make_transform_iterator(
+            index_it,
+            [=, map = map.ref(cuco::find)] __device__(
+                auto it) -> ::cuda::std::tuple<int64_t*, index_t, bool> {
+              const auto i = it.key;
+              const auto tensor_index = it.value;
+              const auto tensor_offset = i - offsets_dev_ptr[tensor_index];
+              const int64_t node_id =
+                  pointers_dev_ptr[tensor_index][tensor_offset];
+              const int64_t batch_index = tensor_index / 2;
+              const int64_t key = node_id | (batch_index << kNodeIdBits);
+
+              auto slot = map.find(key);
+              const auto valid = slot->second == i;
+              valid_ptr[i] = valid;
+
+              return {&slot->second, node_id, valid};
+            });
+        torch::optional<torch::Tensor> part_ids;
+        if (world_size > 1) {
+          part_ids = torch::empty(
+              offsets_ptr[2 * num_batches],
+              src_ids[0].options().dtype(kPartDType));
+        }
+        auto output_it = thrust::make_tabulate_output_iterator(
+            [unique_ids_ptr = unique_ids.data_ptr<index_t>(),
+             part_ids_ptr = part_ids ? part_ids->data_ptr<part_t>() : nullptr,
+             rank = static_cast<uint32_t>(rank),
+             world_size = static_cast<uint32_t>(
+                 world_size)] __device__(const int64_t i, const ::cuda::std::tuple<int64_t*, index_t, bool>& t) {
+              *::cuda::std::get<0>(t) = i;
+              const auto node_id = ::cuda::std::get<1>(t);
+              unique_ids_ptr[i] = node_id;
+              if (part_ids_ptr) {
+                part_ids_ptr[i] =
+                    partition_assignment(node_id, rank, world_size);
+              }
+            });
+        CUB_CALL(
+            DeviceSelect::If, input_it, output_it, cub::DiscardOutputIterator{},
+            offsets_ptr[2 * num_batches],
+            [] __device__(const ::cuda::std::tuple<int64_t*, index_t, bool>& t)
+                -> bool { return ::cuda::std::get<2>(t); });
         valid = ExclusiveCumSum(valid);
         auto unique_ids_offsets = torch::empty(
             num_batches + 1,
@@ -275,19 +295,19 @@ UniqueAndCompactBatchedHashMapBased(
             valid.data_ptr<int64_t>(), unique_ids_offsets_ptr);
         at::cuda::CUDAEvent unique_ids_offsets_event;
         unique_ids_offsets_event.record();
-        auto unique_ids =
-            torch::empty(offsets_ptr[2 * num_batches], src_ids[0].options());
-        CUDA_KERNEL_CALL(
-            _GetInsertedBatched, grid, block, 0, offsets_ptr[2 * num_batches],
-            indexes.data_ptr<int32_t>(), pointers_dev_ptr, offsets_dev_ptr,
-            map.ref(cuco::find), valid.data_ptr<int64_t>(),
-            unique_ids.data_ptr<index_t>());
+        if (false) {
+          CUDA_KERNEL_CALL(
+              _GetInsertedBatched, grid, block, 0, offsets_ptr[2 * num_batches],
+              indexes.data_ptr<int32_t>(), pointers_dev_ptr, offsets_dev_ptr,
+              map.ref(cuco::find), valid.data_ptr<int64_t>(),
+              unique_ids.data_ptr<index_t>());
+        }
         auto mapped_ids =
             torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());
         CUDA_KERNEL_CALL(
             _MapIdsBatched, grid, block, 0, num_batches,
             offsets_ptr[3 * num_batches], indexes.data_ptr<int32_t>(),
-            pointers_dev_ptr, offsets_dev_ptr, map.ref(cuco::find),
+            pointers_dev_ptr, offsets_dev_ptr, valid_ptr, map.ref(cuco::find),
             mapped_ids.data_ptr<index_t>());
         std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> >
             results;
