@@ -51,8 +51,17 @@ from tqdm import tqdm
 # gb.seed(123)
 # torch.manual_seed(123)
 
+
 def create_dataloader(
-    graph, features, itemset, batch_size, fanout, device, num_workers, job, prob_name=None
+    graph,
+    features,
+    itemset,
+    batch_size,
+    fanout,
+    device,
+    num_workers,
+    job,
+    prob_name=None,
 ):
     """
     [HIGHLIGHT]
@@ -230,7 +239,14 @@ class SAGE(nn.Module):
 
 @torch.no_grad()
 def layerwise_infer(
-    args, graph, features, test_set, all_nodes_set, model, num_classes, prob_name=None
+    args,
+    graph,
+    features,
+    test_set,
+    all_nodes_set,
+    model,
+    num_classes,
+    prob_name=None,
 ):
     graph = graph.to(args.device)
     model.eval()
@@ -258,7 +274,9 @@ def layerwise_infer(
 
 
 @torch.no_grad()
-def evaluate(args, model, graph, features, itemset, num_classes, prob_name=None):
+def evaluate(
+    args, model, graph, features, itemset, num_classes, prob_name=None
+):
     graph = graph.to(args.device)
     model.eval()
     y = []
@@ -288,7 +306,16 @@ def evaluate(args, model, graph, features, itemset, num_classes, prob_name=None)
     )
 
 
-def train(args, graph, features, train_set, valid_set, num_classes, model, prob_name=None):
+def train(
+    args,
+    graph,
+    features,
+    train_set,
+    valid_set,
+    num_classes,
+    model,
+    prob_name=None,
+):
     optimizer = torch.optim.Adam(
         model.parameters(), lr=args.lr, weight_decay=5e-4
     )
@@ -298,11 +325,15 @@ def train(args, graph, features, train_set, valid_set, num_classes, model, prob_
     if prob_name is not None:
         prob_data = torch.rand(num_edges, device=args.device)
         if prob_name == "prob":
-            prob_data[torch.randperm(num_edges, device=args.device)[: int(num_edges * 0.5)]] = 0.0
+            prob_data[
+                torch.randperm(num_edges, device=args.device)[
+                    : int(num_edges * 0.5)
+                ]
+            ] = 0.0
         elif prob_name == "mask":
             prob_data = prob_data > 0.2
         graph.add_edge_attribute(prob_name, prob_data)
-    graph = graph.to(args.device) 
+    graph = graph.to(args.device)
 
     dataloader = create_dataloader(
         graph=graph,
@@ -342,7 +373,15 @@ def train(args, graph, features, train_set, valid_set, num_classes, model, prob_
 
         t1 = time.time()
         # Evaluate the model.
-        acc = evaluate(args, model, graph, features, valid_set, num_classes, prob_name=prob_name)
+        acc = evaluate(
+            args,
+            model,
+            graph,
+            features,
+            valid_set,
+            num_classes,
+            prob_name=prob_name,
+        )
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (step + 1):.4f} | "
             f"Accuracy {acc.item():.4f} | Time {t1 - t0:.4f}"
@@ -446,11 +485,20 @@ def main(args):
     assert len(args.fanout) == len(model.layers)
     model = model.to(args.device)
 
-    prob_name = None # options: None | "mask" | "prob"
+    prob_name = None  # options: None | "mask" | "prob"
 
     # Model training.
     print("Training...")
-    train(args, graph, features, train_set, valid_set, num_classes, model, prob_name=prob_name)
+    train(
+        args,
+        graph,
+        features,
+        train_set,
+        valid_set,
+        num_classes,
+        model,
+        prob_name=prob_name,
+    )
 
     # Test the model.
     print("Testing...")
@@ -462,7 +510,7 @@ def main(args):
         all_nodes_set,
         model,
         num_classes,
-        prob_name=prob_name
+        prob_name=prob_name,
     )
     print(f"Test accuracy {test_acc.item():.4f}")
 
