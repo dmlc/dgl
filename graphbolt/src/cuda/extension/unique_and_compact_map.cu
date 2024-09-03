@@ -38,9 +38,6 @@
 namespace graphbolt {
 namespace ops {
 
-using part_t = uint8_t;
-constexpr auto kPartDType = torch::kUInt8;
-
 // Support graphs with up to 2^kNodeIdBits nodes.
 constexpr int kNodeIdBits = 40;
 
@@ -222,7 +219,7 @@ UniqueAndCompactBatchedHashMapBased(
         if (world_size > 1) {
           part_ids = torch::empty(
               offsets_ptr[2 * num_batches],
-              src_ids[0].options().dtype(kPartDType));
+              src_ids[0].options().dtype(cuda::kPartDType));
         }
         auto unique_ids =
             torch::empty(offsets_ptr[2 * num_batches], src_ids[0].options());
@@ -234,7 +231,7 @@ UniqueAndCompactBatchedHashMapBased(
             ::cuda::proclaim_return_type<void>(
                 [=, unique_ids_ptr = unique_ids.data_ptr<index_t>(),
                  part_ids_ptr =
-                     part_ids ? part_ids->data_ptr<part_t>() : nullptr,
+                     part_ids ? part_ids->data_ptr<cuda::part_t>() : nullptr,
                  rank = static_cast<uint32_t>(rank),
                  world_size = static_cast<uint32_t>(
                      world_size)] __device__(const int64_t i, const auto& t) {
@@ -277,8 +274,9 @@ UniqueAndCompactBatchedHashMapBased(
           index = torch::arange(unique_ids.size(0), unique_ids.options());
           auto index_sorted = torch::empty_like(*index);
           CUB_CALL(
-              DeviceSegmentedRadixSort::SortPairs, part_ids->data_ptr<part_t>(),
-              part_ids_sorted.data_ptr<part_t>(),
+              DeviceSegmentedRadixSort::SortPairs,
+              part_ids->data_ptr<cuda::part_t>(),
+              part_ids_sorted.data_ptr<cuda::part_t>(),
               unique_ids.data_ptr<index_t>(),
               unique_ids_sorted.data_ptr<index_t>(), unique_ids.size(0),
               num_batches, unique_ids_offsets_dev_ptr,
@@ -286,10 +284,12 @@ UniqueAndCompactBatchedHashMapBased(
               cuda::NumberOfBits(world_size));
           unique_ids = unique_ids_sorted;
           CUB_CALL(
-              DeviceSegmentedRadixSort::SortPairs, part_ids2.data_ptr<part_t>(),
-              part_ids2_sorted.data_ptr<part_t>(), index->data_ptr<index_t>(),
-              index_sorted.data_ptr<index_t>(), unique_ids.size(0), num_batches,
-              unique_ids_offsets_dev_ptr, unique_ids_offsets_dev_ptr + 1, 0,
+              DeviceSegmentedRadixSort::SortPairs,
+              part_ids2.data_ptr<cuda::part_t>(),
+              part_ids2_sorted.data_ptr<cuda::part_t>(),
+              index->data_ptr<index_t>(), index_sorted.data_ptr<index_t>(),
+              unique_ids.size(0), num_batches, unique_ids_offsets_dev_ptr,
+              unique_ids_offsets_dev_ptr + 1, 0,
               cuda::NumberOfBits(world_size));
           index = index_sorted;
         }

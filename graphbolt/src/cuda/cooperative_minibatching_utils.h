@@ -15,15 +15,20 @@
  *   limitations under the License.
  *
  * @file cuda/cooperative_minibatching_utils.h
- * @brief Cooperative Minibatching (arXiv:2310.12403) utility function in CUDA.
+ * @brief Cooperative Minibatching (arXiv:2310.12403) utility function headers
+ * in CUDA.
  */
 #ifndef GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_H_
 #define GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_H_
 
 #include <curand_kernel.h>
+#include <torch/script.h>
 
 namespace graphbolt {
 namespace cuda {
+
+using part_t = uint8_t;
+constexpr auto kPartDType = torch::kUInt8;
 
 /**
  * @brief Given a vertex id, the rank of current GPU and the world size, returns
@@ -44,6 +49,9 @@ __device__ inline auto rank_assignment(
   curand_init(kCurandSeed, 0, id, &rng);
   return (curand(&rng) - rank) % world_size;
 }
+
+torch::Tensor RankAssignment(
+    torch::Tensor nodes, const int64_t rank, const int64_t world_size);
 
 }  // namespace cuda
 }  // namespace graphbolt
