@@ -51,7 +51,14 @@ __device__ inline auto rank_assignment(
 }
 
 torch::Tensor RankAssignment(
-    torch::Tensor nodes, const int64_t rank, const int64_t world_size);
+    torch::Tensor nodes, int64_t rank, int64_t world_size);
+
+std::pair<torch::Tensor, torch::Tensor> RankSortImpl(
+    torch::Tensor nodes, torch::Tensor part_ids, torch::Tensor offsets_dev,
+    int num_bits);
+
+std::vector<std::tuple<torch::Tensor, torch::Tensor>> RankSort(
+    std::vector<torch::Tensor>& nodes_list, int64_t rank, int64_t world_size);
 
 }  // namespace cuda
 }  // namespace graphbolt

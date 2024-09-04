@@ -267,31 +267,9 @@ UniqueAndCompactBatchedHashMapBased(
         unique_ids_offsets_event.record();
         torch::optional<torch::Tensor> index;
         if (part_ids) {
-          auto part_ids_sorted = torch::empty_like(*part_ids);
-          auto part_ids2 = part_ids->clone();
-          auto part_ids2_sorted = torch::empty_like(part_ids2);
-          auto unique_ids_sorted = torch::empty_like(unique_ids);
-          index = torch::arange(unique_ids.size(0), unique_ids.options());
-          auto index_sorted = torch::empty_like(*index);
-          CUB_CALL(
-              DeviceSegmentedRadixSort::SortPairs,
-              part_ids->data_ptr<cuda::part_t>(),
-              part_ids_sorted.data_ptr<cuda::part_t>(),
-              unique_ids.data_ptr<index_t>(),
-              unique_ids_sorted.data_ptr<index_t>(), unique_ids.size(0),
-              num_batches, unique_ids_offsets_dev_ptr,
-              unique_ids_offsets_dev_ptr + 1, 0,
+          std::tie(unique_ids, index) = cuda::RankSortImpl(
+              unique_ids, *part_ids, unique_ids_offsets_dev,
               cuda::NumberOfBits(world_size));
-          unique_ids = unique_ids_sorted;
-          CUB_CALL(
-              DeviceSegmentedRadixSort::SortPairs,
-              part_ids2.data_ptr<cuda::part_t>(),
-              part_ids2_sorted.data_ptr<cuda::part_t>(),
-              index->data_ptr<index_t>(), index_sorted.data_ptr<index_t>(),
-              unique_ids.size(0), num_batches, unique_ids_offsets_dev_ptr,
-              unique_ids_offsets_dev_ptr + 1, 0,
-              cuda::NumberOfBits(world_size));
-          index = index_sorted;
         }
         auto mapped_ids =
             torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());
