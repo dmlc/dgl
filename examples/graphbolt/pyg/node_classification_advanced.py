@@ -342,10 +342,11 @@ def parse_args():
             "igb-hom-tiny",
             "igb-hom-small",
             "igb-hom-medium",
+            "igb-hom-large",
         ],
         help="The dataset we can use for node classification example. Currently"
         " ogbn-products, ogbn-arxiv, ogbn-papers100M and"
-        " igb-hom-[tiny|small|medium] datasets are supported.",
+        " igb-hom-[tiny|small|medium|large] datasets are supported.",
     )
     parser.add_argument(
         "--fanout",

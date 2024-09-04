@@ -366,6 +366,7 @@ def parse_args():
             "igb-hom-tiny",
             "igb-hom-small",
             "igb-hom-medium",
+            "igb-hom-large",
             "reddit",
             "yelp",
             "flickr",
