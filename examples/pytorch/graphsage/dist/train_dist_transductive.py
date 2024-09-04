@@ -2,7 +2,7 @@ import argparse
 import time
 
 import dgl
-
+import dgl.distributed
 import numpy as np
 import torch as th
 import torch.nn as nn

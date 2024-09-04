@@ -32,7 +32,8 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> >
 UniqueAndCompactBatchedHashMapBased(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids);
+    const std::vector<torch::Tensor>& unique_dst_ids, const int64_t rank,
+    const int64_t world_size);
 
 }  // namespace ops
 }  // namespace graphbolt

@@ -3,6 +3,7 @@ import socket
 import time
 
 import dgl
+import dgl.distributed
 import dgl.nn.pytorch as dglnn
 import numpy as np
 import torch as th
