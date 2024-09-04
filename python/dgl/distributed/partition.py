@@ -109,19 +109,31 @@ def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
     save_graphs(filename, g_list, formats=formats)
 
 
-def _get_inner_node_mask(graph, ntype_id, use_graphbolt=False):
+def _get_inner_node_mask(
+    graph,
+    ntype_id,
+    use_graphbolt=False,
+    gpb=None,
+):
     ndata = graph.node_attributes if use_graphbolt else graph.ndata
     assert "inner_node" in ndata, "'inner_node' is not in nodes' data"
-    if NTYPE in ndata:
-        dtype = F.dtype(ndata["inner_node"])
-        return (
-            ndata["inner_node"] * F.astype(ndata[NTYPE] == ntype_id, dtype) == 1
+    if NTYPE in ndata or gpb is not None:
+        ntype = (
+            gpb.map_to_per_ntype(ndata[NID])[0]
+            if gpb is not None
+            else ndata[NTYPE]
         )
+        dtype = F.dtype(ndata["inner_node"])
+        return ndata["inner_node"] * F.astype(ntype == ntype_id, dtype) == 1
     else:
         return ndata["inner_node"] == 1
 
 
-def _get_inner_edge_mask(graph, etype_id, use_graphbolt=False):
+def _get_inner_edge_mask(
+    graph,
+    etype_id,
+    use_graphbolt=False,
+):
     edata = graph.edge_attributes if use_graphbolt else graph.edata
     assert "inner_edge" in edata, "'inner_edge' is not in edges' data"
     etype = (
@@ -1261,9 +1273,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1298,9 +1310,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1646,9 +1658,9 @@ def dgl_partition_to_graphbolt(
 
     for part_id in range(num_parts):
         # Update graph path.
-        new_part_meta[f"part-{part_id}"][
-            "part_graph_graphbolt"
-        ] = rel_path_results[part_id]
+        new_part_meta[f"part-{part_id}"]["part_graph_graphbolt"] = (
+            rel_path_results[part_id]
+        )
 
     # Save dtype info into partition config.
     # [TODO][Rui] Always use int64_t for node/edge IDs in GraphBolt. See more
