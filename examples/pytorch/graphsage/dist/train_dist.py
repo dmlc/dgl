@@ -4,6 +4,7 @@ import time
 from contextlib import contextmanager
 
 import dgl
+import dgl.distributed
 import dgl.nn.pytorch as dglnn
 
 import numpy as np

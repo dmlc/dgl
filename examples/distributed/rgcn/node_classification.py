@@ -19,6 +19,7 @@ os.environ["DGLBACKEND"] = "pytorch"
 from functools import partial
 
 import dgl
+import dgl.distributed
 import torch as th
 import torch.multiprocessing as mp
 import torch.nn as nn
