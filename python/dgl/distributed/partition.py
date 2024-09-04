@@ -109,12 +109,7 @@ def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
     save_graphs(filename, g_list, formats=formats)
 
 
-def _get_inner_node_mask(
-    graph,
-    ntype_id,
-    use_graphbolt=False,
-    gpb=None,
-):
+def _get_inner_node_mask(graph, ntype_id, use_graphbolt=False, gpb=None):
     ndata = graph.node_attributes if use_graphbolt else graph.ndata
     assert "inner_node" in ndata, "'inner_node' is not in nodes' data"
     if NTYPE in ndata or gpb is not None:
