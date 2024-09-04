@@ -1591,8 +1591,9 @@ def fused_csc_sampling_graph(
     type_per_edge : Optional[torch.tensor], optional
         Type ids of each edge in the graph, by default None. If provided, it is
         required that the edge types in each vertex neighborhood are in sorted
-        order. More concretely, For each i in [0, csc_indptr.size(0) - 1),
-        `type_per_edge[indptr[i]: indptr[i + 1]]` is expected to be sorted.
+        order. To be more precise, For each i in [0, csc_indptr.size(0) - 1),
+        `type_per_edge[indptr[i]: indptr[i + 1]]` is expected to be
+        monotonically nondecreasing.
     node_type_to_id : Optional[Dict[str, int]], optional
         Map node types to ids, by default None.
     edge_type_to_id : Optional[Dict[str, int]], optional
