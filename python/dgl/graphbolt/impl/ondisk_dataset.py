@@ -1026,6 +1026,7 @@ class BuiltinDataset(OnDiskDataset):
         "ogbn-papers100M-seeds",
         "igb-hom-medium",
         "igb-hom-medium-seeds",
+        "igb-hom-large",
         "igb-hom-large-seeds",
     ]
     _all_datasets = _datasets + _large_datasets
