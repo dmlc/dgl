@@ -17,7 +17,6 @@
  * @file cuda/unique_and_compact_map.cu
  * @brief Unique and compact operator implementation on CUDA using hash table.
  */
-#include <curand_kernel.h>
 #include <graphbolt/cuda_ops.h>
 #include <thrust/iterator/tabulate_output_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
@@ -32,25 +31,12 @@
 #include <numeric>
 
 #include "../common.h"
+#include "../cooperative_minibatching_utils.h"
 #include "../utils.h"
 #include "./unique_and_compact.h"
 
 namespace graphbolt {
 namespace ops {
-
-using part_t = uint8_t;
-constexpr auto kPartDType = torch::kUInt8;
-
-// Returns the rotated part id so that current rank's part id is 0.
-template <typename index_t>
-__device__ inline auto partition_assignment(
-    index_t id, uint32_t rank, uint32_t world_size) {
-  // Consider using a faster implementation in the future.
-  constexpr uint64_t kCurandSeed = 999961;  // Any random number.
-  curandStatePhilox4_32_10_t rng;
-  curand_init(kCurandSeed, 0, id, &rng);
-  return (curand(&rng) - rank) % world_size;
-}
 
 // Support graphs with up to 2^kNodeIdBits nodes.
 constexpr int kNodeIdBits = 40;
@@ -233,7 +219,7 @@ UniqueAndCompactBatchedHashMapBased(
         if (world_size > 1) {
           part_ids = torch::empty(
               offsets_ptr[2 * num_batches],
-              src_ids[0].options().dtype(kPartDType));
+              src_ids[0].options().dtype(cuda::kPartDType));
         }
         auto unique_ids =
             torch::empty(offsets_ptr[2 * num_batches], src_ids[0].options());
@@ -245,7 +231,7 @@ UniqueAndCompactBatchedHashMapBased(
             ::cuda::proclaim_return_type<void>(
                 [=, unique_ids_ptr = unique_ids.data_ptr<index_t>(),
                  part_ids_ptr =
-                     part_ids ? part_ids->data_ptr<part_t>() : nullptr,
+                     part_ids ? part_ids->data_ptr<cuda::part_t>() : nullptr,
                  rank = static_cast<uint32_t>(rank),
                  world_size = static_cast<uint32_t>(
                      world_size)] __device__(const int64_t i, const auto& t) {
@@ -255,7 +241,7 @@ UniqueAndCompactBatchedHashMapBased(
                   unique_ids_ptr[i] = node_id;
                   if (part_ids_ptr) {
                     part_ids_ptr[i] =
-                        partition_assignment(node_id, rank, world_size);
+                        cuda::rank_assignment(node_id, rank, world_size);
                   }
                   if (is_i_equal_batch_offset) {
                     const auto batch_index = ::cuda::std::get<2>(t);
@@ -281,28 +267,8 @@ UniqueAndCompactBatchedHashMapBased(
         unique_ids_offsets_event.record();
         torch::optional<torch::Tensor> index;
         if (part_ids) {
-          auto part_ids_sorted = torch::empty_like(*part_ids);
-          auto part_ids2 = part_ids->clone();
-          auto part_ids2_sorted = torch::empty_like(part_ids2);
-          auto unique_ids_sorted = torch::empty_like(unique_ids);
-          index = torch::arange(unique_ids.size(0), unique_ids.options());
-          auto index_sorted = torch::empty_like(*index);
-          CUB_CALL(
-              DeviceSegmentedRadixSort::SortPairs, part_ids->data_ptr<part_t>(),
-              part_ids_sorted.data_ptr<part_t>(),
-              unique_ids.data_ptr<index_t>(),
-              unique_ids_sorted.data_ptr<index_t>(), unique_ids.size(0),
-              num_batches, unique_ids_offsets_dev_ptr,
-              unique_ids_offsets_dev_ptr + 1, 0,
-              cuda::NumberOfBits(world_size));
-          unique_ids = unique_ids_sorted;
-          CUB_CALL(
-              DeviceSegmentedRadixSort::SortPairs, part_ids2.data_ptr<part_t>(),
-              part_ids2_sorted.data_ptr<part_t>(), index->data_ptr<index_t>(),
-              index_sorted.data_ptr<index_t>(), unique_ids.size(0), num_batches,
-              unique_ids_offsets_dev_ptr, unique_ids_offsets_dev_ptr + 1, 0,
-              cuda::NumberOfBits(world_size));
-          index = index_sorted;
+          std::tie(unique_ids, index) = cuda::RankSortImpl(
+              unique_ids, *part_ids, unique_ids_offsets_dev, world_size);
         }
         auto mapped_ids =
             torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());
