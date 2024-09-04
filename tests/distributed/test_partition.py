@@ -2152,9 +2152,3 @@ def test_partition_graph_graphbolt_hetero_find_edges_multi(
         graph_formats="coo",
         n_jobs=4,
     )
-
-
-if __name__ == "__main__":
-    # test_partition_graph_graphbolt_homo('metis',4,False,False,True,False)
-    test_partition_graph_graphbolt_hetero("metis", 4, True, True, True, False)
-    test_partition("metis", 4, 1, False, ["csc"])
