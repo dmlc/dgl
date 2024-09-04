@@ -51,10 +51,8 @@ torch::Tensor RankAssignment(
 
 std::pair<torch::Tensor, torch::Tensor> RankSortImpl(
     torch::Tensor nodes, torch::Tensor part_ids, torch::Tensor offsets_dev,
-    int num_bits) {
-  if (num_bits <= 0) {
-    num_bits = sizeof(cuda::part_t) * 8;
-  }
+    const int64_t world_size) {
+  const int num_bits = cuda::NumberOfBits(world_size);
   auto offsets_dev_ptr = offsets_dev.data_ptr<int64_t>();
   auto part_ids_sorted = torch::empty_like(part_ids);
   auto part_ids2 = part_ids.clone();
@@ -102,8 +100,8 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor>> RankSort(
       offsets_dev.data_ptr<int64_t>(), offsets_ptr,
       sizeof(int64_t) * offsets.numel(), cudaMemcpyHostToDevice,
       cuda::GetCurrentStream()));
-  auto [nodes_sorted, index_sorted] = RankSortImpl(
-      nodes, part_ids, offsets_dev, cuda::NumberOfBits(world_size));
+  auto [nodes_sorted, index_sorted] =
+      RankSortImpl(nodes, part_ids, offsets_dev, world_size);
   std::vector<std::tuple<torch::Tensor, torch::Tensor>> results;
   for (int64_t i = 0; i < num_batches; i++) {
     results.emplace_back(

@@ -50,13 +50,51 @@ __device__ inline auto rank_assignment(
   return (curand(&rng) - rank) % world_size;
 }
 
+/**
+ * @brief Given node ids, the rank of current GPU and the world size, returns
+ * the ranks that the given ids belong in a deterministic manner.
+ *
+ * @param nodes      Node id tensor to be mapped to a rank in [0, world_size).
+ * @param rank       Rank of the current GPU.
+ * @param world_size World size, the total number of cooperating GPUs.
+ *
+ * @return The rank tensor of the GPU the given id tensor is mapped to.
+ */
 torch::Tensor RankAssignment(
     torch::Tensor nodes, int64_t rank, int64_t world_size);
 
+/**
+ * @brief Given node ids, the ranks they belong, the offsets to separate
+ * different node types and num_bits indicating the world size is <= 2^num_bits,
+ * returns node ids sorted w.r.t. the ranks that the given ids belong along with
+ * the original positions.
+ *
+ * @param nodes        Node id tensor to be mapped to a rank in [0, world_size).
+ * @param part_ids     Rank tensor the nodes belong to.
+ * @param offsets_dev  Offsets to separate different node types.
+ * @param world_size   World size, the total number of cooperating GPUs.
+ *
+ * @return (sorted_nodes, original_positions), where the first
+ * one includes sorted nodes, the second contains original positions of the
+ * sorted nodes.
+ */
 std::pair<torch::Tensor, torch::Tensor> RankSortImpl(
     torch::Tensor nodes, torch::Tensor part_ids, torch::Tensor offsets_dev,
-    int num_bits);
+    int64_t world_size);
 
+/**
+ * @brief Given a vector of node ids, the rank of current GPU and the world
+ * size, returns node ids sorted w.r.t. the ranks that the given ids belong
+ * along with the original positions.
+ *
+ * @param nodes_list   Node id tensor to be mapped to a rank in [0, world_size).
+ * @param rank         Rank of the current GPU.
+ * @param world_size   World size, the total number of cooperating GPUs.
+ *
+ * @return vector of (sorted_nodes, original_positions), where the first
+ * one includes sorted nodes, the second contains original positions of the
+ * sorted nodes.
+ */
 std::vector<std::tuple<torch::Tensor, torch::Tensor>> RankSort(
     std::vector<torch::Tensor>& nodes_list, int64_t rank, int64_t world_size);
 

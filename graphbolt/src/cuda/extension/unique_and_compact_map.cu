@@ -268,8 +268,7 @@ UniqueAndCompactBatchedHashMapBased(
         torch::optional<torch::Tensor> index;
         if (part_ids) {
           std::tie(unique_ids, index) = cuda::RankSortImpl(
-              unique_ids, *part_ids, unique_ids_offsets_dev,
-              cuda::NumberOfBits(world_size));
+              unique_ids, *part_ids, unique_ids_offsets_dev, world_size);
         }
         auto mapped_ids =
             torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());
