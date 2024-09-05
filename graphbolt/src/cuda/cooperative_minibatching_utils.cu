@@ -62,12 +62,7 @@ RankSortImpl(
   auto nodes_sorted = torch::empty_like(nodes);
   auto index = torch::arange(nodes.numel(), nodes.options());
   auto index_sorted = torch::empty_like(index);
-  auto offsets = torch::empty(
-      num_batches * world_size + 1, c10::TensorOptions()
-                                        .dtype(offsets_dev.scalar_type())
-                                        .pinned_memory(true));
-  at::cuda::CUDAEvent offsets_event;
-  AT_DISPATCH_INDEX_TYPES(
+  return AT_DISPATCH_INDEX_TYPES(
       nodes.scalar_type(), "RankSortImpl", ([&] {
         CUB_CALL(
             DeviceSegmentedRadixSort::SortPairs,
@@ -75,6 +70,10 @@ RankSortImpl(
             part_ids_sorted.data_ptr<cuda::part_t>(), nodes.data_ptr<index_t>(),
             nodes_sorted.data_ptr<index_t>(), nodes.numel(), num_batches,
             offsets_dev_ptr, offsets_dev_ptr + 1, 0, num_bits);
+        auto offsets = torch::empty(
+            num_batches * world_size + 1, c10::TensorOptions()
+                                              .dtype(offsets_dev.scalar_type())
+                                              .pinned_memory(true));
         CUB_CALL(
             DeviceFor::Bulk, num_batches * world_size + 1,
             [=, part_ids = part_ids_sorted.data_ptr<cuda::part_t>(),
@@ -89,6 +88,7 @@ RankSortImpl(
                                offset_end - offset_begin, rank) +
                            offset_begin;
             });
+        at::cuda::CUDAEvent offsets_event;
         offsets_event.record();
         CUB_CALL(
             DeviceSegmentedRadixSort::SortPairs,
@@ -97,8 +97,9 @@ RankSortImpl(
             index.data_ptr<index_t>(), index_sorted.data_ptr<index_t>(),
             nodes.numel(), num_batches, offsets_dev_ptr, offsets_dev_ptr + 1, 0,
             num_bits);
+        return std::make_tuple(
+            nodes_sorted, index_sorted, offsets, std::move(offsets_event));
       }));
-  return {nodes_sorted, index_sorted, offsets, std::move(offsets_event)};
 }
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
