@@ -61,56 +61,6 @@ int NumberOfBits(const T& range) {
   return bits;
 }
 
-/**
- * @brief Given a sorted array and a value this function returns the index
- * of the first element which compares greater than or equal to value.
- *
- * This function assumes 0-based index
- * @param A: ascending sorted array
- * @param n: size of the A
- * @param x: value to search in A
- * @return index, i, of the first element st. A[i]>=x. If x>A[n-1] returns n.
- * if x<A[0] then it returns 0.
- */
-template <typename indptr_t, typename indices_t>
-__device__ indices_t LowerBound(const indptr_t* A, indices_t n, indptr_t x) {
-  indices_t l = 0, r = n;
-  while (l < r) {
-    const auto m = l + (r - l) / 2;
-    if (x > A[m]) {
-      l = m + 1;
-    } else {
-      r = m;
-    }
-  }
-  return l;
-}
-
-/**
- * @brief Given a sorted array and a value this function returns the index
- * of the first element which compares greater than value.
- *
- * This function assumes 0-based index
- * @param A: ascending sorted array
- * @param n: size of the A
- * @param x: value to search in A
- * @return index, i, of the first element st. A[i]>x. If x>=A[n-1] returns n.
- * if x<A[0] then it returns 0.
- */
-template <typename indptr_t, typename indices_t>
-__device__ indices_t UpperBound(const indptr_t* A, indices_t n, indptr_t x) {
-  indices_t l = 0, r = n;
-  while (l < r) {
-    const auto m = l + (r - l) / 2;
-    if (x >= A[m]) {
-      l = m + 1;
-    } else {
-      r = m;
-    }
-  }
-  return l;
-}
-
 }  // namespace cuda
 }  // namespace graphbolt
 
