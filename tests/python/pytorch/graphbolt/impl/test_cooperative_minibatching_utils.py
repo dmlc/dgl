@@ -35,3 +35,11 @@ def test_gpu_cached_feature_read_async(dtype, rank):
         assert_equal(nodes_list2[i], nodes2[idx2.sort()[1]])
         assert_equal(offsets1, offsets2)
         assert offsets1.is_pinned() and offsets2.is_pinned()
+
+    res3 = torch.ops.graphbolt.rank_sort(nodes_list1, rank, WORLD_SIZE)
+
+    # This function is deterministic. Call with identical arguments and check.
+    for (nodes1, idx1, offsets1), (nodes3, idx3, offsets3) in zip(res1, res3):
+        assert_equal(nodes1, nodes3)
+        assert_equal(idx1, idx3)
+        assert_equal(offsets1, offsets3)
