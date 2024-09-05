@@ -282,8 +282,15 @@ UniqueAndCompactBatched(
     // Utilizes a hash table based implementation, the mapped id of a vertex
     // will be monotonically increasing as the first occurrence index of it in
     // torch.cat([unique_dst_ids, src_ids]). Thus, it is deterministic.
-    return UniqueAndCompactBatchedHashMapBased(
+    auto results4 = UniqueAndCompactBatchedHashMapBased(
         src_ids, dst_ids, unique_dst_ids, rank, world_size);
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+        results3;
+    // TODO @mfbalin: expose the `d` result in a later PR.
+    for (const auto& [a, b, c, d] : results4) {
+      results3.emplace_back(a, b, c);
+    }
+    return results3;
   }
   TORCH_CHECK(
       world_size <= 1,
