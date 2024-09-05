@@ -989,6 +989,16 @@ class BuiltinDataset(OnDiskDataset):
             Self edges are added to the original graph.
             Node features are stored as float32.
 
+    **igb-het-[tiny|small|medium]**
+        The igb-hom-[tiny|small|medium] dataset is a heterogeneous citation network,
+        which is designed for developers to train and evaluate GNN models with
+        high fidelity. See more details in `igb-het-[tiny|small|medium]
+        <https://github.com/IllinoisGraphBenchmark/IGB-Datasets>`_.
+
+        .. note::
+            Reverse paper__cites__paper edges are added to the original graph.
+            Node features are stored as float32.
+
     Parameters
     ----------
     name : str
@@ -1018,6 +1028,10 @@ class BuiltinDataset(OnDiskDataset):
         "igb-hom-tiny-seeds",
         "igb-hom-small",
         "igb-hom-small-seeds",
+        "igb-het-tiny",
+        "igb-het-tiny-seeds",
+        "igb-het-small",
+        "igb-het-small-seeds",
     ]
     _large_datasets = [
         "ogb-lsc-mag240m",
@@ -1028,6 +1042,8 @@ class BuiltinDataset(OnDiskDataset):
         "igb-hom-medium-seeds",
         "igb-hom-large",
         "igb-hom-large-seeds",
+        "igb-het-medium",
+        "igb-het-medium-seeds",
     ]
     _all_datasets = _datasets + _large_datasets
 

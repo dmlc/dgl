@@ -142,7 +142,7 @@ def create_dataloader(
     if name == "ogb-lsc-mag240m":
         node_feature_keys["author"] = ["feat"]
         node_feature_keys["institution"] = ["feat"]
-    if "igb-heterogeneous" in name:
+    if "igb-het" in name:
         node_feature_keys["author"] = ["feat"]
         node_feature_keys["institution"] = ["feat"]
         node_feature_keys["fos"] = ["feat"]
@@ -163,7 +163,7 @@ def extract_embed(node_embed, input_nodes):
 
 def extract_node_features(name, block, data, node_embed, device):
     """Extract the node features from embedding layer or raw features."""
-    if name == "ogbn-mag" or "igb-heterogeneous" in name:
+    if name == "ogbn-mag" or "igb-het" in name:
         input_nodes = {
             k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
         }
@@ -429,7 +429,7 @@ def evaluate(
     model.eval()
     category = "paper"
     # An evaluator for the dataset.
-    if "igb-heterogeneous" in name:
+    if "igb-het" in name:
         evaluator = IGB_Evaluator(name=name, num_tasks=1, eval_metric="acc")
     elif name == "ogbn-mag":
         evaluator = Evaluator(name=name)
@@ -595,7 +595,7 @@ def main(args):
     # `institution` are generated in advance and stored in the feature store.
     # For `ogbn-mag`, we generate the features on the fly.
     embed_layer = None
-    if args.dataset == "ogbn-mag" or "igb-heterogeneous" in args.dataset:
+    if args.dataset == "ogbn-mag" or "igb-het" in args.dataset:
         # Create the embedding layer and move it to the appropriate device.
         embed_layer = rel_graph_embed(g, feat_size).to(device)
         print(
@@ -673,13 +673,12 @@ if __name__ == "__main__":
         choices=[
             "ogbn-mag",
             "ogb-lsc-mag240m",
-            "igb-heterogeneous-tiny",
-            "igb-heterogeneous-small",
-            "igb-heterogeneous-medium",
-            "igb-heterogeneous-large",
-            "igb-heterogeneous-full",
+            "igb-het-tiny",
+            "igb-het-small",
+            "igb-het-medium",
         ],
-        help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m",
+        help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m, "
+        " igb-het-[tiny|small|medium].",
     )
     parser.add_argument("--num_epochs", type=int, default=3)
     parser.add_argument("--num_workers", type=int, default=0)
