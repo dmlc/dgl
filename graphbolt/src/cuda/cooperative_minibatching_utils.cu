@@ -20,7 +20,6 @@
  */
 #include <graphbolt/cuda_ops.h>
 #include <thrust/transform.h>
-#include <torch/autograd.h>
 
 #include <cub/cub.cuh>
 #include <cuda/functional>
