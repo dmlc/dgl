@@ -308,7 +308,8 @@ UniqueAndCompactBatchedHashMapBased(
         for (int64_t i = 0; i < num_batches; i++) {
           results.emplace_back(
               unique_ids.slice(
-                  0, unique_ids_offsets_ptr[i], unique_ids_offsets_ptr[i + 1]),
+                  0, unique_ids_offsets_ptr[i * world_size],
+                  unique_ids_offsets_ptr[(i + 1) * world_size]),
               mapped_ids.slice(
                   0, offsets_ptr[2 * i + 1], offsets_ptr[2 * i + 2]),
               mapped_ids.slice(
