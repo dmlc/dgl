@@ -18,6 +18,7 @@
  * @brief Cooperative Minibatching (arXiv:2310.12403) utility function
  * implementations in CUDA.
  */
+#include <graphbolt/cuda_ops.h>
 #include <thrust/transform.h>
 #include <torch/autograd.h>
 
@@ -62,7 +63,8 @@ RankSortImpl(
   auto part_ids2 = part_ids.clone();
   auto part_ids2_sorted = torch::empty_like(part_ids2);
   auto nodes_sorted = torch::empty_like(nodes);
-  auto index = torch::arange(nodes.numel(), nodes.options());
+  auto index = ops::IndptrEdgeIdsImpl(
+      offsets_dev, nodes.scalar_type(), torch::nullopt, nodes.numel());
   auto index_sorted = torch::empty_like(index);
   return AT_DISPATCH_INDEX_TYPES(
       nodes.scalar_type(), "RankSortImpl", ([&] {
@@ -135,12 +137,6 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
         rank_offsets.slice(0, i * world_size, (i + 1) * world_size + 1));
   }
   return results;
-}
-
-TORCH_LIBRARY_IMPL(graphbolt, CUDA, m) { m.impl("rank_sort", &RankSort); }
-
-TORCH_LIBRARY_IMPL(graphbolt, Autograd, m) {
-  m.impl("rank_sort", torch::autograd::autogradNotImplementedFallback());
 }
 
 }  // namespace cuda

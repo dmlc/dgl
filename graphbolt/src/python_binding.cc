@@ -10,10 +10,10 @@
 #include <graphbolt/unique_and_compact.h>
 
 #ifdef GRAPHBOLT_USE_CUDA
+#include "./cuda/cooperative_minibatching_utils.h"
 #include "./cuda/max_uva_threads.h"
 #endif
 #include "./cnumpy.h"
-#include "./expand_indptr.h"
 #include "./feature_cache.h"
 #include "./index_select.h"
 #include "./io_uring.h"
@@ -217,6 +217,7 @@ TORCH_LIBRARY(graphbolt, m) {
       {at::Tag::pt2_compliant_tag}
 #endif
   );
+  m.def("rank_sort", &cuda::RankSort);
 }
 
 }  // namespace sampling
