@@ -51,5 +51,9 @@ def test_gpu_cached_feature_read_async(dtype, rank):
         off4 = offsets4.tolist()
         for i in range(WORLD_SIZE):
             j = (i - rank + WORLD_SIZE) % WORLD_SIZE
-            assert_equal(nodes1[off1[j]: off1[j + 1]], nodes4[off4[i]: off4[i + 1]])
-            assert_equal(idx1[off1[j]: off1[j + 1]], idx4[off4[i]: off4[i + 1]])
+            assert_equal(
+                nodes1[off1[j] : off1[j + 1]], nodes4[off4[i] : off4[i + 1]]
+            )
+            assert_equal(
+                idx1[off1[j] : off1[j + 1]], idx4[off4[i] : off4[i + 1]]
+            )
