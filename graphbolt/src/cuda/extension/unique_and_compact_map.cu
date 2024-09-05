@@ -21,6 +21,7 @@
 #include <thrust/iterator/reverse_iterator.h>
 #include <thrust/iterator/tabulate_output_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/transform_output_iterator.h>
 
 #include <cub/cub.cuh>
 #include <cuco/static_map.cuh>
@@ -261,19 +262,21 @@ UniqueAndCompactBatchedHashMapBased(
         {
           auto unique_ids_offsets_dev2 =
               torch::empty_like(unique_ids_offsets_dev);
-          auto unique_ids_offsets_dev2_ptr =
-              unique_ids_offsets_dev2.data_ptr<int64_t>();
           CUB_CALL(
               DeviceScan::InclusiveScan,
               thrust::make_reverse_iterator(
                   num_batches + 1 + unique_ids_offsets_dev_ptr),
               thrust::make_reverse_iterator(
                   num_batches + 1 +
-                  thrust::make_tabulate_output_iterator(
-                      [=] __device__(const auto i, const auto x) {
-                        unique_ids_offsets_dev2_ptr[i] = x;
-                        unique_ids_offsets_ptr[i] = x;
-                      })),
+                  thrust::make_transform_output_iterator(
+                      thrust::make_zip_iterator(
+                          unique_ids_offsets_dev2.data_ptr<int64_t>(),
+                          unique_ids_offsets_ptr),
+                      ::cuda::proclaim_return_type<
+                          thrust::tuple<int64_t, int64_t>>(
+                          [=] __device__(const auto x) {
+                            return thrust::make_tuple(x, x);
+                          }))),
               cub::Min{}, num_batches + 1);
           unique_ids_offsets_dev = unique_ids_offsets_dev2;
           unique_ids_offsets_dev_ptr =
