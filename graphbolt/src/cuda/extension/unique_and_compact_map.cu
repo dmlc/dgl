@@ -33,6 +33,7 @@
 #include <numeric>
 
 #include "../common.h"
+#include "../cooperative_minibatching_utils.cuh"
 #include "../cooperative_minibatching_utils.h"
 #include "../utils.h"
 #include "./unique_and_compact.h"

@@ -21,34 +21,11 @@
 #ifndef GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_H_
 #define GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_H_
 
-#include <curand_kernel.h>
+#include <ATen/cuda/CUDAEvent.h>
 #include <torch/script.h>
 
 namespace graphbolt {
 namespace cuda {
-
-using part_t = uint8_t;
-constexpr auto kPartDType = torch::kUInt8;
-
-/**
- * @brief Given a vertex id, the rank of current GPU and the world size, returns
- * the rank that this id belongs in a deterministic manner.
- *
- * @param id         The node id that will mapped to a rank in [0, world_size).
- * @param rank       The rank of the current GPU.
- * @param world_size The world size, the total number of cooperating GPUs.
- *
- * @return The rank of the GPU the given id is mapped to.
- */
-template <typename index_t>
-__device__ inline auto rank_assignment(
-    index_t id, uint32_t rank, uint32_t world_size) {
-  // Consider using a faster implementation in the future.
-  constexpr uint64_t kCurandSeed = 999961;  // Any random number.
-  curandStatePhilox4_32_10_t rng;
-  curand_init(kCurandSeed, 0, id, &rng);
-  return (curand(&rng) - rank) % world_size;
-}
 
 /**
  * @brief Given node ids, the rank of current GPU and the world size, returns
@@ -102,7 +79,8 @@ RankSortImpl(
  * that belongs to the `i`th rank.
  */
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
-    std::vector<torch::Tensor>& nodes_list, int64_t rank, int64_t world_size);
+    const std::vector<torch::Tensor>& nodes_list, int64_t rank,
+    int64_t world_size);
 
 }  // namespace cuda
 }  // namespace graphbolt

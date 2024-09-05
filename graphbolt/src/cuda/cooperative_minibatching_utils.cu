@@ -19,11 +19,13 @@
  * implementations in CUDA.
  */
 #include <thrust/transform.h>
+#include <torch/autograd.h>
 
 #include <cub/cub.cuh>
 #include <cuda/functional>
 
 #include "./common.h"
+#include "./cooperative_minibatching_utils.cuh"
 #include "./cooperative_minibatching_utils.h"
 #include "./utils.h"
 
@@ -103,7 +105,7 @@ RankSortImpl(
 }
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
-    std::vector<torch::Tensor>& nodes_list, const int64_t rank,
+    const std::vector<torch::Tensor>& nodes_list, const int64_t rank,
     const int64_t world_size) {
   const auto num_batches = nodes_list.size();
   auto nodes = torch::cat(nodes_list, 0);
@@ -133,6 +135,12 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
         rank_offsets.slice(0, i * world_size, (i + 1) * world_size + 1));
   }
   return results;
+}
+
+TORCH_LIBRARY_IMPL(graphbolt, CUDA, m) { m.impl("rank_sort", &RankSort); }
+
+TORCH_LIBRARY_IMPL(graphbolt, Autograd, m) {
+  m.impl("rank_sort", torch::autograd::autogradNotImplementedFallback());
 }
 
 }  // namespace cuda
