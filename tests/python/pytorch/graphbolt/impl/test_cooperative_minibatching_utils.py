@@ -43,3 +43,13 @@ def test_gpu_cached_feature_read_async(dtype, rank):
         assert_equal(nodes1, nodes3)
         assert_equal(idx1, idx3)
         assert_equal(offsets1, offsets3)
+
+    # The dependency on the rank argument is simply a permutation.
+    res4 = torch.ops.graphbolt.rank_sort(nodes_list1, 0, WORLD_SIZE)
+    for (nodes1, idx1, offsets1), (nodes4, idx4, offsets4) in zip(res1, res4):
+        off1 = offsets1.tolist()
+        off4 = offsets4.tolist()
+        for i in range(WORLD_SIZE):
+            j = (i - rank + WORLD_SIZE) % WORLD_SIZE
+            assert_equal(nodes1[off1[j]: off1[j + 1]], nodes4[off4[i]: off4[i + 1]])
+            assert_equal(idx1[off1[j]: off1[j + 1]], idx4[off4[i]: off4[i + 1]])
