@@ -196,6 +196,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
+  m.def("rank_sort", &cuda::RankSort);
 #endif
 #ifdef HAS_IMPL_ABSTRACT_PYSTUB
   m.impl_abstract_pystub("dgl.graphbolt.base", "//dgl.graphbolt.base");
@@ -217,7 +218,6 @@ TORCH_LIBRARY(graphbolt, m) {
       {at::Tag::pt2_compliant_tag}
 #endif
   );
-  m.def("rank_sort", &cuda::RankSort);
 }
 
 }  // namespace sampling
