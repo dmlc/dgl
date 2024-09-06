@@ -9,6 +9,8 @@
 
 #include <torch/script.h>
 
+#include <optional>
+
 namespace graphbolt {
 namespace utils {
 

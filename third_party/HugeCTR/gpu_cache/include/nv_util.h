@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#include <cuda_fp16.h>
+#include <cuda_fp8.h>
 #include <cuda_runtime_api.h>
 
 #include <stdexcept>
@@ -24,6 +26,15 @@
   { nv::cuda_check_((val), __FILE__, __LINE__); }
 
 namespace nv {
+
+template <typename T>
+struct is_fp8 : std::false_type {};
+
+template <>
+struct is_fp8<__nv_fp8_e4m3> : std::true_type {};
+
+template <>
+struct is_fp8<__nv_fp8_e5m2> : std::true_type {};
 
 class CudaException : public std::runtime_error {
  public:

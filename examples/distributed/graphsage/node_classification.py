@@ -3,6 +3,7 @@ import socket
 import time
 
 import dgl
+import dgl.distributed
 import dgl.nn.pytorch as dglnn
 import numpy as np
 import torch as th
@@ -109,7 +110,7 @@ class DistSAGE(nn.Module):
             # `-1` indicates all inbound edges will be inlcuded, namely, full
             # neighbor sampling.
             sampler = dgl.dataloading.NeighborSampler([-1])
-            dataloader = dgl.dataloading.DistNodeDataLoader(
+            dataloader = dgl.distributed.DistNodeDataLoader(
                 g,
                 nodes,
                 sampler,
@@ -212,7 +213,7 @@ def run(args, device, data):
     sampler = dgl.dataloading.NeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(",")]
     )
-    dataloader = dgl.dataloading.DistNodeDataLoader(
+    dataloader = dgl.distributed.DistNodeDataLoader(
         g,
         train_nid,
         sampler,

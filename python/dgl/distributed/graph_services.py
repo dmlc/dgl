@@ -154,14 +154,12 @@ def _sample_neighbors_graphbolt(
         fanout = torch.LongTensor([fanout])
     assert isinstance(fanout, torch.Tensor), "Expect a tensor of fanout."
 
-    return_eids = g.edge_attributes is not None and EID in g.edge_attributes
     subgraph = g._sample_neighbors(
         nodes,
         None,
         fanout,
         replace=replace,
         probs_or_mask=probs_or_mask,
-        return_eids=return_eids,
     )
 
     # 3. Map local node IDs to global node IDs.
@@ -177,7 +175,7 @@ def _sample_neighbors_graphbolt(
     global_dst = global_nid_mapping[local_dst]
 
     global_eids = None
-    if return_eids:
+    if g.edge_attributes is not None and EID in g.edge_attributes:
         global_eids = g.edge_attributes[EID][subgraph.original_edge_ids]
     return LocalSampledGraph(
         global_src, global_dst, global_eids, subgraph.type_per_edge

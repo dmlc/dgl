@@ -4,6 +4,7 @@ import time
 from contextlib import contextmanager
 
 import dgl
+import dgl.distributed
 import dgl.nn.pytorch as dglnn
 
 import numpy as np
@@ -88,7 +89,7 @@ class DistSAGE(nn.Module):
             print(f"|V|={g.num_nodes()}, eval batch size: {batch_size}")
 
             sampler = dgl.dataloading.NeighborSampler([-1])
-            dataloader = dgl.dataloading.DistNodeDataLoader(
+            dataloader = dgl.distributed.DistNodeDataLoader(
                 g,
                 nodes,
                 sampler,
@@ -153,7 +154,7 @@ def run(args, device, data):
     sampler = dgl.dataloading.NeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(",")]
     )
-    dataloader = dgl.dataloading.DistNodeDataLoader(
+    dataloader = dgl.distributed.DistNodeDataLoader(
         g,
         train_nid,
         sampler,

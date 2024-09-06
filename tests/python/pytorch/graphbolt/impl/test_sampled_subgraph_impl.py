@@ -2,6 +2,7 @@ import unittest
 
 import backend as F
 
+import dgl
 import dgl.graphbolt as gb
 import pytest
 import torch
@@ -503,6 +504,105 @@ def test_exclude_edges_hetero_duplicated_tensor(reverse_row, reverse_column):
     )
     _assert_container_equal(result.original_row_node_ids, expected_row_node_ids)
     _assert_container_equal(result.original_edge_ids, expected_edge_ids)
+
+
+def test_to_pyg_homo():
+    graph = dgl.graph(([5, 0, 7, 7, 2, 4], [0, 1, 2, 2, 3, 4]))
+    graph = gb.from_dglgraph(graph, is_homogeneous=True).to(F.ctx())
+    items = torch.LongTensor([[0, 3], [4, 4]])
+    names = "seeds"
+    itemset = gb.ItemSet(items, names=names)
+    datapipe = gb.ItemSampler(itemset, batch_size=4).copy_to(F.ctx())
+    num_layer = 2
+    fanouts = [torch.LongTensor([-1]) for _ in range(num_layer)]
+    sampler = gb.NeighborSampler
+    datapipe = sampler(
+        datapipe,
+        graph,
+        fanouts,
+        deduplicate=True,
+    )
+    for minibatch in datapipe:
+        x = torch.randn((minibatch.node_ids().size(0), 2), dtype=torch.float32)
+        for subgraph in minibatch.sampled_subgraphs:
+            (x_src, x_dst), edge_index, sizes = subgraph.to_pyg(x)
+            assert torch.equal(x_src, x)
+            dst_size = subgraph.original_column_node_ids.size(0)
+            assert torch.equal(x_dst, x[:dst_size])
+            src_size = subgraph.original_row_node_ids.size(0)
+            assert dst_size == sizes[1]
+            assert src_size == sizes[0]
+            assert torch.equal(edge_index[0], subgraph.sampled_csc.indices)
+            assert torch.equal(
+                edge_index[1],
+                gb.expand_indptr(
+                    subgraph.sampled_csc.indptr,
+                    subgraph.sampled_csc.indices.dtype,
+                ),
+            )
+            x = x_dst
+
+
+def test_to_pyg_hetero():
+    # COO graph:
+    # [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
+    # [2, 4, 2, 3, 0, 1, 1, 0, 0, 1]
+    # [1, 1, 1, 1, 0, 0, 0, 0, 0] - > edge type.
+    # num_nodes = 5, num_n1 = 2, num_n2 = 3
+    ntypes = {"n1": 0, "n2": 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
+    indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
+    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
+    type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    graph = gb.fused_csc_sampling_graph(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        node_type_to_id=ntypes,
+        edge_type_to_id=etypes,
+    ).to(F.ctx())
+    itemset = gb.HeteroItemSet(
+        {"n1:e1:n2": gb.ItemSet(torch.tensor([[0, 1]]), names="seeds")}
+    )
+    item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    Sampler = gb.NeighborSampler
+    datapipe = Sampler(
+        item_sampler,
+        graph,
+        fanouts,
+        deduplicate=True,
+    )
+    for minibatch in datapipe:
+        x = {}
+        for key, ids in minibatch.node_ids().items():
+            x[key] = torch.randn((ids.size(0), 2), dtype=torch.float32)
+        for subgraph in minibatch.sampled_subgraphs:
+            (x_src, x_dst), edge_index, sizes = subgraph.to_pyg(x)
+            assert x_src == x
+            for ntype in x:
+                dst_size = subgraph.original_column_node_ids[ntype].size(0)
+                assert torch.equal(x_dst[ntype], x[ntype][:dst_size])
+            for etype in subgraph.sampled_csc:
+                src_ntype, _, dst_ntype = gb.etype_str_to_tuple(etype)
+                src_size = subgraph.original_row_node_ids[src_ntype].size(0)
+                dst_size = subgraph.original_column_node_ids[dst_ntype].size(0)
+                assert dst_size == sizes[etype][1]
+                assert src_size == sizes[etype][0]
+                assert torch.equal(
+                    edge_index[etype][0], subgraph.sampled_csc[etype].indices
+                )
+                assert torch.equal(
+                    edge_index[etype][1],
+                    gb.expand_indptr(
+                        subgraph.sampled_csc[etype].indptr,
+                        subgraph.sampled_csc[etype].indices.dtype,
+                    ),
+                )
+            x = x_dst
 
 
 @unittest.skipIf(

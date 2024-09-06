@@ -1,8 +1,7 @@
 import random
-from enum import Enum
+from functools import partial
 
 import dgl.graphbolt as gb
-import pytest
 import torch
 from torch.utils.data.datapipes.iter import Mapper
 
@@ -68,6 +67,10 @@ def test_FeatureFetcher_homo():
     assert len(list(fetcher_dp)) == 5
 
 
+def _func(fn, minibatch):
+    return fn(minibatch)
+
+
 def test_FeatureFetcher_with_edges_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15, bidirection_edge=True)
     a = torch.tensor(
@@ -106,7 +109,8 @@ def test_FeatureFetcher_with_edges_homo():
 
     itemset = gb.ItemSet(torch.arange(10), names="seeds")
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
-    converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
+    fn = partial(_func, add_node_and_edge_ids)
+    converter_dp = Mapper(item_sampler_dp, fn)
     fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
@@ -232,7 +236,8 @@ def test_FeatureFetcher_with_edges_hetero():
         }
     )
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
-    converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
+    fn = partial(_func, add_node_and_edge_ids)
+    converter_dp = Mapper(item_sampler_dp, fn)
     # "n3:e3:n3" is not in the sampled edges.
     # Do not fetch feature for "n2:e2:n1".
     node_feature_keys = {"n1": ["a"]}
