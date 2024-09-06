@@ -979,10 +979,11 @@ class BuiltinDataset(OnDiskDataset):
         .. note::
             Reverse edges are added to the original graph.
 
-    **igb-hom-[tiny|small|medium|large]**
-        The igb-hom-[tiny|small|medium] dataset is a homogeneous citation network,
-        which is designed for developers to train and evaluate GNN models with
-        high fidelity. See more details in `igb-hom-[tiny|small|medium|large]
+    **igb-hom and igb-hom-[tiny|small|medium|large]**
+        The igb-hom-[tiny|small|medium|large] and igb-hom dataset is a homogeneous
+        citation network, which is designed for developers to train and evaluate
+        GNN models with high fidelity. See more details in
+        `igb-hom-[tiny|small|medium|large]
         <https://github.com/IllinoisGraphBenchmark/IGB-Datasets>`_.
 
         .. note::
@@ -1028,6 +1029,8 @@ class BuiltinDataset(OnDiskDataset):
         "igb-hom-medium-seeds",
         "igb-hom-large",
         "igb-hom-large-seeds",
+        "igb-hom",
+        "igb-hom-seeds",
     ]
     _all_datasets = _datasets + _large_datasets
 
