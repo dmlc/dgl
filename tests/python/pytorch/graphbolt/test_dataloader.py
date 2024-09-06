@@ -7,7 +7,7 @@ import dgl.graphbolt
 import pytest
 import torch
 
-from dgl.graphbolt.internal import find_dps, traverse_dps
+from dgl.graphbolt.datapipes import find_dps, traverse_dps
 
 from . import gb_test_utils
 
@@ -63,6 +63,7 @@ def test_DataLoader(overlap_feature_fetch):
 @pytest.mark.parametrize("enable_feature_fetch", [True, False])
 @pytest.mark.parametrize("overlap_feature_fetch", [True, False])
 @pytest.mark.parametrize("overlap_graph_fetch", [True, False])
+@pytest.mark.parametrize("asynchronous", [True, False])
 @pytest.mark.parametrize("num_gpu_cached_edges", [0, 1024])
 @pytest.mark.parametrize("gpu_cache_threshold", [1, 3])
 def test_gpu_sampling_DataLoader(
@@ -70,6 +71,7 @@ def test_gpu_sampling_DataLoader(
     enable_feature_fetch,
     overlap_feature_fetch,
     overlap_graph_fetch,
+    asynchronous,
     num_gpu_cached_edges,
     gpu_cache_threshold,
 ):
@@ -104,10 +106,19 @@ def test_gpu_sampling_DataLoader(
     for i in range(2):
         datapipe = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
         datapipe = datapipe.copy_to(F.ctx())
+        kwargs = {
+            "overlap_fetch": overlap_graph_fetch,
+            "num_gpu_cached_edges": num_gpu_cached_edges,
+            "gpu_cache_threshold": gpu_cache_threshold,
+            "asynchronous": asynchronous,
+        }
+        if i != 0:
+            kwargs = {}
         datapipe = getattr(dgl.graphbolt, sampler_name)(
             datapipe,
             graph,
             fanouts=[torch.LongTensor([2]) for _ in range(num_layers)],
+            **kwargs
         )
         if enable_feature_fetch:
             datapipe = dgl.graphbolt.FeatureFetcher(
@@ -117,31 +128,17 @@ def test_gpu_sampling_DataLoader(
                 ["d"],
                 overlap_fetch=overlap_feature_fetch and i == 0,
             )
-        if i == 0:
-            dataloaders.append(
-                dgl.graphbolt.DataLoader(
-                    datapipe,
-                    overlap_graph_fetch=overlap_graph_fetch,
-                    num_gpu_cached_edges=num_gpu_cached_edges,
-                    gpu_cache_threshold=gpu_cache_threshold,
-                )
-            )
-        else:
-            dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
+        dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
     dataloader, dataloader2 = dataloaders
 
     bufferer_cnt = int(enable_feature_fetch and overlap_feature_fetch)
-    awaiter_cnt = 0
     if overlap_graph_fetch:
         bufferer_cnt += num_layers
-        awaiter_cnt += num_layers
-    datapipe = dataloader.dataset
-    datapipe_graph = traverse_dps(datapipe)
-    awaiters = find_dps(
-        datapipe_graph,
-        dgl.graphbolt.Waiter,
-    )
-    assert len(awaiters) == awaiter_cnt
+        if num_gpu_cached_edges > 0:
+            bufferer_cnt += 2 * num_layers
+    if asynchronous:
+        bufferer_cnt += 2 * num_layers
+    datapipe_graph = traverse_dps(dataloader)
     bufferers = find_dps(
         datapipe_graph,
         dgl.graphbolt.Bufferer,

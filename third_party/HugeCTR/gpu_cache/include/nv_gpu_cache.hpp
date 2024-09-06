@@ -23,8 +23,8 @@
 
 #include "gpu_cache_api.hpp"
 #ifdef LIBCUDACXX_VERSION
-#include <cuda/std/atomic>
-#include <cuda/std/semaphore>
+#include <cuda/atomic>
+#include <cuda/semaphore>
 #endif
 
 #define SET_ASSOCIATIVITY 2
@@ -75,6 +75,8 @@ class gpu_cache : public gpu_cache_api<key_type> {
   // Dump API, i.e. dump some slabsets' keys from the cache
   void Dump(key_type* d_keys, size_t* d_dump_counter, const size_t start_set_index,
             const size_t end_set_index, cudaStream_t stream) override;
+
+  void Record(cudaStream_t stream) override {}
 
  public:
   using slabset = slab_set<set_associativity, key_type, warp_size>;

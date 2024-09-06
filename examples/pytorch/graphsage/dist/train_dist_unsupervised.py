@@ -2,6 +2,11 @@ import argparse
 import time
 from contextlib import contextmanager
 
+import dgl
+import dgl.distributed
+import dgl.function as fn
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
@@ -10,9 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
-import dgl
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
+
 
 class DistSAGE(nn.Module):
     def __init__(
@@ -77,7 +80,7 @@ class DistSAGE(nn.Module):
             # Create sampler
             sampler = dgl.dataloading.NeighborSampler([-1])
             # Create dataloader
-            dataloader = dgl.dataloading.DistNodeDataLoader(
+            dataloader = dgl.distributed.DistNodeDataLoader(
                 g,
                 nodes,
                 sampler,
@@ -201,7 +204,7 @@ def run(args, device, data):
     # Create dataloader
     exclude = "reverse_id" if args.remove_edge else None
     reverse_eids = th.arange(g.num_edges()) if args.remove_edge else None
-    dataloader = dgl.dataloading.DistEdgeDataLoader(
+    dataloader = dgl.distributed.DistEdgeDataLoader(
         g,
         train_eids,
         sampler,
@@ -297,12 +300,12 @@ def run(args, device, data):
                             step,
                             loss.item(),
                             np.mean(iter_tput[3:]),
-                            np.sum(step_time[-args.log_every:]),
-                            np.sum(sample_t[-args.log_every:]),
-                            np.sum(feat_copy_t[-args.log_every:]),
-                            np.sum(forward_t[-args.log_every:]),
-                            np.sum(backward_t[-args.log_every:]),
-                            np.sum(update_t[-args.log_every:]),
+                            np.sum(step_time[-args.log_every :]),
+                            np.sum(sample_t[-args.log_every :]),
+                            np.sum(feat_copy_t[-args.log_every :]),
+                            np.sum(forward_t[-args.log_every :]),
+                            np.sum(backward_t[-args.log_every :]),
+                            np.sum(update_t[-args.log_every :]),
                         )
                     )
                 start = time.time()
@@ -356,9 +359,7 @@ def main(args):
     dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend="gloo")
-    g = dgl.distributed.DistGraph(
-            args.graph_name, part_config=args.part_config
-        )
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print("rank:", g.rank())
     print("number of edges", g.num_edges())
 

@@ -115,7 +115,10 @@ def create_dataloader(
         else {}
     )
     datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1], **kwargs
+        graph,
+        fanout if job != "infer" else [-1],
+        overlap_fetch=args.overlap_graph_fetch,
+        **kwargs,
     )
     # Copy the data to the specified device.
     if args.feature_device != "cpu":
@@ -130,11 +133,7 @@ def create_dataloader(
     if args.feature_device == "cpu":
         datapipe = datapipe.copy_to(device=device)
     # Create and return a DataLoader to handle data loading.
-    return gb.DataLoader(
-        datapipe,
-        num_workers=args.num_workers,
-        overlap_graph_fetch=args.overlap_graph_fetch,
-    )
+    return gb.DataLoader(datapipe, num_workers=args.num_workers)
 
 
 def train_step(minibatch, optimizer, model, loss_fn):
@@ -337,9 +336,10 @@ def parse_args():
             "ogbn-arxiv",
             "ogbn-products",
             "ogbn-papers100M",
-            "reddit",
-            "yelp",
-            "flickr",
+            "igb-hom-tiny",
+            "igb-hom-small",
+            "igb-hom-medium",
+            "igb-hom-large",
         ],
     )
     parser.add_argument("--root", type=str, default="datasets")
@@ -377,13 +377,13 @@ def parse_args():
         "--cpu-cache-size-in-gigabytes",
         type=float,
         default=0,
-        help="The capacity of the CPU cache, the number of features to store.",
+        help="The capacity of the CPU cache in GiB.",
     )
     parser.add_argument(
         "--gpu-cache-size-in-gigabytes",
         type=float,
         default=0,
-        help="The capacity of the GPU cache, the number of features to store.",
+        help="The capacity of the GPU cache in GiB.",
     )
     parser.add_argument("--early-stopping-patience", type=int, default=25)
     parser.add_argument(
@@ -458,14 +458,14 @@ def main():
     if args.cpu_cache_size_in_gigabytes > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
     ):
-        features[("node", None, "feat")] = gb.CPUCachedFeature(
+        features[("node", None, "feat")] = gb.cpu_cached_feature(
             features[("node", None, "feat")],
             int(args.cpu_cache_size_in_gigabytes * 1024 * 1024 * 1024),
             args.cpu_feature_cache_policy,
             args.feature_device == "pinned",
         )
         cpu_cached_feature = features[("node", None, "feat")]
-        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature._feature.miss_rate
+        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
 
@@ -475,12 +475,12 @@ def main():
     host-to-device copy operations for this feature.
     """
     if args.gpu_cache_size_in_gigabytes > 0 and args.feature_device != "cuda":
-        features[("node", None, "feat")] = gb.GPUCachedFeature(
+        features[("node", None, "feat")] = gb.gpu_cached_feature(
             features[("node", None, "feat")],
             int(args.gpu_cache_size_in_gigabytes * 1024 * 1024 * 1024),
         )
         gpu_cached_feature = features[("node", None, "feat")]
-        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature._feature.miss_rate
+        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature.miss_rate
     else:
         gpu_cache_miss_rate_fn = lambda: 1
 

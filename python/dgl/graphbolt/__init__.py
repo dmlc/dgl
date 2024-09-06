@@ -15,7 +15,7 @@ cuda_allocator_env = os.getenv("PYTORCH_CUDA_ALLOC_CONF")
 WARNING_STR_TO_BE_SHOWN = None
 configs = (
     {}
-    if cuda_allocator_env is None
+    if cuda_allocator_env is None or len(cuda_allocator_env) == 0
     else {
         kv_pair.split(":")[0]: kv_pair.split(":")[1]
         for kv_pair in cuda_allocator_env.split(",")
@@ -64,7 +64,12 @@ def load_graphbolt():
     path = os.path.join(dirname, "graphbolt", basename)
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f"Cannot find DGL C++ graphbolt library at {path}"
+            f"Unable to locate the DGL C++ GraphBolt library at {path}. This "
+            "error typically occurs due to a version mismatch between the "
+            "installed DGL and the PyTorch version you are currently using. "
+            "Please ensure that your DGL installation is compatible with your "
+            "PyTorch version. For more information, refer to the installation "
+            "guide at https://www.dgl.ai/pages/start.html."
         )
 
     try:
@@ -79,6 +84,7 @@ load_graphbolt()
 from .base import *
 from .minibatch import *
 from .dataloader import *
+from .datapipes import *
 from .dataset import *
 from .feature_fetcher import *
 from .feature_store import *

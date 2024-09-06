@@ -1,10 +1,60 @@
 """Utility functions for external use."""
-
+from functools import partial
 from typing import Dict, Union
 
 import torch
 
+from torch.utils.data import functional_datapipe
+
 from .minibatch import MiniBatch
+from .minibatch_transformer import MiniBatchTransformer
+
+
+@functional_datapipe("exclude_seed_edges")
+class SeedEdgesExcluder(MiniBatchTransformer):
+    """A mini-batch transformer used to manipulate mini-batch.
+
+    Functional name: :obj:`transform`.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The datapipe.
+    include_reverse_edges : bool
+        Whether reverse edges should be excluded as well. Default is False.
+    reverse_etypes_mapping : Dict[str, str] = None
+        The mapping from the original edge types to their reverse edge types.
+    asynchronous: bool
+        Boolean indicating whether edge exclusion stages should run on
+        background threads to hide the latency of CPU GPU synchronization.
+        Should be enabled only when sampling on the GPU.
+    """
+
+    def __init__(
+        self,
+        datapipe,
+        include_reverse_edges: bool = False,
+        reverse_etypes_mapping: Dict[str, str] = None,
+        asynchronous=False,
+    ):
+        exclude_seed_edges_fn = partial(
+            exclude_seed_edges,
+            include_reverse_edges=include_reverse_edges,
+            reverse_etypes_mapping=reverse_etypes_mapping,
+            async_op=asynchronous,
+        )
+        datapipe = datapipe.transform(exclude_seed_edges_fn)
+        if asynchronous:
+            datapipe = datapipe.buffer()
+            datapipe = datapipe.transform(self._wait_for_sampled_subgraphs)
+        super().__init__(datapipe)
+
+    @staticmethod
+    def _wait_for_sampled_subgraphs(minibatch):
+        minibatch.sampled_subgraphs = [
+            subgraph.wait() for subgraph in minibatch.sampled_subgraphs
+        ]
+        return minibatch
 
 
 def add_reverse_edges(
@@ -79,6 +129,7 @@ def exclude_seed_edges(
     minibatch: MiniBatch,
     include_reverse_edges: bool = False,
     reverse_etypes_mapping: Dict[str, str] = None,
+    async_op: bool = False,
 ):
     """
     Exclude seed edges with or without their reverse edges from the sampled
@@ -88,8 +139,13 @@ def exclude_seed_edges(
     ----------
     minibatch : MiniBatch
         The minibatch.
+    include_reverse_edges : bool
+        Whether reverse edges should be excluded as well. Default is False.
     reverse_etypes_mapping : Dict[str, str] = None
         The mapping from the original edge types to their reverse edge types.
+    async_op: bool
+        Boolean indicating whether the call is asynchronous. If so, the result
+        can be obtained by calling wait on the modified sampled_subgraphs.
     """
     edges_to_exclude = minibatch.seeds
     if include_reverse_edges:
@@ -97,7 +153,7 @@ def exclude_seed_edges(
             edges_to_exclude, reverse_etypes_mapping
         )
     minibatch.sampled_subgraphs = [
-        subgraph.exclude_edges(edges_to_exclude)
+        subgraph.exclude_edges(edges_to_exclude, async_op=async_op)
         for subgraph in minibatch.sampled_subgraphs
     ]
     return minibatch

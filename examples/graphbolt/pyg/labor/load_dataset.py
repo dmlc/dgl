@@ -39,12 +39,7 @@ def load_dataset(dataset_name, disk_based_feature_keys=None):
         "flickr",
     ]:
         dataset, multilabel = load_dgl(dataset_name)
-    elif dataset_name in [
-        "ogbn-products",
-        "ogbn-arxiv",
-        "ogbn-papers100M",
-        "ogbn-mag240M",
-    ]:
+    else:
         if "mag240M" in dataset_name:
             dataset_name = "ogb-lsc-mag240m"
         dataset = gb.BuiltinDataset(dataset_name)
@@ -56,7 +51,5 @@ def load_dataset(dataset_name, disk_based_feature_keys=None):
             if feature_key in disk_based_feature_keys:
                 feature["in_memory"] = False
         dataset = dataset.load()
-    else:
-        raise ValueError("unknown dataset")
 
     return dataset, multilabel
