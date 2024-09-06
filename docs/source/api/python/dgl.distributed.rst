@@ -68,6 +68,10 @@ Distributed Sampling
 Distributed DataLoader
 ``````````````````````
 
+.. autoclass:: NodeCollator
+
+.. autoclass:: EdgeCollator
+
 .. autoclass:: DistDataLoader
 
 .. autoclass:: DistNodeDataLoader

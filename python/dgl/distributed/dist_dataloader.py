@@ -9,7 +9,13 @@ from ..base import EID, NID
 from ..convert import heterograph
 from .dist_context import get_sampler_pool
 
-__all__ = ["DistDataLoader", "DistNodeDataLoader", "DistEdgeDataLoader"]
+__all__ = [
+    "NodeCollator",
+    "EdgeCollator",
+    "DistDataLoader",
+    "DistNodeDataLoader",
+    "DistEdgeDataLoader",
+]
 
 DATALOADER_ID = 0
 

@@ -6,6 +6,8 @@ from .dist_dataloader import (
     DistDataLoader,
     DistEdgeDataLoader,
     DistNodeDataLoader,
+    EdgeCollator,
+    NodeCollator,
 )
 from .dist_graph import DistGraph, DistGraphServer, edge_split, node_split
 from .dist_tensor import DistTensor
