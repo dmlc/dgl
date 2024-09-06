@@ -66,7 +66,6 @@ def create_dataloader(
     #     }
     node_feature_keys = {"paper": ["feat"], "author": ["feat"]}
     if args.dataset == "ogb-lsc-mag240m":
-        node_feature_keys["author"] = ["feat"]
         node_feature_keys["institution"] = ["feat"]
     if "igb-het" in args.dataset:
         node_feature_keys["institute"] = ["feat"]
