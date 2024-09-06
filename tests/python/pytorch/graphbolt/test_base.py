@@ -392,7 +392,6 @@ def test_indptr_edge_ids(offset, dtype):
             assert explanation.graph_break_count == expected_breaks
 
 
-
 @pytest.mark.parametrize("dtype", [torch.float16, torch.float32, torch.float64])
 @pytest.mark.parametrize("shape", [tuple(), (13, 17), (5,)])
 def test_cat(dtype, shape):
