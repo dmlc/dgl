@@ -241,98 +241,7 @@ def _graph_orig_ids(
     return orig_nids, orig_eids
 
 
-def _partition_DGLGraph(
-    part_local_src_id,
-    part_local_dst_id,
-    global_src_id,
-    global_dst_id,
-    global_homo_nid,
-    idx,
-    reshuffle_nodes,
-    id_map,
-    edgeid_offset,
-    etype_ids,
-    return_orig_nids,
-    return_orig_eids,
-    ntypes_map,
-    etypes_map,
-    global_edge_id,
-    uniq_ids,
-    inner_nodes,
-):
-    num_edges = len(part_local_dst_id)
-    part_graph = dgl.graph(
-        data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids)
-    )
-    # create edge data in graph.
-    (
-        part_graph.edata[dgl.EID],
-        part_graph.edata[dgl.ETYPE],
-        part_graph.edata["inner_edge"],
-    ) = _create_edge_data(edgeid_offset, etype_ids, num_edges)
-
-    # compute per_type_ids and ntype for all the nodes in the graph.
-    ntype, per_type_ids = _compute_node_ntype(
-        global_src_id,
-        global_dst_id,
-        global_homo_nid,
-        idx,
-        reshuffle_nodes,
-        id_map,
-    )
-
-    # create node data in graph.
-    (
-        part_graph.ndata[dgl.NTYPE],
-        part_graph.ndata[dgl.NID],
-        part_graph.ndata["inner_node"],
-    ) = _create_node_data(ntype, uniq_ids, reshuffle_nodes, inner_nodes)
-
-    # get the original node ids and edge ids from original graph.
-    orig_nids, orig_eids = _graph_orig_ids(
-        return_orig_nids,
-        return_orig_eids,
-        ntypes_map,
-        etypes_map,
-        part_graph.ndata,
-        part_graph.edata,
-        per_type_ids,
-        part_graph.edata[dgl.ETYPE],
-        global_edge_id,
-    )
-    return (
-        part_graph,
-        ntypes_map,
-        etypes_map,
-        orig_nids,
-        orig_eids,
-    )
-
-
-def _partition_graphbolt(
-    part_local_src_id,
-    part_local_dst_id,
-    global_src_id,
-    global_dst_id,
-    global_homo_nid,
-    idx,
-    reshuffle_nodes,
-    id_map,
-    edgeid_offset,
-    etype_ids,
-    ntypes,
-    etypes,
-    return_orig_nids,
-    return_orig_eids,
-    ntypes_map,
-    etypes_map,
-    global_edge_id,
-    uniq_ids,
-    inner_nodes,
-    store_eids=True,
-    store_inner_node=True,
-    store_inner_edge=True,
-):
+def _create_edge_attr_gb(part_local_dst_id,edgeid_offset,etype_ids,ntypes,etypes,etypes_map):
     edge_attr = {}
     # create edge data in graph.
     num_edges = len(part_local_dst_id)
@@ -342,6 +251,28 @@ def _partition_graphbolt(
         edge_attr["inner_edge"],
     ) = _create_edge_data(edgeid_offset, etype_ids, num_edges)
 
+    is_homo = _is_homogeneous(ntypes, etypes)
+
+    edge_type_to_id = (
+        None
+        if is_homo
+        else {
+            gb.etype_tuple_to_str(etype): etid
+            for etype, etid in etypes_map.items()
+        }
+    )
+    return edge_attr,type_per_edge,edge_type_to_id
+
+
+def _create_node_attr(
+        idx,
+        global_src_id,
+        global_dst_id,
+        global_homo_nid,
+        uniq_ids,
+        reshuffle_nodes,
+        id_map,
+        inner_nodes):
     # compute per_type_ids and ntype for all the nodes in the graph.
     ntype, per_type_ids = _compute_node_ntype(
         global_src_id,
@@ -359,20 +290,10 @@ def _partition_graphbolt(
         node_attr[dgl.NID],
         node_attr["inner_node"],
     ) = _create_node_data(ntype, uniq_ids, reshuffle_nodes, inner_nodes)
+    return node_attr, per_type_ids
 
-    is_homo = _is_homogeneous(ntypes, etypes)
-    # get the original node ids and edge ids from original graph.
-    orig_nids, orig_eids = _graph_orig_ids(
-        return_orig_nids,
-        return_orig_eids,
-        ntypes_map,
-        etypes_map,
-        node_attr,
-        edge_attr,
-        per_type_ids,
-        type_per_edge,
-        global_edge_id,
-    )
+
+def remove_attr_gb(edge_attr,node_attr,store_inner_node,store_inner_edge,store_eids):
     if not store_inner_edge:
         edge_attr.pop("inner_edge")
 
@@ -381,34 +302,7 @@ def _partition_graphbolt(
 
     if not store_inner_node:
         node_attr.pop("inner_node")
-
-    edge_type_to_id = (
-        None
-        if is_homo
-        else {
-            gb.etype_tuple_to_str(etype): etid
-            for etype, etid in etypes_map.items()
-        }
-    )
-
-    indptr, indices = _coo2csc(part_local_src_id, part_local_dst_id)
-    part_graph = gb.fused_csc_sampling_graph(
-        csc_indptr=indptr,
-        indices=indices,
-        node_type_offset=None,
-        type_per_edge=type_per_edge,
-        node_attributes=node_attr,
-        edge_attributes=edge_attr,
-        node_type_to_id=ntypes_map,
-        edge_type_to_id=edge_type_to_id,
-    )
-    return (
-        part_graph,
-        ntypes_map,
-        etypes_map,
-        orig_nids,
-        orig_eids,
-    )
+    return edge_attr,node_attr
 
 
 def create_graph_object(
@@ -700,33 +594,38 @@ def create_graph_object(
 
     # create the graph here now.
     if use_graphbolt:
-        (
-            part_graph,
-            ntypes_map,
-            etypes_map,
-            orig_nids,
-            orig_eids,
-        ) = _partition_graphbolt(
-            part_local_src_id,
-            part_local_dst_id,
-            global_src_id,
-            global_dst_id,
-            global_homo_nid,
-            idx,
-            reshuffle_nodes,
-            id_map,
-            edgeid_offset,
-            etype_ids,
-            ntypes,
-            etypes,
-            return_orig_nids,
-            return_orig_eids,
-            ntypes_map,
-            etypes_map,
-            global_edge_id,
-            uniq_ids,
-            inner_nodes,
-            **kwargs,
+        edge_attr,type_per_edge,edge_type_to_id = _create_edge_attr_gb(part_local_dst_id,edgeid_offset,etype_ids,ntypes,etypes,etypes_map)
+        node_attr, per_type_ids = _create_node_attr(
+                                    idx,
+                                    global_src_id,
+                                    global_dst_id,
+                                    global_homo_nid,
+                                    uniq_ids,
+                                    reshuffle_nodes,
+                                    id_map,
+                                    inner_nodes)
+        orig_nids, orig_eids = _graph_orig_ids(
+                                return_orig_nids,
+                                return_orig_eids,
+                                ntypes_map,
+                                etypes_map,
+                                node_attr,
+                                edge_attr,
+                                per_type_ids,
+                                type_per_edge,
+                                global_edge_id,
+                                )
+        remove_attr_gb(edge_attr,node_attr,**kwargs)
+        indptr, indices = _coo2csc(part_local_src_id, part_local_dst_id)
+        part_graph = gb.fused_csc_sampling_graph(
+            csc_indptr=indptr,
+            indices=indices,
+            node_type_offset=None,
+            type_per_edge=type_per_edge,
+            node_attributes=node_attr,
+            edge_attributes=edge_attr,
+            node_type_to_id=ntypes_map,
+            edge_type_to_id=edge_type_to_id,
         )
         return (
             part_graph,
@@ -737,34 +636,41 @@ def create_graph_object(
             orig_nids,
             orig_eids,
         )
-
     else:
+        num_edges = len(part_local_dst_id)
+        part_graph = dgl.graph(
+            data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids)
+        )
+        # create edge data in graph.
         (
-            part_graph,
-            ntypes_map,
-            etypes_map,
-            orig_nids,
-            orig_eids,
-        ) = _partition_DGLGraph(
-            part_local_src_id,
-            part_local_dst_id,
+            part_graph.edata[dgl.EID],
+            part_graph.edata[dgl.ETYPE],
+            part_graph.edata["inner_edge"],
+        ) = _create_edge_data(edgeid_offset, etype_ids, num_edges)
+
+        part_graph.ndata, per_type_ids = _create_node_attr(
+            idx,
             global_src_id,
             global_dst_id,
             global_homo_nid,
-            idx,
+            uniq_ids,
             reshuffle_nodes,
             id_map,
-            edgeid_offset,
-            etype_ids,
+            inner_nodes
+        )
+
+        # get the original node ids and edge ids from original graph.
+        orig_nids, orig_eids = _graph_orig_ids(
             return_orig_nids,
             return_orig_eids,
             ntypes_map,
             etypes_map,
+            part_graph.ndata,
+            part_graph.edata,
+            per_type_ids,
+            part_graph.edata[dgl.ETYPE],
             global_edge_id,
-            uniq_ids,
-            inner_nodes,
         )
-
     return (
         part_graph,
         node_map_val,
