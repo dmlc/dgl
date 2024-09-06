@@ -58,12 +58,6 @@ def create_dataloader(
         datapipe = datapipe.copy_to(device=device)
         need_copy = False
 
-    # if args.dataset == "ogb-lsc-mag240m":
-    #     node_feature_keys = {
-    #         "paper": ["feat"],
-    #         "author": ["feat"],
-    #         "institution": ["feat"],
-    #     }
     node_feature_keys = {"paper": ["feat"], "author": ["feat"]}
     if args.dataset == "ogb-lsc-mag240m":
         node_feature_keys["institution"] = ["feat"]
