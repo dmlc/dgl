@@ -997,7 +997,7 @@ class BuiltinDataset(OnDiskDataset):
         <https://github.com/IllinoisGraphBenchmark/IGB-Datasets>`_.
 
         .. note::
-            Reverse paper__cites__paper edges are added to the original graph.
+            Four Reverse edge types are added to the original graph.
             Node features are stored as float32.
 
     Parameters
