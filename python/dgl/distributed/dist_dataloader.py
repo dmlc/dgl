@@ -14,7 +14,7 @@ __all__ = [
     "EdgeCollator",
     "DistDataLoader",
     "DistNodeDataLoader",
-    "DistEdgeDataLoader"
+    "DistEdgeDataLoader",
 ]
 
 DATALOADER_ID = 0
