@@ -43,10 +43,10 @@ def test_cpu_cached_feature(dtype, policy):
     cache_size_a *= a[:1].nbytes
     cache_size_b *= b[:1].nbytes
 
-    feat_store_a = gb.CPUCachedFeature(
+    feat_store_a = gb.cpu_cached_feature(
         gb.TorchBasedFeature(a), cache_size_a, policy, pin_memory
     )
-    feat_store_b = gb.CPUCachedFeature(
+    feat_store_b = gb.cpu_cached_feature(
         gb.TorchBasedFeature(b), cache_size_b, policy, pin_memory
     )
 
@@ -79,10 +79,13 @@ def test_cpu_cached_feature(dtype, policy):
     total_miss = feat_store_b._feature.total_miss
     feat_store_b.read(torch.tensor([0, 1]))
     assert total_miss == feat_store_b._feature.total_miss
+    assert feat_store_a._feature.miss_rate == feat_store_a.miss_rate
 
-    # Test get the size of the entire feature with ids.
+    # Test get the size and count of the entire feature.
     assert feat_store_a.size() == torch.Size([3])
     assert feat_store_b.size() == torch.Size([2, 2])
+    assert feat_store_a.count() == a.size(0)
+    assert feat_store_b.count() == b.size(0)
 
     # Test update the entire feature.
     feat_store_a.update(torch.tensor([[0, 1, 2], [3, 5, 2]], dtype=dtype))
@@ -126,7 +129,7 @@ def test_cpu_cached_feature_read_async(dtype):
 
     cache_size = 256 * a[:1].nbytes
 
-    feat_store = gb.CPUCachedFeature(gb.TorchBasedFeature(a), cache_size)
+    feat_store = gb.cpu_cached_feature(gb.TorchBasedFeature(a), cache_size)
 
     # Test read with ids.
     ids1 = torch.tensor([0, 15, 71, 101])
@@ -167,7 +170,7 @@ def test_cpu_cached_disk_feature_read_async(dtype):
     with tempfile.TemporaryDirectory() as test_dir:
         path = to_on_disk_numpy(test_dir, "tensor", a)
 
-        feat_store = gb.CPUCachedFeature(
+        feat_store = gb.cpu_cached_feature(
             gb.DiskBasedFeature(path=path), cache_size
         )
 

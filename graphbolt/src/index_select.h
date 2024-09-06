@@ -92,6 +92,13 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> IndexSelectCSCBatched(
     torch::Tensor nodes, bool with_edge_ids,
     torch::optional<int64_t> output_size);
 
+c10::intrusive_ptr<
+    Future<std::tuple<torch::Tensor, std::vector<torch::Tensor>>>>
+IndexSelectCSCBatchedAsync(
+    torch::Tensor indptr, std::vector<torch::Tensor> indices_list,
+    torch::Tensor nodes, bool with_edge_ids,
+    torch::optional<int64_t> output_size);
+
 }  // namespace ops
 }  // namespace graphbolt
 

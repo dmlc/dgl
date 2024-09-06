@@ -43,9 +43,11 @@ def test_basic_feature_store_homo():
         torch.tensor([[[1, 2], [3, 4]]]),
     )
 
-    # Test get the size of the entire feature.
+    # Test get the size and count of the entire feature.
     assert feature_store.size("node", None, "a") == torch.Size([3])
     assert feature_store.size("node", None, "b") == torch.Size([2, 2])
+    assert feature_store.count("node", None, "a") == a.size(0)
+    assert feature_store.count("node", None, "b") == b.size(0)
 
     # Test get metadata of the feature.
     assert feature_store.metadata("node", None, "a") == metadata

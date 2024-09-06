@@ -106,7 +106,7 @@ struct EdgeTypeSearch {
     const auto indptr_i = sub_indptr[homo_i];
     const auto degree = sub_indptr[homo_i + 1] - indptr_i;
     const etype_t etype = i % num_fanouts;
-    auto offset = cuda::LowerBound(etypes + indptr_i, degree, etype);
+    auto offset = cub::LowerBound(etypes + indptr_i, degree, etype);
     new_sub_indptr[i] = indptr_i + offset;
     new_sliced_indptr[i] = sliced_indptr[homo_i] + offset;
     if (i == num_rows - 1) new_sub_indptr[num_rows] = indptr_i + degree;

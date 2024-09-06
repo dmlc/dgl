@@ -6,6 +6,7 @@ Difference compared to tkipf/relation-gcn
 * l2norm applied to all weights
 * remove nodes that won't be touched
 """
+
 import argparse
 import gc, os
 import itertools
@@ -18,6 +19,7 @@ os.environ["DGLBACKEND"] = "pytorch"
 from functools import partial
 
 import dgl
+import dgl.distributed
 import torch as th
 import torch.multiprocessing as mp
 import torch.nn as nn
@@ -459,7 +461,7 @@ def run(args, device, data):
     val_fanouts = [int(fanout) for fanout in args.validation_fanout.split(",")]
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    dataloader = dgl.dataloading.DistNodeDataLoader(
+    dataloader = dgl.distributed.DistNodeDataLoader(
         g,
         {"paper": train_nid},
         sampler,
@@ -469,7 +471,7 @@ def run(args, device, data):
     )
 
     valid_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
-    valid_dataloader = dgl.dataloading.DistNodeDataLoader(
+    valid_dataloader = dgl.distributed.DistNodeDataLoader(
         g,
         {"paper": val_nid},
         valid_sampler,
@@ -479,7 +481,7 @@ def run(args, device, data):
     )
 
     test_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
-    test_dataloader = dgl.dataloading.DistNodeDataLoader(
+    test_dataloader = dgl.distributed.DistNodeDataLoader(
         g,
         {"paper": test_nid},
         test_sampler,

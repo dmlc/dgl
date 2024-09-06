@@ -117,7 +117,10 @@ def create_dataloader(
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
     datapipe = getattr(datapipe, args.sample_mode)(
-        graph, fanout if job != "infer" else [-1]
+        graph,
+        fanout if job != "infer" else [-1],
+        overlap_fetch=args.storage_device == "pinned",
+        asynchronous=args.storage_device != "cpu",
     )
 
     ############################################################################
@@ -156,11 +159,7 @@ def create_dataloader(
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.DataLoader(
-        datapipe,
-        num_workers=num_workers,
-        overlap_graph_fetch=args.storage_device == "pinned",
-    )
+    dataloader = gb.DataLoader(datapipe, num_workers=num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -364,9 +363,18 @@ def parse_args():
         "--dataset",
         type=str,
         default="ogbn-products",
-        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        choices=[
+            "ogbn-arxiv",
+            "ogbn-products",
+            "ogbn-papers100M",
+            "igb-hom-tiny",
+            "igb-hom-small",
+            "igb-hom-medium",
+            "igb-hom-large",
+        ],
         help="The dataset we can use for node classification example. Currently"
-        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
+        " ogbn-products, ogbn-arxiv, ogbn-papers100M and"
+        " igb-hom-[tiny|small|medium] datasets are supported.",
     )
     parser.add_argument(
         "--mode",

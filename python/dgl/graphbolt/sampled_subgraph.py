@@ -1,7 +1,7 @@
 """Graphbolt sampled subgraph."""
 
 # pylint: disable= invalid-name
-from typing import Dict, Tuple, Union
+from typing import Dict, NamedTuple, Tuple, Union
 
 import torch
 
@@ -18,6 +18,49 @@ from .internal_utils import recursive_apply
 
 
 __all__ = ["SampledSubgraph"]
+
+
+class _ExcludeEdgesWaiter:
+    def __init__(self, sampled_subgraph, index):
+        self.sampled_subgraph = sampled_subgraph
+        self.index = index
+
+    def wait(self):
+        """Returns the stored value when invoked."""
+        sampled_subgraph = self.sampled_subgraph
+        index = self.index
+        # Ensure there is no memory leak.
+        self.sampled_subgraph = self.index = None
+
+        if isinstance(index, dict):
+            for k in list(index.keys()):
+                index[k] = index[k].wait()
+        else:
+            index = index.wait()
+
+        return type(sampled_subgraph)(*_slice_subgraph(sampled_subgraph, index))
+
+
+class PyGLayerData(NamedTuple):
+    """A named tuple class to represent homogenous inputs to a PyG model layer.
+    The fields are x (input features), edge_index and size
+    (source and destination sizes).
+    """
+
+    x: torch.Tensor
+    edge_index: torch.Tensor
+    size: Tuple[int, int]
+
+
+class PyGLayerHeteroData(NamedTuple):
+    """A named tuple class to represent heterogenous inputs to a PyG model
+    layer. The fields are x (input features), edge_index and size
+    (source and destination sizes), and all fields are dictionaries.
+    """
+
+    x: Dict[str, torch.Tensor]
+    edge_index: Dict[str, torch.Tensor]
+    size: Dict[str, Tuple[int, int]]
 
 
 class SampledSubgraph:
@@ -120,6 +163,7 @@ class SampledSubgraph:
             torch.Tensor,
         ],
         assume_num_node_within_int32: bool = True,
+        async_op: bool = False,
     ):
         r"""Exclude edges from the sampled subgraph.
 
@@ -141,6 +185,9 @@ class SampledSubgraph:
             If True, assumes the value of node IDs in the provided `edges` fall
             within the int32 range, which can significantly enhance computation
             speed. Default: True
+        async_op: bool
+            Boolean indicating whether the call is asynchronous. If so, the
+            result can be obtained by calling wait on the returned future.
 
         Returns
         -------
@@ -200,9 +247,8 @@ class SampledSubgraph:
                 self.original_column_node_ids,
             )
             index = _exclude_homo_edges(
-                reverse_edges, edges, assume_num_node_within_int32
+                reverse_edges, edges, assume_num_node_within_int32, async_op
             )
-            return calling_class(*_slice_subgraph(self, index))
         else:
             index = {}
             for etype, pair in self.sampled_csc.items():
@@ -230,8 +276,68 @@ class SampledSubgraph:
                     reverse_edges,
                     edges[etype],
                     assume_num_node_within_int32,
+                    async_op,
                 )
+        if async_op:
+            return _ExcludeEdgesWaiter(self, index)
+        else:
             return calling_class(*_slice_subgraph(self, index))
+
+    def to_pyg(
+        self, x: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    ) -> Union[PyGLayerData, PyGLayerHeteroData]:
+        """
+        Process layer inputs so that they can be consumed by a PyG model layer.
+
+        Parameters
+        ----------
+        x : Union[torch.Tensor, Dict[str, torch.Tensor]]
+            The input node features to the GNN layer.
+
+        Returns
+        -------
+        Union[PyGLayerData, PyGLayerHeteroData]
+            A named tuple class with `x`, `edge_index` and `size` fields.
+            Typically, a PyG GNN layer's forward method will accept these as
+            arguments.
+        """
+        if isinstance(x, torch.Tensor):
+            # Homogenous
+            src = self.sampled_csc.indices
+            dst = expand_indptr(
+                self.sampled_csc.indptr,
+                dtype=src.dtype,
+                output_size=src.size(0),
+            )
+            edge_index = torch.stack([src, dst], dim=0).long()
+            dst_size = self.sampled_csc.indptr.size(0) - 1
+            # h and h[:dst_size] correspond to source and destination features resp.
+            return PyGLayerData(
+                (x, x[:dst_size]), edge_index, (x.size(0), dst_size)
+            )
+        else:
+            # Heterogenous
+            x_dst_dict = {}
+            edge_index_dict = {}
+            sizes_dict = {}
+            for etype, sampled_csc in self.sampled_csc.items():
+                src = sampled_csc.indices
+                dst = expand_indptr(
+                    sampled_csc.indptr,
+                    dtype=src.dtype,
+                    output_size=src.size(0),
+                )
+                edge_index = torch.stack([src, dst], dim=0).long()
+                dst_size = sampled_csc.indptr.size(0) - 1
+                # h and h[:dst_size] correspond to source and destination features resp.
+                src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
+                x_dst_dict[dst_ntype] = x[dst_ntype][:dst_size]
+                edge_index_dict[etype] = edge_index
+                sizes_dict[etype] = (x[src_ntype].size(0), dst_size)
+
+            return PyGLayerHeteroData(
+                (x, x_dst_dict), edge_index_dict, sizes_dict
+            )
 
     def to(
         self, device: torch.device, non_blocking=False
@@ -289,6 +395,7 @@ def _exclude_homo_edges(
     edges: Tuple[torch.Tensor, torch.Tensor],
     edges_to_exclude: torch.Tensor,
     assume_num_node_within_int32: bool,
+    async_op: bool,
 ):
     """Return the indices of edges to be included."""
     if assume_num_node_within_int32:
@@ -303,8 +410,11 @@ def _exclude_homo_edges(
         raise NotImplementedError(
             "Values out of range int32 are not supported yet"
         )
-    mask = ~isin(val, val_to_exclude)
-    return torch.nonzero(mask, as_tuple=True)[0]
+    if async_op:
+        return torch.ops.graphbolt.is_not_in_index_async(val, val_to_exclude)
+    else:
+        mask = ~isin(val, val_to_exclude)
+        return torch.nonzero(mask, as_tuple=True)[0]
 
 
 def _slice_subgraph(subgraph: SampledSubgraph, index: torch.Tensor):

@@ -238,7 +238,7 @@ class BaseCachePolicy {
     // Move the element to the beginning of the queue.
     to.splice(to.begin(), temp);
     // The iterators and references are not invalidated.
-    // TORCH_CHECK(it == to.begin());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(it == to.begin());
   }
 
   int64_t capacity_;

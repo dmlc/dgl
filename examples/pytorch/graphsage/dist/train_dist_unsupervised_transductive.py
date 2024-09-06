@@ -1,13 +1,14 @@
 import argparse
 import time
 
+import dgl
+import dgl.distributed
 import numpy as np
 import torch as th
 import torch.nn.functional as F
 import torch.optim as optim
-import dgl
 from train_dist_transductive import DistEmb, load_embs
-from train_dist_unsupervised import CrossEntropyLoss, DistSAGE, compute_acc
+from train_dist_unsupervised import compute_acc, CrossEntropyLoss, DistSAGE
 
 
 def generate_emb(standalone, model, emb_layer, g, batch_size, device):
@@ -49,7 +50,7 @@ def run(args, device, data):
     # Create dataloader
     exclude = "reverse_id" if args.remove_edge else None
     reverse_eids = th.arange(g.num_edges()) if args.remove_edge else None
-    dataloader = dgl.dataloading.DistEdgeDataLoader(
+    dataloader = dgl.distributed.DistEdgeDataLoader(
         g,
         train_eids,
         sampler,
@@ -104,9 +105,7 @@ def run(args, device, data):
         emb_optimizer = th.optim.SparseAdam(
             list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr
         )
-        print(
-            "optimize Pytorch sparse embedding:", emb_layer.module.sparse_emb
-        )
+        print("optimize Pytorch sparse embedding:", emb_layer.module.sparse_emb)
 
     # Training loop
     epoch = 0
@@ -172,12 +171,12 @@ def run(args, device, data):
                             step,
                             loss.item(),
                             np.mean(iter_tput[3:]),
-                            np.sum(step_time[-args.log_every:]),
-                            np.sum(sample_t[-args.log_every:]),
-                            np.sum(feat_copy_t[-args.log_every:]),
-                            np.sum(forward_t[-args.log_every:]),
-                            np.sum(backward_t[-args.log_every:]),
-                            np.sum(update_t[-args.log_every:]),
+                            np.sum(step_time[-args.log_every :]),
+                            np.sum(sample_t[-args.log_every :]),
+                            np.sum(feat_copy_t[-args.log_every :]),
+                            np.sum(forward_t[-args.log_every :]),
+                            np.sum(backward_t[-args.log_every :]),
+                            np.sum(update_t[-args.log_every :]),
                         )
                     )
 
@@ -228,9 +227,7 @@ def main(args):
     dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend="gloo")
-    g = dgl.distributed.DistGraph(
-            args.graph_name, part_config=args.part_config
-        )
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print("rank:", g.rank())
     print("number of edges", g.num_edges())
 
