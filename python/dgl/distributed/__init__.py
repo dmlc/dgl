@@ -3,11 +3,11 @@
 from . import optim
 from .dist_context import exit_client, initialize
 from .dist_dataloader import (
-    NodeCollator,
-    EdgeCollator,
     DistDataLoader,
     DistEdgeDataLoader,
     DistNodeDataLoader,
+    EdgeCollator,
+    NodeCollator,
 )
 from .dist_graph import DistGraph, DistGraphServer, edge_split, node_split
 from .dist_tensor import DistTensor
