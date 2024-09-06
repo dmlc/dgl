@@ -487,7 +487,7 @@ def load_partition_book(part_config, part_id, part_metadata=None):
     dict
         The edge types
     """
-    if part_metadata == None:
+    if part_metadata is None:
         part_metadata = _load_part_config(part_config)
     assert "num_parts" in part_metadata, "num_parts does not exist."
     assert (
@@ -699,7 +699,7 @@ def _partition_to_graphbolt(
         graph_formats=graph_formats,
     )
     rel_path_result = _save_graph_gb(
-        part_config, part_i, csc_graph, part_metadata
+        part_config, part_i, csc_graph
     )
     part_metadata[f"part-{part_i}"]["part_graph_graphbolt"] = rel_path_result
 
@@ -1469,7 +1469,7 @@ def _load_part(part_config, part_id, parts=None):
     return graph
 
 
-def _save_graph_gb(part_config, part_id, csc_graph, part_meta):
+def _save_graph_gb(part_config, part_id, csc_graph):
     orig_feats_path = os.path.join(
         os.path.dirname(part_config),
         f"part{part_id}",
@@ -1495,7 +1495,7 @@ def cast_various_to_minimum_dtype_gb(
     node_attributes,
     edge_attributes,
 ):
-    # Cast various data to minimum dtype.
+    """Cast various data to minimum dtype."""
     # Cast 1: indptr.
     indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
     # Cast 2: indices.
@@ -1521,6 +1521,7 @@ def cast_various_to_minimum_dtype_gb(
             attributes[key] = _cast_to_minimum_dtype(
                 predicates[key], attributes[key], field=key
             )
+    return indptr, indices, type_per_edge
 
 
 def _create_attributes_gb(
@@ -1659,7 +1660,7 @@ def gb_convert_single_dgl_partition(
             indptr, dtype=indices.dtype
         )
 
-    cast_various_to_minimum_dtype_gb(
+    indptr, indices, type_per_edge=cast_various_to_minimum_dtype_gb(
         graph,
         part_meta,
         num_parts,
@@ -1738,7 +1739,7 @@ def _convert_partition_to_graphbolt(
                     gpb=gpb,
                 ).result()
                 rel_path = _save_graph_gb(
-                    part_config, part_id, csc_graph, part_meta
+                    part_config, part_id, csc_graph
                 )
                 rel_path_results.append(rel_path)
 
@@ -1751,7 +1752,7 @@ def _convert_partition_to_graphbolt(
                 graph=part, ntypes=ntypes, etypes=etypes, gpb=gpb
             )
             rel_path = _save_graph_gb(
-                part_config, part_id, csc_graph, part_meta
+                part_config, part_id, csc_graph
             )
             rel_path_results.append(rel_path)
 
