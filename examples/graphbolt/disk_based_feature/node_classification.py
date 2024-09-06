@@ -340,6 +340,7 @@ def parse_args():
             "igb-hom-small",
             "igb-hom-medium",
             "igb-hom-large",
+            "igb-hom",
         ],
     )
     parser.add_argument("--root", type=str, default="datasets")
