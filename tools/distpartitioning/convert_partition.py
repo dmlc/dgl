@@ -169,11 +169,13 @@ def _coo2csc(part_local_src_id, part_local_dst_id):
     part_local_src_id, part_local_dst_id = th.tensor(
         part_local_src_id, dtype=th.int64
     ), th.tensor(part_local_dst_id, dtype=th.int64)
-    indptr = th.zeros(len(part_local_dst_id) + 1, dtype=th.int64)
-    col_counts = th.bincount(part_local_src_id, minlength=part_local_dst_id)
+    num_nodes = th.max(th.cat([part_local_src_id,part_local_dst_id],dim=0))
+    indptr = th.zeros(num_nodes + 2, dtype=th.int64)
+    col_counts = th.bincount(part_local_dst_id, minlength=num_nodes+1)
     indptr[1:] = th.cumsum(col_counts, 0)
-    indices = part_local_dst_id
-    return indptr, indices
+    edge_id = th.argsort(part_local_dst_id)
+    indices = part_local_src_id[edge_id]
+    return indptr, indices, edge_id
 
 
 def _create_edge_data(edgeid_offset, etype_ids, num_edges):
@@ -616,16 +618,16 @@ def create_graph_object(
                                 global_edge_id,
                                 )
         remove_attr_gb(edge_attr,node_attr,**kwargs)
-        indptr, indices = _coo2csc(part_local_src_id, part_local_dst_id)
+        indptr, indices, csc_edge_ids = _coo2csc(part_local_src_id, part_local_dst_id)
         part_graph = gb.fused_csc_sampling_graph(
             csc_indptr=indptr,
             indices=indices,
             node_type_offset=None,
-            type_per_edge=type_per_edge,
+            type_per_edge=type_per_edge[csc_edge_ids],
             node_attributes=node_attr,
-            edge_attributes=edge_attr,
+            edge_attributes=edge_attr[csc_edge_ids],
             node_type_to_id=ntypes_map,
-            edge_type_to_id=edge_type_to_id,
+            edge_type_to_id=edge_type_to_id[csc_edge_ids],
         )
         return (
             part_graph,
