@@ -109,10 +109,7 @@ def _process_partitions(g_list, formats=None, sort_etypes=False):
     return g_list
 
 
-def _save_dgl_graphs(filename, g_list, formats=None, sort_etypes=False):
-    g_list = _process_partitions(
-        g_list, formats=formats, sort_etypes=sort_etypes
-    )
+def _save_dgl_graphs(filename, g_list, formats=None):
     save_graphs(filename, g_list, formats=formats)
 
 
@@ -469,106 +466,7 @@ def load_partition_feats(
     return node_feats, edge_feats
 
 
-def _load_partition_book_from_metadata(part_metadata, part_id):
-    assert "num_parts" in part_metadata, "num_parts does not exist."
-    assert (
-        part_metadata["num_parts"] > part_id
-    ), "part {} is out of range (#parts: {})".format(
-        part_id, part_metadata["num_parts"]
-    )
-    num_parts = part_metadata["num_parts"]
-    assert (
-        "num_nodes" in part_metadata
-    ), "cannot get the number of nodes of the global graph."
-    assert (
-        "num_edges" in part_metadata
-    ), "cannot get the number of edges of the global graph."
-    assert "node_map" in part_metadata, "cannot get the node map."
-    assert "edge_map" in part_metadata, "cannot get the edge map."
-    assert "graph_name" in part_metadata, "cannot get the graph name"
-
-    # If this is a range partitioning, node_map actually stores a list, whose elements
-    # indicate the boundary of range partitioning. Otherwise, node_map stores a filename
-    # that contains node map in a NumPy array.
-    node_map = part_metadata["node_map"]
-    edge_map = part_metadata["edge_map"]
-    if isinstance(node_map, dict):
-        for key in node_map:
-            is_range_part = isinstance(node_map[key], list)
-            break
-    elif isinstance(node_map, list):
-        is_range_part = True
-        node_map = {DEFAULT_NTYPE: node_map}
-    else:
-        is_range_part = False
-    if isinstance(edge_map, list):
-        edge_map = {DEFAULT_ETYPE: edge_map}
-
-    ntypes = {DEFAULT_NTYPE: 0}
-    etypes = {DEFAULT_ETYPE: 0}
-    if "ntypes" in part_metadata:
-        ntypes = part_metadata["ntypes"]
-    if "etypes" in part_metadata:
-        etypes = part_metadata["etypes"]
-
-    if isinstance(node_map, dict):
-        for key in node_map:
-            assert key in ntypes, "The node type {} is invalid".format(key)
-    if isinstance(edge_map, dict):
-        for key in edge_map:
-            assert key in etypes, "The edge type {} is invalid".format(key)
-
-    if not is_range_part:
-        raise TypeError("Only RangePartitionBook is supported currently.")
-
-    node_map = _get_part_ranges(node_map)
-    edge_map = _get_part_ranges(edge_map)
-
-    # Format dtype of node/edge map if dtype is specified.
-    def _format_node_edge_map(part_metadata, map_type, data):
-        key = f"{map_type}_map_dtype"
-        if key not in part_metadata:
-            return data
-        dtype = part_metadata[key]
-        assert dtype in ["int32", "int64"], (
-            f"The {map_type} map dtype should be either int32 or int64, "
-            f"but got {dtype}."
-        )
-        for key in data:
-            data[key] = data[key].astype(dtype)
-        return data
-
-    node_map = _format_node_edge_map(part_metadata, "node", node_map)
-    edge_map = _format_node_edge_map(part_metadata, "edge", edge_map)
-
-    # Sort the node/edge maps by the node/edge type ID.
-    node_map = dict(sorted(node_map.items(), key=lambda x: ntypes[x[0]]))
-    edge_map = dict(sorted(edge_map.items(), key=lambda x: etypes[x[0]]))
-
-    def _assert_is_sorted(id_map):
-        id_ranges = np.array(list(id_map.values()))
-        ids = []
-        for i in range(num_parts):
-            ids.append(id_ranges[:, i, :])
-        ids = np.array(ids).flatten()
-        assert np.all(
-            ids[:-1] <= ids[1:]
-        ), f"The node/edge map is not sorted: {ids}"
-
-    _assert_is_sorted(node_map)
-    _assert_is_sorted(edge_map)
-
-    return (
-        RangePartitionBook(
-            part_id, num_parts, node_map, edge_map, ntypes, etypes
-        ),
-        part_metadata["graph_name"],
-        ntypes,
-        etypes,
-    )
-
-
-def load_partition_book(part_config, part_id):
+def load_partition_book(part_config, part_id, part_metadata=None):
     """Load a graph partition book from the partition config file.
 
     Parameters
@@ -589,7 +487,8 @@ def load_partition_book(part_config, part_id):
     dict
         The edge types
     """
-    part_metadata = _load_part_config(part_config)
+    if part_metadata == None:
+        part_metadata = _load_part_config(part_config)
     assert "num_parts" in part_metadata, "num_parts does not exist."
     assert (
         part_metadata["num_parts"] > part_id
@@ -771,6 +670,38 @@ def _set_trainer_ids(g, sim_g, node_parts):
                 g.nodes[dst_type].data["trainer_id"], g.edges(etype=c_etype)[1]
             )
             g.edges[c_etype].data["trainer_id"] = trainer_id
+
+
+def _partition_to_graphbolt(
+    parts,
+    part_i,
+    part_config,
+    part_metadata,
+    *,
+    store_eids=True,
+    store_inner_node=False,
+    store_inner_edge=False,
+    graph_formats=None,
+):
+    gpb, _, ntypes, etypes = load_partition_book(
+        part_config, part_i, part_metadata
+    )
+    graph = parts[part_i]
+    csc_graph = gb_convert_single_dgl_partition(
+        ntypes=ntypes,
+        etypes=etypes,
+        gpb=gpb,
+        part_meta=part_metadata,
+        graph=graph,
+        store_eids=store_eids,
+        store_inner_edge=store_inner_edge,
+        store_inner_node=store_inner_node,
+        graph_formats=graph_formats,
+    )
+    rel_path_result = _save_graph_gb(
+        part_config, part_i, csc_graph, part_metadata
+    )
+    part_metadata[f"part-{part_i}"]["part_graph_graphbolt"] = rel_path_result
 
 
 def partition_graph(
@@ -1383,9 +1314,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1420,9 +1351,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1440,34 +1371,8 @@ def partition_graph(
             "edge_feats": os.path.relpath(edge_feat_file, out_path),
         }
         sort_etypes = len(g.etypes) > 1
+        part = _process_partitions([part], graph_formats, sort_etypes)[0]
         if use_graphbolt:
-
-            def _partition_to_graphbolt(
-                part_config,
-                parts,
-                part_i,
-                part_metadata,
-                *,
-                store_eids=True,
-                store_inner_node=False,
-                store_inner_edge=False,
-                graph_formats=None,
-            ):
-                rel_path_result = gb_convert_single_dgl_partition(
-                    part_i,
-                    parts,
-                    part_metadata,
-                    part_config=part_config,
-                    store_eids=store_eids,
-                    store_inner_edge=store_inner_edge,
-                    store_inner_node=store_inner_node,
-                    graph_formats=graph_formats,
-                )
-                part_metadata[f"part-{part_i}"][
-                    "part_graph_graphbolt"
-                ] = rel_path_result
-
-            part = _process_partitions([part], graph_formats, sort_etypes)[0]
             # save FusedCSCSamplingGraph
             kwargs["graph_formats"] = graph_formats
             kwargs.pop("n_jobs", None)
@@ -1480,15 +1385,14 @@ def partition_graph(
             )
         else:
             part_graph_file = os.path.join(part_dir, "graph.dgl")
-            part_metadata["part-{}".format(part_id)][
-                "part_graph"
-            ] = os.path.relpath(part_graph_file, out_path)
+            part_metadata["part-{}".format(part_id)]["part_graph"] = (
+                os.path.relpath(part_graph_file, out_path)
+            )
             # save DGLGraph
             _save_dgl_graphs(
                 part_graph_file,
                 [part],
                 formats=graph_formats,
-                sort_etypes=sort_etypes,
             )
 
     _dump_part_config(part_config, part_metadata)
@@ -1554,7 +1458,7 @@ def init_type_per_edge(graph, gpb):
     return etype_ids
 
 
-def _load_parts(part_config, part_id, parts):
+def _load_part(part_config, part_id, parts=None):
     """load parts from variable or dist."""
     if parts is None:
         graph, _, _, _, _, _, _ = load_partition(
@@ -1565,68 +1469,70 @@ def _load_parts(part_config, part_id, parts):
     return graph
 
 
-def gb_convert_single_dgl_partition(
-    part_id,
-    parts,
+def _save_graph_gb(part_config, part_id, csc_graph, part_meta):
+    orig_feats_path = os.path.join(
+        os.path.dirname(part_config),
+        f"part{part_id}",
+    )
+    csc_graph_path = os.path.join(
+        orig_feats_path, "fused_csc_sampling_graph.pt"
+    )
+    torch.save(csc_graph, csc_graph_path)
+
+    return os.path.relpath(csc_graph_path, os.path.dirname(part_config))
+    # Update graph path.
+
+
+def cast_various_to_minimum_dtype_gb(
+    graph,
     part_meta,
-    graph_formats,
-    part_config,
-    store_eids,
+    num_parts,
+    indptr,
+    indices,
+    type_per_edge,
+    etypes,
+    ntypes,
+    node_attributes,
+    edge_attributes,
+):
+    # Cast various data to minimum dtype.
+    # Cast 1: indptr.
+    indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
+    # Cast 2: indices.
+    indices = _cast_to_minimum_dtype(graph.num_nodes(), indices)
+    # Cast 3: type_per_edge.
+    type_per_edge = _cast_to_minimum_dtype(
+        len(etypes), type_per_edge, field=ETYPE
+    )
+    # Cast 4: node/edge_attributes.
+    predicates = {
+        NID: part_meta["num_nodes"],
+        "part_id": num_parts,
+        NTYPE: len(ntypes),
+        EID: part_meta["num_edges"],
+        ETYPE: len(etypes),
+        DGL2GB_EID: part_meta["num_edges"],
+        GB_DST_ID: part_meta["num_nodes"],
+    }
+    for attributes in [node_attributes, edge_attributes]:
+        for key in attributes:
+            if key not in predicates:
+                continue
+            attributes[key] = _cast_to_minimum_dtype(
+                predicates[key], attributes[key], field=key
+            )
+
+
+def _create_attributes_gb(
+    graph,
+    gpb,
+    edge_ids,
+    is_homo,
     store_inner_node,
     store_inner_edge,
+    store_eids,
+    debug_mode,
 ):
-    """Converts a single DGL partition to GraphBolt.
-
-    Parameters
-    ----------
-    part_id : int
-        The numerical ID of the partition to convert.
-    graph_formats : str or list[str], optional
-        Save partitions in specified formats. It could be any combination of
-        `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
-        it is not necessary to specify this argument. It's mainly for
-        specifying `coo` format to save edge ID mapping and destination node
-        IDs. If not specified, whether to save `coo` format is determined by
-        the availability of the format in DGL partitions. Default: None.
-    store_eids : bool, optional
-        Whether to store edge IDs in the new graph. Default: True.
-    store_inner_node : bool, optional
-        Whether to store inner node mask in the new graph. Default: False.
-    store_inner_edge : bool, optional
-        Whether to store inner edge mask in the new graph. Default: False.
-    """
-    debug_mode = "DGL_DIST_DEBUG" in os.environ
-    if debug_mode:
-        dgl_warning(
-            "Running in debug mode which means all attributes of DGL partitions"
-            " will be saved to the new format."
-        )
-    if part_meta is None:
-        part_meta = _load_part_config(part_config)
-    num_parts = part_meta["num_parts"]
-
-    graph = _load_parts(part_config, part_id, parts)
-
-    gpb, _, ntypes, etypes = (
-        load_partition_book(part_config, part_id)
-        if part_meta is None
-        else _load_partition_book_from_metadata(part_meta, part_id)
-    )
-
-    is_homo = is_homogeneous(ntypes, etypes)
-    node_type_to_id = (
-        None if is_homo else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
-    )
-    edge_type_to_id = (
-        None
-        if is_homo
-        else {
-            gb.etype_tuple_to_str(etype): etid for etype, etid in etypes.items()
-        }
-    )
-    # Obtain CSC indtpr and indices.
-    indptr, indices, edge_ids = graph.adj_tensors("csc")
-
     # Save node attributes. Detailed attributes are shown below.
     #  DGL_GB\Attributes  dgl.NID("_ID")  dgl.NTYPE("_TYPE")  "inner_node"  "part_id"
     #  DGL_Homograph           ✅                🚫                  ✅          ✅
@@ -1660,6 +1566,78 @@ def gb_convert_single_dgl_partition(
     edge_attributes = {
         attr: graph.edata[attr][edge_ids] for attr in required_edge_attrs
     }
+    return node_attributes, edge_attributes, type_per_edge
+
+
+def gb_convert_single_dgl_partition(
+    ntypes,
+    etypes,
+    gpb,
+    graph_formats,
+    store_eids,
+    store_inner_node,
+    store_inner_edge,
+    part_meta,
+    graph,
+):
+    """Converts a single DGL partition to GraphBolt.
+
+    Parameters
+    ----------
+    part_id : int
+        The numerical ID of the partition to convert.
+    graph_formats : str or list[str], optional
+        Save partitions in specified formats. It could be any combination of
+        `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
+        it is not necessary to specify this argument. It's mainly for
+        specifying `coo` format to save edge ID mapping and destination node
+        IDs. If not specified, whether to save `coo` format is determined by
+        the availability of the format in DGL partitions. Default: None.
+    store_eids : bool, optional
+        Whether to store edge IDs in the new graph. Default: True.
+    store_inner_node : bool, optional
+        Whether to store inner node mask in the new graph. Default: False.
+    store_inner_edge : bool, optional
+        Whether to store inner edge mask in the new graph. Default: False.
+    part_meta : dict
+        contain the meta data of the partition.
+    parts : list[DGLGraph]
+        the unit of graphs to be converted to graphbolt graph.
+    parts : list[DGLGraph]
+        the graph to be converted to graphbolt graph.
+    """
+    debug_mode = "DGL_DIST_DEBUG" in os.environ
+    if debug_mode:
+        dgl_warning(
+            "Running in debug mode which means all attributes of DGL partitions"
+            " will be saved to the new format."
+        )
+    num_parts = part_meta["num_parts"]
+
+    is_homo = is_homogeneous(ntypes, etypes)
+    node_type_to_id = (
+        None if is_homo else {ntype: ntid for ntid, ntype in enumerate(ntypes)}
+    )
+    edge_type_to_id = (
+        None
+        if is_homo
+        else {
+            gb.etype_tuple_to_str(etype): etid for etype, etid in etypes.items()
+        }
+    )
+    # Obtain CSC indtpr and indices.
+    indptr, indices, edge_ids = graph.adj_tensors("csc")
+
+    node_attributes, edge_attributes, type_per_edge = _create_attributes_gb(
+        graph,
+        gpb,
+        edge_ids,
+        is_homo,
+        store_inner_node,
+        store_inner_edge,
+        store_eids,
+        debug_mode,
+    )
     # When converting DGLGraph to FusedCSCSamplingGraph, edge IDs are
     # re-ordered(actually FusedCSCSamplingGraph does not have edge IDs
     # in nature). So we need to save such re-order info for any
@@ -1681,32 +1659,18 @@ def gb_convert_single_dgl_partition(
             indptr, dtype=indices.dtype
         )
 
-    # Cast various data to minimum dtype.
-    # Cast 1: indptr.
-    indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
-    # Cast 2: indices.
-    indices = _cast_to_minimum_dtype(graph.num_nodes(), indices)
-    # Cast 3: type_per_edge.
-    type_per_edge = _cast_to_minimum_dtype(
-        len(etypes), type_per_edge, field=ETYPE
+    cast_various_to_minimum_dtype_gb(
+        graph,
+        part_meta,
+        num_parts,
+        indptr,
+        indices,
+        type_per_edge,
+        etypes,
+        ntypes,
+        node_attributes,
+        edge_attributes,
     )
-    # Cast 4: node/edge_attributes.
-    predicates = {
-        NID: part_meta["num_nodes"],
-        "part_id": num_parts,
-        NTYPE: len(ntypes),
-        EID: part_meta["num_edges"],
-        ETYPE: len(etypes),
-        DGL2GB_EID: part_meta["num_edges"],
-        GB_DST_ID: part_meta["num_nodes"],
-    }
-    for attributes in [node_attributes, edge_attributes]:
-        for key in attributes:
-            if key not in predicates:
-                continue
-            attributes[key] = _cast_to_minimum_dtype(
-                predicates[key], attributes[key], field=key
-            )
 
     csc_graph = gb.fused_csc_sampling_graph(
         indptr,
@@ -1718,17 +1682,7 @@ def gb_convert_single_dgl_partition(
         node_type_to_id=node_type_to_id,
         edge_type_to_id=edge_type_to_id,
     )
-    orig_feats_path = os.path.join(
-        os.path.dirname(part_config),
-        part_meta[f"part-{part_id}"]["node_feats"],
-    )
-    csc_graph_path = os.path.join(
-        os.path.dirname(orig_feats_path), "fused_csc_sampling_graph.pt"
-    )
-    torch.save(csc_graph, csc_graph_path)
-
-    return os.path.relpath(csc_graph_path, os.path.dirname(part_config))
-    # Update graph path.
+    return csc_graph
 
 
 def _convert_partition_to_graphbolt(
@@ -1740,7 +1694,6 @@ def _convert_partition_to_graphbolt(
     store_inner_edge,
     n_jobs,
     num_parts,
-    parts=None,
 ):
     # [Rui] DGL partitions are always saved as homogeneous graphs even though
     # the original graph is heterogeneous. But heterogeneous information like
@@ -1752,12 +1705,12 @@ def _convert_partition_to_graphbolt(
     # We can simply pass None to it.
 
     # Iterate over partitions.
+    if part_meta is None:
+        part_meta = _load_part_config(part_config)
     convert_with_format = partial(
         gb_convert_single_dgl_partition,
-        parts=parts,
         part_meta=part_meta,
         graph_formats=graph_formats,
-        part_config=part_config,
         store_eids=store_eids,
         store_inner_node=store_inner_node,
         store_inner_edge=store_inner_edge,
@@ -1772,16 +1725,35 @@ def _convert_partition_to_graphbolt(
             max_workers=min(num_parts, n_jobs),
             mp_context=mp_ctx,
         ) as executor:
-            futures = []
             for part_id in range(num_parts):
-                futures.append(executor.submit(convert_with_format, part_id))
+                gpb, _, ntypes, etypes = load_partition_book(
+                    part_config, part_id
+                )
+                part = _load_part(part_config, part_id)
+                csc_graph = executor.submit(
+                    convert_with_format,
+                    graph=part,
+                    ntypes=ntypes,
+                    etypes=etypes,
+                    gpb=gpb,
+                ).result()
+                rel_path = _save_graph_gb(
+                    part_config, part_id, csc_graph, part_meta
+                )
+                rel_path_results.append(rel_path)
 
-        for part_id in range(num_parts):
-            rel_path_results.append(futures[part_id].result())
     else:
         # If running single-threaded, avoid spawning new interpreter, which is slow
         for part_id in range(num_parts):
-            rel_path_results.append(convert_with_format(part_id))
+            gpb, _, ntypes, etypes = load_partition_book(part_config, part_id)
+            part = _load_part(part_config, part_id)
+            csc_graph = convert_with_format(
+                graph=part, ntypes=ntypes, etypes=etypes, gpb=gpb
+            )
+            rel_path = _save_graph_gb(
+                part_config, part_id, csc_graph, part_meta
+            )
+            rel_path_results.append(rel_path)
 
     for part_id in range(num_parts):
         # Update graph path.
@@ -1795,39 +1767,6 @@ def _convert_partition_to_graphbolt(
     part_meta["node_map_dtype"] = "int64"
     part_meta["edge_map_dtype"] = "int64"
 
-    return part_meta
-
-
-def _dgl_partition_to_graphbolt(
-    part_config,
-    part_meta,
-    parts,
-    *,
-    store_eids=True,
-    store_inner_node=False,
-    store_inner_edge=False,
-    graph_formats=None,
-    n_jobs=1,
-):
-    debug_mode = "DGL_DIST_DEBUG" in os.environ
-    if debug_mode:
-        dgl_warning(
-            "Running in debug mode which means all attributes of DGL partitions"
-            " will be saved to the new format."
-        )
-    new_part_meta = copy.deepcopy(part_meta)
-    num_parts = part_meta["num_parts"]
-    part_meta = _convert_partition_to_graphbolt(
-        new_part_meta,
-        graph_formats,
-        part_config,
-        store_eids,
-        store_inner_node,
-        store_inner_edge,
-        n_jobs,
-        num_parts,
-        parts=parts,
-    )
     return part_meta
 
 
