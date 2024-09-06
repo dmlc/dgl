@@ -109,28 +109,45 @@ def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
     save_graphs(filename, g_list, formats=formats)
 
 
-def _get_inner_node_mask(graph, ntype_id):
-    if NTYPE in graph.ndata:
-        dtype = F.dtype(graph.ndata["inner_node"])
-        return (
-            graph.ndata["inner_node"]
-            * F.astype(graph.ndata[NTYPE] == ntype_id, dtype)
-            == 1
+def _get_inner_node_mask(graph, ntype_id, gpb=None):
+    ndata = (
+        graph.node_attributes
+        if isinstance(graph, gb.FusedCSCSamplingGraph)
+        else graph.ndata
+    )
+    assert "inner_node" in ndata, "'inner_node' is not in nodes' data"
+    if NTYPE in ndata or gpb is not None:
+        ntype = (
+            gpb.map_to_per_ntype(ndata[NID])[0]
+            if gpb is not None
+            else ndata[NTYPE]
         )
+        dtype = F.dtype(ndata["inner_node"])
+        return ndata["inner_node"] * F.astype(ntype == ntype_id, dtype) == 1
     else:
-        return graph.ndata["inner_node"] == 1
+        return ndata["inner_node"] == 1
 
 
-def _get_inner_edge_mask(graph, etype_id):
-    if ETYPE in graph.edata:
-        dtype = F.dtype(graph.edata["inner_edge"])
-        return (
-            graph.edata["inner_edge"]
-            * F.astype(graph.edata[ETYPE] == etype_id, dtype)
-            == 1
-        )
+def _get_inner_edge_mask(
+    graph,
+    etype_id,
+):
+    edata = (
+        graph.edge_attributes
+        if isinstance(graph, gb.FusedCSCSamplingGraph)
+        else graph.edata
+    )
+    assert "inner_edge" in edata, "'inner_edge' is not in edges' data"
+    etype = (
+        graph.type_per_edge
+        if isinstance(graph, gb.FusedCSCSamplingGraph)
+        else (graph.edata[ETYPE] if ETYPE in graph.edata else None)
+    )
+    if etype is not None:
+        dtype = F.dtype(edata["inner_edge"])
+        return edata["inner_edge"] * F.astype(etype == etype_id, dtype) == 1
     else:
-        return graph.edata["inner_edge"] == 1
+        return edata["inner_edge"] == 1
 
 
 def _get_part_ranges(id_ranges):

@@ -10,10 +10,10 @@
 #include <graphbolt/unique_and_compact.h>
 
 #ifdef GRAPHBOLT_USE_CUDA
+#include "./cuda/cooperative_minibatching_utils.h"
 #include "./cuda/max_uva_threads.h"
 #endif
 #include "./cnumpy.h"
-#include "./expand_indptr.h"
 #include "./feature_cache.h"
 #include "./index_select.h"
 #include "./io_uring.h"
@@ -196,6 +196,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
+  m.def("rank_sort", &cuda::RankSort);
 #endif
 #ifdef HAS_IMPL_ABSTRACT_PYSTUB
   m.impl_abstract_pystub("dgl.graphbolt.base", "//dgl.graphbolt.base");

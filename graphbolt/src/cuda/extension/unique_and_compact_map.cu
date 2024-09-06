@@ -18,8 +18,10 @@
  * @brief Unique and compact operator implementation on CUDA using hash table.
  */
 #include <graphbolt/cuda_ops.h>
+#include <thrust/iterator/reverse_iterator.h>
 #include <thrust/iterator/tabulate_output_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/transform_output_iterator.h>
 
 #include <cub/cub.cuh>
 #include <cuco/static_map.cuh>
@@ -31,6 +33,7 @@
 #include <numeric>
 
 #include "../common.h"
+#include "../cooperative_minibatching_utils.cuh"
 #include "../cooperative_minibatching_utils.h"
 #include "../utils.h"
 #include "./unique_and_compact.h"
@@ -104,7 +107,8 @@ __global__ void _MapIdsBatched(
   }
 }
 
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatchedHashMapBased(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
@@ -193,10 +197,9 @@ UniqueAndCompactBatchedHashMapBased(
         auto input_it = thrust::make_transform_iterator(
             index_it,
             ::cuda::proclaim_return_type<
-                ::cuda::std::tuple<int64_t*, index_t, int32_t, bool, bool>>(
+                ::cuda::std::tuple<int64_t*, index_t, int32_t, bool>>(
                 [=, map = map.ref(cuco::find)] __device__(auto it)
-                    -> ::cuda::std::tuple<
-                        int64_t*, index_t, int32_t, bool, bool> {
+                    -> ::cuda::std::tuple<int64_t*, index_t, int32_t, bool> {
                   const auto i = it.key;
                   const auto tensor_index = it.value;
                   const auto tensor_offset = i - offsets_dev_ptr[tensor_index];
@@ -211,9 +214,7 @@ UniqueAndCompactBatchedHashMapBased(
                   auto slot = map.find(key);
                   const auto valid = slot->second == i;
 
-                  return {
-                      &slot->second, node_id, batch_index, valid,
-                      i == batch_offset};
+                  return {&slot->second, node_id, batch_index, valid};
                 }));
         torch::optional<torch::Tensor> part_ids;
         if (world_size > 1) {
@@ -223,8 +224,9 @@ UniqueAndCompactBatchedHashMapBased(
         }
         auto unique_ids =
             torch::empty(offsets_ptr[2 * num_batches], src_ids[0].options());
-        auto unique_ids_offsets_dev = torch::empty(
-            num_batches + 1, src_ids[0].options().dtype(torch::kInt64));
+        auto unique_ids_offsets_dev = torch::full(
+            num_batches + 1, std::numeric_limits<int64_t>::max(),
+            src_ids[0].options().dtype(torch::kInt64));
         auto unique_ids_offsets_dev_ptr =
             unique_ids_offsets_dev.data_ptr<int64_t>();
         auto output_it = thrust::make_tabulate_output_iterator(
@@ -237,16 +239,16 @@ UniqueAndCompactBatchedHashMapBased(
                      world_size)] __device__(const int64_t i, const auto& t) {
                   *::cuda::std::get<0>(t) = i;
                   const auto node_id = ::cuda::std::get<1>(t);
-                  const auto is_i_equal_batch_offset = ::cuda::std::get<4>(t);
                   unique_ids_ptr[i] = node_id;
                   if (part_ids_ptr) {
                     part_ids_ptr[i] =
                         cuda::rank_assignment(node_id, rank, world_size);
                   }
-                  if (is_i_equal_batch_offset) {
-                    const auto batch_index = ::cuda::std::get<2>(t);
-                    unique_ids_offsets_dev_ptr[batch_index] = i;
-                  }
+                  const auto batch_index = ::cuda::std::get<2>(t);
+                  auto ref =
+                      ::cuda::atomic_ref<int64_t, ::cuda::thread_scope_device>{
+                          unique_ids_offsets_dev_ptr[batch_index]};
+                  ref.fetch_min(i, ::cuda::memory_order_relaxed);
                 }));
         CUB_CALL(
             DeviceSelect::If, input_it, output_it,
@@ -258,17 +260,38 @@ UniqueAndCompactBatchedHashMapBased(
         auto unique_ids_offsets = torch::empty(
             num_batches + 1,
             c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
-        auto unique_ids_offsets_ptr = unique_ids_offsets.data_ptr<int64_t>();
-        CUDA_CALL(cudaMemcpyAsync(
-            unique_ids_offsets_ptr, unique_ids_offsets_dev_ptr,
-            sizeof(int64_t) * (num_batches + 1), cudaMemcpyDeviceToHost,
-            stream));
+        {
+          auto unique_ids_offsets_dev2 =
+              torch::empty_like(unique_ids_offsets_dev);
+          CUB_CALL(
+              DeviceScan::InclusiveScan,
+              thrust::make_reverse_iterator(
+                  num_batches + 1 + unique_ids_offsets_dev_ptr),
+              thrust::make_reverse_iterator(
+                  num_batches + 1 +
+                  thrust::make_transform_output_iterator(
+                      thrust::make_zip_iterator(
+                          unique_ids_offsets_dev2.data_ptr<int64_t>(),
+                          unique_ids_offsets.data_ptr<int64_t>()),
+                      ::cuda::proclaim_return_type<
+                          thrust::tuple<int64_t, int64_t>>(
+                          [=] __device__(const auto x) {
+                            return thrust::make_tuple(x, x);
+                          }))),
+              cub::Min{}, num_batches + 1);
+          unique_ids_offsets_dev = unique_ids_offsets_dev2;
+          unique_ids_offsets_dev_ptr =
+              unique_ids_offsets_dev.data_ptr<int64_t>();
+        }
         at::cuda::CUDAEvent unique_ids_offsets_event;
-        unique_ids_offsets_event.record();
         torch::optional<torch::Tensor> index;
         if (part_ids) {
-          std::tie(unique_ids, index) = cuda::RankSortImpl(
-              unique_ids, *part_ids, unique_ids_offsets_dev, world_size);
+          std::tie(
+              unique_ids, index, unique_ids_offsets, unique_ids_offsets_event) =
+              cuda::RankSortImpl(
+                  unique_ids, *part_ids, unique_ids_offsets_dev, world_size);
+        } else {
+          unique_ids_offsets_event.record();
         }
         auto mapped_ids =
             torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());
@@ -278,18 +301,23 @@ UniqueAndCompactBatchedHashMapBased(
             pointers_dev_ptr, offsets_dev_ptr, unique_ids_offsets_dev_ptr,
             index ? index->data_ptr<index_t>() : nullptr, map.ref(cuco::find),
             mapped_ids.data_ptr<index_t>());
-        std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+        std::vector<std::tuple<
+            torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
             results;
         unique_ids_offsets_event.synchronize();
+        auto unique_ids_offsets_ptr = unique_ids_offsets.data_ptr<int64_t>();
         for (int64_t i = 0; i < num_batches; i++) {
           results.emplace_back(
               unique_ids.slice(
-                  0, unique_ids_offsets_ptr[i], unique_ids_offsets_ptr[i + 1]),
+                  0, unique_ids_offsets_ptr[i * world_size],
+                  unique_ids_offsets_ptr[(i + 1) * world_size]),
               mapped_ids.slice(
                   0, offsets_ptr[2 * i + 1], offsets_ptr[2 * i + 2]),
               mapped_ids.slice(
                   0, offsets_ptr[2 * num_batches + i],
-                  offsets_ptr[2 * num_batches + i + 1]));
+                  offsets_ptr[2 * num_batches + i + 1]),
+              unique_ids_offsets.slice(
+                  0, i * world_size, (i + 1) * world_size + 1));
         }
         return results;
       }));
