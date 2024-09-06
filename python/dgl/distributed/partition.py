@@ -1314,9 +1314,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
-                        F.gather_row(g.edges[etype].data[name], local_edges)
-                    )
+                    edge_feats[
+                        _etype_tuple_to_str(etype) + "/" + name
+                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1351,9 +1351,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
-                        F.gather_row(g.edges[etype].data[name], local_edges)
-                    )
+                    edge_feats[
+                        _etype_tuple_to_str(etype) + "/" + name
+                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1385,9 +1385,9 @@ def partition_graph(
             )
         else:
             part_graph_file = os.path.join(part_dir, "graph.dgl")
-            part_metadata["part-{}".format(part_id)]["part_graph"] = (
-                os.path.relpath(part_graph_file, out_path)
-            )
+            part_metadata["part-{}".format(part_id)][
+                "part_graph"
+            ] = os.path.relpath(part_graph_file, out_path)
             # save DGLGraph
             _save_dgl_graphs(
                 part_graph_file,

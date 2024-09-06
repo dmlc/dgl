@@ -19,7 +19,7 @@
  */
 #include <numeric>
 
-#include "./common.h"
+#include "../common.h"
 #include "./gpu_cache.h"
 
 namespace graphbolt {
@@ -74,6 +74,16 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> GpuCache::Query(
   missing_index = missing_index.slice(0, 0, static_cast<size_t>(missing_len));
   missing_keys = missing_keys.slice(0, 0, static_cast<size_t>(missing_len));
   return std::make_tuple(values, missing_index, missing_keys);
+}
+
+c10::intrusive_ptr<Future<std::vector<torch::Tensor>>> GpuCache::QueryAsync(
+    torch::Tensor keys) {
+  return async(
+      [=] {
+        auto [values, missing_index, missing_keys] = Query(keys);
+        return std::vector{values, missing_index, missing_keys};
+      },
+      true);
 }
 
 void GpuCache::Replace(torch::Tensor keys, torch::Tensor values) {

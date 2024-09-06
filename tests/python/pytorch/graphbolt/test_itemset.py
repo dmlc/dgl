@@ -123,7 +123,7 @@ def test_ItemSet_seed_nodes():
     # Indexing with invalid input type.
     with pytest.raises(
         TypeError,
-        match="ItemSet indices must be int, slice, or iterable of int, not <class 'float'>.",
+        match="ItemSet indices must be int, slice, or torch.Tensor, not <class 'float'>.",
     ):
         _ = item_set[1.5]
 

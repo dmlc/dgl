@@ -62,6 +62,3 @@ from .utils import apply_each
 from .mpops import *
 from .homophily import *
 from .label_informativeness import *
-
-if backend_name == "pytorch":
-    from . import distributed
