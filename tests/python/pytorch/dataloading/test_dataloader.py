@@ -821,6 +821,18 @@ def test_dataloader_worker_init_fn():
         pass
 
 
+def test_distributed_dataloaders():
+    # Test distributed dataloaders could be successfully imported.
+    try:
+        from dgl.dataloading import (
+            DistDataLoader,
+            DistEdgeDataLoader,
+            DistNodeDataLoader,
+        )
+    except ImportError:
+        pytest.fail("Distributed DataLoader import failed")
+
+
 if __name__ == "__main__":
     # test_node_dataloader(F.int32, 'neighbor', None)
     test_edge_dataloader_excludes(

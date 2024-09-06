@@ -1474,6 +1474,20 @@ class GraphDataLoader(torch.utils.data.DataLoader):
             raise DGLError("set_epoch is only available when use_ddp is True.")
 
 
+class DistDataLoader:
+    """Deprecated. Please use :class:`~dgl.distributed.DistDataLoader` instead."""
+
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "DistDataLoader is defined in dgl.distributed This class is for "
+            "backward compatibility and will be removed soon. Please update "
+            "your code to use `dgl.distributed.DistDataLoader`."
+        )
+        from ..distributed import DistDataLoader as NewDistDataLoader
+
+        return NewDistDataLoader(*args, **kwargs)
+
+
 class DistNodeDataLoader:
     """Deprecated. Please use :class:`~dgl.distributed.DistNodeDataLoader`
     instead.
