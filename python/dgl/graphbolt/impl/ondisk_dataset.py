@@ -979,7 +979,7 @@ class BuiltinDataset(OnDiskDataset):
         .. note::
             Reverse edges are added to the original graph.
 
-    **igb-hom-[tiny|small|medium|large] and igb-hom**
+    **igb-hom and igb-hom-[tiny|small|medium|large]**
         The igb-hom-[tiny|small|medium|large] and igb-hom dataset is a homogeneous
         citation network, which is designed for developers to train and evaluate
         GNN models with high fidelity. See more details in
