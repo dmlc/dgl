@@ -1,26 +1,19 @@
-import argparse
 import gc
-import json
 import logging
 import os
-import time
 
 import constants
 
 import dgl
 import dgl.graphbolt as gb
 import numpy as np
-import pandas as pd
-import pyarrow
-import scipy.sparse as spsp
 import torch as th
 from dgl.distributed.partition import (
     _etype_str_to_tuple,
     _etype_tuple_to_str,
     RESERVED_FIELD_DTYPE,
 )
-from pyarrow import csv
-from utils import get_idranges, memory_snapshot, read_json
+from utils import get_idranges, memory_snapshot
 
 
 def _get_unique_invidx(srcids, dstids, nids, low_mem=True):
@@ -172,7 +165,7 @@ def _is_homogeneous(ntypes, etypes):
     return len(ntypes) == 1 and len(etypes) == 1
 
 
-def _create_csc_data(part_local_src_id, part_local_dst_id):
+def _coo2csc(part_local_src_id, part_local_dst_id):
     part_local_src_id, part_local_dst_id = th.tensor(
         part_local_src_id, dtype=th.int64
     ), th.tensor(part_local_dst_id, dtype=th.int64)
@@ -398,7 +391,7 @@ def _partition_graphbolt(
         }
     )
 
-    indptr, indices = _create_csc_data(part_local_src_id, part_local_dst_id)
+    indptr, indices = _coo2csc(part_local_src_id, part_local_dst_id)
     part_graph = gb.fused_csc_sampling_graph(
         csc_indptr=indptr,
         indices=indices,
