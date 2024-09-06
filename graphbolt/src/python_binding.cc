@@ -218,6 +218,13 @@ TORCH_LIBRARY(graphbolt, m) {
       {at::Tag::pt2_compliant_tag}
 #endif
   );
+  m.def(
+      "cat(Tensor[] tensors) -> Tensor"
+#ifdef HAS_PT2_COMPLIANT_TAG
+      ,
+      {at::Tag::pt2_compliant_tag}
+#endif
+  );
 }
 
 }  // namespace sampling

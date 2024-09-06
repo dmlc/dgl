@@ -36,6 +36,7 @@ __all__ = [
     "EndMarker",
     "isin",
     "index_select",
+    "cat",
     "expand_indptr",
     "indptr_edge_ids",
     "CSCFormatBase",
@@ -96,6 +97,43 @@ def isin(elements, test_elements):
     assert elements.dim() == 1, "Elements should be 1D tensor."
     assert test_elements.dim() == 1, "Test_elements should be 1D tensor."
     return torch.ops.graphbolt.isin(elements, test_elements)
+
+
+if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+
+    torch_fake_decorator = (
+        torch.library.impl_abstract
+        if TorchVersion(torch.__version__) < TorchVersion("2.4.0a0")
+        else torch.library.register_fake
+    )
+
+    @torch_fake_decorator("graphbolt::cat")
+    def cat_fake(tensors):
+        """Fake implementation of cat for torch.compile() support."""
+        size_0 = sum(t.size(0) for t in tensors)
+        return tensors[0].new_empty((size_0,) + tensors[0].shape[1:])
+
+
+def cat(tensors):
+    """Concatenates the given tensors along the first dimension.
+
+    This is equivalent to
+
+    .. code:: python
+
+       return torch.cat(tensors, dim=0)
+
+    Parameters
+    ----------
+    tensors : List[torch.Tensor]
+        A list of tensors to be concatenated
+
+    Returns
+    -------
+    torch.Tensor
+        The concatenated tensors.
+    """
+    return torch.ops.graphbolt.cat(tensors)
 
 
 if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):

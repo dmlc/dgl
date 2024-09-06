@@ -28,6 +28,16 @@ namespace graphbolt {
 namespace ops {
 
 /**
+ * @brief Is equivalent to `torch.cat(tensors, dim=0)`. Works only for
+ * contiguous tensors.
+ *
+ * @param tensors  A vector of tensors to be concatenated.
+ *
+ * @return torch::cat(tensors, 0).
+ */
+torch::Tensor CatImpl(const std::vector<torch::Tensor>& tensors);
+
+/**
  * @brief Sorts the given input and optionally returns the original indexes.
  *
  * @param input         A pointer to storage containing IDs.

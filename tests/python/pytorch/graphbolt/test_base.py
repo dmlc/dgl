@@ -392,6 +392,36 @@ def test_indptr_edge_ids(offset, dtype):
             assert explanation.graph_break_count == expected_breaks
 
 
+
+@pytest.mark.parametrize("dtype", [torch.float16, torch.float32, torch.float64])
+@pytest.mark.parametrize("shape", [tuple(), (13, 17), (5,)])
+def test_cat(dtype, shape):
+    tensors = [torch.randn((i,) + shape, dtype=dtype, device=F.ctx()) for i in [10, 21, 1]]
+    torch_result = torch.cat(tensors, dim=0)
+    gb_result = gb.cat(tensors)
+    assert torch.equal(torch_result, gb_result)
+
+    if TorchVersion(torch.__version__) >= TorchVersion("2.2.0a0"):
+        import torch._dynamo as dynamo
+        from torch.testing._internal.optests import opcheck
+
+        # Tests torch.compile compatibility
+        opcheck(
+            torch.ops.graphbolt.cat,
+            (tensors,),
+            test_utils=[
+                "test_schema",
+                "test_autograd_registration",
+                "test_faketensor",
+                "test_aot_dispatch_dynamic",
+            ],
+            raise_exception=True,
+        )
+
+        explanation = dynamo.explain(gb.cat)(tensors)
+        assert explanation.graph_break_count == 0
+
+
 def test_csc_format_base_representation():
     csc_format_base = gb.CSCFormatBase(
         indptr=torch.tensor([0, 2, 4]),

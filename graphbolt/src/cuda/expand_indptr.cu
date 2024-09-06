@@ -17,48 +17,14 @@
  * @file cuda/expand_indptr.cu
  * @brief ExpandIndptr operator implementation on CUDA.
  */
-#include <thrust/iterator/constant_iterator.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/transform_iterator.h>
-
 #include <cub/cub.cuh>
 #include <limits>
 
 #include "./common.h"
+#include "./expand_indptr.cuh"
 
 namespace graphbolt {
 namespace ops {
-
-template <typename indices_t, typename nodes_t>
-struct RepeatIndex {
-  const nodes_t* nodes;
-  __host__ __device__ auto operator()(indices_t i) {
-    return thrust::make_constant_iterator(nodes ? nodes[i] : i);
-  }
-};
-
-template <typename indices_t, typename nodes_t>
-struct IotaIndex {
-  const nodes_t* nodes;
-  __host__ __device__ auto operator()(indices_t i) {
-    return thrust::make_counting_iterator(nodes ? nodes[i] : 0);
-  }
-};
-
-template <typename indptr_t, typename indices_t>
-struct OutputBufferIndexer {
-  const indptr_t* indptr;
-  indices_t* buffer;
-  __host__ __device__ auto operator()(int64_t i) { return buffer + indptr[i]; }
-};
-
-template <typename indptr_t>
-struct AdjacentDifference {
-  const indptr_t* indptr;
-  __host__ __device__ auto operator()(int64_t i) {
-    return indptr[i + 1] - indptr[i];
-  }
-};
 
 torch::Tensor ExpandIndptrImpl(
     torch::Tensor indptr, torch::ScalarType dtype,
