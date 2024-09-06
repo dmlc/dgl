@@ -1474,6 +1474,33 @@ class GraphDataLoader(torch.utils.data.DataLoader):
             raise DGLError("set_epoch is only available when use_ddp is True.")
 
 
+class NodeCollator:
+    """Deprecated. Please use :class:`~dgl.distributed.NodeCollator` instead."""
+
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "NodeCollator is defined in dgl.distributed This class is for "
+            "backward compatibility and will be removed soon. Please update "
+            "your code to use `dgl.distributed.NodeCollator`."
+        )
+        from ..distributed import NodeCollator as NewNodeCollator
+
+        return NewNodeCollator(*args, **kwargs)
+    
+class EdgeCollator:
+    """Deprecated. Please use :class:`~dgl.distributed.EdgeCollator` instead."""
+
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "EdgeCollator is defined in dgl.distributed This class is for "
+            "backward compatibility and will be removed soon. Please update "
+            "your code to use `dgl.distributed.EdgeCollator`."
+        )
+        from ..distributed import EdgeCollator as NewEdgeCollator
+
+        return NewEdgeCollator(*args, **kwargs)
+
+
 class DistDataLoader:
     """Deprecated. Please use :class:`~dgl.distributed.DistDataLoader` instead."""
 

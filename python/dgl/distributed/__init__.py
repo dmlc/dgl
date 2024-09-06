@@ -3,6 +3,8 @@
 from . import optim
 from .dist_context import exit_client, initialize
 from .dist_dataloader import (
+    NodeCollator,
+    EdgeCollator,
     DistDataLoader,
     DistEdgeDataLoader,
     DistNodeDataLoader,
