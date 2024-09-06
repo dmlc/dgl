@@ -411,7 +411,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(args):
+def main():
     torch.set_float32_matmul_precision(args.precision)
     if not torch.cuda.is_available():
         args.mode = "cpu-cpu-cpu"
@@ -528,4 +528,4 @@ def main(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args)
+    main()
