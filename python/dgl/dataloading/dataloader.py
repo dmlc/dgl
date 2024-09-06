@@ -1486,7 +1486,8 @@ class NodeCollator:
         from ..distributed import NodeCollator as NewNodeCollator
 
         return NewNodeCollator(*args, **kwargs)
-    
+
+
 class EdgeCollator:
     """Deprecated. Please use :class:`~dgl.distributed.EdgeCollator` instead."""
 
