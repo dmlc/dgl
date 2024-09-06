@@ -698,9 +698,7 @@ def _partition_to_graphbolt(
         store_inner_node=store_inner_node,
         graph_formats=graph_formats,
     )
-    rel_path_result = _save_graph_gb(
-        part_config, part_i, csc_graph
-    )
+    rel_path_result = _save_graph_gb(part_config, part_i, csc_graph)
     part_metadata[f"part-{part_i}"]["part_graph_graphbolt"] = rel_path_result
 
 
@@ -1660,7 +1658,7 @@ def gb_convert_single_dgl_partition(
             indptr, dtype=indices.dtype
         )
 
-    indptr, indices, type_per_edge=cast_various_to_minimum_dtype_gb(
+    indptr, indices, type_per_edge = cast_various_to_minimum_dtype_gb(
         graph,
         part_meta,
         num_parts,
@@ -1738,9 +1736,7 @@ def _convert_partition_to_graphbolt(
                     etypes=etypes,
                     gpb=gpb,
                 ).result()
-                rel_path = _save_graph_gb(
-                    part_config, part_id, csc_graph
-                )
+                rel_path = _save_graph_gb(part_config, part_id, csc_graph)
                 rel_path_results.append(rel_path)
 
     else:
@@ -1751,9 +1747,7 @@ def _convert_partition_to_graphbolt(
             csc_graph = convert_with_format(
                 graph=part, ntypes=ntypes, etypes=etypes, gpb=gpb
             )
-            rel_path = _save_graph_gb(
-                part_config, part_id, csc_graph
-            )
+            rel_path = _save_graph_gb(part_config, part_id, csc_graph)
             rel_path_results.append(rel_path)
 
     for part_id in range(num_parts):
