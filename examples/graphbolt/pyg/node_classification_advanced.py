@@ -343,7 +343,7 @@ def parse_args():
             "igb-hom-small",
             "igb-hom-medium",
             "igb-hom-large",
-            "igb-hom"
+            "igb-hom",
         ],
         help="The dataset we can use for node classification example. Currently"
         " ogbn-products, ogbn-arxiv, ogbn-papers100M and"
