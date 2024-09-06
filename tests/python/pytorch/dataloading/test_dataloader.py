@@ -825,22 +825,22 @@ def test_distributed_dataloaders():
     # Test distributed dataloaders could be successfully imported.
     try:
         from dgl.dataloading import (
-            NodeCollator,
-            EdgeCollator,
             DistDataLoader,
             DistEdgeDataLoader,
             DistNodeDataLoader,
+            EdgeCollator,
+            NodeCollator,
         )
     except ImportError:
         pytest.fail("Distributed DataLoader from dataloading import failed")
 
     try:
         from dgl.distributed import (
-            NodeCollator,
-            EdgeCollator,
             DistDataLoader,
             DistEdgeDataLoader,
             DistNodeDataLoader,
+            EdgeCollator,
+            NodeCollator,
         )
     except ImportError:
         pytest.fail("Distributed DataLoader from dataloading import failed")
