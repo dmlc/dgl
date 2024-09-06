@@ -1583,8 +1583,12 @@ def gb_convert_single_dgl_partition(
 
     Parameters
     ----------
-    part_id : int
-        The numerical ID of the partition to convert.
+    node types : dict
+        The node types
+    edge types : dict
+        The edge types
+    gpb : GraphPartitionBook
+        The global partition information.
     graph_formats : str or list[str], optional
         Save partitions in specified formats. It could be any combination of
         `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
@@ -1599,11 +1603,9 @@ def gb_convert_single_dgl_partition(
     store_inner_edge : bool, optional
         Whether to store inner edge mask in the new graph. Default: False.
     part_meta : dict
-        contain the meta data of the partition.
-    parts : list[DGLGraph]
-        the unit of graphs to be converted to graphbolt graph.
-    parts : list[DGLGraph]
-        the graph to be converted to graphbolt graph.
+        Contain the meta data of the partition.
+    graph : DGLGraph
+        The graph to be converted to graphbolt graph.
     """
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
