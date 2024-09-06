@@ -169,9 +169,9 @@ def _coo2csc(part_local_src_id, part_local_dst_id):
     part_local_src_id, part_local_dst_id = th.tensor(
         part_local_src_id, dtype=th.int64
     ), th.tensor(part_local_dst_id, dtype=th.int64)
-    num_nodes = th.max(th.cat([part_local_src_id,part_local_dst_id],dim=0))
+    num_nodes = th.max(th.cat([part_local_src_id, part_local_dst_id], dim=0))
     indptr = th.zeros(num_nodes + 2, dtype=th.int64)
-    col_counts = th.bincount(part_local_dst_id, minlength=num_nodes+1)
+    col_counts = th.bincount(part_local_dst_id, minlength=num_nodes + 1)
     indptr[1:] = th.cumsum(col_counts, 0)
     edge_id = th.argsort(part_local_dst_id)
     indices = part_local_src_id[edge_id]
@@ -243,7 +243,9 @@ def _graph_orig_ids(
     return orig_nids, orig_eids
 
 
-def _create_edge_attr_gb(part_local_dst_id,edgeid_offset,etype_ids,ntypes,etypes,etypes_map):
+def _create_edge_attr_gb(
+    part_local_dst_id, edgeid_offset, etype_ids, ntypes, etypes, etypes_map
+):
     edge_attr = {}
     # create edge data in graph.
     num_edges = len(part_local_dst_id)
@@ -263,18 +265,19 @@ def _create_edge_attr_gb(part_local_dst_id,edgeid_offset,etype_ids,ntypes,etypes
             for etype, etid in etypes_map.items()
         }
     )
-    return edge_attr,type_per_edge,edge_type_to_id
+    return edge_attr, type_per_edge, edge_type_to_id
 
 
 def _create_node_attr(
-        idx,
-        global_src_id,
-        global_dst_id,
-        global_homo_nid,
-        uniq_ids,
-        reshuffle_nodes,
-        id_map,
-        inner_nodes):
+    idx,
+    global_src_id,
+    global_dst_id,
+    global_homo_nid,
+    uniq_ids,
+    reshuffle_nodes,
+    id_map,
+    inner_nodes,
+):
     # compute per_type_ids and ntype for all the nodes in the graph.
     ntype, per_type_ids = _compute_node_ntype(
         global_src_id,
@@ -295,7 +298,9 @@ def _create_node_attr(
     return node_attr, per_type_ids
 
 
-def remove_attr_gb(edge_attr,node_attr,store_inner_node,store_inner_edge,store_eids):
+def remove_attr_gb(
+    edge_attr, node_attr, store_inner_node, store_inner_edge, store_eids
+):
     if not store_inner_edge:
         edge_attr.pop("inner_edge")
 
@@ -304,7 +309,7 @@ def remove_attr_gb(edge_attr,node_attr,store_inner_node,store_inner_edge,store_e
 
     if not store_inner_node:
         node_attr.pop("inner_node")
-    return edge_attr,node_attr
+    return edge_attr, node_attr
 
 
 def create_graph_object(
@@ -596,29 +601,39 @@ def create_graph_object(
 
     # create the graph here now.
     if use_graphbolt:
-        edge_attr,type_per_edge,edge_type_to_id = _create_edge_attr_gb(part_local_dst_id,edgeid_offset,etype_ids,ntypes,etypes,etypes_map)
+        edge_attr, type_per_edge, edge_type_to_id = _create_edge_attr_gb(
+            part_local_dst_id,
+            edgeid_offset,
+            etype_ids,
+            ntypes,
+            etypes,
+            etypes_map,
+        )
         node_attr, per_type_ids = _create_node_attr(
-                                    idx,
-                                    global_src_id,
-                                    global_dst_id,
-                                    global_homo_nid,
-                                    uniq_ids,
-                                    reshuffle_nodes,
-                                    id_map,
-                                    inner_nodes)
+            idx,
+            global_src_id,
+            global_dst_id,
+            global_homo_nid,
+            uniq_ids,
+            reshuffle_nodes,
+            id_map,
+            inner_nodes,
+        )
         orig_nids, orig_eids = _graph_orig_ids(
-                                return_orig_nids,
-                                return_orig_eids,
-                                ntypes_map,
-                                etypes_map,
-                                node_attr,
-                                edge_attr,
-                                per_type_ids,
-                                type_per_edge,
-                                global_edge_id,
-                                )
-        remove_attr_gb(edge_attr,node_attr,**kwargs)
-        indptr, indices, csc_edge_ids = _coo2csc(part_local_src_id, part_local_dst_id)
+            return_orig_nids,
+            return_orig_eids,
+            ntypes_map,
+            etypes_map,
+            node_attr,
+            edge_attr,
+            per_type_ids,
+            type_per_edge,
+            global_edge_id,
+        )
+        remove_attr_gb(edge_attr, node_attr, **kwargs)
+        indptr, indices, csc_edge_ids = _coo2csc(
+            part_local_src_id, part_local_dst_id
+        )
         part_graph = gb.fused_csc_sampling_graph(
             csc_indptr=indptr,
             indices=indices,
@@ -658,7 +673,7 @@ def create_graph_object(
             uniq_ids,
             reshuffle_nodes,
             id_map,
-            inner_nodes
+            inner_nodes,
         )
 
         # get the original node ids and edge ids from original graph.
