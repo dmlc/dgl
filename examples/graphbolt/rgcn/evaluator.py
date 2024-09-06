@@ -67,45 +67,6 @@ class IGB_Evaluator:
         else:
             raise ValueError("Undefined eval metric %s " % (self.eval_metric))
 
-    def eval(self, input_dict):
-        if self.eval_metric == "acc":
-            y_true, y_pred = self._parse_and_check_input(input_dict)
-            return self._eval_acc(y_true, y_pred)
-        else:
-            raise ValueError("Undefined eval metric %s " % (self.eval_metric))
-
-    @property
-    def expected_input_format(self):
-        desc = "==== Expected input format of Evaluator for {}\n".format(
-            self.name
-        )
-        if self.eval_metric == "acc":
-            desc += "{'y_true': y_true, 'y_pred': y_pred}\n"
-            desc += "- y_true: numpy ndarray or torch tensor of shape (num_nodes num_tasks)\n"
-            desc += "- y_pred: numpy ndarray or torch tensor of shape (num_nodes num_tasks)\n"
-            desc += "where y_pred stores predicted class label (integer),\n"
-            desc += "num_task is {}, and ".format(self.num_tasks)
-            desc += "each row corresponds to one node.\n"
-        else:
-            raise ValueError("Undefined eval metric %s " % (self.eval_metric))
-
-        return desc
-
-    @property
-    def expected_output_format(self):
-        desc = "==== Expected output format of Evaluator for {}\n".format(
-            self.name
-        )
-        if self.eval_metric == "acc":
-            desc += "{'acc': acc}\n"
-            desc += "- acc (float): Accuracy score averaged across {} task(s)\n".format(
-                self.num_tasks
-            )
-        else:
-            raise ValueError("Undefined eval metric %s " % (self.eval_metric))
-
-        return desc
-
     def _eval_acc(self, y_true, y_pred):
         acc_list = []
 
@@ -115,3 +76,10 @@ class IGB_Evaluator:
             acc_list.append(float(np.sum(correct)) / len(correct))
 
         return {"acc": sum(acc_list) / len(acc_list)}
+
+    def eval(self, input_dict):
+        if self.eval_metric == "acc":
+            y_true, y_pred = self._parse_and_check_input(input_dict)
+            return self._eval_acc(y_true, y_pred)
+        else:
+            raise ValueError("Undefined eval metric %s " % (self.eval_metric))

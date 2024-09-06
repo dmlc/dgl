@@ -144,7 +144,7 @@ def create_dataloader(
         node_feature_keys["institution"] = ["feat"]
     if "igb-het" in name:
         node_feature_keys["author"] = ["feat"]
-        node_feature_keys["institution"] = ["feat"]
+        node_feature_keys["institute"] = ["feat"]
         node_feature_keys["fos"] = ["feat"]
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
 
