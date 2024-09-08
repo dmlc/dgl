@@ -24,7 +24,7 @@ def unique_and_compact(
     `Cooperative Minibatching in Graph Neural Networks
     <https://arxiv.org/abs/2310.12403>`__
     Cooperation between the GPUs eliminates duplicate work performed across the
-    GPUs due to the overlapping sampled k-hop neighborhoods of nodes when
+    GPUs due to the overlapping sampled k-hop neighborhoods of seed nodes when
     performing GNN minibatching.
 
     When `world_size` is greater than 1, then the given ids are partitioned
@@ -163,7 +163,7 @@ def unique_and_compact_csc_formats(
     `Cooperative Minibatching in Graph Neural Networks
     <https://arxiv.org/abs/2310.12403>`__
     Cooperation between the GPUs eliminates duplicate work performed across the
-    GPUs due to the overlapping sampled k-hop neighborhoods of nodes when
+    GPUs due to the overlapping sampled k-hop neighborhoods of seed nodes when
     performing GNN minibatching.
 
     When `world_size` is greater than 1, then the given ids are partitioned
