@@ -21,7 +21,8 @@ def unique_and_compact(
     relevant when using Cooperative Minibatching, which was initially proposed
     in `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__ and
     was later first fully described in
-    `Cooperative Minibatching in Graph Neural Networks<https://arxiv.org/abs/2310.12403>`__.
+    `Cooperative Minibatching in Graph Neural Networks
+    <https://arxiv.org/abs/2310.12403>`__
     Cooperation between the GPUs eliminates duplicate work performed across the
     GPUs due to the overlapping sampled k-hop neighborhoods of nodes when
     performing GNN minibatching.
@@ -156,9 +157,12 @@ def unique_and_compact_csc_formats(
     """
     Compact csc formats and return unique nodes (per type). The `rank` and
     `world_size` parameters are relevant when using Cooperative Minibatching,
-    which was initially proposed in `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__
+    which was initially proposed in
+    `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__
     and was later first fully described in
-    `Cooperative Minibatching in Graph Neural Networks<https://arxiv.org/abs/2310.12403>`__. Cooperation between the GPUs eliminates duplicate work performed across the
+    `Cooperative Minibatching in Graph Neural Networks
+    <https://arxiv.org/abs/2310.12403>`__
+    Cooperation between the GPUs eliminates duplicate work performed across the
     GPUs due to the overlapping sampled k-hop neighborhoods of nodes when
     performing GNN minibatching.
 
