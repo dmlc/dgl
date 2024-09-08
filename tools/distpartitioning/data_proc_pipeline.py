@@ -100,6 +100,25 @@ if __name__ == "__main__":
         help="Use GraphBolt for distributed partition.",
     )
     parser.add_argument(
+        "--store-inner-node",
+        action="store_true",
+        default=False,
+        help="Store inner nodes.",
+    )
+
+    parser.add_argument(
+        "--store-inner-edge",
+        action="store_true",
+        default=False,
+        help="Store inner edges.",
+    )
+    parser.add_argument(
+        "--store-eids",
+        action="store_true",
+        default=False,
+        help="Store edge IDs.",
+    )
+    parser.add_argument(
         "--graph-formats",
         default=None,
         type=str,
