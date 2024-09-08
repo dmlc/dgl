@@ -288,7 +288,7 @@ torch::Tensor IndptrEdgeIdsImpl(
  * @param rank            The rank of the current GPU.
  * @param world_size      The total # GPUs, world size.
  *
- * @return
+ * @return (unique_ids, compacted_src_ids, compacted_dst_ids, unique_offsets)
  * - A tensor representing all unique elements in 'src_ids' and 'dst_ids' after
  * removing duplicates. The indices in this tensor precisely match the compacted
  * IDs of the corresponding elements.
@@ -296,6 +296,9 @@ torch::Tensor IndptrEdgeIdsImpl(
  * mapped to compacted IDs.
  * - The tensor corresponding to the 'dst_ids' tensor, where the entries are
  * mapped to compacted IDs.
+ * - The tensor corresponding to the offsets into the unique_ids tensor. Has
+ * size `world_size + 1` and unique_ids[offsets[i]: offsets[i + 1]] belongs to
+ * the rank `(rank + i) % world_size`.
  *
  * @example
  *   torch::Tensor src_ids = src
