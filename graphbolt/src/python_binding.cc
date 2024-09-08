@@ -56,8 +56,9 @@ TORCH_LIBRARY(graphbolt, m) {
        "UniqueAndCompactBatchedFuture")
       .def(
           "wait",
-          &Future<std::vector<
-              std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>::Wait);
+          &Future<std::vector<std::tuple<
+              torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>::
+              Wait);
   m.class_<Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>(
        "GpuGraphCacheQueryFuture")
       .def(
