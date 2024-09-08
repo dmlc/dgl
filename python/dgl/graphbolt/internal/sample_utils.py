@@ -43,7 +43,7 @@ def unique_and_compact(
         nums = [node.size(0) for node in nodes]
         nodes = torch.cat(nodes)
         empty_tensor = nodes.new_empty(0)
-        unique, compacted, _ = torch.ops.graphbolt.unique_and_compact(
+        unique, compacted, _, offsets = torch.ops.graphbolt.unique_and_compact(
             nodes, empty_tensor, empty_tensor, 0, 1
         )
         compacted = compacted.split(nums)
@@ -235,7 +235,12 @@ def unique_and_compact_csc_formats(
             unique_nodes = {}
             compacted_indices = {}
             for i, ntype in enumerate(ntypes):
-                unique_nodes[ntype], compacted_indices[ntype], _ = results[i]
+                (
+                    unique_nodes[ntype],
+                    compacted_indices[ntype],
+                    _,
+                    offsets,
+                ) = results[i]
 
             compacted_csc_formats = {}
             # Map back with the same order.
