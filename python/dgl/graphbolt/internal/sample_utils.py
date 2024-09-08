@@ -17,7 +17,7 @@ def unique_and_compact(
     world_size: int = 1,
 ):
     """
-    Compact a list of nodes tensor. The rank and world_size parameters are
+    Compact a list of nodes tensor. The `rank` and `world_size` parameters are
     relevant when using Cooperative Minibatching, which was initially proposed
     in `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__ and
     was later first fully described in
