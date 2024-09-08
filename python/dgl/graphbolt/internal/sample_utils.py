@@ -21,7 +21,7 @@ def unique_and_compact(
     relevant when using Cooperative Minibatching, which was initially proposed
     in `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__ and
     was later first fully described in
-    `Cooperative Minibatching in Graph Neural Networks<https://arxiv.org/abs/2310.12403>`__. 
+    `Cooperative Minibatching in Graph Neural Networks<https://arxiv.org/abs/2310.12403>`__.
     Cooperation between the GPUs eliminates duplicate work performed across the
     GPUs due to the overlapping sampled k-hop neighborhoods of nodes when
     performing GNN minibatching.
@@ -55,7 +55,7 @@ def unique_and_compact(
         nodes list, where IDs inside are replaced with compacted node IDs.
         "Compacted node list" indicates that the node IDs in the input node
         list are replaced with mapped node IDs, where each type of node is
-        mapped to a contiguous space of IDs ranging from 0 to N. 
+        mapped to a contiguous space of IDs ranging from 0 to N.
         The unique nodes offsets tensor partitions the unique_nodes tensor. Has
         size `world_size + 1` and unique_nodes[offsets[i]: offsets[i + 1]]
         belongs to the rank `(rank + i) % world_size`.
@@ -75,9 +75,11 @@ def unique_and_compact(
     if is_heterogeneous:
         unique, compacted, offsets = {}, {}, {}
         for ntype, nodes_of_type in nodes.items():
-            unique[ntype], compacted[ntype], offsets[ntype] = unique_and_compact_per_type(
-                nodes_of_type
-            )
+            (
+                unique[ntype],
+                compacted[ntype],
+                offsets[ntype],
+            ) = unique_and_compact_per_type(nodes_of_type)
         return unique, compacted, offsets
     else:
         return unique_and_compact_per_type(nodes)
