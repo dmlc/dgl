@@ -254,7 +254,7 @@ def _create_edge_attr_gb(
         type_per_edge,
         edge_attr["inner_edge"],
     ) = _create_edge_data(edgeid_offset, etype_ids, num_edges)
-    assert 'inner_edge' in edge_attr
+    assert "inner_edge" in edge_attr
 
     is_homo = _is_homogeneous(ntypes, etypes)
 
@@ -303,16 +303,16 @@ def remove_attr_gb(
     edge_attr, node_attr, store_inner_node, store_inner_edge, store_eids
 ):
     if not store_inner_edge:
-        assert 'inner_edge' in edge_attr
+        assert "inner_edge" in edge_attr
         edge_attr.pop("inner_edge")
-    assert 'inner_edge' in edge_attr
+    assert "inner_edge" in edge_attr
 
     if not store_eids:
         assert dgl.EID in edge_attr
         edge_attr.pop(dgl.EID)
 
     if not store_inner_node:
-        assert 'inner_node' in node_attr
+        assert "inner_node" in node_attr
         node_attr.pop("inner_node")
     return edge_attr, node_attr
 
@@ -683,8 +683,8 @@ def create_graph_object(
             id_map,
             inner_nodes,
         )
-        for (attr_name,node_attributes) in ndata.items():
-            part_graph.ndata[attr_name]=node_attributes
+        for attr_name, node_attributes in ndata.items():
+            part_graph.ndata[attr_name] = node_attributes
 
         # get the original node ids and edge ids from original graph.
         orig_nids, orig_eids = _graph_orig_ids(

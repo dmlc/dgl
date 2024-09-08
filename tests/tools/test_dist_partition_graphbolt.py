@@ -4,9 +4,7 @@ import tempfile
 
 import dgl
 import dgl.backend as F
-import sys
 import dgl.graphbolt as gb
-sys.path.append('/home/ubuntu/workspace/dgl/tools')
 
 import numpy as np
 import pyarrow.parquet as pq
@@ -21,8 +19,6 @@ from dgl.distributed.partition import (
     load_partition,
     RESERVED_FIELD_DTYPE,
 )
-
-
 
 from distpartitioning import array_readwriter
 from distpartitioning.utils import generate_read_list
@@ -472,7 +468,7 @@ def _verify_shuffled_labels_gb(
     assert np.all(orig_labels == F.asnumpy(nlabel))
     assert np.all(orig_edata == F.asnumpy(edata))
 
-        
+
 def verify_graph_feats_gb(
     g,
     gpbs,
@@ -647,6 +643,7 @@ def _verify_graphbolt_part(
 
     return parts
 
+
 def _test_pipeline_graphbolt(
     num_chunks,
     num_parts,
@@ -677,8 +674,8 @@ def _test_pipeline_graphbolt(
             num_chunks_edge_data=num_chunks_edge_data,
         )
         graph_name = "test"
-        test_ntype='paper'
-        test_etype=("paper", "cites", "paper")
+        test_ntype = "paper"
+        test_etype = ("paper", "cites", "paper")
 
         # Step1: graph partition
         in_dir = os.path.join(root_dir, "chunked-data")
@@ -725,7 +722,9 @@ def _test_pipeline_graphbolt(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = "/opt/conda/envs/pytorch/bin/python tools/verify_partitions.py "
+            cmd = (
+                "/opt/conda/envs/pytorch/bin/python tools/verify_partitions.py "
+            )
             cmd += f" --orig-dataset-dir {in_dir}"
             cmd += f" --part-graph {out_dir}"
             cmd += f" --partitions-dir {output_dir}"
@@ -748,10 +747,10 @@ def _test_pipeline_graphbolt(
         orig_nids = read_orig_ids("orig_nids.dgl")
         orig_eids_str = read_orig_ids("orig_eids.dgl")
 
-        orig_eids={}
+        orig_eids = {}
         # transmit etype from string to tuple.
-        for etype,eids in orig_eids_str.items():
-            orig_eids[_etype_str_to_tuple(etype)]=eids
+        for etype, eids in orig_eids_str.items():
+            orig_eids[_etype_str_to_tuple(etype)] = eids
 
         # load partitions and verify
         part_config = os.path.join(out_dir, "metadata.json")
@@ -775,18 +774,17 @@ def _test_pipeline_graphbolt(
         #     part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
         #         part_config, i, use_graphbolt=True
         #     )
-            # verify_partition_data_types(part_g, use_graphbolt=True)
-            # verify_graph_feats(
-            #     g,
-            #     gpb,
-            #     part_g,
-            #     node_feats,
-            #     edge_feats,
-            #     orig_nids,
-            #     orig_eids,
-            #     use_graphbolt=True,
-            # )
-            
+        # verify_partition_data_types(part_g, use_graphbolt=True)
+        # verify_graph_feats(
+        #     g,
+        #     gpb,
+        #     part_g,
+        #     node_feats,
+        #     edge_feats,
+        #     orig_nids,
+        #     orig_eids,
+        #     use_graphbolt=True,
+        # )
 
 
 @pytest.mark.parametrize(
@@ -844,6 +842,3 @@ def test_pipeline_arbitrary_chunks(
 @pytest.mark.parametrize("data_fmt", ["numpy", "parquet"])
 def test_pipeline_feature_format(data_fmt):
     _test_pipeline_graphbolt(4, 4, 4, data_fmt=data_fmt)
-
-if __name__ == '__main__':
-    test_pipeline_basics(4,4,4)

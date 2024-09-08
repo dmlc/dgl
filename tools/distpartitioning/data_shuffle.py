@@ -1337,7 +1337,7 @@ def gen_dist_partitions(rank, world_size, params):
             return_orig_nids=params.save_orig_nids,
             return_orig_eids=params.save_orig_eids,
             use_graphbolt=params.use_graphbolt,
-            store_inner_node=params.store_inner_node, 
+            store_inner_node=params.store_inner_node,
             store_inner_edge=params.store_inner_edge,
             store_eids=params.store_eids,
         )
