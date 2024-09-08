@@ -56,20 +56,22 @@ namespace sampling {
  *   torch::Tensor compacted_src_ids = std::get<1>(result);
  *   torch::Tensor compacted_dst_ids = std::get<2>(result);
  */
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+UniqueAndCompact(
     const torch::Tensor& src_ids, const torch::Tensor& dst_ids,
     const torch::Tensor unique_dst_ids, const int64_t rank,
     const int64_t world_size);
 
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor> unique_dst_ids, const int64_t rank,
     const int64_t world_size);
 
-c10::intrusive_ptr<Future<
-    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+c10::intrusive_ptr<Future<std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>>
 UniqueAndCompactBatchedAsync(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,

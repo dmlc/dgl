@@ -14,7 +14,8 @@
 
 namespace graphbolt {
 namespace sampling {
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+UniqueAndCompact(
     const torch::Tensor& src_ids, const torch::Tensor& dst_ids,
     const torch::Tensor unique_dst_ids, const int64_t rank,
     const int64_t world_size) {
@@ -31,16 +32,20 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
       "Cooperative Minibatching (arXiv:2310.12403) is supported only on GPUs.");
   auto num_dst = unique_dst_ids.size(0);
   torch::Tensor ids = torch::cat({unique_dst_ids, src_ids});
-  return AT_DISPATCH_INDEX_TYPES(
+  auto [unique_ids, compacted_src, compacted_dst] = AT_DISPATCH_INDEX_TYPES(
       ids.scalar_type(), "unique_and_compact", ([&] {
         ConcurrentIdHashMap<index_t> id_map(ids, num_dst);
         return std::make_tuple(
             id_map.GetUniqueIds(), id_map.MapIds(src_ids),
             id_map.MapIds(dst_ids));
       }));
+  auto offsets = torch::zeros(2, c10::TensorOptions().dtype(torch::kInt64));
+  offsets.data_ptr<int64_t>()[1] = unique_ids.size(0);
+  return {unique_ids, compacted_src, compacted_dst, offsets};
 }
 
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
@@ -64,7 +69,9 @@ UniqueAndCompactBatched(
               src_ids, dst_ids, unique_dst_ids, rank, world_size);
         });
   }
-  std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> results;
+  std::vector<
+      std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
+      results;
   results.reserve(src_ids.size());
   for (std::size_t i = 0; i < src_ids.size(); i++) {
     results.emplace_back(UniqueAndCompact(
@@ -73,8 +80,8 @@ UniqueAndCompactBatched(
   return results;
 }
 
-c10::intrusive_ptr<Future<
-    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+c10::intrusive_ptr<Future<std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>>
 UniqueAndCompactBatchedAsync(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
