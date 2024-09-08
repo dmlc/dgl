@@ -254,6 +254,7 @@ def _create_edge_attr_gb(
         type_per_edge,
         edge_attr["inner_edge"],
     ) = _create_edge_data(edgeid_offset, etype_ids, num_edges)
+    assert 'inner_edge' in edge_attr
 
     is_homo = _is_homogeneous(ntypes, etypes)
 
@@ -302,12 +303,16 @@ def remove_attr_gb(
     edge_attr, node_attr, store_inner_node, store_inner_edge, store_eids
 ):
     if not store_inner_edge:
+        assert 'inner_edge' in edge_attr
         edge_attr.pop("inner_edge")
+    assert 'inner_edge' in edge_attr
 
     if not store_eids:
+        assert dgl.EID in edge_attr
         edge_attr.pop(dgl.EID)
 
     if not store_inner_node:
+        assert 'inner_node' in node_attr
         node_attr.pop("inner_node")
     return edge_attr, node_attr
 
@@ -634,15 +639,18 @@ def create_graph_object(
         indptr, indices, csc_edge_ids = _coo2csc(
             part_local_src_id, part_local_dst_id
         )
+        edge_attr = {
+            attr: edge_attr[attr][csc_edge_ids] for attr in edge_attr.keys()
+        }
         part_graph = gb.fused_csc_sampling_graph(
             csc_indptr=indptr,
             indices=indices,
             node_type_offset=None,
             type_per_edge=type_per_edge[csc_edge_ids],
             node_attributes=node_attr,
-            edge_attributes=edge_attr[csc_edge_ids],
+            edge_attributes=edge_attr,
             node_type_to_id=ntypes_map,
-            edge_type_to_id=edge_type_to_id[csc_edge_ids],
+            edge_type_to_id=edge_type_to_id,
         )
         return (
             part_graph,
@@ -665,7 +673,7 @@ def create_graph_object(
             part_graph.edata["inner_edge"],
         ) = _create_edge_data(edgeid_offset, etype_ids, num_edges)
 
-        part_graph.ndata, per_type_ids = _create_node_attr(
+        ndata, per_type_ids = _create_node_attr(
             idx,
             global_src_id,
             global_dst_id,
@@ -675,6 +683,8 @@ def create_graph_object(
             id_map,
             inner_nodes,
         )
+        for (attr_name,node_attributes) in ndata.items():
+            part_graph.ndata[attr_name]=node_attributes
 
         # get the original node ids and edge ids from original graph.
         orig_nids, orig_eids = _graph_orig_ids(
