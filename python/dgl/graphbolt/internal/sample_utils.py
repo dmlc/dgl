@@ -68,7 +68,7 @@ def unique_and_compact(
     is_heterogeneous = isinstance(nodes, dict)
 
     if not is_heterogeneous:
-        homo_ntype = 'a'
+        homo_ntype = "a"
         nodes = {homo_ntype: nodes}
 
     nums = {}
@@ -110,7 +110,11 @@ def unique_and_compact(
             if is_heterogeneous:
                 return unique, compacted, offsets
             else:
-                return unique[homo_ntype], compacted[homo_ntype], offsets[homo_ntype]
+                return (
+                    unique[homo_ntype],
+                    compacted[homo_ntype],
+                    offsets[homo_ntype],
+                )
 
     post_processer = _Waiter(results, nodes.keys(), nums)
     if async_op:
