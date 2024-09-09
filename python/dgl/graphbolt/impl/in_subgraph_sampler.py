@@ -74,6 +74,7 @@ class InSubgraphSampler(SubgraphSampler):
         (
             original_row_node_ids,
             compacted_csc_formats,
+            _,
         ) = unique_and_compact_csc_formats(subgraph.sampled_csc, seeds)
         subgraph = SampledSubgraphImpl(
             sampled_csc=compacted_csc_formats,

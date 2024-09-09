@@ -38,7 +38,7 @@ namespace sampling {
  * @param rank            The rank of the current GPU.
  * @param world_size      The total # GPUs, world size.
  *
- * @return
+ * @return (unique_ids, compacted_src_ids, compacted_dst_ids, unique_offsets)
  * - A tensor representing all unique elements in 'src_ids' and 'dst_ids' after
  * removing duplicates. The indices in this tensor precisely match the compacted
  * IDs of the corresponding elements.
@@ -46,6 +46,9 @@ namespace sampling {
  * mapped to compacted IDs.
  * - The tensor corresponding to the 'dst_ids' tensor, where the entries are
  * mapped to compacted IDs.
+ * - The tensor corresponding to the offsets into the unique_ids tensor. Has
+ * size `world_size + 1` and unique_ids[offsets[i]: offsets[i + 1]] belongs to
+ * the rank `(rank + i) % world_size`.
  *
  * @example
  *   torch::Tensor src_ids = src
@@ -56,20 +59,22 @@ namespace sampling {
  *   torch::Tensor compacted_src_ids = std::get<1>(result);
  *   torch::Tensor compacted_dst_ids = std::get<2>(result);
  */
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+UniqueAndCompact(
     const torch::Tensor& src_ids, const torch::Tensor& dst_ids,
     const torch::Tensor unique_dst_ids, const int64_t rank,
     const int64_t world_size);
 
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
     const std::vector<torch::Tensor> unique_dst_ids, const int64_t rank,
     const int64_t world_size);
 
-c10::intrusive_ptr<Future<
-    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+c10::intrusive_ptr<Future<std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>>
 UniqueAndCompactBatchedAsync(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
