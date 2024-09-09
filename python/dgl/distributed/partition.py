@@ -1397,8 +1397,7 @@ def partition_graph(
         for part_id, part in parts.items():
             part_dir = os.path.join(out_path, "part" + str(part_id))
             part_graph_file = os.path.join(part_dir, "graph.dgl")
-            part_metadata[
-                "part-{}".format(part_id)][
+            part_metadata["part-{}".format(part_id)][
                     "part_graph"
                 ] = os.path.relpath(part_graph_file, out_path)
             # save DGLGraph
@@ -1708,6 +1707,33 @@ def convert_partition_to_graphbolt_multi_process(
     store_inner_node,
     store_inner_edge,
 ):
+    """
+    Convert signle partition to graphbolt, which is used for multiple process.
+    Parameters
+    ----------
+    part_config : str
+        The path of the partition config file.
+    part_id : int
+        The partition ID.
+    graph_formats : str or list[str], optional
+        Save partitions in specified formats. It could be any combination of
+        `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
+        it is not necessary to specify this argument. It's mainly for
+        specifying `coo` format to save edge ID mapping and destination node
+        IDs. If not specified, whether to save `coo` format is determined by
+        the availability of the format in DGL partitions. Default: None.
+    store_eids : bool, optional
+        Whether to store edge IDs in the new graph. Default: True.
+    store_inner_node : bool, optional
+        Whether to store inner node mask in the new graph. Default: False.
+    store_inner_edge : bool, optional
+        Whether to store inner edge mask in the new graph. Default: False.
+
+    Returns
+    -------
+    str
+        The path csc_graph to save.
+    """
     gpb, _, ntypes, etypes = load_partition_book(
         part_config=part_config, part_id=part_id
     )
