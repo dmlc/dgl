@@ -1314,9 +1314,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
-                        F.gather_row(g.edges[etype].data[name], local_edges)
-                    )
+                    edge_feats[
+                        _etype_tuple_to_str(etype) + "/" + name
+                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1351,9 +1351,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
-                        F.gather_row(g.edges[etype].data[name], local_edges)
-                    )
+                    edge_feats[
+                        _etype_tuple_to_str(etype) + "/" + name
+                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1372,22 +1372,35 @@ def partition_graph(
         }
         sort_etypes = len(g.etypes) > 1
         part = _process_partitions(part, graph_formats, sort_etypes)
-        if use_graphbolt:
-            # save FusedCSCSamplingGraph
-            kwargs["graph_formats"] = graph_formats
-            kwargs.pop("n_jobs", None)
-            _partition_to_graphbolt(
-                part_i=part_id,
-                part_config=part_config,
-                part_metadata=part_metadata,
-                parts=parts,
-                **kwargs,
-            )
-        else:
+
+    # transmit to graphbolt and save graph
+    if use_graphbolt:
+        # save FusedCSCSamplingGraph
+        kwargs["graph_formats"] = graph_formats
+        n_jobs = kwargs.pop("n_jobs", 1)
+        mp_ctx = mp.get_context("spawn")
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=min(num_parts, n_jobs),
+            mp_context=mp_ctx,
+        ) as executor:
+            for part_id in range(num_parts):
+                executor.submit(
+                    _partition_to_graphbolt(
+                        part_i=part_id,
+                        part_config=part_config,
+                        part_metadata=part_metadata,
+                        parts=parts,
+                        **kwargs,
+                    )
+                )
+    else:
+        for part_id, part in parts.items():
+            part_dir = os.path.join(out_path, "part" + str(part_id))
             part_graph_file = os.path.join(part_dir, "graph.dgl")
-            part_metadata["part-{}".format(part_id)]["part_graph"] = (
-                os.path.relpath(part_graph_file, out_path)
-            )
+            part_metadata[
+                "part-{}".format(part_id)][
+                    "part_graph"
+                ] = os.path.relpath(part_graph_file, out_path)
             # save DGLGraph
             _save_dgl_graphs(
                 part_graph_file,
