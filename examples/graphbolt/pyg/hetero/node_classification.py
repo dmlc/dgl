@@ -58,12 +58,12 @@ def create_dataloader(
         datapipe = datapipe.copy_to(device=device)
         need_copy = False
 
+    node_feature_keys = {"paper": ["feat"], "author": ["feat"]}
     if args.dataset == "ogb-lsc-mag240m":
-        node_feature_keys = {
-            "paper": ["feat"],
-            "author": ["feat"],
-            "institution": ["feat"],
-        }
+        node_feature_keys["institution"] = ["feat"]
+    if "igb-het" in args.dataset:
+        node_feature_keys["institute"] = ["feat"]
+        node_feature_keys["fos"] = ["feat"]
     # Fetch node features for the sampled subgraph.
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
 
@@ -335,8 +335,13 @@ def parse_args():
         "--dataset",
         type=str,
         default="ogb-lsc-mag240m",
-        choices=["ogb-lsc-mag240m"],
-        help="Dataset name. Possible values: ogb-lsc-mag240m",
+        choices=[
+            "ogb-lsc-mag240m",
+            "igb-het-tiny",
+            "igb-het-small",
+            "igb-het-medium",
+        ],
+        help="Dataset name. Possible values: ogb-lsc-mag240m, igb-het-[tiny|small|medium].",
     )
     parser.add_argument(
         "--fanout",

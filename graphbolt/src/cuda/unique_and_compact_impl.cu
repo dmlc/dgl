@@ -272,7 +272,8 @@ UniqueAndCompactBatchedSortBased(
       }));
 }
 
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
@@ -282,15 +283,8 @@ UniqueAndCompactBatched(
     // Utilizes a hash table based implementation, the mapped id of a vertex
     // will be monotonically increasing as the first occurrence index of it in
     // torch.cat([unique_dst_ids, src_ids]). Thus, it is deterministic.
-    auto results4 = UniqueAndCompactBatchedHashMapBased(
+    return UniqueAndCompactBatchedHashMapBased(
         src_ids, dst_ids, unique_dst_ids, rank, world_size);
-    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
-        results3;
-    // TODO @mfbalin: expose the `d` result in a later PR.
-    for (const auto& [a, b, c, d] : results4) {
-      results3.emplace_back(a, b, c);
-    }
-    return results3;
   }
   TORCH_CHECK(
       world_size <= 1,
@@ -299,10 +293,25 @@ UniqueAndCompactBatched(
   // Utilizes a sort based algorithm, the mapped id of a vertex part of the
   // src_ids but not part of the unique_dst_ids will be monotonically increasing
   // as the actual vertex id increases. Thus, it is deterministic.
-  return UniqueAndCompactBatchedSortBased(src_ids, dst_ids, unique_dst_ids);
+  auto results3 =
+      UniqueAndCompactBatchedSortBased(src_ids, dst_ids, unique_dst_ids);
+  std::vector<
+      std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
+      results4;
+  auto offsets = torch::zeros(
+      2 * results3.size(),
+      c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
+  for (const auto& [a, b, c] : results3) {
+    auto d = offsets.slice(0, 0, 2);
+    d.data_ptr<int64_t>()[1] = a.size(0);
+    results4.emplace_back(a, b, c, d);
+    offsets = offsets.slice(0, 2);
+  }
+  return results4;
 }
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
     const torch::Tensor unique_dst_ids, const int64_t rank,
     const int64_t world_size) {

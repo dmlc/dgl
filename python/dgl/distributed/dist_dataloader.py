@@ -9,7 +9,13 @@ from ..base import EID, NID
 from ..convert import heterograph
 from .dist_context import get_sampler_pool
 
-__all__ = ["DistDataLoader", "DistNodeDataLoader", "DistEdgeDataLoader"]
+__all__ = [
+    "NodeCollator",
+    "EdgeCollator",
+    "DistDataLoader",
+    "DistNodeDataLoader",
+    "DistEdgeDataLoader",
+]
 
 DATALOADER_ID = 0
 
@@ -372,7 +378,10 @@ class NodeCollator(Collator):
         self._dataset = utils.maybe_flatten_dict(self.nids)
 
         # Add prob/mask into graphbolt partition's edge attributes if needed.
-        Collator.add_edge_attribute_to_graph(self.g, self.graph_sampler.prob)
+        if hasattr(self.graph_sampler, "prob"):
+            Collator.add_edge_attribute_to_graph(
+                self.g, self.graph_sampler.prob
+            )
 
     @property
     def dataset(self):
@@ -631,7 +640,10 @@ class EdgeCollator(Collator):
         self._dataset = utils.maybe_flatten_dict(self.eids)
 
         # Add prob/mask into graphbolt partition's edge attributes if needed.
-        Collator.add_edge_attribute_to_graph(self.g, self.graph_sampler.prob)
+        if hasattr(self.graph_sampler, "prob"):
+            Collator.add_edge_attribute_to_graph(
+                self.g, self.graph_sampler.prob
+            )
 
     @property
     def dataset(self):

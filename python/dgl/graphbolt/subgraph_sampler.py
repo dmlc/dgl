@@ -163,7 +163,7 @@ class SubgraphSampler(MiniBatchTransformer):
                     compacted,
                 ) = compact_temporal_nodes(nodes, nodes_timestamp)
             else:
-                unique_seeds, compacted = unique_and_compact(nodes)
+                unique_seeds, compacted, _ = unique_and_compact(nodes)
                 nodes_timestamp = None
             compacted_seeds = {}
             # Map back in same order as collect.
@@ -212,7 +212,7 @@ class SubgraphSampler(MiniBatchTransformer):
                     compacted,
                 ) = compact_temporal_nodes(nodes, nodes_timestamp)
             else:
-                unique_seeds, compacted = unique_and_compact(nodes)
+                unique_seeds, compacted, _ = unique_and_compact(nodes)
                 nodes_timestamp = None
             # Map back in same order as collect.
             compacted_seeds = compacted[0].view(seeds.shape)
