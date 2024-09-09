@@ -1,4 +1,5 @@
 """Launching distributed graph partitioning pipeline """
+
 import argparse
 import json
 import logging
@@ -75,6 +76,10 @@ def submit_jobs(args) -> str:
     argslist += "--log-level {} ".format(args.log_level)
     argslist += "--save-orig-nids " if args.save_orig_nids else ""
     argslist += "--save-orig-eids " if args.save_orig_eids else ""
+    argslist += "--use-graphbolt " if args.use_graphbolt else ""
+    argslist += "--store-inner-edge " if args.store_inner_edge else ""
+    argslist += "--store-inner-node " if args.store_inner_node else ""
+    argslist += "--store-eids " if args.store_eids else ""
     argslist += (
         f"--graph-formats {args.graph_formats} " if args.graph_formats else ""
     )
@@ -86,7 +91,6 @@ def submit_jobs(args) -> str:
     launch_cmd = get_launch_cmd(args)
     launch_cmd += '"' + udf_cmd + '"'
 
-    print(launch_cmd)
     os.system(launch_cmd)
 
 
@@ -160,6 +164,31 @@ def main():
         help="Save original edge IDs into files",
     )
     parser.add_argument(
+        "--use-graphbolt",
+        action="store_true",
+        help="Use GraphBolt for distributed train.",
+    )
+    parser.add_argument(
+        "--store-inner-node",
+        action="store_true",
+        default=False,
+        help="Store inner nodes.",
+    )
+
+    parser.add_argument(
+        "--store-inner-edge",
+        action="store_true",
+        default=False,
+        help="Store inner edges.",
+    )
+
+    parser.add_argument(
+        "--store-eids",
+        action="store_true",
+        default=False,
+        help="Store edge IDs.",
+    )
+    parser.add_argument(
         "--graph-formats",
         type=str,
         default=None,
@@ -170,7 +199,7 @@ def main():
     )
 
     args, _ = parser.parse_known_args()
-
+    assert args.store_inner_edge is True
     fmt = "%(asctime)s %(levelname)s %(message)s"
     logging.basicConfig(
         format=fmt,

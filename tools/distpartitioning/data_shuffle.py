@@ -13,7 +13,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from convert_partition import create_dgl_object, create_metadata_json
+from convert_partition import create_graph_object, create_metadata_json
 from dataset_utils import get_dataset
 from dist_lookup import DistLookupService
 from globalids import (
@@ -1323,7 +1323,7 @@ def gen_dist_partitions(rank, world_size, params):
             etypes_map,
             orig_nids,
             orig_eids,
-        ) = create_dgl_object(
+        ) = create_graph_object(
             schema_map,
             rank + local_part_id * world_size,
             local_node_data,
@@ -1334,8 +1334,12 @@ def gen_dist_partitions(rank, world_size, params):
                 schema_map[constants.STR_NUM_NODES_PER_TYPE],
             ),
             edge_typecounts,
-            params.save_orig_nids,
-            params.save_orig_eids,
+            return_orig_nids=params.save_orig_nids,
+            return_orig_eids=params.save_orig_eids,
+            use_graphbolt=params.use_graphbolt,
+            store_inner_node=params.store_inner_node,
+            store_inner_edge=params.store_inner_edge,
+            store_eids=params.store_eids,
         )
         sort_etypes = len(etypes_map) > 1
         local_node_features = prepare_local_data(
@@ -1354,8 +1358,12 @@ def gen_dist_partitions(rank, world_size, params):
             orig_eids,
             graph_formats,
             sort_etypes,
+            params.use_graphbolt,
         )
-        memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
+        if params.use_graphbolt:
+            memory_snapshot("DiskWriteGrapgboltObjectsComplete: ", rank)
+        else:
+            memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
         # get the meta-data
         json_metadata = create_metadata_json(
@@ -1369,6 +1377,7 @@ def gen_dist_partitions(rank, world_size, params):
             ntypes_map,
             etypes_map,
             params.output,
+            params.use_graphbolt,
         )
         output_meta_json[
             "local-part-id-" + str(local_part_id * world_size + rank)
