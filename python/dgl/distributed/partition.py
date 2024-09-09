@@ -667,7 +667,7 @@ def _set_trainer_ids(g, sim_g, node_parts):
 
 
 def _update_node_edge_map(node_map_val, edge_map_val, g, num_parts):
-    '''
+    """
     If the original graph contains few nodes or edges for specific node/edge
     types, the partitioned graph may have empty partitions for these types. And
     the node_map_val and edge_map_val will have -1 for the start and end ID of
@@ -696,7 +696,7 @@ def _update_node_edge_map(node_map_val, edge_map_val, g, num_parts):
     | 1                      |  3, 3  |  3, 4   |  4, 5  |
     | 2                      |  5, 6  |  7, 8   |  8, 8  |
 
-    '''
+    """
     # Update the node_map_val to be contiguous.
     ntype_ids = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
     ntype_ids_reverse = {v: k for k, v in ntype_ids.items()}
