@@ -667,6 +667,36 @@ def _set_trainer_ids(g, sim_g, node_parts):
 
 
 def _update_node_edge_map(node_map_val, edge_map_val, g, num_parts):
+    """
+    If the original graph contains few nodes or edges for specific node/edge
+    types, the partitioned graph may have empty partitions for these types. And
+    the node_map_val and edge_map_val will have -1 for the start and end ID of
+    these types. This function updates the node_map_val and edge_map_val to be
+    contiguous.
+
+    Example case:
+    Suppose we have a heterogeneous graph with 3 node/edge types and the number
+    of partitions is 3. A possible node_map_val or edge_map_val is as follows:
+
+    | part_id\Node/Edge Type | Type A |  Type B | Type C |
+    |------------------------|--------|---------|--------|
+    | 0                      | 0, 1   |  -1, -1 |  2, 3  |
+    | 1                      | -1, -1 |  3, 4   |  4, 5  |
+    | 2                      | 5, 6   |  7, 8   |  -1, -1|
+
+    As node/edge IDs are contiguous in node/edge type for each partition, we can
+    update the node_map_val and edge_map_val via updating the start and end ID
+    in row-wise order.
+
+    Updated node_map_val or edge_map_val:
+
+    | part_id\Node/Edge Type | Type A |  Type B | Type C |
+    |------------------------|--------|---------|--------|
+    | 0                      |  0, 1  |  1, 1   |  2, 3  |
+    | 1                      |  3, 3  |  3, 4   |  4, 5  |
+    | 2                      |  5, 6  |  7, 8   |  8, 8  |
+
+    """
     # Update the node_map_val to be contiguous.
     ntype_ids = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
     ntype_ids_reverse = {v: k for k, v in ntype_ids.items()}
@@ -1141,7 +1171,7 @@ def partition_graph(
             for ntype in g.ntypes:
                 inner_ntype_mask = inner_ntype == g.get_ntype_id(ntype)
                 if F.sum(F.astype(inner_ntype_mask, F.int64), 0) == 0:
-                    # Skip if there is no node of this type.
+                    # Skip if there is no node of this type in this partition.
                     continue
                 typed_nids = F.boolean_mask(inner_nids, inner_ntype_mask)
                 # inner node IDs are in a contiguous ID range.
@@ -1160,7 +1190,7 @@ def partition_graph(
             for etype in g.canonical_etypes:
                 inner_etype_mask = inner_etype == g.get_etype_id(etype)
                 if F.sum(F.astype(inner_etype_mask, F.int64), 0) == 0:
-                    # Skip if there is no edge of this type.
+                    # Skip if there is no edge of this type in this partition.
                     continue
                 typed_eids = np.sort(
                     F.asnumpy(F.boolean_mask(inner_eids, inner_etype_mask))
