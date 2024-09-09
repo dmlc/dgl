@@ -471,6 +471,7 @@ class CompactPerLayer(MiniBatchTransformer):
             (
                 original_row_node_ids,
                 compacted_csc_format,
+                _,
             ) = unique_and_compact_csc_formats(subgraph.sampled_csc, seeds)
             subgraph = SampledSubgraphImpl(
                 sampled_csc=compacted_csc_format,
@@ -506,7 +507,11 @@ class CompactPerLayer(MiniBatchTransformer):
     def _compact_per_layer_wait_future(minibatch):
         subgraph = minibatch.sampled_subgraphs[0]
         seeds = minibatch._seed_nodes
-        original_row_node_ids, compacted_csc_format = minibatch._future.wait()
+        (
+            original_row_node_ids,
+            compacted_csc_format,
+            _,
+        ) = minibatch._future.wait()
         delattr(minibatch, "_future")
         subgraph = SampledSubgraphImpl(
             sampled_csc=compacted_csc_format,

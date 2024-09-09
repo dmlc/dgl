@@ -51,13 +51,14 @@ TORCH_LIBRARY(graphbolt, m) {
   m.class_<Future<c10::intrusive_ptr<FusedSampledSubgraph>>>(
        "FusedSampledSubgraphFuture")
       .def("wait", &Future<c10::intrusive_ptr<FusedSampledSubgraph>>::Wait);
-  m.class_<Future<
-      std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>(
+  m.class_<Future<std::vector<
+      std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>>(
        "UniqueAndCompactBatchedFuture")
       .def(
           "wait",
-          &Future<std::vector<
-              std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>::Wait);
+          &Future<std::vector<std::tuple<
+              torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>::
+              Wait);
   m.class_<Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>(
        "GpuGraphCacheQueryFuture")
       .def(
