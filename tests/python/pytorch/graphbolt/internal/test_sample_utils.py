@@ -50,7 +50,7 @@ def test_unique_and_compact_hetero():
         ],
     }
 
-    unique, compacted = gb.unique_and_compact(nodes_dict)
+    unique, compacted, _ = gb.unique_and_compact(nodes_dict)
     for ntype, nodes in unique.items():
         expected_nodes = expected_unique[ntype]
         assert torch.equal(nodes, expected_nodes)
@@ -84,7 +84,7 @@ def test_unique_and_compact_homo():
         torch.tensor([7, 8, 9, 0, 5], device=F.ctx()),
     ]
 
-    unique, compacted = gb.unique_and_compact(nodes_list)
+    unique, compacted, _ = gb.unique_and_compact(nodes_list)
 
     assert torch.equal(unique, expected_unique_N)
     assert isinstance(compacted, list)
@@ -133,7 +133,7 @@ def test_unique_and_compact_csc_formats_hetero():
         ),
     }
 
-    unique_nodes, compacted_csc_formats = gb.unique_and_compact_csc_formats(
+    unique_nodes, compacted_csc_formats, _ = gb.unique_and_compact_csc_formats(
         csc_formats, dst_nodes
     )
 
@@ -159,7 +159,7 @@ def test_unique_and_compact_csc_formats_homo():
     expected_indptr = indptr
     expected_indices = torch.tensor([3, 1, 0, 5, 2, 3, 2, 0, 5, 5, 4])
 
-    unique_nodes, compacted_csc_formats = gb.unique_and_compact_csc_formats(
+    unique_nodes, compacted_csc_formats, _ = gb.unique_and_compact_csc_formats(
         csc_formats, seeds
     )
 
