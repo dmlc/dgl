@@ -75,7 +75,7 @@ class SubgraphSampler(MiniBatchTransformer):
         return minibatch
 
     @staticmethod
-    def _preprocess(minibatch, async_op: bool = False):
+    def _preprocess(minibatch, async_op: bool):
         if minibatch.seeds is None:
             raise ValueError(
                 f"Invalid minibatch {minibatch}: `seeds` should have a value."
