@@ -131,7 +131,8 @@ def _verify_hetero_graph_node_edge_num(
             else part.edata
         )
         if dgl.ETYPE in edata:
-            assert len(g.canonical_etypes) == len(F.unique(edata[dgl.ETYPE]))
+            # edata may not contain all edge types.
+            assert len(g.canonical_etypes) >= len(F.unique(edata[dgl.ETYPE]))
         if debug_mode or isinstance(part, dgl.DGLGraph):
             for ntype in g.ntypes:
                 ntype_id = g.get_ntype_id(ntype)
@@ -516,6 +517,8 @@ def check_hetero_partition(
             gpb.map_to_per_etype(F.tensor([0], F.int32))
         # These are original per-type IDs.
         for etype_id, etype in enumerate(hg.canonical_etypes):
+            if F.sum((etype_ids == etype_id), 0) == 0:
+                continue
             part_src_ids1 = F.boolean_mask(part_src_ids, etype_ids == etype_id)
             src_ntype_ids1 = F.boolean_mask(
                 src_ntype_ids, etype_ids == etype_id
@@ -2160,3 +2163,76 @@ def test_partition_graph_graphbolt_hetero_find_edges_multi(
         graph_formats="coo",
         n_jobs=4,
     )
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [4])
+@pytest.mark.parametrize("num_trainers_per_machine", [1])
+@pytest.mark.parametrize("graph_formats", [None])
+def test_partition_hetero_few_edges(
+    part_method,
+    num_parts,
+    num_trainers_per_machine,
+    graph_formats,
+):
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    if part_method == "random" and num_parts > 1:
+        num_trainers_per_machine = 1
+
+    # Create a heterograph with 2 edges for one edge type.
+    hg = create_random_hetero()
+    edges_coo = {
+        c_etype: hg.edges(etype=c_etype) for c_etype in hg.canonical_etypes
+    }
+    edges_coo[("n1", "a0", "n2")] = (th.tensor([0, 1]), th.tensor([1, 0]))
+    edges_coo[("n1", "a1", "n3")] = (th.tensor([0, 1]), th.tensor([1, 0]))
+    hg = dgl.heterograph(edges_coo)
+
+    check_hetero_partition(
+        hg,
+        part_method,
+        num_parts,
+        num_trainers_per_machine,
+        load_feats=False,
+        graph_formats=graph_formats,
+    )
+    reset_envs()
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [4])
+@pytest.mark.parametrize("num_trainers_per_machine", [1])
+@pytest.mark.parametrize("graph_formats", [None])
+def test_partition_hetero_few_nodes(
+    part_method,
+    num_parts,
+    num_trainers_per_machine,
+    graph_formats,
+):
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    if part_method == "random" and num_parts > 1:
+        num_trainers_per_machine = 1
+
+    # Create a heterograph with 2 nodes for one node type.
+    hg = create_random_hetero()
+    edges_coo = {
+        c_etype: hg.edges(etype=c_etype) for c_etype in hg.canonical_etypes
+    }
+    edges_coo[("n1", "r_few", "n_few")] = (th.tensor([0, 1]), th.tensor([1, 0]))
+    edges_coo[("a0", "a01", "n_1")] = (th.tensor([0, 1]), th.tensor([1, 0]))
+    hg = dgl.heterograph(edges_coo)
+
+    expected_exception = False
+    try:
+        check_hetero_partition(
+            hg,
+            part_method,
+            num_parts,
+            num_trainers_per_machine,
+            load_feats=False,
+            graph_formats=graph_formats,
+        )
+    except Exception as e:
+        expected_exception = True
+    assert expected_exception == (part_method == "metis")
+    reset_envs()

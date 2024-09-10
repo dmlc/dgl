@@ -702,6 +702,93 @@ def _partition_to_graphbolt(
         part_config=part_config, part_id=part_i, csc_graph=csc_graph
     )
     part_metadata[f"part-{part_i}"]["part_graph_graphbolt"] = rel_path_result
+def _update_node_edge_map(node_map_val, edge_map_val, g, num_parts):
+    """
+    If the original graph contains few nodes or edges for specific node/edge
+    types, the partitioned graph may have empty partitions for these types. And
+    the node_map_val and edge_map_val will have -1 for the start and end ID of
+    these types. This function updates the node_map_val and edge_map_val to be
+    contiguous.
+
+    Example case:
+    Suppose we have a heterogeneous graph with 3 node/edge types and the number
+    of partitions is 3. A possible node_map_val or edge_map_val is as follows:
+
+    | part_id\\Node/Edge Type| Type A |  Type B | Type C |
+    |------------------------|--------|---------|--------|
+    | 0                      | 0, 1   |  -1, -1 |  2, 3  |
+    | 1                      | -1, -1 |  3, 4   |  4, 5  |
+    | 2                      | 5, 6   |  7, 8   |  -1, -1|
+
+    As node/edge IDs are contiguous in node/edge type for each partition, we can
+    update the node_map_val and edge_map_val via updating the start and end ID
+    in row-wise order.
+
+    Updated node_map_val or edge_map_val:
+
+    | part_id\\Node/Edge Type| Type A |  Type B | Type C |
+    |------------------------|--------|---------|--------|
+    | 0                      |  0, 1  |  1, 1   |  2, 3  |
+    | 1                      |  3, 3  |  3, 4   |  4, 5  |
+    | 2                      |  5, 6  |  7, 8   |  8, 8  |
+
+    """
+    # Update the node_map_val to be contiguous.
+    ntype_ids = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
+    ntype_ids_reverse = {v: k for k, v in ntype_ids.items()}
+    for part_id in range(num_parts):
+        for ntype_id in list(ntype_ids.values()):
+            ntype = ntype_ids_reverse[ntype_id]
+            start_id = node_map_val[ntype][part_id][0]
+            end_id = node_map_val[ntype][part_id][1]
+            if not (start_id == -1 and end_id == -1):
+                continue
+            prev_ntype_id = (
+                ntype_ids[ntype] - 1
+                if ntype_ids[ntype] > 0
+                else max(ntype_ids.values())
+            )
+            prev_ntype = ntype_ids_reverse[prev_ntype_id]
+            if ntype_ids[ntype] == 0:
+                if part_id == 0:
+                    node_map_val[ntype][part_id][0] = 0
+                else:
+                    node_map_val[ntype][part_id][0] = node_map_val[prev_ntype][
+                        part_id - 1
+                    ][1]
+            else:
+                node_map_val[ntype][part_id][0] = node_map_val[prev_ntype][
+                    part_id
+                ][1]
+            node_map_val[ntype][part_id][1] = node_map_val[ntype][part_id][0]
+    # Update the edge_map_val to be contiguous.
+    etype_ids = {etype: g.get_etype_id(etype) for etype in g.canonical_etypes}
+    etype_ids_reverse = {v: k for k, v in etype_ids.items()}
+    for part_id in range(num_parts):
+        for etype_id in list(etype_ids.values()):
+            etype = etype_ids_reverse[etype_id]
+            start_id = edge_map_val[etype][part_id][0]
+            end_id = edge_map_val[etype][part_id][1]
+            if not (start_id == -1 and end_id == -1):
+                continue
+            prev_etype_id = (
+                etype_ids[etype] - 1
+                if etype_ids[etype] > 0
+                else max(etype_ids.values())
+            )
+            prev_etype = etype_ids_reverse[prev_etype_id]
+            if etype_ids[etype] == 0:
+                if part_id == 0:
+                    edge_map_val[etype][part_id][0] = 0
+                else:
+                    edge_map_val[etype][part_id][0] = edge_map_val[prev_etype][
+                        part_id - 1
+                    ][1]
+            else:
+                edge_map_val[etype][part_id][0] = edge_map_val[prev_etype][
+                    part_id
+                ][1]
+            edge_map_val[etype][part_id][1] = edge_map_val[etype][part_id][0]
 
 
 def partition_graph(
@@ -1119,6 +1206,9 @@ def partition_graph(
             )
             for ntype in g.ntypes:
                 inner_ntype_mask = inner_ntype == g.get_ntype_id(ntype)
+                if F.sum(F.astype(inner_ntype_mask, F.int64), 0) == 0:
+                    # Skip if there is no node of this type in this partition.
+                    continue
                 typed_nids = F.boolean_mask(inner_nids, inner_ntype_mask)
                 # inner node IDs are in a contiguous ID range.
                 expected_range = np.arange(
@@ -1135,6 +1225,9 @@ def partition_graph(
             )
             for etype in g.canonical_etypes:
                 inner_etype_mask = inner_etype == g.get_etype_id(etype)
+                if F.sum(F.astype(inner_etype_mask, F.int64), 0) == 0:
+                    # Skip if there is no edge of this type in this partition.
+                    continue
                 typed_eids = np.sort(
                     F.asnumpy(F.boolean_mask(inner_eids, inner_etype_mask))
                 )
@@ -1161,6 +1254,9 @@ def partition_graph(
                 val.append(
                     F.as_scalar(F.sum(F.astype(inner_node_mask, F.int64), 0))
                 )
+                if F.sum(F.astype(inner_node_mask, F.int64), 0) == 0:
+                    node_map_val[ntype].append([-1, -1])
+                    continue
                 inner_nids = F.boolean_mask(
                     parts[i].ndata[NID], inner_node_mask
                 )
@@ -1181,6 +1277,9 @@ def partition_graph(
                 val.append(
                     F.as_scalar(F.sum(F.astype(inner_edge_mask, F.int64), 0))
                 )
+                if F.sum(F.astype(inner_edge_mask, F.int64), 0) == 0:
+                    edge_map_val[etype].append([-1, -1])
+                    continue
                 inner_eids = np.sort(
                     F.asnumpy(
                         F.boolean_mask(parts[i].edata[EID], inner_edge_mask)
@@ -1191,6 +1290,8 @@ def partition_graph(
                 )
             val = np.cumsum(val).tolist()
             assert val[-1] == g.num_edges(etype)
+        # Update the node_map_val and edge_map_val to be contiguous.
+        _update_node_edge_map(node_map_val, edge_map_val, g, num_parts)
     else:
         node_map_val = {}
         edge_map_val = {}
