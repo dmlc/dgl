@@ -1896,7 +1896,7 @@ def _convert_partition_to_graphbolt(
         ) as executor:
             for part_id in range(num_parts):
                 rel_path_results.append(
-                    executor.submit(part_id=part_id).result()
+                    executor.submit(convert_with_format, part_id=part_id).result()
                 )
 
     else:
