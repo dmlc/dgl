@@ -1503,6 +1503,7 @@ def partition_graph(
             part_metadata["part-{}".format(part_id)][
                     "part_graph"
                 ] = os.path.relpath(part_graph_file, out_path)
+            
             # save DGLGraph
             _save_dgl_graphs(
                 part_graph_file,
