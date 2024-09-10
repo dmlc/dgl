@@ -1501,8 +1501,8 @@ def partition_graph(
             part_dir = os.path.join(out_path, "part" + str(part_id))
             part_graph_file = os.path.join(part_dir, "graph.dgl")
             part_metadata["part-{}".format(part_id)][
-                    "part_graph"
-                ] = os.path.relpath(part_graph_file, out_path)
+                "part_graph"
+            ] = os.path.relpath(part_graph_file, out_path)
             
             # save DGLGraph
             _save_dgl_graphs(
