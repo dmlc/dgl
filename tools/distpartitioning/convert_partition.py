@@ -1,3 +1,4 @@
+import copy
 import gc
 import logging
 import os
@@ -165,24 +166,22 @@ def _is_homogeneous(ntypes, etypes):
     return len(ntypes) == 1 and len(etypes) == 1
 
 
-def _coo2csc(part_local_src_id, part_local_dst_id):
-    part_local_src_id, part_local_dst_id = th.tensor(
-        part_local_src_id, dtype=th.int64
-    ), th.tensor(part_local_dst_id, dtype=th.int64)
-    num_nodes = th.max(th.cat([part_local_src_id, part_local_dst_id], dim=0))
-    indptr = th.zeros(num_nodes + 2, dtype=th.int64)
-    col_counts = th.bincount(part_local_dst_id, minlength=num_nodes + 1)
-    indptr[1:] = th.cumsum(col_counts, 0)
-    edge_id = th.argsort(part_local_dst_id)
-    indices = part_local_src_id[edge_id]
-    return indptr, indices, edge_id
+def _coo2csc(src_ids, dst_ids):
+    src_ids, dst_ids = th.tensor(src_ids, dtype=th.int64), th.tensor(
+        dst_ids, dtype=th.int64
+    )
+    num_nodes = th.max(th.stack([src_ids, dst_ids], dim=0)).item() + 1
+    dst, idx = dst_ids.sort()
+    indptr = th.searchsorted(dst, th.arange(num_nodes + 1))
+    indices = src_ids[idx]
+    return indptr, indices, idx
 
 
 def _create_edge_data(edgeid_offset, etype_ids, num_edges):
     eid = th.arange(
         edgeid_offset,
         edgeid_offset + num_edges,
-        dtype=th.int64,
+        dtype=RESERVED_FIELD_DTYPE[dgl.EID],
     )
     etype = th.as_tensor(etype_ids, dtype=RESERVED_FIELD_DTYPE[dgl.ETYPE])
     inner_edge = th.ones(num_edges, dtype=RESERVED_FIELD_DTYPE["inner_edge"])
@@ -302,19 +301,19 @@ def _create_node_attr(
 def remove_attr_gb(
     edge_attr, node_attr, store_inner_node, store_inner_edge, store_eids
 ):
+    edata, ndata = copy.deepcopy(edge_attr), copy.deepcopy(node_attr)
     if not store_inner_edge:
-        assert "inner_edge" in edge_attr
-        edge_attr.pop("inner_edge")
-    assert "inner_edge" in edge_attr
+        assert "inner_edge" in edata
+        edata.pop("inner_edge")
 
     if not store_eids:
-        assert dgl.EID in edge_attr
-        edge_attr.pop(dgl.EID)
+        assert dgl.EID in edata
+        edata.pop(dgl.EID)
 
     if not store_inner_node:
-        assert "inner_node" in node_attr
-        node_attr.pop("inner_node")
-    return edge_attr, node_attr
+        assert "inner_node" in ndata
+        ndata.pop("inner_node")
+    return edata, ndata
 
 
 def create_graph_object(
@@ -605,8 +604,18 @@ def create_graph_object(
     )
 
     # create the graph here now.
+    ndata, per_type_ids = _create_node_attr(
+        idx,
+        global_src_id,
+        global_dst_id,
+        global_homo_nid,
+        uniq_ids,
+        reshuffle_nodes,
+        id_map,
+        inner_nodes,
+    )
     if use_graphbolt:
-        edge_attr, type_per_edge, edge_type_to_id = _create_edge_attr_gb(
+        edata, type_per_edge, edge_type_to_id = _create_edge_attr_gb(
             part_local_dst_id,
             edgeid_offset,
             etype_ids,
@@ -614,28 +623,9 @@ def create_graph_object(
             etypes,
             etypes_map,
         )
-        node_attr, per_type_ids = _create_node_attr(
-            idx,
-            global_src_id,
-            global_dst_id,
-            global_homo_nid,
-            uniq_ids,
-            reshuffle_nodes,
-            id_map,
-            inner_nodes,
+        edge_attr, node_attr = remove_attr_gb(
+            edge_attr=edata, node_attr=ndata, **kwargs
         )
-        orig_nids, orig_eids = _graph_orig_ids(
-            return_orig_nids,
-            return_orig_eids,
-            ntypes_map,
-            etypes_map,
-            node_attr,
-            edge_attr,
-            per_type_ids,
-            type_per_edge,
-            global_edge_id,
-        )
-        remove_attr_gb(edge_attr, node_attr, **kwargs)
         indptr, indices, csc_edge_ids = _coo2csc(
             part_local_src_id, part_local_dst_id
         )
@@ -651,15 +641,6 @@ def create_graph_object(
             edge_attributes=edge_attr,
             node_type_to_id=ntypes_map,
             edge_type_to_id=edge_type_to_id,
-        )
-        return (
-            part_graph,
-            node_map_val,
-            edge_map_val,
-            ntypes_map,
-            etypes_map,
-            orig_nids,
-            orig_eids,
         )
     else:
         num_edges = len(part_local_dst_id)
@@ -685,19 +666,20 @@ def create_graph_object(
         )
         for attr_name, node_attributes in ndata.items():
             part_graph.ndata[attr_name] = node_attributes
-
-        # get the original node ids and edge ids from original graph.
-        orig_nids, orig_eids = _graph_orig_ids(
-            return_orig_nids,
-            return_orig_eids,
-            ntypes_map,
-            etypes_map,
-            part_graph.ndata,
-            part_graph.edata,
-            per_type_ids,
-            part_graph.edata[dgl.ETYPE],
-            global_edge_id,
-        )
+        type_per_edge = part_graph.edata[dgl.ETYPE]
+        ndata, edata = part_graph.ndata, part_graph.edata
+    # get the original node ids and edge ids from original graph.
+    orig_nids, orig_eids = _graph_orig_ids(
+        return_orig_nids,
+        return_orig_eids,
+        ntypes_map,
+        etypes_map,
+        ndata,
+        edata,
+        per_type_ids,
+        type_per_edge,
+        global_edge_id,
+    )
     return (
         part_graph,
         node_map_val,

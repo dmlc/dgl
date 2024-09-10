@@ -125,7 +125,6 @@ if __name__ == "__main__":
         help="Save partitions in specified formats.",
     )
     params = parser.parse_args()
-    assert params.use_graphbolt is True
     # invoke the pipeline function
     numeric_level = getattr(logging, params.log_level.upper(), None)
     logging.basicConfig(

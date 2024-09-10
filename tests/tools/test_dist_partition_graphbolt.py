@@ -644,6 +644,183 @@ def _verify_graphbolt_part(
     return parts
 
 
+def _verify_hetero_graph_node_edge_num(
+    g,
+    parts,
+    store_inner_edge,
+    debug_mode,
+):
+    """
+    check list:
+        make sure edge type are correct.
+        make sure the number of nodes in each node type are correct.
+        make sure the number of nodes in each node type are correct.
+    """
+    num_nodes = {ntype: 0 for ntype in g.ntypes}
+    num_edges = {etype: 0 for etype in g.canonical_etypes}
+    for part in parts:
+        edata = (
+            part.edge_attributes
+            if isinstance(part, gb.FusedCSCSamplingGraph)
+            else part.edata
+        )
+        if dgl.ETYPE in edata:
+            assert len(g.canonical_etypes) == len(F.unique(edata[dgl.ETYPE]))
+        if debug_mode or isinstance(part, dgl.DGLGraph):
+            for ntype in g.ntypes:
+                ntype_id = g.get_ntype_id(ntype)
+                inner_node_mask = _get_inner_node_mask(part, ntype_id)
+                num_inner_nodes = F.sum(F.astype(inner_node_mask, F.int64), 0)
+                num_nodes[ntype] += num_inner_nodes
+        if store_inner_edge or isinstance(part, dgl.DGLGraph):
+            for etype in g.canonical_etypes:
+                etype_id = g.get_etype_id(etype)
+                inner_edge_mask = _get_inner_edge_mask(part, etype_id)
+                num_inner_edges = F.sum(F.astype(inner_edge_mask, F.int64), 0)
+                num_edges[etype] += num_inner_edges
+
+    # Verify the number of nodes are correct.
+    if debug_mode or isinstance(part, dgl.DGLGraph):
+        for ntype in g.ntypes:
+            print(
+                "node {}: {}, {}".format(
+                    ntype, g.num_nodes(ntype), num_nodes[ntype]
+                )
+            )
+            assert g.num_nodes(ntype) == num_nodes[ntype]
+    # Verify the number of edges are correct.
+    if store_inner_edge or isinstance(part, dgl.DGLGraph):
+        for etype in g.canonical_etypes:
+            print(
+                "edge {}: {}, {}".format(
+                    etype, g.num_edges(etype), num_edges[etype]
+                )
+            )
+            assert g.num_edges(etype) == num_edges[etype]
+
+
+def _verify_edge_id_range_hetero(
+    g,
+    part,
+    eids,
+):
+    """
+    check list:
+        make sure inner_eids fall into a range.
+        make sure all edges are included.
+    """
+    edata = (
+        part.edge_attributes
+        if isinstance(part, gb.FusedCSCSamplingGraph)
+        else part.edata
+    )
+    etype = (
+        part.type_per_edge
+        if isinstance(part, gb.FusedCSCSamplingGraph)
+        else edata[dgl.ETYPE]
+    )
+    eid = torch.arange(len(edata[dgl.EID]))
+    etype_arr = F.gather_row(etype, eid)
+    eid_arr = F.gather_row(edata[dgl.EID], eid)
+    for etype in g.canonical_etypes:
+        etype_id = g.get_etype_id(etype)
+        eids[etype].append(F.boolean_mask(eid_arr, etype_arr == etype_id))
+        # Make sure edge Ids fall into a range.
+        inner_edge_mask = _get_inner_edge_mask(part, etype_id)
+        inner_eids = np.sort(
+            F.asnumpy(F.boolean_mask(edata[dgl.EID], inner_edge_mask))
+        )
+        assert np.all(
+            inner_eids == np.arange(inner_eids[0], inner_eids[-1] + 1)
+        )
+    return eids
+
+
+def _verify_node_id_range_hetero(g, part, nids):
+    """
+    check list:
+        make sure inner nodes have Ids fall into a range.
+    """
+    for ntype in g.ntypes:
+        ntype_id = g.get_ntype_id(ntype)
+        # Make sure inner nodes have Ids fall into a range.
+        inner_node_mask = _get_inner_node_mask(part, ntype_id)
+        inner_nids = F.boolean_mask(
+            part.node_attributes[dgl.NID], inner_node_mask
+        )
+        assert np.all(
+            F.asnumpy(
+                inner_nids
+                == F.arange(
+                    F.as_scalar(inner_nids[0]),
+                    F.as_scalar(inner_nids[-1]) + 1,
+                )
+            )
+        )
+        nids[ntype].append(inner_nids)
+    return nids
+
+
+def _verify_graph_attributes_hetero(
+    g,
+    parts,
+    store_inner_edge,
+    store_inner_node,
+):
+    """
+    check list:
+        make sure edge ids fall into a range.
+        make sure inner nodes have Ids fall into a range.
+        make sure all nodes is included.
+        make sure all edges is included.
+    """
+    nids = {ntype: [] for ntype in g.ntypes}
+    eids = {etype: [] for etype in g.canonical_etypes}
+    # check edge id.
+    if store_inner_edge or isinstance(parts[0], dgl.DGLGraph):
+        for part in parts:
+            # collect eids
+            eids = _verify_edge_id_range_hetero(g, part, eids)
+        for etype in eids:
+            eids_type = F.cat(eids[etype], 0)
+            uniq_ids = F.unique(eids_type)
+            # We should get all nodes.
+            assert len(uniq_ids) == g.num_edges(etype)
+
+    # check node id.
+    if store_inner_node or isinstance(parts[0], dgl.DGLGraph):
+        for part in parts:
+            nids = _verify_node_id_range_hetero(g, part, nids)
+        for ntype in nids:
+            nids_type = F.cat(nids[ntype], 0)
+            uniq_ids = F.unique(nids_type)
+            # We should get all nodes.
+            assert len(uniq_ids) == g.num_nodes(ntype)
+
+
+def _verify_hetero_graph(
+    g,
+    parts,
+    store_eids=False,
+    store_inner_edge=False,
+    store_inner_node=False,
+    debug_mode=False,
+):
+    _verify_hetero_graph_node_edge_num(
+        g,
+        parts,
+        store_inner_edge=store_inner_edge,
+        debug_mode=debug_mode,
+    )
+    if store_eids:
+        _verify_graph_attributes_hetero(
+            g,
+            parts,
+            store_inner_edge=store_inner_edge,
+            store_inner_node=store_inner_node,
+        )
+
+
 def _test_pipeline_graphbolt(
     num_chunks,
     num_parts,
@@ -681,7 +858,7 @@ def _test_pipeline_graphbolt(
         in_dir = os.path.join(root_dir, "chunked-data")
         output_dir = os.path.join(root_dir, "parted_data")
         os.system(
-            "/opt/conda/envs/pytorch/bin/python tools/partition_algo/random_partition.py "
+            "python3 tools/partition_algo/random_partition.py "
             "--in_dir {} --out_dir {} --num_partitions {}".format(
                 in_dir, output_dir, num_parts
             )
@@ -700,31 +877,29 @@ def _test_pipeline_graphbolt(
             for i in range(world_size):
                 f.write(f"127.0.0.{i + 1}\n")
 
-        cmd = "/opt/conda/envs/pytorch/bin/python tools/dispatch_data.py"
-        cmd += f" --in-dir {in_dir}"
-        cmd += f" --partitions-dir {partition_dir}"
-        cmd += f" --out-dir {out_dir}"
-        cmd += f" --ip-config {ip_config}"
-        cmd += " --ssh-port 22"
-        cmd += " --process-group-timeout 60"
-        cmd += " --save-orig-nids"
-        cmd += " --save-orig-eids"
-        cmd += " --use-graphbolt"
-        cmd += f" --graph-formats {graph_formats}" if graph_formats else ""
+        cmd = "python3 tools/dispatch_data.py "
+        cmd += f" --in-dir {in_dir} "
+        cmd += f" --partitions-dir {partition_dir} "
+        cmd += f" --out-dir {out_dir} "
+        cmd += f" --ip-config {ip_config} "
+        cmd += " --ssh-port 22 "
+        cmd += " --process-group-timeout 60 "
+        cmd += " --save-orig-nids "
+        cmd += " --save-orig-eids "
+        cmd += " --use-graphbolt "
+        cmd += f" --graph-formats {graph_formats} " if graph_formats else ""
 
         if store_eids:
-            cmd += " --store-eids"
+            cmd += " --store-eids "
         if store_inner_edge:
-            cmd += " --store-inner-edge"
+            cmd += " --store-inner-edge "
         if store_inner_node:
-            cmd += " --store-inner-node"
+            cmd += " --store-inner-node "
         os.system(cmd)
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = (
-                "/opt/conda/envs/pytorch/bin/python tools/verify_partitions.py "
-            )
+            cmd = "python3 tools/verify_partitions.py "
             cmd += f" --orig-dataset-dir {in_dir}"
             cmd += f" --part-graph {out_dir}"
             cmd += f" --partitions-dir {output_dir}"
@@ -744,7 +919,9 @@ def _test_pipeline_graphbolt(
                         orig_ids[type] = torch.cat((orig_ids[type], data))
             return orig_ids
 
+        orig_nids, orig_eids = None, None
         orig_nids = read_orig_ids("orig_nids.dgl")
+
         orig_eids_str = read_orig_ids("orig_eids.dgl")
 
         orig_eids = {}
@@ -769,22 +946,12 @@ def _test_pipeline_graphbolt(
             part_config=part_config,
             is_homo=False,
         )
-
-        # for i in range(num_parts):
-        #     part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
-        #         part_config, i, use_graphbolt=True
-        #     )
-        # verify_partition_data_types(part_g, use_graphbolt=True)
-        # verify_graph_feats(
-        #     g,
-        #     gpb,
-        #     part_g,
-        #     node_feats,
-        #     edge_feats,
-        #     orig_nids,
-        #     orig_eids,
-        #     use_graphbolt=True,
-        # )
+        _verify_hetero_graph(
+            g,
+            parts,
+            store_eids=store_eids,
+            store_inner_edge=store_inner_edge,
+        )
 
 
 @pytest.mark.parametrize(
@@ -792,9 +959,27 @@ def _test_pipeline_graphbolt(
     [[4, 4, 4], [8, 4, 2], [8, 4, 4], [9, 6, 3], [11, 11, 1], [11, 4, 1]],
 )
 def test_pipeline_basics(num_chunks, num_parts, world_size):
-    _test_pipeline_graphbolt(num_chunks, num_parts, world_size)
+    _test_pipeline_graphbolt(
+        num_chunks,
+        num_parts,
+        world_size,
+    )
     _test_pipeline_graphbolt(
         num_chunks, num_parts, world_size, use_verify_partitions=False
+    )
+
+
+@pytest.mark.parametrize("store_inner_node", [True, False])
+@pytest.mark.parametrize("store_inner_edge", [True, False])
+@pytest.mark.parametrize("store_eids", [True, False])
+def test_pipeline_attributes(store_inner_node, store_inner_edge, store_eids):
+    _test_pipeline_graphbolt(
+        4,
+        4,
+        4,
+        store_inner_node=store_inner_node,
+        store_inner_edge=store_inner_edge,
+        store_eids=store_eids,
     )
 
 

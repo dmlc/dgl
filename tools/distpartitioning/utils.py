@@ -533,9 +533,10 @@ def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
     sort_etypes : bool
         Whether to sort etypes in csc/csr.
     """
-    dgl.distributed.partition._save_graphs(
-        graph_file, [graph_obj], formats, sort_etypes
+    dgl.distributed.partition.process_partitions(
+        graph_obj, formats, sort_etypes
     )
+    dgl.save_graphs(graph_file, [graph_obj], formats=formats)
 
 
 def write_dgl_objects(
