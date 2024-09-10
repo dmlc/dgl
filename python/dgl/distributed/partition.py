@@ -88,7 +88,7 @@ def _dump_part_config(part_config, part_metadata):
         json.dump(part_metadata, outfile, sort_keys=False, indent=4)
 
 
-def _process_partitions(g, formats=None, sort_etypes=False):
+def process_partitions(g, formats=None, sort_etypes=False):
     """Preprocess partitions before saving:
     1. format data types.
     2. sort csc/csr by tag.
@@ -702,6 +702,8 @@ def _partition_to_graphbolt(
         part_config=part_config, part_id=part_i, csc_graph=csc_graph
     )
     part_metadata[f"part-{part_i}"]["part_graph_graphbolt"] = rel_path_result
+
+
 def _update_node_edge_map(node_map_val, edge_map_val, g, num_parts):
     """
     If the original graph contains few nodes or edges for specific node/edge
@@ -1472,7 +1474,7 @@ def partition_graph(
             "edge_feats": os.path.relpath(edge_feat_file, out_path),
         }
         sort_etypes = len(g.etypes) > 1
-        part = _process_partitions(part, graph_formats, sort_etypes)
+        part = process_partitions(part, graph_formats, sort_etypes)
 
     # transmit to graphbolt and save graph
     if use_graphbolt:
