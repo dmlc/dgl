@@ -1482,7 +1482,7 @@ def partition_graph(
         kwargs["graph_formats"] = graph_formats
         n_jobs = kwargs.pop("n_jobs", 1)
         mp_ctx = mp.get_context("spawn")
-        with concurrent.futures.ProcessPoolExecutor(
+        with concurrent.futures.ProcessPoolExecutor(  # pylint: disable=unexpected-keyword-arg
             max_workers=min(num_parts, n_jobs),
             mp_context=mp_ctx,
         ) as executor:
