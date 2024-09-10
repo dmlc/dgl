@@ -88,7 +88,7 @@ def _dump_part_config(part_config, part_metadata):
         json.dump(part_metadata, outfile, sort_keys=False, indent=4)
 
 
-def _process_partitions(g, formats=None, sort_etypes=False):
+def process_partitions(g, formats=None, sort_etypes=False):
     """Preprocess partitions before saving:
     1. format data types.
     2. sort csc/csr by tag.
@@ -1314,9 +1314,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1351,9 +1351,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1371,7 +1371,7 @@ def partition_graph(
             "edge_feats": os.path.relpath(edge_feat_file, out_path),
         }
         sort_etypes = len(g.etypes) > 1
-        part = _process_partitions(part, graph_formats, sort_etypes)
+        part = process_partitions(part, graph_formats, sort_etypes)
 
     # transmit to graphbolt and save graph
     if use_graphbolt:
@@ -1398,8 +1398,8 @@ def partition_graph(
             part_dir = os.path.join(out_path, "part" + str(part_id))
             part_graph_file = os.path.join(part_dir, "graph.dgl")
             part_metadata["part-{}".format(part_id)][
-                    "part_graph"
-                ] = os.path.relpath(part_graph_file, out_path)
+                "part_graph"
+            ] = os.path.relpath(part_graph_file, out_path)
             # save DGLGraph
             _save_dgl_graphs(
                 part_graph_file,
