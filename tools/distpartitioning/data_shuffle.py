@@ -1334,9 +1334,12 @@ def gen_dist_partitions(rank, world_size, params):
                 schema_map[constants.STR_NUM_NODES_PER_TYPE],
             ),
             edge_typecounts,
-            params.save_orig_nids,
-            params.save_orig_eids,
-            params.use_graphbolt,
+            return_orig_nids=params.save_orig_nids,
+            return_orig_eids=params.save_orig_eids,
+            use_graphbolt=params.use_graphbolt,
+            store_inner_node=params.store_inner_node,
+            store_inner_edge=params.store_inner_edge,
+            store_eids=params.store_eids,
         )
         sort_etypes = len(etypes_map) > 1
         local_node_features = prepare_local_data(
