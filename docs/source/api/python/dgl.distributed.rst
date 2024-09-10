@@ -68,7 +68,15 @@ Distributed Sampling
 Distributed DataLoader
 ``````````````````````
 
+.. autoclass:: NodeCollator
+
+.. autoclass:: EdgeCollator
+
 .. autoclass:: DistDataLoader
+
+.. autoclass:: DistNodeDataLoader
+
+.. autoclass:: DistEdgeDataLoader
 
 .. _api-distributed-sampling-ops:
 Distributed Graph Sampling Operators

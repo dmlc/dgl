@@ -1,6 +1,7 @@
 """Subgraph samplers"""
 
 from collections import defaultdict
+from functools import partial
 from typing import Dict
 
 import torch
@@ -13,6 +14,18 @@ from .minibatch_transformer import MiniBatchTransformer
 __all__ = [
     "SubgraphSampler",
 ]
+
+
+class _NoOpWaiter:
+    def __init__(self, result):
+        self.result = result
+
+    def wait(self):
+        """Returns the stored value when invoked."""
+        result = self.result
+        # Ensure there is no memory leak.
+        self.result = None
+        return result
 
 
 @functional_datapipe("sample_subgraph")
@@ -35,7 +48,9 @@ class SubgraphSampler(MiniBatchTransformer):
     args : Non-Keyword Arguments
         Arguments to be passed into sampling_stages.
     kwargs : Keyword Arguments
-        Arguments to be passed into sampling_stages.
+        Arguments to be passed into sampling_stages. Preprocessing stage makes
+        use of the `asynchronous` parameter before it is passed to
+        the sampling stages.
     """
 
     def __init__(
@@ -44,7 +59,11 @@ class SubgraphSampler(MiniBatchTransformer):
         *args,
         **kwargs,
     ):
-        datapipe = datapipe.transform(self._preprocess)
+        async_op = kwargs.get("asynchronous", False)
+        preprocess_fn = partial(self._preprocess, async_op=async_op)
+        datapipe = datapipe.transform(preprocess_fn)
+        if async_op:
+            datapipe = datapipe.buffer().transform(self._wait_preprocess_future)
         datapipe = self.sampling_stages(datapipe, *args, **kwargs)
         datapipe = datapipe.transform(self._postprocess)
         super().__init__(datapipe)
@@ -56,19 +75,30 @@ class SubgraphSampler(MiniBatchTransformer):
         return minibatch
 
     @staticmethod
-    def _preprocess(minibatch):
-        if minibatch.seeds is not None:
-            (
-                seeds,
-                seeds_timestamp,
-                minibatch.compacted_seeds,
-            ) = SubgraphSampler._seeds_preprocess(minibatch)
-        else:
+    def _preprocess(minibatch, async_op: bool):
+        if minibatch.seeds is None:
             raise ValueError(
                 f"Invalid minibatch {minibatch}: `seeds` should have a value."
             )
-        minibatch._seed_nodes = seeds
-        minibatch._seeds_timestamp = seeds_timestamp
+        results = SubgraphSampler._seeds_preprocess(minibatch, async_op)
+        if async_op:
+            minibatch._preprocess_future = results
+        else:
+            (
+                minibatch._seed_nodes,
+                minibatch._seeds_timestamp,
+                minibatch.compacted_seeds,
+            ) = results
+        return minibatch
+
+    @staticmethod
+    def _wait_preprocess_future(minibatch):
+        (
+            minibatch._seed_nodes,
+            minibatch._seeds_timestamp,
+            minibatch.compacted_seeds,
+        ) = minibatch._preprocess_future.wait()
+        delattr(minibatch, "_preprocess_future")
         return minibatch
 
     def _sample(self, minibatch):
@@ -89,7 +119,7 @@ class SubgraphSampler(MiniBatchTransformer):
         return datapipe.transform(self._sample)
 
     @staticmethod
-    def _seeds_preprocess(minibatch):
+    def _seeds_preprocess(minibatch, async_op):
         """Preprocess `seeds` in a minibatch to construct `unique_seeds`,
         `node_timestamp` and `compacted_seeds` for further sampling. It
         optionally incorporates timestamps for temporal graphs, organizing and
@@ -100,6 +130,9 @@ class SubgraphSampler(MiniBatchTransformer):
         ----------
         minibatch: MiniBatch
             The minibatch.
+        async_op: bool
+            Boolean indicating whether the call is asynchronous. If so, the
+            result can be obtained by calling wait on the returned future.
 
         Returns
         -------
@@ -131,7 +164,9 @@ class SubgraphSampler(MiniBatchTransformer):
                         if hasattr(minibatch, "timestamp")
                         else None
                     )
-                    return seeds, nodes_timestamp, None
+                    result = _NoOpWaiter((seeds, nodes_timestamp, None))
+                    break
+                result = None
                 assert typed_seeds.ndim == 2, (
                     "Only tensor with shape 1*N and N*M is "
                     + f"supported now, but got {typed_seeds.shape}."
@@ -155,28 +190,55 @@ class SubgraphSampler(MiniBatchTransformer):
                             minibatch.timestamp[seed_type]
                         )
                         nodes_timestamp[ntype].append(neg_timestamp)
-            # Unique and compact the collected nodes.
-            if use_timestamp:
-                (
-                    unique_seeds,
-                    nodes_timestamp,
-                    compacted,
-                ) = compact_temporal_nodes(nodes, nodes_timestamp)
-            else:
-                unique_seeds, compacted = unique_and_compact(nodes)
-                nodes_timestamp = None
-            compacted_seeds = {}
-            # Map back in same order as collect.
-            for seed_type, typed_seeds in seeds.items():
-                ntypes = seed_type_str_to_ntypes(
-                    seed_type, typed_seeds.shape[1]
-                )
-                compacted_seed = []
-                for ntype in ntypes:
-                    compacted_seed.append(compacted[ntype].pop(0))
-                compacted_seeds[seed_type] = (
-                    torch.cat(compacted_seed).view(len(ntypes), -1).T
-                )
+
+            class _Waiter:
+                def __init__(self, nodes, nodes_timestamp, seeds):
+                    # Unique and compact the collected nodes.
+                    if use_timestamp:
+                        self.future = compact_temporal_nodes(
+                            nodes, nodes_timestamp
+                        )
+                    else:
+                        self.future = unique_and_compact(
+                            nodes, async_op=async_op
+                        )
+                    self.seeds = seeds
+
+                def wait(self):
+                    """Returns the stored value when invoked."""
+                    if use_timestamp:
+                        unique_seeds, nodes_timestamp, compacted = self.future
+                    else:
+                        unique_seeds, compacted, _ = (
+                            self.future.wait() if async_op else self.future
+                        )
+                        nodes_timestamp = None
+                    seeds = self.seeds
+                    # Ensure there is no memory leak.
+                    self.future = self.seeds = None
+
+                    compacted_seeds = {}
+                    # Map back in same order as collect.
+                    for seed_type, typed_seeds in seeds.items():
+                        ntypes = seed_type_str_to_ntypes(
+                            seed_type, typed_seeds.shape[1]
+                        )
+                        compacted_seed = []
+                        for ntype in ntypes:
+                            compacted_seed.append(compacted[ntype].pop(0))
+                        compacted_seeds[seed_type] = (
+                            torch.cat(compacted_seed).view(len(ntypes), -1).T
+                        )
+
+                    return (
+                        unique_seeds,
+                        nodes_timestamp,
+                        compacted_seeds,
+                    )
+
+            # When typed_seeds is not a one-dimensional tensor
+            if result is None:
+                result = _Waiter(nodes, nodes_timestamp, seeds)
         else:
             # When seeds is a one-dimensional tensor, it represents seed nodes,
             # which does not need to do unique and compact.
@@ -186,41 +248,68 @@ class SubgraphSampler(MiniBatchTransformer):
                     if hasattr(minibatch, "timestamp")
                     else None
                 )
-                return seeds, nodes_timestamp, None
-            # Collect nodes from all types of input.
-            nodes = [seeds.view(-1)]
-            nodes_timestamp = None
-            if use_timestamp:
-                # Timestamp for source and destination nodes are the same.
-                negative_ratio = (
-                    seeds.shape[0] // minibatch.timestamp.shape[0] - 1
-                )
-                neg_timestamp = minibatch.timestamp.repeat_interleave(
-                    negative_ratio
-                )
-                seeds_timestamp = torch.cat(
-                    (minibatch.timestamp, neg_timestamp)
-                )
-                nodes_timestamp = [
-                    seeds_timestamp for _ in range(seeds.shape[1])
-                ]
-            # Unique and compact the collected nodes.
-            if use_timestamp:
-                (
-                    unique_seeds,
-                    nodes_timestamp,
-                    compacted,
-                ) = compact_temporal_nodes(nodes, nodes_timestamp)
+                result = _NoOpWaiter((seeds, nodes_timestamp, None))
             else:
-                unique_seeds, compacted = unique_and_compact(nodes)
+                # Collect nodes from all types of input.
+                nodes = [seeds.view(-1)]
                 nodes_timestamp = None
-            # Map back in same order as collect.
-            compacted_seeds = compacted[0].view(seeds.shape)
-        return (
-            unique_seeds,
-            nodes_timestamp,
-            compacted_seeds,
-        )
+                if use_timestamp:
+                    # Timestamp for source and destination nodes are the same.
+                    negative_ratio = (
+                        seeds.shape[0] // minibatch.timestamp.shape[0] - 1
+                    )
+                    neg_timestamp = minibatch.timestamp.repeat_interleave(
+                        negative_ratio
+                    )
+                    seeds_timestamp = torch.cat(
+                        (minibatch.timestamp, neg_timestamp)
+                    )
+                    nodes_timestamp = [
+                        seeds_timestamp for _ in range(seeds.shape[1])
+                    ]
+
+                class _Waiter:
+                    def __init__(self, nodes, nodes_timestamp, seeds):
+                        # Unique and compact the collected nodes.
+                        if use_timestamp:
+                            self.future = compact_temporal_nodes(
+                                nodes, nodes_timestamp
+                            )
+                        else:
+                            self.future = unique_and_compact(
+                                nodes, async_op=async_op
+                            )
+                        self.seeds = seeds
+
+                    def wait(self):
+                        """Returns the stored value when invoked."""
+                        if use_timestamp:
+                            (
+                                unique_seeds,
+                                nodes_timestamp,
+                                compacted,
+                            ) = self.future
+                        else:
+                            unique_seeds, compacted, _ = (
+                                self.future.wait() if async_op else self.future
+                            )
+                            nodes_timestamp = None
+                        seeds = self.seeds
+                        # Ensure there is no memory leak.
+                        self.future = self.seeds = None
+
+                        # Map back in same order as collect.
+                        compacted_seeds = compacted[0].view(seeds.shape)
+
+                        return (
+                            unique_seeds,
+                            nodes_timestamp,
+                            compacted_seeds,
+                        )
+
+                result = _Waiter(nodes, nodes_timestamp, seeds)
+
+        return result if async_op else result.wait()
 
     def sample_subgraphs(
         self, seeds, seeds_timestamp, seeds_pre_time_window=None

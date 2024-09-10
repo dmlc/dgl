@@ -25,6 +25,7 @@
 #include <cub/cub.cuh>
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
+#include <cuda/stream_ref>
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -138,7 +139,7 @@ GpuGraphCache::GpuGraphCache(
             {},
             {},
             allocator_t<index_t>{},
-            cuco::cuda_stream_ref{cuda::GetCurrentStream()}};
+            ::cuda::stream_ref{cuda::GetCurrentStream()}};
         map_ = new map_t<index_t>{std::move(map_temp)};
       }));
   C10_CUDA_KERNEL_LAUNCH_CHECK();  // Check the map constructor's success.
@@ -185,7 +186,7 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
             map_size_ + seeds.size(0) >= map->capacity() * kDoubleLoadFactor)) {
           map->rehash_async(
               map->capacity() * kIntGrowthFactor,
-              cuco::cuda_stream_ref{cuda::GetCurrentStream()});
+              ::cuda::stream_ref{cuda::GetCurrentStream()});
         }
         auto positions = torch::empty_like(seeds);
         CUDA_KERNEL_CALL(

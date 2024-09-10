@@ -1,4 +1,5 @@
 """DGL PyTorch DataLoaders"""
+
 import atexit
 import inspect
 import itertools
@@ -24,7 +25,6 @@ from .._ffi.base import is_tensor_adaptor_enabled
 from ..base import dgl_warning, DGLError, EID, NID
 from ..batch import batch as batch_graphs
 from ..cuda import GPUCache
-from ..distributed import DistGraph
 from ..frame import LazyFeature
 from ..heterograph import DGLGraph
 from ..storages import wrap_storage
@@ -970,11 +970,6 @@ class DataLoader(torch.utils.data.DataLoader):
             super().__init__(**kwargs)
             return
 
-        if isinstance(graph, DistGraph):
-            raise TypeError(
-                "Please use dgl.dataloading.DistNodeDataLoader or "
-                "dgl.datalaoding.DistEdgeDataLoader for DistGraphs."
-            )
         # (BarclayII) I hoped that pin_prefetcher can be merged into PyTorch's native
         # pin_memory argument.  But our neighbor samplers and subgraph samplers
         # return indices, which could be CUDA tensors (e.g. during UVA sampling)
@@ -1477,3 +1472,79 @@ class GraphDataLoader(torch.utils.data.DataLoader):
             self.dist_sampler.set_epoch(epoch)
         else:
             raise DGLError("set_epoch is only available when use_ddp is True.")
+
+
+class NodeCollator:
+    """Deprecated. Please use :class:`~dgl.distributed.NodeCollator` instead."""
+
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "NodeCollator is defined in dgl.distributed This class is for "
+            "backward compatibility and will be removed soon. Please update "
+            "your code to use `dgl.distributed.NodeCollator`."
+        )
+        from ..distributed import NodeCollator as NewNodeCollator
+
+        return NewNodeCollator(*args, **kwargs)
+
+
+class EdgeCollator:
+    """Deprecated. Please use :class:`~dgl.distributed.EdgeCollator` instead."""
+
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "EdgeCollator is defined in dgl.distributed This class is for "
+            "backward compatibility and will be removed soon. Please update "
+            "your code to use `dgl.distributed.EdgeCollator`."
+        )
+        from ..distributed import EdgeCollator as NewEdgeCollator
+
+        return NewEdgeCollator(*args, **kwargs)
+
+
+class DistDataLoader:
+    """Deprecated. Please use :class:`~dgl.distributed.DistDataLoader` instead."""
+
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "DistDataLoader is defined in dgl.distributed This class is for "
+            "backward compatibility and will be removed soon. Please update "
+            "your code to use `dgl.distributed.DistDataLoader`."
+        )
+        from ..distributed import DistDataLoader as NewDistDataLoader
+
+        return NewDistDataLoader(*args, **kwargs)
+
+
+class DistNodeDataLoader:
+    """Deprecated. Please use :class:`~dgl.distributed.DistNodeDataLoader`
+    instead.
+    """
+
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "dgl.dataloading.DistNodeDataLoader has been moved to "
+            "dgl.distributed.DistNodeDataLoader. This old class is deprecated "
+            "and will be removed soon. Please update your code to use the new "
+            "class."
+        )
+        from ..distributed import DistNodeDataLoader as NewDistNodeDataLoader
+
+        return NewDistNodeDataLoader(*args, **kwargs)
+
+
+class DistEdgeDataLoader:
+    """Deprecated. Please use :class:`~dgl.distributed.DistEdgeDataLoader`
+    instead.
+    """
+
+    def __new__(cls, *args, **kwargs):
+        dgl_warning(
+            "dgl.dataloading.DistEdgeDataLoader has been moved to "
+            "dgl.distributed.DistEdgeDataLoader. This old class is deprecated "
+            "and will be removed soon. Please update your code to use the new "
+            "class."
+        )
+        from ..distributed import DistEdgeDataLoader as NewDistEdgeDataLoader
+
+        return NewDistEdgeDataLoader(*args, **kwargs)

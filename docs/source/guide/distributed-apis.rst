@@ -275,14 +275,14 @@ difference is that users need to use :func:`dgl.distributed.sample_neighbors` an
 
 The high-level sampling APIs (:class:`~dgl.dataloading.NodeDataLoader` and
 :class:`~dgl.dataloading.EdgeDataLoader` ) has distributed counterparts
-(:class:`~dgl.dataloading.DistNodeDataLoader` and
-:class:`~dgl.dataloading.DistEdgeDataLoader`).  The code is exactly the same as
+(:class:`~dgl.distributed.DistNodeDataLoader` and
+:class:`~dgl.distributed.DistEdgeDataLoader`).  The code is exactly the same as
 single-process sampling otherwise.
 
 .. code:: python
 
     sampler = dgl.sampling.MultiLayerNeighborSampler([10, 25])
-    dataloader = dgl.sampling.DistNodeDataLoader(g, train_nid, sampler,
+    dataloader = dgl.distributed.DistNodeDataLoader(g, train_nid, sampler,
                                                  batch_size=batch_size, shuffle=True)
     for batch in dataloader:
         ...

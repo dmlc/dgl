@@ -1,14 +1,15 @@
 import argparse
 import time
 
+import dgl
+import dgl.distributed
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import dgl
 from dgl.distributed import DistEmbedding
-from train_dist import DistSAGE, compute_acc
+from train_dist import compute_acc, DistSAGE
 
 
 def initializer(shape, dtype):
@@ -18,9 +19,7 @@ def initializer(shape, dtype):
 
 
 class DistEmb(nn.Module):
-    def __init__(
-            self, num_nodes, emb_size, dgl_sparse_emb=False, dev_id="cpu"
-    ):
+    def __init__(self, num_nodes, emb_size, dgl_sparse_emb=False, dev_id="cpu"):
         super().__init__()
         self.dev_id = dev_id
         self.emb_size = emb_size
@@ -49,9 +48,11 @@ def load_embs(standalone, emb_layer, g):
     x = dgl.distributed.DistTensor(
         (
             g.num_nodes(),
-            emb_layer.module.emb_size
-            if isinstance(emb_layer, th.nn.parallel.DistributedDataParallel)
-            else emb_layer.emb_size,
+            (
+                emb_layer.module.emb_size
+                if isinstance(emb_layer, th.nn.parallel.DistributedDataParallel)
+                else emb_layer.emb_size
+            ),
         ),
         th.float32,
         "eval_embs",
@@ -60,7 +61,7 @@ def load_embs(standalone, emb_layer, g):
     num_nodes = nodes.shape[0]
     for i in range((num_nodes + 1023) // 1024):
         idx = nodes[
-            i * 1024: (i + 1) * 1024
+            i * 1024 : (i + 1) * 1024
             if (i + 1) * 1024 < num_nodes
             else num_nodes
         ]
@@ -113,7 +114,7 @@ def run(args, device, data):
     sampler = dgl.dataloading.NeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(",")]
     )
-    dataloader = dgl.dataloading.DistNodeDataLoader(
+    dataloader = dgl.distributed.DistNodeDataLoader(
         g,
         train_nid,
         sampler,
@@ -164,10 +165,7 @@ def run(args, device, data):
         emb_optimizer = th.optim.SparseAdam(
             list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr
         )
-        print(
-            "optimize Pytorch sparse embedding:",
-            emb_layer.module.sparse_emb
-        )
+        print("optimize Pytorch sparse embedding:", emb_layer.module.sparse_emb)
 
     # Training loop
     iter_tput = []
@@ -231,7 +229,7 @@ def run(args, device, data):
                             acc.item(),
                             np.mean(iter_tput[3:]),
                             gpu_mem_alloc,
-                            np.sum(step_time[-args.log_every:]),
+                            np.sum(step_time[-args.log_every :]),
                         )
                     )
                 start = time.time()
@@ -267,8 +265,7 @@ def run(args, device, data):
                 device,
             )
             print(
-                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format
-                (
+                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format(
                     g.rank(), val_acc, test_acc, time.time() - start
                 )
             )
@@ -278,10 +275,7 @@ def main(args):
     dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend="gloo")
-    g = dgl.distributed.DistGraph(
-            args.graph_name,
-            part_config=args.part_config
-        )
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print("rank:", g.rank())
 
     pb = g.get_partition_book()

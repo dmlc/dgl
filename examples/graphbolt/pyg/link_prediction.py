@@ -1,56 +1,38 @@
 """
-This script demonstrates node classification with GraphSAGE on large graphs, 
-merging GraphBolt (GB) and PyTorch Geometric (PyG). GraphBolt efficiently manages 
-data loading for large datasets, crucial for mini-batch processing. Post data 
-loading, PyG's user-friendly framework takes over for training, showcasing seamless 
-integration with GraphBolt. This combination offers an efficient alternative to 
-traditional Deep Graph Library (DGL) methods, highlighting adaptability and 
-scalability in handling large-scale graph data for diverse real-world applications.
+This script trains and tests a GraphSAGE model for link prediction on
+large graphs using graphbolt dataloader. It is the PyG counterpart of the
+example in `examples/graphbolt/link_prediction.py`.
 
+Paper: [Inductive Representation Learning on Large Graphs]
+(https://arxiv.org/abs/1706.02216)
 
-
-Key Features:
-- Implements the GraphSAGE model, a scalable GNN, for node classification on large graphs.
-- Utilizes GraphBolt, an efficient framework for large-scale graph data processing.
-- Integrates with PyTorch Geometric for building and training the GraphSAGE model.
-- The script is well-documented, providing clear explanations at each step.
+While node classification predicts labels for nodes based on their
+local neighborhoods, link prediction assesses the likelihood of an edge
+existing between two nodes, necessitating different sampling strategies
+that account for pairs of nodes and their joint neighborhoods.
 
 This flowchart describes the main functional sequence of the provided example.
-main: 
-
 main
 │
-├───> Load and preprocess dataset (GraphBolt)
-│     │
-│     └───> Utilize GraphBolt's BuiltinDataset for dataset handling
+├───> OnDiskDataset pre-processing
 │
-├───> Instantiate the SAGE model (PyTorch Geometric)
-│     │
-│     └───> Define the GraphSAGE model architecture
+├───> Instantiate SAGE model
 │
-├───> Train the model
+├───> train
 │     │
-│     ├───> Mini-Batch Processing with GraphBolt
-│     │     │
-│     │     └───> Efficient handling of mini-batches using GraphBolt's utilities
+│     ├───> Get graphbolt dataloader (HIGHLIGHT)
+|     |
+|     |───> Define a PyG GNN model for link prediction (HIGHLIGHT)
 │     │
-│     └───> Training Loop
+│     └───> Training loop
 │           │
-│           ├───> Forward and backward passes
-│           │
-│           └───> Parameters optimization
+│           ├───> SAGE.forward
 │
-└───> Evaluate the model
-      │
-      └───> Performance assessment on validation and test datasets
-            │
-            └───> Accuracy and other relevant metrics calculation
-
-
+└───> Validation and test set evaluation
 """
-
 import argparse
 import time
+from functools import partial
 
 import dgl.graphbolt as gb
 import torch
@@ -63,16 +45,8 @@ torch._dynamo.config.cache_size_limit = 32
 
 import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv
-from tqdm import tqdm
-
-
-def accuracy(out, labels):
-    assert out.ndim == 2
-    assert out.size(0) == labels.size(0)
-    assert labels.ndim == 1 or (labels.ndim == 2 and labels.size(1) == 1)
-    labels = labels.flatten()
-    predictions = torch.argmax(out, 1)
-    return (labels == predictions).sum(dtype=torch.float64) / labels.size(0)
+from torchmetrics.retrieval import RetrievalMRR
+from tqdm import tqdm, trange
 
 
 class GraphSAGE(torch.nn.Module):
@@ -81,18 +55,22 @@ class GraphSAGE(torch.nn.Module):
     #
     # - This class inherits from `torch.nn.Module`.
     # - Two convolutional layers are created using the SAGEConv class from PyG.
-    # - 'in_size', 'hidden_size', 'out_size' are the sizes of
-    #   the input, hidden, and output features, respectively.
     # - The forward method defines the computation performed at every call.
     #####################################################################
-    def __init__(self, in_size, hidden_size, out_size, n_layers):
+    def __init__(self, in_size, hidden_size, n_layers):
         super(GraphSAGE, self).__init__()
         self.layers = torch.nn.ModuleList()
-        sizes = [in_size] + [hidden_size] * (n_layers - 1) + [out_size]
+        sizes = [in_size] + [hidden_size] * n_layers
         for i in range(n_layers):
             self.layers.append(SAGEConv(sizes[i], sizes[i + 1]))
         self.hidden_size = hidden_size
-        self.out_size = out_size
+        self.predictor = torch.nn.Sequential(
+            torch.nn.Linear(hidden_size, hidden_size),
+            torch.nn.ReLU(),
+            torch.nn.Linear(hidden_size, hidden_size),
+            torch.nn.ReLU(),
+            torch.nn.Linear(hidden_size, 1),
+        )
 
     def forward(self, subgraphs, x):
         h = x
@@ -120,7 +98,7 @@ class GraphSAGE(torch.nn.Module):
 
             y = torch.empty(
                 graph.total_num_nodes,
-                self.out_size if is_last_layer else self.hidden_size,
+                self.hidden_size,
                 dtype=torch.float32,
                 device=buffer_device,
                 pin_memory=pin_memory,
@@ -174,15 +152,21 @@ def create_dataloader(
     if args.graph_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
         need_copy = False
+    # Sample negative edges.
+    if job == "train":
+        datapipe = datapipe.sample_uniform_negative(graph, args.neg_ratio)
     # Sample neighbors for each node in the mini-batch.
     datapipe = getattr(datapipe, args.sample_mode)(
         graph,
         fanout if job != "infer" else [-1],
         overlap_fetch=args.overlap_graph_fetch,
-        num_gpu_cached_edges=args.num_gpu_cached_edges,
-        gpu_cache_threshold=args.gpu_graph_caching_threshold,
         asynchronous=args.graph_device != "cpu",
     )
+    if job == "train" and args.exclude_edges:
+        datapipe = datapipe.exclude_seed_edges(
+            include_reverse_edges=True,
+            asynchronous=args.graph_device != "cpu",
+        )
     # Copy the data to the specified device.
     if args.feature_device != "cpu" and need_copy:
         datapipe = datapipe.copy_to(device=device)
@@ -201,41 +185,100 @@ def create_dataloader(
 
 
 @torch.compile
-def train_step(minibatch, optimizer, model, loss_fn):
+def predictions_step(model, h_src, h_dst):
+    return model.predictor(h_src * h_dst).squeeze()
+
+
+def compute_predictions(model, node_emb, seeds, device):
+    """Compute the predictions for given source and destination nodes.
+
+    This function computes the predictions for a set of node pairs, dividing the
+    task into batches to handle potentially large graphs.
+    """
+
+    preds = torch.empty(seeds.shape[0], device=device)
+    seeds_src, seeds_dst = seeds.T
+    # The constant number is 1001, due to negtive ratio in the `ogbl-citation2`
+    # dataset is 1000.
+    eval_size = args.eval_batch_size * 1001
+    # Loop over node pairs in batches.
+    for start in trange(0, seeds_src.shape[0], eval_size, desc="Evaluate"):
+        end = min(start + eval_size, seeds_src.shape[0])
+
+        # Fetch embeddings for current batch of source and destination nodes.
+        h_src = node_emb[seeds_src[start:end]].to(device, non_blocking=True)
+        h_dst = node_emb[seeds_dst[start:end]].to(device, non_blocking=True)
+
+        # Compute prediction scores using the model.
+        preds[start:end] = predictions_step(model, h_src, h_dst)
+    return preds
+
+
+@torch.no_grad()
+def evaluate(model, graph, features, all_nodes_set, valid_set, test_set):
+    """Evaluate the model on validation and test sets."""
+    model.eval()
+
+    dataloader = create_dataloader(
+        graph,
+        features,
+        all_nodes_set,
+        args.eval_batch_size,
+        [-1],
+        args.device,
+        job="infer",
+    )
+
+    # Compute node embeddings for the entire graph.
+    node_emb = model.inference(graph, features, dataloader, args.feature_device)
+    results = []
+
+    # Loop over both validation and test sets.
+    for split in [valid_set, test_set]:
+        # Unpack the item set.
+        seeds = split._items[0].to(node_emb.device)
+        labels = split._items[1].to(node_emb.device)
+        indexes = split._items[2].to(node_emb.device)
+
+        preds = compute_predictions(model, node_emb, seeds, indexes.device)
+        # Compute MRR values for the current split.
+        results.append(RetrievalMRR()(preds, labels, indexes))
+    return results
+
+
+@torch.compile
+def train_step(minibatch, optimizer, model):
     node_features = minibatch.node_features["feat"]
+    compacted_seeds = minibatch.compacted_seeds.T
     labels = minibatch.labels
     optimizer.zero_grad()
-    out = model(minibatch.sampled_subgraphs, node_features)
-    loss = loss_fn(out, labels)
-    num_correct = accuracy(out, labels) * labels.size(0)
+    y = model(minibatch.sampled_subgraphs, node_features)
+    logits = model.predictor(
+        y[compacted_seeds[0]] * y[compacted_seeds[1]]
+    ).squeeze()
+    loss = F.binary_cross_entropy_with_logits(logits, labels)
     loss.backward()
     optimizer.step()
-    return loss.detach(), num_correct, labels.size(0)
+    return loss.detach(), labels.size(0)
 
 
-def train_helper(dataloader, model, optimizer, loss_fn, device):
+def train_helper(dataloader, model, optimizer, device):
     model.train()  # Set the model to training mode
     total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
-    # Accumulator for the total number of correct predictions
-    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0  # Accumulator for the total number of samples processed
-    num_batches = 0  # Counter for the number of mini-batches processed
     start = time.time()
-    for minibatch in tqdm(dataloader, "Training"):
-        loss, num_correct, num_samples = train_step(
-            minibatch, optimizer, model, loss_fn
-        )
-        total_loss += loss
-        total_correct += num_correct
+    for step, minibatch in tqdm(enumerate(dataloader), "Training"):
+        loss, num_samples = train_step(minibatch, optimizer, model)
+        total_loss += loss * num_samples
         total_samples += num_samples
-        num_batches += 1
-    train_loss = total_loss / num_batches
-    train_acc = total_correct / total_samples
+        if step + 1 == args.early_stop:
+            break
+    train_loss = total_loss / total_samples
     end = time.time()
-    return train_loss, train_acc, end - start
+    return train_loss, end - start
 
 
-def train(train_dataloader, valid_dataloader, model, device):
+def train(dataloader, model, device):
     #####################################################################
     # (HIGHLIGHT) Train the model for one epoch.
     #
@@ -245,68 +288,21 @@ def train(train_dataloader, valid_dataloader, model, device):
     # - The function returns the average loss and accuracy for the epoch.
     #
     # Parameters:
-    #   model: The GraphSAGE model.
     #   dataloader: DataLoader that provides mini-batches of graph data.
-    #   optimizer: Optimizer used for updating model parameters.
-    #   loss_fn: Loss function used for training.
+    #   model: The GraphSAGE model.
     #   device: The device (CPU/GPU) to run the training on.
     #####################################################################
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    loss_fn = torch.nn.CrossEntropyLoss()
 
     for epoch in range(args.epochs):
-        train_loss, train_acc, duration = train_helper(
-            train_dataloader, model, optimizer, loss_fn, device
+        train_loss, duration = train_helper(
+            dataloader, model, optimizer, device
         )
-        val_acc = evaluate(model, valid_dataloader, device)
         print(
             f"Epoch {epoch:02d}, Loss: {train_loss.item():.4f}, "
-            f"Approx. Train: {train_acc.item():.4f}, "
-            f"Approx. Val: {val_acc.item():.4f}, "
             f"Time: {duration}s"
         )
-
-
-@torch.no_grad()
-def layerwise_infer(args, graph, features, test_set, all_nodes_set, model):
-    model.eval()
-    dataloader = create_dataloader(
-        graph=graph,
-        features=features,
-        itemset=all_nodes_set,
-        batch_size=4 * args.batch_size,
-        fanout=[-1],
-        device=args.device,
-        job="infer",
-    )
-    pred = model.inference(graph, features, dataloader, args.feature_device)
-    pred = pred[test_set._items[0]]
-    label = test_set._items[1].to(pred.device)
-
-    return accuracy(pred, label)
-
-
-@torch.compile
-def evaluate_step(minibatch, model):
-    node_features = minibatch.node_features["feat"]
-    labels = minibatch.labels
-    out = model(minibatch.sampled_subgraphs, node_features)
-    num_correct = accuracy(out, labels) * labels.size(0)
-    return num_correct, labels.size(0)
-
-
-@torch.no_grad()
-def evaluate(model, dataloader, device):
-    model.eval()
-    total_correct = torch.zeros(1, dtype=torch.float64, device=device)
-    total_samples = 0
-    for minibatch in tqdm(dataloader, "Evaluating"):
-        num_correct, num_samples = evaluate_step(minibatch, model)
-        total_correct += num_correct
-        total_samples += num_samples
-
-    return total_correct / total_samples
 
 
 def parse_args():
@@ -322,6 +318,9 @@ def parse_args():
         default=0.003,
         help="Learning rate for optimization.",
     )
+    parser.add_argument("--neg-ratio", type=int, default=1)
+    parser.add_argument("--train-batch-size", type=int, default=512)
+    parser.add_argument("--eval-batch-size", type=int, default=1024)
     parser.add_argument(
         "--batch-size", type=int, default=1024, help="Batch size for training."
     )
@@ -332,22 +331,18 @@ def parse_args():
         help="Number of workers for data loading.",
     )
     parser.add_argument(
+        "--early-stop",
+        type=int,
+        default=0,
+        help="0 means no early stop, otherwise stop at the input-th step",
+    )
+    parser.add_argument(
         "--dataset",
         type=str,
-        default="ogbn-products",
-        choices=[
-            "ogbn-arxiv",
-            "ogbn-products",
-            "ogbn-papers100M",
-            "igb-hom-tiny",
-            "igb-hom-small",
-            "igb-hom-medium",
-            "igb-hom-large",
-            "igb-hom",
-        ],
-        help="The dataset we can use for node classification example. Currently"
-        " ogbn-products, ogbn-arxiv, ogbn-papers100M and"
-        " igb-hom-[tiny|small|medium|large] and igb-hom datasets are supported.",
+        default="ogbl-citation2",
+        choices=["ogbl-citation2"],
+        help="The dataset we can use for link prediction. Currently"
+        " only ogbl-citation2 dataset is supported.",
     )
     parser.add_argument(
         "--fanout",
@@ -355,6 +350,12 @@ def parse_args():
         default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
         " identical with the number of layers in your model. Default: 10,10,10",
+    )
+    parser.add_argument(
+        "--exclude-edges",
+        type=bool,
+        default=True,
+        help="Whether to exclude reverse edges during sampling. Default: True",
     )
     parser.add_argument(
         "--mode",
@@ -381,18 +382,6 @@ def parse_args():
         default="sample_neighbor",
         choices=["sample_neighbor", "sample_layer_neighbor"],
         help="The sampling function when doing layerwise sampling.",
-    )
-    parser.add_argument(
-        "--num-gpu-cached-edges",
-        type=int,
-        default=0,
-        help="The number of edges to be cached from the graph on the GPU.",
-    )
-    parser.add_argument(
-        "--gpu-graph-caching-threshold",
-        type=int,
-        default=1,
-        help="The number of accesses after which a vertex neighborhood will be cached.",
     )
     parser.add_argument("--precision", type=str, default="high")
     return parser.parse_args()
@@ -429,47 +418,44 @@ def main():
     all_nodes_set = dataset.all_nodes_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
-    num_classes = dataset.tasks[0].metadata["num_classes"]
-
     if args.gpu_cache_size > 0 and args.feature_device != "cuda":
         features._features[("node", None, "feat")] = gb.gpu_cached_feature(
             features._features[("node", None, "feat")],
             args.gpu_cache_size,
         )
 
-    train_dataloader, valid_dataloader = (
-        create_dataloader(
-            graph=graph,
-            features=features,
-            itemset=itemset,
-            batch_size=args.batch_size,
-            fanout=args.fanout,
-            device=args.device,
-            job=job,
-        )
-        for itemset, job in zip([train_set, valid_set], ["train", "evaluate"])
+    train_dataloader = create_dataloader(
+        graph=graph,
+        features=features,
+        itemset=train_set,
+        batch_size=args.train_batch_size,
+        fanout=args.fanout,
+        device=args.device,
+        job="train",
     )
 
     in_channels = features.size("node", None, "feat")[0]
     hidden_channels = 256
-    model = GraphSAGE(
-        in_channels, hidden_channels, num_classes, len(args.fanout)
-    ).to(args.device)
+    model = GraphSAGE(in_channels, hidden_channels, len(args.fanout)).to(
+        args.device
+    )
     assert len(args.fanout) == len(model.layers)
 
-    train(train_dataloader, valid_dataloader, model, args.device)
+    train(train_dataloader, model, args.device)
 
     # Test the model.
     print("Testing...")
-    test_acc = layerwise_infer(
-        args,
+    valid_mrr, test_mrr = evaluate(
+        model,
         graph,
         features,
-        test_set,
         all_nodes_set,
-        model,
+        valid_set,
+        test_set,
     )
-    print(f"Test accuracy {test_acc.item():.4f}")
+    print(
+        f"Validation MRR {valid_mrr.item():.4f}, Test MRR {test_mrr.item():.4f}"
+    )
 
 
 if __name__ == "__main__":

@@ -61,7 +61,7 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatchedSortBased(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
+    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits = 0) {
   auto allocator = cuda::GetAllocator();
   auto stream = cuda::GetCurrentStream();
   auto scalar_type = src_ids.at(0).scalar_type();
@@ -272,30 +272,51 @@ UniqueAndCompactBatchedSortBased(
       }));
 }
 
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits) {
+    const std::vector<torch::Tensor>& unique_dst_ids, const int64_t rank,
+    const int64_t world_size) {
   if (cuda::compute_capability() >= 70) {
     // Utilizes a hash table based implementation, the mapped id of a vertex
     // will be monotonically increasing as the first occurrence index of it in
     // torch.cat([unique_dst_ids, src_ids]). Thus, it is deterministic.
     return UniqueAndCompactBatchedHashMapBased(
-        src_ids, dst_ids, unique_dst_ids);
+        src_ids, dst_ids, unique_dst_ids, rank, world_size);
   }
+  TORCH_CHECK(
+      world_size <= 1,
+      "Cooperative Minibatching (arXiv:2310.12403) is not supported on "
+      "pre-Volta generation GPUs.");
   // Utilizes a sort based algorithm, the mapped id of a vertex part of the
   // src_ids but not part of the unique_dst_ids will be monotonically increasing
   // as the actual vertex id increases. Thus, it is deterministic.
-  return UniqueAndCompactBatchedSortBased(
-      src_ids, dst_ids, unique_dst_ids, num_bits);
+  auto results3 =
+      UniqueAndCompactBatchedSortBased(src_ids, dst_ids, unique_dst_ids);
+  std::vector<
+      std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
+      results4;
+  auto offsets = torch::zeros(
+      2 * results3.size(),
+      c10::TensorOptions().dtype(torch::kInt64).pinned_memory(true));
+  for (const auto& [a, b, c] : results3) {
+    auto d = offsets.slice(0, 0, 2);
+    d.data_ptr<int64_t>()[1] = a.size(0);
+    results4.emplace_back(a, b, c, d);
+    offsets = offsets.slice(0, 2);
+  }
+  return results4;
 }
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
-    const torch::Tensor unique_dst_ids, int num_bits) {
+    const torch::Tensor unique_dst_ids, const int64_t rank,
+    const int64_t world_size) {
   return UniqueAndCompactBatched(
-      {src_ids}, {dst_ids}, {unique_dst_ids}, num_bits)[0];
+      {src_ids}, {dst_ids}, {unique_dst_ids}, rank, world_size)[0];
 }
 
 }  // namespace ops

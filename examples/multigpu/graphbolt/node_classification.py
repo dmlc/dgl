@@ -302,7 +302,7 @@ def run(rank, world_size, args, devices, dataset):
     out_size = num_classes
 
     if args.gpu_cache_size > 0 and args.storage_device != "cuda":
-        feature[("node", None, "feat")] = gb.GPUCachedFeature(
+        feature[("node", None, "feat")] = gb.gpu_cached_feature(
             feature[("node", None, "feat")],
             args.gpu_cache_size,
         )
@@ -364,6 +364,7 @@ def run(rank, world_size, args, devices, dataset):
 
     if rank == 0:
         print(f"Test Accuracy {test_acc.item():.4f}")
+    dist.destroy_process_group()
 
 
 def parse_args():

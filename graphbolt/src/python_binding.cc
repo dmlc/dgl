@@ -10,10 +10,10 @@
 #include <graphbolt/unique_and_compact.h>
 
 #ifdef GRAPHBOLT_USE_CUDA
+#include "./cuda/cooperative_minibatching_utils.h"
 #include "./cuda/max_uva_threads.h"
 #endif
 #include "./cnumpy.h"
-#include "./expand_indptr.h"
 #include "./feature_cache.h"
 #include "./index_select.h"
 #include "./io_uring.h"
@@ -51,13 +51,14 @@ TORCH_LIBRARY(graphbolt, m) {
   m.class_<Future<c10::intrusive_ptr<FusedSampledSubgraph>>>(
        "FusedSampledSubgraphFuture")
       .def("wait", &Future<c10::intrusive_ptr<FusedSampledSubgraph>>::Wait);
-  m.class_<Future<
-      std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>(
+  m.class_<Future<std::vector<
+      std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>>(
        "UniqueAndCompactBatchedFuture")
       .def(
           "wait",
-          &Future<std::vector<
-              std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>::Wait);
+          &Future<std::vector<std::tuple<
+              torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>::
+              Wait);
   m.class_<Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>(
        "GpuGraphCacheQueryFuture")
       .def(
@@ -167,6 +168,8 @@ TORCH_LIBRARY(graphbolt, m) {
       "clock_cache_policy",
       &storage::PartitionedCachePolicy::Create<storage::ClockCachePolicy>);
   m.class_<storage::FeatureCache>("FeatureCache")
+      .def("is_pinned", &storage::FeatureCache::IsPinned)
+      .def_property("nbytes", &storage::FeatureCache::NumBytes)
       .def("index_select", &storage::FeatureCache::IndexSelect)
       .def("query", &storage::FeatureCache::Query)
       .def("query_async", &storage::FeatureCache::QueryAsync)
@@ -179,6 +182,8 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("unique_and_compact_batched", &UniqueAndCompactBatched);
   m.def("unique_and_compact_batched_async", &UniqueAndCompactBatchedAsync);
   m.def("isin", &IsIn);
+  m.def("is_not_in_index", &IsNotInIndex);
+  m.def("is_not_in_index_async", &IsNotInIndexAsync);
   m.def("index_select", &ops::IndexSelect);
   m.def("index_select_async", &ops::IndexSelectAsync);
   m.def("scatter_async", &ops::ScatterAsync);
@@ -192,6 +197,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("set_seed", &RandomEngine::SetManualSeed);
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
+  m.def("rank_sort", &cuda::RankSort);
 #endif
 #ifdef HAS_IMPL_ABSTRACT_PYSTUB
   m.impl_abstract_pystub("dgl.graphbolt.base", "//dgl.graphbolt.base");

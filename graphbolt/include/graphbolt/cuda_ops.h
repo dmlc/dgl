@@ -79,9 +79,21 @@ Sort(torch::Tensor input, int num_bits = 0);
  * @return
  * A boolean tensor of the same shape as elements that is True for elements
  * in test_elements and False otherwise.
- *
  */
 torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements);
+
+/**
+ * @brief Returns the indexes of the nonzero elements in the given boolean mask
+ * if logical_not is false. Otherwise, returns the indexes of the zero elements
+ * instead.
+ *
+ * @param mask        Input boolean mask.
+ * @param logical_not Whether mask should be treated as ~mask.
+ *
+ * @return An int64_t tensor of the same shape as mask containing the indexes
+ * of the selected elements.
+ */
+torch::Tensor Nonzero(torch::Tensor mask, bool logical_not);
 
 /**
  * @brief Select columns for a sparse matrix in a CSC format according to nodes
@@ -262,12 +274,21 @@ torch::Tensor IndptrEdgeIdsImpl(
  *   2. Compact Operation: Utilizes the reverse mapping derived from the unique
  * operation to transform 'src_ids' and 'dst_ids' into compacted IDs.
  *
+ * When world_size is greater than 1, then the given ids are partitioned between
+ * the available ranks. The ids corresponding to the given rank are guaranteed
+ * to come before the ids of other ranks. To do this, the partition ids are
+ * rotated backwards by the given rank so that the ids are ordered as:
+ * [rank, rank + 1, world_size, 0, ..., rank - 1]. This is supported only for
+ * Volta and later generation NVIDIA GPUs.
+ *
  * @param src_ids         A tensor containing source IDs.
  * @param dst_ids         A tensor containing destination IDs.
  * @param unique_dst_ids  A tensor containing unique destination IDs, which is
  *                        exactly all the unique elements in 'dst_ids'.
+ * @param rank            The rank of the current GPU.
+ * @param world_size      The total # GPUs, world size.
  *
- * @return
+ * @return (unique_ids, compacted_src_ids, compacted_dst_ids, unique_offsets)
  * - A tensor representing all unique elements in 'src_ids' and 'dst_ids' after
  * removing duplicates. The indices in this tensor precisely match the compacted
  * IDs of the corresponding elements.
@@ -275,6 +296,9 @@ torch::Tensor IndptrEdgeIdsImpl(
  * mapped to compacted IDs.
  * - The tensor corresponding to the 'dst_ids' tensor, where the entries are
  * mapped to compacted IDs.
+ * - The tensor corresponding to the offsets into the unique_ids tensor. Has
+ * size `world_size + 1` and unique_ids[offsets[i]: offsets[i + 1]] belongs to
+ * the rank `(rank + i) % world_size`.
  *
  * @example
  *   torch::Tensor src_ids = src
@@ -285,20 +309,24 @@ torch::Tensor IndptrEdgeIdsImpl(
  *   torch::Tensor compacted_src_ids = std::get<1>(result);
  *   torch::Tensor compacted_dst_ids = std::get<2>(result);
  */
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+UniqueAndCompact(
     const torch::Tensor src_ids, const torch::Tensor dst_ids,
-    const torch::Tensor unique_dst_ids, int num_bits = 0);
+    const torch::Tensor unique_dst_ids, const int64_t rank,
+    const int64_t world_size);
 
 /**
  * @brief Batched version of UniqueAndCompact. The ith element of the return
  * value is equal to the passing the ith elements of the input arguments to
  * UniqueAndCompact.
  */
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>
+std::vector<
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
 UniqueAndCompactBatched(
     const std::vector<torch::Tensor>& src_ids,
     const std::vector<torch::Tensor>& dst_ids,
-    const std::vector<torch::Tensor>& unique_dst_ids, int num_bits = 0);
+    const std::vector<torch::Tensor>& unique_dst_ids, const int64_t rank,
+    const int64_t world_size);
 
 }  //  namespace ops
 }  //  namespace graphbolt

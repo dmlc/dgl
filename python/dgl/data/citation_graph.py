@@ -3,6 +3,7 @@
 (lingfan): following dataset loading and preprocessing code from tkipf/gcn
 https://github.com/tkipf/gcn/blob/master/gcn/utils.py
 """
+
 from __future__ import absolute_import
 
 import os, sys
@@ -14,7 +15,8 @@ import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 
-from .. import backend as F, batch, convert
+from .. import backend as F, convert
+from ..batch import batch as batch_graphs
 from ..convert import from_networkx, graph as dgl_graph, to_networkx
 from ..transforms import reorder_graph
 from .dgl_dataset import DGLBuiltinDataset
@@ -67,6 +69,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
     reorder : bool
         Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
     """
+
     _urls = {
         "cora_v2": "dataset/cora_v2.zip",
         "citeseer": "dataset/citeseer.zip",
@@ -922,7 +925,7 @@ class CoraBinary(DGLBuiltinDataset):
     @staticmethod
     def collate_fn(cur):
         graphs, pmpds, labels = zip(*cur)
-        batched_graphs = batch.batch(graphs)
+        batched_graphs = batch_graphs(graphs)
         batched_pmpds = sp.block_diag(pmpds)
         batched_labels = np.concatenate(labels, axis=0)
         return batched_graphs, batched_pmpds, batched_labels

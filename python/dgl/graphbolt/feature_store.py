@@ -1,10 +1,16 @@
 """Feature store for GraphBolt."""
 
-from typing import NamedTuple
+from typing import Dict, NamedTuple, Union
 
 import torch
 
-__all__ = ["Feature", "FeatureStore", "FeatureKey"]
+__all__ = [
+    "bytes_to_number_of_items",
+    "Feature",
+    "FeatureStore",
+    "FeatureKey",
+    "wrap_with_cached_feature",
+]
 
 
 class FeatureKey(NamedTuple):
@@ -90,6 +96,16 @@ class Feature:
         -------
         torch.Size
             The size of the feature.
+        """
+        raise NotImplementedError
+
+    def count(self):
+        """Get the count of the feature.
+
+        Returns
+        -------
+        int
+            The count of the feature.
         """
         raise NotImplementedError
 
@@ -194,6 +210,29 @@ class FeatureStore:
         """
         return self.__getitem__((domain, type_name, feature_name)).size()
 
+    def count(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+    ):
+        """Get the count the specified feature in the feature store.
+
+        Parameters
+        ----------
+        domain : str
+            The domain of the feature such as "node", "edge" or "graph".
+        type_name : str
+            The node or edge type name.
+        feature_name : str
+            The feature name.
+        Returns
+        -------
+        int
+            The count of the specified feature in the feature store.
+        """
+        return self.__getitem__((domain, type_name, feature_name)).count()
+
     def metadata(
         self,
         domain: str,
@@ -256,3 +295,57 @@ class FeatureStore:
             feat_name)` format.
         """
         raise NotImplementedError
+
+
+def bytes_to_number_of_items(cache_capacity_in_bytes, single_item):
+    """Returns the number of rows to be cached."""
+    item_bytes = single_item.nbytes
+    # Round up so that we never get a size of 0, unless bytes is 0.
+    return (cache_capacity_in_bytes + item_bytes - 1) // item_bytes
+
+
+def wrap_with_cached_feature(
+    cached_feature_type,
+    fallback_features: Union[Feature, Dict[FeatureKey, Feature]],
+    max_cache_size_in_bytes: int,
+    *args,
+    **kwargs,
+) -> Union[Feature, Dict[FeatureKey, Feature]]:
+    """Wraps the given features with the given cached feature type using
+    a single cache instance."""
+    if not isinstance(fallback_features, dict):
+        assert isinstance(fallback_features, Feature)
+        return wrap_with_cached_feature(
+            cached_feature_type,
+            {"a": fallback_features},
+            max_cache_size_in_bytes,
+            *args,
+            **kwargs,
+        )["a"]
+    row_bytes = None
+    cache = None
+    wrapped_features = {}
+    offset = 0
+    for feature_key, fallback_feature in fallback_features.items():
+        # Fetching the feature dimension from the underlying feature.
+        feat0 = fallback_feature.read(torch.tensor([0]))
+        if row_bytes is None:
+            row_bytes = feat0.nbytes
+        else:
+            assert (
+                row_bytes == feat0.nbytes
+            ), "The # bytes of a single row of the features should match."
+        cache_size = bytes_to_number_of_items(max_cache_size_in_bytes, feat0)
+        if cache is None:
+            cache = cached_feature_type._cache_type(
+                cache_shape=(cache_size,) + feat0.shape[1:],
+                dtype=feat0.dtype,
+                *args,
+                **kwargs,
+            )
+        wrapped_features[feature_key] = cached_feature_type(
+            fallback_feature, cache=cache, offset=offset
+        )
+        offset += fallback_feature.count()
+
+    return wrapped_features

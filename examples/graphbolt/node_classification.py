@@ -363,9 +363,19 @@ def parse_args():
         "--dataset",
         type=str,
         default="ogbn-products",
-        choices=["ogbn-arxiv", "ogbn-products", "ogbn-papers100M"],
+        choices=[
+            "ogbn-arxiv",
+            "ogbn-products",
+            "ogbn-papers100M",
+            "igb-hom-tiny",
+            "igb-hom-small",
+            "igb-hom-medium",
+            "igb-hom-large",
+            "igb-hom",
+        ],
         help="The dataset we can use for node classification example. Currently"
-        " ogbn-products, ogbn-arxiv, ogbn-papers100M datasets are supported.",
+        " ogbn-products, ogbn-arxiv, ogbn-papers100M and"
+        " igb-hom-[tiny|small|medium|large] and igb-hom datasets are supported.",
     )
     parser.add_argument(
         "--mode",

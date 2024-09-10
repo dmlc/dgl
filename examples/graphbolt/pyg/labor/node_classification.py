@@ -30,25 +30,6 @@ def accuracy(out, labels):
     return (labels == predictions).sum(dtype=torch.float64) / labels.size(0)
 
 
-def convert_to_pyg(h, subgraph):
-    #####################################################################
-    # (HIGHLIGHT) Convert given features to be consumed by a PyG layer.
-    #
-    #   We convert the provided sampled edges in CSC format from GraphBolt and
-    #   convert to COO via using gb.expand_indptr.
-    #####################################################################
-    src = subgraph.sampled_csc.indices
-    dst = gb.expand_indptr(
-        subgraph.sampled_csc.indptr,
-        dtype=src.dtype,
-        output_size=src.size(0),
-    )
-    edge_index = torch.stack([src, dst], dim=0).long()
-    dst_size = subgraph.sampled_csc.indptr.size(0) - 1
-    # h and h[:dst_size] correspond to source and destination features resp.
-    return (h, h[:dst_size]), edge_index, (h.size(0), dst_size)
-
-
 class GraphSAGE(torch.nn.Module):
     def __init__(
         self, in_size, hidden_size, out_size, n_layers, dropout, variant
@@ -75,7 +56,7 @@ class GraphSAGE(torch.nn.Module):
     def forward(self, subgraphs, x):
         h = x
         for i, (layer, subgraph) in enumerate(zip(self.layers, subgraphs)):
-            h, edge_index, size = convert_to_pyg(h, subgraph)
+            h, edge_index, size = subgraph.to_pyg(h)
             h = layer(h, edge_index, size=size)
             if self.variant == "custom":
                 h = self.activation(h)
@@ -101,8 +82,8 @@ class GraphSAGE(torch.nn.Module):
             )
             for data in tqdm(dataloader, "Inferencing"):
                 # len(data.sampled_subgraphs) = 1
-                h, edge_index, size = convert_to_pyg(
-                    data.node_features["feat"], data.sampled_subgraphs[0]
+                h, edge_index, size = data.sampled_subgraphs[0].to_pyg(
+                    data.node_features["feat"]
                 )
                 hidden_x = layer(h, edge_index, size=size)
                 if self.variant == "custom":
@@ -333,13 +314,13 @@ def evaluate(
     model.eval()
     total_correct = torch.zeros(1, dtype=torch.float64, device=device)
     total_samples = 0
-    val_dataloader_tqdm = tqdm(dataloader, "Evaluating")
-    for step, minibatch in enumerate(val_dataloader_tqdm):
+    dataloader = tqdm(dataloader, "Evaluating")
+    for step, minibatch in enumerate(dataloader):
         num_correct, num_samples = evaluate_step(minibatch, model, eval_fn)
         total_correct += num_correct
         total_samples += num_samples
         if step % 25 == 0:
-            val_dataloader_tqdm.set_postfix(
+            dataloader.set_postfix(
                 {
                     "num_nodes": minibatch.node_ids().size(0),
                     "gpu_cache_miss": gpu_cache_miss_rate_fn(),
@@ -382,6 +363,11 @@ def parse_args():
             "ogbn-arxiv",
             "ogbn-products",
             "ogbn-papers100M",
+            "igb-hom-tiny",
+            "igb-hom-small",
+            "igb-hom-medium",
+            "igb-hom-large",
+            "igb-hom",
             "reddit",
             "yelp",
             "flickr",
@@ -494,23 +480,23 @@ def main():
     if args.num_cpu_cached_features > 0 and isinstance(
         features[("node", None, "feat")], gb.DiskBasedFeature
     ):
-        features[("node", None, "feat")] = gb.CPUCachedFeature(
+        features[("node", None, "feat")] = gb.cpu_cached_feature(
             features[("node", None, "feat")],
             args.num_cpu_cached_features * feature_num_bytes,
             args.cpu_feature_cache_policy,
             args.feature_device == "pinned",
         )
         cpu_cached_feature = features[("node", None, "feat")]
-        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature._feature.miss_rate
+        cpu_cache_miss_rate_fn = lambda: cpu_cached_feature.miss_rate
     else:
         cpu_cache_miss_rate_fn = lambda: 1
     if args.num_gpu_cached_features > 0 and args.feature_device != "cuda":
-        features[("node", None, "feat")] = gb.GPUCachedFeature(
+        features[("node", None, "feat")] = gb.gpu_cached_feature(
             features[("node", None, "feat")],
             args.num_gpu_cached_features * feature_num_bytes,
         )
         gpu_cached_feature = features[("node", None, "feat")]
-        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature._feature.miss_rate
+        gpu_cache_miss_rate_fn = lambda: gpu_cached_feature.miss_rate
     else:
         gpu_cache_miss_rate_fn = lambda: 1
 
