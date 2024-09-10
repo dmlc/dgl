@@ -561,8 +561,8 @@ class NeighborSamplerImpl(SubgraphSampler):
             deduplicate,
             sampler,
             overlap_fetch,
-            asynchronous,
-            layer_dependency,
+            asynchronous=asynchronous,
+            layer_dependency=layer_dependency,
         )
 
     def _init_seed(self, batch_dependency):
