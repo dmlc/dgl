@@ -349,6 +349,7 @@ def unique_and_compact_csc_formats(
             if is_homogeneous:
                 compacted_csc_formats = list(compacted_csc_formats.values())[0]
                 unique_nodes = list(unique_nodes.values())[0]
+                offsets = list(offsets.values())[0]
 
             return unique_nodes, compacted_csc_formats, offsets
 
