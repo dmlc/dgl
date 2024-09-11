@@ -253,7 +253,7 @@ class SubgraphSampler(MiniBatchTransformer):
         unique_seeds, inverse_seeds, _ = minibatch._unique_future.wait()
         delattr(minibatch, "_unique_future")
         minibatch._seed_nodes = unique_seeds
-        minibatch._inverse_seeds = inverse_seeds
+        minibatch._seed_inverse_ids = inverse_seeds
         return minibatch
 
     def _sample(self, minibatch):
