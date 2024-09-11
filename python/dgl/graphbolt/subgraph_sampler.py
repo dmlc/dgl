@@ -5,8 +5,8 @@ from functools import partial
 from typing import Dict
 
 import torch
-from torch.utils.data import functional_datapipe
 import torch.distributed as thd
+from torch.utils.data import functional_datapipe
 
 from .base import seed_type_str_to_ntypes
 from .internal import compact_temporal_nodes, unique_and_compact
@@ -73,7 +73,9 @@ class SubgraphSampler(MiniBatchTransformer):
     ):
         async_op = kwargs.get("asynchronous", False)
         cooperative = kwargs.get("cooperative", False)
-        preprocess_fn = partial(self._preprocess, cooperative=cooperative, async_op=async_op)
+        preprocess_fn = partial(
+            self._preprocess, cooperative=cooperative, async_op=async_op
+        )
         datapipe = datapipe.transform(preprocess_fn)
         if async_op:
             fn = partial(self._wait_preprocess_future, cooperative=cooperative)
@@ -104,7 +106,9 @@ class SubgraphSampler(MiniBatchTransformer):
             )
         rank = thd.get_rank() if cooperative else 0
         world_size = thd.get_world_size() if cooperative else 1
-        results = SubgraphSampler._seeds_preprocess(minibatch, rank, world_size, async_op)
+        results = SubgraphSampler._seeds_preprocess(
+            minibatch, rank, world_size, async_op
+        )
         if async_op:
             minibatch._preprocess_future = results
         else:
@@ -154,13 +158,18 @@ class SubgraphSampler(MiniBatchTransformer):
                     typed_sorted_seeds,
                     typed_index,
                     typed_offsets,
-                ) in enumerate(zip(
-                    seeds.keys(), sorted_seeds_list, index_list, offsets_list
-                )):
+                ) in enumerate(
+                    zip(
+                        seeds.keys(),
+                        sorted_seeds_list,
+                        index_list,
+                        offsets_list,
+                    )
+                ):
                     sorted_seeds[seed_type] = typed_sorted_seeds
                     sorted_compacted[seed_type] = typed_index
                     sorted_offsets[seed_type] = typed_offsets.tolist()
-                    
+
                 minibatch._seed_nodes = sorted_seeds
                 minibatch.compacted_seeds = sorted_compacted
                 minibatch._seeds_offsets = sorted_offsets
@@ -171,12 +180,19 @@ class SubgraphSampler(MiniBatchTransformer):
         counts_sent = torch.empty(world_size * num_ntypes, dtype=torch.int64)
         if is_hetero:
             for i, offsets in enumerate(minibatch._seeds_offsets[0].values()):
-                counts_sent[torch.arange(i, world_size * num_ntypes, num_ntypes)] = offsets.diff()
+                counts_sent[
+                    torch.arange(i, world_size * num_ntypes, num_ntypes)
+                ] = offsets.diff()
         else:
             counts_sent = minibatch._seeds_offsets[0].diff()
         delattr(minibatch, "_seeds_offsets")
         counts_received = torch.empty_like(counts_sent)
-        minibatch._counts_future = all_to_all(counts_received.split(num_ntypes), counts_sent.split(num_ntypes), async_op=True)
+        minibatch._counts_future = all_to_all(
+            counts_received.split(num_ntypes),
+            counts_sent.split(num_ntypes),
+            group=group,
+            async_op=True,
+        )
         minibatch._counts_sent = counts_sent
         minibatch._counts_received = counts_received
         return minibatch
@@ -198,14 +214,24 @@ class SubgraphSampler(MiniBatchTransformer):
                 idx = torch.arange(i, world_size * num_ntypes, num_ntypes)
                 typed_counts_sent = minibatch._counts_sent[idx].tolist()
                 typed_counts_received = minibatch._counts_received[idx].tolist()
-                typed_seeds_received = typed_seeds.new_empty(sum(typed_counts_received))
-                all_to_all(typed_seeds_received.split(typed_counts_received), typed_seeds.split(typed_counts_sent))
+                typed_seeds_received = typed_seeds.new_empty(
+                    sum(typed_counts_received)
+                )
+                all_to_all(
+                    typed_seeds_received.split(typed_counts_received),
+                    typed_seeds.split(typed_counts_sent),
+                    group,
+                )
                 seeds_received[ntype] = typed_seeds_received
         else:
             counts_sent = minibatch._counts_sent.tolist()
             counts_received = minibatch._counts_received.tolist()
             seeds_received = seeds.new_empty(sum(counts_received))
-            all_to_all(seeds_received.split(counts_received), seeds.split(counts_sent))
+            all_to_all(
+                seeds_received.split(counts_received),
+                seeds.split(counts_sent),
+                group,
+            )
         minibatch._seed_nodes = seeds_received
         minibatch._counts_sent = counts_sent
         minibatch._counts_received = counts_received
