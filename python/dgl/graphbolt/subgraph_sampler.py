@@ -30,12 +30,16 @@ class _NoOpWaiter:
         return result
 
 
-def _shift(l: list, group=None):
-    cutoff = len(l) - thd.get_rank(group)
-    return l[cutoff:] + l[:cutoff]
+def _shift(inputs: list, group=None):
+    cutoff = len(inputs) - thd.get_rank(group)
+    return inputs[cutoff:] + inputs[:cutoff]
 
 
 def all_to_all(outputs, inputs, group=None, async_op=False):
+    """Wrapper for thd.all_to_all that permuted outputs and inputs before
+    calling it. The arguments have the permutation
+    `rank, ..., world_size - 1, 0, ..., rank - 1` and we make it
+    `0, world_size - 1` before calling `thd.all_to_all`."""
     shift_fn = partial(_shift, group=group)
     return thd.all_to_all(shift_fn(outputs), shift_fn(inputs), group, async_op)
 
