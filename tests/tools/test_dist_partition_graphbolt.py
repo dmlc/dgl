@@ -30,7 +30,7 @@ def _verify_metadata_gb(gpb, g, num_parts, part_id, part_sizes):
     check list:
         make sure the number of nodes and edges is correct.
         make sure the number of parts is correct.
-        make sure the number of nodes and edges in each parts os corrcet.
+        make sure the number of nodes and edges in each part is corrcet.
     """
     assert gpb._num_nodes() == g.num_nodes()
     assert gpb._num_edges() == g.num_edges()
