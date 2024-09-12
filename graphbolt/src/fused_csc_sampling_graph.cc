@@ -1412,7 +1412,8 @@ inline int64_t UniformPick(
 /** @brief An operator to perform non-uniform sampling. */
 static torch::Tensor NonUniformPickOp(
     torch::Tensor probs, int64_t fanout, bool replace) {
-  auto positive_probs_indices = probs.contiguous().nonzero();
+  auto positive_probs_indices = probs.nonzero();
+  // returns a N-by-1 tensor, compatible with all data_ptr() usage below
   auto num_positive_probs = positive_probs_indices.size(0);
   if (num_positive_probs == 0) return torch::empty({0}, torch::kLong);
   if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
