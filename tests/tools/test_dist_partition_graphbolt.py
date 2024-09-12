@@ -24,12 +24,6 @@ from distpartitioning import array_readwriter
 from distpartitioning.utils import generate_read_list
 from pytest_utils import create_chunked_dataset
 
-from tools.verification_utils import (
-    verify_graph_feats,
-    verify_partition_data_types,
-    verify_partition_formats,
-)
-
 
 def _verify_metadata_gb(gpb, g, num_parts, part_id, part_sizes):
     """

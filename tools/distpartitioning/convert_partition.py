@@ -4,12 +4,15 @@ import logging
 import os
 
 import constants
-
 import dgl
 import dgl.graphbolt as gb
 import numpy as np
 import torch as th
+from dgl import EID, ETYPE, NID, NTYPE
+
+from dgl.distributed.constants import DGL2GB_EID, GB_DST_ID
 from dgl.distributed.partition import (
+    _cast_to_minimum_dtype,
     _etype_str_to_tuple,
     _etype_tuple_to_str,
     RESERVED_FIELD_DTYPE,
@@ -316,7 +319,72 @@ def remove_attr_gb(
     return edata, ndata
 
 
+def cast_various_to_minimum_dtype_gb(
+    node_count,
+    edge_count,
+    num_parts,
+    indptr,
+    indices,
+    type_per_edge,
+    etypes,
+    ntypes,
+    node_attributes,
+    edge_attributes,
+):
+    """Cast various data to minimum dtype."""
+    # Cast 1: indptr.
+    indptr = _cast_to_minimum_dtype(edge_count, indptr)
+    # Cast 2: indices.
+    indices = _cast_to_minimum_dtype(node_count, indices)
+    # Cast 3: type_per_edge.
+    type_per_edge = _cast_to_minimum_dtype(
+        len(etypes), type_per_edge, field=ETYPE
+    )
+    # Cast 4: node/edge_attributes.
+    predicates = {
+        NID: node_count,
+        "part_id": num_parts,
+        NTYPE: len(ntypes),
+        EID: edge_count,
+        ETYPE: len(etypes),
+        DGL2GB_EID: edge_count,
+        GB_DST_ID: node_count,
+    }
+    for attributes in [node_attributes, edge_attributes]:
+        for key in attributes:
+            if key not in predicates:
+                continue
+            attributes[key] = _cast_to_minimum_dtype(
+                predicates[key], attributes[key], field=key
+            )
+    return indptr, indices, type_per_edge
+
+
+def _process_partition_gb(
+    part_local_src_id,
+    part_local_dst_id,
+    edge_attr,
+    node_attr,
+    type_per_edge,
+    formats,
+):
+    temp_g = dgl.DGLGraph((part_local_src_id, part_local_dst_id))
+    for edge_type, data in edge_attr.items():
+        temp_g.edata[edge_type] = data
+    for node_type, data in node_attr.items():
+        temp_g.ndata[node_type] = data
+    sort_etypes = max(type_per_edge) > 1
+    temp_g = dgl.distributed.partition.process_partitions(
+        temp_g, formats=formats, sort_etypes=sort_etypes
+    )
+    return temp_g.edata, temp_g.ndata
+
+
 def create_graph_object(
+    node_count,
+    edge_count,
+    graph_formats,
+    num_parts,
     schema,
     part_id,
     node_data,
@@ -377,6 +445,14 @@ def create_graph_object(
 
     Parameters:
     -----------
+    node_count : int
+        the number of all nodes
+    edge_count : int
+        the number of all edges
+    graph_formats : str
+        the format of graph
+    num_parts : int
+        the number of parts
     schame : json object
         json object created by reading the graph metadata json file
     part_id : int
@@ -603,6 +679,33 @@ def create_graph_object(
         nid_map[part_local_dst_id],
     )
 
+    """
+    Creating attributes for graphbolt and DGLGraph is as follows.
+
+    node attributes:    
+        this part is implemented in _create_node_attr.
+        compute the ntype and per type ids for each node with global node type id.
+        create ntype, nid and inner node with orig ntype and inner nodes
+    this part is shared by graphbolt and DGLGraph.
+
+    the attributes created for graphbolt are as follows:
+
+    edge attributes:
+        this part is implemented in _create_edge_attr_gb.
+        create eid, type per edge and inner edge with edgeid_offset.
+        create edge_type_to_id with etypes_map.
+    
+    The process to remove extra attribute is implemented in  remove_attr_gb.
+    the unused attributes like inner_node, inner_edge, eids will be removed following the arguments in kwargs.
+    edge_attr, node_attr are the variable that have removed extra attributes to construct csc_graph.
+    edata, ndata are the variable that reserve extra attributes to be used to generate orig_nid and orig_eid. 
+    
+    the src_ids and dst_ids will be transformed into indptr and indices in _coo2csc.
+
+    all variable mentioned above will be casted to minimum data type in cast_various_to_minimum_dtype_gb.
+
+    orig_nids and orig_eids will be generated in _graph_orig_ids with ndata and edata.
+    """
     # create the graph here now.
     ndata, per_type_ids = _create_node_attr(
         idx,
@@ -623,6 +726,17 @@ def create_graph_object(
             etypes,
             etypes_map,
         )
+        edata, ndata = _process_partition_gb(
+            part_local_src_id,
+            part_local_dst_id,
+            edata,
+            ndata,
+            type_per_edge,
+            graph_formats,
+        )
+        assert edata is not None
+        assert ndata is not None
+
         edge_attr, node_attr = remove_attr_gb(
             edge_attr=edata, node_attr=ndata, **kwargs
         )
@@ -632,6 +746,18 @@ def create_graph_object(
         edge_attr = {
             attr: edge_attr[attr][csc_edge_ids] for attr in edge_attr.keys()
         }
+        cast_various_to_minimum_dtype_gb(
+            node_count,
+            edge_count,
+            num_parts,
+            indptr,
+            indices,
+            type_per_edge,
+            etypes,
+            ntypes,
+            node_attr,
+            edge_attr,
+        )
         part_graph = gb.fused_csc_sampling_graph(
             csc_indptr=indptr,
             indices=indices,

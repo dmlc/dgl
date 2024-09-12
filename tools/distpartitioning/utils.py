@@ -539,6 +539,19 @@ def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
     dgl.save_graphs(graph_file, [graph_obj], formats=formats)
 
 
+def _write_graph(
+    part_dir, graph_obj, formats=None, sort_etypes=None, use_graphbolt=False
+):
+    if use_graphbolt:
+        write_graph_graghbolt(
+            os.path.join(part_dir, "fused_csc_sampling_graph.pt"), graph_obj
+        )
+    else:
+        write_graph_dgl(
+            os.path.join(part_dir, "graph.dgl"), graph_obj, formats, sort_etypes
+        )
+
+
 def write_dgl_objects(
     graph_obj,
     node_features,
@@ -579,15 +592,13 @@ def write_dgl_objects(
     """
     part_dir = output_dir + "/part" + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    if use_graphbolt:
-        write_graph_graghbolt(
-            os.path.join(part_dir, "fused_csc_sampling_graph.pt"), graph_obj
-        )
-    else:
-        write_graph_dgl(
-            os.path.join(part_dir, "graph.dgl"), graph_obj, formats, sort_etypes
-        )
-
+    _write_graph(
+        part_dir,
+        graph_obj,
+        formats=formats,
+        sort_etypes=sort_etypes,
+        use_graphbolt=use_graphbolt,
+    )
     if node_features != None:
         write_node_features(
             node_features, os.path.join(part_dir, "node_feat.dgl")

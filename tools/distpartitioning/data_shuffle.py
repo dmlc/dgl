@@ -285,21 +285,21 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
             local_etype_ids.append(rcvd_edge_data[:, 3])
             local_eids.append(rcvd_edge_data[:, 4])
 
-        edge_data[
-            constants.GLOBAL_SRC_ID + "/" + str(local_part_id)
-        ] = np.concatenate(local_src_ids)
-        edge_data[
-            constants.GLOBAL_DST_ID + "/" + str(local_part_id)
-        ] = np.concatenate(local_dst_ids)
-        edge_data[
-            constants.GLOBAL_TYPE_EID + "/" + str(local_part_id)
-        ] = np.concatenate(local_type_eids)
-        edge_data[
-            constants.ETYPE_ID + "/" + str(local_part_id)
-        ] = np.concatenate(local_etype_ids)
-        edge_data[
-            constants.GLOBAL_EID + "/" + str(local_part_id)
-        ] = np.concatenate(local_eids)
+        edge_data[constants.GLOBAL_SRC_ID + "/" + str(local_part_id)] = (
+            np.concatenate(local_src_ids)
+        )
+        edge_data[constants.GLOBAL_DST_ID + "/" + str(local_part_id)] = (
+            np.concatenate(local_dst_ids)
+        )
+        edge_data[constants.GLOBAL_TYPE_EID + "/" + str(local_part_id)] = (
+            np.concatenate(local_type_eids)
+        )
+        edge_data[constants.ETYPE_ID + "/" + str(local_part_id)] = (
+            np.concatenate(local_etype_ids)
+        )
+        edge_data[constants.GLOBAL_EID + "/" + str(local_part_id)] = (
+            np.concatenate(local_eids)
+        )
 
     # Check if the data was exchanged correctly
     local_edge_count = 0
@@ -1324,6 +1324,10 @@ def gen_dist_partitions(rank, world_size, params):
             orig_nids,
             orig_eids,
         ) = create_graph_object(
+            node_count,
+            edge_count,
+            graph_formats,
+            params.num_parts,
             schema_map,
             rank + local_part_id * world_size,
             local_node_data,
