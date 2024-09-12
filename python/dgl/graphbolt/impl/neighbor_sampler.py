@@ -3,6 +3,7 @@
 from functools import partial
 
 import torch
+import torch.distributed as thd
 from torch.utils.data import functional_datapipe
 from torch.utils.data.datapipes.iter import Mapper
 
@@ -12,10 +13,14 @@ from ..base import (
     index_select,
     ORIGINAL_EDGE_ID,
 )
-from ..internal import compact_csc_format, unique_and_compact_csc_formats
+from ..internal import (
+    compact_csc_format,
+    unique_and_compact,
+    unique_and_compact_csc_formats,
+)
 from ..minibatch_transformer import MiniBatchTransformer
 
-from ..subgraph_sampler import SubgraphSampler
+from ..subgraph_sampler import all_to_all, revert_to_homo, SubgraphSampler
 from .fused_csc_sampling_graph import fused_csc_sampling_graph
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
@@ -455,12 +460,32 @@ class SamplePerLayer(MiniBatchTransformer):
 class CompactPerLayer(MiniBatchTransformer):
     """Compact the sampled edges for a single layer."""
 
-    def __init__(self, datapipe, deduplicate, asynchronous=False):
+    def __init__(
+        self, datapipe, deduplicate, cooperative=False, asynchronous=False
+    ):
         self.deduplicate = deduplicate
+        self.cooperative = cooperative
         if asynchronous and deduplicate:
             datapipe = datapipe.transform(self._compact_per_layer_async)
             datapipe = datapipe.buffer()
-            super().__init__(datapipe, self._compact_per_layer_wait_future)
+            datapipe = datapipe.transform(self._compact_per_layer_wait_future)
+            if cooperative:
+                datapipe = datapipe.transform(
+                    self._seeds_cooperative_exchange_1
+                )
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(
+                    self._seeds_cooperative_exchange_2
+                )
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(
+                    self._seeds_cooperative_exchange_3
+                )
+                datapipe = datapipe.buffer()
+                datapipe = datapipe.transform(
+                    self._seeds_cooperative_exchange_4
+                )
+            super().__init__(datapipe)
         else:
             super().__init__(datapipe, self._compact_per_layer)
 
@@ -498,19 +523,20 @@ class CompactPerLayer(MiniBatchTransformer):
         subgraph = minibatch.sampled_subgraphs[0]
         seeds = minibatch._seed_nodes
         assert self.deduplicate
+        rank = thd.get_rank() if self.cooperative else 0
+        world_size = thd.get_world_size() if self.cooperative else 1
         minibatch._future = unique_and_compact_csc_formats(
-            subgraph.sampled_csc, seeds, async_op=True
+            subgraph.sampled_csc, seeds, rank, world_size, async_op=True
         )
         return minibatch
 
-    @staticmethod
-    def _compact_per_layer_wait_future(minibatch):
+    def _compact_per_layer_wait_future(self, minibatch):
         subgraph = minibatch.sampled_subgraphs[0]
         seeds = minibatch._seed_nodes
         (
             original_row_node_ids,
             compacted_csc_format,
-            _,
+            seeds_offsets,
         ) = minibatch._future.wait()
         delattr(minibatch, "_future")
         subgraph = SampledSubgraphImpl(
@@ -521,6 +547,87 @@ class CompactPerLayer(MiniBatchTransformer):
         )
         minibatch._seed_nodes = original_row_node_ids
         minibatch.sampled_subgraphs[0] = subgraph
+        if self.cooperative:
+            subgraph._seeds_offsets = seeds_offsets
+        return minibatch
+
+    @staticmethod
+    def _seeds_cooperative_exchange_1(minibatch):
+        world_size = thd.get_world_size()
+        subgraph = minibatch.sampled_subgraphs[0]
+        seeds_offsets = subgraph._seeds_offsets
+        is_homogeneous = not isinstance(seeds_offsets, dict)
+        if is_homogeneous:
+            seeds_offsets = {"_N": seeds_offsets}
+        num_ntypes = len(seeds_offsets)
+        counts_sent = torch.empty(world_size * num_ntypes, dtype=torch.int64)
+        for i, offsets in enumerate(seeds_offsets.values()):
+            counts_sent[
+                torch.arange(i, world_size * num_ntypes, num_ntypes)
+            ] = offsets.diff()
+        counts_received = torch.empty_like(counts_sent)
+        subgraph._counts_future = all_to_all(
+            counts_received.split(num_ntypes),
+            counts_sent.split(num_ntypes),
+            async_op=True,
+        )
+        subgraph._counts_sent = counts_sent
+        subgraph._counts_received = counts_received
+        return minibatch
+
+    @staticmethod
+    def _seeds_cooperative_exchange_2(minibatch):
+        world_size = thd.get_world_size()
+        seeds = minibatch._seed_nodes
+        is_homogenous = not isinstance(seeds, dict)
+        if is_homogenous:
+            seeds = {"_N": seeds}
+        subgraph = minibatch.sampled_subgraphs[0]
+        subgraph._counts_future.wait()
+        delattr(subgraph, "_counts_future")
+        num_ntypes = len(seeds.keys())
+        seeds_received = {}
+        counts_sent = {}
+        counts_received = {}
+        for i, (ntype, typed_seeds) in enumerate(seeds.items()):
+            idx = torch.arange(i, world_size * num_ntypes, num_ntypes)
+            typed_counts_sent = subgraph._counts_sent[idx].tolist()
+            typed_counts_received = subgraph._counts_received[idx].tolist()
+            typed_seeds_received = typed_seeds.new_empty(
+                sum(typed_counts_received)
+            )
+            all_to_all(
+                typed_seeds_received.split(typed_counts_received),
+                typed_seeds.split(typed_counts_sent),
+            )
+            seeds_received[ntype] = typed_seeds_received
+        subgraph._seeds_received = seeds_received
+        subgraph._counts_sent = revert_to_homo(counts_sent)
+        subgraph._counts_received = revert_to_homo(counts_received)
+        return minibatch
+
+    @staticmethod
+    def _seeds_cooperative_exchange_3(minibatch):
+        subgraph = minibatch.sampled_subgraphs[0]
+        nodes = {
+            ntype: [typed_seeds]
+            for ntype, typed_seeds in subgraph._seeds_received.items()
+        }
+        minibatch._unique_future = unique_and_compact(
+            nodes, 0, 1, async_op=True
+        )
+        return minibatch
+
+    @staticmethod
+    def _seeds_cooperative_exchange_4(minibatch):
+        unique_seeds, inverse_seeds, _ = minibatch._unique_future.wait()
+        delattr(minibatch, "_unique_future")
+        inverse_seeds = {
+            ntype: typed_inv[0] for ntype, typed_inv in inverse_seeds.items()
+        }
+        minibatch._seed_nodes = revert_to_homo(unique_seeds)
+        subgraph = minibatch.sampled_subgraphs[0]
+        subgraph._seed_inverse_ids = revert_to_homo(inverse_seeds)
         return minibatch
 
 
@@ -541,6 +648,7 @@ class NeighborSamplerImpl(SubgraphSampler):
         overlap_fetch,
         num_gpu_cached_edges,
         gpu_cache_threshold,
+        cooperative,
         asynchronous,
         layer_dependency=None,
         batch_dependency=None,
@@ -561,6 +669,7 @@ class NeighborSamplerImpl(SubgraphSampler):
             deduplicate,
             sampler,
             overlap_fetch,
+            cooperative=cooperative,
             asynchronous=asynchronous,
             layer_dependency=layer_dependency,
         )
@@ -637,6 +746,7 @@ class NeighborSamplerImpl(SubgraphSampler):
         deduplicate,
         sampler,
         overlap_fetch,
+        cooperative,
         asynchronous,
         layer_dependency,
     ):
@@ -653,7 +763,9 @@ class NeighborSamplerImpl(SubgraphSampler):
             datapipe = datapipe.sample_per_layer(
                 sampler, fanout, replace, prob_name, overlap_fetch, asynchronous
             )
-            datapipe = datapipe.compact_per_layer(deduplicate, asynchronous)
+            datapipe = datapipe.compact_per_layer(
+                deduplicate, cooperative, asynchronous
+            )
             if is_labor and not layer_dependency:
                 datapipe = datapipe.transform(self._increment_seed)
         if is_labor:
@@ -775,6 +887,7 @@ class NeighborSampler(NeighborSamplerImpl):
         overlap_fetch=False,
         num_gpu_cached_edges=0,
         gpu_cache_threshold=1,
+        cooperative=False,
         asynchronous=False,
     ):
         super().__init__(
@@ -788,6 +901,7 @@ class NeighborSampler(NeighborSamplerImpl):
             overlap_fetch,
             num_gpu_cached_edges,
             gpu_cache_threshold,
+            cooperative,
             asynchronous,
         )
 
@@ -937,6 +1051,7 @@ class LayerNeighborSampler(NeighborSamplerImpl):
         overlap_fetch=False,
         num_gpu_cached_edges=0,
         gpu_cache_threshold=1,
+        cooperative=False,
         asynchronous=False,
     ):
         super().__init__(
@@ -950,6 +1065,7 @@ class LayerNeighborSampler(NeighborSamplerImpl):
             overlap_fetch,
             num_gpu_cached_edges,
             gpu_cache_threshold,
+            cooperative,
             asynchronous,
             layer_dependency,
             batch_dependency,
