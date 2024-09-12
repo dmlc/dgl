@@ -601,17 +601,16 @@ class CompactPerLayer(MiniBatchTransformer):
                 typed_seeds.split(typed_counts_sent),
             )
             seeds_received[ntype] = typed_seeds_received
-        subgraph._seeds_received = seeds_received
+        minibatch._seed_nodes = seeds_received
         subgraph._counts_sent = revert_to_homo(counts_sent)
         subgraph._counts_received = revert_to_homo(counts_received)
         return minibatch
 
     @staticmethod
     def _seeds_cooperative_exchange_3(minibatch):
-        subgraph = minibatch.sampled_subgraphs[0]
         nodes = {
             ntype: [typed_seeds]
-            for ntype, typed_seeds in subgraph._seeds_received.items()
+            for ntype, typed_seeds in minibatch._seed_nodes.items()
         }
         minibatch._unique_future = unique_and_compact(
             nodes, 0, 1, async_op=True
@@ -627,6 +626,11 @@ class CompactPerLayer(MiniBatchTransformer):
         }
         minibatch._seed_nodes = revert_to_homo(unique_seeds)
         subgraph = minibatch.sampled_subgraphs[0]
+        sizes = {
+            ntype: typed_seeds.size(0)
+            for ntype, typed_seeds in unique_seeds.items()
+        }
+        subgraph._seed_sizes = revert_to_homo(sizes)
         subgraph._seed_inverse_ids = revert_to_homo(inverse_seeds)
         return minibatch
 
@@ -831,6 +835,16 @@ class NeighborSampler(NeighborSamplerImpl):
     gpu_cache_threshold : int, optional
         Determines how many times a vertex needs to be accessed before its
         neighborhood ends up being cached on the GPU.
+    cooperative: bool, optional
+        Boolean indicating whether Cooperative Minibatching, which was initially
+        proposed in
+        `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__
+        and was later first fully described in
+        `Cooperative Minibatching in Graph Neural Networks
+        <https://arxiv.org/abs/2310.12403>`__. Cooperation between the GPUs
+        eliminates duplicate work performed across the GPUs due to the
+        overlapping sampled k-hop neighborhoods of seed nodes when performing
+        GNN minibatching.
     asynchronous: bool
         Boolean indicating whether sampling and compaction stages should run
         in background threads to hide the latency of CPU GPU synchronization.
@@ -986,6 +1000,16 @@ class LayerNeighborSampler(NeighborSamplerImpl):
     gpu_cache_threshold : int, optional
         Determines how many times a vertex needs to be accessed before its
         neighborhood ends up being cached on the GPU.
+    cooperative: bool, optional
+        Boolean indicating whether Cooperative Minibatching, which was initially
+        proposed in
+        `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__
+        and was later first fully described in
+        `Cooperative Minibatching in Graph Neural Networks
+        <https://arxiv.org/abs/2310.12403>`__. Cooperation between the GPUs
+        eliminates duplicate work performed across the GPUs due to the
+        overlapping sampled k-hop neighborhoods of seed nodes when performing
+        GNN minibatching.
     asynchronous: bool
         Boolean indicating whether sampling and compaction stages should run
         in background threads to hide the latency of CPU GPU synchronization.

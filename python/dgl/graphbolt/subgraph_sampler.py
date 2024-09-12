@@ -275,6 +275,11 @@ class SubgraphSampler(MiniBatchTransformer):
             ntype: typed_inv[0] for ntype, typed_inv in inverse_seeds.items()
         }
         minibatch._seed_nodes = revert_to_homo(unique_seeds)
+        sizes = {
+            ntype: typed_seeds.size(0)
+            for ntype, typed_seeds in unique_seeds.items()
+        }
+        minibatch._seed_sizes = revert_to_homo(sizes)
         minibatch._seed_inverse_ids = revert_to_homo(inverse_seeds)
         return minibatch
 
