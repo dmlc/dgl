@@ -93,17 +93,27 @@ def process_partitions(g, formats=None, sort_etypes=False):
     1. format data types.
     2. sort csc/csr by tag.
     """
+    ndata = (
+        g.node_attributes
+        if isinstance(g, gb.FusedCSCSamplingGraph)
+        else g.ndata
+    )
+    edata = (
+        g.edge_attributes
+        if isinstance(g, gb.FusedCSCSamplingGraph)
+        else g.edata
+    )
     for k, dtype in RESERVED_FIELD_DTYPE.items():
         if k in g.ndata:
-            g.ndata[k] = F.astype(g.ndata[k], dtype)
+            ndata[k] = F.astype(ndata[k], dtype)
         if k in g.edata:
-            g.edata[k] = F.astype(g.edata[k], dtype)
+            edata[k] = F.astype(edata[k], dtype)
 
     if (sort_etypes) and (formats is not None):
         if "csr" in formats:
-            g = sort_csr_by_tag(g, tag=g.edata[ETYPE], tag_type="edge")
+            g = sort_csr_by_tag(g, tag=edata[ETYPE], tag_type="edge")
         if "csc" in formats:
-            g = sort_csc_by_tag(g, tag=g.edata[ETYPE], tag_type="edge")
+            g = sort_csc_by_tag(g, tag=edata[ETYPE], tag_type="edge")
     return g
 
 
