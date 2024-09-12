@@ -67,6 +67,7 @@ def all_to_all(outputs, inputs, group=None, async_op=False):
             self.temp_outputs = temp_outputs
 
         def wait(self):
+            """Returns the stored value when invoked."""
             handle = self.handle
             outputs = self.outputs
             temp_outputs = self.temp_outputs
