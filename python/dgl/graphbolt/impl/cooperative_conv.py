@@ -24,6 +24,7 @@ class CooperativeConvFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, subgraph: SampledSubgraph, h: torch.Tensor):
+        """Implements the forward pass."""
         counts_sent = subgraph._counts_sent
         counts_received = subgraph._counts_received
         seed_inverse_ids = subgraph._seed_inverse_ids
@@ -40,6 +41,7 @@ class CooperativeConvFunction(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
+        """Implements the forward pass."""
         (
             counts_sent,
             counts_received,
@@ -76,8 +78,6 @@ class CooperativeConv(torch.nn.Module):
     GPUs at the expense of communication.
     """
 
-    def __init__(self):
-        super().__init__()
-
     def forward(self, subgraph: SampledSubgraph, x: torch.Tensor):
+        """Implements the forward pass."""
         return CooperativeConvFunction.apply(subgraph, x)
