@@ -3,6 +3,7 @@ import torch
 from ..sampled_subgraph import SampledSubgraph
 from ..subgraph_sampler import all_to_all
 
+__all__ = ["CooperativeConvFunction", "CooperativeConv"]
 
 class CooperativeConvFunction(torch.autograd.Function):
     @staticmethod

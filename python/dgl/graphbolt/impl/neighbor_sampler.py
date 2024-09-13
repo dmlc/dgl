@@ -601,6 +601,8 @@ class CompactPerLayer(MiniBatchTransformer):
                 typed_seeds.split(typed_counts_sent),
             )
             seeds_received[ntype] = typed_seeds_received
+            counts_sent[ntype] = typed_counts_sent
+            counts_received[ntype] = typed_counts_received
         minibatch._seed_nodes = seeds_received
         subgraph._counts_sent = revert_to_homo(counts_sent)
         subgraph._counts_received = revert_to_homo(counts_received)
