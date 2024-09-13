@@ -1,3 +1,4 @@
+"""Graphbolt cooperative convolution."""
 import torch
 
 from ..sampled_subgraph import SampledSubgraph
@@ -7,6 +8,20 @@ __all__ = ["CooperativeConvFunction", "CooperativeConv"]
 
 
 class CooperativeConvFunction(torch.autograd.Function):
+    """Cooperative convolution operation from Cooperative Minibatching.
+
+    Implements the `all-to-all` message passing algorithm
+    in Cooperative Minibatching, which was initially proposed in
+    `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__ and
+    was later first fully described in
+    `Cooperative Minibatching in Graph Neural Networks
+    <https://arxiv.org/abs/2310.12403>`__.
+    Cooperation between the GPUs eliminates duplicate work performed across the
+    GPUs due to the overlapping sampled k-hop neighborhoods of seed nodes when
+    performing GNN minibatching. This reduces the redundant computations across
+    GPUs at the expense of communication.
+    """
+
     @staticmethod
     def forward(ctx, subgraph: SampledSubgraph, h: torch.Tensor):
         counts_sent = subgraph._counts_sent
