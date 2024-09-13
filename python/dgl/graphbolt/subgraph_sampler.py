@@ -16,6 +16,7 @@ from .minibatch_transformer import MiniBatchTransformer
 __all__ = [
     "SubgraphSampler",
     "all_to_all",
+    "convert_to_hetero",
     "revert_to_homo",
 ]
 
@@ -87,6 +88,13 @@ def revert_to_homo(d: dict):
     """Utility function to convert a dictionary that stores homogenous data."""
     is_homogenous = len(d) == 1 and "_N" in d
     return list(d.values())[0] if is_homogenous else d
+
+
+def convert_to_hetero(item):
+    """Utility function to convert homogenous data to heterogenous with a single
+    node type."""
+    is_heterogenous = isinstance(item, dict)
+    return item if is_heterogenous else {"_N": item}
 
 
 @functional_datapipe("sample_subgraph")
