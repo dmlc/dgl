@@ -146,6 +146,7 @@ def test_gpu_sampling_DataLoader(
                 ["a", "b", "c"],
                 ["d"],
                 overlap_fetch=overlap_feature_fetch and i == 0,
+                cooperative=asynchronous and cooperative and i == 0,
             )
         dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
     dataloader, dataloader2 = dataloaders
@@ -159,6 +160,8 @@ def test_gpu_sampling_DataLoader(
         bufferer_cnt += 2 * num_layers + 1  # _preprocess stage has 1.
         if cooperative:
             bufferer_cnt += 3 * num_layers
+            if enable_feature_fetch:
+                bufferer_cnt += 1  # feature fetch has 1.
     if cooperative:
         # _preprocess stage and each sampling layer.
         bufferer_cnt += 3
