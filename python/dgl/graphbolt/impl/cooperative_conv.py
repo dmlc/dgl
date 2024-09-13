@@ -23,7 +23,7 @@ class CooperativeConvFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, subgraph: SampledSubgraph, input: torch.Tensor):
+    def forward(ctx, subgraph: SampledSubgraph, tensor: torch.Tensor):
         """Implements the forward pass."""
         counts_sent = subgraph._counts_sent
         counts_received = subgraph._counts_received
@@ -32,10 +32,10 @@ class CooperativeConvFunction(torch.autograd.Function):
         ctx.save_for_backward(
             counts_sent, counts_received, seed_inverse_ids, seed_sizes
         )
-        out = input.new_empty((sum(counts_sent),) + input.shape[1:])
+        out = tensor.new_empty((sum(counts_sent),) + tensor.shape[1:])
         all_to_all(
             torch.split(out, counts_sent),
-            torch.split(input[seed_inverse_ids], counts_received),
+            torch.split(tensor[seed_inverse_ids], counts_received),
         )
         return out
 
