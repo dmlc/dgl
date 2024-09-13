@@ -5,6 +5,7 @@ from ..subgraph_sampler import all_to_all
 
 __all__ = ["CooperativeConvFunction", "CooperativeConv"]
 
+
 class CooperativeConvFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, subgraph: SampledSubgraph, h: torch.Tensor):

@@ -203,8 +203,12 @@ def test_gpu_sampling_DataLoader(
                 x = gb.CooperativeConvFunction.apply(subgraph, x)
                 x, edge_index, size = subgraph.to_pyg(x)
                 x = x[0]
-                one = torch.ones(edge_index.shape[1], dtype=x.dtype, device=x.device)
-                coo = torch.sparse_coo_tensor(edge_index.flipud(), one, size=(size[1], size[0]))
+                one = torch.ones(
+                    edge_index.shape[1], dtype=x.dtype, device=x.device
+                )
+                coo = torch.sparse_coo_tensor(
+                    edge_index.flipud(), one, size=(size[1], size[0])
+                )
                 x = torch.sparse.mm(coo, x)
             assert x.shape[0] == minibatch.seeds.shape[0]
             assert x.shape[1] == 1
