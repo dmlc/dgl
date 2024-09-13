@@ -46,7 +46,7 @@ class CooperativeConvFunction(torch.autograd.Function):
 
 class CooperativeConv(torch.nn.Module):
     """Cooperative convolution operation from Cooperative Minibatching.
-     
+
     Implements the `all-to-all` message passing algorithm
     in Cooperative Minibatching, which was initially proposed in
     `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__ and
@@ -58,6 +58,7 @@ class CooperativeConv(torch.nn.Module):
     performing GNN minibatching. This reduces the redundant computations across
     GPUs at the expense of communication.
     """
+
     def __init__(self):
         super().__init__()
 
