@@ -16,6 +16,7 @@ from .minibatch_transformer import MiniBatchTransformer
 __all__ = [
     "SubgraphSampler",
     "all_to_all",
+    "convert_to_hetero",
     "revert_to_homo",
 ]
 
@@ -87,6 +88,13 @@ def revert_to_homo(d: dict):
     """Utility function to convert a dictionary that stores homogenous data."""
     is_homogenous = len(d) == 1 and "_N" in d
     return list(d.values())[0] if is_homogenous else d
+
+
+def convert_to_hetero(item):
+    """Utility function to convert homogenous data to heterogenous with a single
+    node type."""
+    is_heterogenous = isinstance(item, dict)
+    return item if is_heterogenous else {"_N": item}
 
 
 @functional_datapipe("sample_subgraph")
@@ -251,6 +259,8 @@ class SubgraphSampler(MiniBatchTransformer):
                 group,
             )
             seeds_received[ntype] = typed_seeds_received
+            counts_sent[ntype] = typed_counts_sent
+            counts_received[ntype] = typed_counts_received
         minibatch._seed_nodes = seeds_received
         minibatch._counts_sent = revert_to_homo(counts_sent)
         minibatch._counts_received = revert_to_homo(counts_received)
@@ -275,6 +285,11 @@ class SubgraphSampler(MiniBatchTransformer):
             ntype: typed_inv[0] for ntype, typed_inv in inverse_seeds.items()
         }
         minibatch._seed_nodes = revert_to_homo(unique_seeds)
+        sizes = {
+            ntype: typed_seeds.size(0)
+            for ntype, typed_seeds in unique_seeds.items()
+        }
+        minibatch._seed_sizes = revert_to_homo(sizes)
         minibatch._seed_inverse_ids = revert_to_homo(inverse_seeds)
         return minibatch
 

@@ -6,6 +6,7 @@ import backend as F
 
 import dgl
 import dgl.graphbolt
+import dgl.graphbolt as gb
 import pytest
 import torch
 import torch.distributed as thd
@@ -194,5 +195,23 @@ def test_gpu_sampling_DataLoader(
                 if sampler_name == "LayerNeighborSampler":
                     assert torch.equal(edge_feature, edge_feature_ref)
     assert len(list(dataloader)) == N // B
+
+    if asynchronous and cooperative:
+        for minibatch in minibatches:
+            x = torch.ones((minibatch.node_ids().size(0), 1), device=F.ctx())
+            for subgraph in minibatch.sampled_subgraphs:
+                x = gb.CooperativeConvFunction.apply(subgraph, x)
+                x, edge_index, size = subgraph.to_pyg(x)
+                x = x[0]
+                one = torch.ones(
+                    edge_index.shape[1], dtype=x.dtype, device=x.device
+                )
+                coo = torch.sparse_coo_tensor(
+                    edge_index.flipud(), one, size=(size[1], size[0])
+                )
+                x = torch.sparse.mm(coo, x)
+            assert x.shape[0] == minibatch.seeds.shape[0]
+            assert x.shape[1] == 1
+
     if thd.is_initialized():
         thd.destroy_process_group()
