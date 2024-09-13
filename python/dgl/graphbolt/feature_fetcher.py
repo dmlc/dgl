@@ -8,9 +8,9 @@ import torch
 from torch.utils.data import functional_datapipe
 
 from .base import etype_tuple_to_str
+from .impl.cooperative_conv import CooperativeConvFunction
 
 from .minibatch_transformer import MiniBatchTransformer
-from .impl.cooperative_conv import CooperativeConvFunction
 
 
 __all__ = [
