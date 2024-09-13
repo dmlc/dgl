@@ -9,6 +9,7 @@ import dgl.graphbolt as gb
 import numpy as np
 import torch as th
 from dgl import EID, ETYPE, NID, NTYPE
+import dgl.backend as F
 
 from dgl.distributed.constants import DGL2GB_EID, GB_DST_ID
 from dgl.distributed.partition import (
@@ -261,7 +262,7 @@ def _create_edge_attr_gb(
     is_homo = _is_homogeneous(ntypes, etypes)
 
     edge_type_to_id = (
-        None
+        {gb.etype_tuple_to_str(('_N','_E','_N')) : 0}
         if is_homo
         else {
             gb.etype_tuple_to_str(etype): etid
@@ -361,29 +362,40 @@ def cast_various_to_minimum_dtype_gb(
 
 
 def _process_partition_gb(
-    part_local_src_id,
-    part_local_dst_id,
-    edge_attr,
     node_attr,
+    edge_attr,
     type_per_edge,
-    formats,
+    src_ids,
+    dst_ids,
+    sort_etypes,
 ):
-    temp_g = dgl.DGLGraph((part_local_src_id, part_local_dst_id))
-    for edge_type, data in edge_attr.items():
-        temp_g.edata[edge_type] = data
-    for node_type, data in node_attr.items():
-        temp_g.ndata[node_type] = data
-    sort_etypes = max(type_per_edge) > 1
-    temp_g = dgl.distributed.partition.process_partitions(
-        temp_g, formats=formats, sort_etypes=sort_etypes
-    )
-    return temp_g.edata, temp_g.ndata
+    """Preprocess partitions before saving:
+    1. format data types.
+    2. sort csc/csr by tag.
+    """
+    for k, dtype in RESERVED_FIELD_DTYPE.items():
+        if k in node_attr:
+            node_attr[k] = F.astype(node_attr[k], dtype)
+        if k in edge_attr:
+            edge_attr[k] = F.astype(edge_attr[k], dtype)
+    
+    indptr,indices,edge_ids=_coo2csc(src_ids,dst_ids)
+    if sort_etypes:
+        split_size = th.diff(indptr)
+        split_indices = th.split(type_per_edge, tuple(split_size), dim=0)
+        sorted_idxs=[]
+        for split_indice in split_indices:
+            sorted_idxs.append(split_indice.sort()[1])
+
+        sorted_idx = th.cat(sorted_idxs, dim=0)
+        sorted_idx=th.repeat_interleave(indptr[:-1], split_size, dim=0)+sorted_idx
+    
+    return indptr, indices, edge_ids
 
 
 def create_graph_object(
     node_count,
     edge_count,
-    graph_formats,
     num_parts,
     schema,
     part_id,
@@ -726,22 +738,16 @@ def create_graph_object(
             etypes,
             etypes_map,
         )
-        edata, ndata = _process_partition_gb(
-            part_local_src_id,
-            part_local_dst_id,
-            edata,
-            ndata,
-            type_per_edge,
-            graph_formats,
-        )
+
         assert edata is not None
         assert ndata is not None
 
+        sort_etypes = len(etypes_map) > 1
+        indptr, indices, csc_edge_ids = _process_partition_gb(
+            ndata, edata, type_per_edge, part_local_src_id, part_local_dst_id,sort_etypes
+        )
         edge_attr, node_attr = remove_attr_gb(
             edge_attr=edata, node_attr=ndata, **kwargs
-        )
-        indptr, indices, csc_edge_ids = _coo2csc(
-            part_local_src_id, part_local_dst_id
         )
         edge_attr = {
             attr: edge_attr[attr][csc_edge_ids] for attr in edge_attr.keys()
