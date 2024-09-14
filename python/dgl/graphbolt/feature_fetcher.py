@@ -160,13 +160,24 @@ class FeatureFetcher(MiniBatchTransformer):
                 features[key] = value.wait()
         return data
 
-    @staticmethod
-    def _cooperative_exchange(data):
+    def _cooperative_exchange(self, data):
         subgraph = data.sampled_subgraphs[0]
-        for key in data.node_features:
-            feature = data.node_features[key]
-            new_feature = CooperativeConvFunction.apply(subgraph, feature)
-            data.node_features[key] = new_feature
+        is_heterogeneous = isinstance(
+            self.node_feature_keys, Dict
+        ) or isinstance(self.edge_feature_keys, Dict)
+        if is_heterogeneous:
+            node_features = {key: {} for key, _ in data.node_features.keys()}
+            for (key, ntype), feature in data.node_features.items():
+                node_features[key][ntype] = feature
+            for key, feature in node_features.items():
+                new_feature = CooperativeConvFunction.apply(subgraph, feature)
+                for ntype, tensor in new_feature.items():
+                    data.node_features[(key, ntype)] = tensor
+        else:
+            for key in data.node_features:
+                feature = data.node_features[key]
+                new_feature = CooperativeConvFunction.apply(subgraph, feature)
+                data.node_features[key] = new_feature
         return data
 
     def _read(self, data):
