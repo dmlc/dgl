@@ -57,7 +57,7 @@ class CooperativeConvFunction(torch.autograd.Function):
     def backward(
         ctx, grad_output: Union[torch.Tensor, Dict[str, torch.Tensor]]
     ):
-        """Implements the forward pass."""
+        """Implements the backward pass."""
         (
             counts_sent,
             counts_received,
