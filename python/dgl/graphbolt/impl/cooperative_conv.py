@@ -35,8 +35,11 @@ class CooperativeConvFunction(torch.autograd.Function):
         counts_received = convert_to_hetero(subgraph._counts_received)
         seed_inverse_ids = convert_to_hetero(subgraph._seed_inverse_ids)
         seed_sizes = convert_to_hetero(subgraph._seed_sizes)
-        ctx.save_for_backward(
-            counts_sent, counts_received, seed_inverse_ids, seed_sizes
+        ctx.communication_variables = (
+            counts_sent,
+            counts_received,
+            seed_inverse_ids,
+            seed_sizes,
         )
         outs = {}
         for ntype, typed_tensor in convert_to_hetero(tensor).items():
@@ -63,7 +66,8 @@ class CooperativeConvFunction(torch.autograd.Function):
             counts_received,
             seed_inverse_ids,
             seed_sizes,
-        ) = ctx.saved_tensors
+        ) = ctx.communication_variables
+        delattr(ctx, "communication_variables")
         outs = {}
         for ntype, typed_grad_output in convert_to_hetero(grad_output).items():
             out = typed_grad_output.new_empty(
@@ -79,7 +83,11 @@ class CooperativeConvFunction(torch.autograd.Function):
             )  # src
             i[1] = seed_inverse_ids[ntype]  # dst
             coo = torch.sparse_coo_tensor(
-                i, 1, size=(seed_sizes[ntype], i.shape[1])
+                i,
+                torch.ones(
+                    i.shape[1], dtype=grad_output.dtype, device=i.device
+                ),
+                size=(seed_sizes[ntype], i.shape[1]),
             )
             outs[ntype] = torch.sparse.mm(coo, out)
         return None, revert_to_homo(outs)
