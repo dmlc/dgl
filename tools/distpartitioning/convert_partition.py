@@ -352,7 +352,7 @@ def _process_partition_gb(
             th.repeat_interleave(indptr[:-1], split_size, dim=0) + sorted_idx
         )
 
-    return indptr, indices, edge_ids
+    return indptr, indices[sorted_idx], edge_ids[sorted_idx]
 
 
 def create_graph_object(
