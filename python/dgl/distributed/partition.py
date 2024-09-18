@@ -687,7 +687,7 @@ def _partition_to_graphbolt(
         part_config=part_config, part_id=part_i, part_metadata=part_metadata
     )
     graph = parts[part_i]
-    csc_graph = gb_convert_single_dgl_partition(
+    csc_graph = _convert_dgl_partition_to_gb(
         ntypes=ntypes,
         etypes=etypes,
         gpb=gpb,
@@ -1686,7 +1686,7 @@ def _create_attributes_gb(
     return node_attributes, edge_attributes, type_per_edge
 
 
-def gb_convert_single_dgl_partition(
+def _convert_dgl_partition_to_gb(
     ntypes,
     etypes,
     gpb,
@@ -1724,6 +1724,11 @@ def gb_convert_single_dgl_partition(
         Whether to store inner node mask in the new graph. Default: False.
     store_inner_edge : bool, optional
         Whether to store inner edge mask in the new graph. Default: False.
+
+    Returns
+    -------
+    FusedCSCSamplingGraph
+        The csc_graph to be saved.
     """
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
@@ -1804,7 +1809,7 @@ def gb_convert_single_dgl_partition(
     return csc_graph
 
 
-def _convert_partition_to_graphbolt(
+def gb_convert_single_dgl_partition(
     part_config,
     part_id,
     graph_formats=None,
@@ -1845,7 +1850,7 @@ def _convert_partition_to_graphbolt(
     )
     part = _load_part(part_config, part_id)
     part_meta = copy.deepcopy(_load_part_config(part_config))
-    csc_graph = gb_convert_single_dgl_partition(
+    csc_graph = _convert_dgl_partition_to_gb(
         graph=part,
         ntypes=ntypes,
         etypes=etypes,
@@ -1880,7 +1885,7 @@ def _convert_partition_to_graphbolt_wrapper(
 
     # Iterate over partitions.
     convert_with_format = partial(
-        _convert_partition_to_graphbolt,
+        gb_convert_single_dgl_partition,
         part_config=part_config,
         graph_formats=graph_formats,
         store_eids=store_eids,
