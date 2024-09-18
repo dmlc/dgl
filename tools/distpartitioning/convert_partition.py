@@ -5,17 +5,18 @@ import os
 
 import constants
 import dgl
+import dgl.backend as F
 import dgl.graphbolt as gb
 import numpy as np
 import torch as th
 from dgl import EID, ETYPE, NID, NTYPE
-import dgl.backend as F
 
 from dgl.distributed.constants import DGL2GB_EID, GB_DST_ID
 from dgl.distributed.partition import (
     _cast_to_minimum_dtype,
     _etype_str_to_tuple,
     _etype_tuple_to_str,
+    cast_various_to_minimum_dtype_gb,
     RESERVED_FIELD_DTYPE,
 )
 from utils import get_idranges, memory_snapshot
@@ -262,7 +263,7 @@ def _create_edge_attr_gb(
     is_homo = _is_homogeneous(ntypes, etypes)
 
     edge_type_to_id = (
-        {gb.etype_tuple_to_str(('_N','_E','_N')) : 0}
+        {gb.etype_tuple_to_str(("_N", "_E", "_N")): 0}
         if is_homo
         else {
             gb.etype_tuple_to_str(etype): etid
@@ -320,47 +321,6 @@ def remove_attr_gb(
     return edata, ndata
 
 
-def cast_various_to_minimum_dtype_gb(
-    node_count,
-    edge_count,
-    num_parts,
-    indptr,
-    indices,
-    type_per_edge,
-    etypes,
-    ntypes,
-    node_attributes,
-    edge_attributes,
-):
-    """Cast various data to minimum dtype."""
-    # Cast 1: indptr.
-    indptr = _cast_to_minimum_dtype(edge_count, indptr)
-    # Cast 2: indices.
-    indices = _cast_to_minimum_dtype(node_count, indices)
-    # Cast 3: type_per_edge.
-    type_per_edge = _cast_to_minimum_dtype(
-        len(etypes), type_per_edge, field=ETYPE
-    )
-    # Cast 4: node/edge_attributes.
-    predicates = {
-        NID: node_count,
-        "part_id": num_parts,
-        NTYPE: len(ntypes),
-        EID: edge_count,
-        ETYPE: len(etypes),
-        DGL2GB_EID: edge_count,
-        GB_DST_ID: node_count,
-    }
-    for attributes in [node_attributes, edge_attributes]:
-        for key in attributes:
-            if key not in predicates:
-                continue
-            attributes[key] = _cast_to_minimum_dtype(
-                predicates[key], attributes[key], field=key
-            )
-    return indptr, indices, type_per_edge
-
-
 def _process_partition_gb(
     node_attr,
     edge_attr,
@@ -378,22 +338,26 @@ def _process_partition_gb(
             node_attr[k] = F.astype(node_attr[k], dtype)
         if k in edge_attr:
             edge_attr[k] = F.astype(edge_attr[k], dtype)
-    
-    indptr,indices,edge_ids=_coo2csc(src_ids,dst_ids)
+
+    indptr, indices, edge_ids = _coo2csc(src_ids, dst_ids)
     if sort_etypes:
         split_size = th.diff(indptr)
         split_indices = th.split(type_per_edge, tuple(split_size), dim=0)
-        sorted_idxs=[]
+        sorted_idxs = []
         for split_indice in split_indices:
             sorted_idxs.append(split_indice.sort()[1])
 
         sorted_idx = th.cat(sorted_idxs, dim=0)
-        sorted_idx=th.repeat_interleave(indptr[:-1], split_size, dim=0)+sorted_idx
-    
+        sorted_idx = (
+            th.repeat_interleave(indptr[:-1], split_size, dim=0) + sorted_idx
+        )
+
     return indptr, indices, edge_ids
 
 
 def create_graph_object(
+    tot_node_count,
+    tot_edge_count,
     node_count,
     edge_count,
     num_parts,
@@ -457,10 +421,14 @@ def create_graph_object(
 
     Parameters:
     -----------
-    node_count : int
+    tot_node_count : int
         the number of all nodes
-    edge_count : int
+    tot_edge_count : int
         the number of all edges
+    node_count : int
+        the number of nodes in partition
+    edge_count : int
+        the number of edges in partition
     graph_formats : str
         the format of graph
     num_parts : int
@@ -744,7 +712,12 @@ def create_graph_object(
 
         sort_etypes = len(etypes_map) > 1
         indptr, indices, csc_edge_ids = _process_partition_gb(
-            ndata, edata, type_per_edge, part_local_src_id, part_local_dst_id,sort_etypes
+            ndata,
+            edata,
+            type_per_edge,
+            part_local_src_id,
+            part_local_dst_id,
+            sort_etypes,
         )
         edge_attr, node_attr = remove_attr_gb(
             edge_attr=edata, node_attr=ndata, **kwargs
@@ -753,16 +726,18 @@ def create_graph_object(
             attr: edge_attr[attr][csc_edge_ids] for attr in edge_attr.keys()
         }
         cast_various_to_minimum_dtype_gb(
-            node_count,
-            edge_count,
-            num_parts,
-            indptr,
-            indices,
-            type_per_edge,
-            etypes,
-            ntypes,
-            node_attr,
-            edge_attr,
+            node_count=node_count,
+            edge_count=edge_count,
+            tot_node_count=tot_node_count,
+            tot_edge_count=tot_edge_count,
+            num_parts=num_parts,
+            indptr=indptr,
+            indices=indices,
+            type_per_edge=type_per_edge,
+            etypes=etypes,
+            ntypes=ntypes,
+            node_attributes=node_attr,
+            edge_attributes=edge_attr,
         )
         part_graph = gb.fused_csc_sampling_graph(
             csc_indptr=indptr,

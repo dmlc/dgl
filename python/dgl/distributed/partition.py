@@ -1417,9 +1417,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         else:
             for ntype in g.ntypes:
                 if len(g.ntypes) > 1:
@@ -1454,9 +1454,9 @@ def partition_graph(
                 for name in g.edges[etype].data:
                     if name in [EID, "inner_edge"]:
                         continue
-                    edge_feats[
-                        _etype_tuple_to_str(etype) + "/" + name
-                    ] = F.gather_row(g.edges[etype].data[name], local_edges)
+                    edge_feats[_etype_tuple_to_str(etype) + "/" + name] = (
+                        F.gather_row(g.edges[etype].data[name], local_edges)
+                    )
         # delete `orig_id` from ndata/edata
         del part.ndata["orig_id"]
         del part.edata["orig_id"]
@@ -1502,9 +1502,9 @@ def partition_graph(
         for part_id, part in parts.items():
             part_dir = os.path.join(out_path, "part" + str(part_id))
             part_graph_file = os.path.join(part_dir, "graph.dgl")
-            part_metadata["part-{}".format(part_id)][
-                "part_graph"
-            ] = os.path.relpath(part_graph_file, out_path)
+            part_metadata["part-{}".format(part_id)]["part_graph"] = (
+                os.path.relpath(part_graph_file, out_path)
+            )
             # save DGLGraph
             _save_dgl_graphs(
                 part_graph_file,
@@ -1600,8 +1600,6 @@ def _save_graph_gb(part_config, part_id, csc_graph):
 
 
 def cast_various_to_minimum_dtype_gb(
-    graph,
-    part_meta,
     num_parts,
     indptr,
     indices,
@@ -1610,25 +1608,43 @@ def cast_various_to_minimum_dtype_gb(
     ntypes,
     node_attributes,
     edge_attributes,
+    part_meta=None,
+    graph=None,
+    edge_count=None,
+    node_count=None,
+    tot_edge_count=None,
+    tot_node_count=None,
 ):
     """Cast various data to minimum dtype."""
+    if graph is not None:
+        assert part_meta is not None
+        tot_edge_count = graph.num_edges()
+        tot_node_count = graph.num_nodes()
+        node_count = part_meta["num_nodes"]
+        edge_count = part_meta["num_edges"]
+    else:
+        assert tot_edge_count is not None
+        assert tot_node_count is not None
+        assert edge_count is not None
+        assert node_count is not None
+
     # Cast 1: indptr.
-    indptr = _cast_to_minimum_dtype(graph.num_edges(), indptr)
+    indptr = _cast_to_minimum_dtype(tot_edge_count, indptr)
     # Cast 2: indices.
-    indices = _cast_to_minimum_dtype(graph.num_nodes(), indices)
+    indices = _cast_to_minimum_dtype(tot_node_count, indices)
     # Cast 3: type_per_edge.
     type_per_edge = _cast_to_minimum_dtype(
         len(etypes), type_per_edge, field=ETYPE
     )
     # Cast 4: node/edge_attributes.
     predicates = {
-        NID: part_meta["num_nodes"],
+        NID: node_count,
         "part_id": num_parts,
         NTYPE: len(ntypes),
-        EID: part_meta["num_edges"],
+        EID: edge_count,
         ETYPE: len(etypes),
-        DGL2GB_EID: part_meta["num_edges"],
-        GB_DST_ID: part_meta["num_nodes"],
+        DGL2GB_EID: edge_count,
+        GB_DST_ID: node_count,
     }
     for attributes in [node_attributes, edge_attributes]:
         for key in attributes:
@@ -1779,16 +1795,16 @@ def gb_convert_single_dgl_partition(
         )
 
     indptr, indices, type_per_edge = cast_various_to_minimum_dtype_gb(
-        graph,
-        part_meta,
-        num_parts,
-        indptr,
-        indices,
-        type_per_edge,
-        etypes,
-        ntypes,
-        node_attributes,
-        edge_attributes,
+        graph=graph,
+        part_meta=part_meta,
+        num_parts=num_parts,
+        indptr=indptr,
+        indices=indices,
+        type_per_edge=type_per_edge,
+        etypes=etypes,
+        ntypes=ntypes,
+        node_attributes=node_attributes,
+        edge_attributes=edge_attributes,
     )
 
     csc_graph = gb.fused_csc_sampling_graph(

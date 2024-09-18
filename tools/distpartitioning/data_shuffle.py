@@ -285,21 +285,21 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
             local_etype_ids.append(rcvd_edge_data[:, 3])
             local_eids.append(rcvd_edge_data[:, 4])
 
-        edge_data[
-            constants.GLOBAL_SRC_ID + "/" + str(local_part_id)
-        ] = np.concatenate(local_src_ids)
-        edge_data[
-            constants.GLOBAL_DST_ID + "/" + str(local_part_id)
-        ] = np.concatenate(local_dst_ids)
-        edge_data[
-            constants.GLOBAL_TYPE_EID + "/" + str(local_part_id)
-        ] = np.concatenate(local_type_eids)
-        edge_data[
-            constants.ETYPE_ID + "/" + str(local_part_id)
-        ] = np.concatenate(local_etype_ids)
-        edge_data[
-            constants.GLOBAL_EID + "/" + str(local_part_id)
-        ] = np.concatenate(local_eids)
+        edge_data[constants.GLOBAL_SRC_ID + "/" + str(local_part_id)] = (
+            np.concatenate(local_src_ids)
+        )
+        edge_data[constants.GLOBAL_DST_ID + "/" + str(local_part_id)] = (
+            np.concatenate(local_dst_ids)
+        )
+        edge_data[constants.GLOBAL_TYPE_EID + "/" + str(local_part_id)] = (
+            np.concatenate(local_type_eids)
+        )
+        edge_data[constants.ETYPE_ID + "/" + str(local_part_id)] = (
+            np.concatenate(local_etype_ids)
+        )
+        edge_data[constants.GLOBAL_EID + "/" + str(local_part_id)] = (
+            np.concatenate(local_eids)
+        )
 
     # Check if the data was exchanged correctly
     local_edge_count = 0
@@ -1121,7 +1121,6 @@ def gen_dist_partitions(rank, world_size, params):
     )
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
     id_lookup.set_idMap(id_map)
-
     # read input graph files and augment these datastructures with
     # appropriate information (global_nid and owner process) for node and edge data
     (
@@ -1315,6 +1314,8 @@ def gen_dist_partitions(rank, world_size, params):
         )
         local_node_data = prepare_local_data(node_data, local_part_id)
         local_edge_data = prepare_local_data(edge_data, local_part_id)
+        tot_node_count = sum(schema_map["num_nodes_per_type"])
+        tot_edge_count = sum(schema_map["num_edges_per_type"])
         (
             graph_obj,
             ntypes_map_val,
@@ -1324,9 +1325,10 @@ def gen_dist_partitions(rank, world_size, params):
             orig_nids,
             orig_eids,
         ) = create_graph_object(
+            tot_node_count,
+            tot_edge_count,
             node_count,
             edge_count,
-            graph_formats,
             params.num_parts,
             schema_map,
             rank + local_part_id * world_size,
