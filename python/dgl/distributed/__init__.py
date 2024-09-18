@@ -21,6 +21,7 @@ from .partition import (
     load_partition_book,
     load_partition_feats,
     partition_graph,
+    gb_convert_single_dgl_partition,
 )
 from .rpc import *
 from .rpc_client import connect_to_server
