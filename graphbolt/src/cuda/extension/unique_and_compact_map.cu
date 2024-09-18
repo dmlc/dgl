@@ -284,14 +284,18 @@ UniqueAndCompactBatchedHashMapBased(
               unique_ids_offsets_dev.data_ptr<int64_t>();
         }
         at::cuda::CUDAEvent unique_ids_offsets_event;
+        unique_ids_offsets_event.record();
         torch::optional<torch::Tensor> index;
         if (part_ids) {
+          unique_ids_offsets_event.synchronize();
+          const auto num_unique =
+              unique_ids_offsets.data_ptr<int64_t>()[num_batches];
+          unique_ids = unique_ids.slice(0, 0, num_unique);
+          part_ids = part_ids->slice(0, 0, num_unique);
           std::tie(
               unique_ids, index, unique_ids_offsets, unique_ids_offsets_event) =
               cuda::RankSortImpl(
                   unique_ids, *part_ids, unique_ids_offsets_dev, world_size);
-        } else {
-          unique_ids_offsets_event.record();
         }
         auto mapped_ids =
             torch::empty(offsets_ptr[3 * num_batches], unique_ids.options());
