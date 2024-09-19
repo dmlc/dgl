@@ -504,6 +504,20 @@ def write_edge_features(edge_features, edge_file):
     dgl.data.utils.save_tensors(edge_file, edge_features)
 
 
+def write_graph_graghbolt(graph_file, graph_obj):
+    """
+    Utility function to serialize FusedCSCSamplingGraph
+
+    Parameters:
+    -----------
+    graph_obj : FusedCSCSamplingGraph
+        FusedCSCSamplingGraph, as created in convert_partition.py, which is to be serialized
+    graph_file : string
+        File name in which graph object is serialized
+    """
+    torch.save(graph_obj, graph_file)
+
+
 def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
     """
     Utility function to serialize graph dgl objects
@@ -519,9 +533,23 @@ def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
     sort_etypes : bool
         Whether to sort etypes in csc/csr.
     """
-    dgl.distributed.partition._save_graphs(
-        graph_file, [graph_obj], formats, sort_etypes
+    dgl.distributed.partition.process_partitions(
+        graph_obj, formats, sort_etypes
     )
+    dgl.save_graphs(graph_file, [graph_obj], formats=formats)
+
+
+def _write_graph(
+    part_dir, graph_obj, formats=None, sort_etypes=None, use_graphbolt=False
+):
+    if use_graphbolt:
+        write_graph_graghbolt(
+            os.path.join(part_dir, "fused_csc_sampling_graph.pt"), graph_obj
+        )
+    else:
+        write_graph_dgl(
+            os.path.join(part_dir, "graph.dgl"), graph_obj, formats, sort_etypes
+        )
 
 
 def write_dgl_objects(
@@ -534,6 +562,7 @@ def write_dgl_objects(
     orig_eids,
     formats,
     sort_etypes,
+    use_graphbolt,
 ):
     """
     Wrapper function to write graph, node/edge feature, original node/edge IDs.
@@ -558,13 +587,18 @@ def write_dgl_objects(
         Save graph in formats.
     sort_etypes : bool
         Whether to sort etypes in csc/csr.
+    use_graphbolt : bool
+        Whether to use graphbolt or not.
     """
     part_dir = output_dir + "/part" + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    write_graph_dgl(
-        os.path.join(part_dir, "graph.dgl"), graph_obj, formats, sort_etypes
+    _write_graph(
+        part_dir,
+        graph_obj,
+        formats=formats,
+        sort_etypes=sort_etypes,
+        use_graphbolt=use_graphbolt,
     )
-
     if node_features != None:
         write_node_features(
             node_features, os.path.join(part_dir, "node_feat.dgl")
