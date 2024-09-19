@@ -25,6 +25,7 @@
 #include <cub/cub.cuh>
 #include <cuda/functional>
 
+#include "../utils.h"
 #include "./common.h"
 #include "./cooperative_minibatching_utils.cuh"
 #include "./cooperative_minibatching_utils.h"
@@ -142,6 +143,16 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
         rank_offsets.slice(0, i * world_size, (i + 1) * world_size + 1));
   }
   return results;
+}
+
+c10::intrusive_ptr<Future<
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+RankSortAsync(
+    const std::vector<torch::Tensor>& nodes_list, const int64_t rank,
+    const int64_t world_size) {
+  return async(
+      [=] { return RankSort(nodes_list, rank, world_size); },
+      utils::is_on_gpu(nodes_list.at(0)));
 }
 
 }  // namespace cuda

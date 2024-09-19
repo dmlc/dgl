@@ -22,6 +22,7 @@
 #define GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_H_
 
 #include <ATen/cuda/CUDAEvent.h>
+#include <graphbolt/async.h>
 #include <torch/script.h>
 
 namespace graphbolt {
@@ -82,6 +83,12 @@ RankSortImpl(
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
     const std::vector<torch::Tensor>& nodes_list, int64_t rank,
     int64_t world_size);
+
+c10::intrusive_ptr<Future<
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+RankSortAsync(
+    const std::vector<torch::Tensor>& nodes_list, const int64_t rank,
+    const int64_t world_size);
 
 }  // namespace cuda
 }  // namespace graphbolt
