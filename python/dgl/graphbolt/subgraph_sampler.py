@@ -205,9 +205,8 @@ class SubgraphSampler(MiniBatchTransformer):
             seeds = {"_N": seeds}
         if minibatch._seeds_offsets is None:
             assert minibatch.compacted_seeds is None
-            seeds_list = list(seeds.values())
             minibatch._rank_sort_future = torch.ops.graphbolt.rank_sort_async(
-                seeds_list, rank, world_size
+                list(seeds.values()), rank, world_size
             )
         return minibatch
 
