@@ -211,9 +211,7 @@ def train_step(minibatch, optimizer, model, loss_fn):
     return loss.detach(), num_correct, labels.size(0)
 
 
-def train_helper(
-    rank, dataloader, model, optimizer, loss_fn, device
-):
+def train_helper(rank, dataloader, model, optimizer, loss_fn, device):
     model.train()  # Set the model to training mode
     total_loss = torch.zeros(1, device=device)  # Accumulator for the total loss
     # Accumulator for the total number of correct predictions
