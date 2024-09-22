@@ -562,7 +562,7 @@ def run(rank, world_size, args, dataset):
             "paper",
             "feat",
             torch.zeros(1, dtype=torch.int64, device="cuda"),
-        ).dtype
+        ).dtype,
     )
 
     print(
