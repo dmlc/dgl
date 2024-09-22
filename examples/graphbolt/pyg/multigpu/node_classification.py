@@ -261,7 +261,6 @@ def train(args, rank, train_dataloader, valid_dataloader, model, device):
             optimizer,
             loss_fn,
             device,
-            args.cooperative,
         )
         val_acc = evaluate(rank, model, valid_dataloader, device)
         if rank == 0:
@@ -379,7 +378,7 @@ def parse_args():
         default=1,
         help="The number of accesses after which a vertex neighborhood will be cached.",
     )
-    parser.add_argument("--precision", type=str, default="high")
+    parser.add_argument("--precision", type=str, default="medium")
     parser.add_argument(
         "--cooperative",
         action="store_true",
