@@ -1740,11 +1740,6 @@ def _convert_dgl_partition_to_gb(
         Whether to store inner node mask in the new graph. Default: False.
     store_inner_edge : bool, optional
         Whether to store inner edge mask in the new graph. Default: False.
-
-    Returns
-    -------
-    FusedCSCSamplingGraph
-        The csc_graph to be saved.
     """
     debug_mode = "DGL_DIST_DEBUG" in os.environ
     if debug_mode:
