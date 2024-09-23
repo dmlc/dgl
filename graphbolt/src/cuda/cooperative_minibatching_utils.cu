@@ -19,11 +19,13 @@
  * implementations in CUDA.
  */
 #include <graphbolt/cuda_ops.h>
+#include <thrust/scatter.h>
 #include <thrust/transform.h>
 
 #include <cub/cub.cuh>
 #include <cuda/functional>
 
+#include "../utils.h"
 #include "./common.h"
 #include "./cooperative_minibatching_utils.cuh"
 #include "./cooperative_minibatching_utils.h"
@@ -62,8 +64,7 @@ RankSortImpl(
   auto part_ids2 = part_ids.clone();
   auto part_ids2_sorted = torch::empty_like(part_ids2);
   auto nodes_sorted = torch::empty_like(nodes);
-  auto index = ops::IndptrEdgeIdsImpl(
-      offsets_dev, nodes.scalar_type(), torch::nullopt, nodes.numel());
+  auto index = torch::arange(nodes.numel(), nodes.options());
   auto index_sorted = torch::empty_like(index);
   return AT_DISPATCH_INDEX_TYPES(
       nodes.scalar_type(), "RankSortImpl", ([&] {
@@ -100,8 +101,14 @@ RankSortImpl(
             index.data_ptr<index_t>(), index_sorted.data_ptr<index_t>(),
             nodes.numel(), num_batches, offsets_dev_ptr, offsets_dev_ptr + 1, 0,
             num_bits);
+        auto values = ops::IndptrEdgeIdsImpl(
+            offsets_dev, nodes.scalar_type(), torch::nullopt, nodes.numel());
+        THRUST_CALL(
+            scatter, values.data_ptr<index_t>(),
+            values.data_ptr<index_t>() + values.numel(),
+            index_sorted.data_ptr<index_t>(), index.data_ptr<index_t>());
         return std::make_tuple(
-            nodes_sorted, index_sorted, offsets, std::move(offsets_event));
+            nodes_sorted, index, offsets, std::move(offsets_event));
       }));
 }
 
@@ -136,6 +143,16 @@ std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
         rank_offsets.slice(0, i * world_size, (i + 1) * world_size + 1));
   }
   return results;
+}
+
+c10::intrusive_ptr<Future<
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+RankSortAsync(
+    const std::vector<torch::Tensor>& nodes_list, const int64_t rank,
+    const int64_t world_size) {
+  return async(
+      [=] { return RankSort(nodes_list, rank, world_size); },
+      utils::is_on_gpu(nodes_list.at(0)));
 }
 
 }  // namespace cuda
