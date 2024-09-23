@@ -163,8 +163,8 @@ def test_gpu_sampling_DataLoader(
             if enable_feature_fetch:
                 bufferer_cnt += 1  # feature fetch has 1.
     if cooperative:
-        # _preprocess stage and each sampling layer.
-        bufferer_cnt += 3
+        # _preprocess stage.
+        bufferer_cnt += 4
     datapipe_graph = traverse_dps(dataloader)
     bufferers = find_dps(
         datapipe_graph,

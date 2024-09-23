@@ -140,6 +140,9 @@ class SubgraphSampler(MiniBatchTransformer):
         if cooperative:
             datapipe = datapipe.transform(self._seeds_cooperative_exchange_1)
             datapipe = datapipe.buffer()
+            datapipe = datapipe.transform(
+                self._seeds_cooperative_exchange_1_wait_future
+            ).buffer()
             datapipe = datapipe.transform(self._seeds_cooperative_exchange_2)
             datapipe = datapipe.buffer()
             datapipe = datapipe.transform(self._seeds_cooperative_exchange_3)
@@ -193,19 +196,32 @@ class SubgraphSampler(MiniBatchTransformer):
         return minibatch
 
     @staticmethod
-    def _seeds_cooperative_exchange_1(minibatch, group=None):
-        rank = thd.get_rank(group)
-        world_size = thd.get_world_size(group)
+    def _seeds_cooperative_exchange_1(minibatch):
+        rank = thd.get_rank()
+        world_size = thd.get_world_size()
         seeds = minibatch._seed_nodes
         is_homogeneous = not isinstance(seeds, dict)
         if is_homogeneous:
             seeds = {"_N": seeds}
         if minibatch._seeds_offsets is None:
-            seeds_list = list(seeds.values())
-            result = torch.ops.graphbolt.rank_sort(seeds_list, rank, world_size)
             assert minibatch.compacted_seeds is None
+            minibatch._rank_sort_future = torch.ops.graphbolt.rank_sort_async(
+                list(seeds.values()), rank, world_size
+            )
+        return minibatch
+
+    @staticmethod
+    def _seeds_cooperative_exchange_1_wait_future(minibatch):
+        world_size = thd.get_world_size()
+        seeds = minibatch._seed_nodes
+        is_homogeneous = not isinstance(seeds, dict)
+        if is_homogeneous:
+            seeds = {"_N": seeds}
+        num_ntypes = len(seeds.keys())
+        if minibatch._seeds_offsets is None:
+            result = minibatch._rank_sort_future.wait()
+            delattr(minibatch, "_rank_sort_future")
             sorted_seeds, sorted_compacted, sorted_offsets = {}, {}, {}
-            num_ntypes = len(seeds.keys())
             for i, (
                 seed_type,
                 (typed_sorted_seeds, typed_index, typed_offsets),
@@ -229,7 +245,6 @@ class SubgraphSampler(MiniBatchTransformer):
         minibatch._counts_future = all_to_all(
             counts_received.split(num_ntypes),
             counts_sent.split(num_ntypes),
-            group=group,
             async_op=True,
         )
         minibatch._counts_sent = counts_sent
@@ -237,8 +252,8 @@ class SubgraphSampler(MiniBatchTransformer):
         return minibatch
 
     @staticmethod
-    def _seeds_cooperative_exchange_2(minibatch, group=None):
-        world_size = thd.get_world_size(group)
+    def _seeds_cooperative_exchange_2(minibatch):
+        world_size = thd.get_world_size()
         seeds = minibatch._seed_nodes
         minibatch._counts_future.wait()
         delattr(minibatch, "_counts_future")
@@ -256,7 +271,6 @@ class SubgraphSampler(MiniBatchTransformer):
             all_to_all(
                 typed_seeds_received.split(typed_counts_received),
                 typed_seeds.split(typed_counts_sent),
-                group,
             )
             seeds_received[ntype] = typed_seeds_received
             counts_sent[ntype] = typed_counts_sent

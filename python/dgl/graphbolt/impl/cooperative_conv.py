@@ -78,10 +78,10 @@ class CooperativeConvFunction(torch.autograd.Function):
                 torch.split(typed_grad_output, counts_sent[ntype]),
             )
             i = out.new_empty(2, out.shape[0], dtype=torch.int64)
-            i[0] = torch.arange(
+            i[0] = seed_inverse_ids[ntype]  # src
+            i[1] = torch.arange(
                 out.shape[0], device=typed_grad_output.device
-            )  # src
-            i[1] = seed_inverse_ids[ntype]  # dst
+            )  # dst
             coo = torch.sparse_coo_tensor(
                 i,
                 torch.ones(

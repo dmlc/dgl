@@ -99,8 +99,12 @@ __global__ void _MapIdsBatched(
 
       auto slot = map.find(key);
       auto new_id = slot->second;
-      if (index) new_id = index[new_id];
-      mapped_ids[i] = new_id - unique_ids_offsets[batch_index];
+      if (index) {
+        new_id = index[new_id];
+      } else {
+        new_id -= unique_ids_offsets[batch_index];
+      }
+      mapped_ids[i] = new_id;
     }
 
     i += stride;

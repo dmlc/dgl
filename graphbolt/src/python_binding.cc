@@ -59,6 +59,13 @@ TORCH_LIBRARY(graphbolt, m) {
           &Future<std::vector<std::tuple<
               torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>>::
               Wait);
+  m.class_<Future<
+      std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>(
+       "RankSortFuture")
+      .def(
+          "wait",
+          &Future<std::vector<
+              std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>::Wait);
   m.class_<Future<std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t>>>(
        "GpuGraphCacheQueryFuture")
       .def(
@@ -198,6 +205,7 @@ TORCH_LIBRARY(graphbolt, m) {
 #ifdef GRAPHBOLT_USE_CUDA
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
   m.def("rank_sort", &cuda::RankSort);
+  m.def("rank_sort_async", &cuda::RankSortAsync);
 #endif
 #ifdef HAS_IMPL_ABSTRACT_PYSTUB
   m.impl_abstract_pystub("dgl.graphbolt.base", "//dgl.graphbolt.base");

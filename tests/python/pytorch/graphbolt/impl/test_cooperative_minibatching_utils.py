@@ -18,7 +18,7 @@ assert_equal = partial(torch.testing.assert_close, rtol=0, atol=0)
 )
 @pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
 @pytest.mark.parametrize("rank", list(range(WORLD_SIZE)))
-def test_gpu_cached_feature_read_async(dtype, rank):
+def test_rank_sort_and_unique_and_compact(dtype, rank):
     torch.manual_seed(7)
     nodes_list1 = [
         torch.randint(0, 2111111111, [777], dtype=dtype, device=F.ctx())
@@ -32,8 +32,8 @@ def test_gpu_cached_feature_read_async(dtype, rank):
     for i, ((nodes1, idx1, offsets1), (nodes2, idx2, offsets2)) in enumerate(
         zip(res1, res2)
     ):
-        assert_equal(nodes_list1[i], nodes1[idx1.sort()[1]])
-        assert_equal(nodes_list2[i], nodes2[idx2.sort()[1]])
+        assert_equal(nodes_list1[i], nodes1[idx1])
+        assert_equal(nodes_list2[i], nodes2[idx2])
         assert_equal(offsets1, offsets2)
         assert offsets1.is_pinned() and offsets2.is_pinned()
 
@@ -50,13 +50,11 @@ def test_gpu_cached_feature_read_async(dtype, rank):
     for (nodes1, idx1, offsets1), (nodes4, idx4, offsets4) in zip(res1, res4):
         off1 = offsets1.tolist()
         off4 = offsets4.tolist()
+        assert_equal(nodes1[idx1], nodes4[idx4])
         for i in range(WORLD_SIZE):
             j = (i - rank + WORLD_SIZE) % WORLD_SIZE
             assert_equal(
                 nodes1[off1[j] : off1[j + 1]], nodes4[off4[i] : off4[i + 1]]
-            )
-            assert_equal(
-                idx1[off1[j] : off1[j + 1]], idx4[off4[i] : off4[i + 1]]
             )
 
     unique, compacted, offsets = gb.unique_and_compact(
