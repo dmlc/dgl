@@ -8,6 +8,7 @@ import torch
 from torch.utils.data import functional_datapipe
 
 from .base import etype_tuple_to_str
+from .impl.cooperative_conv import CooperativeConvFunction
 
 from .minibatch_transformer import MiniBatchTransformer
 
@@ -73,6 +74,16 @@ class FeatureFetcher(MiniBatchTransformer):
         If True, the feature fetcher will overlap the UVA feature fetcher
         operations with the rest of operations by using an alternative CUDA
         stream or utilizing asynchronous operations. Default is True.
+    cooperative: bool, optional
+        Boolean indicating whether Cooperative Minibatching, which was initially
+        proposed in
+        `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__
+        and was later first fully described in
+        `Cooperative Minibatching in Graph Neural Networks
+        <https://arxiv.org/abs/2310.12403>`__. Cooperation between the GPUs
+        eliminates duplicate work performed across the GPUs due to the
+        overlapping sampled k-hop neighborhoods of seed nodes when performing
+        GNN minibatching.
     """
 
     def __init__(
@@ -82,6 +93,7 @@ class FeatureFetcher(MiniBatchTransformer):
         node_feature_keys=None,
         edge_feature_keys=None,
         overlap_fetch=True,
+        cooperative=False,
     ):
         datapipe = datapipe.mark_feature_fetcher_start()
         self.feature_store = feature_store
@@ -113,9 +125,12 @@ class FeatureFetcher(MiniBatchTransformer):
             datapipe = datapipe.transform(
                 partial(self._execute_stage, i)
             ).buffer(1)
-        super().__init__(
-            datapipe, self._identity if max_val == 0 else self._final_stage
-        )
+        if max_val > 0:
+            datapipe = datapipe.transform(self._final_stage)
+        if cooperative:
+            datapipe = datapipe.transform(self._cooperative_exchange)
+            datapipe = datapipe.buffer()
+        super().__init__(datapipe)
         # A positive value indicates that the overlap optimization is enabled.
         self.max_num_stages = max_val
 
@@ -143,6 +158,26 @@ class FeatureFetcher(MiniBatchTransformer):
                 value, stage = features[key]
                 assert stage == 0
                 features[key] = value.wait()
+        return data
+
+    def _cooperative_exchange(self, data):
+        subgraph = data.sampled_subgraphs[0]
+        is_heterogeneous = isinstance(
+            self.node_feature_keys, Dict
+        ) or isinstance(self.edge_feature_keys, Dict)
+        if is_heterogeneous:
+            node_features = {key: {} for key, _ in data.node_features.keys()}
+            for (key, ntype), feature in data.node_features.items():
+                node_features[key][ntype] = feature
+            for key, feature in node_features.items():
+                new_feature = CooperativeConvFunction.apply(subgraph, feature)
+                for ntype, tensor in new_feature.items():
+                    data.node_features[(key, ntype)] = tensor
+        else:
+            for key in data.node_features:
+                feature = data.node_features[key]
+                new_feature = CooperativeConvFunction.apply(subgraph, feature)
+                data.node_features[key] = new_feature
         return data
 
     def _read(self, data):
