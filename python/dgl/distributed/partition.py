@@ -1821,29 +1821,29 @@ def _convert_dgl_partition_to_gb(
 
 
 def gb_convert_single_dgl_partition(
-    part_config,
     part_id,
-    graph_formats=None,
-    store_eids=False,
-    store_inner_node=False,
-    store_inner_edge=False,
+    graph_formats,
+    part_config,
+    store_eids=True,
+    store_inner_node=True,
+    store_inner_edge=True,
 ):
     """
     The pipeline converting signle partition to graphbolt.
 
     Parameters
     ----------
-    part_config : str
-        The path of the partition config file.
     part_id : int
         The partition ID.
-    graph_formats : str or list[str], optional
+    graph_formats : str or list[str]
         Save partitions in specified formats. It could be any combination of
         `coo`, `csc`. As `csc` format is mandatory for `FusedCSCSamplingGraph`,
         it is not necessary to specify this argument. It's mainly for
         specifying `coo` format to save edge ID mapping and destination node
         IDs. If not specified, whether to save `coo` format is determined by
         the availability of the format in DGL partitions. Default: None.
+    part_config : str
+        The path of the partition config file.
     store_eids : bool, optional
         Whether to store edge IDs in the new graph. Default: True.
     store_inner_node : bool, optional
