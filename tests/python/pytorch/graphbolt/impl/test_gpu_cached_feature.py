@@ -16,6 +16,7 @@ def to_on_disk_numpy(test_dir, name, t):
     np.save(path, t.cpu().numpy())
     return path
 
+
 def _skip_condition_CachedFeature():
     return (F._default_context_str != "gpu") or (
         torch.cuda.get_device_capability()[0] < 7
