@@ -65,7 +65,11 @@ def create_dataloader(
         node_feature_keys["institute"] = ["feat"]
         node_feature_keys["fos"] = ["feat"]
     # Fetch node features for the sampled subgraph.
-    datapipe = datapipe.fetch_feature(features, node_feature_keys)
+    datapipe = datapipe.fetch_feature(
+        features,
+        node_feature_keys,
+        overlap_fetch=args.overlap_feature_fetch,
+    )
 
     # Copy the data to the specified device.
     if need_copy:
