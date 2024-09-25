@@ -1,4 +1,3 @@
-import unittest
 import backend as F
 
 import pytest
@@ -7,17 +6,19 @@ import torch
 from dgl import graphbolt as gb
 
 
-@unittest.skipIf(
-    F._default_context_str != "gpu"
-    or torch.cuda.get_device_capability()[0] < 7,
-    reason="GPUCachedFeature tests are available only on GPU."
-    if F._default_context_str != "gpu"
-    else "GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
-)
 @pytest.mark.parametrize(
     "cached_feature_type", [gb.cpu_cached_feature, gb.gpu_cached_feature]
 )
 def test_hetero_cached_feature(cached_feature_type):
+    if cached_feature_type == gb.gpu_cached_feature and (
+        F._default_context_str != "gpu"
+        or torch.cuda.get_device_capability()[0] < 7
+    ):
+        pytest.skip(
+            "GPUCachedFeature tests are available only when testing the GPU backend."
+            if F._default_context_str != "gpu" else
+            "GPUCachedFeature requires a Volta or later generation NVIDIA GPU."
+        )
     device = F.ctx() if cached_feature_type == gb.gpu_cached_feature else None
     pin_memory = cached_feature_type == gb.gpu_cached_feature
 
