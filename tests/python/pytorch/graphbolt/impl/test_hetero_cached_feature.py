@@ -16,8 +16,8 @@ def test_hetero_cached_feature(cached_feature_type):
     ):
         pytest.skip(
             "GPUCachedFeature tests are available only when testing the GPU backend."
-            if F._default_context_str != "gpu" else
-            "GPUCachedFeature requires a Volta or later generation NVIDIA GPU."
+            if F._default_context_str != "gpu"
+            else "GPUCachedFeature requires a Volta or later generation NVIDIA GPU."
         )
     device = F.ctx() if cached_feature_type == gb.gpu_cached_feature else None
     pin_memory = cached_feature_type == gb.gpu_cached_feature
