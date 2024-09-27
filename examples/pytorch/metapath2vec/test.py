@@ -98,9 +98,9 @@ if __name__ == "__main__":
             random_state=0, solver="lbfgs"
         ).fit(venue_training, venue_label)
         y_pred_venue = clf_venue.predict(venue_testing)
-        clf_author = LogisticRegression(
-            random_state=0, solver="lbfgs"
-        ).fit(author_training, author_label)
+        clf_author = LogisticRegression(random_state=0, solver="lbfgs").fit(
+            author_training, author_label
+        )
         y_pred_author = clf_author.predict(author_testing)
         macro_average_venue += f1_score(
             venue_true, y_pred_venue, average="macro"

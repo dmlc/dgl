@@ -190,9 +190,9 @@ class Node2vec(nn.Module):
 
         x_train, y_train = x_train.cpu().numpy(), y_train.cpu().numpy()
         x_val, y_val = x_val.cpu().numpy(), y_val.cpu().numpy()
-        lr = LogisticRegression(
-            solver="lbfgs", max_iter=150
-        ).fit(x_train, y_train)
+        lr = LogisticRegression(solver="lbfgs", max_iter=150).fit(
+            x_train, y_train
+        )
 
         return lr.score(x_val, y_val)
 
