@@ -302,7 +302,7 @@ def train(dataset, params):
 
     optimizer = optim.Adam(model.parameters(), lr=0.0008, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.8, patience=8, verbose=True
+        optimizer, mode="min", factor=0.8, patience=8
     )
 
     epoch_train_losses, epoch_val_losses = [], []
