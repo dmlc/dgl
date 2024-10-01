@@ -85,7 +85,9 @@ class EEGGraphDataset(DGLDataset):
         self, montage_sensor1_idx, montage_sensor2_idx, coords_1010
     ):
         def get_coord(ref_sensor, coord):
-            return float((coords_1010[coords_1010.label == ref_sensor][coord]).iloc[0])
+            return float(
+                (coords_1010[coords_1010.label == ref_sensor][coord]).iloc[0]
+            )
 
         # get the reference sensor in the 10-10 system for the current montage pair in 10-20 system
         ref_sensor1 = self.ref_names[montage_sensor1_idx]
