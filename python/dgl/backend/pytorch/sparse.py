@@ -154,7 +154,7 @@ def _cast_if_autocast_enabled(*args):
     if not th.is_autocast_enabled():
         return args
     else:
-        return th.amp.autocast_mode._cast( 
+        return th.amp.autocast_mode._cast(
             args, "cuda", th.get_autocast_gpu_dtype()
         )
 
