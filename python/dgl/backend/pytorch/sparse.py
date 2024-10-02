@@ -145,7 +145,7 @@ class empty_context:
 # and do it only in a nested autocast context.
 def _disable_autocast_if_enabled():
     if th.is_autocast_enabled():
-        return th.amp.autocast('cuda', enabled=False)
+        return th.amp.autocast("cuda", enabled=False)
     else:
         return empty_context()
 
@@ -155,7 +155,7 @@ def _cast_if_autocast_enabled(*args):
         return args
     else:
         return th.amp.autocast_mode._cast( 
-            args, 'cuda', th.get_autocast_gpu_dtype()
+            args, "cuda", th.get_autocast_gpu_dtype()
         )
 
 
