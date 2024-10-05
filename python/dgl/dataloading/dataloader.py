@@ -1503,6 +1503,7 @@ class EdgeCollator:
 
 
 def _remove_kwargs_dist(kwargs):
+    """Deprecated."""
     if "num_workers" in kwargs:
         del kwargs["num_workers"]
     if "pin_memory" in kwargs:
