@@ -1502,6 +1502,15 @@ class EdgeCollator:
         return NewEdgeCollator(*args, **kwargs)
 
 
+def _remove_kwargs_dist(kwargs):
+    if "num_workers" in kwargs:
+        del kwargs["num_workers"]
+    if "pin_memory" in kwargs:
+        del kwargs["pin_memory"]
+        print("Distributed DataLoaders do not support pin_memory.")
+    return kwargs
+
+
 class DistDataLoader:
     """Deprecated. Please use :class:`~dgl.distributed.DistDataLoader` instead."""
 
