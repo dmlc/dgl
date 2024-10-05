@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from .. import backend as F, transforms, utils
 from ..base import EID, NID
 from ..convert import heterograph
-from ..dataloading.dataloader import _remove_kwargs_dist
 from .dist_context import get_sampler_pool
 
 __all__ = [
@@ -768,6 +767,15 @@ class EdgeCollator(Collator):
             return self._collate(items)
         else:
             return self._collate_with_negative_sampling(items)
+
+
+def _remove_kwargs_dist(kwargs):
+    if "num_workers" in kwargs:
+        del kwargs["num_workers"]
+    if "pin_memory" in kwargs:
+        del kwargs["pin_memory"]
+        print("Distributed DataLoaders do not support pin_memory.")
+    return kwargs
 
 
 class DistNodeDataLoader(DistDataLoader):
