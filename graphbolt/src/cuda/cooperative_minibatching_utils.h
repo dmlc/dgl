@@ -22,6 +22,7 @@
 #define GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_H_
 
 #include <ATen/cuda/CUDAEvent.h>
+#include <graphbolt/async.h>
 #include <torch/script.h>
 
 namespace graphbolt {
@@ -42,21 +43,21 @@ torch::Tensor RankAssignment(
 
 /**
  * @brief Given node ids, the ranks they belong, the offsets to separate
- * different node types and num_bits indicating the world size is <= 2^num_bits,
- * returns node ids sorted w.r.t. the ranks that the given ids belong along with
- * the original positions.
+ * different node types and world size, returns node ids sorted w.r.t. the ranks
+ * that the given ids belong along with their new positions.
  *
  * @param nodes        Node id tensor to be mapped to a rank in [0, world_size).
  * @param part_ids     Rank tensor the nodes belong to.
  * @param offsets_dev  Offsets to separate different node types.
  * @param world_size   World size, the total number of cooperating GPUs.
  *
- * @return (sorted_nodes, original_positions, rank_offsets, rank_offsets_event),
- * where the first one includes sorted nodes, the second contains original
- * positions of the sorted nodes and the third contains the offsets of the
- * sorted_nodes indicating sorted_nodes[rank_offsets[i]: rank_offsets[i + 1]]
- * contains nodes that belongs to the `i`th rank. Before accessing rank_offsets
- * on the CPU, `rank_offsets_event.synchronize()` is required.
+ * @return (sorted_nodes, new_positions, rank_offsets, rank_offsets_event),
+ * where the first one includes sorted nodes, the second contains new positions
+ * of the given nodes, so that sorted_nodes[new_positions] == nodes, and the
+ * third contains the offsets of the sorted_nodes indicating
+ * sorted_nodes[rank_offsets[i]: rank_offsets[i + 1]] contains nodes that
+ * belongs to the `i`th rank. Before accessing rank_offsets on the CPU,
+ * `rank_offsets_event.synchronize()` is required.
  */
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, at::cuda::CUDAEvent>
 RankSortImpl(
@@ -72,15 +73,22 @@ RankSortImpl(
  * @param rank         Rank of the current GPU.
  * @param world_size   World size, the total number of cooperating GPUs.
  *
- * @return vector of (sorted_nodes, original_positions, rank_offsets), where the
- * first one includes sorted nodes, the second contains original positions of
- * the sorted nodes and the third contains the offsets of the sorted_nodes
- * indicating sorted_nodes[rank_offsets[i]: rank_offsets[i + 1]] contains nodes
- * that belongs to the `i`th rank.
+ * @return vector of (sorted_nodes, new_positions, rank_offsets), where the
+ * first one includes sorted nodes, the second contains new positions of the
+ * given nodes, so that sorted_nodes[new_positions] == nodes, and the third
+ * contains the offsets of the sorted_nodes indicating
+ * sorted_nodes[rank_offsets[i]: rank_offsets[i + 1]] contains nodes that
+ * belongs to the `i`th rank.
  */
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>> RankSort(
     const std::vector<torch::Tensor>& nodes_list, int64_t rank,
     int64_t world_size);
+
+c10::intrusive_ptr<Future<
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>>>>
+RankSortAsync(
+    const std::vector<torch::Tensor>& nodes_list, const int64_t rank,
+    const int64_t world_size);
 
 }  // namespace cuda
 }  // namespace graphbolt

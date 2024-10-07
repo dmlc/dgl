@@ -1,11 +1,15 @@
+import os
 import unittest
+from sys import platform
 
 import backend as F
 
 import dgl
 import dgl.graphbolt
+import dgl.graphbolt as gb
 import pytest
 import torch
+import torch.distributed as thd
 
 from dgl.graphbolt.datapipes import find_dps, traverse_dps
 
@@ -63,6 +67,7 @@ def test_DataLoader(overlap_feature_fetch):
 @pytest.mark.parametrize("enable_feature_fetch", [True, False])
 @pytest.mark.parametrize("overlap_feature_fetch", [True, False])
 @pytest.mark.parametrize("overlap_graph_fetch", [True, False])
+@pytest.mark.parametrize("cooperative", [True, False])
 @pytest.mark.parametrize("asynchronous", [True, False])
 @pytest.mark.parametrize("num_gpu_cached_edges", [0, 1024])
 @pytest.mark.parametrize("gpu_cache_threshold", [1, 3])
@@ -71,10 +76,23 @@ def test_gpu_sampling_DataLoader(
     enable_feature_fetch,
     overlap_feature_fetch,
     overlap_graph_fetch,
+    cooperative,
     asynchronous,
     num_gpu_cached_edges,
     gpu_cache_threshold,
 ):
+    if cooperative and not thd.is_initialized():
+        # On Windows, the init method can only be file.
+        init_method = (
+            f"file:///{os.path.join(os.getcwd(), 'dis_tempfile')}"
+            if platform == "win32"
+            else "tcp://127.0.0.1:12345"
+        )
+        thd.init_process_group(
+            init_method=init_method,
+            world_size=1,
+            rank=0,
+        )
     N = 40
     B = 4
     num_layers = 2
@@ -110,6 +128,7 @@ def test_gpu_sampling_DataLoader(
             "overlap_fetch": overlap_graph_fetch,
             "num_gpu_cached_edges": num_gpu_cached_edges,
             "gpu_cache_threshold": gpu_cache_threshold,
+            "cooperative": cooperative,
             "asynchronous": asynchronous,
         }
         if i != 0:
@@ -118,7 +137,7 @@ def test_gpu_sampling_DataLoader(
             datapipe,
             graph,
             fanouts=[torch.LongTensor([2]) for _ in range(num_layers)],
-            **kwargs
+            **kwargs,
         )
         if enable_feature_fetch:
             datapipe = dgl.graphbolt.FeatureFetcher(
@@ -127,6 +146,7 @@ def test_gpu_sampling_DataLoader(
                 ["a", "b", "c"],
                 ["d"],
                 overlap_fetch=overlap_feature_fetch and i == 0,
+                cooperative=asynchronous and cooperative and i == 0,
             )
         dataloaders.append(dgl.graphbolt.DataLoader(datapipe))
     dataloader, dataloader2 = dataloaders
@@ -137,7 +157,14 @@ def test_gpu_sampling_DataLoader(
         if num_gpu_cached_edges > 0:
             bufferer_cnt += 2 * num_layers
     if asynchronous:
-        bufferer_cnt += 2 * num_layers
+        bufferer_cnt += 2 * num_layers + 1  # _preprocess stage has 1.
+        if cooperative:
+            bufferer_cnt += 3 * num_layers
+            if enable_feature_fetch:
+                bufferer_cnt += 1  # feature fetch has 1.
+    if cooperative:
+        # _preprocess stage.
+        bufferer_cnt += 4
     datapipe_graph = traverse_dps(dataloader)
     bufferers = find_dps(
         datapipe_graph,
@@ -171,3 +198,23 @@ def test_gpu_sampling_DataLoader(
                 if sampler_name == "LayerNeighborSampler":
                     assert torch.equal(edge_feature, edge_feature_ref)
     assert len(list(dataloader)) == N // B
+
+    if asynchronous and cooperative:
+        for minibatch in minibatches:
+            x = torch.ones((minibatch.node_ids().size(0), 1), device=F.ctx())
+            for subgraph in minibatch.sampled_subgraphs:
+                x = gb.CooperativeConvFunction.apply(subgraph, x)
+                x, edge_index, size = subgraph.to_pyg(x)
+                x = x[0]
+                one = torch.ones(
+                    edge_index.shape[1], dtype=x.dtype, device=x.device
+                )
+                coo = torch.sparse_coo_tensor(
+                    edge_index.flipud(), one, size=(size[1], size[0])
+                )
+                x = torch.sparse.mm(coo, x)
+            assert x.shape[0] == minibatch.seeds.shape[0]
+            assert x.shape[1] == 1
+
+    if thd.is_initialized():
+        thd.destroy_process_group()

@@ -65,7 +65,10 @@ def test_NeighborSampler_GraphFetch(
         graph.type_per_edge = None
     item_sampler = gb.ItemSampler(itemset, batch_size=2).copy_to(F.ctx())
     fanout = torch.LongTensor([2])
-    datapipe = item_sampler.map(gb.SubgraphSampler._preprocess)
+    preprocess_fn = partial(
+        gb.SubgraphSampler._preprocess, cooperative=False, async_op=False
+    )
+    datapipe = item_sampler.map(preprocess_fn)
     datapipe = datapipe.map(
         partial(gb.NeighborSampler._prepare, graph.node_type_to_id)
     )

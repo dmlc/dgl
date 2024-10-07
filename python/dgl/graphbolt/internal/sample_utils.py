@@ -15,6 +15,7 @@ def unique_and_compact(
     ],
     rank: int = 0,
     world_size: int = 1,
+    async_op: bool = False,
 ):
     """
     Compact a list of nodes tensor. The `rank` and `world_size` parameters are
@@ -22,7 +23,7 @@ def unique_and_compact(
     in `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__ and
     was later first fully described in
     `Cooperative Minibatching in Graph Neural Networks
-    <https://arxiv.org/abs/2310.12403>`__
+    <https://arxiv.org/abs/2310.12403>`__.
     Cooperation between the GPUs eliminates duplicate work performed across the
     GPUs due to the overlapping sampled k-hop neighborhoods of seed nodes when
     performing GNN minibatching.
@@ -48,6 +49,9 @@ def unique_and_compact(
         The rank of the current process.
     world_size : int
         The number of processes.
+    async_op: bool
+        Boolean indicating whether the call is asynchronous. If so, the result
+        can be obtained by calling wait on the returned future.
 
     Returns
     -------
@@ -58,32 +62,65 @@ def unique_and_compact(
         list are replaced with mapped node IDs, where each type of node is
         mapped to a contiguous space of IDs ranging from 0 to N.
         The unique nodes offsets tensor partitions the unique_nodes tensor. Has
-        size `world_size + 1` and unique_nodes[offsets[i]: offsets[i + 1]]
+        size `world_size + 1` and `unique_nodes[offsets[i]: offsets[i + 1]]`
         belongs to the rank `(rank + i) % world_size`.
     """
     is_heterogeneous = isinstance(nodes, dict)
 
-    def unique_and_compact_per_type(nodes):
-        nums = [node.size(0) for node in nodes]
-        nodes = torch.cat(nodes)
-        empty_tensor = nodes.new_empty(0)
-        unique, compacted, _, offsets = torch.ops.graphbolt.unique_and_compact(
-            nodes, empty_tensor, empty_tensor, rank, world_size
-        )
-        compacted = compacted.split(nums)
-        return unique, list(compacted), offsets
+    if not is_heterogeneous:
+        homo_ntype = "a"
+        nodes = {homo_ntype: nodes}
 
-    if is_heterogeneous:
-        unique, compacted, offsets = {}, {}, {}
-        for ntype, nodes_of_type in nodes.items():
-            (
-                unique[ntype],
-                compacted[ntype],
-                offsets[ntype],
-            ) = unique_and_compact_per_type(nodes_of_type)
-        return unique, compacted, offsets
+    nums = {}
+    concat_nodes, empties = [], []
+    for ntype, nodes_of_type in nodes.items():
+        nums[ntype] = [node.size(0) for node in nodes_of_type]
+        concat_nodes.append(torch.cat(nodes_of_type))
+        empties.append(concat_nodes[-1].new_empty(0))
+    unique_fn = (
+        torch.ops.graphbolt.unique_and_compact_batched_async
+        if async_op
+        else torch.ops.graphbolt.unique_and_compact_batched
+    )
+    results = unique_fn(concat_nodes, empties, empties, rank, world_size)
+
+    class _Waiter:
+        def __init__(self, future, ntypes, nums):
+            self.future = future
+            self.ntypes = ntypes
+            self.nums = nums
+
+        def wait(self):
+            """Returns the stored value when invoked."""
+            results = self.future.wait() if async_op else self.future
+            ntypes = self.ntypes
+            nums = self.nums
+            # Ensure there is no memory leak.
+            self.future = self.ntypes = self.nums = None
+
+            unique, compacted, offsets = {}, {}, {}
+            for ntype, result in zip(ntypes, results):
+                (
+                    unique[ntype],
+                    concat_compacted,
+                    _,
+                    offsets[ntype],
+                ) = result
+                compacted[ntype] = list(concat_compacted.split(nums[ntype]))
+            if is_heterogeneous:
+                return unique, compacted, offsets
+            else:
+                return (
+                    unique[homo_ntype],
+                    compacted[homo_ntype],
+                    offsets[homo_ntype],
+                )
+
+    post_processer = _Waiter(results, nodes.keys(), nums)
+    if async_op:
+        return post_processer
     else:
-        return unique_and_compact_per_type(nodes)
+        return post_processer.wait()
 
 
 def compact_temporal_nodes(nodes, nodes_timestamp):
@@ -161,7 +198,7 @@ def unique_and_compact_csc_formats(
     `Deep Graph Library PR#4337<https://github.com/dmlc/dgl/pull/4337>`__
     and was later first fully described in
     `Cooperative Minibatching in Graph Neural Networks
-    <https://arxiv.org/abs/2310.12403>`__
+    <https://arxiv.org/abs/2310.12403>`__.
     Cooperation between the GPUs eliminates duplicate work performed across the
     GPUs due to the overlapping sampled k-hop neighborhoods of seed nodes when
     performing GNN minibatching.
@@ -206,8 +243,8 @@ def unique_and_compact_csc_formats(
         pairs are replaced with mapped node IDs, where each type of node is
         mapped to a contiguous space of IDs ranging from 0 to N. The unique
         nodes offsets tensor partitions the unique_nodes tensor. Has size
-        `world_size + 1` and unique_nodes[offsets[i]: offsets[i + 1]] belongs to
-        the rank `(rank + i) % world_size`.
+        `world_size + 1` and `unique_nodes[offsets[i]: offsets[i + 1]]` belongs
+        to the rank `(rank + i) % world_size`.
 
     Examples
     --------
@@ -312,6 +349,7 @@ def unique_and_compact_csc_formats(
             if is_homogeneous:
                 compacted_csc_formats = list(compacted_csc_formats.values())[0]
                 unique_nodes = list(unique_nodes.values())[0]
+                offsets = list(offsets.values())[0]
 
             return unique_nodes, compacted_csc_formats, offsets
 

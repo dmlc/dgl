@@ -95,13 +95,36 @@ if __name__ == "__main__":
         help="Save original edge IDs into files",
     )
     parser.add_argument(
+        "--use-graphbolt",
+        action="store_true",
+        help="Use GraphBolt for distributed partition.",
+    )
+    parser.add_argument(
+        "--store-inner-node",
+        action="store_true",
+        default=False,
+        help="Store inner nodes.",
+    )
+
+    parser.add_argument(
+        "--store-inner-edge",
+        action="store_true",
+        default=False,
+        help="Store inner edges.",
+    )
+    parser.add_argument(
+        "--store-eids",
+        action="store_true",
+        default=False,
+        help="Store edge IDs.",
+    )
+    parser.add_argument(
         "--graph-formats",
         default=None,
         type=str,
         help="Save partitions in specified formats.",
     )
     params = parser.parse_args()
-
     # invoke the pipeline function
     numeric_level = getattr(logging, params.log_level.upper(), None)
     logging.basicConfig(

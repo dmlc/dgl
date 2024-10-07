@@ -75,6 +75,10 @@ def submit_jobs(args) -> str:
     argslist += "--log-level {} ".format(args.log_level)
     argslist += "--save-orig-nids " if args.save_orig_nids else ""
     argslist += "--save-orig-eids " if args.save_orig_eids else ""
+    argslist += "--use-graphbolt " if args.use_graphbolt else ""
+    argslist += "--store-eids " if args.store_eids else ""
+    argslist += "--store-inner-node " if args.store_inner_node else ""
+    argslist += "--store-inner-edge " if args.store_inner_edge else ""
     argslist += (
         f"--graph-formats {args.graph_formats} " if args.graph_formats else ""
     )
@@ -158,6 +162,30 @@ def main():
         "--save-orig-eids",
         action="store_true",
         help="Save original edge IDs into files",
+    )
+    parser.add_argument(
+        "--use-graphbolt",
+        action="store_true",
+        help="Use GraphBolt for distributed partition.",
+    )
+    parser.add_argument(
+        "--store-inner-node",
+        action="store_true",
+        default=False,
+        help="Store inner nodes.",
+    )
+
+    parser.add_argument(
+        "--store-inner-edge",
+        action="store_true",
+        default=False,
+        help="Store inner edges.",
+    )
+    parser.add_argument(
+        "--store-eids",
+        action="store_true",
+        default=False,
+        help="Store edge IDs.",
     )
     parser.add_argument(
         "--graph-formats",
