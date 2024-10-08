@@ -5,7 +5,7 @@ import time
 import unittest
 import uuid
 
-import backend as F
+import dgl.backend as F
 import dgl
 import numpy as np
 import pytest
@@ -255,7 +255,7 @@ def start_dist_neg_dataloader(
         train_eid = {dist_graph.etypes[0]: th.arange(num_edges_to_sample)}
 
     for i in range(num_server):
-        part, _, _, _, _, _, _ = load_partition(part_config, i)
+        part, _, _, _, _, _, _ = load_partition(part_config, i, use_graphbolt=use_graphbolt)
 
     num_negs = 5
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10])
@@ -463,7 +463,7 @@ def start_node_dataloader(
     gpb = None
     disable_shared_mem = num_server > 1
     if disable_shared_mem:
-        _, _, _, gpb, _, _, _ = load_partition(part_config, rank)
+        _, _, _, gpb, _, _, _ = load_partition(part_config, rank, use_graphbolt=use_graphbolt)
     num_nodes_to_sample = 202
     batch_size = 32
     graph_name = os.path.splitext(os.path.basename(part_config))[0]
@@ -482,7 +482,7 @@ def start_node_dataloader(
         }
 
     for i in range(num_server):
-        part, _, _, _, _, _, _ = load_partition(part_config, i)
+        part, _, _, _, _, _, _ = load_partition(part_config, i, use_graphbolt=use_graphbolt)
 
     # Create sampler
     _prob = None
@@ -589,7 +589,7 @@ def start_edge_dataloader(
     gpb = None
     disable_shared_mem = num_server > 1
     if disable_shared_mem:
-        _, _, _, gpb, _, _, _ = load_partition(part_config, rank)
+        _, _, _, gpb, _, _, _ = load_partition(part_config, rank, use_graphbolt=use_graphbolt)
     num_edges_to_sample = 202
     batch_size = 32
     graph_name = os.path.splitext(os.path.basename(part_config))[0]
@@ -604,7 +604,7 @@ def start_edge_dataloader(
         }
 
     for i in range(num_server):
-        part, _, _, _, _, _, _ = load_partition(part_config, i)
+        part, _, _, _, _, _, _ = load_partition(part_config, i, use_graphbolt=use_graphbolt)
 
     # Create sampler
     _prob = None
@@ -1178,3 +1178,6 @@ def test_deprecated_dataloader(dataloader_type):
         dataloader_type,
         use_deprecated_dataloader=True,
     )
+
+if __name__ == "__main__":
+    test_dataloader_homograph(1,0,'node',True,False)
