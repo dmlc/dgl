@@ -671,7 +671,7 @@ if __name__ == "__main__":
             "igb-het-medium",
             "igb-het-large",
             "igb-het",
-            "igb-het-MLPerf"
+            "igb-het-MLPerf",
         ],
         help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m, "
         " igb-het-[tiny|small|medium|large].",
