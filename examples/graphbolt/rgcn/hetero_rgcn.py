@@ -163,7 +163,7 @@ def extract_embed(node_embed, input_nodes):
 
 def extract_node_features(name, block, data, node_embed, device):
     """Extract the node features from embedding layer or raw features."""
-    if name == "ogbn-mag" or "igb-het" in name:
+    if name == "ogbn-mag":
         input_nodes = {
             k: v.to(device) for k, v in block.srcdata[dgl.NID].items()
         }
@@ -281,13 +281,6 @@ class RelGraphConvLayer(nn.Module):
         # based on its own features, thereby allowing the model to refine the node
         # representations. Note that this does not imply the existence of self-loop
         # edges in the graph. It is similar to residual connection.
-        self.loop_weights = nn.ModuleDict(
-            {
-                ntype: nn.Linear(in_size, out_size, bias=True)
-                for ntype in self.ntypes
-            }
-        )
-
         self.loop_weights = nn.ModuleDict(
             {
                 ntype: nn.Linear(in_size, out_size, bias=True)
@@ -677,6 +670,8 @@ if __name__ == "__main__":
             "igb-het-small",
             "igb-het-medium",
             "igb-het-large",
+            "igb-het",
+            "igb-het-MLPerf"
         ],
         help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m, "
         " igb-het-[tiny|small|medium|large].",
