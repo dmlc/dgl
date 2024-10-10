@@ -246,7 +246,7 @@ def run(
         model.parameters(), lr=args.lr, weight_decay=args.wd
     )
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="max", factor=0.75, patience=50, verbose=True
+        optimizer, mode="max", factor=0.75, patience=50
     )
 
     total_time = 0
