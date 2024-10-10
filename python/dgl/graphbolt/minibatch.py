@@ -173,10 +173,10 @@ class MiniBatch:
         """DGL blocks extracted from `MiniBatch` containing graphical structures
         and ID mappings.
         """
-        if not self.sampled_subgraphs:
-            return None
+        # if not self.sampled_subgraphs:
+        #     return None
 
-        if self._blocks is None:
+        if self._blocks is None and self.sampled_subgraphs:
             self._blocks = self.compute_blocks()
         return self._blocks
 
