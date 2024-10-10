@@ -215,7 +215,6 @@ def run(
         mode="max",
         factor=0.7,
         patience=20,
-        verbose=True,
         min_lr=1e-4,
     )
 
