@@ -283,7 +283,7 @@ def _verify_graphbolt_partition(graph, part_id, gpb, ntypes, etypes):
     print(f"Partition {part_id} looks good!")
 
 
-def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
+def load_partition(part_config, part_id, load_feats=True, use_graphbolt=None):
     """Load data of a partition from the data path.
 
     A partition data includes a graph structure of the partition, a dict of node tensors,
@@ -334,6 +334,21 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
         "part-{}".format(part_id) in part_metadata
     ), "part-{} does not exist".format(part_id)
     part_files = part_metadata["part-{}".format(part_id)]
+
+    if use_graphbolt is None:
+        if os.path.exists(
+            os.path.join(config_path, f"part{part_id}", "graph.dgl")
+        ):
+            use_graphbolt = False
+        elif os.path.exists(
+            os.path.join(
+                config_path, f"part{part_id}", "fused_csc_sampling_graph.pt"
+            )
+        ):
+            use_graphbolt = True
+        else:
+            raise ValueError("The graph object doesn't exist.")
+
     if use_graphbolt:
         part_graph_field = "part_graph_graphbolt"
     else:
