@@ -41,7 +41,9 @@ def test_rank_sort_and_unique_and_compact(dtype, rank):
     res3 = torch.ops.graphbolt.rank_sort(nodes_list1[::-1], rank, WORLD_SIZE)
 
     # This function is deterministic. Call with identical arguments and check.
-    for (nodes1, idx1, offsets1), (nodes3, idx3, offsets3) in zip(res1, reversed(res3)):
+    for (nodes1, idx1, offsets1), (nodes3, idx3, offsets3) in zip(
+        res1, reversed(res3)
+    ):
         assert_equal(nodes1, nodes3)
         assert_equal(idx1, idx3)
         assert_equal(offsets1.diff(), offsets3.diff())
