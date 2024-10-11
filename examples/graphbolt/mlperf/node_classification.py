@@ -213,7 +213,10 @@ class EntityClassify(nn.Module):
             h = layer(subgraph, h)
         if self.cooperative:
             h = gb.CooperativeConvFunction.apply(minibatch, h)
-            h = h[minibatch.compacted_seeds]
+            out = {}
+            for ntype, compacted_seeds in minibatch.compacted_seeds.items():
+                out[ntype] = h[ntype][compacted_seeds]
+            h = out
         return h
 
 
