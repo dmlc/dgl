@@ -6,6 +6,8 @@ import dgl
 
 import numpy as np
 import pyarrow.parquet as pq
+from scipy import sparse as spsp
+import dgl.backend as F
 import pytest
 import torch
 from dgl.data.utils import load_graphs, load_tensors
@@ -19,7 +21,10 @@ from dgl.distributed.partition import (
 
 from distpartitioning import array_readwriter
 from distpartitioning.utils import generate_read_list
-from pytest_utils import create_chunked_dataset
+from pytest_utils import (
+    create_chunked_dataset,
+    chunk_graph,
+)
 
 from tools.verification_utils import (
     verify_graph_feats,
@@ -202,6 +207,111 @@ def test_chunk_graph_arbitrary_chunks(
     )
 
 
+def create_mini_chunked_dataset(root_dir, num_chunks, data_fmt, edges_fmt, vector_rows, **kwargs):
+    num_nodes = {"n1": 1000, "n2": 1010, "n3": 1020}
+    etypes = [
+        ("n1", "r1", "n2"),
+        ("n2", "r1", "n1"),
+        ("n1", "r2", "n3"),
+        ("n2", "r3", "n3"),
+    ]
+    edges_coo = {}
+    for etype in etypes:
+        src_ntype, _, dst_ntype = etype
+        arr = spsp.random(
+            num_nodes[src_ntype],
+            num_nodes[dst_ntype],
+            density=0.001,
+            format="coo",
+            random_state=100,
+        )
+        edges_coo[etype] = (arr.row, arr.col)
+    edges_coo[("n1", "a0", "n2")] = (torch.tensor([0, 1]), torch.tensor([1, 0]))
+    edges_coo[("n1", "a1", "n3")] = (torch.tensor([0, 1]), torch.tensor([1, 0]))
+    g=dgl.heterograph(edges_coo)
+
+    # save feature
+    n1_feats = np.random.randn(num_nodes["n1"], 3)
+    n2_feats = np.random.randn(num_nodes["n2"], 3)
+    n3_feats = np.random.randn(num_nodes["n3"], 3)
+
+    n1_label = np.random.choice(4, 1000)
+    n2_label = np.random.choice(4, 1010)
+    n3_label = np.random.choice(4, 1020)
+
+    a0_feat = np.random.randn(2, 3)
+    a1_feat = np.random.randn(2, 3)
+
+    input_dir = os.path.join(root_dir, "data_test")
+    os.makedirs(input_dir)
+    for sub_d in ["n1", "n2", "n3", "a0", "a1"]:
+        os.makedirs(os.path.join(input_dir, sub_d))
+
+    n1_feat_path = os.path.join(input_dir, "n1/feat.npy")
+    with open(n1_feat_path, "wb") as f:
+        np.save(f, n1_feats)
+    g.nodes["n1"].data["feat"] = torch.from_numpy(n1_feats)
+
+    n2_feat_path = os.path.join(input_dir, "n2/feat.npy")
+    with open(n2_feat_path, "wb") as f:
+        np.save(f, n2_feats)
+    g.nodes["n2"].data["feat"] = torch.from_numpy(n2_feats)
+    
+    n3_feat_path = os.path.join(input_dir, "n3/feat.npy")
+    with open(n3_feat_path, "wb") as f:
+        np.save(f, n3_feats)
+    g.nodes["n3"].data["feat"] = torch.from_numpy(n3_feats)
+
+    n1_label_path = os.path.join(input_dir, "n1/label.npy")
+    with open(n1_label_path, "wb") as f:
+        np.save(f, n1_label)
+    g.nodes["n1"].data["label"] = torch.from_numpy(n1_label)
+
+    n2_label_path = os.path.join(input_dir, "n2/label.npy")
+    with open(n2_label_path, "wb") as f:
+        np.save(f, n2_label)
+    g.nodes["n2"].data["label"] = torch.from_numpy(n2_label)
+
+    n3_label_path = os.path.join(input_dir, "n3/label.npy")
+    with open(n3_label_path, "wb") as f:
+        np.save(f, n3_label)
+    g.nodes["n3"].data["label"] = torch.from_numpy(n3_label)
+
+    a0_feat_path = os.path.join(input_dir, "a0/feat.npy")
+    with open(a0_feat_path, "wb") as f:
+        np.save(f, a0_feat)
+    g.edges["n1", "a0", "n2"].data["feat"] = torch.from_numpy(a0_feat)
+
+    a1_feat_path = os.path.join(input_dir, "a1/feat.npy")
+    with open(a1_feat_path, "wb") as f:
+        np.save(f, a1_feat)
+    g.edges["n1", "a1", "n3"].data["feat"] = torch.from_numpy(a1_feat)
+
+    node_data={
+        "n1": {"feat": n1_feat_path, "label": n1_label_path},
+        "n2": {"feat": n2_feat_path, "label": n2_label_path},
+        "n3": {"feat": n3_feat_path, "label": n3_label_path},
+    }
+    edge_data={
+        ("n1", "a0", "n2"): {"feat": a0_feat_path},
+        ("n1", "a1", "n3"): {"feat": a1_feat_path},
+    }
+    output_dir = os.path.join(root_dir, "chunked-data")
+    chunk_graph(
+        g,
+        "mag240m",
+        node_data,
+        edge_data,
+        num_chunks=num_chunks,
+        output_path=output_dir,
+        data_fmt=data_fmt,
+        edges_fmt=edges_fmt,
+        vector_rows=vector_rows,
+        **kwargs,
+    )
+    return g
+
+
 def _test_pipeline(
     num_chunks,
     num_parts,
@@ -234,7 +344,7 @@ def _test_pipeline(
         in_dir = os.path.join(root_dir, "chunked-data")
         output_dir = os.path.join(root_dir, "parted_data")
         os.system(
-            "python3 tools/partition_algo/random_partition.py "
+            "/opt/conda/envs/pytorch/bin/python tools/partition_algo/random_partition.py "
             "--in_dir {} --out_dir {} --num_partitions {}".format(
                 in_dir, output_dir, num_parts
             )
@@ -253,7 +363,7 @@ def _test_pipeline(
             for i in range(world_size):
                 f.write(f"127.0.0.{i + 1}\n")
 
-        cmd = "python3 tools/dispatch_data.py"
+        cmd = "/opt/conda/envs/pytorch/bin/python tools/dispatch_data.py"
         cmd += f" --in-dir {in_dir}"
         cmd += f" --partitions-dir {partition_dir}"
         cmd += f" --out-dir {out_dir}"
@@ -267,7 +377,7 @@ def _test_pipeline(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = "python3 tools/verify_partitions.py "
+            cmd = "/opt/conda/envs/pytorch/bin/python tools/verify_partitions.py "
             cmd += f" --orig-dataset-dir {in_dir}"
             cmd += f" --part-graph {out_dir}"
             cmd += f" --partitions-dir {output_dir}"
@@ -373,9 +483,98 @@ def test_pipeline_feature_format(data_fmt):
     _test_pipeline(4, 4, 4, data_fmt=data_fmt)
 
 
+def test_partition_hetero_few_nodes(
+    num_chunks,
+    num_parts,
+    world_size,
+    graph_formats=None,
+    data_fmt="numpy",
+    edges_fmt="csv",
+    vector_rows=False,
+    num_chunks_nodes=None,
+    num_chunks_edges=None,
+    num_chunks_node_data=None,
+    num_chunks_edge_data=None,
+):
+    with tempfile.TemporaryDirectory() as root_dir:
+        g = create_mini_chunked_dataset(
+            root_dir,
+            num_chunks,
+            data_fmt=data_fmt,
+            edges_fmt=edges_fmt,
+            vector_rows=vector_rows,
+            num_chunks_nodes=num_chunks_nodes,
+            num_chunks_edges=num_chunks_edges,
+            num_chunks_node_data=num_chunks_node_data,
+            num_chunks_edge_data=num_chunks_edge_data,
+        )
+
+        # Step1: graph partition
+        in_dir = os.path.join(root_dir, "chunked-data")
+        output_dir = os.path.join(root_dir, "parted_data")
+        os.system(
+            "/opt/conda/envs/pytorch/bin/python tools/partition_algo/random_partition.py "
+            "--in_dir {} --out_dir {} --num_partitions {}".format(
+                in_dir, output_dir, num_parts
+            )
+        )
+
+        # Step2: data dispatch
+        partition_dir = os.path.join(root_dir, "parted_data")
+        out_dir = os.path.join(root_dir, "partitioned")
+        ip_config = os.path.join(root_dir, "ip_config.txt")
+        with open(ip_config, "w") as f:
+            for i in range(world_size):
+                f.write(f"127.0.0.{i + 1}\n")
+
+        cmd = "/opt/conda/envs/pytorch/bin/python tools/dispatch_data.py"
+        cmd += f" --in-dir {in_dir}"
+        cmd += f" --partitions-dir {partition_dir}"
+        cmd += f" --out-dir {out_dir}"
+        cmd += f" --ip-config {ip_config}"
+        cmd += " --ssh-port 22"
+        cmd += " --process-group-timeout 60"
+        cmd += " --save-orig-nids"
+        cmd += " --save-orig-eids"
+        cmd += f" --graph-formats {graph_formats}" if graph_formats else ""
+        os.system(cmd)
+
+        # read original node/edge IDs
+        def read_orig_ids(fname):
+            orig_ids = {}
+            for i in range(num_parts):
+                ids_path = os.path.join(out_dir, f"part{i}", fname)
+                part_ids = load_tensors(ids_path)
+                for type, data in part_ids.items():
+                    if type not in orig_ids:
+                        orig_ids[type] = data
+                    else:
+                        orig_ids[type] = torch.cat((orig_ids[type], data))
+            return orig_ids
+
+        orig_nids = read_orig_ids("orig_nids.dgl")
+        orig_eids = read_orig_ids("orig_eids.dgl")
+
+        # load partitions and verify
+        part_config = os.path.join(out_dir, "metadata.json")
+        for i in range(num_parts):
+            part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
+                part_config, i
+            )
+            verify_partition_data_types(part_g)
+            verify_partition_formats(part_g, graph_formats)
+            verify_graph_feats(
+                g, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids
+            )
+
+
 def test_utils_generate_read_list():
     read_list = generate_read_list(10, 4)
     assert np.array_equal(read_list[0], np.array([0, 1, 2]))
     assert np.array_equal(read_list[1], np.array([3, 4, 5]))
     assert np.array_equal(read_list[2], np.array([6, 7]))
     assert np.array_equal(read_list[3], np.array([8, 9]))
+
+if __name__=='__main__':
+    test_partition_hetero_few_nodes(2,4,4)
+    # test_pipeline_basics(4,4,4,)

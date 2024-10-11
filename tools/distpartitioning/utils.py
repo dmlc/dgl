@@ -3,6 +3,8 @@ import logging
 import os
 from itertools import cycle
 
+import sys 
+sys.path.append('/home/ubuntu/workspace/dgl/tools/distpartitioning')
 import constants
 
 import dgl
