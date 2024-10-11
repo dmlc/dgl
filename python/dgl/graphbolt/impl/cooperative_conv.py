@@ -42,7 +42,7 @@ class CooperativeConvFunction(torch.autograd.Function):
             seed_sizes,
         )
         outs = {}
-        for ntype, typed_tensor in convert_to_hetero(tensor).items():
+        for ntype, typed_tensor in sorted(convert_to_hetero(tensor).items()):
             out = typed_tensor.new_empty(
                 (sum(counts_sent.get(ntype, [0])),) + typed_tensor.shape[1:],
                 requires_grad=typed_tensor.requires_grad,
@@ -70,7 +70,9 @@ class CooperativeConvFunction(torch.autograd.Function):
         ) = ctx.communication_variables
         delattr(ctx, "communication_variables")
         outs = {}
-        for ntype, typed_grad_output in convert_to_hetero(grad_output).items():
+        for ntype, typed_grad_output in sorted(
+            convert_to_hetero(grad_output).items()
+        ):
             out = typed_grad_output.new_empty(
                 (sum(counts_received[ntype]),) + typed_grad_output.shape[1:]
             )
