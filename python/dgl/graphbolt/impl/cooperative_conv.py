@@ -44,17 +44,18 @@ class CooperativeConvFunction(torch.autograd.Function):
         outs = {}
         for ntype, typed_tensor in convert_to_hetero(tensor).items():
             out = typed_tensor.new_empty(
-                (sum(counts_sent[ntype]),) + typed_tensor.shape[1:]
+                (sum(counts_sent.get(ntype, [0])),) + typed_tensor.shape[1:],
+                requires_grad=typed_tensor.requires_grad,
             )
             all_to_all(
-                torch.split(out, counts_sent[ntype]),
+                torch.split(out, counts_sent.get(ntype, 0)),
                 torch.split(
-                    typed_tensor[seed_inverse_ids[ntype]],
-                    counts_received[ntype],
+                    typed_tensor[seed_inverse_ids.get(ntype, slice(None))],
+                    counts_received.get(ntype, 0),
                 ),
             )
             outs[ntype] = out
-        return revert_to_homo(out)
+        return revert_to_homo(outs)
 
     @staticmethod
     def backward(

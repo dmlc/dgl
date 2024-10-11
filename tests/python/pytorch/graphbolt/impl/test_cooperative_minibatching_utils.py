@@ -57,12 +57,12 @@ def test_rank_sort_and_unique_and_compact(dtype, rank):
                 nodes1[off1[j] : off1[j + 1]], nodes4[off4[i] : off4[i + 1]]
             )
 
-    unique, compacted, offsets = gb.unique_and_compact(
-        nodes_list1[:1], rank, WORLD_SIZE
-    )
+    nodes = {str(i): [typed_seeds] for i, typed_seeds in enumerate(nodes_list1)}
 
-    nodes1, idx1, offsets1 = res1[0]
+    unique, compacted, offsets = gb.unique_and_compact(nodes, rank, WORLD_SIZE)
 
-    assert_equal(unique, nodes1)
-    assert_equal(compacted[0], idx1)
-    assert_equal(offsets, offsets1)
+    for i in nodes.keys():
+        nodes1, idx1, offsets1 = res1[int(i)]
+        assert_equal(unique[i], nodes1)
+        assert_equal(compacted[i][0], idx1)
+        assert_equal(offsets[i], offsets1)

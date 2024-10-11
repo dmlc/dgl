@@ -166,13 +166,13 @@ class FeatureFetcher(MiniBatchTransformer):
             self.node_feature_keys, Dict
         ) or isinstance(self.edge_feature_keys, Dict)
         if is_heterogeneous:
-            node_features = {key: {} for key, _ in data.node_features.keys()}
-            for (key, ntype), feature in data.node_features.items():
+            node_features = {key: {} for _, key in data.node_features.keys()}
+            for (ntype, key), feature in data.node_features.items():
                 node_features[key][ntype] = feature
             for key, feature in node_features.items():
                 new_feature = CooperativeConvFunction.apply(subgraph, feature)
                 for ntype, tensor in new_feature.items():
-                    data.node_features[(key, ntype)] = tensor
+                    data.node_features[(ntype, key)] = tensor
         else:
             for key in data.node_features:
                 feature = data.node_features[key]

@@ -561,7 +561,7 @@ class CompactPerLayer(MiniBatchTransformer):
             seeds_offsets = {"_N": seeds_offsets}
         num_ntypes = len(seeds_offsets)
         counts_sent = torch.empty(world_size * num_ntypes, dtype=torch.int64)
-        for i, offsets in enumerate(seeds_offsets.values()):
+        for i, (_, offsets) in enumerate(sorted(seeds_offsets.items())):
             counts_sent[
                 torch.arange(i, world_size * num_ntypes, num_ntypes)
             ] = offsets.diff()
@@ -589,7 +589,7 @@ class CompactPerLayer(MiniBatchTransformer):
         seeds_received = {}
         counts_sent = {}
         counts_received = {}
-        for i, (ntype, typed_seeds) in enumerate(seeds.items()):
+        for i, (ntype, typed_seeds) in enumerate(sorted(seeds.items())):
             idx = torch.arange(i, world_size * num_ntypes, num_ntypes)
             typed_counts_sent = subgraph._counts_sent[idx].tolist()
             typed_counts_received = subgraph._counts_received[idx].tolist()
