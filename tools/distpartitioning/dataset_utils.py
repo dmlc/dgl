@@ -546,7 +546,11 @@ def get_dataset(
                     block_size=4096,
                     autogenerate_column_names=True,
                 )
-                parse_options = pyarrow.csv.ParseOptions(delimiter=" ")
+                parse_options = pyarrow.csv.ParseOptions(
+                    delimiter=etype_info[constants.STR_FORMAT][
+                        constants.STR_FORMAT_DELIMITER
+                    ]
+                )
                 with pyarrow.csv.open_csv(
                     edge_file,
                     read_options=read_options,
