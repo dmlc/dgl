@@ -333,7 +333,7 @@ def _test_pipeline(
         in_dir = os.path.join(root_dir, "chunked-data")
         output_dir = os.path.join(root_dir, "parted_data")
         os.system(
-            "python tools/partition_algo/random_partition.py "
+            "python3 tools/partition_algo/random_partition.py "
             "--in_dir {} --out_dir {} --num_partitions {}".format(
                 in_dir, output_dir, num_parts
             )
@@ -352,7 +352,7 @@ def _test_pipeline(
             for i in range(world_size):
                 f.write(f"127.0.0.{i + 1}\n")
 
-        cmd = "python tools/dispatch_data.py"
+        cmd = "python3 tools/dispatch_data.py"
         cmd += f" --in-dir {in_dir}"
         cmd += f" --partitions-dir {partition_dir}"
         cmd += f" --out-dir {out_dir}"
@@ -366,9 +366,7 @@ def _test_pipeline(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = (
-                "/opt/conda/envs/pytorch/bin/python tools/verify_partitions.py "
-            )
+            cmd = "python3 tools/verify_partitions.py "
             cmd += f" --orig-dataset-dir {in_dir}"
             cmd += f" --part-graph {out_dir}"
             cmd += f" --partitions-dir {output_dir}"
@@ -511,7 +509,7 @@ def test_partition_hetero_few_entity(
         in_dir = os.path.join(root_dir, "chunked-data")
         output_dir = os.path.join(root_dir, "parted_data")
         os.system(
-            "python tools/partition_algo/random_partition.py "
+            "python3 tools/partition_algo/random_partition.py "
             "--in_dir {} --out_dir {} --num_partitions {}".format(
                 in_dir, output_dir, num_parts
             )
@@ -525,7 +523,7 @@ def test_partition_hetero_few_entity(
             for i in range(world_size):
                 f.write(f"127.0.0.{i + 1}\n")
 
-        cmd = "python tools/dispatch_data.py"
+        cmd = "python3 tools/dispatch_data.py"
         cmd += f" --in-dir {in_dir}"
         cmd += f" --partitions-dir {partition_dir}"
         cmd += f" --out-dir {out_dir}"
