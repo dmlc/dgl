@@ -1268,9 +1268,7 @@ def partition_graph(
                         int(F.as_scalar(inner_nids[-1])) + 1,
                     ]
                 )
-            val = np.cumsum(
-                val
-            ).tolist()  # note computing the cumulative sum of array elements.
+            val = np.cumsum(val).tolist()
             assert val[-1] == g.num_nodes(ntype)
         for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype)

@@ -547,6 +547,8 @@ def get_dataset(
                     autogenerate_column_names=True,
                 )
                 parse_options = pyarrow.csv.ParseOptions(delimiter=" ")
+                # if getsize() == 0, the file is empty, indicating that the partition doesn't have this attribute.
+                # The src_ids and dst_ids should remain empty.
                 if os.path.getsize(edge_file) != 0:
                     with pyarrow.csv.open_csv(
                         edge_file,
