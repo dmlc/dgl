@@ -547,18 +547,21 @@ def get_dataset(
                     autogenerate_column_names=True,
                 )
                 parse_options = pyarrow.csv.ParseOptions(delimiter=" ")
-                with pyarrow.csv.open_csv(
-                    edge_file,
-                    read_options=read_options,
-                    parse_options=parse_options,
-                ) as reader:
-                    for next_chunk in reader:
-                        if next_chunk is None:
-                            break
+                if os.path.getsize(edge_file) != 0:
+                    with pyarrow.csv.open_csv(
+                        edge_file,
+                        read_options=read_options,
+                        parse_options=parse_options,
+                    ) as reader:
+                        for next_chunk in reader:
+                            if next_chunk is None:
+                                break
 
-                        next_table = pyarrow.Table.from_batches([next_chunk])
-                        src_ids.append(next_table["f0"].to_numpy())
-                        dst_ids.append(next_table["f1"].to_numpy())
+                            next_table = pyarrow.Table.from_batches(
+                                [next_chunk]
+                            )
+                            src_ids.append(next_table["f0"].to_numpy())
+                            dst_ids.append(next_table["f1"].to_numpy())
             elif (
                 etype_info[constants.STR_FORMAT][constants.STR_NAME]
                 == constants.STR_PARQUET
