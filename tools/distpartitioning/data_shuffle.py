@@ -1411,7 +1411,7 @@ def gen_dist_partitions(rank, world_size, params):
         for rank_id, last_id in enumerate(gather_list):
             prev_last_ids[
                 rank_id + (local_part_id * world_size)
-        ] = last_id.item()
+            ] = last_id.item()
 
     if rank == 0:
         # get meta-data from all partitions and merge them on rank-0
