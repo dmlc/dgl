@@ -357,7 +357,7 @@ def _process_partition_gb(
 
 
 def _update_node_map(node_map_val, end_ids_per_rank, id_ntypes, prev_last_id):
-    """this function is modified from the function '_update_node_edge_map' in dgl.distributed.partition """
+    """this function is modified from the function '_update_node_edge_map' in dgl.distributed.partition"""
     # Update the node_map_val to be contiguous.
     rank = dist.get_rank()
     prev_end_id = (
