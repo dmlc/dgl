@@ -336,9 +336,7 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
     part_files = part_metadata["part-{}".format(part_id)]
 
     exist_dgl_graph = exist_graphbolt_graph = False
-    if os.path.exists(
-        os.path.join(config_path, f"part{part_id}", "graph.dgl")
-    ):
+    if os.path.exists(os.path.join(config_path, f"part{part_id}", "graph.dgl")):
         use_graphbolt = False
         exist_dgl_graph = True
     elif os.path.exists(
