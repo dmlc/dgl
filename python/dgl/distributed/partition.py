@@ -339,18 +339,18 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
     if os.path.exists(os.path.join(config_path, f"part{part_id}", "graph.dgl")):
         use_graphbolt = False
         exist_dgl_graph = True
-    elif os.path.exists(
+    if os.path.exists(
         os.path.join(
             config_path, f"part{part_id}", "fused_csc_sampling_graph.pt"
         )
     ):
         use_graphbolt = True
         exist_graphbolt_graph = True
-    else:
-        raise ValueError("The graph object doesn't exist.")
 
-    # Check if both DGL graph and GraphBolt graph exist. Make sure only one exists.
-    if exist_dgl_graph and exist_graphbolt_graph:
+    # Check if both DGL graph and GraphBolt graph exist or not exist. Make sure only one exists.
+    if not exist_dgl_graph and not exist_graphbolt_graph:
+        raise ValueError("The graph object doesn't exist.")
+    elif exist_dgl_graph and exist_graphbolt_graph:
         raise ValueError(
             "Both DGL graph and GraphBolt graph exist. Please remove one."
         )
