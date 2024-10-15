@@ -350,7 +350,7 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
     # Check if both DGL graph and GraphBolt graph exist or not exist. Make sure only one exists.
     if not exist_dgl_graph and not exist_graphbolt_graph:
         raise ValueError("The graph object doesn't exist.")
-    elif exist_dgl_graph and exist_graphbolt_graph:
+    if exist_dgl_graph and exist_graphbolt_graph:
         raise ValueError(
             "Both DGL graph and GraphBolt graph exist. Please remove one."
         )
