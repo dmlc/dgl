@@ -352,8 +352,6 @@ def _process_partition_gb(
         sorted_idx = (
             th.repeat_interleave(indptr[:-1], split_size, dim=0) + sorted_idx
         )
-    else:
-        sorted_idxs=th.arange(len(edge_ids))
 
     return indptr, indices[sorted_idx], edge_ids[sorted_idx]
 
