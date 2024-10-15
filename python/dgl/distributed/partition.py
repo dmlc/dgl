@@ -335,19 +335,27 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
     ), "part-{} does not exist".format(part_id)
     part_files = part_metadata["part-{}".format(part_id)]
 
-    if use_graphbolt is False:
-        if os.path.exists(
-            os.path.join(config_path, f"part{part_id}", "graph.dgl")
-        ):
-            use_graphbolt = False
-        elif os.path.exists(
-            os.path.join(
-                config_path, f"part{part_id}", "fused_csc_sampling_graph.pt"
-            )
-        ):
-            use_graphbolt = True
-        else:
-            raise ValueError("The graph object doesn't exist.")
+    exist_dgl_graph = exist_graphbolt_graph = False
+    if os.path.exists(
+        os.path.join(config_path, f"part{part_id}", "graph.dgl")
+    ):
+        use_graphbolt = False
+        exist_dgl_graph = True
+    elif os.path.exists(
+        os.path.join(
+            config_path, f"part{part_id}", "fused_csc_sampling_graph.pt"
+        )
+    ):
+        use_graphbolt = True
+        exist_graphbolt_graph = True
+    else:
+        raise ValueError("The graph object doesn't exist.")
+
+    # Check if both DGL graph and GraphBolt graph exist. Make sure only one exists.
+    if exist_dgl_graph and exist_graphbolt_graph:
+        raise ValueError(
+            "Both DGL graph and GraphBolt graph exist. Please remove one."
+        )
 
     if use_graphbolt:
         part_graph_field = "part_graph_graphbolt"
