@@ -560,9 +560,7 @@ def get_dataset(
                         if next_chunk is None:
                             break
 
-                        next_table = pyarrow.Table.from_batches(
-                            [next_chunk]
-                        )
+                        next_table = pyarrow.Table.from_batches([next_chunk])
                         src_ids.append(next_table["f0"].to_numpy())
                         dst_ids.append(next_table["f1"].to_numpy())
             elif (
