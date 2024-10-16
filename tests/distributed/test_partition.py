@@ -990,6 +990,7 @@ def test_dgl_partition_to_graphbolt_homo(
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
+            os.remove(os.path.join(test_dir, f"part{part_id}/graph.dgl"))
             new_g = load_partition(
                 part_config, part_id, load_feats=False, use_graphbolt=True
             )[0]
@@ -1067,6 +1068,7 @@ def test_dgl_partition_to_graphbolt_hetero(
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
+            os.remove(os.path.join(test_dir, f"part{part_id}/graph.dgl"))
             new_g = load_partition(
                 part_config, part_id, load_feats=False, use_graphbolt=True
             )[0]
