@@ -551,21 +551,20 @@ def get_dataset(
                     # if getsize() == 0, the file is empty, indicating that the partition doesn't have this attribute.
                     # The src_ids and dst_ids should remain empty.
                     continue
-                else:
-                    with pyarrow.csv.open_csv(
-                        edge_file,
-                        read_options=read_options,
-                        parse_options=parse_options,
-                    ) as reader:
-                        for next_chunk in reader:
-                            if next_chunk is None:
-                                break
+                with pyarrow.csv.open_csv(
+                    edge_file,
+                    read_options=read_options,
+                    parse_options=parse_options,
+                ) as reader:
+                    for next_chunk in reader:
+                        if next_chunk is None:
+                            break
 
-                            next_table = pyarrow.Table.from_batches(
-                                [next_chunk]
-                            )
-                            src_ids.append(next_table["f0"].to_numpy())
-                            dst_ids.append(next_table["f1"].to_numpy())
+                        next_table = pyarrow.Table.from_batches(
+                            [next_chunk]
+                        )
+                        src_ids.append(next_table["f0"].to_numpy())
+                        dst_ids.append(next_table["f1"].to_numpy())
             elif (
                 etype_info[constants.STR_FORMAT][constants.STR_NAME]
                 == constants.STR_PARQUET
