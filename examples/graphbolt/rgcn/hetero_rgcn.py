@@ -674,7 +674,7 @@ if __name__ == "__main__":
             "igb-het-MLPerf",
         ],
         help="Dataset name. Possible values: ogbn-mag, ogb-lsc-mag240m, "
-        " igb-het-[tiny|small|medium|large].",
+        "igb-het, and igb-het-[tiny|small|medium|large|MLPerf].",
     )
     parser.add_argument("--num_epochs", type=int, default=3)
     parser.add_argument("--num_workers", type=int, default=0)

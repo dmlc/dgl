@@ -983,17 +983,18 @@ class BuiltinDataset(OnDiskDataset):
         The igb-hom-[tiny|small|medium|large] and igb-hom dataset is a homogeneous
         citation network, which is designed for developers to train and evaluate
         GNN models with high fidelity. See more details in
-        `igb-hom-[tiny|small|medium|large]
+        `igb-hom-[tiny|small|medium|large] and igb-hom
         <https://github.com/IllinoisGraphBenchmark/IGB-Datasets>`_.
 
         .. note::
             Self edges are added to the original graph.
             Node features are stored as float32.
 
-    **igb-het-[tiny|small|medium|large]**
-        The igb-hom-[tiny|small|medium] dataset is a heterogeneous citation network,
-        which is designed for developers to train and evaluate GNN models with
-        high fidelity. See more details in `igb-het-[tiny|small|medium|large]
+    **igb-het and igb-het-[tiny|small|medium|large|mlperf]**
+        The igb-hom-[tiny|small|medium|large|mlperf] and igb-het dataset is a
+        heterogeneous citation network, which is designed for developers to train
+        and evaluate GNN models with high fidelity. See more details in
+        `igb-het-[tiny|small|medium|large|mlperf] and igb-het
         <https://github.com/IllinoisGraphBenchmark/IGB-Datasets>`_.
 
         .. note::
@@ -1049,6 +1050,10 @@ class BuiltinDataset(OnDiskDataset):
         "igb-het-medium-seeds",
         "igb-het-large",
         "igb-het-large-seeds",
+        "igb-het",
+        "igb-het-seeds",
+        "igb-het-MLPerf",
+        "igb-het-MLPerf-seeds",
     ]
     _all_datasets = _datasets + _large_datasets
 
