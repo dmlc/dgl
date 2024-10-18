@@ -1052,8 +1052,8 @@ class BuiltinDataset(OnDiskDataset):
         "igb-het-large-seeds",
         "igb-het",
         "igb-het-seeds",
-        "igb-het-MLPerf",
-        "igb-het-MLPerf-seeds",
+        "igb-het-mlperf",
+        "igb-het-mlperf-seeds",
     ]
     _all_datasets = _datasets + _large_datasets
 
