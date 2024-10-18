@@ -346,7 +346,7 @@ def parse_args():
             "igb-het-medium",
             "igb-het-large",
             "igb-het-MLPerf",
-            "igb-het"
+            "igb-het",
         ],
         help="Dataset name. Possible values: ogb-lsc-mag240m, igb-het, and igb-het-[tiny|small|medium|large|MLPerf].",
     )
