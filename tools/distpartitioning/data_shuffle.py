@@ -489,6 +489,10 @@ def exchange_feature(
         feat_dims_dtype.append(DATA_TYPE_ID[torch.float32])
         feature_dimension = 0
 
+    feature_dimension_tensor = torch.tensor([feature_dimension])
+    dist.all_reduce(feature_dimension_tensor, op=dist.ReduceOp.MAX)
+    feature_dimension = feature_dimension_tensor.item()
+
     logging.debug(f"Sending the feature shape information - {feat_dims_dtype}")
     all_dims_dtype = allgather_sizes(
         feat_dims_dtype, world_size, num_parts, return_sizes=True
@@ -553,7 +557,11 @@ def exchange_feature(
         else:
             cur_features[local_feat_key] = output_feat_list
             cur_global_ids[local_feat_key] = output_id_list
-
+    else:
+        cur_features[local_feat_key] = torch.empty(
+            (0, feature_dimension), dtype=torch.float32
+        )
+        cur_global_ids[local_feat_key] = torch.empty((0,), dtype=torch.int64)
     return cur_features, cur_global_ids
 
 
@@ -1301,6 +1309,7 @@ def gen_dist_partitions(rank, world_size, params):
     if params.graph_formats:
         graph_formats = params.graph_formats.split(",")
 
+    prev_last_ids = {}
     for local_part_id in range(params.num_parts // world_size):
         # Synchronize for each local partition of the graph object.
         dist.barrier()
@@ -1340,6 +1349,7 @@ def gen_dist_partitions(rank, world_size, params):
                 schema_map[constants.STR_NUM_NODES_PER_TYPE],
             ),
             edge_typecounts,
+            prev_last_ids,
             return_orig_nids=params.save_orig_nids,
             return_orig_eids=params.save_orig_eids,
             use_graphbolt=params.use_graphbolt,
@@ -1389,6 +1399,19 @@ def gen_dist_partitions(rank, world_size, params):
             "local-part-id-" + str(local_part_id * world_size + rank)
         ] = json_metadata
         memory_snapshot("MetadataCreateComplete: ", rank)
+
+        last_id_tensor = torch.tensor(
+            [prev_last_ids[rank + (local_part_id * world_size)]],
+            dtype=torch.int64,
+        )
+        gather_list = [
+            torch.zeros(1, dtype=torch.int64) for _ in range(world_size)
+        ]
+        dist.all_gather(gather_list, last_id_tensor)
+        for rank_id, last_id in enumerate(gather_list):
+            prev_last_ids[
+                rank_id + (local_part_id * world_size)
+            ] = last_id.item()
 
     if rank == 0:
         # get meta-data from all partitions and merge them on rank-0
