@@ -13,7 +13,7 @@ import pytest
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from pytest_utils import create_chunked_dataset
+from pytest_utils import create_hetero_chunked_dataset
 from tools.distpartitioning import constants, dist_lookup
 from tools.distpartitioning.gloo_wrapper import allgather_sizes
 from tools.distpartitioning.utils import (
@@ -210,7 +210,7 @@ def test_lookup_service(
 ):
 
     with tempfile.TemporaryDirectory() as root_dir:
-        g = create_chunked_dataset(
+        g = create_hetero_chunked_dataset(
             root_dir,
             num_chunks,
             data_fmt="numpy",

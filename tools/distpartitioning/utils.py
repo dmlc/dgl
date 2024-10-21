@@ -1,8 +1,8 @@
 import json
 import logging
 import os
-from itertools import cycle
 
+from itertools import cycle
 import constants
 
 import dgl

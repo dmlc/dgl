@@ -22,7 +22,10 @@ from dgl.distributed.partition import (
 
 from distpartitioning import array_readwriter
 from distpartitioning.utils import generate_read_list
-from pytest_utils import create_chunked_dataset
+from pytest_utils import (
+    create_hetero_chunked_dataset,
+    create_homo_chunked_dataset,
+)
 
 
 def _verify_metadata_gb(gpb, g, num_parts, part_id, part_sizes):
@@ -829,24 +832,41 @@ def _test_pipeline_graphbolt(
     store_eids=True,
     store_inner_edge=True,
     store_inner_node=True,
+    is_homogeneous=False,
 ):
     if num_parts % world_size != 0:
         # num_parts should be a multiple of world_size
         return
 
     with tempfile.TemporaryDirectory() as root_dir:
-        g = create_chunked_dataset(
-            root_dir,
-            num_chunks,
-            data_fmt=data_fmt,
-            num_chunks_nodes=num_chunks_nodes,
-            num_chunks_edges=num_chunks_edges,
-            num_chunks_node_data=num_chunks_node_data,
-            num_chunks_edge_data=num_chunks_edge_data,
-        )
-        graph_name = "test"
-        test_ntype = "paper"
-        test_etype = ("paper", "cites", "paper")
+        if is_homogeneous:
+            g = create_homo_chunked_dataset(
+                root_dir,
+                num_chunks,
+                data_fmt=data_fmt,
+                num_chunks_nodes=num_chunks_nodes,
+                num_chunks_edges=num_chunks_edges,
+                num_chunks_node_data=num_chunks_node_data,
+                num_chunks_edge_data=num_chunks_edge_data,
+            )
+            graph_name = "test"
+            test_ntype = "_N"
+            test_etype = ("_N", "_E", "_N")
+            ntypes = ["_N"]
+        else:
+            g = create_hetero_chunked_dataset(
+                root_dir,
+                num_chunks,
+                data_fmt=data_fmt,
+                num_chunks_nodes=num_chunks_nodes,
+                num_chunks_edges=num_chunks_edges,
+                num_chunks_node_data=num_chunks_node_data,
+                num_chunks_edge_data=num_chunks_edge_data,
+            )
+            graph_name = "test"
+            test_ntype = "paper"
+            test_etype = ("paper", "cites", "paper")
+            ntypes = ["author", "institution", "paper"]
 
         # Step1: graph partition
         in_dir = os.path.join(root_dir, "chunked-data")
@@ -857,7 +877,7 @@ def _test_pipeline_graphbolt(
                 in_dir, output_dir, num_parts
             )
         )
-        for ntype in ["author", "institution", "paper"]:
+        for ntype in ntypes:
             fname = os.path.join(output_dir, "{}.txt".format(ntype))
             with open(fname, "r") as f:
                 header = f.readline().rstrip()
@@ -893,7 +913,7 @@ def _test_pipeline_graphbolt(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = "python3 tools/verify_partitions.py "
+            cmd = "fhomopython3 tools/verify_partitions.py "
             cmd += f" --orig-dataset-dir {in_dir}"
             cmd += f" --part-graph {out_dir}"
             cmd += f" --partitions-dir {output_dir}"
@@ -952,14 +972,20 @@ def _test_pipeline_graphbolt(
     "num_chunks, num_parts, world_size",
     [[4, 4, 4], [8, 4, 2], [8, 4, 4], [9, 6, 3], [11, 11, 1], [11, 4, 1]],
 )
-def test_pipeline_basics(num_chunks, num_parts, world_size):
+@pytest.mark.parametrize("is_homogeneous", [False, True])
+def test_pipeline_basics(num_chunks, num_parts, world_size, is_homogeneous):
     _test_pipeline_graphbolt(
         num_chunks,
         num_parts,
         world_size,
+        is_homogeneous=is_homogeneous,
     )
     _test_pipeline_graphbolt(
-        num_chunks, num_parts, world_size, use_verify_partitions=False
+        num_chunks,
+        num_parts,
+        world_size,
+        use_verify_partitions=False,
+        is_homogeneous=is_homogeneous,
     )
 
 
@@ -1001,12 +1027,14 @@ def test_pipeline_attributes(store_inner_node, store_inner_edge, store_eids):
         [1, 5, 3, 1, 1],
     ],
 )
+@pytest.mark.parametrize("is_homogeneous", [False, True])
 def test_pipeline_arbitrary_chunks(
     num_chunks,
     num_parts,
     world_size,
     num_chunks_node_data,
     num_chunks_edge_data,
+    is_homogeneous,
 ):
 
     _test_pipeline_graphbolt(
@@ -1015,9 +1043,13 @@ def test_pipeline_arbitrary_chunks(
         world_size,
         num_chunks_node_data=num_chunks_node_data,
         num_chunks_edge_data=num_chunks_edge_data,
+        is_homogeneous=is_homogeneous,
     )
 
 
 @pytest.mark.parametrize("data_fmt", ["numpy", "parquet"])
-def test_pipeline_feature_format(data_fmt):
-    _test_pipeline_graphbolt(4, 4, 4, data_fmt=data_fmt)
+@pytest.mark.parametrize("is_homogeneous", [False, True])
+def test_pipeline_feature_format(data_fmt, is_homogeneous):
+    _test_pipeline_graphbolt(
+        4, 4, 4, data_fmt=data_fmt, is_homogeneous=is_homogeneous
+    )

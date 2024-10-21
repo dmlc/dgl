@@ -19,7 +19,7 @@ from dgl.distributed.partition import (
 
 from distpartitioning import array_readwriter
 from distpartitioning.utils import generate_read_list
-from pytest_utils import create_chunked_dataset
+from pytest_utils import create_hetero_chunked_dataset
 
 from tools.verification_utils import (
     verify_graph_feats,
@@ -39,7 +39,7 @@ def _test_chunk_graph(
     num_chunks_edge_data=None,
 ):
     with tempfile.TemporaryDirectory() as root_dir:
-        g = create_chunked_dataset(
+        g = create_hetero_chunked_dataset(
             root_dir,
             num_chunks,
             data_fmt=data_fmt,
