@@ -17,10 +17,22 @@ def to_on_disk_numpy(test_dir, name, t):
     return path
 
 
+def _skip_condition_cached_feature():
+    return (F._default_context_str != "gpu") or (
+        torch.cuda.get_device_capability()[0] < 7
+    )
+
+
+def _reason_to_skip_cached_feature():
+    if F._default_context_str != "gpu":
+        return "GPUCachedFeature tests are available only when testing the GPU backend."
+
+    return "GPUCachedFeature requires a Volta or later generation NVIDIA GPU."
+
+
 @unittest.skipIf(
-    F._default_context_str != "gpu"
-    or torch.cuda.get_device_capability()[0] < 7,
-    reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
+    _skip_condition_cached_feature(),
+    reason=_reason_to_skip_cached_feature(),
 )
 @pytest.mark.parametrize(
     "dtype",
@@ -116,9 +128,8 @@ def test_gpu_cached_feature(dtype, cache_size_a, cache_size_b):
 
 
 @unittest.skipIf(
-    F._default_context_str != "gpu"
-    or torch.cuda.get_device_capability()[0] < 7,
-    reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
+    _skip_condition_cached_feature(),
+    reason=_reason_to_skip_cached_feature(),
 )
 @pytest.mark.parametrize(
     "dtype",
@@ -155,9 +166,8 @@ def test_gpu_cached_feature_read_async(dtype, pin_memory):
 
 
 @unittest.skipIf(
-    F._default_context_str != "gpu"
-    or torch.cuda.get_device_capability()[0] < 7,
-    reason="GPUCachedFeature requires a Volta or later generation NVIDIA GPU.",
+    _skip_condition_cached_feature(),
+    reason=_reason_to_skip_cached_feature(),
 )
 @unittest.skipIf(
     not torch.ops.graphbolt.detect_io_uring(),

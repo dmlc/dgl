@@ -17,6 +17,7 @@ from .kvstore import KVClient, KVServer
 from .nn import *
 from .partition import (
     dgl_partition_to_graphbolt,
+    gb_convert_single_dgl_partition,
     load_partition,
     load_partition_book,
     load_partition_feats,

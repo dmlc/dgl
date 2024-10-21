@@ -9,6 +9,7 @@ import dgl.backend as F
 import dgl.graphbolt as gb
 import numpy as np
 import torch as th
+import torch.distributed as dist
 from dgl import EID, ETYPE, NID, NTYPE
 
 from dgl.distributed.constants import DGL2GB_EID, GB_DST_ID
@@ -357,6 +358,34 @@ def _process_partition_gb(
     return indptr, indices[sorted_idx], edge_ids[sorted_idx]
 
 
+def _update_node_map(node_map_val, end_ids_per_rank, id_ntypes, prev_last_id):
+    """this function is modified from the function '_update_node_edge_map' in dgl.distributed.partition"""
+    # Update the node_map_val to be contiguous.
+    rank = dist.get_rank()
+    prev_end_id = (
+        end_ids_per_rank[rank - 1].item() if rank > 0 else prev_last_id
+    )
+    ntype_ids = {ntype: ntype_id for ntype_id, ntype in enumerate(id_ntypes)}
+    for ntype_id in list(ntype_ids.values()):
+        ntype = id_ntypes[ntype_id]
+        start_id = node_map_val[ntype][0][0]
+        end_id = node_map_val[ntype][0][1]
+        if not (start_id == -1 and end_id == -1):
+            continue
+        prev_ntype_id = (
+            ntype_ids[ntype] - 1
+            if ntype_ids[ntype] > 0
+            else max(ntype_ids.values())
+        )
+        prev_ntype = id_ntypes[prev_ntype_id]
+        if ntype_ids[ntype] == 0:
+            node_map_val[ntype][0][0] = prev_end_id
+        else:
+            node_map_val[ntype][0][0] = node_map_val[prev_ntype][0][1]
+        node_map_val[ntype][0][1] = node_map_val[ntype][0][0]
+    return node_map_val[ntype][0][-1]
+
+
 def create_graph_object(
     tot_node_count,
     tot_edge_count,
@@ -370,6 +399,7 @@ def create_graph_object(
     edgeid_offset,
     node_typecounts,
     edge_typecounts,
+    last_ids={},
     return_orig_nids=False,
     return_orig_eids=False,
     use_graphbolt=False,
@@ -514,12 +544,30 @@ def create_graph_object(
     shuffle_global_nid_range = (shuffle_global_nids[0], shuffle_global_nids[-1])
 
     # Determine the node ID ranges of different node types.
+    prev_last_id = last_ids.get(part_id - 1, 0)
     for ntype_name in global_nid_ranges:
         ntype_id = ntypes_map[ntype_name]
         type_nids = shuffle_global_nids[ntype_ids == ntype_id]
-        node_map_val[ntype_name].append(
-            [int(type_nids[0]), int(type_nids[-1]) + 1]
-        )
+        if len(type_nids) == 0:
+            node_map_val[ntype_name].append([-1, -1])
+        else:
+            node_map_val[ntype_name].append(
+                [int(type_nids[0]), int(type_nids[-1]) + 1]
+            )
+            last_id = th.tensor(
+                [max(prev_last_id, int(type_nids[-1]) + 1)], dtype=th.int64
+            )
+    id_ntypes = list(global_nid_ranges.keys())
+
+    gather_last_ids = [
+        th.zeros(1, dtype=th.int64) for _ in range(dist.get_world_size())
+    ]
+
+    dist.all_gather(gather_last_ids, last_id)
+    prev_last_id = _update_node_map(
+        node_map_val, gather_last_ids, id_ntypes, prev_last_id
+    )
+    last_ids[part_id] = prev_last_id
 
     # process edges
     memory_snapshot("CreateDGLObj_AssignEdgeData: ", part_id)
