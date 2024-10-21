@@ -220,7 +220,7 @@ def _test_pipeline(
         return
 
     with tempfile.TemporaryDirectory() as root_dir:
-        g = create_chunked_dataset(
+        g = create_hetero_chunked_dataset(
             root_dir,
             num_chunks,
             data_fmt=data_fmt,
