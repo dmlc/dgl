@@ -423,7 +423,7 @@ def evaluate(
     category = "paper"
     # An evaluator for the dataset.
     if "igb-het" in name:
-        evaluator = IGB_Evaluator(name=name, num_tasks=1, eval_metric="acc")
+        evaluator = IGB_Evaluator(name=name, num_tasks=1)
     elif name == "ogbn-mag":
         evaluator = Evaluator(name=name)
     else:
