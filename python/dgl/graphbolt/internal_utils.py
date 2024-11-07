@@ -313,7 +313,7 @@ def check_sha1(filename, sha1_hash):
     return sha1.hexdigest() == sha1_hash
 
 
-def extract_archive(file, target_dir, overwrite=True, filter='data'):
+def extract_archive(file, target_dir, overwrite=True, filter="data"):
     """Extract archive file.
 
     Parameters
@@ -351,7 +351,9 @@ def extract_archive(file, target_dir, overwrite=True, filter='data'):
                     member_path = os.path.join(path, member.name)
                     if not is_within_directory(path, member_path):
                         raise Exception("Attempted Path Traversal in Tar File")
-                tar.extractall(path, members, numeric_owner=numeric_owner, filter=filter)
+                tar.extractall(
+                    path, members, numeric_owner=numeric_owner, filter=filter
+                )
 
             safe_extract(archive, path=target_dir)
     elif file.endswith(".gz"):
