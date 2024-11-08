@@ -406,7 +406,7 @@ class TUDataset(DGLBuiltinDataset):
                     int
                 )
             )
-            self.num_labels = int(max(DS_graph_labels) + 1)
+            self.num_labels = int(max(DS_graph_labels)[0] + 1)
             self.graph_labels = F.tensor(DS_graph_labels)
         elif os.path.exists(self._file_path("graph_attributes")):
             DS_graph_labels = loadtxt(
