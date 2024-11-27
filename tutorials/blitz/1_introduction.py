@@ -204,6 +204,7 @@ train(g, model)
 #
 #    g = g.to('cuda')
 #    model = GCN(g.ndata['feat'].shape[1], 16, dataset.num_classes).to('cuda')
+#    model = model.to('cuda')
 #    train(g, model)
 #
 
