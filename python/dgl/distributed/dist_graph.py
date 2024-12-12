@@ -170,10 +170,7 @@ class AddEdgeAttributeFromKVRequest(rpc.Request):
             gpb = server_state.partition_book
             # Initialize the edge attribute.
             num_edges = g.total_num_edges
-            if self._padding == 0:
-                attr_data = torch.zeros(num_edges, dtype=data_type)
-            else:
-                attr_data = torch.full((num_edges,), self._padding, dtype=data_type)
+            attr_data = torch.full((num_edges,), self._padding, dtype=data_type)
             # Map data from kvstore to the local partition for inner edges only.
             num_inner_edges = gpb.metadata()[gpb.partid]["num_edges"]
             homo_eids = g.edge_attributes[EID][:num_inner_edges]
