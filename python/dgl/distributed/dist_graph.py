@@ -143,15 +143,16 @@ def _copy_data_from_shared_mem(name, shape):
 class AddEdgeAttributeFromKVRequest(rpc.Request):
     """Add edge attribute from kvstore to local GraphBolt partition."""
 
-    def __init__(self, name, kv_names):
+    def __init__(self, name, kv_names, padding=0):
         self._name = name
         self._kv_names = kv_names
+        self._padding = padding
 
     def __getstate__(self):
-        return self._name, self._kv_names
+        return self._name, self._kv_names, self._padding
 
     def __setstate__(self, state):
-        self._name, self._kv_names = state
+        self._name, self._kv_names, self._padding = state
 
     def process_request(self, server_state):
         # For now, this is only used to add prob/mask data to the graph.
@@ -169,7 +170,10 @@ class AddEdgeAttributeFromKVRequest(rpc.Request):
             gpb = server_state.partition_book
             # Initialize the edge attribute.
             num_edges = g.total_num_edges
-            attr_data = torch.zeros(num_edges, dtype=data_type)
+            if self._padding == 0:
+                attr_data = torch.zeros(num_edges, dtype=data_type)
+            else:
+                attr_data = torch.full((num_edges,), self._padding, dtype=data_type)
             # Map data from kvstore to the local partition for inner edges only.
             num_inner_edges = gpb.metadata()[gpb.partid]["num_edges"]
             homo_eids = g.edge_attributes[EID][:num_inner_edges]
@@ -1620,7 +1624,7 @@ class DistGraph:
                 edata_names.append(name)
         return edata_names
 
-    def add_edge_attribute(self, name):
+    def add_edge_attribute(self, name, padding=0):
         """Add an edge attribute into GraphBolt partition from edge data.
 
         Parameters
@@ -1643,7 +1647,7 @@ class DistGraph:
         ]
         rpc.send_request(
             self._client._main_server_id,
-            AddEdgeAttributeFromKVRequest(name, kv_names),
+            AddEdgeAttributeFromKVRequest(name, kv_names, padding),
         )
         # Wait for the response.
         assert rpc.recv_response()._name == name

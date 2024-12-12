@@ -311,7 +311,7 @@ class Collator(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def add_edge_attribute_to_graph(g, data_name):
+    def add_edge_attribute_to_graph(g, data_name, gb_padding=0):
         """Add data into the graph as an edge attribute.
 
         For some cases such as prob/mask-based sampling on GraphBolt partitions,
@@ -329,7 +329,7 @@ class Collator(ABC):
             The name of data that's stored in DistGraph.ndata/edata.
         """
         if g._use_graphbolt and data_name:
-            g.add_edge_attribute(data_name)
+            g.add_edge_attribute(data_name, gb_padding)
 
 
 class NodeCollator(Collator):
@@ -366,7 +366,7 @@ class NodeCollator(Collator):
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
 
-    def __init__(self, g, nids, graph_sampler):
+    def __init__(self, g, nids, graph_sampler, gb_padding=0):
         self.g = g
         if not isinstance(nids, Mapping):
             assert (
@@ -380,7 +380,7 @@ class NodeCollator(Collator):
         # Add prob/mask into graphbolt partition's edge attributes if needed.
         if hasattr(self.graph_sampler, "prob"):
             Collator.add_edge_attribute_to_graph(
-                self.g, self.graph_sampler.prob
+                self.g, self.graph_sampler.prob, gb_padding
             )
 
     @property
@@ -612,6 +612,7 @@ class EdgeCollator(Collator):
         reverse_eids=None,
         reverse_etypes=None,
         negative_sampler=None,
+        gb_padding=0,
     ):
         self.g = g
         if not isinstance(eids, Mapping):
@@ -642,7 +643,7 @@ class EdgeCollator(Collator):
         # Add prob/mask into graphbolt partition's edge attributes if needed.
         if hasattr(self.graph_sampler, "prob"):
             Collator.add_edge_attribute_to_graph(
-                self.g, self.graph_sampler.prob
+                self.g, self.graph_sampler.prob, gb_padding
             )
 
     @property
@@ -864,6 +865,7 @@ class DistEdgeDataLoader(DistDataLoader):
             else:
                 dataloader_kwargs[k] = v
 
+        collator_kwargs["gb_padding"] = 1
         if device is None:
             # for the distributed case default to the CPU
             device = "cpu"
