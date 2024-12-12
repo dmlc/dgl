@@ -1628,6 +1628,8 @@ class DistGraph:
         ----------
         name : str
             The name of the edge attribute.
+        padding : int, optional
+            The padding value for the new edge attribute.
         """
         # Sanity checks.
         if not self._use_graphbolt:

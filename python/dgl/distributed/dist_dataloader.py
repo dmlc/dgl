@@ -327,6 +327,8 @@ class Collator(ABC):
             The graph.
         data_name : str
             The name of data that's stored in DistGraph.ndata/edata.
+        gb_padding : int, optional
+            The padding value for GraphBolt partitions' new edge_attributes.
         """
         if g._use_graphbolt and data_name:
             g.add_edge_attribute(data_name, gb_padding)
@@ -344,6 +346,8 @@ class NodeCollator(Collator):
         The node set to compute outputs.
     graph_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
+    gb_padding : int, optional
+        The padding value for GraphBolt partitions' new edge_attributes.
 
     Examples
     --------
