@@ -1902,7 +1902,25 @@ def check_mask_hetero_sampling_gb(tmpdir, num_server, use_graphbolt=True):
 
     part_config = tmpdir / "test_sampling.json"
 
-    dgl.distributed.initialize("rpc_ip_config.txt")
+    pserver_list = []
+    ctx = mp.get_context("spawn")
+    for i in range(num_server):
+        p = ctx.Process(
+            target=start_server,
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                True,
+            ),
+        )
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    dgl.distributed.initialize("rpc_ip_config.txt", use_graphbolt=True)
     dist_graph = DistGraph("test_sampling", part_config=part_config)
 
     os.environ["DGL_DIST_DEBUG"] = "1"
