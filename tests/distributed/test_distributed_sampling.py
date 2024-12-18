@@ -1882,9 +1882,9 @@ def check_mask_hetero_sampling_gb(tmpdir, num_server, use_graphbolt=True):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_hetero_graph()
-    indices = torch.randperm(g.num_edges("r34"))[:10]
+    eids = torch.randperm(g.num_edges("r34"))[:10]
     mask = torch.zeros(g.num_edges("r34"), dtype=torch.bool)
-    mask[indices] = True
+    mask[eids] = True
 
     num_parts = num_server
 
@@ -1900,17 +1900,14 @@ def check_mask_hetero_sampling_gb(tmpdir, num_server, use_graphbolt=True):
         store_eids=True,
     )
 
-    pserver_list = []
-
     part_config = tmpdir / "test_sampling.json"
 
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", part_config=part_config)
-    print(dist_graph.local_partition)
 
     os.environ["DGL_DIST_DEBUG"] = "1"
 
-    edges = {("n3", "r34", "n4"): indices}
+    edges = {("n3", "r34", "n4"): eids}
     sampler = dgl.dataloading.MultiLayerNeighborSampler([10, 10], mask="mask")
     loader = dgl.dataloading.DistEdgeDataLoader(
         dist_graph, edges, sampler, batch_size=64
