@@ -7,8 +7,9 @@ import traceback
 import unittest
 from pathlib import Path
 
-import backend as F
 import dgl
+
+import dgl.backend as F
 import numpy as np
 import pytest
 import torch
@@ -1856,6 +1857,77 @@ def test_local_sampling_heterograph(num_parts, use_graphbolt, prob_or_mask):
                 assert torch.all(
                     g.edges[c_etype].data[prob_or_mask][sampled_orig_eids] > 0
                 )
+
+
+def check_mask_hetero_sampling_gb(tmpdir, num_server, use_graphbolt=True):
+    def create_hetero_graph(dense=False, empty=False):
+        num_nodes = {"n1": 210, "n2": 200, "n3": 220, "n4": 230}
+        etypes = [("n1", "r12", "n2"), ("n2", "r23", "n3"), ("n3", "r34", "n4")]
+        edges = {}
+        random.seed(42)
+        for etype in etypes:
+            src_ntype, _, dst_ntype = etype
+            arr = spsp.random(
+                num_nodes[src_ntype] - 10 if empty else num_nodes[src_ntype],
+                num_nodes[dst_ntype] - 10 if empty else num_nodes[dst_ntype],
+                density=0.1,
+                format="coo",
+                random_state=100,
+            )
+            edges[etype] = (arr.row, arr.col)
+        g = dgl.heterograph(edges, num_nodes)
+
+        return g
+
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
+
+    g = create_hetero_graph()
+    indices = torch.randperm(g.num_edges("r34"))[:10]
+    mask = torch.zeros(g.num_edges("r34"), dtype=torch.bool)
+    mask[indices] = True
+
+    num_parts = num_server
+
+    orig_nid_map, orig_eid_map = partition_graph(
+        g,
+        "test_sampling",
+        num_parts,
+        tmpdir,
+        num_hops=1,
+        part_method="metis",
+        return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=True,
+    )
+
+    pserver_list = []
+
+    part_config = tmpdir / "test_sampling.json"
+
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    dist_graph = DistGraph("test_sampling", part_config=part_config)
+    print(dist_graph.local_partition)
+
+    os.environ["DGL_DIST_DEBUG"] = "1"
+
+    edges = {("n3", "r34", "n4"): indices}
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([10, 10], mask="mask")
+    loader = dgl.dataloading.DistEdgeDataLoader(
+        dist_graph, edges, sampler, batch_size=64
+    )
+
+    block = next(iter(loader))[2][0]
+    assert block.num_src_nodes("n1") > 0
+
+
+@pytest.mark.parametrize("num_parts", [1])
+def test_local_masked_sampling_heterograph_gb(
+    num_server,
+):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_mask_hetero_sampling_gb(Path(tmpdirname), num_server)
 
 
 if __name__ == "__main__":
