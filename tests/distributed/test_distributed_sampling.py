@@ -1862,6 +1862,9 @@ def test_local_sampling_heterograph(num_parts, use_graphbolt, prob_or_mask):
 def check_hetero_dist_edge_dataloader_gb(
     tmpdir, num_server, use_graphbolt=True
 ):
+    # Custom function to create a heterogeneous graph, ensuring that edges with missing masks
+    # can still be used to sample in DistEdgeDataloader. create_random_hetero does not support this case,
+    # so this function was added to handle the requirement.
     def create_hetero_graph():
         num_nodes = {"n1": 210, "n2": 200, "n3": 220, "n4": 230}
         etypes = [("n1", "r12", "n2"), ("n2", "r23", "n3"), ("n3", "r34", "n4")]
