@@ -7,7 +7,7 @@ import traceback
 import unittest
 from pathlib import Path
 
-import dgl.backend as F
+import backend as F
 import dgl
 import numpy as np
 import pytest
