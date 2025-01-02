@@ -28,7 +28,7 @@ def numpy_save_aligned(*args, **kwargs):
 
 
 def _read_torch_data(path):
-    return torch.load(path)
+    return torch.load(path, weights_only=False)
 
 
 def _read_numpy_data(path, in_memory=True):
