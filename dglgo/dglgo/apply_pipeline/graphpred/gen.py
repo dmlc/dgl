@@ -119,10 +119,9 @@ class ApplyGraphpredPipeline(PipelineBase):
         cls.user_cfg_cls(**user_cfg_dict)
 
         # Training configuration
-        train_cfg = torch.load(
-            user_cfg_dict["cpt_path"],
-            weights_only=False
-        )["cfg"]
+        train_cfg = torch.load(user_cfg_dict["cpt_path"], weights_only=False)[
+            "cfg"
+        ]
 
         # Dict for code rendering
         render_cfg = deepcopy(user_cfg_dict)
