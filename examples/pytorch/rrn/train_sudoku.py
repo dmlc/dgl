@@ -79,7 +79,7 @@ def main(args):
         if not os.path.exists(model_path):
             raise FileNotFoundError("Saved model not Found!")
 
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(model_path, weights_only=False))
         model.to(device)
 
         test_dataloader = sudoku_dataloader(args.batch_size, segment="test")

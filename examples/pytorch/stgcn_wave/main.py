@@ -175,7 +175,7 @@ for epoch in range(1, epochs + 1):
 best_model = STGCN_WAVE(
     blocks, n_his, n_route, G, drop_prob, num_layers, device, args.control_str
 ).to(device)
-best_model.load_state_dict(torch.load(save_path))
+best_model.load_state_dict(torch.load(save_path, weights_only=False))
 
 
 l = evaluate_model(best_model, loss, test_iter)

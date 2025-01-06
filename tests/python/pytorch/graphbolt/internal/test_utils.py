@@ -77,7 +77,7 @@ def test_save_data(data_fmt, save_fmt, contiguous):
 
         # Step2. Load the data.
         if save_fmt == "torch":
-            loaded_data = torch.load(save_file_name)
+            loaded_data = torch.load(save_file_name, weights_only=False)
             assert loaded_data.is_contiguous()
             assert torch.equal(tensor_data, loaded_data)
         elif save_fmt == "numpy":

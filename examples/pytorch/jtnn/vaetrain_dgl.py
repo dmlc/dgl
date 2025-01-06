@@ -54,7 +54,7 @@ lr = float(opts.lr)
 model = DGLJTNNVAE(vocab, hidden_size, latent_size, depth)
 
 if opts.model_path is not None:
-    model.load_state_dict(torch.load(opts.model_path))
+    model.load_state_dict(torch.load(opts.model_path, weights_only=False))
 else:
     for param in model.parameters():
         if param.dim() == 1:

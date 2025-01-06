@@ -168,7 +168,7 @@ def main(args):
         if num_patient_epochs == args["patience"]:
             break
 
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, weights_only=False))
     train_score, val_score, test_score = run_an_eval_epoch(
         graph, splitted_idx, model, evaluator
     )
