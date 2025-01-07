@@ -7,8 +7,9 @@ import traceback
 import unittest
 from pathlib import Path
 
-import backend as F
 import dgl
+
+import dgl.backend as F
 import numpy as np
 import pytest
 import torch
@@ -1919,6 +1920,9 @@ def check_hetero_dist_edge_dataloader_gb(
 
     block = next(iter(loader))[2][0]
     assert block.num_src_nodes("n1") > 0
+    assert block.num_edges("r12") > 0
+    assert block.num_edges("r13") > 0
+    assert block.num_edges("r23") > 0
 
 
 def test_hetero_dist_edge_dataloader_gb(

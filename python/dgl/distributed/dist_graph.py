@@ -143,7 +143,7 @@ def _copy_data_from_shared_mem(name, shape):
 class AddEdgeAttributeFromKVRequest(rpc.Request):
     """Add edge attribute from kvstore to local GraphBolt partition."""
 
-    def __init__(self, name, kv_names, padding=0):
+    def __init__(self, name, kv_names, padding):
         self._name = name
         self._kv_names = kv_names
         self._padding = padding
@@ -170,6 +170,11 @@ class AddEdgeAttributeFromKVRequest(rpc.Request):
             gpb = server_state.partition_book
             # Initialize the edge attribute.
             num_edges = g.total_num_edges
+
+            # Padding is used here to fill missing edge attributes (e.g., 'prob' or 'mask') for certain edge types.
+            # In DGLGraph, some edges may not have attributes or their values could be None.
+            # GraphBolt, however, samples edges based on specific attributes (like 'mask' == 1), so we pad the missing attributes with default values (e.g., 1 for 'mask')
+            # to ensure that all edges can be sampled consistently, regardless of whether their attributes are available in the DGLGraph.
             attr_data = torch.full((num_edges,), self._padding, dtype=data_type)
             # Map data from kvstore to the local partition for inner edges only.
             num_inner_edges = gpb.metadata()[gpb.partid]["num_edges"]
@@ -1621,7 +1626,7 @@ class DistGraph:
                 edata_names.append(name)
         return edata_names
 
-    def add_edge_attribute(self, name, padding=0):
+    def add_edge_attribute(self, name, padding):
         """Add an edge attribute into GraphBolt partition from edge data.
 
         Parameters

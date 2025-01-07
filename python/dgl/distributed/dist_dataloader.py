@@ -311,7 +311,7 @@ class Collator(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def add_edge_attribute_to_graph(g, data_name, gb_padding=0):
+    def add_edge_attribute_to_graph(g, data_name, gb_padding):
         """Add data into the graph as an edge attribute.
 
         For some cases such as prob/mask-based sampling on GraphBolt partitions,
@@ -348,6 +348,8 @@ class NodeCollator(Collator):
         The neighborhood sampler.
     gb_padding : int, optional
         The padding value for GraphBolt partitions' new edge_attributes.
+        e.g. some edges of specific types have no mask, the mask will be set as gb_padding.
+        the edge will not be sampled if the mask is 0.
 
     Examples
     --------
@@ -512,6 +514,10 @@ class EdgeCollator(Collator):
 
         A set of builtin negative samplers are provided in
         :ref:`the negative sampling module <api-dataloading-negative-sampling>`.
+    gb_padding : int, optional
+        The padding value for GraphBolt partitions' new edge_attributes if the attributes in DistGraph are None.
+        e.g. prob/mask-based sampling.
+        Only when the mask of one edge is set as 1, the edge will be sampled.
 
     Examples
     --------
@@ -616,7 +622,7 @@ class EdgeCollator(Collator):
         reverse_eids=None,
         reverse_etypes=None,
         negative_sampler=None,
-        gb_padding=0,
+        gb_padding=1,
     ):
         self.g = g
         if not isinstance(eids, Mapping):
@@ -869,7 +875,6 @@ class DistEdgeDataLoader(DistDataLoader):
             else:
                 dataloader_kwargs[k] = v
 
-        collator_kwargs["gb_padding"] = 1
         if device is None:
             # for the distributed case default to the CPU
             device = "cpu"
