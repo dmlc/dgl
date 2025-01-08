@@ -101,7 +101,7 @@ def main(run, cfg, data):
         else:
             lr_scheduler.step()
 
-    model.load_state_dict(torch.load(tmp_cpt_path))
+    model.load_state_dict(torch.load(tmp_cpt_path, weights_only=False))
     os.remove(tmp_cpt_path)
     test_metric = evaluate(device, test_loader, model)
     print('Test Metric: {:.4f}'.format(test_metric))

@@ -25,7 +25,9 @@ def solve_sudoku(puzzle):
         urllib.request.urlretrieve(url, model_filename)
 
     model = SudokuNN(num_steps=64, edge_drop=0.0)
-    model.load_state_dict(torch.load(model_filename, map_location="cpu"))
+    model.load_state_dict(
+        torch.load(model_filename, weights_only=False, map_location="cpu")
+    )
     model.eval()
 
     g = _basic_sudoku_graph()

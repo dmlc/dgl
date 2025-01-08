@@ -140,7 +140,9 @@ elif args.model == "pointnet2_msg":
 
 net = net.to(dev)
 if args.load_model_path:
-    net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
+    net.load_state_dict(
+        torch.load(args.load_model_path, weights_only=False, map_location=dev)
+    )
 
 opt = optim.Adam(net.parameters(), lr=1e-3, weight_decay=1e-4)
 

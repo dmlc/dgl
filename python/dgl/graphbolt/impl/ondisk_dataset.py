@@ -852,7 +852,7 @@ class OnDiskDataset(Dataset):
         if graph_topology is None:
             return None
         if graph_topology.type == "FusedCSCSamplingGraph":
-            return torch.load(graph_topology.path)
+            return torch.load(graph_topology.path, weights_only=False)
         raise NotImplementedError(
             f"Graph topology type {graph_topology.type} is not supported."
         )

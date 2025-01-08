@@ -194,7 +194,9 @@ def main(args):
     model.eval()
     test_loss = []
     test_f1 = []
-    model.load_state_dict(torch.load(os.path.join(args.save_dir, args.name)))
+    model.load_state_dict(
+        torch.load(os.path.join(args.save_dir, args.name), weights_only=False)
+    )
     with torch.no_grad():
         for batch in test_set:
             g = batch.graph

@@ -214,7 +214,10 @@ def main(args, task):
     # test
     if args.use_val:
         model.load_state_dict(
-            torch.load(os.path.join(log_dir, "best_model_{}.pkl".format(task)))
+            torch.load(
+                os.path.join(log_dir, "best_model_{}.pkl".format(task)),
+                weights_only=False,
+            )
         )
     if cpu_flag and cuda:
         model = model.to("cpu")

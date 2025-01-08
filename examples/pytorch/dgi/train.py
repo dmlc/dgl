@@ -126,7 +126,7 @@ def main(args):
 
     # train classifier
     print("Loading {}th epoch".format(best_t))
-    dgi.load_state_dict(torch.load("best_dgi.pkl"))
+    dgi.load_state_dict(torch.load("best_dgi.pkl", weights_only=False))
     embeds = dgi.encoder(features, corrupt=False)
     embeds = embeds.detach()
     mean = 0

@@ -104,7 +104,7 @@ if not args.use_gt:
         use_cluster_feat=args.use_cluster_feat,
         use_focal_loss=args.use_focal_loss,
     )
-    model.load_state_dict(torch.load(args.model_filename))
+    model.load_state_dict(torch.load(args.model_filename, weights_only=False))
     model = model.to(device)
     model.eval()
 

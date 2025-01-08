@@ -57,7 +57,7 @@ def main():
         data to have the same number of input edge features, got {:d} and {:d}'.format(model_edge_feat_size, data_edge_feat_size)
 
     model = {{ model_class_name }}(**cfg['model'])
-    model.load_state_dict(torch.load(cfg['cpt_path'], map_location='cpu')['model'])
+    model.load_state_dict(torch.load(cfg['cpt_path'], weights_only=False, map_location='cpu')['model'])
     pred = infer(device, data_loader, model).detach().cpu()
 
     # Dump the results

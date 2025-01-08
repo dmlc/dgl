@@ -615,7 +615,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
                     f"but the feature {key} is loaded on disk."
                 )
                 features[key] = TorchBasedFeature(
-                    torch.load(spec.path), metadata=metadata
+                    torch.load(spec.path, weights_only=False), metadata=metadata
                 )
             elif spec.format == "numpy":
                 if spec.in_memory:

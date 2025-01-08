@@ -206,7 +206,7 @@ def main():
         raise RuntimeError(f"Checkpoint file not found at {checkpoint_path}")
 
     ## reading in checkpoint
-    checkpoint = torch.load(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     print("Predicting on test data...")

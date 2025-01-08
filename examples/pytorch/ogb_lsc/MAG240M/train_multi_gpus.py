@@ -304,7 +304,7 @@ def test(args, dataset, g, feats, paper_offset):
     ).cuda()
 
     # load ddp's model parameters, we need to remove the name of 'module.'
-    state_dict = torch.load(args.model_path)
+    state_dict = torch.load(args.model_path, weights_only=False)
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
         name = k[7:]

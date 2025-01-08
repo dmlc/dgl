@@ -139,7 +139,9 @@ net = PointTransformerCLS(40, batch_size, feature_dim=6)
 
 net = net.to(dev)
 if args.load_model_path:
-    net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
+    net.load_state_dict(
+        torch.load(args.load_model_path, weights_only=False, map_location=dev)
+    )
 
 if args.opt == "sgd":
     # The optimizer strategy described in paper:

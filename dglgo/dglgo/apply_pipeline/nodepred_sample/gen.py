@@ -48,7 +48,7 @@ class ApplyNodepredNsPipeline(PipelineBase):
             cpt: str = typer.Option(..., help="input checkpoint file path"),
         ):
             # Training configuration
-            train_cfg = torch.load(cpt)["cfg"]
+            train_cfg = torch.load(cpt, weights_only=False)["cfg"]
             if data is None:
                 print("data is not specified, use the training dataset")
                 data = train_cfg["data_name"]
@@ -101,7 +101,9 @@ class ApplyNodepredNsPipeline(PipelineBase):
         cls.user_cfg_cls(**user_cfg_dict)
 
         # Training configuration
-        train_cfg = torch.load(user_cfg_dict["cpt_path"])["cfg"]
+        train_cfg = torch.load(user_cfg_dict["cpt_path"], weights_only=False)[
+            "cfg"
+        ]
 
         # Dict for code rendering
         render_cfg = deepcopy(user_cfg_dict)

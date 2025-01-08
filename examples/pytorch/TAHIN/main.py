@@ -111,7 +111,9 @@ def main(args):
     # test use the best model
     model.eval()
     with torch.no_grad():
-        model.load_state_dict(torch.load("TAHIN" + "_" + args.dataset))
+        model.load_state_dict(
+            torch.load("TAHIN" + "_" + args.dataset, weights_only=False)
+        )
         test_loss = []
         test_acc = []
         test_auc = []

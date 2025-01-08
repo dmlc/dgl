@@ -625,8 +625,12 @@ if __name__ == "__main__":
                         args.res_dir,
                         f"run{run+1}_optimizer_checkpoint{epoch}.pth",
                     )
-                    model.load_state_dict(torch.load(model_name))
-                    optimizer.load_state_dict(torch.load(optimizer_name))
+                    model.load_state_dict(
+                        torch.load(model_name, weights_only=False)
+                    )
+                    optimizer.load_state_dict(
+                        torch.load(optimizer_name, weights_only=False)
+                    )
                     tested[epoch] = (
                         test(final_val_loader, dataset.eval_metric)[
                             dataset.eval_metric
