@@ -171,10 +171,11 @@ class AddEdgeAttributeFromKVRequest(rpc.Request):
             # Initialize the edge attribute.
             num_edges = g.total_num_edges
 
-            # Padding is used here to fill missing edge attributes (e.g., 'prob' or 'mask') for certain edge types.
-            # In DGLGraph, some edges may not have attributes or their values could be None.
-            # GraphBolt, however, samples edges based on specific attributes (like 'mask' == 1), so we pad the missing attributes with default values (e.g., 1 for 'mask')
-            # to ensure that all edges can be sampled consistently, regardless of whether their attributes are available in the DGLGraph.
+            # Padding is used to fill missing edge attributes (e.g., 'prob' or 'mask') for certain edge types.
+            # In DGLGraph, some edges may lack these attributes or have them set to None, but DGL will still sample these edges.
+            # In contrast, GraphBolt samples edges based on specific attributes (e.g., 'mask' == 1) and will skip edges with missing attributes.
+            # To ensure consistent sampling behavior in GraphBolt, we pad missing attributes with default values (e.g., 'mask' = 1),
+            # allowing all edges to be sampled, even if their attributes were missing or None in DGLGraph.
             attr_data = torch.full((num_edges,), self._padding, dtype=data_type)
             # Map data from kvstore to the local partition for inner edges only.
             num_inner_edges = gpb.metadata()[gpb.partid]["num_edges"]
