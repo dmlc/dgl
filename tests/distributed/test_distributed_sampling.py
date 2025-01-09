@@ -7,8 +7,9 @@ import traceback
 import unittest
 from pathlib import Path
 
-import backend as F
 import dgl
+
+import dgl.backend as F
 import numpy as np
 import pytest
 import torch
@@ -1856,6 +1857,81 @@ def test_local_sampling_heterograph(num_parts, use_graphbolt, prob_or_mask):
                 assert torch.all(
                     g.edges[c_etype].data[prob_or_mask][sampled_orig_eids] > 0
                 )
+
+
+def check_hetero_dist_edge_dataloader_gb(
+    tmpdir, num_server, use_graphbolt=True
+):
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
+
+    g = create_random_hetero()
+    eids = torch.randperm(g.num_edges("r23"))[:10]
+    mask = torch.zeros(g.num_edges("r23"), dtype=torch.bool)
+    mask[eids] = True
+
+    num_parts = num_server
+
+    orig_nid_map, orig_eid_map = partition_graph(
+        g,
+        "test_sampling",
+        num_parts,
+        tmpdir,
+        num_hops=1,
+        part_method="metis",
+        return_mapping=True,
+        use_graphbolt=use_graphbolt,
+        store_eids=True,
+    )
+
+    part_config = tmpdir / "test_sampling.json"
+
+    pserver_list = []
+    ctx = mp.get_context("spawn")
+    for i in range(num_server):
+        p = ctx.Process(
+            target=start_server,
+            args=(
+                i,
+                tmpdir,
+                num_server > 1,
+                "test_sampling",
+                ["csc", "coo"],
+                True,
+            ),
+        )
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    dgl.distributed.initialize("rpc_ip_config.txt", use_graphbolt=True)
+    dist_graph = DistGraph("test_sampling", part_config=part_config)
+
+    os.environ["DGL_DIST_DEBUG"] = "1"
+
+    edges = {("n2", "r23", "n3"): eids}
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([10, 10], mask="mask")
+    loader = dgl.dataloading.DistEdgeDataLoader(
+        dist_graph, edges, sampler, batch_size=64
+    )
+    dgl.distributed.exit_client()
+    for p in pserver_list:
+        p.join()
+        assert p.exitcode == 0
+
+    block = next(iter(loader))[2][0]
+    assert block.num_src_nodes("n1") > 0
+    assert block.num_edges("r12") > 0
+    assert block.num_edges("r13") > 0
+    assert block.num_edges("r23") > 0
+
+
+def test_hetero_dist_edge_dataloader_gb(
+    num_server=1,
+):
+    reset_envs()
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_hetero_dist_edge_dataloader_gb(Path(tmpdirname), num_server)
 
 
 if __name__ == "__main__":
