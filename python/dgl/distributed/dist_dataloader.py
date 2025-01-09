@@ -349,7 +349,7 @@ class NodeCollator(Collator):
     gb_padding : int, optional
         The padding value for GraphBolt partitions' new edge_attributes if the attributes in DistGraph are None.
         e.g. prob/mask-based sampling.
-        Only when the mask of one edge is set as 1, the edge will be sampled in dgl.graphbolt.FusedCSCSamplingGraph.sample_neighbors.
+        Only when the mask of one edge is set as 1, an edge will be sampled in dgl.graphbolt.FusedCSCSamplingGraph.sample_neighbors.
         The argument will be used in add_edge_attribute_to_graph to add new edge_attributes in graphbolt.
 
     Examples
@@ -518,7 +518,7 @@ class EdgeCollator(Collator):
     gb_padding : int, optional
         The padding value for GraphBolt partitions' new edge_attributes if the attributes in DistGraph are None.
         e.g. prob/mask-based sampling.
-        Only when the mask of one edge is set as 1, the edge will be sampled in dgl.graphbolt.FusedCSCSamplingGraph.sample_neighbors.
+        Only when the mask of one edge is set as 1, an edge will be sampled in dgl.graphbolt.FusedCSCSamplingGraph.sample_neighbors.
         The argument will be used in add_edge_attribute_to_graph to add new edge_attributes in graphbolt.
     --------
     The following example shows how to train a 3-layer GNN for edge classification on a
