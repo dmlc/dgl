@@ -141,10 +141,21 @@ void SpMMSumCsr(
   }
 #if !defined(_WIN32)
 #ifdef USE_LIBXSMM
-  int cpu_id = libxsmm_cpuid_x86();
+  int cpu_id, limit;
+#ifdef AARCH64
+  static int arm_cpu_id = -1;
+  if (arm_cpu_id == -1){
+    arm_cpu_id = libxsmm_cpuid_arm();
+  }
+  cpu_id = arm_cpu_id;
+  limit = LIBXSMM_AARCH64_A64FX;
+#else //x86
+    cpu_id = libxsmm_cpuid_x86();
+    limit = LIBXSMM_X86_AVX512;
+#endif//AARCH64
   const bool no_libxsmm =
       bcast.use_bcast || std::is_same<DType, double>::value ||
-      (std::is_same<DType, BFloat16>::value && cpu_id < LIBXSMM_X86_AVX512) ||
+      (std::is_same<DType, BFloat16>::value && cpu_id < limit) ||
       !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
@@ -266,10 +277,23 @@ void SpMMCmpCsr(
   }
 #if !defined(_WIN32)
 #ifdef USE_LIBXSMM
-  int cpu_id = libxsmm_cpuid_x86();
+#ifdef AARCH64
+  static int arm_cpu_id = -1;
+  if (arm_cpu_id == -1){
+    arm_cpu_id = libxsmm_cpuid_arm();
+  }
+#endif//AARCH64
+  int cpu_id, limit;
+#ifdef AARCH64
+  cpu_id = arm_cpu_id;
+  limit = LIBXSMM_AARCH64_A64FX;
+#else //x86
+    cpu_id = libxsmm_cpuid_x86();
+    limit = LIBXSMM_AARCH64_A64FX;
+#endif//AARCH64
   const bool no_libxsmm = bcast.use_bcast ||
                           std::is_same<DType, double>::value ||
-                          cpu_id < LIBXSMM_X86_AVX512 ||
+                          cpu_id < limit ||
                           !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(
