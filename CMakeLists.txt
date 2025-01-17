@@ -122,6 +122,17 @@ if (${BUILD_TYPE} STREQUAL "dev")
   if (MSVC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Od")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Od")
+  elseif ( CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(AARCH64)")
+    # Check if the compiler supports ARMv8.2-A or later with SVE
+    include(CheckCCompilerFlag)
+    # Try to detect whether the system supports SVE
+    check_c_compiler_flag("-march=armv8.2-a+sve" SUPPORTS_SVE) 
+    # Output the result
+    if(SUPPORTS_SVE)
+      message(STATUS "Hardware supports SVE")
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g3 -ggdb -march=armv8.2-a+sve")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -ggdb -march=armv8.2-a+sve")
+    endif()
   else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g3 -ggdb")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -ggdb")
