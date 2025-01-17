@@ -11,7 +11,7 @@ import torch
 from dgl.data.utils import load_graphs, load_tensors
 from partition_algo.base import load_partition_meta
 
-from pytest_utils import create_chunked_dataset
+from pytest_utils import create_hetero_chunked_dataset
 
 """
 TODO: skipping this test case since the dependency, mpirun, is
@@ -23,7 +23,7 @@ not yet configured in the CI framework.
 def test_parmetis_preprocessing():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
-        g = create_chunked_dataset(root_dir, num_chunks)
+        g = create_hetero_chunked_dataset(root_dir, num_chunks)
 
         # Trigger ParMETIS pre-processing here.
         input_dir = os.path.join(root_dir, "chunked-data")
@@ -117,7 +117,7 @@ def test_parmetis_preprocessing():
 def test_parmetis_postprocessing():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
-        g = create_chunked_dataset(root_dir, num_chunks)
+        g = create_hetero_chunked_dataset(root_dir, num_chunks)
 
         num_nodes = g.num_nodes()
         num_institutions = g.num_nodes("institution")
@@ -188,7 +188,7 @@ def test_parmetis_wrapper():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
         graph_name = "mag240m"
-        g = create_chunked_dataset(root_dir, num_chunks)
+        g = create_hetero_chunked_dataset(root_dir, num_chunks)
         all_ntypes = g.ntypes
         all_etypes = g.etypes
         num_constraints = len(all_ntypes) + 3
