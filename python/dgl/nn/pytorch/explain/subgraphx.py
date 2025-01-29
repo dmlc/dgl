@@ -145,7 +145,7 @@ class SubgraphX(nn.Module):
         device = self.feat.device
         for _ in range(self.shapley_steps):
             permuted_space = np.random.permutation(coalition_space)
-            split_idx = int(np.where(permuted_space == split_point)[0])
+            split_idx = int(np.where(permuted_space == split_point)[0][0])
 
             selected_nodes = permuted_space[:split_idx]
 
@@ -490,7 +490,7 @@ class HeteroSubgraphX(nn.Module):
             selected_node_map = dict()
             for ntype, nodes in coalition_space.items():
                 permuted_space = np.random.permutation(nodes)
-                split_idx = int(np.where(permuted_space == split_point)[0])
+                split_idx = int(np.where(permuted_space == split_point)[0][0])
                 selected_node_map[ntype] = permuted_space[:split_idx]
 
             # Mask for coalition set S_i
