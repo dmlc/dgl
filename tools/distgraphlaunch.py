@@ -129,7 +129,7 @@ def execute_remote(
         subprocess.check_call(ssh_cmd, shell=True)
 
     thread = Thread(target=run, args=(ssh_cmd,))
-    thread.setDaemon(True)
+    thread.daemon = True
     thread.start()
     return thread
 
