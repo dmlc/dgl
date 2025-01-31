@@ -228,24 +228,41 @@ it is stored in DGL Chunked Graph Format:
       |-- edges/                   # stores edge ID data
       |  |-- writes-part1.csv
       |  |-- writes-part2.csv
+      |  |-- writes-part3.csv
       |  |-- affiliated_with-part1.csv
       |  |-- affiliated_with-part2.csv
       |  |-- cites-part1.csv
-      |  |-- cites-part1.csv
+      |  |-- cites-part2.csv
+      |  |-- cites-part3.csv
+      |  |-- cites-part4.csv
       |
       |-- node_data/               # stores node feature data
          |-- paper-feat-part1.npy
          |-- paper-feat-part2.npy
+         |-- paper-feat-part3.npy
          |-- paper-label-part1.npy
          |-- paper-label-part2.npy
          |-- paper-year-part1.npy
          |-- paper-year-part2.npy
+         |-- paper-year-part3.npy
+         |-- paper-year-part4.npy
 
-All the data files are chunked into two parts, including the edges of each relation
+All the data files are chunked into parts or chunks, including the edges of each relation
 (e.g., writes, affiliates, cites) and node features. If the graph has edge features,
 they will be chunked into multiple files too. All ID data are stored in
 CSV (we will illustrate the contents soon) while node features are stored in
 numpy arrays.
+
+.. note::
+    Please note that the files for edges (writes, affiliates, cites) are chunked 
+    into multiple files. The no. of files for each edge type can be split into any
+    number of files.
+
+.. note::
+    Data preprocessing pipeline only assumes that the files for edges and edge-features
+    for any edge type are chunked into same number of files. For instance, in the 
+    above example if the graph had edge features for ``cites`` then the edge feature
+    files for ``cites`` edge type should also be chunked into 4 files.
 
 The ``metadata.json`` stores all the metadata information such as file names
 and chunk sizes (e.g., number of nodes, number of edges).
@@ -255,10 +272,10 @@ and chunk sizes (e.g., number of nodes, number of edges).
     {
        "graph_name" : "MAG240M-LSC",  # given graph name
        "node_type": ["author", "paper", "institution"],
-       "num_nodes_per_chunk": [
-           [61191556, 61191556],      # number of author nodes per chunk
-           [61191553, 61191552],      # number of paper nodes per chunk
-           [12861, 12860]             # number of institution nodes per chunk
+       "num_nodes_per_type": [
+           122383112,       # number of author nodes
+           122383105,       # number of paper nodes
+           25721            # number of institution nodes
        ],
        # The edge type name is a colon-joined string of source, edge, and destination type.
        "edge_type": [
@@ -266,39 +283,63 @@ and chunk sizes (e.g., number of nodes, number of edges).
            "author:affiliated_with:institution",
            "paper:cites:paper"
        ],
-       "num_edges_per_chunk": [
-           [193011360, 193011360],    # number of author:writes:paper edges per chunk
-           [22296293, 22296293],      # number of author:affiliated_with:institution edges per chunk
-           [648874463, 648874463]     # number of paper:cites:paper edges per chunk
+       "num_edges_per_type": [
+           386022720,     # number of author:writes:paper edges
+           44592586,      # number of author:affiliated_with:institution edges
+           1297748926     # number of paper:cites:paper edges
        ],
        "edges" : {
             "author:writes:paper" : {  # edge type
                  "format" : {"name": "csv", "delimiter": " "},
                  # The list of paths. Can be relative or absolute.
-                 "data" : ["edges/writes-part1.csv", "edges/writes-part2.csv"]
+                 "data" : [
+                    "edges/writes-part1.csv", 
+                    "edges/writes-part2.csv"
+                    "edges/writes-part3.csv"
+                 ]
             },
             "author:affiliated_with:institution" : {
                  "format" : {"name": "csv", "delimiter": " "},
-                 "data" : ["edges/affiliated_with-part1.csv", "edges/affiliated_with-part2.csv"]
+                 "data" : [
+                    "edges/affiliated_with-part1.csv", 
+                    "edges/affiliated_with-part2.csv"
+                 ]
             },
             "paper:cites:paper" : {
                  "format" : {"name": "csv", "delimiter": " "},
-                 "data" : ["edges/cites-part1.csv", "edges/cites-part2.csv"]
+                 "data" : [
+                    "edges/cites-part1.csv", 
+                    "edges/cites-part2.csv"
+                    "edges/cites-part3.csv"
+                    "edges/cites-part4.csv"
+                 ]
             }
        },
        "node_data" : {
             "paper": {       # node type
                  "feat": {   # feature key
                      "format": {"name": "numpy"},
-                     "data": ["node_data/paper-feat-part1.npy", "node_data/paper-feat-part2.npy"]
+                     "data": [
+                        "node_data/paper-feat-part1.npy", 
+                        "node_data/paper-feat-part2.npy"
+                        "node_data/paper-feat-part3.npy"
+                     ]
                  },
                  "label": {   # feature key
                      "format": {"name": "numpy"},
-                     "data": ["node_data/paper-label-part1.npy", "node_data/paper-label-part2.npy"]
+                     "data": [
+                        "node_data/paper-label-part1.npy", 
+                        "node_data/paper-label-part2.npy"
+                     ]
                  },
                  "year": {   # feature key
                      "format": {"name": "numpy"},
-                     "data": ["node_data/paper-year-part1.npy", "node_data/paper-year-part2.npy"]
+                     "data": [
+                        "node_data/paper-year-part1.npy", 
+                        "node_data/paper-year-part2.npy"
+                        "node_data/paper-year-part3.npy"
+                        "node_data/paper-year-part4.npy"
+                     ]
                  }
             }
        },
@@ -307,7 +348,7 @@ and chunk sizes (e.g., number of nodes, number of edges).
 
 There are three parts in ``metadata.json``:
 
-* Graph schema information and chunk sizes, e.g., ``"node_type"`` , ``"num_nodes_per_chunk"``, etc.
+* Graph schema information and chunk sizes, e.g., ``"node_type"`` , ``"num_nodes_per_type"``, etc.
 * Edge index data under key ``"edges"``.
 * Node/edge feature data under keys ``"node_data"`` and ``"edge_data"``.
 
@@ -335,16 +376,16 @@ strict requirement as long as ``metadata.json`` contains valid file paths.
 * ``graph_name``: String. Unique name used by :class:`dgl.distributed.DistGraph`
   to load graph.
 * ``node_type``: List of string. Node type names.
-* ``num_nodes_per_chunk``: List of list of integer. For graphs with :math:`T` node
-  types stored in :math:`P` chunks, the value contains :math:`T` integer lists.
-  Each list contains :math:`P` integers, which specify the number of nodes
-  in each chunk.
+* ``num_nodes_per_type``: List of integer. For graphs with :math:`T` node
+  types the value contains a list :math:`T` integers.
+  Each integer in this list specifies the number of nodes
+  for a given node type.
 * ``edge_type``: List of string. Edge type names in the form of
   ``<source node type>:<relation>:<destination node type>``.
-* ``num_edges_per_chunk``: List of list of integer. For graphs with :math:`R` edge
-  types stored in :math:`P` chunks, the value contains :math:`R` integer lists.
-  Each list contains :math:`P` integers, which specify the number of edges
-  in each chunk.
+* ``num_edges_per_type``: List of integer. For graphs with :math:`R` edge
+  types, the value contains a list of :math:`R` integers.
+  Each integer specifies the number of edges
+  for a given edge type.
 * ``edges``: Dict of ``ChunkFileSpec``. Edge index files.
   Dictionary keys are edge type names in the form of
   ``<source node type>:<relation>:<destination node type>``.
@@ -443,7 +484,7 @@ efficiently. The entire step can be further accelerated using multi-processing.
     python /myrepo/dgl/tools/dispatch_data.py         \
        --in-dir /mydata/MAG240M-LSC_chunked/          \
        --partitions-dir /mydata/MAG240M-LSC_2parts/   \
-       --out-dir data/MAG_LSC_partitioned            \
+       --out-dir /mydata/MAG_LSC_partitioned            \
        --ip-config ip_config.txt
 
 * ``--in-dir`` specifies the path to the folder of the input chunked graph data produced
