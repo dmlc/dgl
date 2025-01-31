@@ -236,7 +236,9 @@ class SubgraphSampler(MiniBatchTransformer):
         else:
             minibatch._seeds_offsets = {"_N": minibatch._seeds_offsets}
         counts_sent = torch.empty(world_size * num_ntypes, dtype=torch.int64)
-        for i, offsets in enumerate(minibatch._seeds_offsets.values()):
+        for i, (_, offsets) in enumerate(
+            sorted(minibatch._seeds_offsets.items())
+        ):
             counts_sent[
                 torch.arange(i, world_size * num_ntypes, num_ntypes)
             ] = offsets.diff()
@@ -261,7 +263,7 @@ class SubgraphSampler(MiniBatchTransformer):
         seeds_received = {}
         counts_sent = {}
         counts_received = {}
-        for i, (ntype, typed_seeds) in enumerate(seeds.items()):
+        for i, (ntype, typed_seeds) in enumerate(sorted(seeds.items())):
             idx = torch.arange(i, world_size * num_ntypes, num_ntypes)
             typed_counts_sent = minibatch._counts_sent[idx].tolist()
             typed_counts_received = minibatch._counts_received[idx].tolist()
