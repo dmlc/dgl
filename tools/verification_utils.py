@@ -1,6 +1,7 @@
 import json
 import os
 
+import array_readwriter
 import constants
 
 import dgl
@@ -21,7 +22,7 @@ from dgl.distributed.partition import (
 from distpartitioning.utils import get_idranges
 
 
-def read_file(fname, ftype):
+def read_file(fname, ftype, delimiter=" "):
     """Read a file from disk
     Parameters:
     -----------
@@ -36,9 +37,9 @@ def read_file(fname, ftype):
         file contents are returned as numpy array
     """
     reader_fmt_meta = {"name": ftype}
-    array_readwriter.get_array_parser(**reader_fmt_meta).read(fname)
-
-    return data
+    if ftype == constants.STR_CSV:
+        reader_fmt_meta["delimiter"] = delimiter
+    return array_readwriter.get_array_parser(**reader_fmt_meta).read(fname)
 
 
 def verify_partition_data_types(part_g):
@@ -204,7 +205,7 @@ def get_node_partids(partitions_dir, graph_schema):
         dict(
             zip(
                 graph_schema[constants.STR_NODE_TYPE],
-                graph_schema[constants.STR_NODE_TYPE_COUNTS],
+                graph_schema[constants.STR_NUM_NODES_PER_TYPE],
             )
         ),
     )
@@ -215,8 +216,8 @@ def get_node_partids(partitions_dir, graph_schema):
         )
         assert (
             len(node_partids[ntype])
-            == graph_schema[constants.STR_NODE_TYPE_COUNTS][ntype_id]
-        ), f"Node count for {ntype} = {len(node_partids[ntype])} in the partitions_dir while it should be {graph_schema[constants.STR_NTYPE_COUNTS][ntype_id]} (from graph schema)."
+            == graph_schema[constants.STR_NUM_NODES_PER_TYPE][ntype_id]
+        ), f"Node count for {ntype} = {len(node_partids[ntype])} in the partitions_dir while it should be {graph_schema[constants.STR_NUM_NODES_PER_TYPE][ntype_id]} (from graph schema)."
 
     return node_partids
 
