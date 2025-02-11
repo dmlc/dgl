@@ -185,9 +185,15 @@ else(MSVC)
   endif(NOT APPLE)
 endif(MSVC)
 
-if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)|(aarch64)|(AARCH64)")
   message(STATUS "Disabling LIBXSMM on ${CMAKE_SYSTEM_PROCESSOR}.")
   set(USE_LIBXSMM OFF)
+endif()
+
+# Flag for arm specific optimization 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(AARCH64)")
+  message(STATUS "setting flag for arm specific optimizations = ${CMAKE_SYSTEM_PROCESSOR} to ON.")
+  add_definitions(-DAARCH64)
 endif()
 
 # Source file lists
