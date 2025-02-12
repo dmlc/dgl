@@ -94,7 +94,7 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name=None):
         src = [0] * num_edges
         dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
-            eid = int(attr[edge_id_attr_name])
+            eid = int(attr[edge_id_attr_name][0])
             if eid < 0 or eid >= nx_graph.number_of_edges():
                 raise DGLError(
                     "Expect edge IDs to be a non-negative integer smaller than {:d}, "
@@ -278,7 +278,7 @@ def networkxbipartite2tensors(
                     "Expect the node {} to have attribute bipartite=1 "
                     "with edge {}".format(v, (u, v))
                 )
-            eid = int(attr[edge_id_attr_name])
+            eid = int(attr[edge_id_attr_name][0])
             if eid < 0 or eid >= nx_graph.number_of_edges():
                 raise DGLError(
                     "Expect edge IDs to be a non-negative integer smaller than {:d}, "
