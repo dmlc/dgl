@@ -1,0 +1,88 @@
+apiVersion: "kubeflow.org/v1"
+kind: "TFJob"
+metadata:
+  name: "dgl-dist-sample-test"
+spec:
+  tfReplicaSpecs:
+    PS:
+      replicas: 4
+      restartPolicy: Never
+      template:
+        metadata:
+          labels:
+            dgl-test: dist
+        spec:      
+          volumes:
+          - name: partition-efs
+            persistentVolumeClaim:
+              claimName: efs-dgl-dist-claim
+          - name: dshm
+            emptyDir:
+              medium: Memory
+          containers:
+            - name: tensorflow
+              image: public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170              
+              volumeMounts:
+              - name: partition-efs
+                mountPath: /root/data
+              - name: dshm
+                mountPath: /dev/shm    
+              ports:
+              - containerPort: 30051
+                name: dist-port1
+              - containerPort: 30050
+                name: dist-port2
+              args: 
+              - "bash"
+              - "-c"
+              - |
+                echo $TF_CONFIG
+                export NUM_NODES=$(python get_num_nodes.py)
+                echo $NUM_NODES
+                export PYTHONUNBUFFERED=1
+                sleep 10s
+                pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html
+                python -c "import dgl"
+                cd /root
+                export PARTITION_DATA_BASE_PATH=/root/data/${NUM_NODES}parts
+                git clone --branch add_distributed_test https://github.com/vovallen/dgl.git
+                cd dgl/benchmarks/distributed/dist_sample
+                ls /root/data
+                python gen_script.py
+                cat ip_config.txt
+                bash run.sh
+          affinity: # Specify instance type and seperate two pods on to two machines
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: beta.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                    - m5n.24xlarge
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                    - key: dgl-test
+                      operator: In
+                      values:
+                      - dist
+                  topologyKey: kubernetes.io/hostname          
+          tolerations:
+            - key: dgl.ai/dedicated
+              operator: "Exists"
+              effect: "NoSchedule"
+          # hostNetwork: true
+          # hostPorts:
+          # - min: 0
+          #   max: 65535
+          # dnsPolicy: ClusterFirstWithHostNet
+    # Worker:
+    #   replicas: 4
+    #   restartPolicy: Never
+    #   template:
+    #     spec:
+    #       containers:
+    #         - name: tensorflow
+    #           image: kubeflow/tf-dist-mnist-test:1.0
