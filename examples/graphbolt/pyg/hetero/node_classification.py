@@ -344,8 +344,11 @@ def parse_args():
             "igb-het-tiny",
             "igb-het-small",
             "igb-het-medium",
+            "igb-het-large",
+            "igb-het-mlperf",
+            "igb-het",
         ],
-        help="Dataset name. Possible values: ogb-lsc-mag240m, igb-het-[tiny|small|medium].",
+        help="Dataset name. Possible values: ogb-lsc-mag240m, igb-het, and igb-het-[tiny|small|medium|large|mlperf].",
     )
     parser.add_argument(
         "--fanout",
