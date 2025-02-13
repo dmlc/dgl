@@ -81,6 +81,12 @@ def test_hypergraphatt():
     ), f"stdout: {out.stdout.decode('utf-8')}\nstderr: {out.stderr.decode('utf-8')}"
 
 
+def test_rgcn():
+    script = os.path.join(EXAMPLE_ROOT, "rgcn.py")
+    out = subprocess.run(["python", str(script)], capture_output=True)
+    assert out.returncode == 0
+
+
 def test_sgc():
     script = os.path.join(EXAMPLE_ROOT, "sgc.py")
     out = subprocess.run(["python", str(script)], capture_output=True)
