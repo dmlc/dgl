@@ -391,6 +391,7 @@ def run(rank, world_size, args, dataset):
     # Set up multiprocessing environment.
     torch.cuda.set_device(rank)
     dist.init_process_group(
+        backend='cpu:gloo,cuda:nccl',
         init_method="tcp://127.0.0.1:12345",
         rank=rank,
         world_size=world_size,

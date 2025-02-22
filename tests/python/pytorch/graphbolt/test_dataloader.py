@@ -89,6 +89,7 @@ def test_gpu_sampling_DataLoader(
             else "tcp://127.0.0.1:12345"
         )
         thd.init_process_group(
+            backend='cpu:gloo,cuda:nccl',
             init_method=init_method,
             world_size=1,
             rank=0,
