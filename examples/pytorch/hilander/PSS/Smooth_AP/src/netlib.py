@@ -71,7 +71,9 @@ def networkselect(opt):
         raise Exception("Network {} not available!".format(opt.arch))
 
     if opt.resume:
-        weights = torch.load(os.path.join(opt.save_path, opt.resume))
+        weights = torch.load(
+            os.path.join(opt.save_path, opt.resume), weights_only=False
+        )
         weights_state_dict = weights["state_dict"]
 
         if torch.cuda.device_count() > 1:

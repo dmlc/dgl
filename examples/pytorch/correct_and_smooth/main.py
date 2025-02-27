@@ -66,7 +66,9 @@ def main():
     if args.pretrain:
         print("---------- Before ----------")
         model.load_state_dict(
-            torch.load(f"base/{args.dataset}-{args.model}.pt")
+            torch.load(
+                f"base/{args.dataset}-{args.model}.pt", weights_only=False
+            )
         )
         model.eval()
 

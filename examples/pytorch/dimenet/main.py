@@ -238,7 +238,9 @@ def main(model_cnf):
     if pretrain_params["flag"]:
         torch_path = pretrain_params["path"]
         target = model_params["targets"][0]
-        model.load_state_dict(torch.load(f"{torch_path}/{target}.pt"))
+        model.load_state_dict(
+            torch.load(f"{torch_path}/{target}.pt", weights_only=False)
+        )
 
         logger.info("Testing with Pretrained model")
         predictions, labels = evaluate(device, model, test_loader)

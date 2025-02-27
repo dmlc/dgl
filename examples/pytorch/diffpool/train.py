@@ -223,7 +223,8 @@ def graph_classify_task(prog_args):
                 + "/"
                 + prog_args.dataset
                 + "/model.iter-"
-                + str(prog_args.load_epoch)
+                + str(prog_args.load_epoch),
+                weights_only=False,
             )
         )
 
@@ -334,7 +335,8 @@ def evaluate(dataloader, model, prog_args, logger=None):
                 + "/"
                 + prog_args.dataset
                 + "/model.iter-"
-                + str(logger["best_epoch"])
+                + str(logger["best_epoch"]),
+                weights_only=False,
             )
         )
     model.eval()

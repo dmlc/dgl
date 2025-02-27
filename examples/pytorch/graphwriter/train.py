@@ -161,7 +161,7 @@ def main(args):
     model = GraphWriter(args)
     model.to(args.device)
     if args.test:
-        model = torch.load(args.save_model)
+        model = torch.load(args.save_model, weights_only=False)
         model.args = args
         print(model)
         test(model, test_dataloader, args)

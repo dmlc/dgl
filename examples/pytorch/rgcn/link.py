@@ -336,7 +336,7 @@ if __name__ == "__main__":
 
     # testing
     print("Testing...")
-    checkpoint = torch.load(model_state_file)
+    checkpoint = torch.load(model_state_file, weights_only=False)
     model = model.cpu()  # test on CPU
     model.eval()
     model.load_state_dict(checkpoint["state_dict"])

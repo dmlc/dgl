@@ -371,7 +371,7 @@ def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
         os.path.getsize(partition_path),
     )
     graph = (
-        torch.load(partition_path)
+        torch.load(partition_path, weights_only=False)
         if use_graphbolt
         else load_graphs(partition_path)[0][0]
     )

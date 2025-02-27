@@ -58,7 +58,9 @@ struct CUDAWorkspaceAllocator {
   // Required by thrust to satisfy allocator requirements.
   using value_type = value_t;
 
-  explicit CUDAWorkspaceAllocator() { at::globalContext().lazyInitCUDA(); }
+  explicit CUDAWorkspaceAllocator() {
+    at::globalContext().lazyInitDevice(at::kCUDA);
+  }
 
   template <class U>
   CUDAWorkspaceAllocator(CUDAWorkspaceAllocator<U> const&) noexcept {}

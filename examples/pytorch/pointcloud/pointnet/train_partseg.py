@@ -187,7 +187,9 @@ elif args.model == "pointnet2_msg":
 
 net = net.to(dev)
 if args.load_model_path:
-    net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
+    net.load_state_dict(
+        torch.load(args.load_model_path, weights_only=False, map_location=dev)
+    )
 
 opt = optim.Adam(net.parameters(), lr=0.001, weight_decay=1e-4)
 scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.5)

@@ -247,7 +247,7 @@ def test(args, dataset, g, feats, paper_offset):
         0.5,
         "paper",
     ).cuda()
-    model.load_state_dict(torch.load(args.model_path))
+    model.load_state_dict(torch.load(args.model_path, weights_only=False))
 
     model.eval()
     correct = total = 0

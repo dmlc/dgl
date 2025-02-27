@@ -178,7 +178,9 @@ def main(args):
 
     print()
     if args.early_stop:
-        model.load_state_dict(torch.load("es_checkpoint.pt"))
+        model.load_state_dict(
+            torch.load("es_checkpoint.pt", weights_only=False)
+        )
     acc = evaluate(g, model, features, labels, test_mask)
     print("Test Accuracy {:.4f}".format(acc))
 

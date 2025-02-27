@@ -181,7 +181,9 @@ net = PointTransformerSeg()
 
 net = net.to(dev)
 if args.load_model_path:
-    net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
+    net.load_state_dict(
+        torch.load(args.load_model_path, weights_only=False, map_location=dev)
+    )
 
 opt = torch.optim.SGD(
     net.parameters(), lr=0.01, weight_decay=1e-4, momentum=0.9

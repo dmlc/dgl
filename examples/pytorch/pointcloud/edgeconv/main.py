@@ -115,7 +115,9 @@ dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = Model(20, [64, 64, 128, 256], [512, 512, 256], 40)
 model = model.to(dev)
 if args.load_model_path:
-    model.load_state_dict(torch.load(args.load_model_path, map_location=dev))
+    model.load_state_dict(
+        torch.load(args.load_model_path, weights_only=False, map_location=dev)
+    )
 
 opt = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
 

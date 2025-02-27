@@ -179,7 +179,7 @@ def main():
 
     for pred_file in glob.iglob(args.pred_files):
         print("load:", pred_file)
-        pred = torch.load(pred_file)
+        pred = torch.load(pred_file, weights_only=False)
         val_acc, test_acc = run(
             args, graph, labels, pred, train_idx, val_idx, test_idx, evaluator
         )

@@ -34,4 +34,6 @@ class EarlyStopping:
         torch.save(model.state_dict(), self.checkpoint_path)
 
     def load_checkpoint(self, model):
-        model.load_state_dict(torch.load(self.checkpoint_path))
+        model.load_state_dict(
+            torch.load(self.checkpoint_path, weights_only=False)
+        )

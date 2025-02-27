@@ -496,6 +496,6 @@ if __name__ == "__main__":
     with io.BytesIO() as f:
         model.save(f)
         f.seek(0)
-        print(torch.load(f))
+        print(torch.load(f, weights_only=False))
 
     print("Testing LatentDirichletAllocation passed!")

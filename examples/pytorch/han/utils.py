@@ -304,4 +304,4 @@ class EarlyStopping(object):
 
     def load_checkpoint(self, model):
         """Load the latest checkpoint."""
-        model.load_state_dict(torch.load(self.filename))
+        model.load_state_dict(torch.load(self.filename, weights_only=False))

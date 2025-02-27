@@ -48,7 +48,7 @@ def main():
                 features, got {:d} and {:d}'.format(model_in_size, data_in_size)
 
     model = {{ model_class_name }}(**cfg['model'])
-    model.load_state_dict(torch.load(cfg['cpt_path'], map_location='cpu')['model'])
+    model.load_state_dict(torch.load(cfg['cpt_path'], weights_only=False, map_location='cpu')['model'])
     logits = infer(device, data, model)
     pred = logits.argmax(dim=1).cpu()
 

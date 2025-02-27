@@ -180,7 +180,7 @@ def train(
 
     PATH = "model.pt"
     if counter[0] != 0:
-        checkpoint = torch.load(PATH)
+        checkpoint = torch.load(PATH, weights_only=False)
         model.load_state_dict(checkpoint["model_state_dict"])
         opt.load_state_dict(checkpoint["optimizer_state_dict"])
         epoch = checkpoint["epoch"]
