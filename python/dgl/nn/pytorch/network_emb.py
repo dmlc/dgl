@@ -391,6 +391,7 @@ class MetaPath2Vec(nn.Module):
         u_list = []
         v_list = []
         for tr in traces.cpu().numpy():
+            tr = [u for u in tr if u != -1]
             tr_nids = [
                 self.local_to_global_nid[self.node_metapath[i]][tr[i]]
                 for i in range(len(tr))
@@ -429,6 +430,11 @@ class MetaPath2Vec(nn.Module):
         torch.Tensor
             Loss value
         """
+        if pos_u.numel() == 0:
+            # If there are no positive samples (i.e., if all the start nodes
+            # in the batch have no neighbors according to the meta-path),
+            # return a loss of 0.0 to prevent errors.
+            return torch.tensor(0.0, requires_grad=True)
         emb_u = self.node_embed(pos_u)
         emb_v = self.context_embed(pos_v)
         emb_neg_v = self.context_embed(neg_v)
@@ -437,7 +443,7 @@ class MetaPath2Vec(nn.Module):
         score = torch.clamp(score, max=10, min=-10)
         score = -F.logsigmoid(score)
 
-        neg_score = torch.bmm(emb_neg_v, emb_u.unsqueeze(2)).squeeze()
+        neg_score = torch.bmm(emb_neg_v, emb_u.unsqueeze(2)).squeeze(-1)
         neg_score = torch.clamp(neg_score, max=10, min=-10)
         neg_score = -torch.sum(F.logsigmoid(-neg_score), dim=1)
 
