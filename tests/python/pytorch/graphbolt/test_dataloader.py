@@ -90,6 +90,7 @@ def test_gpu_sampling_DataLoader(
         )
 
         from torch.torch_version import TorchVersion
+
         if TorchVersion(torch.__version__) >= TorchVersion("2.7.0a"):
             if not thd.is_mpi_available():
                 import warnings
