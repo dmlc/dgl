@@ -93,8 +93,10 @@ def test_gpu_sampling_DataLoader(
         if TorchVersion(torch.__version__) >= TorchVersion("2.7.0a"):
             if not thd.is_mpi_available():
                 import warnings
-                warnings.warn("MPY backend should be available for " 
-                              "cooperative optimization")
+                warnings.warn(
+                    "MPY backend should be available for " 
+                    "cooperative optimization"
+                )
                 return
 
             thd.init_process_group(
