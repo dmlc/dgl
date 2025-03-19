@@ -88,11 +88,26 @@ def test_gpu_sampling_DataLoader(
             if platform == "win32"
             else "tcp://127.0.0.1:12345"
         )
-        thd.init_process_group(
-            init_method=init_method,
-            world_size=1,
-            rank=0,
-        )
+
+        from torch.torch_version import TorchVersion
+        if TorchVersion(torch.__version__) >= TorchVersion("2.7.0a"):
+            if not thd.is_mpi_available():
+                import warnings
+                warnings.warn("MPY backend should be available for " 
+                              "cooperative optimization")
+                return
+
+            thd.init_process_group(
+                backend="mpi",
+                init_method=init_method,
+            )
+        else:
+            thd.init_process_group(
+                init_method=init_method,
+                world_size=1,
+                rank=0,
+            )
+  
     N = 40
     B = 4
     num_layers = 2
