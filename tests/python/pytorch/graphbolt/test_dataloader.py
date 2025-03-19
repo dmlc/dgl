@@ -93,8 +93,9 @@ def test_gpu_sampling_DataLoader(
         if TorchVersion(torch.__version__) >= TorchVersion("2.7.0a"):
             if not thd.is_mpi_available():
                 import warnings
+
                 warnings.warn(
-                    "MPY backend should be available for " 
+                    "MPY backend should be available for "
                     "cooperative optimization"
                 )
                 return
@@ -109,7 +110,7 @@ def test_gpu_sampling_DataLoader(
                 world_size=1,
                 rank=0,
             )
-  
+
     N = 40
     B = 4
     num_layers = 2
