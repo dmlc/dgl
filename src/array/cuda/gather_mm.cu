@@ -113,7 +113,7 @@ __global__ void GatherMMScatterKernel(
       for (unsigned int outloop = 0; outloop < out_len; outloop += 32) {
         DType out_reg = static_cast<DType>(0.0f);  // thread private
         const unsigned int l = laneId;
-        if (l < out_len) {
+        if (l + outloop < out_len) {
           // iterate over elements of a row of A
           for (unsigned int i = 0; i < a_tile; i++) {
             const DType a_val = sh_A[local_row * sh_a_tile + i];
