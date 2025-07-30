@@ -368,10 +368,11 @@ class EdgeGATConv(nn.Module):
             # Residual.
             if self.res_fc is not None:
                 # Use -1 rather than self._num_heads to handle broadcasting.
-                resval = self.res_fc(h_dst).view(
-                    *dst_prefix_shape, -1, self._out_feats
-                )
-                rst = rst + resval
+                if h_dst.numel() != 0:
+                    resval = self.res_fc(h_dst).view(
+                        *dst_prefix_shape, -1, self._out_feats
+                    )
+                    rst = rst + resval
             # Bias.
             if self.bias is not None:
                 rst = rst + self.bias.view(
