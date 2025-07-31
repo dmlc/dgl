@@ -320,10 +320,11 @@ class GATv2Conv(nn.Module):
             rst = graph.dstdata["ft"]
             # residual
             if self.res_fc is not None:
-                resval = self.res_fc(h_dst).view(
-                    h_dst.shape[0], -1, self._out_feats
-                )
-                rst = rst + resval
+                if h_dst.numel() != 0:
+                    resval = self.res_fc(h_dst).view(
+                        h_dst.shape[0], -1, self._out_feats
+                    )
+                    rst = rst + resval
             # activation
             if self.activation:
                 rst = self.activation(rst)
