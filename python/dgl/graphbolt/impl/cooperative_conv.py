@@ -42,19 +42,21 @@ class CooperativeConvFunction(torch.autograd.Function):
             seed_sizes,
         )
         outs = {}
-        for ntype, typed_tensor in convert_to_hetero(tensor).items():
+        for ntype, typed_tensor in sorted(convert_to_hetero(tensor).items()):
             out = typed_tensor.new_empty(
-                (sum(counts_sent[ntype]),) + typed_tensor.shape[1:]
+                (sum(counts_sent.get(ntype, [0])),) + typed_tensor.shape[1:],
+                requires_grad=typed_tensor.requires_grad,
             )
+            default_splits = [0] * torch.distributed.get_world_size()
             all_to_all(
-                torch.split(out, counts_sent[ntype]),
+                torch.split(out, counts_sent.get(ntype, default_splits)),
                 torch.split(
-                    typed_tensor[seed_inverse_ids[ntype]],
-                    counts_received[ntype],
+                    typed_tensor[seed_inverse_ids.get(ntype, slice(None))],
+                    counts_received.get(ntype, default_splits),
                 ),
             )
             outs[ntype] = out
-        return revert_to_homo(out)
+        return revert_to_homo(outs)
 
     @staticmethod
     def backward(
@@ -69,7 +71,9 @@ class CooperativeConvFunction(torch.autograd.Function):
         ) = ctx.communication_variables
         delattr(ctx, "communication_variables")
         outs = {}
-        for ntype, typed_grad_output in convert_to_hetero(grad_output).items():
+        for ntype, typed_grad_output in sorted(
+            convert_to_hetero(grad_output).items()
+        ):
             out = typed_grad_output.new_empty(
                 (sum(counts_received[ntype]),) + typed_grad_output.shape[1:]
             )

@@ -37,13 +37,16 @@ def test_rank_sort_and_unique_and_compact(dtype, rank):
         assert_equal(offsets1, offsets2)
         assert offsets1.is_pinned() and offsets2.is_pinned()
 
-    res3 = torch.ops.graphbolt.rank_sort(nodes_list1, rank, WORLD_SIZE)
+    # Test with the reverse order of ntypes. See if results are equivalent.
+    res3 = torch.ops.graphbolt.rank_sort(nodes_list1[::-1], rank, WORLD_SIZE)
 
     # This function is deterministic. Call with identical arguments and check.
-    for (nodes1, idx1, offsets1), (nodes3, idx3, offsets3) in zip(res1, res3):
+    for (nodes1, idx1, offsets1), (nodes3, idx3, offsets3) in zip(
+        res1, reversed(res3)
+    ):
         assert_equal(nodes1, nodes3)
         assert_equal(idx1, idx3)
-        assert_equal(offsets1, offsets3)
+        assert_equal(offsets1.diff(), offsets3.diff())
 
     # The dependency on the rank argument is simply a permutation.
     res4 = torch.ops.graphbolt.rank_sort(nodes_list1, 0, WORLD_SIZE)
@@ -57,12 +60,12 @@ def test_rank_sort_and_unique_and_compact(dtype, rank):
                 nodes1[off1[j] : off1[j + 1]], nodes4[off4[i] : off4[i + 1]]
             )
 
-    unique, compacted, offsets = gb.unique_and_compact(
-        nodes_list1[:1], rank, WORLD_SIZE
-    )
+    nodes = {str(i): [typed_seeds] for i, typed_seeds in enumerate(nodes_list1)}
 
-    nodes1, idx1, offsets1 = res1[0]
+    unique, compacted, offsets = gb.unique_and_compact(nodes, rank, WORLD_SIZE)
 
-    assert_equal(unique, nodes1)
-    assert_equal(compacted[0], idx1)
-    assert_equal(offsets, offsets1)
+    for i in nodes.keys():
+        nodes1, idx1, offsets1 = res1[int(i)]
+        assert_equal(unique[i], nodes1)
+        assert_equal(compacted[i][0], idx1)
+        assert_equal(offsets[i], offsets1)
