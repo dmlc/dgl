@@ -142,7 +142,7 @@ def compute_acc_unsupervised(emb, labels, train_nids, val_nids, test_nids):
     test_nids = test_nids.cpu().numpy()
     test_labels = labels[test_nids]
     emb = (emb - emb.mean(0, keepdims=True)) / emb.std(0, keepdims=True)
-    lr = lm.LogisticRegression(multi_class="multinomial", max_iter=10000)
+    lr = lm.LogisticRegression(max_iter=10000)
     lr.fit(emb[train_nids], train_labels)
     pred = lr.predict(emb)
     f1_micro_eval = skm.f1_score(val_labels, pred[val_nids], average="micro")
