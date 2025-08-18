@@ -44,10 +44,10 @@ querying the graph's structure.
     >>> # Node IDs
     >>> print(g.nodes())
     tensor([0, 1, 2, 3])
-    >>> # Edge end nodes
+    >>> # Edge and nodes
     >>> print(g.edges())
     (tensor([0, 0, 0, 1]), tensor([1, 2, 3, 3]))
-    >>> # Edge end nodes and edge IDs
+    >>> # Edge and nodes and edge IDs
     >>> print(g.edges(form='all'))
     (tensor([0, 0, 0, 1]), tensor([1, 2, 3, 3]), tensor([0, 1, 2, 3]))
 
