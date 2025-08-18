@@ -339,7 +339,136 @@ def chunk_graph(
         )
 
 
-def create_chunked_dataset(
+def create_homo_chunked_dataset(
+    root_dir,
+    num_chunks,
+    data_fmt="numpy",
+    edges_fmt="csv",
+    vector_rows=False,
+    **kwargs,
+):
+    """
+    This function creates a sample homo dataset.
+
+    Parameters:
+    -----------
+    root_dir : string
+        directory in which all the files for the chunked dataset will be stored.
+    """
+    # Step0: prepare chunked graph data format.
+    # A synthetic mini MAG240.
+    num_N = 1200
+
+    def rand_edges(num_src, num_dst, num_edges):
+        eids = np.random.choice(num_src * num_dst, num_edges, replace=False)
+        src = torch.from_numpy(eids // num_dst)
+        dst = torch.from_numpy(eids % num_dst)
+
+        return src, dst
+
+    num_E = 24 * 1000
+
+    # Structure.
+    data_dict = {("_N", "_E", "_N"): rand_edges(num_N, num_N, num_E)}
+    src, dst = data_dict[("_N", "_E", "_N")]
+    data_dict[("_N", "_E", "_N")] = (dst, src)
+    g = dgl.heterograph(data_dict)
+
+    # paper feat, label, year
+    num_paper_feats = 3
+    _N_feat = np.random.randn(num_N, num_paper_feats)
+    num_classes = 4
+    _N_label = np.random.choice(num_classes, num_N)
+    _N_year = np.random.choice(2022, num_N)
+    _N_orig_ids = np.arange(0, num_N)
+
+    # masks.
+    _N_train_mask = np.random.choice([True, False], num_N)
+    _N_test_mask = np.random.choice([True, False], num_N)
+    _N_val_mask = np.random.choice([True, False], num_N)
+
+    # Edge features.
+    _E_count = np.random.choice(10, num_E)
+
+    # Save features.
+    input_dir = os.path.join(root_dir, "data_test")
+    os.makedirs(input_dir)
+    for sub_d in ["_N", "_E"]:
+        os.makedirs(os.path.join(input_dir, sub_d))
+
+    _N_feat_path = os.path.join(input_dir, "_N/feat.npy")
+    with open(_N_feat_path, "wb") as f:
+        np.save(f, _N_feat)
+    g.nodes["_N"].data["feat"] = torch.from_numpy(_N_feat)
+
+    _N_label_path = os.path.join(input_dir, "_N/label.npy")
+    with open(_N_label_path, "wb") as f:
+        np.save(f, _N_label)
+    g.nodes["_N"].data["label"] = torch.from_numpy(_N_label)
+
+    _N_year_path = os.path.join(input_dir, "_N/year.npy")
+    with open(_N_year_path, "wb") as f:
+        np.save(f, _N_year)
+    g.nodes["_N"].data["year"] = torch.from_numpy(_N_year)
+
+    _N_orig_ids_path = os.path.join(input_dir, "_N/orig_ids.npy")
+    with open(_N_orig_ids_path, "wb") as f:
+        np.save(f, _N_orig_ids)
+    g.nodes["_N"].data["orig_ids"] = torch.from_numpy(_N_orig_ids)
+
+    _E_count_path = os.path.join(input_dir, "_E/count.npy")
+    with open(_E_count_path, "wb") as f:
+        np.save(f, _E_count)
+    g.edges["_E"].data["count"] = torch.from_numpy(_E_count)
+
+    _N_train_mask_path = os.path.join(input_dir, "_N/train_mask.npy")
+    with open(_N_train_mask_path, "wb") as f:
+        np.save(f, _N_train_mask)
+    g.nodes["_N"].data["train_mask"] = torch.from_numpy(_N_train_mask)
+
+    _N_test_mask_path = os.path.join(input_dir, "_N/test_mask.npy")
+    with open(_N_test_mask_path, "wb") as f:
+        np.save(f, _N_test_mask)
+    g.nodes["_N"].data["test_mask"] = torch.from_numpy(_N_test_mask)
+
+    _N_val_mask_path = os.path.join(input_dir, "_N/val_mask.npy")
+    with open(_N_val_mask_path, "wb") as f:
+        np.save(f, _N_val_mask)
+    g.nodes["_N"].data["val_mask"] = torch.from_numpy(_N_val_mask)
+
+    node_data = {
+        "_N": {
+            "feat": _N_feat_path,
+            "train_mask": _N_train_mask_path,
+            "test_mask": _N_test_mask_path,
+            "val_mask": _N_val_mask_path,
+            "label": _N_label_path,
+            "year": _N_year_path,
+            "orig_ids": _N_orig_ids_path,
+        }
+    }
+
+    edge_data = {"_E": {"count": _E_count_path}}
+
+    output_dir = os.path.join(root_dir, "chunked-data")
+    chunk_graph(
+        g,
+        "mag240m",
+        node_data,
+        edge_data,
+        num_chunks=num_chunks,
+        output_path=output_dir,
+        data_fmt=data_fmt,
+        edges_fmt=edges_fmt,
+        vector_rows=vector_rows,
+        **kwargs,
+    )
+    logging.debug("Done with creating chunked graph")
+
+    return g
+
+
+def create_hetero_chunked_dataset(
     root_dir,
     num_chunks,
     data_fmt="numpy",
