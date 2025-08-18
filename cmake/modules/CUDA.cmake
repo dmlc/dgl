@@ -73,7 +73,7 @@ set(CUDA_gpu_detect_output "")
       # The line below prevents CMake from inserting a variable with line
       # breaks in the cache
       message(STATUS "Found GPU arch ${__nvcc_out}")
-      string(REGEX MATCH "([1-9].[0-9])" __nvcc_out "${__nvcc_out}")
+      string(REGEX MATCHALL "([1-9].[0-9])" __nvcc_out "${__nvcc_out}")
       if(__nvcc_out VERSION_LESS "3.5")
         # drop support for cc < 3.5 and build for all known archs.
         message(WARNING "GPU arch less than 3.5 is not supported.")
