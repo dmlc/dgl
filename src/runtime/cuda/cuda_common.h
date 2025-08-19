@@ -170,12 +170,10 @@ struct cuda_dtype<__half> {
   static constexpr cudaDataType_t value = CUDA_R_16F;
 };
 
-#if BF16_ENABLED
 template <>
 struct cuda_dtype<__nv_bfloat16> {
   static constexpr cudaDataType_t value = CUDA_R_16BF;
 };
-#endif  // BF16_ENABLED
 
 template <>
 struct cuda_dtype<float> {
@@ -200,12 +198,10 @@ struct accum_dtype<__half> {
   typedef float type;
 };
 
-#if BF16_ENABLED
 template <>
 struct accum_dtype<__nv_bfloat16> {
   typedef float type;
 };
-#endif  // BF16_ENABLED
 
 template <>
 struct accum_dtype<float> {
@@ -217,7 +213,6 @@ struct accum_dtype<double> {
   typedef double type;
 };
 
-#if CUDART_VERSION >= 11000
 /**
  * @brief Cast index data type to cusparseIndexType_t.
  */
@@ -235,7 +230,6 @@ template <>
 struct cusparse_idtype<int64_t> {
   static constexpr cusparseIndexType_t value = CUSPARSE_INDEX_64I;
 };
-#endif
 
 /** @brief Thread local workspace */
 class CUDAThreadEntry {

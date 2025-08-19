@@ -291,10 +291,8 @@ template IdArray Full<kDGLCUDA, int64_t>(
     int64_t val, int64_t length, DGLContext ctx);
 template IdArray Full<kDGLCUDA, __half>(
     __half val, int64_t length, DGLContext ctx);
-#if BF16_ENABLED
 template IdArray Full<kDGLCUDA, __nv_bfloat16>(
     __nv_bfloat16 val, int64_t length, DGLContext ctx);
-#endif  // BF16_ENABLED
 template IdArray Full<kDGLCUDA, float>(
     float val, int64_t length, DGLContext ctx);
 template IdArray Full<kDGLCUDA, double>(

@@ -313,12 +313,10 @@ template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, __half>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, __half>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-#if BF16_ENABLED
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, __nv_bfloat16>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, __nv_bfloat16>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-#endif  // BF16_ENABLED
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, float>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, float>(

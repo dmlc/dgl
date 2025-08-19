@@ -158,12 +158,10 @@ template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, __half>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, __half>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-#if BF16_ENABLED
 template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-#endif  // BF16_ENABLED
 template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, float>(

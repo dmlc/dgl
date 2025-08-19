@@ -61,7 +61,6 @@ struct CSRGEMM<__half> {
   }
 };
 
-#if BF16_ENABLED
 template <>
 struct CSRGEMM<__nv_bfloat16> {
   template <typename... Args>
@@ -86,7 +85,6 @@ struct CSRGEMM<__nv_bfloat16> {
     return static_cast<cusparseStatus_t>(0);
   }
 };
-#endif  // BF16_ENABLED
 
 template <>
 struct CSRGEMM<float> {
@@ -169,7 +167,6 @@ struct CSRGEAM<__half> {
   }
 };
 
-#if BF16_ENABLED
 template <>
 struct CSRGEAM<__nv_bfloat16> {
   template <typename... Args>
@@ -194,7 +191,6 @@ struct CSRGEAM<__nv_bfloat16> {
     return static_cast<cusparseStatus_t>(0);
   }
 };
-#endif  // BF16_ENABLED
 
 template <>
 struct CSRGEAM<float> {
