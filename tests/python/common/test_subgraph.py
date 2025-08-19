@@ -784,6 +784,67 @@ def test_khop_out_subgraph(idtype):
     assert F.array_equal(F.astype(inv["user"], idtype), F.tensor([0], idtype))
     assert F.array_equal(F.astype(inv["game"], idtype), F.tensor([0], idtype))
 
+@parametrize_idtype
+def test_khop_subgraph(idtype):
+    g = dgl.graph(
+        ([0, 2, 0, 4, 2, 5], [1, 1, 2, 3, 4, 2]), idtype=idtype, device=F.ctx()
+    )
+    g.edata["w"] = F.tensor([[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11]])
+    sg, inv = dgl.khop_subgraph(g, 0, k=2)
+    
+    assert sg.idtype == g.idtype
+    u, v = sg.edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1), (2, 1), (4, 2), (2, 3), (0, 2)}
+    assert F.array_equal(
+        sg.edata[dgl.EID], F.tensor([0, 2, 1, 4, 5], dtype=idtype)
+    )
+    assert F.array_equal(
+        sg.edata["w"], F.tensor([[0, 1], [4, 5], [2, 3], [8, 9], [10, 11]])
+    )
+    assert F.array_equal(F.astype(inv, idtype), F.tensor([0], idtype))
+
+    # Test multiple nodes
+    sg, inv = dgl.khop_subgraph(g, [0, 2], k=1)
+    assert sg.num_edges() == 5
+
+    sg, inv = dgl.khop_subgraph(g, F.tensor([0, 2], idtype), k=1)
+    assert sg.num_edges() == 5
+
+    #test on hetrograph
+    g = dgl.heterograph(
+        {
+            ("user", "plays", "game"): ([0, 1, 1, 2, 4, 5], [0, 0, 2, 1, 0, 2]),
+            ("user", "follows", "user"): ([0, 1], [1, 3]),
+        },
+        idtype=idtype,
+        device=F.ctx(),
+    )
+    sg, inv = dgl.khop_subgraph(g, {"user": 0}, k=2)
+    assert sg.idtype == idtype
+    assert sg.num_nodes("game") == 2
+    assert sg.num_nodes("user") == 4
+    assert len(sg.ntypes) == 2
+    assert len(sg.etypes) == 2
+    u, v = sg["follows"].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1), (1, 2)}
+    u, v = sg["plays"].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 0), (1, 0), (1, 1), (3, 0)}
+    assert F.array_equal(F.astype(inv["user"], idtype), F.tensor([0], idtype))
+ 
+    # Test multiple nodes
+    sg, inv = dgl.khop_subgraph(
+        g, {"user": F.tensor([2], idtype), "game": 0}, k=1
+    )
+    assert sg.num_edges("follows") == 1
+    u, v = sg["plays"].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 0), (1, 0), (2, 1), (3, 0)}
+    assert F.array_equal(F.astype(inv["user"], idtype), F.tensor([2], idtype))
+    assert F.array_equal(F.astype(inv["game"], idtype), F.tensor([0], idtype))
+
 
 @unittest.skipIf(not F.gpu_ctx(), "only necessary with GPU")
 @pytest.mark.parametrize(
