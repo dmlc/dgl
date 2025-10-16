@@ -37,6 +37,7 @@ def graph(
     device=None,
     row_sorted=False,
     col_sorted=False,
+    node_count_check=True,
 ):
     """Create a graph and return.
 
@@ -83,6 +84,9 @@ def graph(
     col_sorted : bool, optional
         Whether or not the columns of the COO are in ascending order within
         each row. This only has an effect when ``row_sorted`` is True.
+    node_count_check : bool, optional
+        When num_nodes is passed, whether we should perform sanity checks to
+        ensure they are valid. Note that this comes with a performance penalty.
 
     Returns
     -------
@@ -160,9 +164,11 @@ def graph(
             "graph, use dgl.from_networkx instead."
         )
 
-    (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(data, idtype)
+    (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(
+        data, idtype, infer_node_count=(node_count_check or num_nodes is None)
+    )
     if num_nodes is not None:  # override the number of nodes
-        if num_nodes < max(urange, vrange):
+        if node_count_check and num_nodes < max(urange, vrange):
             raise DGLError(
                 "The num_nodes argument must be larger than the max ID in the data,"
                 " but got {} and {}.".format(num_nodes, max(urange, vrange) - 1)
