@@ -26,9 +26,9 @@ def sparse_all_to_all_push(idx, value, partition):
     Returns
     -------
     torch.Tensor
-        The 1D tensor of the recieved indices.
+        The 1D tensor of the received indices.
     torch.Tensor
-        The set of recieved values.
+        The set of received values.
 
     Examples
     --------
@@ -115,7 +115,7 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     Returns
     -------
     torch.Tensor
-        The set of recieved values, corresponding to `req_idx`.
+        The set of received values, corresponding to `req_idx`.
 
     Examples
     --------

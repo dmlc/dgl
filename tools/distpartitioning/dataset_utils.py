@@ -39,7 +39,7 @@ def _broadcast_shape(
     num_parts : integer
         specifying the no. of partitions
     is_feat_data : bool
-        flag used to seperate feature data and edge data
+        flag used to separate feature data and edge data
     feat_name : string
         name of the feature
 
