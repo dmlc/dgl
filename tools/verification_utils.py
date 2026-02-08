@@ -65,7 +65,7 @@ def verify_partition_formats(part_g, formats):
         created for the partitioned graphs
     formats : string
         formats(csc, coo, csr) supported formats and multiple
-        values can be seperated by comma
+        values can be separated by comma
     """
     # Verify saved graph formats
     if formats is None:
