@@ -314,7 +314,11 @@ def enum_attach_nx(ctr_mol, nei_node, amap, singletons):
 
 
 # Try rings first: Speed-Up
-def enum_assemble_nx(node, neighbors, prev_nodes=[], prev_amap=[]):
+def enum_assemble_nx(node, neighbors, prev_nodes=None, prev_amap=None):
+    if prev_nodes is None:
+        prev_nodes = []
+    if prev_amap is None:
+        prev_amap = []
     all_attach_confs = []
     singletons = [
         nei_node["nid"]

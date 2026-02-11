@@ -263,7 +263,7 @@ def load_data(dataset, remove_self_loop=False):
     elif dataset == "ACMRaw":
         return load_acm_raw(remove_self_loop)
     else:
-        return NotImplementedError("Unsupported dataset {}".format(dataset))
+        raise NotImplementedError("Unsupported dataset {}".format(dataset))
 
 
 class EarlyStopping(object):

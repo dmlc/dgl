@@ -41,7 +41,7 @@ def train(args, device):
             in_feats=int(g.ndata["feat"].shape[1]), num_layers=args.n_layers
         )
     else:
-        return NotImplementedError("Unsupported model {}".format(args.model))
+        raise NotImplementedError("Unsupported model {}".format(args.model))
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 

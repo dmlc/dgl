@@ -209,7 +209,7 @@ class BGNNPredictor:
             elif self.task == "classification":
                 loss = F.cross_entropy(pred, y.long())
             else:
-                raise NotImplemented(
+                raise NotImplementedError(
                     "Unknown task. Supported tasks: classification, regression."
                 )
 

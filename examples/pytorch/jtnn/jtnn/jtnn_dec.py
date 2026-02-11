@@ -80,7 +80,9 @@ def can_assemble(mol_tree, u, v_node_dict):
     return len(cands) > 0
 
 
-def create_node_dict(smiles, clique=[]):
+def create_node_dict(smiles, clique=None):
+    if clique is None:
+        clique = []
     return dict(
         smiles=smiles,
         mol=get_mol(smiles),
