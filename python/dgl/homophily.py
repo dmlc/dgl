@@ -182,6 +182,13 @@ def linkx_homophily(graph, y):
         num_nodes = graph.num_nodes()
         num_classes = y.max(dim=0).values.item() + 1
 
+        if num_classes == 1:
+            raise ValueError(
+                "linkx_homophily is not defined for graphs with a "
+                "single node class. The formula requires at least 2 "
+                "classes since it divides by (C - 1)."
+            )
+
         value = torch.tensor(0.0).to(graph.device)
         for k in range(num_classes):
             # Get the nodes that belong to class k.
@@ -189,7 +196,15 @@ def linkx_homophily(graph, y):
             same_class_deg_k = graph.ndata["same_class_deg"][class_mask].sum()
             deg_k = deg[class_mask].sum()
             num_nodes_k = class_mask.sum()
-            value += max(0, same_class_deg_k / deg_k - num_nodes_k / num_nodes)
+            # Skip classes whose nodes have no in-edges to avoid
+            # division by zero.  When deg_k is 0 the ratio
+            # same_class_deg_k / deg_k is 0/0; since there are no
+            # neighbours, the same-class fraction is undefined and
+            # the contribution of this class is treated as 0.
+            if deg_k > 0:
+                value += max(
+                    0, same_class_deg_k / deg_k - num_nodes_k / num_nodes
+                )
 
         return value.item() / (num_classes - 1)
 
