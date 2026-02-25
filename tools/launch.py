@@ -496,7 +496,7 @@ def get_available_port(ip):
     for port in range(1234, 65535):
         try:
             sock.connect((ip, port))
-        except:
+        except Exception:
             return port
     raise RuntimeError("Failed to get available port for ip~{}".format(ip))
 

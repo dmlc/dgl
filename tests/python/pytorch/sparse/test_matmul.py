@@ -139,14 +139,14 @@ def test_spspmm_duplicate():
 
     try:
         matmul(A1, A2)
-    except:
+    except Exception:
         pass
     else:
         assert False, "Should raise error."
 
     try:
         matmul(A2, A1)
-    except:
+    except Exception:
         pass
     else:
         assert False, "Should raise error."

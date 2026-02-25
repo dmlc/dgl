@@ -237,7 +237,7 @@ if __name__ == "__main__":
                         e, valid_loss, test_full_loss
                     )
                 )
-    except:
+    except Exception:
         traceback.print_exc()
     finally:
         if args.visualize:

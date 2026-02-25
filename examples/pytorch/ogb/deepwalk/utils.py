@@ -16,19 +16,19 @@ def sum_up_params(model):
 
     try:
         n.append(model.index_emb_negu.cpu().numel() * 2)
-    except:
+    except Exception:
         pass
     try:
         n.append(model.state_sum_u.cpu().numel() * 2)
-    except:
+    except Exception:
         pass
     try:
         n.append(model.grad_avg.cpu().numel())
-    except:
+    except Exception:
         pass
     try:
         n.append(model.context_weight.cpu().numel())
-    except:
+    except Exception:
         pass
 
     print("#params " + str(sum(n)))

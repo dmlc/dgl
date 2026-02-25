@@ -192,7 +192,7 @@ class DGLDataset(object):
                     print("Done loading data from cached files.")
             except KeyboardInterrupt:
                 raise
-            except:
+            except Exception:
                 load_flag = False
                 if self.verbose:
                     print(traceback.format_exc())

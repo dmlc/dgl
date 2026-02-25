@@ -29,7 +29,7 @@ def generate_ip_config(file_name, num_machines, num_servers):
         try:
             sock.connect((ip, port))
             ports = []
-        except:
+        except Exception:
             ports.append(port)
             if len(ports) == num_machines * num_servers:
                 break

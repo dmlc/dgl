@@ -317,7 +317,7 @@ def partition_graph(num_community, G, resultdir):
     ## create ouptut directory
     try:
         os.makedirs(resultdir, mode=0o775, exist_ok=True)
-    except:
+    except Exception:
         raise DGLError("Error: Could not create directory: ", resultdir)
 
     tic = time.time()
@@ -329,7 +329,7 @@ def partition_graph(num_community, G, resultdir):
     try:
         resultdir = os.path.join(resultdir, str(num_community) + "Communities")
         os.makedirs(resultdir, mode=0o775, exist_ok=True)
-    except:
+    except Exception:
         raise DGLError("Error: Could not create sub-directory: ", resultdir)
 
     ## Libra partitioning

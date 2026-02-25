@@ -28,6 +28,6 @@ def sum_up_params(model):
     n.append(model.lookup_table.cpu().numel())
     try:
         n.append(model.index_emb_negu.cpu().numel() * 2)
-    except:
+    except Exception:
         pass
     print("#params " + str(sum(n)))

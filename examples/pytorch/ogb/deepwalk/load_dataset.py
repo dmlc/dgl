@@ -31,7 +31,7 @@ if __name__ == "__main__":
     try:
         w = g.edata["edge_weight"]
         weighted = True
-    except:
+    except Exception:
         weighted = False
 
     edge_num = g.edges()[0].shape[0]

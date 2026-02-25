@@ -421,7 +421,7 @@ def test_graph_serialize_with_restricted_formats():
     expect_except = False
     try:
         dgl.save_graphs(path, g_list, formats=["csr"])
-    except:
+    except Exception:
         expect_except = True
     assert expect_except
 

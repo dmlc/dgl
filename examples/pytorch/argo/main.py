@@ -100,7 +100,7 @@ def _train(**kwargs):
                 loss = F.cross_entropy(
                     y_hat[: output_nodes.shape[0]], y[: output_nodes.shape[0]]
                 )
-            except:
+            except Exception:
                 loss = F.binary_cross_entropy_with_logits(
                     y_hat[: output_nodes.shape[0]].float(),
                     y[: output_nodes.shape[0]].float(),

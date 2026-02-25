@@ -537,7 +537,7 @@ class AsGraphPredDataset(DGLDataset):
                     self.train_idx = F.nonzero_1d(self.dataset.train_mask)
                     self.val_idx = F.nonzero_1d(self.dataset.val_mask)
                     self.test_idx = F.nonzero_1d(self.dataset.test_mask)
-                except:
+                except Exception:
                     raise DGLError(
                         "The input dataset does not have default train/val/test\
                         split. Please specify split_ratio to generate the split."

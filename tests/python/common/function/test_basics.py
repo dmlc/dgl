@@ -362,7 +362,7 @@ def test_update_routines(idtype):
     try:
         g.send_and_recv([u, v])
         assert False
-    except:
+    except Exception:
         pass
 
     # pull

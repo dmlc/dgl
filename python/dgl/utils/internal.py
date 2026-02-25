@@ -685,7 +685,7 @@ def retry_method_with_fix(fix_method):
             # pylint: disable=W0703,bare-except
             try:
                 return func(self, *args, **kwargs)
-            except:
+            except Exception:
                 fix_method(self)
                 return func(self, *args, **kwargs)
 

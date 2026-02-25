@@ -1408,7 +1408,7 @@ def test_multiprocessing_with_shared_memory():
         assert torch.equal(graph.node_type_offset, node_type_offset2)
         type_per_edge2 = data_queue.get()
         assert torch.equal(graph.type_per_edge, type_per_edge2)
-    except:
+    except Exception:
         raise
     finally:
         # Send a finish signal to end sub-process.

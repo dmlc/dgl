@@ -401,7 +401,7 @@ def main(args):
         try:
             embed_layer.reset_parameters()
             model.reset_parameters()
-        except:
+        except Exception:
             # old pytorch version doesn't support reset_parameters() API
             pass
 

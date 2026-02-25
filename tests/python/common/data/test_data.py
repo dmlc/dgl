@@ -446,7 +446,7 @@ def _test_construct_graphs_node_ids():
     expect_except = False
     try:
         _, _ = DGLGraphConstructor.construct_graphs(node_data, edge_data)
-    except:
+    except Exception:
         expect_except = True
     assert expect_except
 
@@ -732,7 +732,7 @@ def _test_construct_graphs_multiple():
         _, _ = DGLGraphConstructor.construct_graphs(
             node_data, edge_data, graph_data
         )
-    except:
+    except Exception:
         expect_except = True
     assert expect_except
 
@@ -781,7 +781,7 @@ def _test_DefaultDataParser():
     expect_except = False
     try:
         _get_data_table(df)
-    except:
+    except Exception:
         expect_except = True
     assert expect_except
 
@@ -887,7 +887,7 @@ def _test_load_yaml_with_sanity_check():
             expect_except = False
             try:
                 meta = load_yaml_with_sanity_check(yaml_path)
-            except:
+            except Exception:
                 expect_except = True
             assert expect_except
         # inapplicable version
@@ -1000,7 +1000,7 @@ def _test_load_node_data_from_csv():
         expect_except = False
         try:
             NodeData.load_from_csv(meta_node, DefaultDataParser())
-        except:
+        except Exception:
             expect_except = True
         assert expect_except
 
@@ -1569,7 +1569,7 @@ def _test_NodeEdgeGraphData():
             {"feat": np.random.rand(num_nodes + 1, 3)},
             graph_id=np.arange(num_nodes - 1),
         )
-    except:
+    except Exception:
         expect_except = True
     assert expect_except
 
@@ -1608,7 +1608,7 @@ def _test_NodeEdgeGraphData():
             {"feat": np.random.rand(num_edges - 1, 3)},
             graph_id=np.arange(num_edges + 2),
         )
-    except:
+    except Exception:
         expect_except = True
     assert expect_except
 

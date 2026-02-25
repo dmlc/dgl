@@ -305,7 +305,7 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
     expect_except = False
     try:
         _, _ = g.find_edges(orig_eid[test_etype][eids], etype=("n1", "r12"))
-    except:
+    except Exception:
         expect_except = True
     assert expect_except
     u, v = g.find_edges(orig_eid[test_etype][eids], etype="r12")
