@@ -566,7 +566,7 @@ def main(args):
         if embed_layer is not None:
             embed_layer.reset_parameters()
         model.reset_parameters()
-    except:
+    except Exception:
         # Old pytorch version doesn't support reset_parameters() API.
         ##################################################################
         # [Why we need to reset the parameters?]

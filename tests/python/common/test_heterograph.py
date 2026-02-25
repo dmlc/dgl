@@ -579,14 +579,14 @@ def test_empty_query(idtype):
     try:
         g.in_degrees([0])
         fail = False
-    except:
+    except Exception:
         pass
     assert error_thrown
     error_thrown = True
     try:
         g.out_degrees([0])
         fail = False
-    except:
+    except Exception:
         pass
     assert error_thrown
 
@@ -3111,7 +3111,7 @@ def test_remove_edges(idtype):
     assert_fail = False
     try:
         g.remove_edges(1)
-    except:
+    except Exception:
         assert_fail = True
     assert assert_fail
 
@@ -3221,7 +3221,7 @@ def test_remove_nodes(idtype):
     assert_fail = False
     try:
         g.remove_nodes(3)
-    except:
+    except Exception:
         assert_fail = True
     assert assert_fail
 

@@ -474,7 +474,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges, use_graphbolt=False):
             (g.num_nodes(), 3), F.float32, "test4"
         )
         raise Exception("")
-    except:
+    except Exception:
         pass
 
     # Test write data
@@ -876,7 +876,7 @@ def check_dist_graph_hetero(
             (g.num_nodes("n1"), 3), F.float32, "test4"
         )
         raise Exception("")
-    except:
+    except Exception:
         pass
 
     # Test write data

@@ -1205,7 +1205,7 @@ class DataLoader(torch.utils.data.DataLoader):
             def init_fn(worker_id):
                 try:
                     psutil.Process().cpu_affinity([loader_cores[worker_id]])
-                except:
+                except Exception:
                     raise Exception(
                         "ERROR: cannot use affinity id={} cpu={}".format(
                             worker_id, loader_cores

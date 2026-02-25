@@ -65,7 +65,7 @@ def download_proteins():
     url = url + file_name
     try:
         req = requests.get(url)
-    except:
+    except Exception:
         raise DGLError(
             "Error: Failed to download Proteins dataset!! Aborting.."
         )

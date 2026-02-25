@@ -144,7 +144,7 @@ for epoch in range(args.epochs):
         for loader_id in range(num_loaders):
             try:
                 minibatch = next(train_loaders[loader_id])
-            except:
+            except Exception:
                 train_loaders[loader_id] = iter(
                     set_train_sampler_loader(gs[loader_id], ks[loader_id])
                 )

@@ -733,7 +733,7 @@ def test_metis_partition(idtype):
         assert_fail = False
         try:
             check_metis_partition(g, 1)
-        except:
+        except Exception:
             assert_fail = True
         assert assert_fail
 
@@ -1518,7 +1518,7 @@ def test_remove_edges(idtype):
     assert_fail = False
     try:
         g = dgl.remove_edges(g, 1)
-    except:
+    except Exception:
         assert_fail = True
     assert assert_fail
 
@@ -1752,7 +1752,7 @@ def test_remove_nodes(idtype):
     assert_fail = False
     try:
         g.remove_nodes(3)
-    except:
+    except Exception:
         assert_fail = True
     assert assert_fail
 
@@ -2091,7 +2091,7 @@ def test_add_selfloop(idtype):
     raise_error = False
     try:
         g = dgl.add_self_loop(g)
-    except:
+    except Exception:
         raise_error = True
     assert raise_error
 
@@ -2189,7 +2189,7 @@ def test_add_selfloop(idtype):
     raise_error = False
     try:
         g = dgl.add_self_loop(g, etype="plays")
-    except:
+    except Exception:
         raise_error = True
     assert raise_error
 
@@ -2214,7 +2214,7 @@ def test_remove_selfloop(idtype):
     raise_error = False
     try:
         g = dgl.remove_self_loop(g, etype="plays")
-    except:
+    except Exception:
         raise_error = True
     assert raise_error
 
@@ -2237,7 +2237,7 @@ def test_remove_selfloop(idtype):
     raise_error = False
     try:
         g = dgl.remove_self_loop(g, etype="plays")
-    except:
+    except Exception:
         raise_error = True
     assert raise_error
 
@@ -2286,7 +2286,7 @@ def test_reorder_graph(idtype):
     raise_error = False
     try:
         dgl.reorder_graph(g, edge_permute_algo="none")
-    except:
+    except Exception:
         raise_error = True
     assert raise_error
 
@@ -2316,7 +2316,7 @@ def test_reorder_graph(idtype):
         raise_error = False
         try:
             dgl.reorder_graph(mg, node_permute_algo="metis")
-        except:
+        except Exception:
             raise_error = True
         assert raise_error
 
@@ -2326,7 +2326,7 @@ def test_reorder_graph(idtype):
             dgl.reorder_graph(
                 mg, node_permute_algo="metis", permute_config={"k": 2}
             )
-        except:
+        except Exception:
             raise_error = True
         assert not raise_error
 
@@ -2339,7 +2339,7 @@ def test_reorder_graph(idtype):
             node_permute_algo="custom",
             permute_config={"nodes_perm": nodes_perm},
         )
-    except:
+    except Exception:
         raise_error = True
     assert not raise_error
 
@@ -2351,7 +2351,7 @@ def test_reorder_graph(idtype):
             node_permute_algo="custom",
             permute_config={"nodes_perm": nodes_perm[: g.num_nodes() - 1]},
         )
-    except:
+    except Exception:
         raise_error = True
     assert raise_error
 
@@ -2359,7 +2359,7 @@ def test_reorder_graph(idtype):
     raise_error = False
     try:
         dgl.reorder_graph(g, node_permute_algo="cmk")
-    except:
+    except Exception:
         raise_error = True
     assert raise_error
 
@@ -2372,7 +2372,7 @@ def test_reorder_graph(idtype):
             device=F.ctx(),
         )
         dgl.reorder_graph(hg)
-    except:
+    except Exception:
         raise_error = True
     assert raise_error
 

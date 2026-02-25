@@ -95,7 +95,7 @@ def train():
             model.zero_grad()
             try:
                 loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta)
-            except:
+            except Exception:
                 print([t.smiles for t in batch["mol_trees"]])
                 raise
             loss.backward()

@@ -288,7 +288,7 @@ class NDArrayBase(_NDArrayBase):
         if not isinstance(source_array, np.ndarray):
             try:
                 source_array = np.asarray(source_array, dtype=self.dtype)
-            except:
+            except Exception:
                 raise TypeError(
                     "array must be an array_like data,"
                     + "type %s is not supported" % str(type(source_array))

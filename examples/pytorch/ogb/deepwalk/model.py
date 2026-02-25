@@ -548,7 +548,7 @@ class SkipGramModel(nn.Module):
                     torch.sum(embedding.mul(embedding), 1) + 1e-6
                 ).unsqueeze(1)
             torch.save(embedding, file_name)
-        except:
+        except Exception:
             self.save_embedding_pt_dgl_graph(dataset, file_name)
 
     def save_embedding_pt_dgl_graph(self, dataset, file_name):
