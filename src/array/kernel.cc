@@ -355,7 +355,7 @@ NDArray GetEdgeMapping(HeteroGraphRef graph) {
 void SegmentReduceDispatch(
     const std::string& op, NDArray feat, NDArray offsets, NDArray out,
     NDArray arg) {
-  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "SegmentReduce", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(feat->ctx.device_type, XPU, "SegmentReduce", {
     ATEN_ID_TYPE_SWITCH(offsets->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(feat->dtype, Dtype, XPU, "Feature data", {
         SegmentReduce<XPU, IdType, Dtype>(op, feat, offsets, out, arg);
