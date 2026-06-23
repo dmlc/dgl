@@ -30,7 +30,7 @@ class ClusterGCNSampler(Sampler):
         The number of partitions.
     cache_path : str
         The path to the cache directory for storing the partition result.
-    balance_ntypes, balkance_edges, mode :
+    balance_ntypes, balance_edges, mode :
         Passed to :func:`dgl.metis_partition_assignment`.
     prefetch_ndata : list[str], optional
         The node data to prefetch for the subgraph.
