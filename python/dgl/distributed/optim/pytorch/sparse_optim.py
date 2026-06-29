@@ -8,6 +8,12 @@ import torch as th
 
 import dgl
 
+
+def _create_event(device):
+    if device is not None and device.type == "npu":
+        return th.npu.Event()
+    return th.cuda.Event()
+
 from .... import backend as F
 from ...dist_tensor import DistTensor
 from ...graph_partition_book import EDGE_PART_POLICY, NODE_PART_POLICY
@@ -40,7 +46,7 @@ class DistSparseGradOptimizer(abc.ABC):
         self._rank = None
         self._world_size = None
         self._shared_cache = {}
-        self._clean_grad = False
+        self._clean_grad = True
         self._opt_meta = {}
         self._state = {}
         ## collect all hyper parameters for save
@@ -257,17 +263,19 @@ class DistSparseGradOptimizer(abc.ABC):
         """
         with th.no_grad():
             # [Rui]
-            # As `gloo` supports CPU tensors only while `nccl` supports GPU
+            # As `gloo` supports CPU tensors only while `nccl`/`hccl` supports GPU
             # tensors only, we firstly create tensors on the corresponding
             # devices and then copy the data to target device if needed.
             # Please note that the target device can be different from the
             # preferred device.
             target_device = None
-            preferred_device = (
-                th.device(f"cuda:{self._rank}")
-                if th.distributed.get_backend() == "nccl"
-                else th.device("cpu")
-            )
+            backend = th.distributed.get_backend() if th.distributed.is_initialized() else ""
+            if backend == "nccl":
+                preferred_device = th.device(f"cuda:{self._rank}")
+            elif backend == "hccl":
+                preferred_device = th.device(f"npu:{self._rank}")
+            else:
+                preferred_device = th.device("cpu")
             local_indics = {emb.name: [] for emb in self._params}
             local_grads = {emb.name: [] for emb in self._params}
             for emb in self._params:
@@ -357,7 +365,7 @@ class DistSparseGradOptimizer(abc.ABC):
                     # machine_id + i
 
                     # use scatter to sync across trainers about the p2p tensor size
-                    # Note: If we have GPU nccl support, we can use all_to_all to
+                    # Note: If we have GPU nccl/hccl support, we can use all_to_all to
                     # sync information here
                     gather_list = list(
                         th.empty(
@@ -553,7 +561,7 @@ class SparseAdagrad(DistSparseGradOptimizer):
         grad_state_dst = grad_state.to(state_dev, non_blocking=True)
         if state_block:
             # use events to try and overlap CPU and GPU as much as possible
-            update_event = th.cuda.Event()
+            update_event = _create_event(exec_dev)
             update_event.record()
 
         # update emb
@@ -562,7 +570,7 @@ class SparseAdagrad(DistSparseGradOptimizer):
         tmp_dst = tmp.to(state_dev, non_blocking=True)
 
         if state_block:
-            std_event = th.cuda.Event()
+            std_event = _create_event(exec_dev)
             std_event.record()
             # wait for our transfers from exec_dev to state_dev to finish
             # before we can use them
@@ -718,7 +726,7 @@ class SparseAdam(DistSparseGradOptimizer):
         update_power_dst = update_power.to(state_dev, non_blocking=True)
         if state_block:
             # use events to try and overlap CPU and GPU as much as possible
-            update_event = th.cuda.Event()
+            update_event = _create_event(exec_dev)
             update_event.record()
 
         update_mem_corr = update_mem / (
@@ -732,7 +740,7 @@ class SparseAdam(DistSparseGradOptimizer):
         std_values_dst = std_values.to(state_dev, non_blocking=True)
 
         if state_block:
-            std_event = th.cuda.Event()
+            std_event = _create_event(exec_dev)
             std_event.record()
             # wait for our transfers from exec_dev to state_dev to finish
             # before we can use them

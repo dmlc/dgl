@@ -51,6 +51,12 @@ atexit.register(_set_python_exit_flag)
 prefetcher_timeout = int(os.environ.get("DGL_PREFETCHER_TIMEOUT", "30"))
 
 
+def _stream_module(device):
+    if device is not None and device.type == "npu":
+        return torch.npu
+    return torch.cuda
+
+
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys, shuffle):
         self.dataset = dataset
@@ -495,11 +501,13 @@ def _prefetch(batch, dataloader, stream):
     # Once the futures are fetched, this function waits for them to complete by
     # calling its wait() method.
     if stream is not None:
-        current_stream = torch.cuda.current_stream()
+        mod = _stream_module(dataloader.device)
+        current_stream = mod.current_stream()
         current_stream.wait_stream(stream)
     else:
         current_stream = None
-    with torch.cuda.stream(stream):
+    with (torch.cuda.stream(stream) if dataloader.device.type != "npu"
+          else torch.npu.stream(stream)):
         # fetch node/edge features
         feats = recursive_apply(batch, _prefetch_for, dataloader)
         feats = recursive_apply(feats, _await_or_return)
@@ -630,8 +638,9 @@ class _PrefetchingIter(object):
         self.use_thread = dataloader.use_prefetch_thread
         self.use_alternate_streams = dataloader.use_alternate_streams
         self.device = self.dataloader.device
-        if self.use_alternate_streams and self.device.type == "cuda":
-            self.stream = torch.cuda.Stream(device=self.device)
+        if self.use_alternate_streams and self.device.type in ("cuda", "npu"):
+            mod = _stream_module(self.device)
+            self.stream = mod.Stream(device=self.device)
         else:
             self.stream = None
         self._shutting_down = False
@@ -782,6 +791,8 @@ def _get_device(device):
     device = torch.device(device)
     if device.type == "cuda" and device.index is None:
         device = torch.device("cuda", torch.cuda.current_device())
+    elif device.type == "npu" and device.index is None:
+        device = torch.device("npu", torch.npu.current_device())
     return device
 
 

@@ -285,6 +285,7 @@ public:
         GM_ADDR featureData, GM_ADDR outputData, GM_ADDR indptrData, GM_ADDR indicesData, GM_ADDR vectorWindowIdsData, GM_ADDR vectorWinSplitData, uint32_t numDstRows, uint32_t numSrcRows,
         uint32_t featureDim, uint32_t nonZeroCount, uint32_t vectorWindowCount, AscendC::TPipe *pipe)
     {
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
         this->M = numDstRows;
         this->K = numSrcRows;
         this->N = featureDim;
@@ -466,3 +467,4 @@ extern "C" __global__ __aicore__ void spmm_sum(
         cubeProcessor.Process();
     }
 }
+

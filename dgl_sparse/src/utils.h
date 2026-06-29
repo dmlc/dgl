@@ -52,7 +52,15 @@ inline static void ElementwiseOpSanityCheck(
 
 /** @brief Convert a Torch tensor to a DGL array. */
 inline static runtime::NDArray TorchTensorToDGLArray(torch::Tensor tensor) {
-  return runtime::DLPackConvert::FromDLPack(at::toDLPack(tensor.contiguous()));
+  tensor = tensor.contiguous();
+  // Clone on NPU to ensure owned storage before DLPack conversion.
+  // Ascend NPU's at::toDLPack has a bug for int32 tensor views where the
+  // resulting DLManagedTensor may reference invalid storage after the
+  // original tensor is destroyed. CPU and CUDA paths do not need this.
+  if (tensor.device().type() == c10::DeviceType::PrivateUse1) {
+    tensor = tensor.clone();
+  }
+  return runtime::DLPackConvert::FromDLPack(at::toDLPack(tensor));
 }
 
 /** @brief Convert a DGL array to a Torch tensor. */

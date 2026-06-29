@@ -22,7 +22,7 @@ Install DGL-Ascend from source
 
 Download the source files from GitHub.
 ```bash
-git clone https://gitcode.com/AI4Science/dgl-ascend.git
+git clone https://github.com/BUPT-GAMMA/dgl-ascend.git
 ```
 
 Update submodules

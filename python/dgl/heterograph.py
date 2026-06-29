@@ -5887,7 +5887,7 @@ class DGLGraph(object):
         """
         if F.get_preferred_backend() != "pytorch":
             raise DGLError("record_stream only support the PyTorch backend.")
-        if F.device_type(self.device) != "cuda":
+        if F.device_type(self.device) not in ("cuda", "npu"):
             raise DGLError("The graph must be on GPU to be recorded.")
         self._graph.record_stream(stream)
         for frame in itertools.chain(self._node_frames, self._edge_frames):

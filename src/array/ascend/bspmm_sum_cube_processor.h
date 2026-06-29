@@ -124,8 +124,8 @@ private:
         uint32_t k = tcBlockCount * CUBE_BLOCK_LENGTH;
         AscendC::Nd2NzParams nd2nzA1Params;
         nd2nzA1Params.ndNum = 1;
-        nd2nzA1Params.nValue = CUBE_BLOCK_LENGTH;
-        nd2nzA1Params.dValue = k;
+        nd2nzA1Params.nValue = k;
+        nd2nzA1Params.dValue = CUBE_BLOCK_LENGTH;
         nd2nzA1Params.srcNdMatrixStride = 0;
         nd2nzA1Params.srcDValue = k;
         nd2nzA1Params.dstNzC0Stride = CUBE_BLOCK_LENGTH;

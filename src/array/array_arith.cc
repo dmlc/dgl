@@ -5,6 +5,7 @@
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/device_api.h>
 #include <dgl/runtime/ndarray.h>
 
 #include "../c_api_common.h"
@@ -16,42 +17,114 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace aten {
 
+// --- Ascend L-variant kernel dispatch ---
+// The NPU binary_elewise AscendC kernel only supports int32/int64
+// comparison ops (LT, GT, LE, GE, EQ, NE) in L-variant (array vs scalar).
+// All other ops/types/variants have no NPU kernel and fall back to CPU.
+
+namespace {
+
+template <typename IdType, typename Op>
+IdArray BinaryElewiseAscendL(IdArray lhs, int64_t rhs) {
+  DGLContext cpu_ctx{kDGLCPU, 0};
+  auto lhs_cpu = lhs.CopyTo(cpu_ctx);
+  IdArray ret = impl::BinaryElewise<kDGLCPU, IdType, Op>(
+      lhs_cpu, static_cast<IdType>(rhs));
+  auto ascend_ret = ret.CopyTo(lhs->ctx);
+  return ascend_ret;
+}
+
+#define ASCEND_L_KERNEL(type, op)                                            \
+  template <>                                                                \
+  IdArray BinaryElewiseAscendL<type, arith::op>(IdArray lhs, int64_t rhs) { \
+    return impl::BinaryElewise<kDGLAscend, type, arith::op>(                 \
+        lhs, static_cast<type>(rhs));                                        \
+  }
+
+ASCEND_L_KERNEL(int32_t, LT)
+ASCEND_L_KERNEL(int64_t, LT)
+ASCEND_L_KERNEL(int32_t, GT)
+ASCEND_L_KERNEL(int64_t, GT)
+ASCEND_L_KERNEL(int32_t, LE)
+ASCEND_L_KERNEL(int64_t, LE)
+ASCEND_L_KERNEL(int32_t, GE)
+ASCEND_L_KERNEL(int64_t, GE)
+ASCEND_L_KERNEL(int32_t, EQ)
+ASCEND_L_KERNEL(int64_t, EQ)
+ASCEND_L_KERNEL(int32_t, NE)
+ASCEND_L_KERNEL(int64_t, NE)
+
+}  // anonymous namespace
+
 // Generate operators with both operations being NDArrays.
-#define BINARY_ELEMENT_OP(name, op)                                  \
-  IdArray name(IdArray lhs, IdArray rhs) {                           \
-    IdArray ret;                                                     \
-    CHECK_SAME_DTYPE(lhs, rhs);                                      \
-    CHECK_SAME_CONTEXT(lhs, rhs);                                    \
-    ATEN_XPU_SWITCH_CUDA(lhs->ctx.device_type, XPU, #name, {         \
-      ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                      \
-        ret = impl::BinaryElewise<XPU, IdType, arith::op>(lhs, rhs); \
-      });                                                            \
-    });                                                              \
-    return ret;                                                      \
+#define BINARY_ELEMENT_OP(name, op)                                   \
+  IdArray name(IdArray lhs, IdArray rhs) {                            \
+    IdArray ret;                                                      \
+    CHECK_SAME_DTYPE(lhs, rhs);                                       \
+    CHECK_SAME_CONTEXT(lhs, rhs);                                     \
+    if (lhs->ctx.device_type == kDGLAscend) {                         \
+      DGLContext cpu_ctx{kDGLCPU, 0};                                \
+      auto lhs_cpu = lhs.CopyTo(cpu_ctx);                            \
+      auto rhs_cpu = rhs.CopyTo(cpu_ctx);                            \
+      ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                       \
+        ret = impl::BinaryElewise<kDGLCPU, IdType, arith::op>(       \
+            lhs_cpu, rhs_cpu);                                        \
+      });                                                             \
+      auto ascend_ret = ret.CopyTo(lhs->ctx);                        \
+      return ascend_ret;                                             \
+    } else {                                                          \
+      ATEN_XPU_SWITCH_CUDA(lhs->ctx.device_type, XPU, #name, {        \
+        ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                     \
+          ret = impl::BinaryElewise<XPU, IdType, arith::op>(         \
+              lhs, rhs);                                             \
+        });                                                           \
+      });                                                             \
+    }                                                                 \
+    return ret;                                                       \
   }
 
 // Generate operators with only lhs being NDArray.
-#define BINARY_ELEMENT_OP_L(name, op)                                \
-  IdArray name(IdArray lhs, int64_t rhs) {                           \
-    IdArray ret;                                                     \
-    ATEN_XPU_SWITCH_CUDA(lhs->ctx.device_type, XPU, #name, {         \
-      ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                      \
-        ret = impl::BinaryElewise<XPU, IdType, arith::op>(lhs, rhs); \
-      });                                                            \
-    });                                                              \
-    return ret;                                                      \
+#define BINARY_ELEMENT_OP_L(name, op)                                 \
+  IdArray name(IdArray lhs, int64_t rhs) {                            \
+    IdArray ret;                                                      \
+    if (lhs->ctx.device_type == kDGLAscend) {                         \
+      ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                       \
+        ret = BinaryElewiseAscendL<IdType, arith::op>(lhs, rhs);      \
+      });                                                             \
+      return ret;                                                     \
+    } else {                                                          \
+      ATEN_XPU_SWITCH_CUDA(lhs->ctx.device_type, XPU, #name, {        \
+        ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                     \
+          ret = impl::BinaryElewise<XPU, IdType, arith::op>(         \
+              lhs, rhs);                                              \
+        });                                                           \
+      });                                                             \
+    }                                                                 \
+    return ret;                                                       \
   }
 
-// Generate operators with only lhs being NDArray.
-#define BINARY_ELEMENT_OP_R(name, op)                                \
-  IdArray name(int64_t lhs, IdArray rhs) {                           \
-    IdArray ret;                                                     \
-    ATEN_XPU_SWITCH_CUDA(rhs->ctx.device_type, XPU, #name, {         \
-      ATEN_ID_TYPE_SWITCH(rhs->dtype, IdType, {                      \
-        ret = impl::BinaryElewise<XPU, IdType, arith::op>(lhs, rhs); \
-      });                                                            \
-    });                                                              \
-    return ret;                                                      \
+// Generate operators with only rhs being NDArray.
+#define BINARY_ELEMENT_OP_R(name, op)                                 \
+  IdArray name(int64_t lhs, IdArray rhs) {                            \
+    IdArray ret;                                                      \
+    if (rhs->ctx.device_type == kDGLAscend) {                         \
+      DGLContext cpu_ctx{kDGLCPU, 0};                                \
+      auto rhs_cpu = rhs.CopyTo(cpu_ctx);                            \
+      ATEN_ID_TYPE_SWITCH(rhs->dtype, IdType, {                       \
+        ret = impl::BinaryElewise<kDGLCPU, IdType, arith::op>(       \
+            lhs, rhs_cpu);                                            \
+      });                                                             \
+      auto ascend_ret = ret.CopyTo(rhs->ctx);                        \
+      return ascend_ret;                                             \
+    } else {                                                          \
+      ATEN_XPU_SWITCH_CUDA(rhs->ctx.device_type, XPU, #name, {        \
+        ATEN_ID_TYPE_SWITCH(rhs->dtype, IdType, {                     \
+          ret = impl::BinaryElewise<XPU, IdType, arith::op>(         \
+              lhs, rhs);                                              \
+        });                                                           \
+      });                                                             \
+    }                                                                 \
+    return ret;                                                       \
   }
 
 // Generate operators with only lhs being NDArray.
@@ -209,3 +282,4 @@ NDArray operator==(int64_t lhs, const NDArray& rhs) {
 NDArray operator!=(int64_t lhs, const NDArray& rhs) {
   return dgl::aten::NE(lhs, rhs);
 }
+

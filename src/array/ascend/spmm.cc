@@ -12,6 +12,7 @@
 #include <string>
 #include <dmlc/logging.h>
 #include <cstdint>
+#include <cstdlib>
 
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
@@ -29,6 +30,27 @@ constexpr uint32_t cubeCoreCount = 20;
 constexpr uint32_t vectorCoreCount = 40;
 constexpr uint16_t kHalfOne = 0x3c00;
 
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+#include <torch_npu/csrc/core/npu/NPUStream.h>
+static bool use_pytorch_stream() {
+    static bool val = []() {
+        const char* env = std::getenv("DGL_SPMM_USE_PYTORCH_STREAM");
+        if (!env) return false;
+        return env[0] == '1' && env[1] == '\0';
+    }();
+    return val;
+}
+#endif
+
+static bool use_aiv_only_sum() {
+    static bool val = []() {
+        const char* env = std::getenv("DGL_SPMM_SUM_AIV_ONLY");
+        if (!env) return false;
+        return env[0] == '1' && env[1] == '\0';
+    }();
+    return val;
+}
+
 #ifndef ACLRT_LAUNCH_KERNEL
 #define ACLRT_LAUNCH_KERNEL(kernel_func) aclrtlaunch_##kernel_func
 #endif
@@ -41,6 +63,12 @@ extern "C" uint32_t aclrtlaunch_spmm_sum(
     uint32_t numDstRows, uint32_t numSrcRows, uint32_t featureDim,
     uint32_t nonZeroCount, uint32_t totalTcBlocks, uint32_t vectorWindowCount,
     uint32_t cubeWindowCount, uint32_t columnToEdgeLength);
+
+extern "C" uint32_t aclrtlaunch_spmm_sum_aiv(
+    uint32_t blockDim, aclrtStream stream, void* featureData, void* outputData,
+    void* indptrData, void* indicesData, void* vectorRowSplitData,
+    uint32_t numDstRows, uint32_t numSrcRows, uint32_t featureDim,
+    uint32_t nonZeroCount);
 
 extern "C" uint32_t aclrtlaunch_bspmm_sum(
     uint32_t blockDim, aclrtStream stream, void* denseBlockData,
@@ -283,11 +311,20 @@ void SpMMCsrAscend(
   const IdType* indptr_ptr = static_cast<const IdType*>(csr.indptr->data);
   const IdType* indices_ptr = static_cast<const IdType*>(csr.indices->data);
   
-  static aclrtStream spmm_stream = nullptr;
-  if (spmm_stream == nullptr) {
-    ASCEND_CALL(aclrtCreateStream(&spmm_stream));
+  aclrtStream stream;
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+  if (use_pytorch_stream()) {
+    stream = c10::npu::getCurrentNPUStream(ctx.device_id).stream();
+  } else
+#endif
+  {
+    static aclrtStream spmm_stream = nullptr;
+    if (spmm_stream == nullptr) {
+      ASCEND_CALL(aclrtCreateStream(&spmm_stream));
+    }
+    stream = spmm_stream;
+    ASCEND_CALL(aclrtSynchronizeDevice());
   }
-  aclrtStream stream = spmm_stream;
 
   uint32_t num_rows_u32 = static_cast<uint32_t>(num_rows);
   uint32_t num_cols_u32 = static_cast<uint32_t>(num_cols);
@@ -379,6 +416,31 @@ void SpMMCsrAscend(
     return;
   }
 
+  // AIV-only sum: bypass sum preprocess entirely
+  if (!use_bspmm && use_aiv_only_sum()) {
+    std::vector<uint32_t> row_pointers =
+        CopyDeviceArrayToHostUInt32(indptr_ptr, static_cast<size_t>(num_rows + 1), stream);
+    std::vector<uint32_t> row_split =
+        BuildRowNnzBalancedPartitions(row_pointers, vectorCoreCount);
+    auto split_dev = MakeDeviceBuffer(
+        row_split.data(), row_split.size() * sizeof(uint32_t), stream);
+    ASCEND_CALL(aclrtSynchronizeStream(stream));
+    ASCEND_CALL(aclrtMemsetAsync(out->data, out.GetSize(), 0, out.GetSize(), stream));
+    uint32_t blockDim = vectorCoreCount;
+    aclError launch_err = ACLRT_LAUNCH_KERNEL(spmm_sum_aiv)(
+        blockDim, stream, ufeat->data, out->data,
+        const_cast<void*>(static_cast<const void*>(indptr_ptr)),
+        const_cast<void*>(static_cast<const void*>(indices_ptr)),
+        split_dev.get(), num_rows_u32, num_cols_u32,
+        out_dim_u32, num_edges_u32);
+    if (launch_err != ACL_SUCCESS) {
+      LOG(FATAL) << "spmm_sum_aiv kernel launch failed with error code: " << launch_err;
+    }
+    ASCEND_CALL(aclrtSynchronizeStream(stream));
+    return;
+  }
+
+  // Original sum path with preprocess cache
   std::shared_ptr<SumPreprocessCacheValue> cache_value;
   {
     std::lock_guard<std::mutex> lock(g_spmm_preprocess_cache_mutex);
@@ -533,6 +595,7 @@ void SpMMCsrAscend(
   void* column_to_edge_dev = cache_value->column_to_edge_dev.get();
 
   ASCEND_CALL(aclrtMemsetAsync(out->data, out.GetSize(), 0, out.GetSize(), stream));
+
   uint32_t blockDim = cubeCoreCount;
   aclError launch_err = use_bspmm ? ACLRT_LAUNCH_KERNEL(bspmm_sum)(
       blockDim, stream, dense_blocks_dev, ufeat->data, out->data,
@@ -683,3 +746,4 @@ void SpMMCoo<kDGLAscend, int64_t, double>(
 
 } // namespace aten
 } // namespace dgl
+

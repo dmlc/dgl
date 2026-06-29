@@ -5,6 +5,13 @@ from abc import abstractmethod
 import torch as th
 
 from ...cuda import nccl
+from ...ascend import hccl
+
+
+def _create_event(device):
+    if device is not None and device.type == "npu":
+        return th.npu.Event()
+    return th.cuda.Event()
 from ...nn.pytorch import NodeEmbedding
 from ...partition import NDArrayPartition
 from ...utils import (
@@ -35,7 +42,7 @@ class SparseGradOptimizer(abc.ABC):
         self._rank = None
         self._world_size = None
         self._shared_cache = {}
-        self._clean_grad = False
+        self._clean_grad = True
         self._opt_meta = {}
         self._comm = None
         self._first_step = True
@@ -66,14 +73,16 @@ class SparseGradOptimizer(abc.ABC):
 
     def step(self):
         """The step function.
-
         The step function is invoked at the end of every batch to update embeddings
         """
         # on the first step, check to see if the grads are on the GPU
         if self._first_step:
             for emb in self._params:
                 for _, data in emb._trace:
-                    if data.grad.device.type == "cuda":
+                    if data.grad is None:
+                        continue
+
+                    if data.grad.device.type in ["cuda", "npu"]:
                         # create a communicator
                         if self._device:
                             assert (
@@ -87,11 +96,18 @@ class SparseGradOptimizer(abc.ABC):
                         ), "All gradients must be on the same device"
 
             # distributed backend use nccl
+            backend = th.distributed.get_backend() if th.distributed.is_initialized() else ""
             if self._device and (
                 not th.distributed.is_initialized()
-                or th.distributed.get_backend() == "nccl"
+                or backend == "nccl"
+                or backend == "hccl"
             ):
                 # device is only set if the grads are on a GPU
+                self._comm_setup()
+            elif backend == "hccl" and any(emb._tensor.device.type == "npu" for emb in self._params):
+                # For HCCL/NPU: embedding is on NPU even if gradient landed on CPU
+                # due to NPU autograd limitations. Force comm mode.
+                self._device = th.device("npu", self._rank % th.npu.device_count())
                 self._comm_setup()
             else:
                 self._shared_setup()
@@ -178,10 +194,18 @@ class SparseGradOptimizer(abc.ABC):
                     idx = th.cat(idx, dim=0)
                     grad = th.cat(grad, dim=0)
 
-                (
-                    idx_in[emb_name],
-                    grad_in[emb_name],
-                ) = nccl.sparse_all_to_all_push(idx, grad, partition=partition)
+                # Use hccl for Ascend devices, nccl for NVIDIA devices
+                backend = th.distributed.get_backend() if th.distributed.is_initialized() else ""
+                if backend == "hccl":
+                    (
+                        idx_in[emb_name],
+                        grad_in[emb_name],
+                    ) = hccl.sparse_all_to_all_push(idx, grad, partition=partition)
+                else:
+                    (
+                        idx_in[emb_name],
+                        grad_in[emb_name],
+                    ) = nccl.sparse_all_to_all_push(idx, grad, partition=partition)
                 if emb.partition:
                     # if the embedding is partitioned, map back to indexes
                     # into the local tensor
@@ -214,6 +238,8 @@ class SparseGradOptimizer(abc.ABC):
                 grad = []
                 for i, data in emb._trace:
                     idx.append(i)
+                    if data.grad is None:
+                        continue
                     grad.append(data.grad.data)
                 # If the sparse embedding is not used in the previous forward step
                 # The idx and grad will be empty, initialize them as empty tensors to
@@ -270,7 +296,7 @@ class SparseGradOptimizer(abc.ABC):
                             shared_emb[emb_name][0].append(idx_i)
                             shared_emb[emb_name][1].append(grad_i)
                         else:
-                            # currently nccl does not support Alltoallv operation
+                            # currently nccl/hccl does not support Alltoallv operation on all devices
                             # we need to use CPU shared memory to share gradient
                             # across processes
                             idx_i = idx_i.to(th.device("cpu"))
@@ -833,7 +859,7 @@ class SparseAdam(SparseGradOptimizer):
 
             # whether or not we need to transfer data from the GPU to the CPU
             # while updating the weights
-            is_d2h = state_dev.type == "cpu" and exec_dev.type == "cuda"
+            is_d2h = state_dev.type == "cpu" and exec_dev.type in ("cuda", "npu")
 
             # only perform async copies cpu -> gpu, or gpu-> gpu, but block
             # when copying to the cpu, so as to ensure the copy is finished
@@ -905,7 +931,7 @@ class SparseAdam(SparseGradOptimizer):
                 )
                 if state_block:
                     # use events to try and overlap CPU and GPU as much as possible
-                    update_event = th.cuda.Event()
+                    update_event = _create_event(exec_dev)
                     update_event.record()
 
             update_mem_corr = update_mem / (
@@ -920,7 +946,7 @@ class SparseAdam(SparseGradOptimizer):
             std_values_dst = std_values.to(state_dev, non_blocking=True)
 
             if state_block:
-                std_event = th.cuda.Event()
+                std_event = _create_event(exec_dev)
                 std_event.record()
 
             if not use_uva:

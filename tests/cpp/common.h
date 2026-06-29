@@ -8,6 +8,9 @@ static constexpr DGLContext CPU = DGLContext{kDGLCPU, 0};
 #ifdef DGL_USE_CUDA
 static constexpr DGLContext GPU = DGLContext{kDGLCUDA, 0};
 #endif
+#ifdef DGL_USE_ASCEND
+static constexpr DGLContext NPU = DGLContext{kDGLAscend, 0};
+#endif
 
 template <typename T>
 inline T* Ptr(dgl::runtime::NDArray nd) {

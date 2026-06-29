@@ -161,11 +161,30 @@ CMAKE_ARGS=(
     -DUSE_CUDA=OFF
     -DUSE_ASCEND=ON
     -DBUILD_TORCH=ON
+    -DUSE_DISTRIBUTED=ON
+    -DUSE_GRAPHBLAST=ON
+    -DUSE_TORCH=ON
 )
 
 # Add Ascend toolkit path if available
 if [[ -n "${ASCEND_TOOLKIT_HOME}" ]]; then
     CMAKE_ARGS+=(-DASCEND_TOOLKIT_HOME="${ASCEND_TOOLKIT_HOME}")
+fi
+
+# Append PyTorch cmake path if available
+TORCH_CMAKE_PATH=$(python3 -c "import torch; print(torch.utils.cmake_prefix_path)" 2>/dev/null) || true
+if [[ -n "${TORCH_CMAKE_PATH}" ]]; then
+    CMAKE_ARGS+=(-DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:+${CMAKE_PREFIX_PATH};}${TORCH_CMAKE_PATH}")
+    echo_info "PyTorch cmake path: ${TORCH_CMAKE_PATH}"
+fi
+
+# Add torch_npu lib path for find_library and linker
+TORCH_NPU_LIB_PATH=$(python3 -c "import torch_npu; import os; print(os.path.join(os.path.dirname(torch_npu.__file__), 'lib'))" 2>/dev/null) || true
+if [[ -n "${TORCH_NPU_LIB_PATH}" ]] && [[ -d "${TORCH_NPU_LIB_PATH}" ]]; then
+    CMAKE_ARGS+=(-DCMAKE_LIBRARY_PATH="${TORCH_NPU_LIB_PATH}")
+    export LIBRARY_PATH="${LIBRARY_PATH:+${LIBRARY_PATH}:}${TORCH_NPU_LIB_PATH}"
+    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}${TORCH_NPU_LIB_PATH}"
+    echo_info "torch_npu lib path: ${TORCH_NPU_LIB_PATH}"
 fi
 
 echo_info "CMake arguments: ${CMAKE_ARGS[*]}"

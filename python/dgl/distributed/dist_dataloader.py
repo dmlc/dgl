@@ -825,11 +825,6 @@ class DistNodeDataLoader(DistDataLoader):
         if device is None:
             # for the distributed case default to the CPU
             device = "cpu"
-        assert (
-            device == "cpu"
-        ), "Only cpu is supported in the case of a DistGraph."
-        # Distributed DataLoader currently does not support heterogeneous graphs
-        # and does not copy features.  Fallback to normal solution
         self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
         _remove_kwargs_dist(dataloader_kwargs)
         super().__init__(
@@ -878,11 +873,6 @@ class DistEdgeDataLoader(DistDataLoader):
         if device is None:
             # for the distributed case default to the CPU
             device = "cpu"
-        assert (
-            device == "cpu"
-        ), "Only cpu is supported in the case of a DistGraph."
-        # Distributed DataLoader currently does not support heterogeneous graphs
-        # and does not copy features.  Fallback to normal solution
         self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
         _remove_kwargs_dist(dataloader_kwargs)
         super().__init__(

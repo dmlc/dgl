@@ -141,22 +141,39 @@ class empty_context:
         return
 
 
-# Disable CUDA autocast since we have casted args manually,
+# Disable CUDA/NPU autocast since we have casted args manually,
 # and do it only in a nested autocast context.
+def _is_autocast_enabled():
+    if th.is_autocast_enabled():
+        return True
+    if hasattr(th, "npu") and hasattr(th.npu, "is_autocast_enabled") and th.npu.is_autocast_enabled():
+        return True
+    return False
+
+
 def _disable_autocast_if_enabled():
     if th.is_autocast_enabled():
-        return th.cuda.amp.autocast(enabled=False)
-    else:
+        if hasattr(th, "cuda") and hasattr(th.cuda, "amp"):
+            return th.cuda.amp.autocast(enabled=False)
         return empty_context()
+    if hasattr(th, "npu") and hasattr(th.npu, "is_autocast_enabled") and th.npu.is_autocast_enabled():
+        return th.npu.amp.autocast(enabled=False)
+    return empty_context()
 
 
 def _cast_if_autocast_enabled(*args):
-    if not th.is_autocast_enabled():
+    if not _is_autocast_enabled():
         return args
-    else:
-        return th.cuda.amp.autocast_mode._cast(
-            args, th.get_autocast_gpu_dtype()
-        )
+    if th.is_autocast_enabled():
+        if hasattr(th, "cuda") and hasattr(th.cuda, "amp"):
+            return th.cuda.amp.autocast_mode._cast(
+                args, th.get_autocast_gpu_dtype()
+            )
+        return args
+    if hasattr(th, "npu") and hasattr(th.npu, "is_autocast_enabled") and th.npu.is_autocast_enabled():
+        dtype = th.npu.get_autocast_dtype() if hasattr(th.npu, "get_autocast_dtype") else th.float16
+        return th.npu.amp.autocast_mode._cast(args, dtype)
+    return args
 
 
 class GSpMM(th.autograd.Function):

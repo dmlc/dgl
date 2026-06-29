@@ -163,12 +163,25 @@ if(USE_ASCEND)
   else()
     set(ASCEND_PATH "/usr/local/Ascend/ascend-toolkit/latest")
   endif()
-  
+
   if(EXISTS ${ASCEND_PATH})
     message(STATUS "Found Ascend toolkit at: ${ASCEND_PATH}")
     include_directories("${ASCEND_PATH}/include")
+    include_directories("${ASCEND_PATH}/arm64-linux/ascendc/include")
+    include_directories("${ASCEND_PATH}/arm64-linux/ascendc/include/basic_api/impl")
+    include_directories("${ASCEND_PATH}/aarch64-linux/ascendc/include/basic_api/interface")
     link_directories("${ASCEND_PATH}/lib64")
     add_definitions(-DDGL_USE_ASCEND)
+
+    # HCCL
+    find_library(HCCL_LIB hccl HINTS "${ASCEND_PATH}/lib64" "${ASCEND_PATH}/acllib/lib64")
+    if(HCCL_LIB)
+      message(STATUS "Found HCCL library: ${HCCL_LIB}")
+      list(APPEND DGL_LINKER_LIBS ${HCCL_LIB})
+    else()
+      list(APPEND DGL_LINKER_LIBS hccl)
+    endif()
+
     # Find and link Ascend runtime library
     find_library(ASCENDCL_LIB ascendcl HINTS "${ASCEND_PATH}/lib64" "${ASCEND_PATH}/acllib/lib64")
     if(ASCENDCL_LIB)
@@ -178,7 +191,13 @@ if(USE_ASCEND)
       # Try with just the library name if find_library fails
       list(APPEND DGL_LINKER_LIBS ascendcl)
     endif()
-    
+
+    find_library(ACL_LIB acl HINTS "${ASCEND_PATH}/acllib/lib64")
+    if(ACL_LIB)
+      message(STATUS "Found ACL library: ${ACL_LIB}")
+      list(APPEND DGL_LINKER_LIBS ${ACL_LIB})
+    endif()
+
     # Build AscendC kernel library for all operators
     # Find AscendC cmake directory
     if(EXISTS ${ASCEND_PATH}/compiler/tikcpp/ascendc_kernel_cmake)
@@ -189,7 +208,7 @@ if(USE_ASCEND)
       message(WARNING "ascendc_kernel_cmake not found, AscendC kernel will not be built")
       set(ASCENDC_CMAKE_DIR "")
     endif()
-    
+
     if(ASCENDC_CMAKE_DIR)
       # Set ASCEND_CANN_PACKAGE_PATH for AscendC kernel compilation
       # This is required by ascendc.cmake
@@ -197,7 +216,7 @@ if(USE_ASCEND)
         set(ASCEND_CANN_PACKAGE_PATH "${ASCEND_PATH}" CACHE STRING "ASCEND CANN package installation directory")
       endif()
       message(STATUS "Using ASCEND_CANN_PACKAGE_PATH: ${ASCEND_CANN_PACKAGE_PATH}")
-      
+
       # Set SOC_VERSION for AscendC kernel compilation
       # Can be set via CMake -DSOC_VERSION or environment variable
       if(NOT DEFINED SOC_VERSION)
@@ -208,7 +227,7 @@ if(USE_ASCEND)
         endif()
       endif()
       message(STATUS "Using SOC_VERSION: ${SOC_VERSION}")
-      
+
       # Ensure CMAKE_BUILD_TYPE is set for AscendC kernel compilation
       # AscendC merge scripts require a valid build type
       # Map DGL's BUILD_TYPE to CMAKE_BUILD_TYPE
@@ -221,15 +240,15 @@ if(USE_ASCEND)
         message(STATUS "CMAKE_BUILD_TYPE not set, mapping BUILD_TYPE=${BUILD_TYPE} to CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
       endif()
       message(STATUS "Using CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE} for AscendC kernels")
-      
+
       include(${ASCENDC_CMAKE_DIR}/ascendc.cmake)
-      
+
       # Automatically discover all AscendC kernel files (*_kernel.cpp pattern)
       # This allows easy addition of new operators by simply adding new kernel files
-      file(GLOB ASCENDC_KERNEL_FILES 
+      file(GLOB ASCENDC_KERNEL_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/src/array/ascend/*_kernel.cpp"
       )
-      
+
       if(ASCENDC_KERNEL_FILES)
         # List all found kernel files for debugging
         message(STATUS "Found AscendC kernel files:")
@@ -254,6 +273,32 @@ if(USE_ASCEND)
   else()
     message(WARNING "Ascend toolkit not found at ${ASCEND_PATH}, building without ACL support")
   endif()
+
+  execute_process(COMMAND python3 -c "import torch; import os; print(os.path.dirname(torch.__file__))"
+                  OUTPUT_VARIABLE LIBTORCH_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND python3 -c "import torch_npu; import os; print(os.path.dirname(torch_npu.__file__))"
+                  OUTPUT_VARIABLE LIBTORCH_NPU_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+  execute_process(COMMAND python3 -c "import sys; print(sys.prefix)"
+                  OUTPUT_VARIABLE Python3_ROOT_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+  find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+
+  find_package(Torch REQUIRED PATHS ${LIBTORCH_PATH})
+
+  include_directories(${LIBTORCH_NPU_PATH}/include)
+  link_directories(${LIBTORCH_NPU_PATH}/lib)
+
+  # Find c10_npu for direct PyTorch NPU stream access
+  find_library(C10_NPU_LIB c10_npu HINTS ${LIBTORCH_NPU_PATH}/lib)
+  if(C10_NPU_LIB)
+    list(APPEND DGL_LINKER_LIBS ${C10_NPU_LIB})
+    add_definitions(-DDGL_USE_PYTORCH_NPU_STREAM)
+    message(STATUS "Found c10_npu: ${C10_NPU_LIB} — enabling PyTorch NPU stream support")
+  else()
+    message(STATUS "c10_npu not found — using legacy stream management")
+  endif()
+
 endif(USE_ASCEND)
 
 if(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -320,6 +365,9 @@ list(APPEND DGL_SRC ${DGL_SRC_1})
 if(USE_ASCEND)
   file(GLOB ASCEND_SRC src/array/ascend/*.cc)
   list(APPEND DGL_SRC ${ASCEND_SRC})
+  # Add Ascend partition operations
+  file(GLOB ASCEND_PARTITION_SRC src/partition/ascend/*.cc)
+  list(APPEND DGL_SRC ${ASCEND_PARTITION_SRC})
 endif(USE_ASCEND)
 
 if (NOT MSVC)
@@ -404,7 +452,7 @@ if(EXTERNAL_DMLC_PATH)
   endif()
   message(STATUS "looking for dmlc headers in ${EXTERNAL_DMLC_PATH}")
   include_directories(SYSTEM ${EXTERNAL_DMLC_PATH})
-  
+
   if (NOT EXTERNAL_DMLC_LIB_PATH)
     message(FATAL_ERROR "EXTERNAL_DMLC_LIB_PATH must be set if EXTERNAL_DMLC_PATH is set")
   endif()
@@ -504,7 +552,24 @@ if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
   target_compile_definitions(dgl PRIVATE PARALLEL_ALGORITHMS)
 endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
-target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
+target_include_directories(dgl PRIVATE ${Python3_INCLUDE_DIRS})
+
+find_library(GFORTRAN_LIB NAMES gfortran REQUIRED)
+find_library(GOMP_LIB NAMES gomp REQUIRED)
+
+message(STATUS "Found gfortran: ${GFORTRAN_LIB}")
+message(STATUS "Found gomp: ${GOMP_LIB}")
+
+target_link_libraries(dgl PRIVATE
+  ${DGL_LINKER_LIBS}
+  ${DGL_RUNTIME_LINKER_LIBS}
+  ${TORCH_LIBRARIES}
+  ${Python3_LIBRARIES}
+  c10
+  ${GFORTRAN_LIB}
+  ${GOMP_LIB}
+)
+
 if(MSVC)
   add_custom_command(
     TARGET dgl POST_BUILD COMMAND
@@ -567,8 +632,34 @@ if(BUILD_CPP_TEST)
   include_directories("third_party/pcg/include")
   file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/cpp/*.cc)
   add_executable(runUnitTests ${TEST_SRC_FILES})
-  target_link_libraries(runUnitTests gtest gtest_main)
-  target_link_libraries(runUnitTests dgl)
+
+  execute_process(COMMAND python3 -c "import sys; print(f'{sys.prefix}/lib')"
+                  OUTPUT_VARIABLE CONDA_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND python3 -c "import torch_npu; import os; print(f'{os.path.dirname(torch_npu.__file__)}/lib')"
+                  OUTPUT_VARIABLE TORCH_NPU_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND python3 -c "import torch; import os; print(f'{os.path.dirname(torch.__file__)}/lib')"
+                  OUTPUT_VARIABLE TORCH_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+  link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR})
+
+  set_target_properties(runUnitTests PROPERTIES
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR}"
+  )
+  target_link_libraries(runUnitTests PRIVATE gtest gtest_main 
+    ${Python3_LIBRARIES}
+    ${TORCH_LIBRARIES}
+    c10
+    ${GFORTRAN_LIB}
+    ${GOMP_LIB}
+  )
+  target_link_libraries(runUnitTests PRIVATE dgl 
+    ${Python3_LIBRARIES}
+    ${TORCH_LIBRARIES}
+    c10
+    ${GFORTRAN_LIB}
+    ${GOMP_LIB}
+  )
   add_test(UnitTests runUnitTests)
 endif(BUILD_CPP_TEST)
 
@@ -659,3 +750,4 @@ if(BUILD_GRAPHBOLT)
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
   endif(MSVC)
 endif(BUILD_GRAPHBOLT)
+

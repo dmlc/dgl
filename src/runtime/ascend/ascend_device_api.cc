@@ -120,8 +120,12 @@ class AscendDeviceAPI final : public DeviceAPI {
       DGLDataType type_hint) final {
 #ifdef DGL_USE_ASCEND
     SetDevice(ctx);
-    void* ret = nullptr;
-    ASCEND_CALL(aclrtMalloc(&ret, nbytes, ACL_MEM_MALLOC_HUGE_FIRST));
+    // Ascend 910B3: avoid stale L2 cache line by offsetting data ptr +64.
+    void* base = nullptr;
+    ASCEND_CALL(aclrtMalloc(&base, nbytes + 64, ACL_MEM_MALLOC_NORMAL_ONLY));
+    // Only zero the first 64 bytes (sacrificial cache line), not the whole buffer.
+    ASCEND_CALL(aclrtMemset(base, 64, 0, 64));
+    void* ret = static_cast<char*>(base) + 64;
     return ret;
 #else
     LOG(FATAL) << "Ascend runtime is not enabled.";
@@ -132,7 +136,8 @@ class AscendDeviceAPI final : public DeviceAPI {
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
 #ifdef DGL_USE_ASCEND
     SetDevice(ctx);
-    ASCEND_CALL(aclrtFree(ptr));
+    // AllocDataSpace returns ptr+64; recover the base pointer for free.
+    ASCEND_CALL(aclrtFree(static_cast<char*>(ptr) - 64));
 #else
     LOG(FATAL) << "Ascend runtime is not enabled.";
 #endif
@@ -143,19 +148,17 @@ class AscendDeviceAPI final : public DeviceAPI {
       size_t size, DGLContext ctx_from, DGLContext ctx_to,
       DGLDataType type_hint) final {
 #ifdef DGL_USE_ASCEND
-    aclrtStream stream = nullptr;  // Use default stream
     from = static_cast<const char*>(from) + from_offset;
     to = static_cast<char*>(to) + to_offset;
 
+    if (size == 0) return;
+
     if (ctx_from.device_type == kDGLAscend && ctx_to.device_type == kDGLAscend) {
-      // Device to Device
       ASCEND_CALL(aclrtSetDevice(ctx_from.device_id));
       if (ctx_from.device_id == ctx_to.device_id) {
-        ASCEND_CALL(aclrtMemcpyAsync(
-            to, size, from, size, ACL_MEMCPY_DEVICE_TO_DEVICE, stream));
-        ASCEND_CALL(aclrtSynchronizeStream(stream));
+        ASCEND_CALL(aclrtMemcpy(
+            to, size, from, size, ACL_MEMCPY_DEVICE_TO_DEVICE));
       } else {
-        // Cross device copy - need to go through host
         void* temp = malloc(size);
         ASCEND_CALL(aclrtMemcpy(temp, size, from, size, ACL_MEMCPY_DEVICE_TO_HOST));
         ASCEND_CALL(aclrtSetDevice(ctx_to.device_id));
@@ -165,15 +168,14 @@ class AscendDeviceAPI final : public DeviceAPI {
     } else if (ctx_from.device_type == kDGLAscend && ctx_to.device_type == kDGLCPU) {
       // Device to Host
       ASCEND_CALL(aclrtSetDevice(ctx_from.device_id));
-      ASCEND_CALL(aclrtMemcpyAsync(
-          to, size, from, size, ACL_MEMCPY_DEVICE_TO_HOST, stream));
-      ASCEND_CALL(aclrtSynchronizeStream(stream));
+      ASCEND_CALL(aclrtSynchronizeStream(static_cast<aclrtStream>(current_stream_)));
+      ASCEND_CALL(aclrtMemcpy(
+          to, size, from, size, ACL_MEMCPY_DEVICE_TO_HOST));
     } else if (ctx_from.device_type == kDGLCPU && ctx_to.device_type == kDGLAscend) {
       // Host to Device
       ASCEND_CALL(aclrtSetDevice(ctx_to.device_id));
-      ASCEND_CALL(aclrtMemcpyAsync(
-          to, size, from, size, ACL_MEMCPY_HOST_TO_DEVICE, stream));
-      ASCEND_CALL(aclrtSynchronizeStream(stream));
+      ASCEND_CALL(aclrtMemcpy(
+          to, size, from, size, ACL_MEMCPY_HOST_TO_DEVICE));
     } else {
       LOG(FATAL) << "Expect copy from/to Ascend or between Ascend devices";
     }
@@ -280,5 +282,18 @@ DGL_REGISTER_GLOBAL("device_api.ascend")
       *rv = static_cast<void*>(ptr);
     });
 
+#ifdef DGL_USE_ASCEND
+static thread_local aclrtStream current_ascend_stream = nullptr;
+
+aclrtStream getCurrentAscendStream() {
+  return current_ascend_stream;
+}
+
+void setCurrentAscendStream(aclrtStream stream) {
+  current_ascend_stream = stream;
+}
+#endif
+
 }  // namespace runtime
 }  // namespace dgl
+

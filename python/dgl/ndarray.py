@@ -11,6 +11,8 @@ import functools
 import operator
 
 import numpy as _np
+import torch
+import torch_npu
 
 from . import backend as F
 from ._ffi.function import _init_api
@@ -142,6 +144,7 @@ def cast_to_signed(arr):
     """
     return _CAPI_DGLArrayCastToSigned(arr)
 
+_SHARED_TENSOR_CACHE = {}
 
 def get_shared_mem_array(name, shape, dtype):
     """Get a tensor from shared memory with specific name
@@ -160,11 +163,24 @@ def get_shared_mem_array(name, shape, dtype):
     F.tensor
         The tensor got from shared memory.
     """
-    new_arr = empty_shared_mem(
-        name, False, shape, F.reverse_data_type_dict[dtype]
-    )
-    dlpack = new_arr.to_dlpack()
-    return F.zerocopy_from_dlpack(dlpack)
+    if name in _SHARED_TENSOR_CACHE:
+        return _SHARED_TENSOR_CACHE[name]
+
+    if not torch.distributed.is_initialized():
+        return torch.empty(shape, dtype=dtype, device='cpu')
+
+    backend = torch.distributed.get_backend()
+    if backend in ("hccl", "nccl"):
+        tensor = create_shared_mem_array(name, shape, dtype)
+    else:
+        new_arr = empty_shared_mem(
+            name, False, shape, F.reverse_data_type_dict[dtype]
+        )
+        dlpack = new_arr.to_dlpack()
+        tensor = F.zerocopy_from_dlpack(dlpack)
+
+    _SHARED_TENSOR_CACHE[name] = tensor
+    return tensor
 
 
 def create_shared_mem_array(name, shape, dtype):
@@ -184,11 +200,40 @@ def create_shared_mem_array(name, shape, dtype):
     F.tensor
         The created tensor.
     """
-    new_arr = empty_shared_mem(
-        name, True, shape, F.reverse_data_type_dict[dtype]
-    )
-    dlpack = new_arr.to_dlpack()
-    return F.zerocopy_from_dlpack(dlpack)
+    if name in _SHARED_TENSOR_CACHE:
+        return _SHARED_TENSOR_CACHE[name]
+
+    if not torch.distributed.is_initialized():
+        return torch.empty(shape, dtype=dtype, device='cpu')
+
+    backend = torch.distributed.get_backend()
+    rank = torch.distributed.get_rank()
+    world_size = torch.distributed.get_world_size()
+
+    if backend == "hccl":
+        device = f'npu:{torch.npu.current_device()}'
+    elif backend == "nccl":
+        device = f'cuda:{torch.cuda.current_device()}'
+    else:
+        new_arr = empty_shared_mem(
+            name, True, shape, F.reverse_data_type_dict[dtype]
+        )
+        dlpack = new_arr.to_dlpack()
+        tensor = F.zerocopy_from_dlpack(dlpack)
+        _SHARED_TENSOR_CACHE[name] = tensor
+        return tensor
+
+    tensor = torch.empty(shape, dtype=dtype, device=device)
+
+    if rank == 0:
+        tensor.uniform_(-0.1, 0.1)
+
+    if world_size > 1:
+        torch.distributed.broadcast(tensor, src=0)
+
+    _SHARED_TENSOR_CACHE[name] = tensor
+
+    return tensor
 
 
 def exist_shared_mem_array(name):
@@ -310,3 +355,4 @@ NULL = {
     "int64": array(_np.array([], dtype=_np.int64)),
     "int32": array(_np.array([], dtype=_np.int32)),
 }
+

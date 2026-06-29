@@ -328,12 +328,65 @@ void _TestCOOToCSR(DGLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indices, tcsr.indices));
 }
 
+#ifdef DGL_USE_ASCEND
+template <typename IDX>
+void _TestCOOToCSRAscend(DGLContext ctx) {
+  // Direct unsorted COO → CSR (uses CPU sort fallback + NPU kernel)
+  auto coo = COO1<IDX>(ctx);
+  auto csr = CSR1<IDX>(ctx);
+  auto tcsr = aten::COOToCSR(coo);
+  ASSERT_FALSE(coo.row_sorted);
+  ASSERT_EQ(csr.num_rows, tcsr.num_rows);
+  ASSERT_EQ(csr.num_cols, tcsr.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(csr.indices, tcsr.indices));
+
+  // Sparse unsorted COO → CSR
+  coo = SparseCOOCSR::COOSparse<IDX>(ctx);
+  csr = SparseCOOCSR::CSRSparse<IDX>(ctx);
+  tcsr = aten::COOToCSR(coo);
+  ASSERT_FALSE(coo.row_sorted);
+  ASSERT_EQ(csr.num_rows, tcsr.num_rows);
+  ASSERT_EQ(csr.num_cols, tcsr.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(csr.indices, tcsr.indices));
+
+  // Sorted COO → CSR (NPU kernel path; manually sort on CPU first, copy to NPU)
+  auto cpu_ctx = DGLContext{kDGLCPU, 0};
+  auto unsorted = COO1<IDX>(cpu_ctx);
+  aten::COOSort_(&unsorted, false);
+  auto sorted = unsorted.CopyTo(ctx);
+  tcsr = aten::COOToCSR(sorted);
+  ASSERT_TRUE(sorted.row_sorted);
+  ASSERT_EQ(sorted.num_rows, tcsr.num_rows);
+  ASSERT_EQ(sorted.num_cols, tcsr.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(tcsr.indices, sorted.col));
+  ASSERT_TRUE(ArrayEQ<IDX>(tcsr.data, sorted.data));
+
+  // Row-sorted, null-data COO → CSR
+  auto null_coo = RowSorted_NullData_COO<IDX>(cpu_ctx);
+  auto ref_csr = RowSorted_NullData_CSR<IDX>(cpu_ctx);
+  auto null_coo_npu = null_coo.CopyTo(ctx);
+  tcsr = aten::COOToCSR(null_coo_npu);
+  ASSERT_TRUE(null_coo_npu.row_sorted);
+  ASSERT_EQ(ref_csr.num_rows, tcsr.num_rows);
+  ASSERT_EQ(ref_csr.num_cols, tcsr.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(ref_csr.indptr, tcsr.indptr));
+  // Null data → auto Range, so data should differ from CPU ref
+  ASSERT_FALSE(ArrayEQ<IDX>(null_coo_npu.data, tcsr.data));
+}
+#endif
+
 TEST(SpmatTest, COOToCSR) {
   _TestCOOToCSR<int32_t>(CPU);
   _TestCOOToCSR<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCOOToCSR<int32_t>(GPU);
   _TestCOOToCSR<int64_t>(GPU);
+#endif
+#ifdef DGL_USE_ASCEND
+  _TestCOOToCSRAscend<int32_t>(NPU);
+  _TestCOOToCSRAscend<int64_t>(NPU);
 #endif
 }
 
