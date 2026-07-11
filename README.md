@@ -326,3 +326,7 @@ DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and 
 ## License
 
 DGL uses Apache License 2.0.
+
+---
+
+*[Mukller](https://github.com/Mukller)*
