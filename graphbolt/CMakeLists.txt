@@ -74,6 +74,12 @@ if(USE_CUDA)
 endif()
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
+if(APPLE)
+include_directories(BEFORE ${BOLT_DIR}
+                           ${BOLT_HEADERS}
+                           "../third_party/pcg/include"
+                           "../third_party/tsl_robin_map/include")
+else()
 include_directories(BEFORE ${BOLT_DIR}
                            ${BOLT_HEADERS}
                            # For CXX20 features:
@@ -81,6 +87,7 @@ include_directories(BEFORE ${BOLT_DIR}
                            "../third_party/cccl/libcudacxx/include"
                            "../third_party/pcg/include"
                            "../third_party/tsl_robin_map/include")
+endif()
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 if(BUILD_WITH_TASKFLOW)
   target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE "../third_party/taskflow")

@@ -6,12 +6,6 @@ mkdir -p build
 mkdir -p $BINDIR/graphbolt
 cd build
 
-if [ $(uname) = 'Darwin' ]; then
-  CPSOURCE=*.dylib
-else
-  CPSOURCE=*.so
-fi
-
 # We build for the same architectures as DGL, thus we hardcode
 # TORCH_CUDA_ARCH_LIST and we need to at least compile for Volta. Until
 # https://github.com/NVIDIA/cccl/issues/1083 is resolved, we need to compile the
@@ -29,6 +23,16 @@ if ! [[ -z "${CUDAARCHS}" ]]; then
   fi
 fi
 CMAKE_FLAGS="-DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DUSE_CUDA=$USE_CUDA -DTORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST"
+
+if [ $(uname) = 'Darwin' ]; then
+  CPSOURCE=*.dylib
+  export CFLAGS="-Xclang -fopenmp -I/opt/homebrew/opt/libomp/include $CFLAGS"
+  export CXXFLAGS="-Xclang -fopenmp -I/opt/homebrew/opt/libomp/include $CXXFLAGS"
+  export LDFLAGS="-L/opt/homebrew/opt/libomp/lib -lomp $LDFLAGS"
+  CMAKE_FLAGS="$CMAKE_FLAGS -DOpenMP_ROOT=/opt/homebrew/opt/libomp -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+else
+  CPSOURCE=*.so
+fi
 echo "graphbolt cmake flags: $CMAKE_FLAGS"
 
 if [ $# -eq 0 ]; then
