@@ -139,8 +139,18 @@ def is_enabled(api):
 
 
 def to_dgl_nd(data):
+    if hasattr(data, "device") and getattr(data.device, "type", None) == "mps":
+        data = data.cpu()
     return zerocopy_to_dgl_ndarray(data)
 
 
+import threading
+_tls = threading.local()
+
 def from_dgl_nd(data):
-    return zerocopy_from_dgl_ndarray(data)
+    res = zerocopy_from_dgl_ndarray(data)
+    target_device = getattr(_tls, "target_device", None)
+    if target_device is not None and getattr(target_device, "type", None) == "mps":
+        if hasattr(res, "to"):
+            res = res.to(target_device)
+    return res

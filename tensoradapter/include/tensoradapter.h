@@ -34,6 +34,9 @@ void* CPURawAlloc(size_t nbytes);
  */
 void CPURawDelete(void* ptr);
 
+void* MPSRawAlloc(size_t nbytes);
+void MPSRawDelete(void* ptr);
+
 #ifdef DGL_USE_CUDA
 /**
  * @brief Allocate a piece of GPU memory via

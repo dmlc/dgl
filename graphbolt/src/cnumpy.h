@@ -17,7 +17,43 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#ifdef __APPLE__
+#include <mutex>
+#include <condition_variable>
+
+namespace cuda {
+namespace std {
+template <ptrdiff_t LeastMaxValue = 1024>
+class counting_semaphore {
+ public:
+  explicit counting_semaphore(ptrdiff_t desired) : count_(desired) {}
+  
+  void release(ptrdiff_t update = 1) {
+    ::std::lock_guard<::std::mutex> lock(mtx_);
+    count_ += update;
+    if (update > 1) {
+      cv_.notify_all();
+    } else if (update == 1) {
+      cv_.notify_one();
+    }
+  }
+  
+  void acquire() {
+    ::std::unique_lock<::std::mutex> lock(mtx_);
+    cv_.wait(lock, [this]() { return count_ > 0; });
+    --count_;
+  }
+
+ private:
+  ptrdiff_t count_;
+  ::std::mutex mtx_;
+  ::std::condition_variable cv_;
+};
+} // namespace std
+} // namespace cuda
+#else
 #include <cuda/std/semaphore>
+#endif
 #include <memory>
 #include <mutex>
 #include <string>

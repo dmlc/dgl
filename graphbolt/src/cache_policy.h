@@ -25,7 +25,47 @@
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
 
+#ifdef __APPLE__
+namespace cuda {
+namespace std {
+enum memory_order {
+  memory_order_relaxed = __ATOMIC_RELAXED,
+  memory_order_consume = __ATOMIC_CONSUME,
+  memory_order_acquire = __ATOMIC_ACQUIRE,
+  memory_order_release = __ATOMIC_RELEASE,
+  memory_order_acq_rel = __ATOMIC_ACQ_REL,
+  memory_order_seq_cst = __ATOMIC_SEQ_CST
+};
+
+template <typename T>
+class atomic_ref {
+ public:
+  explicit atomic_ref(T& obj) : ptr_(&obj) {}
+  
+  T fetch_add(T val, memory_order order = memory_order_seq_cst) const {
+    return __atomic_fetch_add(ptr_, val, order);
+  }
+  
+  T load(memory_order order = memory_order_seq_cst) const {
+    return __atomic_load_n(ptr_, order);
+  }
+
+  bool compare_exchange_strong(T& expected, T desired, memory_order success = memory_order_seq_cst, memory_order failure = memory_order_seq_cst) const {
+    return __atomic_compare_exchange_n(ptr_, &expected, desired, false, success, failure);
+  }
+  
+  bool compare_exchange_weak(T& expected, T desired, memory_order success = memory_order_seq_cst, memory_order failure = memory_order_seq_cst) const {
+    return __atomic_compare_exchange_n(ptr_, &expected, desired, true, success, failure);
+  }
+
+ private:
+  T* ptr_;
+};
+} // namespace std
+} // namespace cuda
+#else
 #include <cuda/std/atomic>
+#endif
 #include <limits>
 
 #include "./circular_queue.h"

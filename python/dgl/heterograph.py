@@ -37,6 +37,36 @@ from .view import (
 __all__ = ["DGLGraph", "combine_names"]
 
 
+class HeteroGraphIndexProxy(heterograph_index.HeteroGraphIndex):
+    def __new__(cls, gidx, graph_ref):
+        return object.__new__(cls)
+
+    def __init__(self, gidx, graph_ref):
+        if isinstance(gidx, HeteroGraphIndexProxy):
+            gidx = gidx._gidx
+        self._gidx = gidx
+        self._graph_ref = graph_ref
+        self.handle = gidx.handle
+
+    def __del__(self):
+        # Overriding to prevent ObjectBase.__del__ from double-freeing the handle owned by self._gidx
+        pass
+
+    def __getattr__(self, name):
+        attr = getattr(self._gidx, name)
+        if callable(attr):
+            def wrapper(*args, **kwargs):
+                from .backend import _tls
+                old_device = getattr(_tls, "target_device", None)
+                _tls.target_device = self._graph_ref.device
+                try:
+                    return attr(*args, **kwargs)
+                finally:
+                    _tls.target_device = old_device
+            return wrapper
+        return attr
+
+
 class DGLGraph(object):
     """Class for storing graph structure and node/edge feature data.
 
@@ -125,7 +155,7 @@ class DGLGraph(object):
 
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
         """Init internal states."""
-        self._graph = gidx
+        self._graph = HeteroGraphIndexProxy(gidx, self)
         self._canonical_etypes = None
         self._batch_num_nodes = None
         self._batch_num_edges = None
@@ -5653,6 +5683,8 @@ class DGLGraph(object):
 
         The case of heterogeneous graphs is the same.
         """
+        if getattr(self, "_device", None) is not None:
+            return self._device
         return F.to_backend_ctx(self._graph.ctx)
 
     def to(self, device, **kwargs):  # pylint: disable=invalid-name
@@ -5707,6 +5739,36 @@ class DGLGraph(object):
         """
         if device is None or self.device == device:
             return self
+
+        import torch as th
+        th_device = th.device(device)
+        if th_device.type == "mps":
+            ret = copy.copy(self)
+            ret._device = th.device("mps", th_device.index if th_device.index is not None else 0)
+            
+            new_nframes = []
+            for nframe in self._node_frames:
+                new_nframes.append(nframe.to(th_device, **kwargs))
+            ret._node_frames = new_nframes
+
+            new_eframes = []
+            for eframe in self._edge_frames:
+                new_eframes.append(eframe.to(th_device, **kwargs))
+            ret._edge_frames = new_eframes
+
+            if self._batch_num_nodes is not None:
+                new_bnn = {
+                    k: F.copy_to(num, th_device, **kwargs)
+                    for k, num in self._batch_num_nodes.items()
+                }
+                ret._batch_num_nodes = new_bnn
+            if self._batch_num_edges is not None:
+                new_bne = {
+                    k: F.copy_to(num, th_device, **kwargs)
+                    for k, num in self._batch_num_edges.items()
+                }
+                ret._batch_num_edges = new_bne
+            return ret
 
         ret = copy.copy(self)
 

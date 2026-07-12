@@ -90,6 +90,16 @@ class TensorDispatcher {
     FUNCCAST(tensoradapter::CPURawDelete, entry)(ptr);
   }
 
+  inline void* MPSAllocWorkspace(size_t nbytes) {
+    auto entry = entrypoints_[Op::kMPSRawAlloc];
+    return FUNCCAST(tensoradapter::MPSRawAlloc, entry)(nbytes);
+  }
+
+  inline void MPSFreeWorkspace(void* ptr) {
+    auto entry = entrypoints_[Op::kMPSRawDelete];
+    FUNCCAST(tensoradapter::MPSRawDelete, entry)(ptr);
+  }
+
 #ifdef DGL_USE_CUDA
   /**
    * @brief Allocate a piece of GPU memory via
@@ -229,6 +239,7 @@ class TensorDispatcher {
    */
   static constexpr const char* names_[] = {
       "CPURawAlloc",         "CPURawDelete",
+      "MPSRawAlloc",         "MPSRawDelete",
 #ifdef DGL_USE_CUDA
       "CUDARawAlloc",        "CUDARawDelete",
       "CUDACurrentStream",   "RecordStream",
@@ -242,15 +253,17 @@ class TensorDispatcher {
    public:
     static constexpr int kCPURawAlloc = 0;
     static constexpr int kCPURawDelete = 1;
+    static constexpr int kMPSRawAlloc = 2;
+    static constexpr int kMPSRawDelete = 3;
 #ifdef DGL_USE_CUDA
-    static constexpr int kCUDARawAlloc = 2;
-    static constexpr int kCUDARawDelete = 3;
-    static constexpr int kCUDACurrentStream = 4;
-    static constexpr int kRecordStream = 5;
-    static constexpr int kCUDARawHostAlloc = 6;
-    static constexpr int kCUDARawHostDelete = 7;
-    static constexpr int kCUDARecordHostAlloc = 8;
-    static constexpr int kCUDAHostAllocatorEmptyCache = 9;
+    static constexpr int kCUDARawAlloc = 4;
+    static constexpr int kCUDARawDelete = 5;
+    static constexpr int kCUDACurrentStream = 6;
+    static constexpr int kRecordStream = 7;
+    static constexpr int kCUDARawHostAlloc = 8;
+    static constexpr int kCUDARawHostDelete = 9;
+    static constexpr int kCUDARecordHostAlloc = 10;
+    static constexpr int kCUDAHostAllocatorEmptyCache = 11;
 #endif  // DGL_USE_CUDA
   };
 
@@ -259,7 +272,7 @@ class TensorDispatcher {
 
   /** @brief Entrypoints of each function */
   void* entrypoints_[num_entries_] = {
-      nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr,
 #ifdef DGL_USE_CUDA
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 #endif  // DGL_USE_CUDA

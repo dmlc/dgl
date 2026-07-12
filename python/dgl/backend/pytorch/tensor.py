@@ -12,6 +12,96 @@ from ... import ndarray as nd
 from ...function.base import TargetCode
 from ...utils import version
 
+import ctypes
+
+# Python C API
+_pythonapi = ctypes.pythonapi
+_PyCapsule_New = _pythonapi.PyCapsule_New
+_PyCapsule_New.restype = ctypes.py_object
+_PyCapsule_New.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p]
+
+class _DLDevice(ctypes.Structure):
+    _fields_ = [
+        ("device_type", ctypes.c_int),
+        ("device_id", ctypes.c_int),
+    ]
+
+class _DLDataType(ctypes.Structure):
+    _fields_ = [
+        ("code", ctypes.c_uint8),
+        ("bits", ctypes.c_uint8),
+        ("lanes", ctypes.c_uint16),
+    ]
+
+class _DLTensor(ctypes.Structure):
+    _fields_ = [
+        ("data", ctypes.c_void_p),
+        ("device", _DLDevice),
+        ("ndim", ctypes.c_int),
+        ("dtype", _DLDataType),
+        ("shape", ctypes.POINTER(ctypes.c_int64)),
+        ("strides", ctypes.POINTER(ctypes.c_int64)),
+        ("byte_offset", ctypes.c_uint64),
+    ]
+
+class _DLManagedTensor(ctypes.Structure):
+    pass
+
+_DLManagedTensor._fields_ = [
+    ("dl_tensor", _DLTensor),
+    ("manager_ctx", ctypes.c_void_p),
+    ("deleter", ctypes.CFUNCTYPE(None, ctypes.POINTER(_DLManagedTensor))),
+]
+
+# Keep references to keep structures alive
+_keepers = {}
+
+@ctypes.CFUNCTYPE(None, ctypes.POINTER(_DLManagedTensor))
+def _dlpack_deleter(self_ptr):
+    addr = ctypes.addressof(self_ptr.contents)
+    if addr in _keepers:
+        del _keepers[addr]
+
+def mps_to_dlpack(tensor):
+    tensor = tensor.contiguous()
+    managed = _DLManagedTensor()
+    
+    managed.dl_tensor.device.device_type = 8
+    managed.dl_tensor.device.device_id = 0
+    managed.dl_tensor.data = tensor.data_ptr()
+    
+    ndim = tensor.dim()
+    managed.dl_tensor.ndim = ndim
+    
+    shape_arr = (ctypes.c_int64 * ndim)(*tensor.shape)
+    stride_arr = (ctypes.c_int64 * ndim)(*tensor.stride())
+    
+    managed.dl_tensor.shape = ctypes.cast(shape_arr, ctypes.POINTER(ctypes.c_int64))
+    managed.dl_tensor.strides = ctypes.cast(stride_arr, ctypes.POINTER(ctypes.c_int64))
+    
+    if tensor.dtype == th.float32:
+        managed.dl_tensor.dtype.code = 2
+        managed.dl_tensor.dtype.bits = 32
+    elif tensor.dtype == th.int64:
+        managed.dl_tensor.dtype.code = 0
+        managed.dl_tensor.dtype.bits = 64
+    elif tensor.dtype == th.int32:
+        managed.dl_tensor.dtype.code = 0
+        managed.dl_tensor.dtype.bits = 32
+    else:
+        raise TypeError(f"Unsupported dtype: {tensor.dtype}")
+        
+    managed.dl_tensor.dtype.lanes = 1
+    managed.dl_tensor.byte_offset = 0
+    managed.manager_ctx = None
+    managed.deleter = _dlpack_deleter
+    
+    heap_ptr = ctypes.pointer(managed)
+    _keepers[ctypes.addressof(heap_ptr.contents)] = (tensor, shape_arr, stride_arr, heap_ptr)
+    
+    capsule = _PyCapsule_New(heap_ptr, b"dltensor", None)
+    return capsule
+
 if version.parse(th.__version__) < version.parse("2.1.0"):
     raise RuntimeError("DGL requires PyTorch >= 2.1.0")
 
@@ -107,7 +197,7 @@ def device_type(ctx):
 def device_id(ctx):
     ctx = th.device(ctx)
     if ctx.index is None:
-        return 0 if ctx.type == "cpu" else th.cuda.current_device()
+        return 0 if ctx.type in ["cpu", "mps"] else th.cuda.current_device()
     else:
         return ctx.index
 
@@ -118,6 +208,8 @@ def to_backend_ctx(dglctx):
         return th.device("cpu")
     elif dev_type == 2:
         return th.device("cuda", dglctx.device_id)
+    elif dev_type == 8:
+        return th.device("mps", dglctx.device_id)
     else:
         raise ValueError("Unsupported DGL device context:", dglctx)
 
@@ -141,6 +233,8 @@ def copy_to(input, ctx, **kwargs):
         if ctx.index is not None:
             th.cuda.set_device(ctx.index)
         return input.cuda(**kwargs)
+    elif ctx.type == "mps":
+        return input.to("mps")
     else:
         raise RuntimeError("Invalid context", ctx)
 
@@ -432,7 +526,11 @@ def zerocopy_from_numpy(np_array):
 def zerocopy_to_dgl_ndarray(data):
     if data.dtype == th.bool:
         data = data.byte()
-    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
+    if data.device.type == "mps":
+        capsule = mps_to_dlpack(data)
+        return nd.from_dlpack(capsule)
+    else:
+        return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
 
 # NGC PyTorch containers are shipping alpha version PyTorch.

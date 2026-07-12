@@ -168,3 +168,10 @@ cscope.*
 
 # model file
 *.pth
+
+# DeepChem Playground (Local Mac MPS Development)
+deepchem.md
+hello_deepchem.ipynb
+hello_deepchem_executed.ipynb
+pr_message.md
+requirements.txt

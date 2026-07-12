@@ -32,6 +32,8 @@ inline std::string DeviceName(int type) {
       return "cpu";
     case kDGLCUDA:
       return "cuda";
+    case 8: // kDGLMetal (Apple Silicon MPS)
+      return "metal";
     // add more device here once supported
     default:
       LOG(FATAL) << "unknown type =" << type;

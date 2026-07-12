@@ -141,6 +141,7 @@ class DGLContext(ctypes.Structure):
         "sdaccel": 6,
         "vulkan": 7,
         "metal": 8,
+        "mps": 8,
         "vpi": 9,
         "rocm": 10,
         "opengl": 11,

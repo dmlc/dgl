@@ -2031,6 +2031,9 @@ def create_from_edges(
     -------
     DGLGraph
     """
+    if any(hasattr(a, "device") and a.device.type == "mps" for a in arrays):
+        arrays = tuple(a.cpu() if hasattr(a, "device") and a.device.type == "mps" else a for a in arrays)
+
     if utype == vtype:
         num_ntypes = 1
     else:

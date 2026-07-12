@@ -23,6 +23,66 @@ from ..._sparse_ops import (
 from ...base import ALL, is_all
 from ...heterograph_index import create_unitgraph_from_csr
 
+def _fallback_mps(func, *args, **kwargs):
+    has_mps = False
+    original_device = None
+
+    def find_device(obj):
+        nonlocal has_mps, original_device
+        if isinstance(obj, th.Tensor):
+            if obj.device.type == "mps":
+                has_mps = True
+                original_device = obj.device
+        elif isinstance(obj, (list, tuple)):
+            for x in obj:
+                find_device(x)
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                find_device(v)
+
+    find_device(args)
+    find_device(kwargs)
+    
+    if has_mps:
+        import dgl
+        from dgl._ffi.runtime_ctypes import DGLContext
+        def check_mps(obj):
+            if isinstance(obj, th.Tensor):
+                if obj.device.type == "mps":
+                    return obj.cpu()
+            elif isinstance(obj, list):
+                return [check_mps(x) for x in obj]
+            elif isinstance(obj, tuple):
+                return tuple(check_mps(x) for x in obj)
+            elif isinstance(obj, dict):
+                return {k: check_mps(v) for k, v in obj.items()}
+            elif hasattr(obj, "copy_to"):
+                try:
+                    return obj.copy_to(DGLContext(1, 0))
+                except:
+                    return obj
+            return obj
+
+        cpu_args = check_mps(args)
+        cpu_kwargs = check_mps(kwargs)
+        
+        res_cpu = func(*cpu_args, **cpu_kwargs)
+        
+        def move_to_device(obj, device):
+            if isinstance(obj, th.Tensor):
+                return obj.to(device)
+            elif isinstance(obj, list):
+                return [move_to_device(x, device) for x in obj]
+            elif isinstance(obj, tuple):
+                return tuple(move_to_device(x, device) for x in obj)
+            elif isinstance(obj, dict):
+                return {k: move_to_device(v, device) for k, v in obj.items()}
+            return obj
+            
+        return move_to_device(res_cpu, original_device)
+        
+    return None
+
 __all__ = [
     "gspmm",
     "gsddmm",
@@ -1021,6 +1081,9 @@ class GATHERMM(th.autograd.Function):
 
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
+    res = _fallback_mps(gspmm, gidx, op, reduce_op, lhs_data, rhs_data)
+    if res is not None:
+        return res
     if op == "sub":
         op = "add"
         rhs_data = -rhs_data
@@ -1033,6 +1096,9 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
 
 
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target="u", rhs_target="v"):
+    res = _fallback_mps(gsddmm, gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
+    if res is not None:
+        return res
     if op == "sub":
         op = "add"
         rhs_data = -rhs_data
@@ -1047,6 +1113,9 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target="u", rhs_target="v"):
 
 
 def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
+    res = _fallback_mps(gspmm_hetero, g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple)
+    if res is not None:
+        return res
     lhs_tuple, rhs_tuple = (
         lhs_and_rhs_tuple[:lhs_len],
         lhs_and_rhs_tuple[lhs_len:],
@@ -1080,6 +1149,9 @@ def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
 def gsddmm_hetero(
     g, op, lhs_len, lhs_target="u", rhs_target="v", *lhs_and_rhs_tuple
 ):
+    res = _fallback_mps(gsddmm_hetero, g, op, lhs_len, lhs_target, rhs_target, *lhs_and_rhs_tuple)
+    if res is not None:
+        return res
     lhs_tuple, rhs_tuple = (
         lhs_and_rhs_tuple[:lhs_len],
         lhs_and_rhs_tuple[lhs_len:],
@@ -1111,24 +1183,36 @@ def gsddmm_hetero(
 
 
 def edge_softmax(gidx, logits, eids=ALL, norm_by="dst"):
+    res = _fallback_mps(edge_softmax, gidx, logits, eids, norm_by)
+    if res is not None:
+        return res
     args = _cast_if_autocast_enabled(gidx, logits, eids, norm_by)
     with _disable_autocast_if_enabled():
         return EdgeSoftmax.apply(*args)
 
 
 def edge_softmax_hetero(gidx, eids=ALL, norm_by="dst", *logits):
+    res = _fallback_mps(edge_softmax_hetero, gidx, eids, norm_by, *logits)
+    if res is not None:
+        return res
     args = _cast_if_autocast_enabled(gidx, eids, norm_by, *logits)
     with _disable_autocast_if_enabled():
         return EdgeSoftmax_hetero.apply(*args)
 
 
 def segment_reduce(op, x, offsets):
+    res = _fallback_mps(segment_reduce, op, x, offsets)
+    if res is not None:
+        return res
     args = _cast_if_autocast_enabled(op, x, offsets)
     with _disable_autocast_if_enabled():
         return SegmentReduce.apply(*args)
 
 
 def scatter_add(x, idx, m):
+    res = _fallback_mps(scatter_add, x, idx, m)
+    if res is not None:
+        return res
     args = _cast_if_autocast_enabled(x, idx, m)
     with _disable_autocast_if_enabled():
         return ScatterAdd.apply(*args)
@@ -1171,7 +1255,7 @@ def csrmask(gidxA, A_weights, gidxB):
 
 
 def segment_mm(A, B, seglen_A):
-    if A.device.type == "cpu":
+    if A.device.type in ["cpu", "mps"]:
         C = []
         off = 0
         for i in range(B.shape[0]):
@@ -1185,7 +1269,7 @@ def segment_mm(A, B, seglen_A):
 
 
 def gather_mm(A, B, idx_A=None, idx_B=None):
-    if A.device.type == "cpu":
+    if A.device.type in ["cpu", "mps"]:
         A = A[idx_A] if idx_A is not None else A
         B = B[idx_B] if idx_B is not None else B
         return th.bmm(A.unsqueeze(1), B).squeeze(1)

@@ -6,13 +6,17 @@ mkdir -p build
 mkdir -p $BINDIR/tensoradapter/pytorch
 cd build
 
+CMAKE_FLAGS="-DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DTORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST -DUSE_CUDA=$USE_CUDA"
+
 if [ $(uname) = 'Darwin' ]; then
 	CPSOURCE=*.dylib
+	export CFLAGS="-Xclang -fopenmp -I/opt/homebrew/opt/libomp/include $CFLAGS"
+	export CXXFLAGS="-Xclang -fopenmp -I/opt/homebrew/opt/libomp/include $CXXFLAGS"
+	export LDFLAGS="-L/opt/homebrew/opt/libomp/lib -lomp $LDFLAGS"
+	CMAKE_FLAGS="$CMAKE_FLAGS -DOpenMP_ROOT=/opt/homebrew/opt/libomp -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 else
 	CPSOURCE=*.so
 fi
-
-CMAKE_FLAGS="-DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DTORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST -DUSE_CUDA=$USE_CUDA"
 
 if [ $# -eq 0 ]; then
 	$CMAKE_COMMAND $CMAKE_FLAGS ..

@@ -26,6 +26,14 @@ TA_EXPORTS void CPURawDelete(void* ptr) {
   c10::GetCPUAllocator()->raw_deallocate(ptr);
 }
 
+TA_EXPORTS void* MPSRawAlloc(size_t nbytes) {
+  return c10::GetAllocator(c10::DeviceType::MPS)->raw_allocate(nbytes);
+}
+
+TA_EXPORTS void MPSRawDelete(void* ptr) {
+  c10::GetAllocator(c10::DeviceType::MPS)->raw_deallocate(ptr);
+}
+
 #ifdef DGL_USE_CUDA
 TA_EXPORTS void* CUDARawAlloc(size_t nbytes, cudaStream_t stream) {
   at::globalContext().lazyInitDevice(at::kCUDA);
