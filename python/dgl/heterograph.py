@@ -37,6 +37,15 @@ from .view import (
 __all__ = ["DGLGraph", "combine_names"]
 
 
+def _compose_original_ids(parent_frames, subgraph_frames, id_key):
+    """Compose subgraph IDs with IDs already stored on the parent graph."""
+    for parent_frame, subgraph_frame in zip(parent_frames, subgraph_frames):
+        if id_key in parent_frame:
+            subgraph_frame[id_key] = F.gather_row(
+                parent_frame[id_key], subgraph_frame[id_key]
+            )
+
+
 class DGLGraph(object):
     """Class for storing graph structure and node/edge feature data.
 
@@ -645,7 +654,8 @@ class DGLGraph(object):
         store_ids : bool, optional
             If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
             and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
-            respectively.
+            respectively. If IDs were stored by an earlier removal, they will continue to
+            refer to the graph before the first removal.
 
         Notes
         -----
@@ -753,9 +763,12 @@ class DGLGraph(object):
                 batch_num_removed_edges, self.idtype
             )
 
+        parent_edge_frames = self._edge_frames
         sub_g = self.edge_subgraph(
             edges, relabel_nodes=False, store_ids=store_ids
         )
+        if store_ids:
+            _compose_original_ids(parent_edge_frames, sub_g._edge_frames, EID)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
@@ -779,7 +792,8 @@ class DGLGraph(object):
         store_ids : bool, optional
             If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
             and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
-            respectively.
+            respectively. If IDs were stored by an earlier removal, they will continue to
+            refer to the graph before the first removal.
 
         Notes
         -----
@@ -900,6 +914,8 @@ class DGLGraph(object):
 
         # node_subgraph
         # If batch_num_edges is to be updated, record the original edge IDs
+        parent_node_frames = self._node_frames
+        parent_edge_frames = self._edge_frames
         sub_g = self.subgraph(nodes, store_ids=store_ids or batched)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
@@ -938,6 +954,10 @@ class DGLGraph(object):
                 self._batch_num_edges[c_etype] = F.astype(
                     batch_num_left_edges, self.idtype
                 )
+
+        if store_ids:
+            _compose_original_ids(parent_node_frames, self._node_frames, NID)
+            _compose_original_ids(parent_edge_frames, self._edge_frames, EID)
 
         if batched and not store_ids:
             for c_ntype in self.ntypes:

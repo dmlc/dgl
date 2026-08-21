@@ -12,6 +12,23 @@ def create_graph(idtype, num_node):
     return g
 
 
+def create_heterograph(idtype):
+    return dgl.heterograph(
+        {
+            ("user", "plays", "game"): (
+                F.tensor([0, 1, 1, 2]),
+                F.tensor([0, 0, 1, 1]),
+            ),
+            ("developer", "develops", "game"): (
+                F.tensor([0, 1]),
+                F.tensor([0, 1]),
+            ),
+        },
+        idtype=idtype,
+        device=F.ctx(),
+    )
+
+
 @parametrize_idtype
 def test_node_removal(idtype):
     g = create_graph(idtype, 10)
@@ -191,6 +208,74 @@ def test_edge_frame(idtype):
     # remove edges
     g.remove_edges(range(3, 7))
     assert F.allclose(g.edata["h"], F.tensor(new_data))
+
+
+@parametrize_idtype
+def test_heterograph_node_removal_preserves_original_ids(idtype):
+    # Repeated removals must keep IDs relative to the graph before the first
+    # removal instead of replacing them with IDs from each intermediate graph.
+    g = create_heterograph(idtype)
+
+    g.remove_nodes([0], ntype="game", store_ids=True)
+    g.remove_nodes([0], ntype="developer", store_ids=True)
+    g.remove_nodes([0], ntype="user", store_ids=True)
+
+    assert F.array_equal(g.nodes["game"].data[dgl.NID], F.tensor([1], idtype))
+    assert F.array_equal(
+        g.nodes["developer"].data[dgl.NID], F.tensor([1], idtype)
+    )
+    assert F.array_equal(
+        g.nodes["user"].data[dgl.NID], F.tensor([1, 2], idtype)
+    )
+    assert F.array_equal(
+        g.edges["plays"].data[dgl.EID], F.tensor([2, 3], idtype)
+    )
+    assert F.array_equal(
+        g.edges["develops"].data[dgl.EID], F.tensor([1], idtype)
+    )
+
+
+@parametrize_idtype
+def test_heterograph_edge_removal_preserves_original_ids(idtype):
+    g = create_heterograph(idtype)
+
+    g.remove_edges([0, 1], etype="plays", store_ids=True)
+    g.remove_edges([0], etype="develops", store_ids=True)
+    g.remove_edges([0], etype="plays", store_ids=True)
+
+    assert F.array_equal(g.edges["plays"].data[dgl.EID], F.tensor([3], idtype))
+    assert F.array_equal(
+        g.edges["develops"].data[dgl.EID], F.tensor([1], idtype)
+    )
+
+
+@parametrize_idtype
+def test_batched_node_removal_preserves_original_ids(idtype):
+    g = dgl.batch([create_heterograph(idtype), create_heterograph(idtype)])
+
+    g.remove_nodes([0, 2], ntype="game", store_ids=True)
+    g.remove_nodes([0, 2], ntype="developer", store_ids=True)
+
+    assert F.array_equal(g.batch_num_nodes("game"), F.tensor([1, 1], idtype))
+    assert F.array_equal(
+        g.batch_num_nodes("developer"), F.tensor([1, 1], idtype)
+    )
+    assert F.array_equal(g.batch_num_edges("plays"), F.tensor([2, 2], idtype))
+    assert F.array_equal(
+        g.batch_num_edges("develops"), F.tensor([1, 1], idtype)
+    )
+    assert F.array_equal(
+        g.nodes["game"].data[dgl.NID], F.tensor([1, 3], idtype)
+    )
+    assert F.array_equal(
+        g.nodes["developer"].data[dgl.NID], F.tensor([1, 3], idtype)
+    )
+    assert F.array_equal(
+        g.edges["plays"].data[dgl.EID], F.tensor([2, 3, 6, 7], idtype)
+    )
+    assert F.array_equal(
+        g.edges["develops"].data[dgl.EID], F.tensor([1, 3], idtype)
+    )
 
 
 @parametrize_idtype
