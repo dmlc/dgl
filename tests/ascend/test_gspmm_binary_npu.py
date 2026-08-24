@@ -20,9 +20,12 @@ from dgl._sparse_ops import _gspmm
 
 try:
     import torch_npu  # noqa: F401
-    has_npu = True
-except ImportError:
+    has_npu = torch.npu.is_available()
+    if has_npu == False:
+        pytest.fail("❌ NPU UT 强制失败：NPU 驱动/硬件不可用")
+except (ImportError, AttributeError):
     has_npu = False
+    pytest.fail("❌ NPU UT 强制失败：torch_npu 未安装")
 
 
 def get_device():
