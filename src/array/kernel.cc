@@ -401,22 +401,12 @@ void SegmentReduceDispatch(
   });
 }
 
-/** @brief Scatter Add (on first dimension) dispatch function. */
+/** @brief Scatter Add (on first dimension) dispatch function.
+ *
+ * Native NPU kernel for Ascend; replaces former CPU fallback path.
+ */
 void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
-  if (feat->ctx.device_type == kDGLAscend) {
-    DGLContext cpu_ctx{kDGLCPU, 0};
-    NDArray feat_cpu = feat.CopyTo(cpu_ctx);
-    NDArray idx_cpu = idx.CopyTo(cpu_ctx);
-    NDArray out_cpu = out.CopyTo(cpu_ctx);
-    ATEN_ID_TYPE_SWITCH(idx_cpu->dtype, IdType, {
-      ATEN_FLOAT_TYPE_SWITCH_16BITS(feat_cpu->dtype, Dtype, kDGLCPU, "Feature data", {
-        ScatterAdd<kDGLCPU, IdType, Dtype>(feat_cpu, idx_cpu, out_cpu);
-      });
-    });
-    out_cpu.CopyTo(out);
-    return;
-  }
-  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "ScatterAdd", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(feat->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(feat->dtype, Dtype, XPU, "Feature data", {
         ScatterAdd<XPU, IdType, Dtype>(feat, idx, out);
