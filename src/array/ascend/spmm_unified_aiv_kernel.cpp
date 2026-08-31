@@ -32,6 +32,7 @@ public:
         uint32_t featureDim,
         uint32_t batchCount,
         uint32_t nonZeroCount,
+        uint32_t isCopyRhs,
         AscendC::TPipe *pipe)
     {
         KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
@@ -41,6 +42,7 @@ public:
         this->batchCount = batchCount;
         this->rowWidth = featureDim;
         this->nnz = nonZeroCount;
+        this->isCopyRhs = isCopyRhs;
 
         uint32_t blockIdx = AscendC::GetBlockIdx();
         uint32_t blockNum = AscendC::GetBlockNum();
@@ -160,10 +162,18 @@ private:
         AscendC::DataCopyExtParams copyParams = {1, this->rowBytes, 0, 0, 0};
         AscendC::DataCopyPadExtParams<DType> padParams = {true, 0, (uint8_t)(this->rowAlignedElements - this->rowWidth), DType(0.0f)};
         for (uint32_t i = 0; i < batchNnz; ++i) {
-            uint32_t neighborIndex = indicesGm.GetValue(batchStart + i);
-            uint32_t featureGmOffset = (neighborIndex * this->batchCount + batchIndex) * this->featureDim;
-            AscendC::DataCopyPad<DType>(featureBatch[i * this->rowAlignedElements],
-                                         featureGm[featureGmOffset], copyParams, padParams);
+            if (this->isCopyRhs) {
+                // copy_rhs (copy_e_sum): feature is edge feature, read sequentially
+                uint32_t featureGmOffset = ((batchStart + i) * this->batchCount + batchIndex) * this->featureDim;
+                AscendC::DataCopyPad<DType>(featureBatch[i * this->rowAlignedElements],
+                                             featureGm[featureGmOffset], copyParams, padParams);
+            } else {
+                // copy_lhs (copy_u_sum): feature is node feature, gather by indices
+                uint32_t neighborIndex = indicesGm.GetValue(batchStart + i);
+                uint32_t featureGmOffset = (neighborIndex * this->batchCount + batchIndex) * this->featureDim;
+                AscendC::DataCopyPad<DType>(featureBatch[i * this->rowAlignedElements],
+                                             featureGm[featureGmOffset], copyParams, padParams);
+            }
         }
         featureQueue.EnQue(featureBatch);
     }
@@ -179,6 +189,7 @@ private:
 
     uint32_t M, K, featureDim, batchCount, rowWidth, nnz;
     uint32_t batchSize;
+    uint32_t isCopyRhs = 0;
     uint32_t rowBytes, rowAlignedBytes, rowAlignedElements;
     uint32_t startRow, localRowCount;
     AscendC::TQue<AscendC::TPosition::VECOUT, BUFFER_NUM> accumQueue;
@@ -210,13 +221,15 @@ extern "C" __global__ __aicore__ void spmm_unified_aiv(
         SpmmUnifiedAivSum<float> processor;
         processor.Init(featureData, outputData, indptrData, indicesData,
                         vectorRowSplitData, tiling->numDstRows, tiling->numSrcRows,
-                        tiling->featureDim, tiling->batchCount, tiling->nonZeroCount, &pipe);
+                        tiling->featureDim, tiling->batchCount, tiling->nonZeroCount,
+                        tiling->isCopyRhs, &pipe);
         processor.Process();
     } else {
         SpmmUnifiedAivSum<half> processor;
         processor.Init(featureData, outputData, indptrData, indicesData,
                         vectorRowSplitData, tiling->numDstRows, tiling->numSrcRows,
-                        tiling->featureDim, tiling->batchCount, tiling->nonZeroCount, &pipe);
+                        tiling->featureDim, tiling->batchCount, tiling->nonZeroCount,
+                        tiling->isCopyRhs, &pipe);
         processor.Process();
     }
 }

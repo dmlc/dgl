@@ -170,8 +170,12 @@ CSRMatrix COOToCSRWithKernel(COOMatrix coo) {
         npu_sorted_data = NDArray::Empty({nnz}, coo.data->dtype, ctx);
         launch_gather(gather_stream, npu_sorted_data, coo.data, perm_npu);
       } else {
+        // Create identity [0,1,...,nnz-1] and gather by perm
+        // so npu_sorted_data[j] = perm[j] (original edge index for j-th sorted edge)
         IdArray cpu_data = aten::Range(0, nnz, coo.row->dtype.bits, cpu_ctx);
-        npu_sorted_data = cpu_data.CopyTo(ctx);
+        NDArray npu_identity = cpu_data.CopyTo(ctx);
+        npu_sorted_data = NDArray::Empty({nnz}, coo.row->dtype, ctx);
+        launch_gather(gather_stream, npu_sorted_data, npu_identity, perm_npu);
       }
       ASCEND_CALL(aclrtDestroyStream(gather_stream));
     }

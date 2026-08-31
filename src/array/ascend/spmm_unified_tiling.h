@@ -110,4 +110,5 @@ struct SpmmUnifiedAivTilingData {
     uint32_t nonZeroCount;
     uint32_t batchCount;
     uint32_t dtype;
+    uint32_t isCopyRhs;  // 0=copy_lhs (gather feature[indices[e]]), 1=copy_rhs (sequential read feature[e])
 };

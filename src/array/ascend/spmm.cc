@@ -1,5 +1,6 @@
 #include <dgl/array.h>
 #include <dgl/aten/csr.h>
+#include <dgl/aten/array_ops.h>
 #include <dgl/runtime/device_api.h>
 #include "../kernel_decl.h"
 #include <vector>
@@ -66,6 +67,7 @@ struct SpmmUnifiedAivTilingData {
     uint32_t nonZeroCount;
     uint32_t batchCount;
     uint32_t dtype;  // 0=FP32, 1=FP16
+    uint32_t isCopyRhs;  // 0=copy_lhs (gather), 1=copy_rhs (sequential read)
 };
 struct SpmmUnifiedMaxMinTilingData {
     uint32_t numDstRows;
@@ -319,7 +321,8 @@ void SpMMCsrAscend(
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
 
-  // Validate operation
+  // Validate operation — copy_rhs is handled by the caller (SpMMCsrUnified
+  // via GatherByIndex), so SpMMCsrAscend only sees copy_lhs after pre-gather.
   if (op != "copy_lhs" || (reduce != "sum" && reduce != "max" && reduce != "min")) {
     LOG(FATAL) << "SpMMCsrAscend only supports copy_lhs+sum/max/min operation. "
                << "Got: op=" << op << ", reduce=" << reduce;
@@ -683,6 +686,43 @@ static CSRMatrix CastCSRToInt32SpMM(const CSRMatrix& csr) {
                     data32, csr.sorted);
 }
 
+// Helper: gather NDArray by index, supporting multi-dimensional tensors
+// For multi-dim tensors, copies to CPU, gathers, copies back (small overhead
+// compared to the NPU kernel itself for typical graph sizes)
+static NDArray GatherByIndex(NDArray src, NDArray index) {
+  if (IsNullArray(index)) return src;
+  if (src->ndim <= 1) return IndexSelect(src, index);
+
+  // Multi-dim gather on CPU (dtype-agnostic: use byte-level memcpy)
+  DGLContext cpu_ctx{kDGLCPU, 0};
+  NDArray src_cpu = src.CopyTo(cpu_ctx);
+  NDArray idx_cpu = index.CopyTo(cpu_ctx);
+
+  const int32_t* idx_ptr = idx_cpu.Ptr<int32_t>();
+  int64_t nnz = index->shape[0];
+  int64_t feat_dim = 1;
+  for (int i = 1; i < src->ndim; ++i) feat_dim *= src->shape[i];
+  int64_t dtype_bytes = src->dtype.bits / 8;
+
+  // Create output on CPU
+  std::vector<int64_t> out_shape(src->ndim);
+  out_shape[0] = nnz;
+  for (int i = 1; i < src->ndim; ++i) out_shape[i] = src->shape[i];
+  NDArray out_cpu = NDArray::Empty(out_shape, src->dtype, cpu_ctx);
+
+  const char* src_bytes = static_cast<const char*>(src_cpu->data);
+  char* out_bytes = static_cast<char*>(out_cpu->data);
+  int64_t row_bytes = feat_dim * dtype_bytes;
+  for (int64_t i = 0; i < nnz; ++i) {
+    int32_t eid = idx_ptr[i];
+    std::memcpy(out_bytes + i * row_bytes, src_bytes + eid * row_bytes,
+                row_bytes);
+  }
+
+  // Copy back to NPU
+  return out_cpu.CopyTo(src->ctx);
+}
+
 // ============================================================================
 // SpMMCsrUnified — unified NPU kernel for FP32 and FP16
 // Uses spmm_unified_aiv (sum) / spmm_unified_max / spmm_unified_min
@@ -712,8 +752,9 @@ static void SpMMCsrUnified(
     const std::string& op, const std::string& reduce,
     const CSRMatrix& csr, NDArray ufeat, NDArray out,
     std::vector<NDArray> out_aux) {
-  if (op != "copy_lhs" || (reduce != "sum" && reduce != "max" && reduce != "min")) {
-    LOG(FATAL) << "SpMMCsrUnified only supports copy_lhs+sum/max/min";
+  if (!((op == "copy_lhs" || op == "copy_rhs") &&
+        (reduce == "sum" || reduce == "max" || reduce == "min"))) {
+    LOG(FATAL) << "SpMMCsrUnified only supports copy_lhs/copy_rhs + sum/max/min";
   }
 
   DGLContext ctx = out->ctx;
@@ -773,6 +814,7 @@ static void SpMMCsrUnified(
   tiling.nonZeroCount = static_cast<uint32_t>(nnz);
   tiling.batchCount = static_cast<uint32_t>(batch_count);
   tiling.dtype = (sizeof(DType) == 4) ? 0 : 1;  // 0=FP32, 1=FP16
+  tiling.isCopyRhs = (op == "copy_rhs") ? 1 : 0;
 
   void* tiling_dev = nullptr;
   ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling), ACL_MEM_MALLOC_HUGE_FIRST));
@@ -818,8 +860,18 @@ void SpMMCsr<kDGLAscend, int32_t, float>(
     const std::string& op, const std::string& reduce, const BcastOff& bcast,
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
-  if (op == "copy_lhs" && (reduce == "sum" || reduce == "max" || reduce == "min") && ufeat->ndim <= 3) {
-    SpMMCsrUnified<int32_t, float>(op, reduce, csr, ufeat, out, out_aux);
+  if ((op == "copy_lhs" || op == "copy_rhs") &&
+      (reduce == "sum" || reduce == "max" || reduce == "min") &&
+      (op == "copy_lhs" ? ufeat->ndim : efeat->ndim) <= 3) {
+    NDArray feat;
+    if (op == "copy_rhs") {
+      // InCSR's data array contains edge reorder index from COOToCSR.
+      // Use it to gather efeat into CSC row order: feat[j] = efeat[data[j]]
+      feat = IsNullArray(csr.data) ? efeat : GatherByIndex(efeat, csr.data);
+    } else {
+      feat = ufeat;
+    }
+    SpMMCsrUnified<int32_t, float>(op, reduce, csr, feat, out, out_aux);
   } else {
     // CPU fallback for non-copy_lhs ops or multi-dim features
     DGLContext cpu_ctx{kDGLCPU, 0};
@@ -844,6 +896,14 @@ void SpMMCsr<kDGLAscend, int32_t, uint16_t>(
     const std::string& op, const std::string& reduce, const BcastOff& bcast,
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
+  // FP16 copy_rhs: not supported on NPU (SpMMCsrAscend only does copy_lhs,
+  // SpMMCsrUnified only supports float). Falls back to CPU for correctness.
+  // CPU uint16_t SpMMCsr is not instantiated, so LOG(FATAL) for now.
+  // FP32 copy_rhs is fully supported via SpMMCsrUnified.
+  if (op == "copy_rhs") {
+    LOG(FATAL) << "FP16 copy_rhs not supported on Ascend NPU. "
+               << "Use FP32 for copy_e_sum operations.";
+  }
   SpMMCsrAscend<int32_t, uint16_t>(op, reduce, bcast, csr, ufeat, efeat, out, out_aux);
 }
 
@@ -853,6 +913,10 @@ void SpMMCsr<kDGLAscend, int64_t, uint16_t>(
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
   CSRMatrix csr32 = CastCSRToInt32SpMM(csr);
+  if (op == "copy_rhs") {
+    LOG(FATAL) << "FP16 copy_rhs not supported on Ascend NPU. "
+               << "Use FP32 for copy_e_sum operations.";
+  }
   SpMMCsrAscend<int32_t, uint16_t>(op, reduce, bcast, csr32, ufeat, efeat, out, out_aux);
 }
 
@@ -862,8 +926,16 @@ void SpMMCsr<kDGLAscend, int64_t, float>(
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
   CSRMatrix csr32 = CastCSRToInt32SpMM(csr);
-  if (op == "copy_lhs" && (reduce == "sum" || reduce == "max" || reduce == "min") && ufeat->ndim <= 3) {
-    SpMMCsrUnified<int32_t, float>(op, reduce, csr32, ufeat, out, out_aux);
+  if ((op == "copy_lhs" || op == "copy_rhs") &&
+      (reduce == "sum" || reduce == "max" || reduce == "min") &&
+      (op == "copy_lhs" ? ufeat->ndim : efeat->ndim) <= 3) {
+    NDArray feat;
+    if (op == "copy_rhs") {
+      feat = IsNullArray(csr32.data) ? efeat : GatherByIndex(efeat, csr32.data);
+    } else {
+      feat = ufeat;
+    }
+    SpMMCsrUnified<int32_t, float>(op, reduce, csr32, feat, out, out_aux);
   } else {
     DGLContext cpu_ctx{kDGLCPU, 0};
     CSRMatrix csr32_cpu = csr32.CopyTo(cpu_ctx);
