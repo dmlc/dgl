@@ -152,14 +152,22 @@ class SAGEConv(nn.Module):
         ----
         The linear weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
         The LSTM module is using xavier initialization method for its weights.
+        Biases are initialized to be zero, matching :func:`torch.nn.Linear`'s
+        own default and the other DGL conv layers.
         """
         gain = nn.init.calculate_gain("relu")
         if self._aggre_type == "pool":
             nn.init.xavier_uniform_(self.fc_pool.weight, gain=gain)
+            if self.fc_pool.bias is not None:
+                nn.init.zeros_(self.fc_pool.bias)
         if self._aggre_type == "lstm":
             self.lstm.reset_parameters()
         if self._aggre_type != "gcn":
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
+            if self.fc_self.bias is not None:
+                nn.init.zeros_(self.fc_self.bias)
+        elif self.bias is not None:
+            nn.init.zeros_(self.bias)
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
 
     def _lstm_reducer(self, nodes):
