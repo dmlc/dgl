@@ -810,6 +810,23 @@ def test_sage_conv(idtype, g, aggre_type):
     h = sage(g, feat)
     assert h.shape[-1] == 10
 
+    # test reset_parameters: bias terms should be reinitialized to zero,
+    # matching the other DGL conv layers (e.g. GraphConv), not left at
+    # whatever value training moved them to.
+    biases = []
+    if aggre_type == "pool":
+        biases.append(sage.fc_pool.bias)
+    if aggre_type != "gcn":
+        biases.append(sage.fc_self.bias)
+    else:
+        biases.append(sage.bias)
+    with th.no_grad():
+        for bias in biases:
+            bias.add_(1.0)
+    sage.reset_parameters()
+    for bias in biases:
+        assert F.allclose(bias, th.zeros_like(bias))
+
 
 @parametrize_idtype
 @pytest.mark.parametrize("g", get_cases(["bipartite"]))
