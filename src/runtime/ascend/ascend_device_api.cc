@@ -120,7 +120,7 @@ class AscendDeviceAPI final : public DeviceAPI {
       DGLDataType type_hint) final {
 #ifdef DGL_USE_ASCEND
     SetDevice(ctx);
-    // Ascend 910B3: avoid stale L2 cache line by offsetting data ptr +64.
+    // Ascend 910B/910_93 (DAV_2201): avoid stale L2 cache line by offsetting data ptr +64.
     void* base = nullptr;
     ASCEND_CALL(aclrtMalloc(&base, nbytes + 64, ACL_MEM_MALLOC_NORMAL_ONLY));
     // Only zero the first 64 bytes (sacrificial cache line), not the whole buffer.

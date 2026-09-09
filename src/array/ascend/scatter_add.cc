@@ -57,14 +57,17 @@ namespace aten {
 #ifdef DGL_USE_ASCEND
 namespace {
 
-// blockDim = min(N, 40), consistent with segment_reduce.cc:75-76.
+// blockDim = min(N, vectorCoreCount), runtime query for A2/A3 compatibility.
 template <typename IdType, typename DType>
 void LaunchScatterAddKernel(
-    int64_t num_items, int64_t num_segments, int64_t feat_dim,
+    int device_id, int64_t num_items, int64_t num_segments, int64_t feat_dim,
     const void* feat_ptr, const void* idx_ptr, void* out_ptr,
     aclrtStream stream) {
+  int64_t coreNum = 0;
+  aclrtGetDeviceInfo(device_id, ACL_DEV_ATTR_VECTOR_CORE_NUM, &coreNum);
+  if (coreNum <= 0) coreNum = 48;
   uint32_t block_dim = static_cast<uint32_t>(
-      num_items > 0 ? std::min<int64_t>(num_items, 40) : 1);
+      num_items > 0 ? std::min<int64_t>(num_items, coreNum) : 1);
 
   ScatterAddTilingData tiling = {
       static_cast<uint32_t>(num_items),
@@ -112,7 +115,7 @@ void ScatterAddAscendImpl(NDArray feat, NDArray idx, NDArray out) {
   aclrtStream stream = nullptr;
 
   LaunchScatterAddKernel<IdType, DType>(
-      num_items, num_segments, feat_dim, feat->data, idx->data, out->data,
+      ctx.device_id, num_items, num_segments, feat_dim, feat->data, idx->data, out->data,
       stream);
 }
 
