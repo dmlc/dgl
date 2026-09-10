@@ -120,12 +120,17 @@ class AscendDeviceAPI final : public DeviceAPI {
       DGLDataType type_hint) final {
 #ifdef DGL_USE_ASCEND
     SetDevice(ctx);
-    // Ascend 910B/910_93 (DAV_2201): avoid stale L2 cache line by offsetting data ptr +64.
+    // Ascend 910B/910_93 (DAV_2201): offset data ptr by 512 bytes to avoid
+    // stale L2 cache line while keeping 512-byte alignment. The MTE (memory
+    // transfer engine) on DAV_2201 requires 512-byte aligned addresses; a
+    // smaller offset (e.g. +64) would break that alignment and cause
+    // intermittent AI Core errors on A3.
+    constexpr size_t kAlignmentOffset = 512;
     void* base = nullptr;
-    ASCEND_CALL(aclrtMalloc(&base, nbytes + 64, ACL_MEM_MALLOC_NORMAL_ONLY));
-    // Only zero the first 64 bytes (sacrificial cache line), not the whole buffer.
-    ASCEND_CALL(aclrtMemset(base, 64, 0, 64));
-    void* ret = static_cast<char*>(base) + 64;
+    ASCEND_CALL(aclrtMalloc(&base, nbytes + kAlignmentOffset, ACL_MEM_MALLOC_NORMAL_ONLY));
+    // Only zero the sacrificial cache lines, not the whole buffer.
+    ASCEND_CALL(aclrtMemset(base, kAlignmentOffset, 0, kAlignmentOffset));
+    void* ret = static_cast<char*>(base) + kAlignmentOffset;
     return ret;
 #else
     LOG(FATAL) << "Ascend runtime is not enabled.";
@@ -136,8 +141,8 @@ class AscendDeviceAPI final : public DeviceAPI {
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
 #ifdef DGL_USE_ASCEND
     SetDevice(ctx);
-    // AllocDataSpace returns ptr+64; recover the base pointer for free.
-    ASCEND_CALL(aclrtFree(static_cast<char*>(ptr) - 64));
+    // AllocDataSpace returns ptr+512; recover the base pointer for free.
+    ASCEND_CALL(aclrtFree(static_cast<char*>(ptr) - 512));
 #else
     LOG(FATAL) << "Ascend runtime is not enabled.";
 #endif
