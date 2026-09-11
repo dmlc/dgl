@@ -106,7 +106,16 @@ void GatherMM(
       << "gather_mm operator expects a 3D tensor for the second input.";
   CHECK(A->ctx == B->ctx)
       << "gather_mm expects all arguments to be on the same device.";
-  if (aten::IsNullArray(idx_a)) {
+  if (aten::IsNullArray(idx_a) && aten::IsNullArray(idx_b)) {
+    // Both None: C[r] = A[r] @ B[r] (math definition: idx None -> arange(m)).
+    // Requires A.shape[0] == B.shape[0] (m == R) when m > 0; for m == 0 the
+    // output is empty ([0, n]) regardless of R, so no constraint is needed.
+    if (A->shape[0] > 0) {
+      CHECK_EQ(A->shape[0], B->shape[0])
+          << "gather_mm expects A.shape[0] == B.shape[0] when both idx_a and "
+             "idx_b are None and m > 0.";
+    }
+  } else if (aten::IsNullArray(idx_a)) {
     CHECK_EQ(A->shape[0], idx_b->shape[0])
         << "gather_mm expects len(idx_b) == A.shape[0] when idx_a is None.";
     CHECK(A->ctx == idx_b->ctx)
@@ -123,8 +132,14 @@ void GatherMM(
     CHECK(A->ctx == idx_a->ctx && A->ctx == idx_b->ctx)
         << "gather_mm expects all arguments to be on the same device.";
   }
-  const auto idtype = aten::IsNullArray(idx_a) ? idx_b->dtype : idx_a->dtype;
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
+  // idtype: prefer idx_a, then idx_b; both None -> default int32 (host generates
+  // arange internally, IdType is not read).
+  const auto idtype = aten::IsNullArray(idx_a)
+                          ? (aten::IsNullArray(idx_b)
+                                 ? DGLDataType{kDGLInt, 32, 1}
+                                 : idx_b->dtype)
+                          : idx_a->dtype;
+  ATEN_XPU_SWITCH_CUDA_ASCEND(A->ctx.device_type, XPU, "GatherMM", {
     ATEN_ID_TYPE_SWITCH(idtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(A->dtype, Dtype, XPU, "Feature data", {
         GatherMM<XPU, IdType, Dtype>(A, B, C, idx_a, idx_b);
@@ -164,8 +179,12 @@ void GatherMMScatter(
     CHECK(A->ctx == idx_a->ctx && A->ctx == idx_b->ctx)
         << "gather_mm_scatter expects all arguments to be on the same device.";
   }
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
-    ATEN_ID_TYPE_SWITCH(idx_c->dtype, IdType, {
+  // idx_c may be Null; derive IdType from a non-Null idx to avoid dereference crash.
+  const auto idtype_scatter = !aten::IsNullArray(idx_c)
+      ? idx_c->dtype
+      : (!aten::IsNullArray(idx_a) ? idx_a->dtype : idx_b->dtype);
+  ATEN_XPU_SWITCH_CUDA_ASCEND(A->ctx.device_type, XPU, "GatherMMScatter", {
+    ATEN_ID_TYPE_SWITCH(idtype_scatter, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(A->dtype, Dtype, XPU, "Feature data", {
         GatherMMScatter<XPU, IdType, Dtype>(A, B, C, idx_a, idx_b, idx_c);
       });
