@@ -6,8 +6,10 @@
 // 对应 DESIGN.md §1.5 Buffer 规划 + §2.1 多核切分策略。
 //
 // 多核切分（DESIGN.md §2.1）：
-//   - sum 路径: AIC+AIV, blockDim=20 (cubeCoreCount), VectorCore=40
-//   - max/min 路径: AIV_ONLY, blockDim=40 (vectorCoreCount)
+//   - sum 路径: AIC+AIV, blockDim=cubeCoreCount (runtime query), VectorCore=2x
+//   - max/min 路径: AIV_ONLY, blockDim=vectorCoreCount (runtime query)
+//   - 核数通过 aclrtGetDeviceInfo(ACL_DEV_ATTR_*_CORE_NUM) 运行时获取，
+//     不硬编码，兼容 A2 (20/40) 和 A3 (24/48) 等不同子型号。
 // ============================================================================
 
 #pragma once
@@ -42,10 +44,8 @@ static constexpr uint32_t REDUCE_SUM = 0;
 static constexpr uint32_t REDUCE_MAX = 1;
 static constexpr uint32_t REDUCE_MIN = 2;
 static constexpr uint32_t HALF_SIZE = 2;
-static constexpr uint32_t CUBE_CORE_COUNT = 20;
-static constexpr uint32_t VECTOR_CORE_COUNT = 40;
 
-// 数据类型标识
+// 核数通过运行时 aclrtGetDeviceInfo 动态获取，不在此处硬编码。
 
 // reduce 操作标识
 
@@ -69,7 +69,7 @@ inline uint32_t GetC0Size(uint32_t dtype)
 // ============================================================================
 // Tiling 数据结构 - sum 路径 (向核函数传递的运行时参数)
 // ============================================================================
-// sum 路径使用 AIC+AIV 模式, blockDim=20
+// sum 路径使用 AIC+AIV 模式, blockDim=runtime cubeCoreCount
 // 参数通过 aclrtlaunch_spmm_unified_sum 传递
 // ============================================================================
 struct SpmmUnifiedSumTilingData {
@@ -88,7 +88,7 @@ struct SpmmUnifiedSumTilingData {
 // ============================================================================
 // Tiling 数据结构 - max/min 路径
 // ============================================================================
-// max/min 路径使用 AIV_ONLY 模式, blockDim=40
+// max/min 路径使用 AIV_ONLY 模式, blockDim=runtime vectorCoreCount
 // 参数通过 aclrtlaunch_spmm_unified_max / aclrtlaunch_spmm_unified_min 传递
 // ============================================================================
 struct SpmmUnifiedMaxMinTilingData {

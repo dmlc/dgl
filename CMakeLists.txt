@@ -218,12 +218,15 @@ if(USE_ASCEND)
       message(STATUS "Using ASCEND_CANN_PACKAGE_PATH: ${ASCEND_CANN_PACKAGE_PATH}")
 
       # Set SOC_VERSION for AscendC kernel compilation
-      # Can be set via CMake -DSOC_VERSION or environment variable
+      # Can be set via CMake -DSOC_VERSION or environment variable SOC_VERSION
+      # All A2/A3 sub-models share DAV_2201 architecture (BUILD_MODE=c220).
+      # Default: ascend910b4 (A2). Binary compiled with this SOC also runs on A3.
+      # The build script auto-detects from hardware via npu-smi.
       if(NOT DEFINED SOC_VERSION)
         if(DEFINED ENV{SOC_VERSION})
           set(SOC_VERSION $ENV{SOC_VERSION} CACHE STRING "Ascend SoC version")
         else()
-          set(SOC_VERSION "Ascend910B4" CACHE STRING "Ascend SoC version (e.g., Ascend910B, Ascend910B4)")
+          set(SOC_VERSION "ascend910b4" CACHE STRING "Ascend SoC version (e.g., ascend910b4 for A2, ascend910_9382 for A3)")
         endif()
       endif()
       message(STATUS "Using SOC_VERSION: ${SOC_VERSION}")
@@ -642,12 +645,15 @@ if(BUILD_CPP_TEST)
                   OUTPUT_VARIABLE TORCH_NPU_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND python3 -c "import torch; import os; print(f'{os.path.dirname(torch.__file__)}/lib')"
                   OUTPUT_VARIABLE TORCH_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND python3 -c "import torch, os; print(os.path.normpath(os.path.join(os.path.dirname(torch.__file__), '..', 'torch.libs')))"
+                  OUTPUT_VARIABLE TORCH_LIBS_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR})
+  link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR} ${TORCH_LIBS_DIR})
 
   set_target_properties(runUnitTests PROPERTIES
     BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR}"
+    INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR};${TORCH_LIBS_DIR}"
+    LINK_FLAGS "-Wl,-rpath-link,${TORCH_LIBS_DIR}"
   )
   target_link_libraries(runUnitTests PRIVATE gtest gtest_main 
     ${Python3_LIBRARIES}

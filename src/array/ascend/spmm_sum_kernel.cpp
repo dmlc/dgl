@@ -217,7 +217,7 @@ private:
         fixpipeParams.dstNdStride = 0;
         fixpipeParams.reluEn = false;
         fixpipeParams.quantPre = QuantMode_t::F322F16;
-        AscendC::Fixpipe(outputGm[baseRow * this->N + outputColStart], outputChunkTensor, fixpipeParams);
+        AscendC::Fixpipe<half, float, AscendC::CFG_ROW_MAJOR>(outputGm[baseRow * this->N + outputColStart], outputChunkTensor, fixpipeParams);
     }
 
     __aicore__ inline uint32_t CeilCubeBlock(uint32_t len)
