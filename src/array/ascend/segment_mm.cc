@@ -40,6 +40,12 @@ extern "C" uint32_t aclrtlaunch_segment_mm_backward_b(
     uint32_t mGrid, uint32_t nGrid,
     uint32_t nTile, uint32_t kTile);
 
+namespace dgl {
+namespace runtime {
+aclrtStream getCurrentAscendStream();
+}  // namespace runtime
+}  // namespace dgl
+
 // Tiling for a single etype's GEMM [m, k, n]. Computes a 2D (M, N) core grid
 // with mGrid*nGrid <= cubeCoreCount, and per-tile sizes (16/8 aligned) capped
 // to safe L0A/L0B/L0C capacities.
@@ -102,7 +108,7 @@ static void SegmentMMAscend(
     n = B->shape[1];
   }
 
-  aclrtStream stream = nullptr;
+  aclrtStream stream = dgl::runtime::getCurrentAscendStream();
 
   int64_t a_offset = 0;   // element offset into A (rows accumulate)
   int64_t b_offset = 0;   // element offset into B (per etype B[r])
@@ -118,7 +124,10 @@ static void SegmentMMAscend(
       // zeroed explicitly (callers pass torch.empty outputs).
       size_t c_bytes = static_cast<size_t>(m) * nu * sizeof(DType);
       if (c_bytes > 0) {
-        ASCEND_CALL(aclrtMemset(C_data + c_offset, c_bytes, 0, c_bytes));
+        // DMA-engine async clear on the current stream (review: sync
+        // aclrtMemset blocks the host thread).
+        ASCEND_CALL(aclrtMemsetAsync(
+            C_data + c_offset, c_bytes, 0, c_bytes, stream));
       }
       a_offset += static_cast<int64_t>(seglen[etype]) * k;
       b_offset += static_cast<int64_t>(k) * n;
@@ -142,12 +151,15 @@ static void SegmentMMAscend(
       LOG(FATAL) << "segment_mm kernel launch failed (etype=" << etype
                  << ") with error code: " << err;
     }
-    ASCEND_CALL(aclrtSynchronizeStream(stream));
 
     a_offset += static_cast<int64_t>(seglen[etype]) * k;
     b_offset += static_cast<int64_t>(k) * n;
     c_offset += static_cast<int64_t>(seglen[etype]) * n;
   }
+
+  // All etype launches/memsets are ordered on the same stream, so a single
+  // sync at the end is sufficient (and lets successive etype GEMMs pipeline).
+  ASCEND_CALL(aclrtSynchronizeStream(stream));
 }
 
 template <typename IdType, typename DType>
@@ -166,7 +178,7 @@ static void SegmentMMBackwardBAscend(
   int64_t n = A->shape[1];   // dB rows
   int64_t m = dC->shape[1];  // dB cols
 
-  aclrtStream stream = nullptr;
+  aclrtStream stream = dgl::runtime::getCurrentAscendStream();
 
   int64_t a_offset = 0;
   int64_t dC_offset = 0;
@@ -182,7 +194,10 @@ static void SegmentMMBackwardBAscend(
       // zeroed explicitly (callers pass torch.empty outputs).
       size_t db_bytes = static_cast<size_t>(nu) * mu * sizeof(DType);
       if (db_bytes > 0) {
-        ASCEND_CALL(aclrtMemset(dB_data + dB_offset, db_bytes, 0, db_bytes));
+        // DMA-engine async clear on the current stream (review: sync
+        // aclrtMemset blocks the host thread).
+        ASCEND_CALL(aclrtMemsetAsync(
+            dB_data + dB_offset, db_bytes, 0, db_bytes, stream));
       }
       a_offset += static_cast<int64_t>(n) * seglen_data[etype];
       dC_offset += static_cast<int64_t>(m) * seglen_data[etype];
@@ -206,12 +221,15 @@ static void SegmentMMBackwardBAscend(
       LOG(FATAL) << "segment_mm_backward_b kernel launch failed (etype=" << etype
                  << ") with error code: " << err;
     }
-    ASCEND_CALL(aclrtSynchronizeStream(stream));
 
     a_offset += static_cast<int64_t>(n) * seglen_data[etype];
     dC_offset += static_cast<int64_t>(m) * seglen_data[etype];
     dB_offset += static_cast<int64_t>(n) * m;
   }
+
+  // All etype launches/memsets are ordered on the same stream, so a single
+  // sync at the end is sufficient (and lets successive etype GEMMs pipeline).
+  ASCEND_CALL(aclrtSynchronizeStream(stream));
 }
 
 #endif  // DGL_USE_ASCEND
