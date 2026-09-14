@@ -17,6 +17,14 @@
  * copy_lhs same-(src,dst)-ntype de-duplication, and launches one kernel per
  * relation.
  */
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+// Include torch_npu stream headers FIRST: c10 redefines LOG/CHECK macros;
+// dmlc's definitions below must win so LOG(FATAL) throws (catchable) instead
+// of aborting the process.
+#include <torch_npu/csrc/core/npu/NPUStream.h>
+#include <torch_npu/csrc/core/npu/NPUFunctions.h>
+#endif
+
 #include <dgl/array.h>
 #include "../kernel_decl.h"
 
@@ -48,6 +56,41 @@ struct HeteroGradTilingData {
 extern "C" uint32_t aclrtlaunch_kernel_update_grad_minmax_hetero(
     uint32_t blockDim, aclrtStream stream, void* feat, void* idx,
     void* idx_etype, void* out, void* tiling_ptr);
+
+namespace dgl {
+namespace runtime {
+aclrtStream getCurrentAscendStream();
+}  // namespace runtime
+}  // namespace dgl
+
+namespace {
+
+// Resolve the stream to launch on. torch_npu executes eager ops on its own
+// NPU stream, so DGL must use the same stream for cross-framework ordering
+// (review: stream-granularity sync instead of aclrtSynchronizeDevice).
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+inline aclrtStream ResolveStream(int64_t device_id) {
+  return c10_npu::getCurrentNPUStream(
+             static_cast<c10::DeviceIndex>(device_id)).stream();
+}
+// torch_npu runs on its own ACL context; aclrtSynchronizeStream from DGL's
+// default context does not reliably wait on torch streams, so use torch's
+// own wrapper (stream-granularity, review: not device-wide sync).
+inline void SyncStream(int64_t device_id) {
+  c10_npu::stream_synchronize(ResolveStream(device_id));
+}
+#else
+inline aclrtStream ResolveStream(int64_t) {
+  return dgl::runtime::getCurrentAscendStream();
+}
+inline void SyncStream(int64_t) {
+  aclrtStream s = dgl::runtime::getCurrentAscendStream();
+  aclError e = aclrtSynchronizeStream(s);
+  CHECK(e == ACL_SUCCESS) << "Ascend Error, code: " << e;
+}
+#endif
+
+}  // namespace
 #endif  // DGL_USE_ASCEND
 
 namespace dgl {
@@ -104,10 +147,12 @@ void UpdateGradMinMaxHeteroAscendImpl(
   }
 
   DGLContext ctx = feat.front()->ctx;
-  ASCEND_CALL(aclrtSynchronizeDevice());
   ASCEND_CALL(aclrtSetDevice(ctx.device_id));
 
-  aclrtStream stream = nullptr;
+  // Stream-granularity sync (review: aclrtSynchronizeDevice waits on all
+  // streams device-wide, blocking far more than needed).
+  aclrtStream stream = ResolveStream(ctx.device_id);
+  SyncStream(ctx.device_id);
 
   std::vector<std::vector<dgl_id_t>> src_dst_ntypes(
       graph->NumVertexTypes(), std::vector<dgl_id_t>());
@@ -163,11 +208,12 @@ void UpdateGradMinMax_hetero<kDGLAscend, int64_t, float>(
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out) {
 #ifdef DGL_USE_ASCEND
   // int64 idx + idx_etype -> int32 conversion.
-  // Synchronize the device before D2H CopyTo to avoid stream race.
+  // Stream-granularity sync before D2H CopyTo to avoid stream race
+  // (review: aclrtSynchronizeDevice waits on all streams device-wide).
   DGLContext ctx = feat.front()->ctx;
   DGLContext cpu_ctx{kDGLCPU, 0};
-  ASCEND_CALL(aclrtSynchronizeDevice());
   ASCEND_CALL(aclrtSetDevice(ctx.device_id));
+  SyncStream(ctx.device_id);
   std::vector<NDArray> idx_i32, idx_etype_i32;
   idx_i32.reserve(idx.size());
   idx_etype_i32.reserve(idx_etype.size());

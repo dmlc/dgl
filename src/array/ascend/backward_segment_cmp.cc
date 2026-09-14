@@ -11,6 +11,14 @@
  *   - dtype coverage: int32/int64 x float32 supported; half/double
  *     LOG(FATAL) placeholders.
  */
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+// Include torch_npu stream headers FIRST: c10 redefines LOG/CHECK macros;
+// dmlc's definitions below must win so LOG(FATAL) throws (catchable) instead
+// of aborting the process.
+#include <torch_npu/csrc/core/npu/NPUStream.h>
+#include <torch_npu/csrc/core/npu/NPUFunctions.h>
+#endif
+
 #include <dgl/array.h>
 #include "../kernel_decl.h"
 
@@ -39,6 +47,41 @@ struct BwdCmpTilingData {
 extern "C" uint32_t aclrtlaunch_kernel_backward_segment_cmp(
     uint32_t blockDim, aclrtStream stream, void* feat, void* arg, void* out,
     void* tiling_ptr);
+
+namespace dgl {
+namespace runtime {
+aclrtStream getCurrentAscendStream();
+}  // namespace runtime
+}  // namespace dgl
+
+namespace {
+
+// Resolve the stream to launch on. torch_npu executes eager ops on its own
+// NPU stream, so DGL must use the same stream for cross-framework ordering
+// (review: stream-granularity sync instead of aclrtSynchronizeDevice).
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+inline aclrtStream ResolveStream(int64_t device_id) {
+  return c10_npu::getCurrentNPUStream(
+             static_cast<c10::DeviceIndex>(device_id)).stream();
+}
+// torch_npu runs on its own ACL context; aclrtSynchronizeStream from DGL's
+// default context does not reliably wait on torch streams, so use torch's
+// own wrapper (stream-granularity, review: not device-wide sync).
+inline void SyncStream(int64_t device_id) {
+  c10_npu::stream_synchronize(ResolveStream(device_id));
+}
+#else
+inline aclrtStream ResolveStream(int64_t) {
+  return dgl::runtime::getCurrentAscendStream();
+}
+inline void SyncStream(int64_t) {
+  aclrtStream s = dgl::runtime::getCurrentAscendStream();
+  aclError e = aclrtSynchronizeStream(s);
+  CHECK(e == ACL_SUCCESS) << "Ascend Error, code: " << e;
+}
+#endif
+
+}  // namespace
 #endif  // DGL_USE_ASCEND
 
 namespace dgl {
@@ -85,10 +128,12 @@ void LaunchBackwardSegmentCmpKernel(
 template <typename DType>
 void BackwardSegmentCmpAscendImpl(NDArray feat, NDArray arg, NDArray out) {
   DGLContext ctx = feat->ctx;
-  ASCEND_CALL(aclrtSynchronizeDevice());
   ASCEND_CALL(aclrtSetDevice(ctx.device_id));
 
-  aclrtStream stream = nullptr;
+  // Stream-granularity sync (review: aclrtSynchronizeDevice waits on all
+  // streams device-wide, blocking far more than needed).
+  aclrtStream stream = ResolveStream(ctx.device_id);
+  SyncStream(ctx.device_id);
 
   int64_t n = feat->shape[0];
   int64_t m = out->shape[0];
@@ -120,9 +165,10 @@ void BackwardSegmentCmp<kDGLAscend, int64_t, float>(
     NDArray feat, NDArray arg, NDArray out) {
 #ifdef DGL_USE_ASCEND
   // int64 arg -> int32 conversion.
-  // Synchronize the device before D2H CopyTo to avoid stream race.
-  ASCEND_CALL(aclrtSynchronizeDevice());
+  // Stream-granularity sync before D2H CopyTo to avoid stream race
+  // (review: aclrtSynchronizeDevice waits on all streams device-wide).
   ASCEND_CALL(aclrtSetDevice(arg->ctx.device_id));
+  SyncStream(arg->ctx.device_id);
   NDArray arg_cpu = arg.CopyTo(DGLContext{kDGLCPU, 0});
   IdArray arg_i32_cpu = aten::AsNumBits(arg_cpu, 32);
   NDArray arg_i32 = arg_i32_cpu.CopyTo(arg->ctx);
