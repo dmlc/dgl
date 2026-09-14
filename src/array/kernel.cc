@@ -69,7 +69,7 @@ void SegmentMM(
       << "segment_mm expects seglen_A to be on CPU.";
   CHECK(A->ctx == B->ctx)
       << "segment_mm expects A and B to be of the same device";
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMM", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(A->ctx.device_type, XPU, "SegmentMM", {
     ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(A->dtype, Dtype, XPU, "Feature data", {
         SegmentMM<XPU, IdType, Dtype>(A, B, C, seglen_A, A_trans, B_trans);
@@ -86,7 +86,10 @@ void SegmentMMBackwardB(
                            "for the second input.";
   CHECK_EQ(seglen->ctx.device_type, kDGLCPU)
       << "segment_mm expects seglen to be on CPU.";
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
+  CHECK_EQ(A->shape[0], dC->shape[0])
+      << "segment_mm_backward expects A.shape[0] == dC.shape[0] "
+         "(K_sum consistency)";
+  ATEN_XPU_SWITCH_CUDA_ASCEND(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
     ATEN_ID_TYPE_SWITCH(seglen->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(A->dtype, Dtype, XPU, "Feature data", {
         SegmentMMBackwardB<XPU, IdType, Dtype>(A, dC, dB, seglen);
