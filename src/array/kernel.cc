@@ -445,7 +445,7 @@ void UpdateGradMinMaxDispatchHetero(
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out) {
   auto pair = graph->meta_graph()->FindEdge(0);  // checking the first etype
   auto src_id = pair.first;
-  ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(
           feat[src_id]->dtype, Dtype, XPU, "Feature data", {
@@ -458,23 +458,7 @@ void UpdateGradMinMaxDispatchHetero(
 
 /** @brief Backward segment cmp dispatch function.*/
 void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
-  if (feat->ctx.device_type == kDGLAscend) {
-#ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();
-#endif
-    DGLContext cpu_ctx{kDGLCPU, 0};
-    NDArray feat_cpu = feat.CopyTo(cpu_ctx);
-    NDArray arg_cpu = arg.CopyTo(cpu_ctx);
-    NDArray out_cpu = out.CopyTo(cpu_ctx);
-    ATEN_ID_TYPE_SWITCH(arg_cpu->dtype, IdType, {
-      ATEN_FLOAT_TYPE_SWITCH_16BITS(feat_cpu->dtype, Dtype, kDGLCPU, "Feature data", {
-        BackwardSegmentCmp<kDGLCPU, IdType, Dtype>(feat_cpu, arg_cpu, out_cpu);
-      });
-    });
-    out_cpu.CopyTo(out);
-    return;
-  }
-  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
     ATEN_ID_TYPE_SWITCH(arg->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(feat->dtype, Dtype, XPU, "Feature data", {
         BackwardSegmentCmp<XPU, IdType, Dtype>(feat, arg, out);
