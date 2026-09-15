@@ -81,6 +81,46 @@ inline void SyncStream(int64_t) {
 }
 #endif
 
+// int64 -> int32 index narrowing.
+//
+// Two constraints make the naive routes unusable here:
+//   - the framework's blocking D2H memcpy (NDArray::CopyTo) reads stale
+//     bytes from torch-written buffers across torch_npu's ACL context;
+//   - the AsNumBits AscendC kernel only converts the first
+//     n / GetBlockNum() elements (latent bug, block_dim=1 -> first 16).
+// Stream-ordered async copies on the torch stream are verified reliable,
+// so narrow on host between an ordered D2H and H2D.
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+inline NDArray ConvertIdx64To32(const NDArray& src, int64_t device_id) {
+  int64_t n = src.NumElements();
+  NDArray ret = dgl::aten::NewIdArray(n, src->ctx, 32);
+  if (n == 0) return ret;
+  size_t bytes64 = static_cast<size_t>(n) * sizeof(int64_t);
+  size_t bytes32 = static_cast<size_t>(n) * sizeof(int32_t);
+  std::vector<int64_t> host64(static_cast<size_t>(n));
+  std::vector<int32_t> host32(static_cast<size_t>(n));
+  aclrtStream ts = ResolveStream(device_id);
+  ASCEND_CALL(aclrtMemcpyAsync(host64.data(), bytes64, src->data, bytes64,
+                               ACL_MEMCPY_DEVICE_TO_HOST, ts));
+  c10_npu::stream_synchronize(ts);
+  for (int64_t i = 0; i < n; ++i) {
+    host32[static_cast<size_t>(i)] =
+        static_cast<int32_t>(host64[static_cast<size_t>(i)]);
+  }
+  ASCEND_CALL(aclrtMemcpyAsync(ret->data, bytes32, host32.data(), bytes32,
+                               ACL_MEMCPY_HOST_TO_DEVICE, ts));
+  c10_npu::stream_synchronize(ts);
+  return ret;
+}
+#else
+inline NDArray ConvertIdx64To32(const NDArray& src, int64_t device_id) {
+  ASCEND_CALL(aclrtSetDevice(device_id));
+  NDArray cpu = src.CopyTo(DGLContext{kDGLCPU, 0});
+  IdArray cpu_i32 = dgl::aten::AsNumBits(cpu, 32);
+  return cpu_i32.CopyTo(src->ctx);
+}
+#endif
+
 }  // namespace
 #endif  // DGL_USE_ASCEND
 
@@ -132,7 +172,9 @@ void BackwardSegmentCmpAscendImpl(NDArray feat, NDArray arg, NDArray out) {
 
   // Stream-granularity sync (review: aclrtSynchronizeDevice waits on all
   // streams device-wide, blocking far more than needed).
-  aclrtStream stream = ResolveStream(ctx.device_id);
+  // Launch on DGL's default stream: our kernels are mutually ordered there.
+  // torch-boundary waits (H2D visibility) use the torch stream (SyncStream).
+  aclrtStream stream = nullptr;
   SyncStream(ctx.device_id);
 
   int64_t n = feat->shape[0];
@@ -164,14 +206,14 @@ template <>
 void BackwardSegmentCmp<kDGLAscend, int64_t, float>(
     NDArray feat, NDArray arg, NDArray out) {
 #ifdef DGL_USE_ASCEND
-  // int64 arg -> int32 conversion.
-  // Stream-granularity sync before D2H CopyTo to avoid stream race
-  // (review: aclrtSynchronizeDevice waits on all streams device-wide).
+  // int64 arg -> int32 conversion, performed on-device via the AsNumBits
+  // Ascend kernel (no host round-trip: the blocking D2H memcpy of
+  // torch-written buffers is unreliable under torch_npu's own ACL context /
+  // copy streams). Ordering is guaranteed because the AsNumBits kernel and
+  // the consumer kernel both run on the same resolved stream.
   ASCEND_CALL(aclrtSetDevice(arg->ctx.device_id));
   SyncStream(arg->ctx.device_id);
-  NDArray arg_cpu = arg.CopyTo(DGLContext{kDGLCPU, 0});
-  IdArray arg_i32_cpu = aten::AsNumBits(arg_cpu, 32);
-  NDArray arg_i32 = arg_i32_cpu.CopyTo(arg->ctx);
+  NDArray arg_i32 = ConvertIdx64To32(arg, arg->ctx.device_id);
   BackwardSegmentCmpAscendImpl<float>(feat, arg_i32, out);
 #else
   LOG(FATAL) << "Ascend support is not compiled. Please compile with "

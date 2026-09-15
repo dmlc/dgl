@@ -90,6 +90,46 @@ inline void SyncStream(int64_t) {
 }
 #endif
 
+// int64 -> int32 index narrowing.
+//
+// Two constraints make the naive routes unusable here:
+//   - the framework's blocking D2H memcpy (NDArray::CopyTo) reads stale
+//     bytes from torch-written buffers across torch_npu's ACL context;
+//   - the AsNumBits AscendC kernel only converts the first
+//     n / GetBlockNum() elements (latent bug, block_dim=1 -> first 16).
+// Stream-ordered async copies on the torch stream are verified reliable,
+// so narrow on host between an ordered D2H and H2D.
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+inline NDArray ConvertIdx64To32(const NDArray& src, int64_t device_id) {
+  int64_t n = src.NumElements();
+  NDArray ret = dgl::aten::NewIdArray(n, src->ctx, 32);
+  if (n == 0) return ret;
+  size_t bytes64 = static_cast<size_t>(n) * sizeof(int64_t);
+  size_t bytes32 = static_cast<size_t>(n) * sizeof(int32_t);
+  std::vector<int64_t> host64(static_cast<size_t>(n));
+  std::vector<int32_t> host32(static_cast<size_t>(n));
+  aclrtStream ts = ResolveStream(device_id);
+  ASCEND_CALL(aclrtMemcpyAsync(host64.data(), bytes64, src->data, bytes64,
+                               ACL_MEMCPY_DEVICE_TO_HOST, ts));
+  c10_npu::stream_synchronize(ts);
+  for (int64_t i = 0; i < n; ++i) {
+    host32[static_cast<size_t>(i)] =
+        static_cast<int32_t>(host64[static_cast<size_t>(i)]);
+  }
+  ASCEND_CALL(aclrtMemcpyAsync(ret->data, bytes32, host32.data(), bytes32,
+                               ACL_MEMCPY_HOST_TO_DEVICE, ts));
+  c10_npu::stream_synchronize(ts);
+  return ret;
+}
+#else
+inline NDArray ConvertIdx64To32(const NDArray& src, int64_t device_id) {
+  ASCEND_CALL(aclrtSetDevice(device_id));
+  NDArray cpu = src.CopyTo(DGLContext{kDGLCPU, 0});
+  IdArray cpu_i32 = dgl::aten::AsNumBits(cpu, 32);
+  return cpu_i32.CopyTo(src->ctx);
+}
+#endif
+
 }  // namespace
 #endif  // DGL_USE_ASCEND
 
@@ -151,7 +191,9 @@ void UpdateGradMinMaxHeteroAscendImpl(
 
   // Stream-granularity sync (review: aclrtSynchronizeDevice waits on all
   // streams device-wide, blocking far more than needed).
-  aclrtStream stream = ResolveStream(ctx.device_id);
+  // Launch on DGL's default stream: our kernels are mutually ordered there.
+  // torch-boundary waits (H2D visibility) use the torch stream (SyncStream).
+  aclrtStream stream = nullptr;
   SyncStream(ctx.device_id);
 
   std::vector<std::vector<dgl_id_t>> src_dst_ntypes(
@@ -207,24 +249,19 @@ void UpdateGradMinMax_hetero<kDGLAscend, int64_t, float>(
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out) {
 #ifdef DGL_USE_ASCEND
-  // int64 idx + idx_etype -> int32 conversion.
-  // Stream-granularity sync before D2H CopyTo to avoid stream race
-  // (review: aclrtSynchronizeDevice waits on all streams device-wide).
+  // int64 idx + idx_etype -> int32 narrowing via ConvertIdx64To32 (see the
+  // helper comment for why the naive CopyTo/AsNumBits routes are unusable).
   DGLContext ctx = feat.front()->ctx;
-  DGLContext cpu_ctx{kDGLCPU, 0};
   ASCEND_CALL(aclrtSetDevice(ctx.device_id));
   SyncStream(ctx.device_id);
   std::vector<NDArray> idx_i32, idx_etype_i32;
   idx_i32.reserve(idx.size());
   idx_etype_i32.reserve(idx_etype.size());
   for (size_t i = 0; i < idx.size(); ++i) {
-    NDArray idx_cpu = idx[i].CopyTo(cpu_ctx);
-    IdArray idx_i32_cpu = aten::AsNumBits(idx_cpu, 32);
-    idx_i32.push_back(idx_i32_cpu.CopyTo(ctx));
-
-    NDArray idx_etype_cpu = idx_etype[i].CopyTo(cpu_ctx);
-    IdArray idx_etype_i32_cpu = aten::AsNumBits(idx_etype_cpu, 32);
-    idx_etype_i32.push_back(idx_etype_i32_cpu.CopyTo(ctx));
+    idx_i32.push_back(
+        ConvertIdx64To32(idx[i], idx[i]->ctx.device_id));
+    idx_etype_i32.push_back(
+        ConvertIdx64To32(idx_etype[i], idx_etype[i]->ctx.device_id));
   }
   UpdateGradMinMaxHeteroAscendImpl<float>(
       graph, op, feat, idx_i32, idx_etype_i32, out);
