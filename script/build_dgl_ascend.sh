@@ -3,69 +3,141 @@
 # Build DGL with Huawei Ascend NPU support
 #
 # Usage:
-#   bash script/build_dgl_ascend.sh
+#   bash script/build_dgl_ascend.sh [options]
+#
+# Options:
+#   -s SOC     Ascend SoC version (auto-detected by default)
+#   -t TYPE    Build type: dev, dogfood, release (default: dev)
+#   -c         Clean build (remove existing build directory)
+#   -j JOBS    Number of parallel jobs (default: $(nproc))
+#   -h         Show this help message
 #
 # Environment variables:
 #   ASCEND_TOOLKIT_HOME: Path to Ascend CANN toolkit (optional, auto-detected)
 #   DGL_HOME: Path to DGL source directory (optional, auto-detected)
+#   SOC_VERSION: Override SoC version (same as -s)
+#
+# Supported SoC versions (all DAV_2201 architecture, kernel code identical):
+#   A2 series:  Ascend910B1, Ascend910B2, Ascend910B2C, Ascend910B3, Ascend910B4
+#   A3 series:  ascend910_9362, ascend910_9372, ascend910_9381, ascend910_9382,
+#               ascend910_9391, ascend910_9392
+#
+# Note: A2 and A3 share the same DAV_2201 architecture (same instruction set,
+#   same buffer sizes). The only differences are core count (20/40 vs 24/48),
+#   frequency, L2 and HBM size. Core count is queried at runtime via
+#   aclrtGetDeviceInfo, so one build runs on all sub-models. SOC_VERSION only
+#   affects the compiled kernel microcode binary.
 #
 
-# Exit on error, but we'll handle some cases specially
 set -e
 set -o pipefail
 
-# Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-echo_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
+echo_info()  { echo -e "${GREEN}[INFO]${NC} $1" >&2; }
+echo_warn()  { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
+echo_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 
-echo_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-echo_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# Set DGL_HOME if not set
 if [[ -z "${DGL_HOME}" ]]; then
     export DGL_HOME="${PROJECT_ROOT}"
     echo_info "DGL_HOME set to: ${DGL_HOME}"
 fi
-
-# Check if we're in the correct directory
 cd "${DGL_HOME}"
 echo_info "Working directory: $(pwd)"
 
+# ---------------------------------------------------------------------------
+# Supported SoC version lists
+# ---------------------------------------------------------------------------
+A2_SOC_LIST="ascend910b1 ascend910b2 ascend910b2c ascend910b3 ascend910b4 ascend910b4-1"
+A3_SOC_LIST="ascend910_9362 ascend910_9372 ascend910_9381 ascend910_9382 ascend910_9391 ascend910_9392"
+ALL_SOC_LIST="${A2_SOC_LIST} ${A3_SOC_LIST}"
+
+is_valid_soc() {
+    local soc_lower
+    soc_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    for s in ${ALL_SOC_LIST}; do
+        [[ "${soc_lower}" == "${s}" ]] && return 0
+    done
+    return 1
+}
+
+is_a2_soc() {
+    local soc_lower
+    soc_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    for s in ${A2_SOC_LIST}; do
+        [[ "${soc_lower}" == "${s}" ]] && return 0
+    done
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# Auto-detect SoC version from hardware
+#   Strategy: npu-smi board info → NPU Name field → map to SoC version
+#   Fallback: ascend910b4 (A2, also runs on A3; DAV_2201)
+# ---------------------------------------------------------------------------
+detect_soc_version() {
+    if ! command -v npu-smi &>/dev/null; then
+        echo_warn "npu-smi not found, cannot auto-detect SoC version"
+        echo "ascend910b4"
+        return
+    fi
+
+    local npu_name
+    # npu-smi info -t board -i 0 -c 0 → "NPU Name : 9382"
+    npu_name=$(npu-smi info -t board -i 0 -c 0 2>/dev/null | grep "NPU Name" | awk -F':' '{print $2}' | tr -d ' \t' || true)
+
+    if [[ -z "${npu_name}" ]]; then
+        echo_warn "Cannot read NPU Name from npu-smi, using default ascend910b4"
+        echo "ascend910b4"
+        return
+    fi
+
+    echo_info "Detected NPU Name: ${npu_name}"
+
+    # Map board name to SoC version
+    case "${npu_name}" in
+        910B1|910b1)       echo "ascend910b1" ;;
+        910B2|910b2)       echo "ascend910b2" ;;
+        910B2C|910b2c)     echo "ascend910b2c" ;;
+        910B3|910b3)       echo "ascend910b3" ;;
+        910B4|910b4)       echo "ascend910b4" ;;
+        9362)              echo "ascend910_9362" ;;
+        9372)              echo "ascend910_9372" ;;
+        9381)              echo "ascend910_9381" ;;
+        9382)              echo "ascend910_9382" ;;
+        9391)              echo "ascend910_9391" ;;
+        9392)              echo "ascend910_9392" ;;
+        *)
+            echo_warn "Unknown NPU Name '${npu_name}', using default ascend910b4"
+            echo "ascend910b4"
+            ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
 # Detect Ascend CANN toolkit
+# ---------------------------------------------------------------------------
 detect_ascend_toolkit() {
     if [[ -n "${ASCEND_TOOLKIT_HOME}" ]] && [[ -d "${ASCEND_TOOLKIT_HOME}" ]]; then
         echo_info "Using ASCEND_TOOLKIT_HOME: ${ASCEND_TOOLKIT_HOME}"
         return 0
     fi
-    
     if [[ -n "${ASCEND_HOME}" ]] && [[ -d "${ASCEND_HOME}" ]]; then
         export ASCEND_TOOLKIT_HOME="${ASCEND_HOME}"
         echo_info "Using ASCEND_HOME: ${ASCEND_TOOLKIT_HOME}"
         return 0
     fi
-    
-    # Try common installation paths
     local common_paths=(
         "/usr/local/Ascend/ascend-toolkit/latest"
         "/usr/local/Ascend/latest"
         "$HOME/Ascend/ascend-toolkit/latest"
     )
-    
     for path in "${common_paths[@]}"; do
         if [[ -d "${path}" ]]; then
             export ASCEND_TOOLKIT_HOME="${path}"
@@ -73,47 +145,56 @@ detect_ascend_toolkit() {
             return 0
         fi
     done
-    
     echo_warn "Ascend CANN toolkit not found. Building without ACL support."
     echo_warn "Set ASCEND_TOOLKIT_HOME environment variable if CANN is installed elsewhere."
     return 1
 }
 
-# Setup Ascend environment
 setup_ascend_env() {
     if [[ -n "${ASCEND_TOOLKIT_HOME}" ]]; then
-        # Source the Ascend environment script if it exists
         local env_script="${ASCEND_TOOLKIT_HOME}/bin/setenv.bash"
         if [[ -f "${env_script}" ]]; then
             echo_info "Sourcing Ascend environment: ${env_script}"
-            # Temporarily disable set -e to avoid exit from setenv.bash
             set +e
             source "${env_script}" 2>/dev/null || true
             set -e
         fi
-        # Always set paths manually to ensure they are correct
         export LD_LIBRARY_PATH="${ASCEND_TOOLKIT_HOME}/lib64:${LD_LIBRARY_PATH}"
         export PATH="${ASCEND_TOOLKIT_HOME}/bin:${PATH}"
         echo_info "LD_LIBRARY_PATH updated"
     fi
 }
 
+# ---------------------------------------------------------------------------
 # Parse command line arguments
+# ---------------------------------------------------------------------------
 BUILD_TYPE="dev"
 CLEAN_BUILD=false
 JOBS=$(nproc)
+SOC_VERSION=""
 
-while getopts "ht:cj:" opt; do
+while getopts "hs:t:cj:" opt; do
     case ${opt} in
         h)
-            echo "Usage: $0 [-t build_type] [-c] [-j jobs]"
+            echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
+            echo "  -s SOC     Ascend SoC version (auto-detected by default)"
+            echo "             A2: $(echo ${A2_SOC_LIST} | sed 's/ /, /g')"
+            echo "             A3: $(echo ${A3_SOC_LIST} | sed 's/ /, /g')"
             echo "  -t TYPE    Build type: dev, dogfood, release (default: dev)"
             echo "  -c         Clean build (remove existing build directory)"
             echo "  -j JOBS    Number of parallel jobs (default: $(nproc))"
             echo "  -h         Show this help message"
+            echo ""
+            echo "Environment variables:"
+            echo "  SOC_VERSION          Override SoC version (same as -s)"
+            echo "  ASCEND_TOOLKIT_HOME  Path to CANN toolkit"
+            echo "  DGL_HOME             Path to DGL source"
             exit 0
+            ;;
+        s)
+            SOC_VERSION="${OPTARG}"
             ;;
         t)
             BUILD_TYPE="${OPTARG}"
@@ -131,14 +212,36 @@ while getopts "ht:cj:" opt; do
     esac
 done
 
+# Resolve SoC version: CLI -s > env SOC_VERSION > auto-detect
+if [[ -z "${SOC_VERSION}" ]]; then
+    SOC_VERSION=$(detect_soc_version)
+fi
+
+# Strip whitespace
+SOC_VERSION="$(echo "${SOC_VERSION}" | tr -d '[:space:]')"
+
+# Validate
+if ! is_valid_soc "${SOC_VERSION}"; then
+    echo_error "Invalid SoC version: ${SOC_VERSION}"
+    echo_error "Supported: ${ALL_SOC_LIST}"
+    exit 1
+fi
+
+if is_a2_soc "${SOC_VERSION}"; then
+    echo_info "SoC: ${SOC_VERSION} (Atlas A2 series, DAV_2201)"
+else
+    echo_info "SoC: ${SOC_VERSION} (Atlas A3 series, DAV_2201)"
+fi
+
 echo_info "=========================================="
 echo_info "  DGL Ascend Build Script"
 echo_info "=========================================="
 echo_info "Build type: ${BUILD_TYPE}"
+echo_info "SoC version: ${SOC_VERSION}"
 echo_info "Parallel jobs: ${JOBS}"
 
 # Detect and setup Ascend environment
-detect_ascend_toolkit || true  # Continue even if not found
+detect_ascend_toolkit || true
 setup_ascend_env
 
 # Clean build if requested
@@ -148,9 +251,16 @@ if [[ "${CLEAN_BUILD}" == true ]]; then
     rm -rf graphbolt/build
     rm -rf dgl_sparse/build
     rm -rf tensoradapter/pytorch/build
+else
+    # Incremental build: clean AscendC kernel preprocess subdirectories.
+    # merge_obj_text.sh links .o files in-place (REL→EXEC), so re-running
+    # the build on an existing directory causes ld.lld "unknown file type".
+    if [[ -d "build" ]]; then
+        echo_info "Cleaning AscendC kernel preprocess cache for incremental build..."
+        find build -maxdepth 1 -type d -name "dgl_ascendc_*_preprocess*" -exec rm -rf {} + 2>/dev/null || true
+    fi
 fi
 
-# Create build directory
 mkdir -p build
 cd build
 
@@ -164,21 +274,19 @@ CMAKE_ARGS=(
     -DUSE_DISTRIBUTED=ON
     -DUSE_GRAPHBLAST=ON
     -DUSE_TORCH=ON
+    -DSOC_VERSION="${SOC_VERSION}"
 )
 
-# Add Ascend toolkit path if available
 if [[ -n "${ASCEND_TOOLKIT_HOME}" ]]; then
     CMAKE_ARGS+=(-DASCEND_TOOLKIT_HOME="${ASCEND_TOOLKIT_HOME}")
 fi
 
-# Append PyTorch cmake path if available
 TORCH_CMAKE_PATH=$(python3 -c "import torch; print(torch.utils.cmake_prefix_path)" 2>/dev/null) || true
 if [[ -n "${TORCH_CMAKE_PATH}" ]]; then
     CMAKE_ARGS+=(-DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:+${CMAKE_PREFIX_PATH};}${TORCH_CMAKE_PATH}")
     echo_info "PyTorch cmake path: ${TORCH_CMAKE_PATH}"
 fi
 
-# Add torch_npu lib path for find_library and linker
 TORCH_NPU_LIB_PATH=$(python3 -c "import torch_npu; import os; print(os.path.join(os.path.dirname(torch_npu.__file__), 'lib'))" 2>/dev/null) || true
 if [[ -n "${TORCH_NPU_LIB_PATH}" ]] && [[ -d "${TORCH_NPU_LIB_PATH}" ]]; then
     CMAKE_ARGS+=(-DCMAKE_LIBRARY_PATH="${TORCH_NPU_LIB_PATH}")
@@ -194,11 +302,12 @@ cmake "${CMAKE_ARGS[@]}" ..
 echo_info "Building DGL with ${JOBS} parallel jobs..."
 make -j${JOBS}
 
-# Check if build was successful
 if [[ $? -eq 0 ]]; then
     echo_info "=========================================="
     echo_info "  Build completed successfully!"
     echo_info "=========================================="
+    echo ""
+    echo_info "SoC version: ${SOC_VERSION}"
     echo ""
     echo_info "To install the Python package, run:"
     echo "  cd ${DGL_HOME}/python"
@@ -210,4 +319,3 @@ else
     echo_error "Build failed!"
     exit 1
 fi
-

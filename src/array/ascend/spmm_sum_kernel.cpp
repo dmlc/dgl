@@ -217,7 +217,7 @@ private:
         fixpipeParams.dstNdStride = 0;
         fixpipeParams.reluEn = false;
         fixpipeParams.quantPre = QuantMode_t::F322F16;
-        AscendC::Fixpipe(outputGm[baseRow * this->N + outputColStart], outputChunkTensor, fixpipeParams);
+        AscendC::Fixpipe<half, float, AscendC::CFG_ROW_MAJOR>(outputGm[baseRow * this->N + outputColStart], outputChunkTensor, fixpipeParams);
     }
 
     __aicore__ inline uint32_t CeilCubeBlock(uint32_t len)
@@ -285,6 +285,7 @@ public:
         GM_ADDR featureData, GM_ADDR outputData, GM_ADDR indptrData, GM_ADDR indicesData, GM_ADDR vectorWindowIdsData, GM_ADDR vectorWinSplitData, uint32_t numDstRows, uint32_t numSrcRows,
         uint32_t featureDim, uint32_t nonZeroCount, uint32_t vectorWindowCount, AscendC::TPipe *pipe)
     {
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
         this->M = numDstRows;
         this->K = numSrcRows;
         this->N = featureDim;

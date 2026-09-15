@@ -1,10 +1,4 @@
 cmake_minimum_required(VERSION 3.18)
-# CMake >= 3.27 dropped compatibility with cmake_minimum_required < 3.5.
-# Bundled third_party (e.g. dmlc-core) still declares 3.2; allow it to configure.
-if(POLICY CMP0148)
-  cmake_policy(SET CMP0148 NEW)
-endif()
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
@@ -224,12 +218,15 @@ if(USE_ASCEND)
       message(STATUS "Using ASCEND_CANN_PACKAGE_PATH: ${ASCEND_CANN_PACKAGE_PATH}")
 
       # Set SOC_VERSION for AscendC kernel compilation
-      # Can be set via CMake -DSOC_VERSION or environment variable
+      # Can be set via CMake -DSOC_VERSION or environment variable SOC_VERSION
+      # All A2/A3 sub-models share DAV_2201 architecture (BUILD_MODE=c220).
+      # Default: ascend910b4 (A2). Binary compiled with this SOC also runs on A3.
+      # The build script auto-detects from hardware via npu-smi.
       if(NOT DEFINED SOC_VERSION)
         if(DEFINED ENV{SOC_VERSION})
           set(SOC_VERSION $ENV{SOC_VERSION} CACHE STRING "Ascend SoC version")
         else()
-          set(SOC_VERSION "Ascend910B4" CACHE STRING "Ascend SoC version (e.g., Ascend910B, Ascend910B4)")
+          set(SOC_VERSION "ascend910b4" CACHE STRING "Ascend SoC version (e.g., ascend910b4 for A2, ascend910_9382 for A3)")
         endif()
       endif()
       message(STATUS "Using SOC_VERSION: ${SOC_VERSION}")
@@ -288,6 +285,9 @@ if(USE_ASCEND)
   execute_process(COMMAND python3 -c "import sys; print(sys.prefix)"
                   OUTPUT_VARIABLE Python3_ROOT_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+  # Development (not Development.Module): libdgl.so links libtorch.so, which
+  # pulls in many Python C API symbols; therefore libpython must be linked
+  # explicitly via Python3_LIBRARIES.
   find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
   find_package(Torch REQUIRED PATHS ${LIBTORCH_PATH})
@@ -302,7 +302,15 @@ if(USE_ASCEND)
     add_definitions(-DDGL_USE_PYTORCH_NPU_STREAM)
     message(STATUS "Found c10_npu: ${C10_NPU_LIB} — enabling PyTorch NPU stream support")
   else()
-    message(STATUS "c10_npu not found — using legacy stream management")
+    # c10_npu symbols are inside libtorch_npu.so on some installations
+    find_library(LIBTORCH_NPU NAMES torch_npu HINTS ${LIBTORCH_NPU_PATH}/lib)
+    if(LIBTORCH_NPU)
+      list(APPEND DGL_LINKER_LIBS ${LIBTORCH_NPU})
+      add_definitions(-DDGL_USE_PYTORCH_NPU_STREAM)
+      message(STATUS "Found libtorch_npu: ${LIBTORCH_NPU} — enabling PyTorch NPU stream support (c10_npu embedded)")
+    else()
+      message(STATUS "c10_npu not found — using legacy stream management")
+    endif()
   endif()
 
 endif(USE_ASCEND)
@@ -560,21 +568,11 @@ endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
 target_include_directories(dgl PRIVATE ${Python3_INCLUDE_DIRS})
 
-find_library(GFORTRAN_LIB NAMES gfortran)
-find_library(GOMP_LIB NAMES gomp)
+find_library(GFORTRAN_LIB NAMES gfortran REQUIRED)
+find_library(GOMP_LIB NAMES gomp REQUIRED)
 
-if(GFORTRAN_LIB)
-  message(STATUS "Found gfortran: ${GFORTRAN_LIB}")
-else()
-  message(STATUS "gfortran not found — skipping (not required for Ascend builds)")
-  set(GFORTRAN_LIB "")
-endif()
-if(GOMP_LIB)
-  message(STATUS "Found gomp: ${GOMP_LIB}")
-else()
-  message(STATUS "gomp not found — skipping")
-  set(GOMP_LIB "")
-endif()
+message(STATUS "Found gfortran: ${GFORTRAN_LIB}")
+message(STATUS "Found gomp: ${GOMP_LIB}")
 
 target_link_libraries(dgl PRIVATE
   ${DGL_LINKER_LIBS}
@@ -655,12 +653,15 @@ if(BUILD_CPP_TEST)
                   OUTPUT_VARIABLE TORCH_NPU_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND python3 -c "import torch; import os; print(f'{os.path.dirname(torch.__file__)}/lib')"
                   OUTPUT_VARIABLE TORCH_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND python3 -c "import torch, os; print(os.path.normpath(os.path.join(os.path.dirname(torch.__file__), '..', 'torch.libs')))"
+                  OUTPUT_VARIABLE TORCH_LIBS_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR})
+  link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR} ${TORCH_LIBS_DIR})
 
   set_target_properties(runUnitTests PROPERTIES
     BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR}"
+    INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR};${TORCH_LIBS_DIR}"
+    LINK_FLAGS "-Wl,-rpath-link,${TORCH_LIBS_DIR}"
   )
   target_link_libraries(runUnitTests PRIVATE gtest gtest_main 
     ${Python3_LIBRARIES}

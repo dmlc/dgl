@@ -1,5 +1,6 @@
 #include <dgl/array.h>
 #include <dgl/aten/csr.h>
+#include <dgl/aten/array_ops.h>
 #include <dgl/runtime/device_api.h>
 #include "../kernel_decl.h"
 #include <vector>
@@ -27,9 +28,19 @@
 
 constexpr uint32_t windowSize = 16;
 constexpr uint32_t tcBlockWidth = 16;
-constexpr uint32_t cubeCoreCount = 20;
-constexpr uint32_t vectorCoreCount = 40;
 constexpr uint16_t kHalfOne = 0x3c00;
+
+static uint32_t GetCubeCoreCount(int32_t device_id) {
+  int64_t coreNum = 0;
+  aclrtGetDeviceInfo(device_id, ACL_DEV_ATTR_CUBE_CORE_NUM, &coreNum);
+  return coreNum > 0 ? static_cast<uint32_t>(coreNum) : 24;
+}
+
+static uint32_t GetVectorCoreCount(int32_t device_id) {
+  int64_t coreNum = 0;
+  aclrtGetDeviceInfo(device_id, ACL_DEV_ATTR_VECTOR_CORE_NUM, &coreNum);
+  return coreNum > 0 ? static_cast<uint32_t>(coreNum) : 48;
+}
 
 #ifdef DGL_USE_PYTORCH_NPU_STREAM
 #include <torch_npu/csrc/core/npu/NPUStream.h>
@@ -66,6 +77,7 @@ struct SpmmUnifiedAivTilingData {
     uint32_t nonZeroCount;
     uint32_t batchCount;
     uint32_t dtype;  // 0=FP32, 1=FP16
+    uint32_t isCopyRhs;  // 0=copy_lhs (gather), 1=copy_rhs (sequential read)
 };
 struct SpmmUnifiedMaxMinTilingData {
     uint32_t numDstRows;
@@ -319,7 +331,8 @@ void SpMMCsrAscend(
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
 
-  // Validate operation
+  // Validate operation — copy_rhs is handled by the caller (SpMMCsrUnified
+  // via GatherByIndex), so SpMMCsrAscend only sees copy_lhs after pre-gather.
   if (op != "copy_lhs" || (reduce != "sum" && reduce != "max" && reduce != "min")) {
     LOG(FATAL) << "SpMMCsrAscend only supports copy_lhs+sum/max/min operation. "
                << "Got: op=" << op << ", reduce=" << reduce;
@@ -375,7 +388,7 @@ void SpMMCsrAscend(
       std::vector<uint32_t> row_pointers =
           CopyDeviceArrayToHostUInt32(indptr_ptr, static_cast<size_t>(num_rows + 1), stream);
       std::vector<uint32_t> vector_core_row_split =
-          BuildRowNnzBalancedPartitions(row_pointers, vectorCoreCount);
+          BuildRowNnzBalancedPartitions(row_pointers, GetVectorCoreCount(ctx.device_id));
 
       auto new_cache_value = std::make_shared<MaxMinPreprocessCacheValue>();
       new_cache_value->vector_row_split_dev = MakeDeviceBuffer(
@@ -396,7 +409,7 @@ void SpMMCsrAscend(
     void* vector_row_split_dev = cache_value->vector_row_split_dev.get();
 
     ASCEND_CALL(aclrtMemsetAsync(out->data, out.GetSize(), 0, out.GetSize(), stream));
-    uint32_t blockDim = vectorCoreCount;
+    uint32_t blockDim = GetVectorCoreCount(ctx.device_id);
     aclError launch_err = ACL_SUCCESS;
     if (reduce == "max") {
       launch_err = use_bspmm ? ACLRT_LAUNCH_KERNEL(bspmm_max)(
@@ -437,17 +450,19 @@ void SpMMCsrAscend(
     return;
   }
 
-  // AIV-only sum: bypass sum preprocess entirely
-  if (!use_bspmm && use_aiv_only_sum()) {
+  // AIV-only sum: bypass sum preprocess entirely.
+  // FP16 (uint16_t) always uses AIV-only: the Cube (spmm_sum + Fixpipe) path
+  // does not work on DAV_2201 c220 architecture where AIC/AIV are split cores.
+  if (!use_bspmm && (use_aiv_only_sum() || std::is_same<DType, uint16_t>::value)) {
     std::vector<uint32_t> row_pointers =
         CopyDeviceArrayToHostUInt32(indptr_ptr, static_cast<size_t>(num_rows + 1), stream);
     std::vector<uint32_t> row_split =
-        BuildRowNnzBalancedPartitions(row_pointers, vectorCoreCount);
+        BuildRowNnzBalancedPartitions(row_pointers, GetVectorCoreCount(ctx.device_id));
     auto split_dev = MakeDeviceBuffer(
         row_split.data(), row_split.size() * sizeof(uint32_t), stream);
     ASCEND_CALL(aclrtSynchronizeStream(stream));
     ASCEND_CALL(aclrtMemsetAsync(out->data, out.GetSize(), 0, out.GetSize(), stream));
-    uint32_t blockDim = vectorCoreCount;
+    uint32_t blockDim = GetVectorCoreCount(ctx.device_id);
     aclError launch_err = ACLRT_LAUNCH_KERNEL(spmm_sum_aiv)(
         blockDim, stream, ufeat->data, out->data,
         const_cast<void*>(static_cast<const void*>(indptr_ptr)),
@@ -572,9 +587,9 @@ void SpMMCsrAscend(
       vector_work.push_back(row_pointers[end_node] - row_pointers[start_node]);
     }
     std::vector<uint32_t> cube_core_boundaries =
-        BuildBalancedPartitions(cube_work, cubeCoreCount);
+        BuildBalancedPartitions(cube_work, GetCubeCoreCount(ctx.device_id));
     std::vector<uint32_t> vector_core_boundaries =
-        BuildBalancedPartitions(vector_work, vectorCoreCount);
+        BuildBalancedPartitions(vector_work, GetVectorCoreCount(ctx.device_id));
 
     auto new_cache_value = std::make_shared<SumPreprocessCacheValue>();
     new_cache_value->dense_blocks_dev = MakeDeviceBuffer(
@@ -617,7 +632,7 @@ void SpMMCsrAscend(
 
   ASCEND_CALL(aclrtMemsetAsync(out->data, out.GetSize(), 0, out.GetSize(), stream));
 
-  uint32_t blockDim = cubeCoreCount;
+  uint32_t blockDim = GetCubeCoreCount(ctx.device_id);
   aclError launch_err = use_bspmm ? ACLRT_LAUNCH_KERNEL(bspmm_sum)(
       blockDim, stream, dense_blocks_dev, ufeat->data, out->data,
       const_cast<void*>(static_cast<const void*>(indptr_ptr)),
@@ -683,23 +698,61 @@ static CSRMatrix CastCSRToInt32SpMM(const CSRMatrix& csr) {
                     data32, csr.sorted);
 }
 
+// Helper: gather NDArray by index, supporting multi-dimensional tensors
+// For multi-dim tensors, copies to CPU, gathers, copies back (small overhead
+// compared to the NPU kernel itself for typical graph sizes)
+static NDArray GatherByIndex(NDArray src, NDArray index) {
+  if (IsNullArray(index)) return src;
+  if (src->ndim <= 1) return IndexSelect(src, index);
+
+  // Multi-dim gather on CPU (dtype-agnostic: use byte-level memcpy)
+  DGLContext cpu_ctx{kDGLCPU, 0};
+  NDArray src_cpu = src.CopyTo(cpu_ctx);
+  NDArray idx_cpu = index.CopyTo(cpu_ctx);
+
+  const int32_t* idx_ptr = idx_cpu.Ptr<int32_t>();
+  int64_t nnz = index->shape[0];
+  int64_t feat_dim = 1;
+  for (int i = 1; i < src->ndim; ++i) feat_dim *= src->shape[i];
+  int64_t dtype_bytes = src->dtype.bits / 8;
+
+  // Create output on CPU
+  std::vector<int64_t> out_shape(src->ndim);
+  out_shape[0] = nnz;
+  for (int i = 1; i < src->ndim; ++i) out_shape[i] = src->shape[i];
+  NDArray out_cpu = NDArray::Empty(out_shape, src->dtype, cpu_ctx);
+
+  const char* src_bytes = static_cast<const char*>(src_cpu->data);
+  char* out_bytes = static_cast<char*>(out_cpu->data);
+  int64_t row_bytes = feat_dim * dtype_bytes;
+  for (int64_t i = 0; i < nnz; ++i) {
+    int32_t eid = idx_ptr[i];
+    std::memcpy(out_bytes + i * row_bytes, src_bytes + eid * row_bytes,
+                row_bytes);
+  }
+
+  // Copy back to NPU
+  return out_cpu.CopyTo(src->ctx);
+}
+
 // ============================================================================
 // SpMMCsrUnified — unified NPU kernel for FP32 and FP16
 // Uses spmm_unified_aiv (sum) / spmm_unified_max / spmm_unified_min
-// All paths use pure Vector Core (40 cores), Cube+Vector reserved for future
+// All paths use pure Vector Core, Cube+Vector reserved for future
 // ============================================================================
 static std::vector<uint32_t> BuildRowSplitUnified(
-    const uint32_t* indptr, int64_t num_rows, aclrtStream stream) {
+    const uint32_t* indptr, int64_t num_rows, uint32_t coreCount,
+    aclrtStream stream) {
   std::vector<uint32_t> host_indptr(num_rows + 1);
   aclrtMemcpy(host_indptr.data(), sizeof(uint32_t) * (num_rows + 1),
               indptr, sizeof(uint32_t) * (num_rows + 1), ACL_MEMCPY_DEVICE_TO_HOST);
-  // Build balanced partition by nnz across 40 vector cores
-  std::vector<uint32_t> split(41, 0);
-  split[40] = static_cast<uint32_t>(num_rows);
+  // Build balanced partition by nnz across vector cores
+  std::vector<uint32_t> split(coreCount + 1, 0);
+  split[coreCount] = static_cast<uint32_t>(num_rows);
   uint32_t total_nnz = host_indptr.back();
-  for (uint32_t part = 1; part < 40; ++part) {
+  for (uint32_t part = 1; part < coreCount; ++part) {
     uint32_t target = static_cast<uint32_t>(
-        (static_cast<uint64_t>(part) * total_nnz) / 40);
+        (static_cast<uint64_t>(part) * total_nnz) / coreCount);
     split[part] = static_cast<uint32_t>(
         std::lower_bound(host_indptr.begin(), host_indptr.end(), target) -
         host_indptr.begin());
@@ -712,8 +765,9 @@ static void SpMMCsrUnified(
     const std::string& op, const std::string& reduce,
     const CSRMatrix& csr, NDArray ufeat, NDArray out,
     std::vector<NDArray> out_aux) {
-  if (op != "copy_lhs" || (reduce != "sum" && reduce != "max" && reduce != "min")) {
-    LOG(FATAL) << "SpMMCsrUnified only supports copy_lhs+sum/max/min";
+  if (!((op == "copy_lhs" || op == "copy_rhs") &&
+        (reduce == "sum" || reduce == "max" || reduce == "min"))) {
+    LOG(FATAL) << "SpMMCsrUnified only supports copy_lhs/copy_rhs + sum/max/min";
   }
 
   DGLContext ctx = out->ctx;
@@ -733,6 +787,9 @@ static void SpMMCsrUnified(
 
   aclrtStream stream = nullptr;
 
+  // Get vector core count dynamically (compatible with A2/A3)
+  uint32_t vecCoreCount = GetVectorCoreCount(ctx.device_id);
+
   // Build row split for load balancing
   const IdType* indptr_ptr = static_cast<const IdType*>(csr.indptr->data);
   // Copy indptr to host for split calculation
@@ -748,12 +805,12 @@ static void SpMMCsrUnified(
                 indptr_ptr, sizeof(uint32_t) * (num_rows + 1), ACL_MEMCPY_DEVICE_TO_HOST);
   }
 
-  std::vector<uint32_t> split(41, 0);
-  split[40] = static_cast<uint32_t>(num_rows);
+  std::vector<uint32_t> split(vecCoreCount + 1, 0);
+  split[vecCoreCount] = static_cast<uint32_t>(num_rows);
   uint32_t total_nnz = host_indptr.back();
-  for (uint32_t part = 1; part < 40; ++part) {
+  for (uint32_t part = 1; part < vecCoreCount; ++part) {
     uint32_t target = static_cast<uint32_t>(
-        (static_cast<uint64_t>(part) * total_nnz) / 40);
+        (static_cast<uint64_t>(part) * total_nnz) / vecCoreCount);
     split[part] = static_cast<uint32_t>(
         std::lower_bound(host_indptr.begin(), host_indptr.end(), target) -
         host_indptr.begin());
@@ -761,9 +818,9 @@ static void SpMMCsrUnified(
 
   // Copy split to device
   void* split_dev = nullptr;
-  ASCEND_CALL(aclrtMalloc(&split_dev, 41 * sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST));
-  ASCEND_CALL(aclrtMemcpy(split_dev, 41 * sizeof(uint32_t), split.data(),
-                           41 * sizeof(uint32_t), ACL_MEMCPY_HOST_TO_DEVICE));
+  ASCEND_CALL(aclrtMalloc(&split_dev, (vecCoreCount + 1) * sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST));
+  ASCEND_CALL(aclrtMemcpy(split_dev, (vecCoreCount + 1) * sizeof(uint32_t), split.data(),
+                           (vecCoreCount + 1) * sizeof(uint32_t), ACL_MEMCPY_HOST_TO_DEVICE));
 
   // Build tiling
   SpmmUnifiedAivTilingData tiling;
@@ -773,6 +830,7 @@ static void SpMMCsrUnified(
   tiling.nonZeroCount = static_cast<uint32_t>(nnz);
   tiling.batchCount = static_cast<uint32_t>(batch_count);
   tiling.dtype = (sizeof(DType) == 4) ? 0 : 1;  // 0=FP32, 1=FP16
+  tiling.isCopyRhs = (op == "copy_rhs") ? 1 : 0;
 
   void* tiling_dev = nullptr;
   ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling), ACL_MEM_MALLOC_HUGE_FIRST));
@@ -783,7 +841,7 @@ static void SpMMCsrUnified(
   ASCEND_CALL(aclrtMemsetAsync(out->data, out.GetSize(), 0, out.GetSize(), stream));
 
   // Launch kernel
-  uint32_t blockDim = 40;
+  uint32_t blockDim = vecCoreCount;
   aclError err;
   if (reduce == "sum") {
     err = ACLRT_LAUNCH_KERNEL(spmm_unified_aiv)(
@@ -818,8 +876,18 @@ void SpMMCsr<kDGLAscend, int32_t, float>(
     const std::string& op, const std::string& reduce, const BcastOff& bcast,
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
-  if (op == "copy_lhs" && (reduce == "sum" || reduce == "max" || reduce == "min") && ufeat->ndim <= 3) {
-    SpMMCsrUnified<int32_t, float>(op, reduce, csr, ufeat, out, out_aux);
+  if ((op == "copy_lhs" || op == "copy_rhs") &&
+      (reduce == "sum" || reduce == "max" || reduce == "min") &&
+      (op == "copy_lhs" ? ufeat->ndim : efeat->ndim) <= 3) {
+    NDArray feat;
+    if (op == "copy_rhs") {
+      // InCSR's data array contains edge reorder index from COOToCSR.
+      // Use it to gather efeat into CSC row order: feat[j] = efeat[data[j]]
+      feat = IsNullArray(csr.data) ? efeat : GatherByIndex(efeat, csr.data);
+    } else {
+      feat = ufeat;
+    }
+    SpMMCsrUnified<int32_t, float>(op, reduce, csr, feat, out, out_aux);
   } else {
     // CPU fallback for non-copy_lhs ops or multi-dim features
     DGLContext cpu_ctx{kDGLCPU, 0};
@@ -844,6 +912,14 @@ void SpMMCsr<kDGLAscend, int32_t, uint16_t>(
     const std::string& op, const std::string& reduce, const BcastOff& bcast,
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
+  // FP16 copy_rhs: not supported on NPU (SpMMCsrAscend only does copy_lhs,
+  // SpMMCsrUnified only supports float). Falls back to CPU for correctness.
+  // CPU uint16_t SpMMCsr is not instantiated, so LOG(FATAL) for now.
+  // FP32 copy_rhs is fully supported via SpMMCsrUnified.
+  if (op == "copy_rhs") {
+    LOG(FATAL) << "FP16 copy_rhs not supported on Ascend NPU. "
+               << "Use FP32 for copy_e_sum operations.";
+  }
   SpMMCsrAscend<int32_t, uint16_t>(op, reduce, bcast, csr, ufeat, efeat, out, out_aux);
 }
 
@@ -853,6 +929,10 @@ void SpMMCsr<kDGLAscend, int64_t, uint16_t>(
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
   CSRMatrix csr32 = CastCSRToInt32SpMM(csr);
+  if (op == "copy_rhs") {
+    LOG(FATAL) << "FP16 copy_rhs not supported on Ascend NPU. "
+               << "Use FP32 for copy_e_sum operations.";
+  }
   SpMMCsrAscend<int32_t, uint16_t>(op, reduce, bcast, csr32, ufeat, efeat, out, out_aux);
 }
 
@@ -862,8 +942,16 @@ void SpMMCsr<kDGLAscend, int64_t, float>(
     const CSRMatrix& csr, NDArray ufeat, NDArray efeat, NDArray out,
     std::vector<NDArray> out_aux) {
   CSRMatrix csr32 = CastCSRToInt32SpMM(csr);
-  if (op == "copy_lhs" && (reduce == "sum" || reduce == "max" || reduce == "min") && ufeat->ndim <= 3) {
-    SpMMCsrUnified<int32_t, float>(op, reduce, csr32, ufeat, out, out_aux);
+  if ((op == "copy_lhs" || op == "copy_rhs") &&
+      (reduce == "sum" || reduce == "max" || reduce == "min") &&
+      (op == "copy_lhs" ? ufeat->ndim : efeat->ndim) <= 3) {
+    NDArray feat;
+    if (op == "copy_rhs") {
+      feat = IsNullArray(csr32.data) ? efeat : GatherByIndex(efeat, csr32.data);
+    } else {
+      feat = ufeat;
+    }
+    SpMMCsrUnified<int32_t, float>(op, reduce, csr32, feat, out, out_aux);
   } else {
     DGLContext cpu_ctx{kDGLCPU, 0};
     CSRMatrix csr32_cpu = csr32.CopyTo(cpu_ctx);

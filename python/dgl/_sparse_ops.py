@@ -153,6 +153,50 @@ def _edge_softmax_forward(gidx, e, op):
     return myout
 
 
+def _npu_gspmm_binary(gidx, op, reduce_op, u, e, v_shp, ctx, dtype):
+    import torch as th
+    num_edges = gidx.num_edges(0)
+    _, dsttype = gidx.metagraph.find_edge(0)
+    num_dst = gidx.num_nodes(dsttype)
+
+    from ._ffi.runtime_ctypes import DGLContext
+    cpu_gidx = gidx.copy_to(DGLContext(1, 0))
+    eid_cpu = th.arange(num_edges, dtype=th.int64)
+    src_eid, dst_eid, _ = cpu_gidx.find_edges(0, eid_cpu)
+    _, csc_order_idx = cpu_gidx.get_csr_shuffle_order(0)
+    csc_order = csc_order_idx.tousertensor().to(ctx)
+    src_eid = src_eid.to(ctx)
+    dst_eid = dst_eid.to(ctx)
+
+    u_gathered = u[src_eid[csc_order]]
+    e_sorted = e[csc_order]
+
+    if op == "mul":
+        msg = u_gathered * e_sorted
+    else:
+        msg = u_gathered + e_sorted
+
+    msg_flat = msg.reshape(num_edges, -1)
+
+    seglen = th.zeros(num_dst, device=ctx, dtype=th.int64)
+    seglen.scatter_add_(
+        0, dst_eid[csc_order].long(),
+        th.ones(num_edges, device=ctx, dtype=th.int64)
+    )
+    offsets = th.cumsum(
+        th.cat([th.zeros(1, device=ctx, dtype=seglen.dtype), seglen]), 0
+    )
+
+    try:
+        th.npu.synchronize()
+    except Exception:
+        pass
+
+    rst = F.segment_reduce(reduce_op, msg_flat, offsets)
+    rst = rst.reshape(v_shp)
+    return rst, (None, None)
+
+
 def _gspmm(gidx, op, reduce_op, u, e):
     r"""Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
@@ -224,6 +268,22 @@ def _gspmm(gidx, op, reduce_op, u, e):
     v_shp = (gidx.num_nodes(dsttype),) + infer_broadcast_shape(
         op, u_shp[1:], e_shp[1:]
     )
+    _is_npu = hasattr(F, "device_type") and F.device_type(ctx) == "npu"
+    if (
+        _is_npu
+        and op in ("mul", "add")
+        and reduce_op == "sum"
+        and use_u
+        and use_e
+        and gidx.num_edges(0) > 0
+    ):
+        v, (arg_u, arg_e) = _npu_gspmm_binary(
+            gidx, op, reduce_op, u, e, v_shp, ctx, dtype
+        )
+        if (expand_u or not use_u) and (expand_e or not use_e):
+            v = F.squeeze(v, -1)
+        return v, (arg_u, arg_e)
+
     v = F.zeros(v_shp, dtype, ctx)
     use_cmp = reduce_op in ["max", "min"]
     arg_u, arg_e = None, None
