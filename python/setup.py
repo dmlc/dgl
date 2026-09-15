@@ -228,8 +228,8 @@ if include_libs:
 
 # Configure dependencies.
 install_requires = [
-    "torch==2.8.0",
-    "torch_npu==2.8.0.post2",
+    "torch==2.7.1",
+    "torch_npu==2.7.1.post4",
     "networkx>=2.1",
     "numpy>=1.14.0",
     "packaging",

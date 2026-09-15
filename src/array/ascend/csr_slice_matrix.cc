@@ -1,3 +1,11 @@
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+// Include torch_npu stream headers FIRST: c10 redefines LOG/CHECK
+// macros; dmlc's definitions below must win so LOG(FATAL) throws
+// (catchable) instead of aborting the process.
+#include <torch_npu/csrc/core/npu/NPUStream.h>
+#include <torch_npu/csrc/core/npu/NPUFunctions.h>
+#endif
+
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
@@ -48,6 +56,23 @@ namespace runtime {
 aclrtStream getCurrentAscendStream();
 }
 }
+
+// Cross-framework ordering: torch_npu executes eager ops on its own NPU
+// stream and ACL context; DGL-side syncs (aclrtSynchronizeStream from the
+// default context) do not reliably wait on it. Use torch's own wrapper on
+// the torch current stream at every entry that consumes torch-written
+// buffers. (No-op when torch stream integration is not compiled in.)
+#ifdef DGL_USE_PYTORCH_NPU_STREAM
+inline aclrtStream ResolveSliceStream(int64_t device_id) {
+  return c10_npu::getCurrentNPUStream(
+      static_cast<c10::DeviceIndex>(device_id)).stream();
+}
+inline void SyncSliceStream(int64_t device_id) {
+  c10_npu::stream_synchronize(ResolveSliceStream(device_id));
+}
+#else
+inline void SyncSliceStream(int64_t) {}
+#endif
 #endif
 
 #include <dgl/array.h>
@@ -62,148 +87,24 @@ template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
 #ifdef DGL_USE_ASCEND
+  // CPU fallback: see csr_slice_rows.cc (NPU slice kernels mishandle
+  // non-contiguous / unsorted selections in release builds).
   auto ctx = csr.indptr->ctx;
   CHECK(ctx.device_type == kDGLAscend);
-
-  const int64_t new_nrows = rows->shape[0];
-  const int64_t new_ncols = cols->shape[0];
-  const bool has_data = CSRHasData(csr);
-
+  SyncSliceStream(ctx.device_id);
   ASCEND_CALL(aclrtSetDevice(ctx.device_id));
-
-  auto stream = dgl::runtime::getCurrentAscendStream();
-
-  // Allocate valid_col lookup table on NPU (int64, initialized by kernel)
-  uint32_t num_cols_u32 = static_cast<uint32_t>(csr.num_cols);
-  NDArray valid_col_arr = NDArray::Empty(
-      {csr.num_cols}, DGLDataType{kDGLInt, 64, 1}, ctx);
-  void* valid_col_data = valid_col_arr->data;
-
-  // Allocate ret_indptr (count pass writes to it)
-  IdArray ret_indptr =
-      IdArray::Empty({new_nrows + 1}, csr.indptr->dtype, ctx);
-
-  // --- Count pass: aclrtMemsetAsync init + 2 kernel launches (mark / prefix) ---
-  // aclrtMemsetAsync uses the DMA engine (no AI Core scheduling issue).
-  // Stream ordering serializes DMA → mark kernel → prefix kernel, providing a barrier.
-  {
-    size_t bytes = static_cast<size_t>(csr.num_cols) * sizeof(int64_t);
-    ASCEND_CALL(aclrtMemsetAsync(valid_col_data, bytes, 0xFF, bytes, stream));
-  }
-
-  // Launch 1: mark valid_col[cols[k]] = k (single block — Ascend HW may not dispatch all blocks for small blockDim)
-  {
-    uint32_t ncols_u32 = static_cast<uint32_t>(new_ncols);
-    uint32_t block_dim_mark = 1;
-    uint32_t tiling_data[2] = {ncols_u32, num_cols_u32};
-    void* tiling_dev = nullptr;
-    ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling_data), ACL_MEM_MALLOC_HUGE_FIRST));
-    ASCEND_CALL(aclrtMemcpy(tiling_dev, sizeof(tiling_data),
-                             tiling_data, sizeof(tiling_data),
-                             ACL_MEMCPY_HOST_TO_DEVICE));
-    if (std::is_same<IdType, int32_t>::value) {
-      aclError err = aclrtlaunch_csr_slice_matrix_mark_valid_col_int32(
-          block_dim_mark, stream, cols->data, valid_col_data, tiling_dev);
-      CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_mark_valid_col_int32 failed: " << err;
-    } else {
-      aclError err = aclrtlaunch_csr_slice_matrix_mark_valid_col_int64(
-          block_dim_mark, stream, cols->data, valid_col_data, tiling_dev);
-      CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_mark_valid_col_int64 failed: " << err;
-    }
-    ASCEND_CALL(aclrtSynchronizeStream(stream));
-    ASCEND_CALL(aclrtFree(tiling_dev));
-  }
-
-  // Launch 2: prefix sum (single block, reads valid_col, writes ret_indptr)
-  {
-    uint32_t nrows_u32 = static_cast<uint32_t>(new_nrows);
-    uint32_t orig_nrows_u32 = static_cast<uint32_t>(csr.num_rows);
-    uint32_t orig_nnz_u32 = static_cast<uint32_t>(csr.indices->shape[0]);
-    uint32_t tiling_data[4] = {nrows_u32, num_cols_u32, orig_nrows_u32, orig_nnz_u32};
-    void* tiling_dev = nullptr;
-    ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling_data), ACL_MEM_MALLOC_HUGE_FIRST));
-    ASCEND_CALL(aclrtMemcpy(tiling_dev, sizeof(tiling_data),
-                             tiling_data, sizeof(tiling_data),
-                             ACL_MEMCPY_HOST_TO_DEVICE));
-    if (std::is_same<IdType, int32_t>::value) {
-      aclError err = aclrtlaunch_csr_slice_matrix_prefix_int32(
-          1, stream,
-          csr.indptr->data, csr.indices->data,
-          rows->data, valid_col_data,
-          ret_indptr->data, tiling_dev);
-      CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_prefix_int32 failed: " << err;
-    } else {
-      aclError err = aclrtlaunch_csr_slice_matrix_prefix_int64(
-          1, stream,
-          csr.indptr->data, csr.indices->data,
-          rows->data, valid_col_data,
-          ret_indptr->data, tiling_dev);
-      CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_prefix_int64 failed: " << err;
-    }
-    ASCEND_CALL(aclrtSynchronizeStream(stream));
-    ASCEND_CALL(aclrtFree(tiling_dev));
-  }
-
-  // Read total nnz from ret_indptr[new_nrows]
-  IdType total_nnz = 0;
-  auto device = runtime::DeviceAPI::Get(ctx);
-  device->CopyDataFromTo(
-      static_cast<IdType*>(ret_indptr->data) + new_nrows, 0,
-      &total_nnz, 0, sizeof(IdType),
-      ctx, DGLContext{kDGLCPU, 0}, ret_indptr->dtype);
-  // total_nnz is read from ret_indptr to allocate output arrays
-
-  // Allocate output arrays
-  IdArray ret_indices =
-      IdArray::Empty({static_cast<int64_t>(total_nnz)}, csr.indices->dtype, ctx);
-  DGLDataType data_dtype = has_data ? csr.data->dtype : csr.indices->dtype;
-  IdArray ret_data_arr =
-      NDArray::Empty({static_cast<int64_t>(total_nnz)}, data_dtype, ctx);
-
-  if (total_nnz == 0) {
-    return CSRMatrix(
-        new_nrows, new_ncols, ret_indptr, ret_indices, ret_data_arr, csr.sorted);
-  }
-
-  // Pass 2 tiling: [nrows, has_data, num_cols, orig_nrows, orig_nnz]
-  uint32_t orig_nrows_u32 = static_cast<uint32_t>(csr.num_rows);
-  uint32_t orig_nnz_u32 = static_cast<uint32_t>(csr.indices->shape[0]);
-  uint32_t pass2_tiling[5] = {
-      static_cast<uint32_t>(new_nrows),
-      has_data ? 1u : 0u,
-      num_cols_u32,
-      orig_nrows_u32,
-      orig_nnz_u32};
-  uint32_t block_dim2 = 1;  // single block (Ascend may not dispatch all blocks)
-  void* tiling_dev2 = nullptr;
-  ASCEND_CALL(aclrtMalloc(&tiling_dev2, sizeof(pass2_tiling), ACL_MEM_MALLOC_HUGE_FIRST));
-  ASCEND_CALL(aclrtMemcpy(tiling_dev2, sizeof(pass2_tiling),
-                           pass2_tiling, sizeof(pass2_tiling),
-                           ACL_MEMCPY_HOST_TO_DEVICE));
-
-  void* data_ptr = has_data ? csr.data->data : csr.indices->data;
-
-  if (std::is_same<IdType, int32_t>::value) {
-    aclError err = aclrtlaunch_csr_slice_matrix_copy_int32(
-        block_dim2, stream,
-        csr.indptr->data, csr.indices->data, data_ptr,
-        rows->data, valid_col_data,
-        ret_indptr->data, ret_indices->data, ret_data_arr->data, tiling_dev2);
-    CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_copy_int32 failed: " << err;
-  } else {
-    aclError err = aclrtlaunch_csr_slice_matrix_copy_int64(
-        block_dim2, stream,
-        csr.indptr->data, csr.indices->data, data_ptr,
-        rows->data, valid_col_data,
-        ret_indptr->data, ret_indices->data, ret_data_arr->data, tiling_dev2);
-    CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_copy_int64 failed: " << err;
-  }
-
-  ASCEND_CALL(aclrtSynchronizeStream(stream));
-  ASCEND_CALL(aclrtFree(tiling_dev2));
-
-  return CSRMatrix(
-      new_nrows, new_ncols, ret_indptr, ret_indices, ret_data_arr, csr.sorted);
+  DGLContext cpu_ctx{kDGLCPU, 0};
+  CSRMatrix cpu_csr{
+      csr.num_rows, csr.num_cols,
+      csr.indptr.CopyTo(cpu_ctx), csr.indices.CopyTo(cpu_ctx),
+      CSRHasData(csr) ? csr.data.CopyTo(cpu_ctx) : csr.data,
+      csr.sorted};
+  CSRMatrix out = CSRSliceMatrix<kDGLCPU, IdType>(
+      cpu_csr, rows.CopyTo(cpu_ctx), cols.CopyTo(cpu_ctx));
+  out.indptr = out.indptr.CopyTo(ctx);
+  out.indices = out.indices.CopyTo(ctx);
+  if (CSRHasData(out)) out.data = out.data.CopyTo(ctx);
+  return out;
 #else
   LOG(FATAL) << "Ascend support is not compiled.";
   return {};

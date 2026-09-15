@@ -285,10 +285,10 @@ if(USE_ASCEND)
   execute_process(COMMAND python3 -c "import sys; print(sys.prefix)"
                   OUTPUT_VARIABLE Python3_ROOT_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  # Development (not Development.Module): libdgl.so links libtorch.so, which
-  # pulls in many Python C API symbols; therefore libpython must be linked
-  # explicitly via Python3_LIBRARIES.
-  find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+  # Development.Module (not Development/Embed): libdgl.so is loaded by the Python
+  # interpreter via ctypes, so it must NOT link libpython — wheels then carry no
+  # libpython dependency and work on any cpython build.
+  find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
 
   find_package(Torch REQUIRED PATHS ${LIBTORCH_PATH})
 

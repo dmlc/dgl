@@ -1,0 +1,41 @@
+# manylinux_2_28 build image for dgl-ascend wheel (aarch64).
+#
+# CANN is NOT installed in this image -- it is bind-mounted read-only from the
+# host at runtime (see tools/build_wheel.sh / the podman run command). This works
+# because CANN 8.5.0 binaries only require GLIBC_2.17 / GLIBCXX_3.4.19, which
+# manylinux_2_28 (glibc 2.28, AlmaLinux 8) satisfies.
+#
+# Build (from repo root), using the DaoCloud mirror of quay.io since quay.io's
+# CDN is unreachable from CN networks:
+#   CONTAINERS_STORAGE_CONF=/tmp/podman-vfs.conf \
+#   podman build -f docker/Dockerfile.manylinux_cann_aarch64 \
+#       -t dgl-ascend-build:aarch64 .
+#
+# Then run with host CANN bind-mounted:
+#   CONTAINERS_STORAGE_CONF=/tmp/podman-vfs.conf \
+#   podman run --rm --cpus=32 --memory=128g \
+#       -v /usr/local/Ascend:/usr/local/Ascend:ro \
+#       -v "$PWD":/work -w /work \
+#       dgl-ascend-build:aarch64 bash tools/build_wheel.sh
+
+FROM quay.m.daocloud.io/pypa/manylinux_2_28_aarch64:latest
+
+ARG PYVER=cp311-cp311
+ENV PYBIN=/opt/python/${PYVER}/bin
+ENV PATH=${PYBIN}:${PATH}
+ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/cann-8.5.0
+ENV ASCEND_HOME_PATH=${ASCEND_TOOLKIT_HOME}
+ENV ASCEND_OPP_PATH=${ASCEND_TOOLKIT_HOME}/opp
+ENV LD_LIBRARY_PATH=${ASCEND_TOOLKIT_HOME}/lib64:${ASCEND_TOOLKIT_HOME}/lib64/plugin/opskernel:${LD_LIBRARY_PATH}
+
+# pip uses the Huawei Cloud PyPI mirror (same as host); pypi.org is unreachable here.
+RUN mkdir -p /root/.pip && printf '[global]\nindex-url = https://mirrors.huaweicloud.com/repository/pypi/simple\ntrusted-host = mirrors.huaweicloud.com\ntimeout = 120\n' > /root/.pip/pip.conf
+
+# Build tools. manylinux ships gcc/g++/make; add cmake + patchelf (auditwheel dep) via pip.
+RUN ${PYBIN}/pip install --upgrade pip setuptools wheel build "Cython>=0.29" auditwheel cmake patchelf
+
+# torch 2.8.0 + torch_npu 2.8.0 from the Huawei mirror.
+# On aarch64 the PyPI torch wheel is the CPU build (no aarch64 CUDA wheel on PyPI),
+# which is what torch_npu expects.
+RUN ${PYBIN}/pip install torch==2.7.1
+RUN ${PYBIN}/pip install torch_npu==2.7.1.post2
