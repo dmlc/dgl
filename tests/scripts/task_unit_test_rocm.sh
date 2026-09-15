@@ -26,9 +26,19 @@ export TF_FORCE_GPU_ALLOW_GROWTH=true
 unset TORCH_ALLOW_TF32_CUBLAS_OVERRIDE
 
 # torch_shm_manager, which PyTorch launches to share CPU tensors across
-# processes, links against librocm-openblas.so.0. When PyTorch is installed from
-# the rocm-sdk wheels that library lives inside the package rather than on the
-# default loader path.
+# processes (e.g. torch.multiprocessing, DGL's multiprocess/IPC tests), links
+# against librocm-openblas.so.0 and librocprofiler-sdk.so.1. When PyTorch is
+# installed from the rocm-sdk wheels those libraries live inside the package
+# rather than on the default loader path: librocm-openblas.so.0 under
+# .../lib/host-math/lib, librocprofiler-sdk.so.1 directly under .../lib.
+# Without both on LD_LIBRARY_PATH, torch_shm_manager fails to start with
+# "error while loading shared libraries", surfacing as a generic
+# "no response from torch_shm_manager" RuntimeError in any test that shares
+# CPU tensors across processes.
+ROCM_SDK_CORE_LIB=$(python3 -c "import os, _rocm_sdk_core; print(os.path.join(os.path.dirname(_rocm_sdk_core.__file__), 'lib'))" 2>/dev/null)
+if [ -d "${ROCM_SDK_CORE_LIB}" ]; then
+  export LD_LIBRARY_PATH=${ROCM_SDK_CORE_LIB}:${LD_LIBRARY_PATH}
+fi
 ROCM_SDK_MATH_LIBS=$(python3 -c "import os, _rocm_sdk_core; print(os.path.join(os.path.dirname(_rocm_sdk_core.__file__), 'lib', 'host-math', 'lib'))" 2>/dev/null)
 if [ -d "${ROCM_SDK_MATH_LIBS}" ]; then
   export LD_LIBRARY_PATH=${ROCM_SDK_MATH_LIBS}:${LD_LIBRARY_PATH}

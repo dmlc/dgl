@@ -54,6 +54,14 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+# JUnit/coverage output from tests/scripts/task_unit_test_rocm.sh, and its
+# test-generated fixtures/download cache, when run from the repo root.
+pytest_*.xml
+lcov_pytest*.info
+python_coverage_report.txt
+cluster_gcn.pkl
+optim_ip_config.txt
+_download/
 
 # Translations
 *.mo
