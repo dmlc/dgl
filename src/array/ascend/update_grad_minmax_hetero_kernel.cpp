@@ -65,7 +65,6 @@ class KernelUpdateGradMinMaxHetero {
  public:
   __aicore__ inline void Init(GM_ADDR feat, GM_ADDR idx, GM_ADDR idx_etype,
                               GM_ADDR out, GM_ADDR tiling_ptr) {
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 
     AscendC::GlobalTensor<uint32_t> tilingGm;
     tilingGm.SetGlobalBuffer((__gm__ uint32_t*)tiling_ptr, 4);
