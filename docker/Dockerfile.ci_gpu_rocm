@@ -64,8 +64,11 @@ RUN cmake --preset rocm -DCMAKE_HIP_ARCHITECTURES=${ARG_GPU_BUILD_TARGETS} -DGPU
 RUN cmake --build ${DGL_BUILD_DIR} --parallel ${MAX_JOBS}
 
 WORKDIR ${DGL_SRC_DIR}/python
-# Make sure we have wheel and build installed
-RUN python -m pip install build wheel
+# Make sure we have wheel and build installed. Cython is needed here (not
+# just at runtime) because setup.py's config_cython() only builds the
+# dgl._ffi._cy3.core extension when Cython is importable at `pip install`
+# time; otherwise it silently falls back to the ctypes-only FFI path.
+RUN python -m pip install build wheel cython
 # Install an editable version of the package so we can make source changes and test them
 RUN python -m pip install -e .
 # Build the wheel file for packaging (won't update automatically with source changes)

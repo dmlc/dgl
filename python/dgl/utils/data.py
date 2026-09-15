@@ -3,6 +3,7 @@
 from collections import namedtuple
 
 import networkx as nx
+import numpy as np
 import scipy as sp
 
 from .. import backend as F
@@ -94,7 +95,12 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name=None):
         src = [0] * num_edges
         dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
-            eid = int(attr[edge_id_attr_name])
+            # edge_id_attr_name's value may be a plain int, a numpy scalar, or
+            # (as e.g. produced by some numpy-based preprocessing) a
+            # single-element array. np.asarray(...).item() extracts a Python
+            # int from any of these; a bare int(...) call rejects
+            # single-element non-0-d arrays as of NumPy 2.0.
+            eid = int(np.asarray(attr[edge_id_attr_name]).item())
             if eid < 0 or eid >= nx_graph.number_of_edges():
                 raise DGLError(
                     "Expect edge IDs to be a non-negative integer smaller than {:d}, "
@@ -278,7 +284,9 @@ def networkxbipartite2tensors(
                     "Expect the node {} to have attribute bipartite=1 "
                     "with edge {}".format(v, (u, v))
                 )
-            eid = int(attr[edge_id_attr_name])
+            # See the analogous conversion in networkx2tensor() above for why
+            # np.asarray(...).item() is used instead of a bare int(...) call.
+            eid = int(np.asarray(attr[edge_id_attr_name]).item())
             if eid < 0 or eid >= nx_graph.number_of_edges():
                 raise DGLError(
                     "Expect edge IDs to be a non-negative integer smaller than {:d}, "

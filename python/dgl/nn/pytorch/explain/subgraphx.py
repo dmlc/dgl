@@ -145,7 +145,11 @@ class SubgraphX(nn.Module):
         device = self.feat.device
         for _ in range(self.shapley_steps):
             permuted_space = np.random.permutation(coalition_space)
-            split_idx = int(np.where(permuted_space == split_point)[0])
+            # np.where(...)[0] is a single-element 1-D array here (split_point
+            # appears exactly once in permuted_space); .item() extracts a
+            # Python int from it. A bare int(...) call on that array works on
+            # older NumPy but raises TypeError as of NumPy 2.0.
+            split_idx = np.where(permuted_space == split_point)[0].item()
 
             selected_nodes = permuted_space[:split_idx]
 
@@ -490,7 +494,9 @@ class HeteroSubgraphX(nn.Module):
             selected_node_map = dict()
             for ntype, nodes in coalition_space.items():
                 permuted_space = np.random.permutation(nodes)
-                split_idx = int(np.where(permuted_space == split_point)[0])
+                # See the analogous conversion in SubgraphX.shapley() above
+                # for why .item() is used instead of a bare int(...) call.
+                split_idx = np.where(permuted_space == split_point)[0].item()
                 selected_node_map[ntype] = permuted_space[:split_idx]
 
             # Mask for coalition set S_i
