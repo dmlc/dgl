@@ -38,9 +38,19 @@ using namespace c10::hip;
 using GPUStream_t = at::hip::HIPStreamMasqueradingAsCUDA;
 #define THRUST_BACKEND thrust::hip
 #define GET_CURRENT_GPU_STREAM getCurrentHIPStreamMasqueradingAsCUDA
-#define GRAPHBOLT_CACHING_ALLOCATOR c10::hip::HIPCachingAllocator
+// NOTE: unlike GET_CURRENT_GPU_STREAM (getCurrentHIPStreamMasqueradingAsCUDA,
+// a real ATen-level "masquerading" symbol), this PyTorch version does not
+// provide a c10::hip::HIPCachingAllocator alias at all - only
+// c10::cuda::CUDACachingAllocator is defined (used directly by both the CUDA
+// and HIP builds internally, same "unified CUDA naming" pattern as
+// C10_CUDA_KERNEL_LAUNCH_CHECK above).
+#define GRAPHBOLT_CACHING_ALLOCATOR c10::cuda::CUDACachingAllocator
 #define GRAPHBOLT_C10_CHECK C10_HIP_CHECK
-#define GRAPHBOLT_C10_KERNEL_LAUNCH_CHECK C10_HIP_KERNEL_LAUNCH_CHECK
+// NOTE: unlike C10_HIP_CHECK (aliased to C10_CUDA_CHECK by PyTorch's own
+// <c10/hip/HIPException.h>), this PyTorch version does not provide a
+// C10_HIP_KERNEL_LAUNCH_CHECK alias - only C10_CUDA_KERNEL_LAUNCH_CHECK is
+// defined (used directly by both the CUDA and HIP builds internally).
+#define GRAPHBOLT_C10_KERNEL_LAUNCH_CHECK C10_CUDA_KERNEL_LAUNCH_CHECK
 
 #else // we're using CUDA
 
@@ -103,8 +113,14 @@ struct CUDAWorkspaceAllocator {
 
   CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
 
-  void operator()(void* ptr) const {
-   GRAPHBOLT_CACHING_ALLOCATOR::raw_delete(ptr);
+  // Templated (rather than a single void* overload) so that
+  // std::unique_ptr<T, CUDAWorkspaceAllocator>'s destructor - which requires
+  // std::is_invocable<deleter_type&, pointer>, i.e. an EXACT-type call, not
+  // relying on the (otherwise always-legal) implicit T*->void* conversion -
+  // finds a directly matching overload for every T used with AllocateStorage.
+  template <typename T>
+  void operator()(T* ptr) const {
+   GRAPHBOLT_CACHING_ALLOCATOR::raw_delete(static_cast<void*>(ptr));
   }
 
   // Required by thrust to satisfy allocator requirements.
@@ -194,7 +210,7 @@ template <typename scalar_t>
 struct CopyScalar {
   CopyScalar() : is_ready_(true) { init_pinned_storage(); }
 
-  void record(GPUStream_t stream = GetCurrentStream()) {
+  void record(GPUStream_t stream = GPUStream_t(GetCurrentStream())) {
     copy_event_.record(stream);
     is_ready_ = false;
   }
@@ -205,7 +221,7 @@ struct CopyScalar {
 
   CopyScalar(const scalar_t* device_ptr) {
     init_pinned_storage();
-    auto stream = GetCurrentStream();
+    GPUStream_t stream = GPUStream_t(GetCurrentStream());
     CUDA_CALL(cudaMemcpyAsync(
         reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr()), device_ptr,
         sizeof(scalar_t), cudaMemcpyDeviceToHost, stream));

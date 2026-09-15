@@ -76,13 +76,14 @@ cd ${DEPS_DIR}
 # This was implicitly not allowed in previous releases we were using, 
 # but with v2.7.0 they are explicitly not allowed.
 
-# TODO (#22) remove this once the patches are merged
-# the patches for this were merged in https://github.com/ROCm/rocm-libraries/pull/1883
-# but may take more time to be released.
-
-# Right now we need to patch the rocPRIM headers to fix the build because these
-# config headers are missing gfx942 (I've added them manually)
-run cp ${FILE_SOURCE_DIR}/*.hpp ${INSTALL_PREFIX}/include/rocprim/device/detail/config/.
+# (#22) The rocPRIM config headers used to be missing gfx942 entirely, so this
+# script used to manually copy hand-patched versions (script/*.hpp) over
+# ROCm's own rocprim/device/detail/config/*.hpp. That gap was fixed upstream
+# in https://github.com/ROCm/rocm-libraries/pull/1883 and ROCm 10.0.0 ships
+# rocPRIM 4.6.0, which already has working gfx942/gfx950 configs with a
+# different internal API shape than our old vendored copies. Copying the
+# stale local copies over ROCm 10.0.0's headers actively breaks the build
+# (undefined default_batch_memcpy_config_base etc.), so this step is removed.
 
 # hipCollections installs cuco headers that still need local fixes on recent ROCm
 # stacks (rocThrust 5.0, libhipcxx SFINAE). Patch files live under script/patches/.

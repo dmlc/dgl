@@ -50,14 +50,16 @@
 #include <c10/hip/HIPGuard.h>
 #include <torch/csrc/api/include/torch/cuda.h>
 
-namespace c10::cuda {
-using CUDAStream = c10::hip::HIPStreamMasqueradingAsCUDA;
-using CUDAStreamGuard = c10::hip::HIPStreamGuardMasqueradingAsCUDA;
-
-inline auto getCurrentCUDAStream() {
-  return c10::hip::getCurrentHIPStreamMasqueradingAsCUDA();
-}
-}  // namespace c10::cuda
+// NOTE: c10::cuda::CUDAStream, c10::cuda::CUDAStreamGuard, and
+// c10::cuda::getCurrentCUDAStream(DeviceIndex device_index = -1) used to not
+// exist for HIP builds on older PyTorch/ROCm ports, so this file used to
+// reopen namespace c10::cuda here to alias/define them from their
+// c10::hip::*MasqueradingAsCUDA equivalents. This PyTorch/ROCm version's own
+// (hipified) <c10/hip/HIPStream.h> and <c10/hip/HIPGuard.h> now declare
+// c10::cuda::CUDAStream, c10::cuda::CUDAStreamGuard, and
+// c10::cuda::getCurrentCUDAStream directly, so the shims here would conflict
+// (typedef redefinition / ambiguous overload) with those real declarations.
+// Removed; all call sites below resolve to PyTorch's real declarations.
 
 #endif
 
