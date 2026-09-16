@@ -40,7 +40,6 @@ public:
                                 const __gm__ EdgeSoftmaxTilingData* tiling)
     {
         // 声明 AIV-only 任务类型（DESIGN.md §1.2）
-        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 
         tiling_ = tiling;
         uint32_t blockIdx = AscendC::GetBlockIdx();

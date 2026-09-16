@@ -8,7 +8,6 @@ constexpr uint32_t TILE_SIZE = 1024;
 class KernelRangeI32 {
 public:
     __aicore__ inline void Init(GM_ADDR dst, GM_ADDR tiling_ptr) {
-        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 
         GlobalTensor<uint32_t> tilingGm;
         tilingGm.SetGlobalBuffer((__gm__ uint32_t*)tiling_ptr, 3);
@@ -66,7 +65,6 @@ extern "C" __global__ __aicore__ void range_i32(
 class KernelRangeI64 {
 public:
     __aicore__ inline void Init(GM_ADDR dst, GM_ADDR tiling_ptr) {
-        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 
         GlobalTensor<uint32_t> tilingGm;
         tilingGm.SetGlobalBuffer((__gm__ uint32_t*)tiling_ptr, 3);

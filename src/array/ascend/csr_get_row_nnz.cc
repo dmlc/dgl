@@ -1,10 +1,10 @@
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
-#define ASCEND_CALL(func)                                                \
-  {                                                                      \
-    aclError e = (func);                                                 \
-    CHECK(e == ACL_SUCCESS) << "Ascend Error, code: " << e;              \
+#define ASCEND_CALL(func)                                   \
+  {                                                         \
+    aclError e = (func);                                    \
+    CHECK(e == ACL_SUCCESS) << "Ascend Error, code: " << e; \
   }
 
 #ifndef ACLRT_LAUNCH_KERNEL
@@ -12,22 +12,23 @@
 #endif
 
 extern "C" uint32_t aclrtlaunch_csr_get_row_nnz_int32(
-    uint32_t blockDim, aclrtStream stream,
-    void* indptr, void* rows, void* out, void* tiling);
+    uint32_t blockDim, aclrtStream stream, void* indptr, void* rows, void* out,
+    void* tiling);
 
 extern "C" uint32_t aclrtlaunch_csr_get_row_nnz_int64(
-    uint32_t blockDim, aclrtStream stream,
-    void* indptr, void* rows, void* out, void* tiling);
+    uint32_t blockDim, aclrtStream stream, void* indptr, void* rows, void* out,
+    void* tiling);
 
 namespace dgl {
 namespace runtime {
 aclrtStream getCurrentAscendStream();
 }
-}
+}  // namespace dgl
 #endif
 
 #include <dgl/array.h>
 #include <dgl/runtime/device_api.h>
+
 #include "../array_op.h"
 
 namespace dgl {
@@ -41,11 +42,11 @@ int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   IdType start = 0, end = 0;
   auto device = runtime::DeviceAPI::Get(csr.indptr->ctx);
   device->CopyDataFromTo(
-      indptr_data + row, 0, &start, 0, sizeof(IdType),
-      csr.indptr->ctx, DGLContext{kDGLCPU, 0}, csr.indptr->dtype);
+      indptr_data + row, 0, &start, 0, sizeof(IdType), csr.indptr->ctx,
+      DGLContext{kDGLCPU, 0}, csr.indptr->dtype);
   device->CopyDataFromTo(
-      indptr_data + row + 1, 0, &end, 0, sizeof(IdType),
-      csr.indptr->ctx, DGLContext{kDGLCPU, 0}, csr.indptr->dtype);
+      indptr_data + row + 1, 0, &end, 0, sizeof(IdType), csr.indptr->ctx,
+      DGLContext{kDGLCPU, 0}, csr.indptr->dtype);
   return static_cast<int64_t>(end - start);
 }
 
@@ -69,13 +70,28 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
 
   uint32_t n = static_cast<uint32_t>(len);
   uint32_t orig_rows = static_cast<uint32_t>(csr.num_rows);
-  uint32_t block_dim = 1;
+  // Multi-core: the kernel reads through typed __gm__ pointers and
+  // flushes degrees via MTE copies — per-word GM writes from non-zero
+  // blocks are silently dropped on this stack, which is what killed the
+  // first two attempts. Cap blocks by the row count.
+  uint32_t block_dim = 40;
+  {
+    int64_t core_num = 0;
+    if (aclrtGetDeviceInfo(
+            ctx.device_id, ACL_DEV_ATTR_VECTOR_CORE_NUM, &core_num) ==
+            ACL_SUCCESS &&
+        core_num > 0 && core_num <= 4096) {
+      block_dim = static_cast<uint32_t>(core_num);
+    }
+  }
+  if (block_dim > n) block_dim = n;
   uint32_t tiling_data[2] = {n, orig_rows};
   void* tiling_dev = nullptr;
-  ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling_data), ACL_MEM_MALLOC_HUGE_FIRST));
-  ASCEND_CALL(aclrtMemcpy(tiling_dev, sizeof(tiling_data),
-                           tiling_data, sizeof(tiling_data),
-                           ACL_MEMCPY_HOST_TO_DEVICE));
+  ASCEND_CALL(
+      aclrtMalloc(&tiling_dev, sizeof(tiling_data), ACL_MEM_MALLOC_HUGE_FIRST));
+  ASCEND_CALL(aclrtMemcpy(
+      tiling_dev, sizeof(tiling_data), tiling_data, sizeof(tiling_data),
+      ACL_MEMCPY_HOST_TO_DEVICE));
 
   if (std::is_same<IdType, int32_t>::value) {
     aclError err = aclrtlaunch_csr_get_row_nnz_int32(
@@ -103,4 +119,3 @@ template NDArray CSRGetRowNNZ<kDGLAscend, int64_t>(CSRMatrix, NDArray);
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl
-

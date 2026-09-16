@@ -35,7 +35,6 @@ public:
         uint32_t isCopyRhs,
         AscendC::TPipe *pipe)
     {
-        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
         this->M = numDstRows;
         this->K = numSrcRows;
         this->featureDim = featureDim;

@@ -14,13 +14,13 @@ def test_device_context_mapping():
     
     # Check that npu is in the STR2MASK
     assert "npu" in DGLContext.STR2MASK
-    assert DGLContext.STR2MASK["npu"] == 13
+    assert DGLContext.STR2MASK["npu"] == 12
     assert "ascend" in DGLContext.STR2MASK
-    assert DGLContext.STR2MASK["ascend"] == 13
-    
-    # Check that 13 is in MASK2STR
-    assert 13 in DGLContext.MASK2STR
-    assert DGLContext.MASK2STR[13] == "npu"
+    assert DGLContext.STR2MASK["ascend"] == 12
+
+    # Check that 12 is in MASK2STR
+    assert 12 in DGLContext.MASK2STR
+    assert DGLContext.MASK2STR[12] == "npu"
     
     print("Device context mapping test passed!")
 
@@ -100,9 +100,9 @@ def test_to_backend_ctx():
         torch_cuda = F.to_backend_ctx(cuda_ctx)
         assert torch_cuda == torch.device('cuda', 0)
     
-    # Test NPU context (device_type=13)
+    # Test NPU context (device_type=12)
     if _check_npu_available():
-        npu_ctx = DGLContext(13, 0)
+        npu_ctx = DGLContext(12, 0)
         torch_npu_dev = F.to_backend_ctx(npu_ctx)
         assert torch_npu_dev == torch.device('npu', 0)
     

@@ -30,7 +30,6 @@ public:
                                  GM_ADDR indexLhs, GM_ADDR indexRhs,
                                  GM_ADDR out, const __gm__ SddmmBinaryTilingData* tiling)
     {
-        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
         tiling_ = tiling;
         uint32_t blockIdx = GetBlockIdx();
         dtype_ = tiling->dtype;

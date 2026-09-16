@@ -41,7 +41,6 @@ public:
     __aicore__ inline void Init(GM_ADDR lhs, GM_ADDR rhs, GM_ADDR row, GM_ADDR col, GM_ADDR out,
                                 const __gm__ SddmmTilingData* tiling)
     {
-        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
         tiling_ = tiling;
         uint32_t blockIdx = AscendC::GetBlockIdx();
         dtype_ = tiling->dtype;

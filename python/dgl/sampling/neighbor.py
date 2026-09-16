@@ -590,25 +590,48 @@ def _sample_neighbors(
             raise DGLError(
                 "distributed training not supported in fused sampling"
             )
-        cpu = F.device_type(g.device) == "cpu"
+        # CPU and NPU are supported: the aten-level sampling kernel runs
+        # natively on NPU, while the host-side map-indices/exclude steps
+        # round-trip their (small, sampling-output-sized) arrays.
+        supported = F.device_type(g.device) in ("cpu", "npu")
         if isinstance(nodes, dict):
             for ntype in list(nodes.keys()):
-                if not cpu:
+                if not supported:
                     break
-                cpu = cpu and F.device_type(nodes[ntype].device) == "cpu"
+                supported = supported and F.device_type(nodes[ntype].device) in (
+                    "cpu",
+                    "npu",
+                )
         else:
-            cpu = cpu and F.device_type(nodes.device) == "cpu"
-        if not cpu or F.backend_name != "pytorch":
+            supported = supported and F.device_type(nodes.device) in (
+                "cpu",
+                "npu",
+            )
+        if not supported or F.backend_name != "pytorch":
             raise DGLError(
-                "Only PyTorch backend and cpu is supported in fused sampling"
+                "Only PyTorch backend and cpu/npu is supported in fused "
+                "sampling"
+            )
+        if F.device_type(g.device) == "npu" and prob is not None:
+            raise DGLError(
+                "Weighted fused sampling (prob/mask) is not supported on "
+                "NPU yet"
             )
 
         if mapping is None:
             mapping = {}
         mapping_name = "__mapping" + str(os.getpid())
         if mapping_name not in mapping.keys():
+            # The mapping dtype must match the graph idtype: the aten
+            # kernel reads it through the IdType template parameter, so an
+            # int64 mapping on an int32 graph is a 4-byte-offset misread
+            # (previously silent on CPU, rejected by the NPU launcher).
             mapping[mapping_name] = [
-                torch.LongTensor(g.num_nodes(ntype)).fill_(-1)
+                torch.full(
+                    (g.num_nodes(ntype),),
+                    -1,
+                    dtype=F.int64 if g._idtype_str == "int64" else F.int32,
+                    device=g.device)
                 for ntype in g.ntypes
             ]
 
@@ -976,7 +999,8 @@ def select_topk(
                 "Must specify node type when the graph is not homogeneous."
             )
         nodes = {g.ntypes[0]: nodes}
-    assert g.device == F.cpu(), "Graph must be on CPU."
+    if F.device_type(g.device) == "cuda":
+        raise DGLError("select_topk with CUDA graphs is not supported yet.")
 
     # Parse nodes into a list of NDArrays.
     nodes = utils.prepare_tensor_dict(g, nodes, "nodes")

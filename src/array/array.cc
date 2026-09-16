@@ -841,6 +841,26 @@ COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask,
     bool replace) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.indptr->ctx.device_type == kDGLAscend) {
+    if (IsNullArray(prob_or_mask)) {
+      ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+        ret = impl::CSRRowWiseSamplingUniform<kDGLAscend, IdType>(
+            mat, rows, num_samples, replace);
+      });
+    } else {
+      CHECK_VALID_CONTEXT(prob_or_mask, rows);
+      // The AscendC weighted kernel operates in float32 (double is forbidden
+      // in __aicore__). The launcher normalizes float64 / int8 / uint8
+      // probability or mask to float32 on the host side; the sampling itself
+      // runs natively on the NPU kernel.
+      ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+        ret = impl::CSRRowWiseSampling<kDGLAscend, IdType, float>(
+            mat, rows, num_samples, prob_or_mask, replace);
+      });
+    }
+  } else
+#endif  // DGL_USE_ASCEND
   if (IsNullArray(prob_or_mask)) {
     ATEN_CSR_SWITCH_CUDA_UVA(
         mat, rows, XPU, IdType, "CSRRowWiseSamplingUniform", {
@@ -869,6 +889,23 @@ std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused(
     std::vector<IdType>* new_seed_nodes, int64_t num_samples,
     NDArray prob_or_mask, bool replace) {
   std::pair<CSRMatrix, IdArray> ret;
+#ifdef DGL_USE_ASCEND
+  if (rows->ctx.device_type == kDGLAscend) {
+    if (IsNullArray(prob_or_mask)) {
+      ret = impl::CSRRowWiseSamplingUniformFused<
+          kDGLAscend, IdType, map_seed_nodes>(
+          mat, rows, seed_mapping, new_seed_nodes, num_samples, replace);
+    } else {
+      CHECK_VALID_CONTEXT(prob_or_mask, rows);
+      // Weighted fused sampling has no CUDA reference either; explicit
+      // named gap on NPU (see the fused operator docs in the process
+      // repository). CHECK raises a catchable DGL error; LOG(FATAL)
+      // would abort the process out from under Python.
+      CHECK(false) << "Weighted fused sampling (prob/mask) is not supported "
+                      "on NPU yet";
+    }
+  } else
+#endif  // DGL_USE_ASCEND
   if (IsNullArray(prob_or_mask)) {
     ATEN_XPU_SWITCH(
         rows->ctx.device_type, XPU, "CSRRowWiseSamplingUniformFused", {
@@ -931,6 +968,19 @@ COOMatrix CSRRowWisePerEtypeSampling(
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.indptr->ctx.device_type == kDGLAscend) {
+    CHECK_VALID_CONTEXT(weight, rows);
+    // The AscendC sort network is float-only; the launcher normalizes
+    // int32/int64/float64 weights to float32 (min-offset shift) before
+    // launching the kernel.
+    ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+      ret = impl::CSRRowWiseTopk<kDGLAscend, IdType, float>(
+          mat, rows, k, weight, ascending);
+    });
+    return ret;
+  }
+#endif  // DGL_USE_ASCEND
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseTopk", {
     ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
       ret = impl::CSRRowWiseTopk<XPU, IdType, DType>(
@@ -944,6 +994,18 @@ COOMatrix CSRRowWiseSamplingBiased(
     CSRMatrix mat, IdArray rows, int64_t num_samples, NDArray tag_offset,
     FloatArray bias, bool replace) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.indptr->ctx.device_type == kDGLAscend) {
+    // The AscendC biased kernel operates in float32 (double is forbidden
+    // in __aicore__). The launcher normalizes float64 bias to float32 on
+    // the host side; the sampling itself runs natively on the NPU kernel.
+    ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+      ret = impl::CSRRowWiseSamplingBiased<kDGLAscend, IdType, float>(
+          mat, rows, num_samples, tag_offset, bias, replace);
+    });
+    return ret;
+  }
+#endif  // DGL_USE_ASCEND
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSamplingBiased", {
     ATEN_FLOAT_TYPE_SWITCH(bias->dtype, FloatType, "bias", {
       ret = impl::CSRRowWiseSamplingBiased<XPU, IdType, FloatType>(
@@ -1269,6 +1331,19 @@ COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask,
     bool replace) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.row->ctx.device_type == kDGLAscend) {
+    // Only the uniform path (no probability/mask) has an Ascend
+    // implementation so far; reject the weighted path explicitly.
+    CHECK(IsNullArray(prob_or_mask))
+        << "COO weighted row-wise sampling on Ascend is not supported yet";
+    ATEN_ID_TYPE_SWITCH(mat.row->dtype, IdType, {
+      ret = impl::COORowWiseSamplingUniform<kDGLAscend, IdType>(
+          mat, rows, num_samples, replace);
+    });
+    return ret;
+  }
+#endif  // DGL_USE_ASCEND
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWiseSampling", {
     if (IsNullArray(prob_or_mask)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(
@@ -1309,6 +1384,19 @@ COOMatrix COORowWisePerEtypeSampling(
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.row->ctx.device_type == kDGLAscend) {
+    CHECK_VALID_CONTEXT(weight, rows);
+    // Assembly route (ADR-0001 pattern): the Ascend launcher converts the
+    // full graph to CSR and runs the native CSR topk kernel; the weight
+    // dtype normalization to f32 happens inside that kernel's launcher.
+    ATEN_ID_TYPE_SWITCH(mat.row->dtype, IdType, {
+      ret = impl::COORowWiseTopk<kDGLAscend, IdType, float>(
+          mat, rows, k, weight, ascending);
+    });
+    return ret;
+  }
+#endif  // DGL_USE_ASCEND
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWiseTopk", {
     ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
       ret = impl::COORowWiseTopk<XPU, IdType, DType>(

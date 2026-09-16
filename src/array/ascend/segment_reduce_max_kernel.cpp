@@ -26,7 +26,6 @@ public:
     __aicore__ inline void Init(GM_ADDR offsets, GM_ADDR feat, GM_ADDR output,
                                 GM_ADDR segmentSplit, uint32_t numItems, uint32_t numSegments, uint32_t featDim)
     {
-        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
         this->featDim = featDim;
         this->rowBytes = this->featDim * sizeof(float);
         uint32_t rowAlignedBytes = (this->rowBytes + BYTE_ALIGN - 1) / BYTE_ALIGN * BYTE_ALIGN;

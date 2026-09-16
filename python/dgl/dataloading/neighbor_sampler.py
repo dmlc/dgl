@@ -155,17 +155,22 @@ class NeighborSampler(BlockSampler):
         # sample_neighbors_fused function requires multithreading to be more efficient
         # than sample_neighbors
         if self.fused and get_num_threads() > 1:
-            cpu = F.device_type(g.device) == "cpu"
+            # CPU and NPU graphs take the fused path (the aten kernel runs
+            # natively on NPU; host-side steps round-trip small arrays).
+            supported = F.device_type(g.device) in ("cpu", "npu")
             if isinstance(seed_nodes, dict):
                 for ntype in list(seed_nodes.keys()):
-                    if not cpu:
+                    if not supported:
                         break
-                    cpu = (
-                        cpu and F.device_type(seed_nodes[ntype].device) == "cpu"
-                    )
+                    supported = supported and F.device_type(
+                        seed_nodes[ntype].device
+                    ) in ("cpu", "npu")
             else:
-                cpu = cpu and F.device_type(seed_nodes.device) == "cpu"
-            if cpu and isinstance(g, DGLGraph) and F.backend_name == "pytorch":
+                supported = supported and F.device_type(seed_nodes.device) in (
+                    "cpu",
+                    "npu",
+                )
+            if supported and isinstance(g, DGLGraph) and F.backend_name == "pytorch":
                 if self.g != g:
                     self.mapping = {}
                     self.g = g
@@ -179,7 +184,10 @@ class NeighborSampler(BlockSampler):
                         exclude_edges=exclude_eids,
                         mapping=self.mapping,
                     )
-                    seed_nodes = block.srcdata[NID]
+                    # The fused block emits host-side NID; move it back to
+                    # the graph device so the next layer's seeds match.
+                    seed_nodes = F.copy_to(
+                        block.srcdata[NID], F.context(seed_nodes))
                     blocks.insert(0, block)
                 return seed_nodes, output_nodes, blocks
 
