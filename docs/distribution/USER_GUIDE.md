@@ -36,7 +36,7 @@ pip install dgl-ascend
 ```
 
 > 若机器上已装了别的 torch 版本，先卸载：`pip uninstall -y torch torch_npu`。
-> dgl-ascend 钉死 `torch==2.7.1` / `torch_npu==2.7.1.post4`，版本不匹配会运行时 segfault。
+> dgl-ascend 钉死 `torch==2.8.0` / `torch_npu==2.8.0.post2`，版本不匹配会运行时 segfault。
 
 ---
 
@@ -44,7 +44,7 @@ pip install dgl-ascend
 
 1. pip 从 **PyPI** 下载 dgl-ascend wheel（cp311 + aarch64）。
 2. wheel 内含 libdgl.so + cython 扩展 + 子组件 .so + Python 代码。
-3. 解析依赖，从 **PyPI** 自动拉：`torch==2.7.1`、`torch_npu==2.7.1.post4`、numpy、scipy、pandas、psutil、pydantic、pyyaml、requests、tqdm、networkx、packaging。
+3. 解析依赖，从 **PyPI** 自动拉：`torch==2.8.0`、`torch_npu==2.8.0.post2`、numpy、scipy、pandas、psutil、pydantic、pyyaml、requests、tqdm、networkx、packaging。
 4. 全部装入当前 Python 环境。
 
 > 国内用户建议配 PyPI 镜像加速依赖下载（如华为云 `mirrors.huaweicloud.com/repository/pypi/simple`），写入 `~/.pip/pip.conf` 即可。
@@ -97,7 +97,7 @@ print('SpMM OK', tuple(g.ndata['h'].shape))   # (4, 16)
 | `No matching distribution found` | Python 非 3.11，或架构非 aarch64 | 用 Python 3.11；x86_64/其他 Python 版本暂无 wheel |
 | `ImportError: libhccl.so` / `libascend_hal.so` | CANN/驱动环境未 source | `source setenv.bash` 或补 `LD_LIBRARY_PATH` |
 | `ImportError: libtorch_npu.so` | import 顺序错（dgl 先于 torch_npu） | 严格按 `torch`→`torch_npu`→`dgl` |
-| 安装成功但首次 kernel 调用 segfault | torch/torch_npu 版本非 2.7.1 | `pip install torch==2.7.1 torch_npu==2.7.1.post4` |
+| 安装成功但首次 kernel 调用 segfault | torch/torch_npu 版本非 2.8.0 | `pip install torch==2.8.0 torch_npu==2.8.0.post2` |
 | `Int64 precision not fully supported` | 图索引用了 int64 | `dgl.graph(..., idtype=torch.int32)` |
 | `Float precision not fully supported` | 特征用了 float32 | 特征 `.to(torch.float16)` |
 | `pip` 卡在下载 torch | 走了公网 PyPI | 配国内 PyPI 镜像（见第 3 节） |
@@ -135,7 +135,7 @@ print("result shape:", g.ndata["h"].shape)
 - `dgl-ascend 0.0.2`：基于上游 DGL + Ascend NPU 支持。
   - `0.0.2` = DGL-Ascend 版本
   - 构建所用 CANN ≥ 8.5（对标 DGL CUDA 的 `+cu118`），用户需 CANN ≥ 8.5。
-- 强制依赖：`torch==2.7.1`、`torch_npu==2.7.1.post4`（精确版本，不可混用）。
+- 强制依赖：`torch==2.8.0`、`torch_npu==2.8.0.post2`（精确版本，不可混用）。
 
 ---
 

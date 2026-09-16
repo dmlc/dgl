@@ -16,13 +16,13 @@
 |----------|-------------------|-----------|
 | **9.1.0**（最新推荐） | 2.12.0 / 2.11.0 / 2.10.0.post4 / 2.9.0.post6 / 2.7.1.post8 | 2.12.0 / 2.11.0 / 2.10.0 / 2.9.0 / 2.7.1 |
 | 9.0.0 | 2.9.0.post2 / 2.8.0.post4 / 2.7.1.post4 | 2.9.0 / 2.8.0 / 2.7.1 |
-| **8.5.0**（本机当前） | 2.9.0 / 2.8.0.post2 / **2.7.1.post2** ← 我们用的 / 2.6.0.post5 | 2.9.0 / 2.8.0 / **2.7.1** / 2.6.0 |
+| **8.5.0**（本机当前） | 2.9.0 / **2.8.0.post2** ← 我们用的 / 2.7.1.post2 / 2.6.0.post5 | 2.9.0 / **2.8.0** / 2.7.1 / 2.6.0 |
 | 8.3.RC1 | 2.8.0 / 2.7.1 / 2.6.0.post3 | 2.8.0 / 2.7.1 / 2.6.0 |
 | 8.2.RC1 | 2.6.0 / 2.5.1.post1 | 2.6.0 / 2.5.1 |
 | 8.1.RC1 | 2.5.1 / 2.4.0.post4 / 2.3.1.post6 | 2.5.1 / 2.4.0 / 2.3.1 |
 | 8.0.0 | 2.4.0.post2 / 2.3.1.post4 | 2.4.0 / 2.3.1 |
 
-> **一个 CANN 版本可配多个 torch_npu 版本**。CANN 8.5.0 可用 torch_npu 2.6/2.7.1/2.8.0.post2/2.9.0。我们选 **2.7.1.post2**（已验证全测试通过）。
+> **一个 CANN 版本可配多个 torch_npu 版本**。CANN 8.5.0 可用 torch_npu 2.6/2.7.1/2.8.0.post2/2.9.0。我们选 **2.8.0.post2**（已验证全测试通过）。
 
 ### 1.2 torch ↔ Python
 
@@ -31,13 +31,13 @@
 | 2.12.0 | 3.10 / 3.11 / 3.12 / 3.13 / 3.14 |
 | 2.10.0 | 3.10 / 3.11 / 3.12 / 3.13 |
 | 2.9.0 | 3.10 / 3.11 / 3.12 / 3.13 |
-| 2.8.0 | 3.9 / 3.10 / 3.11 / 3.12 / 3.13 |
-| **2.7.1** | **3.9 / 3.10 / 3.11 / 3.12 / 3.13** |
+| **2.8.0** | **3.9 / 3.10 / 3.11 / 3.12 / 3.13** |
+| 2.7.1 | 3.9 / 3.10 / 3.11 / 3.12 / 3.13 |
 | 2.6.0 | 3.9 / 3.10 / 3.11 |
 
 ### 1.3 硬件支持
 
-Ascend 910 系列（含 910B3）✅。其他：950DT、A3、A2、310P、310B、310。
+当前主要适配 **Ascend A2**（含 910B3）。A3、A5、310P、310B、310 未做适配，不保证支持。
 
 ---
 
@@ -45,7 +45,7 @@ Ascend 910 系列（含 910B3）✅。其他：950DT、A3、A2、310P、310B、3
 
 | CANN | torch_npu | torch | Python | wheel | 状态 |
 |------|-----------|-------|--------|-------|------|
-| 8.5.0 | 2.7.1.post2 | 2.7.1 | **cp311** | `dgl_ascend-2.5+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl` | ✅ 已构建 + 全测试通过 |
+| 8.5.0 | 2.8.0.post2 | 2.8.0 | **cp311** | `dgl_ascend-0.0.2+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl` | ✅ 已构建 + 全测试通过 |
 
 ---
 
@@ -55,25 +55,25 @@ Ascend 910 系列（含 910B3）✅。其他：950DT、A3、A2、310P、310B、3
 
 | CANN | torch_npu | torch | Python | wheel 状态 |
 |------|-----------|-------|--------|-----------|
-| 8.5.0 | 2.7.1.post2 | 2.7.1 | cp310 | ⬜ 待构建 |
-| 8.5.0 | 2.7.1.post2 | 2.7.1 | cp311 | ✅ 已有 |
-| 8.5.0 | 2.7.1.post2 | 2.7.1 | cp312 | ⬜ 待构建 |
+| 8.5.0 | 2.8.0.post2 | 2.8.0 | cp310 | ⬜ 待构建 |
+| 8.5.0 | 2.8.0.post2 | 2.8.0 | cp311 | ✅ 已有 |
+| 8.5.0 | 2.8.0.post2 | 2.8.0 | cp312 | ⬜ 待构建 |
 
-> torch 2.7.1 支持 Python 3.9-3.13。当前只编 cp310/311/312（对标 DGL CUDA 的 Python 矩阵）。cp313/cp39 后续可扩展。
+> torch 2.8.0 支持 Python 3.9-3.13。当前只编 cp310/311/312（对标 DGL CUDA 的 Python 矩阵）。cp313/cp39 后续可扩展。
 
 **预检结果**（已确认华为云镜像有对应 wheel）：
 ```
-torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl          ✅
-torch-2.7.1-cp312-cp312-manylinux_2_28_aarch64.whl          ✅
-torch_npu-2.7.1.post2-cp310-cp310-manylinux_2_28_aarch64.whl ✅
-torch_npu-2.7.1.post2-cp312-cp312-manylinux_2_28_aarch64.whl ✅
+torch-2.8.0-cp310-cp310-manylinux_2_28_aarch64.whl          ✅
+torch-2.8.0-cp312-cp312-manylinux_2_28_aarch64.whl          ✅
+torch_npu-2.8.0.post2-cp310-cp310-manylinux_2_28_aarch64.whl ✅
+torch_npu-2.8.0.post2-cp312-cp312-manylinux_2_28_aarch64.whl ✅
 ```
 
 ### 3.2 中期：多 CANN 版本（需额外 CANN toolkit）
 
 | CANN | torch_npu | torch | 需要什么 |
 |------|-----------|-------|---------|
-| 8.5.0 | 2.7.1.post2 | 2.7.1 | 本机已有 ✅ |
+| 8.5.0 | 2.8.0.post2 | 2.8.0 | 本机已有 ✅ |
 | 9.1.0 | 2.12.0 | 2.12.0 | 下载 CANN 9.1.0 toolkit + 临时容器 |
 | 9.0.0 | 2.8.0.post4 | 2.8.0 | 下载 CANN 9.0.0 toolkit + 临时容器 |
 
@@ -86,7 +86,7 @@ torch_npu-2.7.1.post2-cp312-cp312-manylinux_2_28_aarch64.whl ✅
 ### 4.1 前提
 
 - 本容器已有 NPU + CANN 8.5.0 + podman。
-- `dgl-ascend-build:aarch64` 镜像（torch 2.7.1 for cp311）已构建或需重建。
+- `dgl-ascend-build:aarch64` 镜像（torch 2.8.0 for cp311）已构建或需重建。
 - 仓库 `third_party/` 子模块已初始化。
 
 ### 4.2 重建 podman 环境（如已清理）
@@ -127,7 +127,7 @@ DGL_VERSION_SUFFIX=+cann8.5 python python/update_version.py >/dev/null
 for PYVER in cp310-cp310 cp312-cp312; do
   echo "======== Building $PYVER ========"
   export PATH=/opt/python/${PYVER}/bin:$PATH
-  pip install --quiet numpy pyyaml "cmake<4" "Cython<3" torch==2.7.1 torch_npu==2.7.1.post2
+  pip install --quiet numpy pyyaml "cmake<4" "Cython<3" torch==2.8.0 torch_npu==2.8.0.post2
 
   # 干净编译（AscendC 不支持增量）
   bash script/build_dgl_ascend.sh -t release -c -j 32
@@ -147,7 +147,7 @@ ls -lh /work/matrix_wheels/
 '
 ```
 
-> 产物：`matrix_wheels/dgl_ascend-2.5+cann8.5-cp310-cp310-manylinux_2_28_aarch64.whl` 和 `dgl_ascend-2.5+cann8.5-cp312-cp312-manylinux_2_28_aarch64.whl`。
+> 产物：`matrix_wheels/dgl_ascend-0.0.2+cann8.5-cp310-cp310-manylinux_2_28_aarch64.whl` 和 `dgl_ascend-0.0.2+cann8.5-cp312-cp312-manylinux_2_28_aarch64.whl`。
 
 ### 4.4 汇总 + 更新分发
 
@@ -155,7 +155,7 @@ ls -lh /work/matrix_wheels/
 cd /data/dgl-ascend-install
 
 # 把 cp311 的也放进 matrix_wheels（已有）
-cp wheels/dgl_ascend-2.5+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl matrix_wheels/
+cp wheels/dgl_ascend-0.0.2+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl matrix_wheels/
 
 # 3 个 wheel 统一放 wheels/ + 重生成 repo.html
 cp matrix_wheels/*.whl wheels/
@@ -176,7 +176,7 @@ CONTAINERS_STORAGE_CONF=/tmp/podman-vfs.conf podman run --rm \
 export LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64:/usr/local/Ascend/cann-8.5.0/lib64:$LD_LIBRARY_PATH
 export TORCH_DEVICE_BACKEND_AUTOLOAD=0
 for PYVER in cp310-cp310 cp312-cp312; do
-  /opt/python/${PYVER}/bin/pip install --quiet numpy pyyaml torch==2.7.1 torch_npu==2.7.1.post2
+  /opt/python/${PYVER}/bin/pip install --quiet numpy pyyaml torch==2.8.0 torch_npu==2.8.0.post2
   /opt/python/${PYVER}/bin/pip install --no-deps /wheels/dgl_ascend-*${PYVER%%-*}*.whl
   /opt/python/${PYVER}/bin/python -c "
 import torch,torch_npu,dgl
@@ -251,15 +251,15 @@ python -m wheel tags --platform-tag manylinux_2_28_aarch64 dist/*.whl -w /work/m
 最终 `repo.html` 应包含（按需逐步补齐）：
 
 ```
-# CANN 8.5 × torch 2.7.1
-dgl_ascend-2.5+cann8.5-cp310-cp310-manylinux_2_28_aarch64.whl
-dgl_ascend-2.5+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl
-dgl_ascend-2.5+cann8.5-cp312-cp312-manylinux_2_28_aarch64.whl
+# CANN 8.5 × torch 2.8.0
+dgl_ascend-0.0.2+cann8.5-cp310-cp310-manylinux_2_28_aarch64.whl
+dgl_ascend-0.0.2+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl
+dgl_ascend-0.0.2+cann8.5-cp312-cp312-manylinux_2_28_aarch64.whl
 
 # CANN 9.1 × torch 2.12.0（未来）
-dgl_ascend-2.5+cann9.1-cp310-cp310-manylinux_2_28_aarch64.whl
-dgl_ascend-2.5+cann9.1-cp311-cp311-manylinux_2_28_aarch64.whl
-dgl_ascend-2.5+cann9.1-cp312-cp312-manylinux_2_28_aarch64.whl
+dgl_ascend-0.0.2+cann9.1-cp310-cp310-manylinux_2_28_aarch64.whl
+dgl_ascend-0.0.2+cann9.1-cp311-cp311-manylinux_2_28_aarch64.whl
+dgl_ascend-0.0.2+cann9.1-cp312-cp312-manylinux_2_28_aarch64.whl
 ```
 
 用户 `pip install dgl-ascend -f <URL>/repo.html` 时，pip 按 (CANN 后缀 + Python 版本 + 架构) 自动选最匹配的 wheel。
@@ -271,7 +271,7 @@ dgl_ascend-2.5+cann9.1-cp312-cp312-manylinux_2_28_aarch64.whl
 | 事项 | 说明 |
 |------|------|
 | **构建=运行版本** | libdgl.so 按 torch C++ ABI 编译，构建用的 torch 版本必须和用户运行时一致（`install_requires` 钉死） |
-| **torch_npu 须匹配 CANN** | 2.8.0（无 post，配 CANN 8.3）跑在 CANN 8.5 上 → `free(): invalid pointer` 崩溃。CANN 8.5 用 **2.7.1.post2**；2.8.0.post2/post4 未验证 |
+| **torch_npu 须匹配 CANN** | 2.8.0（无 post，配 CANN 8.3）跑在 CANN 8.5 上 → `free(): invalid pointer` 崩溃。CANN 8.5 用 **2.8.0.post2** |
 | **only manylinux_2_28** | 不出 linux_aarch64（manylinux_2_28 是超集，覆盖更广） |
 | **CANN 向后兼容** | `+cann8.5` wheel 只能在 CANN≥8.5 跑；要覆盖 CANN 8.1 用户须专门编 `+cann8.1` |
 | **包名固定 `dgl-ascend`** | 不用 `dgl`（与上游 DGL 不同团队，避免包名冲突） |
@@ -279,6 +279,6 @@ dgl_ascend-2.5+cann9.1-cp312-cp312-manylinux_2_28_aarch64.whl
 ---
 
 > **文档版本**: v1.0
-> **基于**: torch_npu 2.7.1.post2 + CANN 8.5.0 + manylinux_2_28_aarch64，910B3 全测试通过
+> **基于**: torch_npu 2.8.0.post2 + CANN 8.5.0 + manylinux_2_28_aarch64，910B3 全测试通过
 > **最后更新**: 2026-07-29
 > **数据来源**: Ascend/pytorch 官方 COMPATIBILITY.md

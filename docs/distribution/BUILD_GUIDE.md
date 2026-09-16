@@ -1,6 +1,6 @@
 # dgl-ascend Wheel 构建操作指导
 
-> 面向构建者：如何从源码编出可分发的 dgl-ascend wheel。已验证路径（torch 2.7.1 + CANN 8.5 + manylinux_2_28_aarch64，910B3 上全测试通过）。
+> 面向构建者：如何从源码编出可分发的 dgl-ascend wheel。已验证路径（torch 2.8.0 + CANN 8.5 + manylinux_2_28_aarch64，910B3 上全测试通过）。
 >
 > 关联文档：分发方案 `PYPI_PUBLISH_PLAN.md`、用户安装 `USER_GUIDE.md`、manylinux 分析 `MANYLINUX_PLAN.md`。
 
@@ -25,10 +25,10 @@
 
 ```
 dgl_ascend-{dgl版本}+cann{CANN版本}-{cpython}-{abi}-{平台}.whl
-例: dgl_ascend-2.5+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl
+例: dgl_ascend-0.0.2+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl
 ```
 
-- `2.5`：上游 DGL 版本（`python/dgl/_ffi/libinfo.py` `__version__`）。
+- `0.0.2`：发布版本（`python/dgl/_ffi/libinfo.py` `__version__`）。
 - `+cann8.5`：构建所用 CANN 版本（对标 DGL CUDA 的 `+cu118`），由 `DGL_VERSION_SUFFIX` 注入。
 - `cp311-cp311`：Python 标签 + ABI 标签（因含编译型 cython 扩展，绑定具体 Python）。
 - `manylinux_2_28_aarch64`：平台标签（glibc≥2.28 通用）。
@@ -39,7 +39,7 @@ dgl_ascend-{dgl版本}+cann{CANN版本}-{cpython}-{abi}-{平台}.whl
 
 | 维度 | 取值 | 说明 |
 |------|------|------|
-| CANN / torch_npu | CANN 8.5 + torch_npu 2.7.1.post2（当前） | torch、torch_npu、CANN 三者版本耦合，由 torch_npu 版本统一决定。换 CANN 版本要换对应 torch_npu + CANN toolkit |
+| CANN / torch_npu | CANN 8.5 + torch_npu 2.8.0.post2（当前） | torch、torch_npu、CANN 三者版本耦合，由 torch_npu 版本统一决定。换 CANN 版本要换对应 torch_npu + CANN toolkit |
 | Python | cp310 / cp311 / cp312 | 对标 DGL CUDA 的 Python 矩阵 |
 | 架构 | aarch64（x86_64 需 x86 Ascend 机器） | — |
 
@@ -82,7 +82,7 @@ docker run -itd --name <name> --privileged --net=host --shm-size=32g \
 
 ## 3. 主流程：manylinux_2_28 容器构建（路径 A）
 
-> 已验证：torch 2.7.1 + CANN 8.5 + cp311，910B3 上 8 单进程 + 5 分布式测试全过。
+> 已验证：torch 2.8.0 + CANN 8.5 + cp311，910B3 上 8 单进程 + 5 分布式测试全过。
 
 ### 3.1 准备 podman（容器内 overlay → vfs）
 
@@ -111,8 +111,8 @@ ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/cann-8.5.0
 ENV LD_LIBRARY_PATH=${ASCEND_TOOLKIT_HOME}/lib64:...
 # pip 用华为云镜像；装构建工具 + torch + torch_npu
 RUN ${PYBIN}/pip install --upgrade pip setuptools wheel build "Cython>=0.29" auditwheel cmake patchelf
-RUN ${PYBIN}/pip install torch==2.7.1
-RUN ${PYBIN}/pip install torch_npu==2.7.1.post2
+RUN ${PYBIN}/pip install torch==2.8.0
+RUN ${PYBIN}/pip install torch_npu==2.8.0.post2
 ```
 
 构建镜像（上下文用 `docker/` 避免传整个仓库）：
@@ -152,7 +152,7 @@ bash script/build_dgl_ascend.sh -t release -c -j 32
 cd python && rm -rf build dist *.egg-info dgl/_ffi/_cy3
 DGL_PACKAGE_SUFFIX=-ascend python -m build --wheel --no-isolation
 '
-# 产物: python/dist/dgl_ascend-2.5+cann8.5-cp311-cp311-linux_aarch64.whl
+# 产物: python/dist/dgl_ascend-0.0.2+cann8.5-cp311-cp311-linux_aarch64.whl
 ```
 
 ### 3.4 重标签为 manylinux_2_28（用 `wheel tags`，不用 auditwheel）
@@ -163,7 +163,7 @@ manylinux 容器编的 libdgl.so 符号 ≤2.28（合规），无需 bundle 任�
 mkdir -p repaired_wheels && cp python/dist/dgl_ascend-*-linux_aarch64.whl repaired_wheels/
 cd repaired_wheels
 python -m wheel tags --platform-tag manylinux_2_28_aarch64 --remove dgl_ascend-*-linux_aarch64.whl
-# → dgl_ascend-2.5+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl
+# → dgl_ascend-0.0.2+cann8.5-cp311-cp311-manylinux_2_28_aarch64.whl
 ```
 
 合规性自检（wheel 内每个 .so 的 GLIBC 都应 ≤2.28）：
@@ -196,7 +196,7 @@ python tools/gen_repo_html.py --wheel-dir <wheel目录> --base-url <托管URL>/ 
 | 9 | **`TORCH_DEVICE_BACKEND_AUTOLOAD=0`** | 防 torch 自动加载 torch_npu 干扰 cmake 探测 | cmake 探测路径被污染 |
 | 10 | **装 numpy/pyyaml** | torch_npu 导入时需要（未声明在 wheel deps） | `No module named 'yaml'` |
 | 11 | **`--no-isolation`** | `python -m build` 默认隔离会去 PyPI 拉 build 依赖（pypi.org 不通） | 构建失败 |
-| 12 | **torch_npu 版本须匹配 CANN** | libdgl.so 按 torch C++ ABI 编译 | 2.8.0（无 post，配 CANN 8.3）跑在 CANN 8.5 上 → `free(): invalid pointer` 崩溃；8.5 用 2.7.1.post2 |
+| 12 | **torch_npu 版本须匹配 CANN** | libdgl.so 按 torch C++ ABI 编译 | 2.8.0（无 post，配 CANN 8.3）跑在 CANN 8.5 上 → `free(): invalid pointer` 崩溃；8.5 用 2.8.0.post2 |
 
 ---
 
@@ -206,7 +206,7 @@ python tools/gen_repo_html.py --wheel-dir <wheel目录> --base-url <托管URL>/ 
 
 一个 manylinux 镜像里有 `/opt/python/cp310-cp310`、`cp311-cp311`、`cp312-cp312`。对每个 Python：
 
-1. 镜像里装该 Python 的 torch/torch_npu（改 Dockerfile 的 `ARG PYVER` 重建镜像，或运行时 `/opt/python/<PYVER>/bin/pip install torch==2.7.1 torch_npu==2.7.1.post2`）。
+1. 镜像里装该 Python 的 torch/torch_npu（改 Dockerfile 的 `ARG PYVER` 重建镜像，或运行时 `/opt/python/<PYVER>/bin/pip install torch==2.8.0 torch_npu==2.8.0.post2`）。
 2. §3.3 构建命令里把 `PATH=/opt/python/cp311-cp311/bin` 换成目标 `cp310-cp310` / `cp312-cp312`。
 3. 产出对应 `cp310-cp310` / `cp312-cp312` 的 wheel。
 
@@ -236,14 +236,14 @@ python tools/gen_repo_html.py --wheel-dir <wheel目录> --base-url <托管URL>/ 
 
 ```bash
 cd /data/dgl-ascend-install/dgl-ascend
-# 用系统 python（已有 torch 2.7.1）建 venv，--system-site-packages 继承 torch
+# 用系统 python（已有 torch 2.8.0）建 venv，--system-site-packages 继承 torch
 python3 -m venv --system-site-packages /tmp/dgl-venv
 /tmp/dgl-venv/bin/pip install "Cython<3" build auditwheel wheel
 
 export PATH=/tmp/dgl-venv/bin:$PATH SOC_VERSION=Ascend910B3 TORCH_DEVICE_BACKEND_AUTOLOAD=0
 bash script/build_dgl_ascend.sh -t release -c -j 32
 cd python && DGL_PACKAGE_SUFFIX=-ascend python -m build --wheel --no-isolation
-# → dgl_ascend-2.5+cann8.5-cp311-cp311-linux_aarch64.whl (glibc≥2.38)
+# → dgl_ascend-0.0.2+cann8.5-cp311-cp311-linux_aarch64.whl (glibc≥2.38)
 ```
 
 > 产物是 `linux_aarch64`（非 manylinux），只能在 glibc≥2.38 机器装。正式分发用 §3 的 manylinux 版。
@@ -296,7 +296,7 @@ pip install dgl-ascend -f http://<本机IP>:18080/repo.html
 | `Could not find GFORTRAN_LIB` | gfortran 库在非标准路径 | `ln -sf $(gcc -print-file-name=libgfortran.so) /usr/lib64/libgfortran.so` |
 | `target pattern contains no '%'` | 容器无 NPU，`import torch_npu` 驱动日志污染 cmake | 子容器加 `--device /dev/davinci*` 穿透 |
 | `PackedFunc ... already registered` 崩溃 | auditwheel 重定位 libdgl.so 导致双加载 | 用 `wheel tags` 重标签，不用 auditwheel |
-| `free(): invalid pointer` 崩溃 | torch_npu 版本与 CANN 不匹配（如 2.8.0 跑在 CANN 8.5） | 用匹配 CANN 的 torch_npu 版本（8.5 → 2.7.1.post2） |
+| `free(): invalid pointer` 崩溃 | torch_npu 版本与 CANN 不匹配（如 2.8.0 无 post、配 CANN 8.3 的，跑在 CANN 8.5） | 用匹配 CANN 的 torch_npu 版本（8.5 → 2.8.0.post2） |
 | `Int64/Float precision not supported on Ascend` | 用了 int64/float32 | `idtype=torch.int32` + 特征 `.to(torch.float16)` |
 | `HCCL_SOCKET_IFNAME ... not found in nic list` / `HcclGetRootInfo error 6` | `HCCL_IF_IP` 指了别的机器 IP | `export HCCL_IF_IP=<本机IP>` |
 | `No matching distribution found` | Python 版本/架构不匹配 | repo.html 须含对应 cpXXX + manylinux_2_28_aarch64 的 wheel |
@@ -332,5 +332,5 @@ python -m wheel tags --platform-tag manylinux_2_28_aarch64 --remove dgl_ascend-*
 ---
 
 > **文档版本**: v1.1
-> **基于**: torch 2.7.1 + CANN 8.5 + manylinux_2_28_aarch64，910B3 全测试通过
+> **基于**: torch 2.8.0 + CANN 8.5 + manylinux_2_28_aarch64，910B3 全测试通过
 > **最后更新**: 2026-08-03

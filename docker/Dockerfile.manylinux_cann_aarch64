@@ -34,8 +34,8 @@ RUN mkdir -p /root/.pip && printf '[global]\nindex-url = https://mirrors.huaweic
 # Build tools. manylinux ships gcc/g++/make; add cmake + patchelf (auditwheel dep) via pip.
 RUN ${PYBIN}/pip install --upgrade pip setuptools wheel build "Cython>=0.29" auditwheel cmake patchelf
 
-# torch 2.8.0 + torch_npu 2.8.0 from the Huawei mirror.
+# torch 2.8.0 + torch_npu 2.8.0.post2 from the Huawei mirror.
 # On aarch64 the PyPI torch wheel is the CPU build (no aarch64 CUDA wheel on PyPI),
 # which is what torch_npu expects.
-RUN ${PYBIN}/pip install torch==2.7.1
-RUN ${PYBIN}/pip install torch_npu==2.7.1.post2
+RUN ${PYBIN}/pip install torch==2.8.0
+RUN ${PYBIN}/pip install torch_npu==2.8.0.post2
