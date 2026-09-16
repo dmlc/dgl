@@ -200,6 +200,9 @@ def reduce_mean(input):
 
 def max(input, dim):
     # NOTE: the second argmax array is not returned
+    # NPU: torch.max does not support int32, cast to int64 first
+    if getattr(input, 'is_npu', False) and input.dtype == th.int32:
+        return th.max(input.to(th.int64), dim=dim)[0].to(th.int32)
     return th.max(input, dim=dim)[0]
 
 
@@ -209,6 +212,9 @@ def reduce_max(input):
 
 def min(input, dim):
     # NOTE: the second argmin array is not returned
+    # NPU: torch.min does not support int32, cast to int64 first
+    if getattr(input, 'is_npu', False) and input.dtype == th.int32:
+        return th.min(input.to(th.int64), dim=dim)[0].to(th.int32)
     return th.min(input, dim=dim)[0]
 
 

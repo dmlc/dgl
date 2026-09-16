@@ -30,9 +30,11 @@ _full = full
 _full_1d = full_1d
 _softmax = softmax
 _default_context_str = os.getenv("DGLTESTDEV", "cpu")
+import torch as _th
 _context_dict = {
     "cpu": cpu(),
     "gpu": cuda(),
+    "npu": _th.device("npu:0"),
 }
 _default_context = _context_dict[_default_context_str]
 

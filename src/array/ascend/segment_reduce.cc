@@ -73,8 +73,12 @@ void LaunchSegmentReduceKernel(
     int64_t num_segments, int64_t feat_dim, const uint32_t* offsets_ptr,
     const float* feat_ptr, float* out_ptr, aclrtStream stream) {
   int64_t coreNum = 0;
-  aclrtGetDeviceInfo(device_id, ACL_DEV_ATTR_VECTOR_CORE_NUM, &coreNum);
-  if (coreNum <= 0) coreNum = 48;
+  aclError err = aclrtGetDeviceInfo(device_id, ACL_DEV_ATTR_VECTOR_CORE_NUM, &coreNum);
+  if (err != ACL_SUCCESS || coreNum <= 0) {
+    coreNum = 0;
+    err = aclrtGetDeviceInfo(device_id, ACL_DEV_ATTR_AICORE_CORE_NUM, &coreNum);
+    if (err != ACL_SUCCESS || coreNum <= 0) coreNum = 6;
+  }
   uint32_t block_dim = static_cast<uint32_t>(
       num_segments > 0 ? std::min<int64_t>(num_segments, coreNum) : 1);
   std::vector<uint32_t> segment_split =
