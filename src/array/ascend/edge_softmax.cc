@@ -28,6 +28,7 @@
 
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
+#include "torch_stream_sync.h"
 #include <acl/acl_rt.h>
 #include "edge_softmax_tiling.h"
 // NPU gather kernel (from sddmm_copy_lhs) — replaces CPU IndexSelectND
@@ -244,7 +245,11 @@ static void EdgeSoftmaxAscendImpl(
 
   DGLContext ctx = is_backward ? out->ctx : efeat->ctx;
   CHECK(ctx.device_type == kDGLAscend) << "Expected Ascend device context";
-  ASCEND_CALL(aclrtSetDevice(ctx.device_id));
+  dgl::aten::SetDeviceIfChanged(ctx.device_id);
+  // torch_npu host 队列同步: efeat/out 可能是 torch 算子(如 leaky_relu/matmul)
+  // 的异步输出, 须确保其已提交并写入设备后再 launch edge_softmax kernel,
+  // 否则读到全零输入(详见 torch_stream_sync.h 注释)
+  dgl::aten::SyncTorchNpuStream();
 
   // Convert CSR to int32 if needed
   CSRMatrix csr_used = csr;

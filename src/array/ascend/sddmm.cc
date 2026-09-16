@@ -24,6 +24,7 @@
 
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
+#include "torch_stream_sync.h"
 #include <acl/acl_rt.h>
 #include <Python.h>
 #include <torch/extension.h>
@@ -220,7 +221,7 @@ void SDDMMCooNPUFallback(const std::string& op, const BcastOff& bcast,
   if (num_edges == 0) return;
 
   DGLContext ctx = out->ctx;
-  ASCEND_CALL(aclrtSetDevice(ctx.device_id));
+  dgl::aten::SetDeviceIfChanged(ctx.device_id);
 
   // Get stream (use DGL stream, not PyTorch stream)
   aclrtStream stream = nullptr;
@@ -427,7 +428,7 @@ void SDDMMCooAscend(const BcastOff& bcast, const COOMatrix& coo,
 
   DGLContext ctx = out->ctx;
   CHECK(ctx.device_type == kDGLAscend) << "Expected Ascend device context";
-  ASCEND_CALL(aclrtSetDevice(ctx.device_id));
+  dgl::aten::SetDeviceIfChanged(ctx.device_id);
 
   // Get stream
   aclrtStream stream = nullptr;

@@ -1,5 +1,6 @@
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
+#include "torch_stream_sync.h"
 #include <acl/acl_rt.h>
 #define ASCEND_CALL(func)                                   \
   {                                                         \
@@ -64,7 +65,11 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   NDArray rst = NDArray::Empty({len}, rows->dtype, ctx);
   if (len == 0) return rst;
 
-  ASCEND_CALL(aclrtSetDevice(ctx.device_id));
+  dgl::aten::SetDeviceIfChanged(ctx.device_id);
+  // torch_npu host 队列同步: indptr 可能来自惰性格式转换链(如首次
+  // in_degrees 触发的 COO->CSC), 须确保上游写入已提交到设备,
+  // 否则 kernel 读到未初始化数据导致全零度数(偶发误报 0-in-degree)
+  dgl::aten::SyncTorchNpuStream();
 
   auto stream = dgl::runtime::getCurrentAscendStream();
 
