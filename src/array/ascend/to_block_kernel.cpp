@@ -1,29 +1,3 @@
-/**
- * Copyright (c) 2024 by Contributors
- * @file to_block_kernel.cpp
- * @brief Ascend C kernel for to_block (single entry, op_type + dtype branching).
- *
- * Kernel Type: AIV (single entry to avoid K_TYPE_AIV multi-function bug).
- *   op_type 0: dedup_hash_build — single-core dedup + hash table
- *   op_type 1: map_edges — multi-core edge mapping via hash lookup
- *
- * Hash table: flat open-addressing with quadratic probing (matching CPU
- * ConcurrentIdHashMap semantics). Two separate arrays (keys, values) each
- * of capacity entries, stored in GM.
- *
- * Synchronization (R1): cross-pipe RAW dependencies are explicitly
- * synchronized with AscendC::PipeBarrier<PIPE_ALL>().
- *   - K1: Scalar (SetValue) → MTE3 (DataCopyPad UB→GM)
- *   - K3: MTE2 (DataCopyPad GM→UB) → Scalar (GetValue);
- *         Scalar (SetValue) → MTE3 (DataCopyPad UB→GM)
- *
- * UB budget (R3): K3 allocates 4 hash arrays (src_keys/src_vals/dst_keys/
- * dst_vals). The budget accounts for all 4 arrays.
- *
- * API compliance (R4): no GlobalTensor::SetValue. Count is staged through
- * a UB LocalTensor and written with DataCopyPad.
- */
-
 #include "to_block_tiling.h"
 #include "kernel_operator.h"
 

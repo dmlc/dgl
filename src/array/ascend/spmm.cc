@@ -704,6 +704,10 @@ static CSRMatrix CastCSRToInt32SpMM(const CSRMatrix& csr) {
 // compared to the NPU kernel itself for typical graph sizes)
 static NDArray GatherByIndex(NDArray src, NDArray index) {
   if (IsNullArray(index)) return src;
+  // torch_npu host 队列同步: src 可能是 torch 算子(如 TypedLinear 的 bmm)
+  // 的异步输出, 后续 CopyTo(D2H) 走 ACL memcpy 不 flush torch 队列,
+  // 会读到未写入数据导致 gather 错误(详见 torch_stream_sync.h 注释)
+  dgl::aten::SyncTorchNpuStream();
   if (src->ndim <= 1) return IndexSelect(src, index);
 
   // Multi-dim gather on CPU (dtype-agnostic: use byte-level memcpy)

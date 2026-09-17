@@ -1,23 +1,3 @@
-/**
- * Copyright (c) 2024 by Contributors
- * @file to_block_ascend.cc
- * @brief Ascend device-side IdsMapper for to_block.
- *
- * Implements the AscendIdsMapper functor pattern (matching CUDAIdsMapper)
- * using Ascend C kernels launched via aclrtlaunch_to_block_kernel.
- *
- * Flow per IdsMapper call (ProcessToBlock internally managed):
- *   Phase A: For each ntype with non-empty src_nodes → dedup_hash_build (block_dim=1)
- *   Phase B: For each ntype with non-empty rhs (!include_rhs_in_lhs) → dedup_hash_build
- *   Phase C: Sync + read unique counts → build lhs_nodes + num_nodes_per_type
- *   Phase D: For each etype with edges → map_edges (multi-core)
- *   Phase E: Return new_lhs/new_rhs (mapped edge arrays on device)
- *
- * Tiling uploads use synchronous host-to-device aclrtMemcpy, so no
- * per-tiling aclrtSynchronizeStream is required; a single sync before
- * reading counts back (Phase C) covers all preceding kernels.
- */
-
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>

@@ -1,21 +1,3 @@
-/**
- * Copyright (c) 2024 by Contributors
- * @file to_block_tiling.h
- * @brief Tiling block for the to_block Ascend C kernels.
- *
- * Single-entry kernel dispatching on op_type and dtype_bytes:
- *   op_type 0: dedup_hash_build (block_dim=1) — dedup + ordered hash map
- *   op_type 1: map_edges (block_dim=N) — multi-core edge mapping
- *
- * Hash table: flat open-addressing with quadratic probing (matching CPU
- * ConcurrentIdHashMap semantics). The host computes capacity as
- * next-power-of-two(2 * max_candidates), capped by UB budget.
- *
- * K3 UB budget note: 4 hash arrays (src_keys + src_vals + dst_keys +
- * dst_vals) must fit in UB simultaneously. For int32 with capacity 8192:
- * 4 * 8192 * 4 = 128KB. For int64 the host caps at 4096: 4 * 4096 * 8 =
- * 128KB. Both fit in 190KB available UB.
- */
 #ifndef TO_BLOCK_TILING_H
 #define TO_BLOCK_TILING_H
 

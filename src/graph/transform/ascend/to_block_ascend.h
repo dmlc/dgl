@@ -1,16 +1,3 @@
-/**
- * Copyright (c) 2024 by Contributors
- * @file to_block_ascend.h
- * @brief Ascend device-side ToBlock implementation declarations.
- *
- * ToBlockAscend<IdType> implements the DGL IdsMapper pattern on Ascend NPU,
- * replacing the CPU workaround (ToBlockCPU) that copies data host-side.
- *
- * The implementation uses two Ascend C kernel operations:
- *   1. Dedup hash build (single-core) — order-preserving unique+hash per ntype
- *   2. Edge mapping (multi-core) — hash table lookup for edge endpoints
- */
-
 #ifndef DGL_GRAPH_TRANSFORM_ASCEND_TO_BLOCK_ASCEND_H_
 #define DGL_GRAPH_TRANSFORM_ASCEND_TO_BLOCK_ASCEND_H_
 
