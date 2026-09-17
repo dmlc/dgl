@@ -35,27 +35,9 @@ class KernelCsrSliceMatrixMark {
   uint32_t ncols_;
 };
 
-extern "C" __global__ __aicore__ void csr_slice_matrix_mark_valid_col_int32(
-    GM_ADDR cols, GM_ADDR valid_col, GM_ADDR tiling_ptr) {
-  GlobalTensor<uint32_t> tilingGm;
-  tilingGm.SetGlobalBuffer((__gm__ uint32_t *)tiling_ptr, 2);
-  uint32_t ncols = tilingGm.GetValue(0);
-  uint32_t num_cols = tilingGm.GetValue(1);
-  KernelCsrSliceMatrixMark<int32_t> op;
-  op.Init(cols, valid_col, ncols, num_cols);
-  op.Process();
-}
 
-extern "C" __global__ __aicore__ void csr_slice_matrix_mark_valid_col_int64(
-    GM_ADDR cols, GM_ADDR valid_col, GM_ADDR tiling_ptr) {
-  GlobalTensor<uint32_t> tilingGm;
-  tilingGm.SetGlobalBuffer((__gm__ uint32_t *)tiling_ptr, 2);
-  uint32_t ncols = tilingGm.GetValue(0);
-  uint32_t num_cols = tilingGm.GetValue(1);
-  KernelCsrSliceMatrixMark<int64_t> op;
-  op.Init(cols, valid_col, ncols, num_cols);
-  op.Process();
-}
+
+
 
 // --- CSRSliceMatrix pass 1c: prefix sum (count valid edges per row) ---
 // Single-block: reads valid_col (already fully init+marked), writes ret_indptr
@@ -107,37 +89,9 @@ class KernelCsrSliceMatrixPrefix {
   uint32_t nrows_;
 };
 
-extern "C" __global__ __aicore__ void csr_slice_matrix_prefix_int32(
-    GM_ADDR indptr, GM_ADDR indices,
-    GM_ADDR rows, GM_ADDR valid_col,
-    GM_ADDR ret_indptr,
-    GM_ADDR tiling_ptr) {
-  GlobalTensor<uint32_t> tilingGm;
-  tilingGm.SetGlobalBuffer((__gm__ uint32_t *)tiling_ptr, 4);
-  uint32_t nrows = tilingGm.GetValue(0);
-  uint32_t num_cols = tilingGm.GetValue(1);
-  uint32_t orig_nrows = tilingGm.GetValue(2);
-  uint32_t orig_nnz = tilingGm.GetValue(3);
-  KernelCsrSliceMatrixPrefix<int32_t> op;
-  op.Init(indptr, indices, rows, valid_col, ret_indptr, nrows, num_cols, orig_nrows, orig_nnz);
-  op.Process();
-}
 
-extern "C" __global__ __aicore__ void csr_slice_matrix_prefix_int64(
-    GM_ADDR indptr, GM_ADDR indices,
-    GM_ADDR rows, GM_ADDR valid_col,
-    GM_ADDR ret_indptr,
-    GM_ADDR tiling_ptr) {
-  GlobalTensor<uint32_t> tilingGm;
-  tilingGm.SetGlobalBuffer((__gm__ uint32_t *)tiling_ptr, 4);
-  uint32_t nrows = tilingGm.GetValue(0);
-  uint32_t num_cols = tilingGm.GetValue(1);
-  uint32_t orig_nrows = tilingGm.GetValue(2);
-  uint32_t orig_nnz = tilingGm.GetValue(3);
-  KernelCsrSliceMatrixPrefix<int64_t> op;
-  op.Init(indptr, indices, rows, valid_col, ret_indptr, nrows, num_cols, orig_nrows, orig_nnz);
-  op.Process();
-}
+
+
 
 // --- CSRSliceMatrix pass 2: copy valid edges with column remap ---
 template <typename IdxT>
@@ -212,43 +166,40 @@ struct CsrSliceMatrixCopyTiling {
   uint32_t orig_nnz;
 };
 
-extern "C" __global__ __aicore__ void csr_slice_matrix_copy_int32(
-    GM_ADDR indptr, GM_ADDR indices, GM_ADDR data_or_null,
-    GM_ADDR rows, GM_ADDR valid_col,
-    GM_ADDR ret_indptr, GM_ADDR ret_indices, GM_ADDR ret_data,
-    GM_ADDR tiling_ptr) {
-  GlobalTensor<uint32_t> tilingGm;
-  tilingGm.SetGlobalBuffer((__gm__ uint32_t *)tiling_ptr, 5);
-  uint32_t nrows = tilingGm.GetValue(0);
-  uint32_t has_data = tilingGm.GetValue(1);
-  uint32_t num_cols = tilingGm.GetValue(2);
-  uint32_t orig_nrows = tilingGm.GetValue(3);
-  uint32_t orig_nnz = tilingGm.GetValue(4);
-  KernelCsrSliceMatrixCopy<int32_t> op;
-  op.Init(indptr, indices, data_or_null, rows, valid_col,
-          ret_indptr, ret_indices, ret_data, nrows,
-          static_cast<int32_t>(has_data), num_cols,
-          orig_nrows, orig_nnz);
-  op.Process();
-}
 
-extern "C" __global__ __aicore__ void csr_slice_matrix_copy_int64(
-    GM_ADDR indptr, GM_ADDR indices, GM_ADDR data_or_null,
-    GM_ADDR rows, GM_ADDR valid_col,
-    GM_ADDR ret_indptr, GM_ADDR ret_indices, GM_ADDR ret_data,
-    GM_ADDR tiling_ptr) {
-  GlobalTensor<uint32_t> tilingGm;
-  tilingGm.SetGlobalBuffer((__gm__ uint32_t *)tiling_ptr, 5);
-  uint32_t nrows = tilingGm.GetValue(0);
-  uint32_t has_data = tilingGm.GetValue(1);
-  uint32_t num_cols = tilingGm.GetValue(2);
-  uint32_t orig_nrows = tilingGm.GetValue(3);
-  uint32_t orig_nnz = tilingGm.GetValue(4);
-  KernelCsrSliceMatrixCopy<int64_t> op;
-  op.Init(indptr, indices, data_or_null, rows, valid_col,
-          ret_indptr, ret_indices, ret_data, nrows,
-          static_cast<int32_t>(has_data), num_cols,
-          orig_nrows, orig_nnz);
-  op.Process();
-}
 
+
+
+
+
+// Unified single entry — avoids K_TYPE_AIV multi-function meta-section bug.
+struct CsrSliceMatrixUnifiedTiling {
+  uint32_t op_type;      // 0=mark_valid_col, 1=prefix, 2=copy
+  uint32_t dtype_bytes;  // 4=int32, 8=int64
+  uint32_t ncols;        // mark
+  uint32_t num_cols;     // mark/prefix/copy
+  uint32_t nrows;        // prefix/copy
+  uint32_t orig_nrows;   // prefix/copy
+  uint32_t orig_nnz;     // prefix/copy
+  int32_t  has_data;     // copy
+};
+
+extern "C" __global__ __aicore__ void csr_slice_matrix(
+    GM_ADDR a0, GM_ADDR a1, GM_ADDR a2, GM_ADDR a3, GM_ADDR a4,
+    GM_ADDR a5, GM_ADDR a6, GM_ADDR a7, GM_ADDR tiling_ptr) {
+  KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
+  const __gm__ CsrSliceMatrixUnifiedTiling* t =
+      (const __gm__ CsrSliceMatrixUnifiedTiling*)tiling_ptr;
+  const uint32_t op = t->op_type;
+  const bool is32 = (t->dtype_bytes == 4);
+  if (op == 0) {
+    if (is32) { KernelCsrSliceMatrixMark<int32_t> k; k.Init(a0,a1,t->ncols,t->num_cols); k.Process(); }
+    else      { KernelCsrSliceMatrixMark<int64_t> k; k.Init(a0,a1,t->ncols,t->num_cols); k.Process(); }
+  } else if (op == 1) {
+    if (is32) { KernelCsrSliceMatrixPrefix<int32_t> k; k.Init(a0,a1,a2,a3,a4,t->nrows,t->num_cols,t->orig_nrows,t->orig_nnz); k.Process(); }
+    else      { KernelCsrSliceMatrixPrefix<int64_t> k; k.Init(a0,a1,a2,a3,a4,t->nrows,t->num_cols,t->orig_nrows,t->orig_nnz); k.Process(); }
+  } else {
+    if (is32) { KernelCsrSliceMatrixCopy<int32_t> k; k.Init(a0,a1,a2,a3,a4,a5,a6,a7,t->nrows,t->has_data,t->num_cols,t->orig_nrows,t->orig_nnz); k.Process(); }
+    else      { KernelCsrSliceMatrixCopy<int64_t> k; k.Init(a0,a1,a2,a3,a4,a5,a6,a7,t->nrows,t->has_data,t->num_cols,t->orig_nrows,t->orig_nnz); k.Process(); }
+  }
+}

@@ -11,37 +11,24 @@
 #define ACLRT_LAUNCH_KERNEL(kernel_func) aclrtlaunch_##kernel_func
 #endif
 
-extern "C" uint32_t aclrtlaunch_csr_slice_matrix_mark_valid_col_int32(
-    uint32_t blockDim, aclrtStream stream,
-    void* cols, void* valid_col, void* tiling);
+// 统一 tiling struct — layout matches CsrSliceMatrixUnifiedTiling in kernel
+struct CsrSliceMatrixUnifiedTiling {
+  uint32_t op_type;      // 0=mark_valid_col, 1=prefix, 2=copy
+  uint32_t dtype_bytes;  // sizeof(IdType): 4/int32, 8/int64
+  uint32_t ncols;        // mark
+  uint32_t num_cols;     // mark/prefix/copy
+  uint32_t nrows;        // prefix/copy
+  uint32_t orig_nrows;   // prefix/copy
+  uint32_t orig_nnz;     // prefix/copy
+  int32_t  has_data;     // copy
+};
 
-extern "C" uint32_t aclrtlaunch_csr_slice_matrix_mark_valid_col_int64(
+// 单入口 launch: op_type + dtype_bytes 由 tiling 下发, 规避 K_TYPE_AIV
+// 多函数 meta-section 编号错乱(注册 107000 / launch 507035)
+extern "C" uint32_t aclrtlaunch_csr_slice_matrix(
     uint32_t blockDim, aclrtStream stream,
-    void* cols, void* valid_col, void* tiling);
-
-extern "C" uint32_t aclrtlaunch_csr_slice_matrix_prefix_int32(
-    uint32_t blockDim, aclrtStream stream,
-    void* indptr, void* indices,
-    void* rows, void* valid_col,
-    void* ret_indptr, void* tiling);
-
-extern "C" uint32_t aclrtlaunch_csr_slice_matrix_prefix_int64(
-    uint32_t blockDim, aclrtStream stream,
-    void* indptr, void* indices,
-    void* rows, void* valid_col,
-    void* ret_indptr, void* tiling);
-
-extern "C" uint32_t aclrtlaunch_csr_slice_matrix_copy_int32(
-    uint32_t blockDim, aclrtStream stream,
-    void* indptr, void* indices, void* data_or_null,
-    void* rows, void* valid_col,
-    void* ret_indptr, void* ret_indices, void* ret_data, void* tiling);
-
-extern "C" uint32_t aclrtlaunch_csr_slice_matrix_copy_int64(
-    uint32_t blockDim, aclrtStream stream,
-    void* indptr, void* indices, void* data_or_null,
-    void* rows, void* valid_col,
-    void* ret_indptr, void* ret_indices, void* ret_data, void* tiling);
+    void* a0, void* a1, void* a2, void* a3, void* a4,
+    void* a5, void* a6, void* a7, void* tiling);
 
 namespace dgl {
 namespace runtime {
@@ -95,21 +82,18 @@ CSRMatrix CSRSliceMatrix(
   {
     uint32_t ncols_u32 = static_cast<uint32_t>(new_ncols);
     uint32_t block_dim_mark = 1;
-    uint32_t tiling_data[2] = {ncols_u32, num_cols_u32};
+    CsrSliceMatrixUnifiedTiling tiling{0, (uint32_t)sizeof(IdType),
+                                        ncols_u32, num_cols_u32, 0, 0, 0, 0};
     void* tiling_dev = nullptr;
-    ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling_data), ACL_MEM_MALLOC_HUGE_FIRST));
-    ASCEND_CALL(aclrtMemcpy(tiling_dev, sizeof(tiling_data),
-                             tiling_data, sizeof(tiling_data),
+    ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling), ACL_MEM_MALLOC_HUGE_FIRST));
+    ASCEND_CALL(aclrtMemcpy(tiling_dev, sizeof(tiling),
+                             &tiling, sizeof(tiling),
                              ACL_MEMCPY_HOST_TO_DEVICE));
-    if (std::is_same<IdType, int32_t>::value) {
-      aclError err = aclrtlaunch_csr_slice_matrix_mark_valid_col_int32(
-          block_dim_mark, stream, cols->data, valid_col_data, tiling_dev);
-      CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_mark_valid_col_int32 failed: " << err;
-    } else {
-      aclError err = aclrtlaunch_csr_slice_matrix_mark_valid_col_int64(
-          block_dim_mark, stream, cols->data, valid_col_data, tiling_dev);
-      CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_mark_valid_col_int64 failed: " << err;
-    }
+    aclError err = aclrtlaunch_csr_slice_matrix(
+        block_dim_mark, stream,
+        cols->data, valid_col_data, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, tiling_dev);
+    CHECK(err == ACL_SUCCESS) << "csr_slice_matrix mark failed: " << err;
     ASCEND_CALL(aclrtSynchronizeStream(stream));
     ASCEND_CALL(aclrtFree(tiling_dev));
   }
@@ -119,27 +103,19 @@ CSRMatrix CSRSliceMatrix(
     uint32_t nrows_u32 = static_cast<uint32_t>(new_nrows);
     uint32_t orig_nrows_u32 = static_cast<uint32_t>(csr.num_rows);
     uint32_t orig_nnz_u32 = static_cast<uint32_t>(csr.indices->shape[0]);
-    uint32_t tiling_data[4] = {nrows_u32, num_cols_u32, orig_nrows_u32, orig_nnz_u32};
+    CsrSliceMatrixUnifiedTiling tiling{1, (uint32_t)sizeof(IdType),
+                                        0, num_cols_u32,
+                                        nrows_u32, orig_nrows_u32, orig_nnz_u32, 0};
     void* tiling_dev = nullptr;
-    ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling_data), ACL_MEM_MALLOC_HUGE_FIRST));
-    ASCEND_CALL(aclrtMemcpy(tiling_dev, sizeof(tiling_data),
-                             tiling_data, sizeof(tiling_data),
+    ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling), ACL_MEM_MALLOC_HUGE_FIRST));
+    ASCEND_CALL(aclrtMemcpy(tiling_dev, sizeof(tiling),
+                             &tiling, sizeof(tiling),
                              ACL_MEMCPY_HOST_TO_DEVICE));
-    if (std::is_same<IdType, int32_t>::value) {
-      aclError err = aclrtlaunch_csr_slice_matrix_prefix_int32(
-          1, stream,
-          csr.indptr->data, csr.indices->data,
-          rows->data, valid_col_data,
-          ret_indptr->data, tiling_dev);
-      CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_prefix_int32 failed: " << err;
-    } else {
-      aclError err = aclrtlaunch_csr_slice_matrix_prefix_int64(
-          1, stream,
-          csr.indptr->data, csr.indices->data,
-          rows->data, valid_col_data,
-          ret_indptr->data, tiling_dev);
-      CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_prefix_int64 failed: " << err;
-    }
+    aclError err = aclrtlaunch_csr_slice_matrix(
+        1, stream,
+        csr.indptr->data, csr.indices->data, rows->data, valid_col_data, ret_indptr->data,
+        nullptr, nullptr, nullptr, tiling_dev);
+    CHECK(err == ACL_SUCCESS) << "csr_slice_matrix prefix failed: " << err;
     ASCEND_CALL(aclrtSynchronizeStream(stream));
     ASCEND_CALL(aclrtFree(tiling_dev));
   }
@@ -165,39 +141,29 @@ CSRMatrix CSRSliceMatrix(
         new_nrows, new_ncols, ret_indptr, ret_indices, ret_data_arr, csr.sorted);
   }
 
-  // Pass 2 tiling: [nrows, has_data, num_cols, orig_nrows, orig_nnz]
+  // Pass 2: copy valid edges with column remap
   uint32_t orig_nrows_u32 = static_cast<uint32_t>(csr.num_rows);
   uint32_t orig_nnz_u32 = static_cast<uint32_t>(csr.indices->shape[0]);
-  uint32_t pass2_tiling[5] = {
-      static_cast<uint32_t>(new_nrows),
-      has_data ? 1u : 0u,
-      num_cols_u32,
-      orig_nrows_u32,
-      orig_nnz_u32};
+  CsrSliceMatrixUnifiedTiling tiling2{2, (uint32_t)sizeof(IdType),
+                                       0, num_cols_u32,
+                                       static_cast<uint32_t>(new_nrows),
+                                       orig_nrows_u32, orig_nnz_u32,
+                                       has_data ? 1 : 0};
   uint32_t block_dim2 = 1;  // single block (Ascend may not dispatch all blocks)
   void* tiling_dev2 = nullptr;
-  ASCEND_CALL(aclrtMalloc(&tiling_dev2, sizeof(pass2_tiling), ACL_MEM_MALLOC_HUGE_FIRST));
-  ASCEND_CALL(aclrtMemcpy(tiling_dev2, sizeof(pass2_tiling),
-                           pass2_tiling, sizeof(pass2_tiling),
+  ASCEND_CALL(aclrtMalloc(&tiling_dev2, sizeof(tiling2), ACL_MEM_MALLOC_HUGE_FIRST));
+  ASCEND_CALL(aclrtMemcpy(tiling_dev2, sizeof(tiling2),
+                           &tiling2, sizeof(tiling2),
                            ACL_MEMCPY_HOST_TO_DEVICE));
 
   void* data_ptr = has_data ? csr.data->data : csr.indices->data;
 
-  if (std::is_same<IdType, int32_t>::value) {
-    aclError err = aclrtlaunch_csr_slice_matrix_copy_int32(
-        block_dim2, stream,
-        csr.indptr->data, csr.indices->data, data_ptr,
-        rows->data, valid_col_data,
-        ret_indptr->data, ret_indices->data, ret_data_arr->data, tiling_dev2);
-    CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_copy_int32 failed: " << err;
-  } else {
-    aclError err = aclrtlaunch_csr_slice_matrix_copy_int64(
-        block_dim2, stream,
-        csr.indptr->data, csr.indices->data, data_ptr,
-        rows->data, valid_col_data,
-        ret_indptr->data, ret_indices->data, ret_data_arr->data, tiling_dev2);
-    CHECK(err == ACL_SUCCESS) << "csr_slice_matrix_copy_int64 failed: " << err;
-  }
+  aclError err = aclrtlaunch_csr_slice_matrix(
+      block_dim2, stream,
+      csr.indptr->data, csr.indices->data, data_ptr,
+      rows->data, valid_col_data,
+      ret_indptr->data, ret_indices->data, ret_data_arr->data, tiling_dev2);
+  CHECK(err == ACL_SUCCESS) << "csr_slice_matrix copy failed: " << err;
 
   ASCEND_CALL(aclrtSynchronizeStream(stream));
   ASCEND_CALL(aclrtFree(tiling_dev2));
