@@ -18,7 +18,6 @@
 #ifdef DGL_USE_ASCEND
 #include <Python.h>
 #include <acl/acl.h>
-#include "torch_stream_sync.h"
 #include <acl/acl_rt.h>
 #include <acl/acl_op.h>
 #define ASCEND_CALL(func)                                                \
@@ -343,7 +342,7 @@ void SpMMCsrAscend(
   
   DGLContext ctx = ufeat->ctx;
   CHECK(ctx.device_type == kDGLAscend) << "Expected Ascend device context";
-  dgl::aten::SetDeviceIfChanged(ctx.device_id);
+  ASCEND_CALL(aclrtSetDevice(ctx.device_id));
   
   int64_t num_rows = csr.num_rows;
   int64_t num_cols = csr.num_cols;
@@ -704,10 +703,6 @@ static CSRMatrix CastCSRToInt32SpMM(const CSRMatrix& csr) {
 // compared to the NPU kernel itself for typical graph sizes)
 static NDArray GatherByIndex(NDArray src, NDArray index) {
   if (IsNullArray(index)) return src;
-  // torch_npu host 队列同步: src 可能是 torch 算子(如 TypedLinear 的 bmm)
-  // 的异步输出, 后续 CopyTo(D2H) 走 ACL memcpy 不 flush torch 队列,
-  // 会读到未写入数据导致 gather 错误(详见 torch_stream_sync.h 注释)
-  dgl::aten::SyncTorchNpuStream();
   if (src->ndim <= 1) return IndexSelect(src, index);
 
   // Multi-dim gather on CPU (dtype-agnostic: use byte-level memcpy)
@@ -776,7 +771,7 @@ static void SpMMCsrUnified(
   }
 
   DGLContext ctx = out->ctx;
-  dgl::aten::SetDeviceIfChanged(ctx.device_id);
+  ASCEND_CALL(aclrtSetDevice(ctx.device_id));
 
   int64_t num_rows = csr.num_rows;
   int64_t num_cols = csr.num_cols;
@@ -841,13 +836,6 @@ static void SpMMCsrUnified(
   ASCEND_CALL(aclrtMalloc(&tiling_dev, sizeof(tiling), ACL_MEM_MALLOC_HUGE_FIRST));
   ASCEND_CALL(aclrtMemcpy(tiling_dev, sizeof(tiling), &tiling,
                            sizeof(tiling), ACL_MEMCPY_HOST_TO_DEVICE));
-
-  // [NPU cross-stream sync] torch_npu host 队列同步(修复进程首调全零问题):
-  // ufeat 等输入可能是 torch 算子(如 GraphConv 内 th.matmul)的异步输出,
-  // 其提交经由 c10_npu host 队列异步 flush, ACL 级同步等不到; 若不先
-  // flush, 本 kernel 会在生产者写入前执行, 读到全零输入(首调必现, 详见
-  // torch_stream_sync.h 注释)。
-  dgl::aten::SyncTorchNpuStream();
 
   // Zero output
   ASCEND_CALL(aclrtMemsetAsync(out->data, out.GetSize(), 0, out.GetSize(), stream));
