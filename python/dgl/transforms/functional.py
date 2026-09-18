@@ -3298,6 +3298,22 @@ def reorder_graph(
                 )
             )
         rg = subgraph.node_subgraph(g, nodes_perm, store_ids=False)
+        # NPU: node_subgraph may return graph with internal arrays on CPU
+        # while reporting device = npu:0. Rebuild to fix device mismatch.
+        if rg.edges()[0].device != g.device:
+            from dgl import graph as _rebuild_graph
+            src, dst = rg.edges()
+            new_rg = _rebuild_graph(
+                (src.to(g.device), dst.to(g.device)),
+                num_nodes=rg.num_nodes(),
+                idtype=g.idtype,
+                device=g.device,
+            )
+            for k, v in rg.ndata.items():
+                new_rg.ndata[k] = F.copy_to(v, g.device)
+            for k, v in rg.edata.items():
+                new_rg.edata[k] = F.copy_to(v, g.device)
+            rg = new_rg
     else:
         nodes_perm = F.arange(0, g.num_nodes(), g.idtype, g.device)
         rg = g.clone()
@@ -3331,9 +3347,28 @@ def reorder_graph(
         edges_perm = F.astype(
             F.gather_row(rev_id, F.tensor(edges_perm)), rg.idtype
         )
-        rg = subgraph.edge_subgraph(
-            rg, edges_perm, relabel_nodes=False, store_ids=False
-        )
+        # NPU: edge_subgraph kernel has first-call JIT sync issue,
+        # rebuild graph from permuted edges to avoid the NPU kernel
+        if hasattr(rg, 'device') and str(rg.device) != 'cpu':
+            cur_src, cur_dst = rg.edges()
+            new_src = F.gather_row(cur_src, F.tensor(edges_perm))
+            new_dst = F.gather_row(cur_dst, F.tensor(edges_perm))
+            from dgl import graph as _rebuild_g
+            rg_new = _rebuild_g(
+                (new_src.to(rg.device), new_dst.to(rg.device)),
+                num_nodes=rg.num_nodes(),
+                idtype=rg.idtype,
+                device=rg.device,
+            )
+            for k, v in rg.ndata.items():
+                rg_new.ndata[k] = F.copy_to(v, rg.device)
+            for k, v in rg.edata.items():
+                rg_new.edata[k] = F.copy_to(v, rg.device)
+            rg = rg_new
+        else:
+            rg = subgraph.edge_subgraph(
+                rg, edges_perm, relabel_nodes=False, store_ids=False
+            )
 
     if store_ids:
         rg.edata[EID] = rg.edata.pop("__orig__")

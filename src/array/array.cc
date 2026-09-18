@@ -862,11 +862,21 @@ COOMatrix CSRRowWiseSampling(
   } else
 #endif  // DGL_USE_ASCEND
   if (IsNullArray(prob_or_mask)) {
-    ATEN_CSR_SWITCH_CUDA_UVA(
-        mat, rows, XPU, IdType, "CSRRowWiseSamplingUniform", {
-          ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(
-              mat, rows, num_samples, replace);
-        });
+#ifdef DGL_USE_ASCEND
+    if (rows->ctx.device_type == kDGLAscend) {
+      ATEN_ID_TYPE_SWITCH(rows->dtype, IdType, {
+        ret = impl::CSRRowWiseSamplingUniform<kDGLAscend, IdType>(
+            mat, rows, num_samples, replace);
+      });
+    } else
+#endif
+    {
+      ATEN_CSR_SWITCH_CUDA_UVA(
+          mat, rows, XPU, IdType, "CSRRowWiseSamplingUniform", {
+            ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(
+                mat, rows, num_samples, replace);
+          });
+    }
   } else {
     // prob_or_mask is pinned and rows on GPU is valid
     CHECK_VALID_CONTEXT(prob_or_mask, rows);

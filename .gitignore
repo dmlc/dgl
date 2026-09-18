@@ -168,3 +168,7 @@ cscope.*
 
 # model file
 *.pth
+###
+tests/ascend/results/
+tests/python/common/transforms/extra-info/
+tests/python/pytorch/nn/extra-info/

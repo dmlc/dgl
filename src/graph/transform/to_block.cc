@@ -36,6 +36,10 @@
 
 #include "../../array/cpu/concurrent_id_hash_map.h"
 
+#ifdef DGL_USE_ASCEND
+#include "ascend/to_block_ascend.h"
+#endif
+
 namespace dgl {
 
 using namespace dgl::runtime;
@@ -345,6 +349,23 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCUDA, int64_t>(
 
 #endif  // DGL_USE_CUDA
 
+#ifdef DGL_USE_ASCEND
+
+template <>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLAscend, int32_t>(
+    HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
+    bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes) {
+  return ToBlockAscend<int32_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
+}
+
+template <>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLAscend, int64_t>(
+    HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
+    bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes) {
+  return ToBlockAscend<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
+}
+#endif  // DGL_USE_ASCEND
+
 DGL_REGISTER_GLOBAL("capi._CAPI_DGLToBlock")
     .set_body([](DGLArgs args, DGLRetValue *rv) {
       const HeteroGraphRef graph_ref = args[0];
@@ -356,12 +377,22 @@ DGL_REGISTER_GLOBAL("capi._CAPI_DGLToBlock")
       HeteroGraphPtr new_graph;
       std::vector<IdArray> induced_edges;
 
-      ATEN_XPU_SWITCH_CUDA(graph_ref->Context().device_type, XPU, "ToBlock", {
+      auto device_type = graph_ref->Context().device_type;
+      if (device_type == kDGLAscend) {
+#ifdef DGL_USE_ASCEND
         ATEN_ID_TYPE_SWITCH(graph_ref->DataType(), IdType, {
-          std::tie(new_graph, induced_edges) = ToBlock<XPU, IdType>(
+          std::tie(new_graph, induced_edges) = ToBlock<kDGLAscend, IdType>(
               graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs, &lhs_nodes);
         });
-      });
+#endif
+      } else {
+        ATEN_XPU_SWITCH_CUDA(device_type, XPU, "ToBlock", {
+          ATEN_ID_TYPE_SWITCH(graph_ref->DataType(), IdType, {
+            std::tie(new_graph, induced_edges) = ToBlock<XPU, IdType>(
+                graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs, &lhs_nodes);
+          });
+        });
+      }
 
       List<Value> lhs_nodes_ref;
       for (IdArray &array : lhs_nodes)
