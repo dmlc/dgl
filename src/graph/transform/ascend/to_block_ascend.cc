@@ -177,10 +177,36 @@ struct AscendIdsMapper {
     const uint32_t ub_avail = QueryUbAvailableBytes(ctx.device_id);
     const int64_t num_etypes = static_cast<int64_t>(edge_arrays.size());
 
+    // All device workspace / tiling pointers collected here; freed by
+    // WorkspaceGuard on scope exit regardless of error path.
+    std::vector<void*> alloc_ptrs;
+
+    // Allocate device workspace and register it in the RAII guard.
+    auto alloc_ws = [&](size_t bytes) -> void* {
+      void* p = device->AllocWorkspace(ctx, bytes);
+      alloc_ptrs.push_back(p);
+      return p;
+    };
+
     // -----------------------------------------------------------------------
     // Phase A: Build lhs hash tables + unique_ids
     // For each ntype with non-empty src_nodes: launch K1 (dedup_hash_build).
     // -----------------------------------------------------------------------
+    // RAII guard: collect every device workspace / tiling pointer allocated
+    // in Phase A-D and free them all on scope exit. Without this, a CHECK or
+    // LOG(FATAL) in the middle of Phase A-D (e.g. hash saturation, launch
+    // failure) skips Phase E and leaks device memory (review comment #5).
+    struct WorkspaceGuard {
+      std::vector<void*>& ptrs;
+      runtime::DeviceAPI* device;
+      const DGLContext& ctx;
+      ~WorkspaceGuard() {
+        for (void* p : ptrs) {
+          if (p != nullptr) device->FreeWorkspace(ctx, p);
+        }
+      }
+    } ws_guard{alloc_ptrs, device, ctx};
+
     // Device-side arrays that need to persist until Phase D:
     struct NtypeWorkspace {
       void* hash_keys = nullptr;
@@ -220,18 +246,17 @@ struct AscendIdsMapper {
       NtypeWorkspace& ws = lhs_ws[ntype];
       ws.num_ids = num_ids;
       ws.capacity = capacity;
-      ws.hash_keys = device->AllocWorkspace(ctx, capacity * dtype_bytes);
-      ws.hash_vals = device->AllocWorkspace(ctx, capacity * dtype_bytes);
-      ws.unique_ids = device->AllocWorkspace(ctx, num_ids * dtype_bytes);
-      ws.count = device->AllocWorkspace(ctx, sizeof(int64_t));
+      ws.hash_keys = alloc_ws(capacity * dtype_bytes);
+      ws.hash_vals = alloc_ws(capacity * dtype_bytes);
+      ws.unique_ids = alloc_ws(num_ids * dtype_bytes);
+      ws.count = alloc_ws(sizeof(int64_t));
 
       // Setup tiling
       ToBlockTiling host_tiling;
       SetupDedupTiling(
           &host_tiling, num_ids, num_seeds, capacity, dtype_bytes, ub_avail);
 
-      void* tiling_dev = device->AllocWorkspace(ctx, sizeof(ToBlockTiling));
-      tiling_devs.push_back(tiling_dev);
+      void* tiling_dev = alloc_ws(sizeof(ToBlockTiling));
       // CopyDataFromTo (CPU->Ascend) uses synchronous aclrtMemcpy, so the
       // tiling is visible to the kernel without an extra stream sync (F1).
       device->CopyDataFromTo(
@@ -270,17 +295,16 @@ struct AscendIdsMapper {
         NtypeWorkspace& ws = rhs_ws[ntype];
         ws.num_ids = num_ids;
         ws.capacity = capacity;
-        ws.hash_keys = device->AllocWorkspace(ctx, capacity * dtype_bytes);
-        ws.hash_vals = device->AllocWorkspace(ctx, capacity * dtype_bytes);
-        ws.unique_ids = device->AllocWorkspace(ctx, num_ids * dtype_bytes);
-        ws.count = device->AllocWorkspace(ctx, sizeof(int64_t));
+        ws.hash_keys = alloc_ws(capacity * dtype_bytes);
+        ws.hash_vals = alloc_ws(capacity * dtype_bytes);
+        ws.unique_ids = alloc_ws(num_ids * dtype_bytes);
+        ws.count = alloc_ws(sizeof(int64_t));
 
         ToBlockTiling host_tiling;
         SetupDedupTiling(
             &host_tiling, num_ids, num_seeds, capacity, dtype_bytes, ub_avail);
 
-        void* tiling_dev = device->AllocWorkspace(ctx, sizeof(ToBlockTiling));
-        tiling_devs.push_back(tiling_dev);
+        void* tiling_dev = alloc_ws(sizeof(ToBlockTiling));
         device->CopyDataFromTo(
             &host_tiling, 0, tiling_dev, 0, sizeof(ToBlockTiling),
             DGLContext{kDGLCPU, 0}, ctx, DGLDataType{});
@@ -391,8 +415,7 @@ struct AscendIdsMapper {
         host_tiling.hash_mask_dst = dst_ws.capacity - 1;
         host_tiling.block_dim = launch_dim;
 
-        void* tiling_dev = device->AllocWorkspace(ctx, sizeof(ToBlockTiling));
-        tiling_devs.push_back(tiling_dev);
+        void* tiling_dev = alloc_ws(sizeof(ToBlockTiling));
         device->CopyDataFromTo(
             &host_tiling, 0, tiling_dev, 0, sizeof(ToBlockTiling),
             DGLContext{kDGLCPU, 0}, ctx, DGLDataType{});
@@ -423,34 +446,11 @@ struct AscendIdsMapper {
     }
 
     // -----------------------------------------------------------------------
-    // Phase E: Sync and free workspaces
+    // Phase E: Sync, then return. All workspaces and tiling buffers are freed
+    // automatically by the WorkspaceGuard (RAII) on scope exit — even if a
+    // CHECK/LOG(FATAL) fired earlier in Phase A-D (review comment #5).
     // -----------------------------------------------------------------------
     ASCEND_CALL(aclrtSynchronizeStream(stream));
-
-    for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-      if (lhs_ws[ntype].hash_keys)
-        device->FreeWorkspace(ctx, lhs_ws[ntype].hash_keys);
-      if (lhs_ws[ntype].hash_vals)
-        device->FreeWorkspace(ctx, lhs_ws[ntype].hash_vals);
-      if (lhs_ws[ntype].unique_ids)
-        device->FreeWorkspace(ctx, lhs_ws[ntype].unique_ids);
-      if (lhs_ws[ntype].count)
-        device->FreeWorkspace(ctx, lhs_ws[ntype].count);
-
-      if (rhs_ws[ntype].hash_keys)
-        device->FreeWorkspace(ctx, rhs_ws[ntype].hash_keys);
-      if (rhs_ws[ntype].hash_vals)
-        device->FreeWorkspace(ctx, rhs_ws[ntype].hash_vals);
-      if (rhs_ws[ntype].unique_ids)
-        device->FreeWorkspace(ctx, rhs_ws[ntype].unique_ids);
-      if (rhs_ws[ntype].count)
-        device->FreeWorkspace(ctx, rhs_ws[ntype].count);
-    }
-
-    // Free all tiling device buffers
-    for (void* td : tiling_devs) {
-      if (td) device->FreeWorkspace(ctx, td);
-    }
 
     return std::make_tuple(std::move(new_lhs_ids), std::move(new_rhs_ids));
 #else
