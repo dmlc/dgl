@@ -11,9 +11,9 @@
 #define ACLRT_LAUNCH_KERNEL(kernel_func) aclrtlaunch_##kernel_func
 #endif
 
-extern "C" uint32_t aclrtlaunch_range_i32(
-    uint32_t blockDim, aclrtStream stream, void* dst, void* tiling);
-extern "C" uint32_t aclrtlaunch_range_i64(
+// 单入口 + dtype_bytes tiling 分支: 避免 K_TYPE_AIV 多函数 meta 段编号
+// 不匹配导致 CANN 9.0.0 下注册失败 107000
+extern "C" uint32_t aclrtlaunch_range(
     uint32_t blockDim, aclrtStream stream, void* dst, void* tiling);
 
 namespace dgl {
@@ -40,6 +40,7 @@ struct TilingData {
   uint32_t n;
   uint32_t low_hi;
   uint32_t low_lo;
+  uint32_t dtype_bytes;  // sizeof(IdType)
 };
 
 static thread_local void* tiling_dev_buf = nullptr;
@@ -92,7 +93,8 @@ IdArray Range<kDGLAscend, int32_t>(int32_t low, int32_t high, DGLContext ctx) {
 
   auto stream = dgl::runtime::getCurrentAscendStream();
   uint32_t block_dim = CalcBlockDim(ctx.device_id, length);
-  aclrtlaunch_range_i32(block_dim, stream, ret->data, tiling_dev);
+  tiling.dtype_bytes = 4;
+  aclrtlaunch_range(block_dim, stream, ret->data, tiling_dev);
 
   return ret;
 }
@@ -116,7 +118,8 @@ IdArray Range<kDGLAscend, int64_t>(int64_t low, int64_t high, DGLContext ctx) {
 
   auto stream = dgl::runtime::getCurrentAscendStream();
   uint32_t block_dim = CalcBlockDim(ctx.device_id, length);
-  aclrtlaunch_range_i64(block_dim, stream, ret->data, tiling_dev);
+  tiling.dtype_bytes = 8;
+  aclrtlaunch_range(block_dim, stream, ret->data, tiling_dev);
 
   return ret;
 }
