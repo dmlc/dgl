@@ -7,6 +7,7 @@
 // The device block is: header (kTilingHeaderWords words, field order below)
 // followed by one output-start word per launched block (block prefix sums).
 // Field order must match KernelCsrRowWiseSamplingUniform::Init.
+// Header word count: was 8 before adding dtype_bytes; now 9.
 constexpr uint32_t kTilingHeaderWords = 9;
 
 struct CsrRowWiseSamplingUniformTiling {
