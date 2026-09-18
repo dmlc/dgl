@@ -241,7 +241,7 @@ uint32_t QueryVectorCoreCount(int device_id) {
 uint32_t QueryUbAvailableBytes(int device_id) {
   int64_t ub_bytes = 0;
   aclError err = aclrtGetDeviceInfo(
-      device_id, ACL_DEV_ATTR_UBUF_PER_VECTOR_CORE, &ub_bytes);
+      device_id, ACL_DEV_ATTR_LOCAL_MEM_PER_VECTOR_CORE, &ub_bytes);
   if (err != ACL_SUCCESS ||
       ub_bytes <= static_cast<int64_t>(kUbReservedBytes) ||
       ub_bytes > (1 << 30)) {

@@ -656,23 +656,33 @@ if(BUILD_CPP_TEST)
   execute_process(COMMAND python3 -c "import torch, os; print(os.path.normpath(os.path.join(os.path.dirname(torch.__file__), '..', 'torch.libs')))"
                   OUTPUT_VARIABLE TORCH_LIBS_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+  # libtorch_npu.so references Python-binding symbols (THPVariableClass,
+  # pybind11 type casters, ...) that are defined in libtorch_python.so, so
+  # any executable linking the dgl target must also link torch_python.
+  # Note: link_directories() below has no effect on the already-declared
+  # runUnitTests target, hence the explicit find_library path.
+  find_library(TORCH_PYTHON_LIBRARY torch_python HINTS ${TORCH_LIB_DIR} NO_DEFAULT_PATH)
+
   link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR} ${TORCH_LIBS_DIR})
 
+  message(STATUS "DBG dirs: [${CONDA_LIB_DIR}] [${TORCH_NPU_LIB_DIR}] [${TORCH_LIB_DIR}] [${TORCH_LIBS_DIR}]")
   set_target_properties(runUnitTests PROPERTIES
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR};${TORCH_LIBS_DIR}"
-    LINK_FLAGS "-Wl,-rpath-link,${TORCH_LIBS_DIR}"
+    LINK_FLAGS "-Wl,-rpath,${CONDA_LIB_DIR}:${TORCH_NPU_LIB_DIR}:${TORCH_LIB_DIR}:${TORCH_LIBS_DIR} -Wl,-rpath-link,${TORCH_LIBS_DIR}"
   )
-  target_link_libraries(runUnitTests PRIVATE gtest gtest_main 
+  target_link_libraries(runUnitTests PRIVATE gtest gtest_main
     ${Python3_LIBRARIES}
     ${TORCH_LIBRARIES}
+    ${TORCH_PYTHON_LIBRARY}
     c10
     ${GFORTRAN_LIB}
     ${GOMP_LIB}
   )
-  target_link_libraries(runUnitTests PRIVATE dgl 
+  target_link_libraries(runUnitTests PRIVATE dgl
     ${Python3_LIBRARIES}
     ${TORCH_LIBRARIES}
+    ${TORCH_PYTHON_LIBRARY}
     c10
     ${GFORTRAN_LIB}
     ${GOMP_LIB}

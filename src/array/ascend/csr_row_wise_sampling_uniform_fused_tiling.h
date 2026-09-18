@@ -28,7 +28,7 @@ struct CsrRowWiseSamplingUniformFusedTiling {
 //   - vector-core count (ACL_DEV_ATTR_VECTOR_CORE_NUM): AIV counts differ
 //     across SoCs (910B family: 40; other families and trimmed vNPU
 //     instances differ)
-//   - unified-buffer size (ACL_DEV_ATTR_UBUF_PER_VECTOR_CORE): 192KB on
+//   - unified-buffer size (ACL_DEV_ATTR_LOCAL_MEM_PER_VECTOR_CORE): 192KB on
 //     910B, 248KB on 950PR
 // The values below are only fallbacks for when the query fails.
 constexpr uint32_t kDefaultVectorCoreCountFused = 40;  // fallback, 910B
