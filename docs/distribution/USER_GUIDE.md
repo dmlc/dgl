@@ -62,7 +62,7 @@ python -c "
 import torch
 import torch_npu
 import dgl
-print('dgl       ', dgl.__version__)         # 0.0.1
+print('dgl       ', dgl.__version__)         # 0.0.2
 print('torch     ', torch.__version__)        # 2.8.0+cpu
 print('torch_npu ', torch_npu.__version__)    # 2.8.0.post2
 print('npu avail ', torch.npu.is_available()) # True
@@ -132,8 +132,8 @@ print("result shape:", g.ndata["h"].shape)
 
 ## 7. 版本说明
 
-- `dgl-ascend 0.0.1`：基于上游 DGL + Ascend NPU 支持。
-  - `0.0.1` = DGL-Ascend 版本
+- `dgl-ascend 0.0.2`：基于上游 DGL + Ascend NPU 支持。
+  - `0.0.2` = DGL-Ascend 版本
   - 构建所用 CANN ≥ 8.5（对标 DGL CUDA 的 `+cu118`），用户需 CANN ≥ 8.5。
 - 强制依赖：`torch==2.8.0`、`torch_npu==2.8.0.post2`（精确版本，不可混用）。
 
