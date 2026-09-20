@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📚 DGL-Ascend 项目主页
+    url: https://gitcode.com/AI4Science/dgl-ascend
+    about: 查阅 DGL-Ascend 项目介绍与源码
+  - name: 💬 DGL-Ascend Issues
+    url: https://gitcode.com/AI4Science/dgl-ascend/issues
+    about: 查看已有问题或提交 Issue
+  - name: 📖 DGL 官方文档
+    url: https://www.dgl.ai
+    about: 学习 DGL 图神经网络框架相关技术

@@ -1,0 +1,54 @@
+name: Feature Request / 功能需求
+description: 提交新功能或改进建议
+title: '[Feature]: '
+labels: ['kind/feature', 'triage']
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sending a feature request! Please fill in the following template.
+        感谢提交功能需求！请填写以下模板。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description / 功能描述
+      description: Describe the feature you want to add / 描述您希望添加的功能
+      placeholder: |
+        What feature do you want? / 您想要什么功能？
+        Why is it needed? / 为什么需要这个功能？
+        How should it work? / 应该如何工作？
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case / 应用场景
+      description: Describe the use case for this feature / 描述此功能的应用场景
+      placeholder: |
+        What problem does this solve? / 解决什么问题？
+        Who will benefit from this? / 谁会受益？
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior / 期望行为
+      description: How should the feature behave? / 功能应该如何表现？
+      placeholder: Describe the expected behavior / 描述期望的行为
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information / 附加信息
+      description: Any other context or references / 其它上下文或参考资料
+      placeholder: |
+        References, links, or similar features in other projects
+        参考资料、链接或其它项目中的类似功能
+    validations:
+      required: false
