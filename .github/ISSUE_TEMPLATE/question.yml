@@ -1,0 +1,30 @@
+name: Question|问题咨询
+description: 如果您需要咨询或者讨论问题，请使用此模板。
+title: "[Question|问题咨询]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢提出问题，我们将安排人答复！
+        Welcome to ask questions and discuss with other members.
+  - type: textarea
+    attributes:
+      label: 问题描述 / Question Description (Mandatory / 必填)
+      description: 请详细描述您的问题
+      placeholder: 请尽可能详细地描述您的问题，包括上下文和已尝试的方法
+  - type: textarea
+    attributes:
+      label: 环境信息 / Environment (Optional / 选填)
+      description: 如果问题与环境相关，请提供环境信息
+      placeholder: |
+        - 昇腾硬件型号
+        - DGL-Ascend 版本 / commit
+        - CANN 版本
+        - Python / PyTorch / torch_npu 版本
+        - 操作系统
+  - type: textarea
+    attributes:
+      label: 已尝试的方法 / Attempts Made (Optional / 选填)
+      description: 请描述您已经尝试过的方法
+      placeholder: 列出您已经尝试的解决方案或排查步骤
