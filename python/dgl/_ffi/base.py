@@ -33,10 +33,104 @@ class DGLError(Exception):
     pass  # pylint: disable=unnecessary-pass
 
 
+# Latch state for the torch_npu <-> DGL Ascend stream bridge.
+_ascend_bridge = {"ok": False, "pid": None}
+
+torch = None
+
+
+def _bridge_ascend_stream():
+    """Synchronize the NPU device before entering libdgl.
+
+    torch_npu submits kernels asynchronously on its own (non-default) ACL
+    streams, while DGL Ascend kernels run on the ACL default stream and block
+    on it until completion.  Without a barrier, a torch_npu write (e.g. a
+    feature tensor copied to NPU) may still be in flight when a DGL kernel
+    reads it, producing nondeterministic results or device-side faults.
+
+    Directly handing torch's stream to DGL (DGLSetStream) is not safe either:
+    torch_npu submits work to that stream from its internal task-queue
+    thread, while DGL would submit from the caller thread - concurrent
+    submissions on one stream corrupt the driver state.
+
+    The simplest correct barrier is therefore to synchronize the whole
+    device on the host before each DGL C API call.  This drains every stream,
+    not just the calling thread's current stream: a producer may have issued
+    the write on an arbitrary stream (its own current stream, the default
+    stream, or a user-created stream), and synchronizing only
+    ``current_stream()`` would leave those in-flight writes unordered.  DGL
+    ops themselves synchronize at the end, so the reverse (DGL -> torch)
+    direction is already ordered.  When the device is idle this call is cheap.
+
+    Set DGL_ASCEND_STREAM_BRIDGE=0 to disable (for debugging only).
+    """
+    global torch
+    if os.environ.get("DGL_ASCEND_STREAM_BRIDGE", "1") == "0":
+        return
+    if sys.is_finalizing():
+        # Interpreter shutdown: destructors must not touch torch_npu.
+        return
+    st = _ascend_bridge
+    if not st["ok"]:
+        # torch_npu may be imported after dgl; retry cheaply until latched.
+        if "torch_npu" not in sys.modules:
+            return
+        try:
+            import torch as _torch
+            import torch_npu  # noqa: F401
+
+            torch = _torch
+            if not torch.npu.is_available():
+                return
+            st["ok"] = True
+            st["pid"] = os.getpid()
+        except Exception:  # pylint: disable=broad-except
+            return
+    if os.getpid() != st["pid"]:
+        # Forked subprocess (e.g. a DataLoader worker): torch_npu cannot be
+        # re-initialized here, and workers only issue CPU-side DGL calls,
+        # so there is no NPU stream to order against.  Skip the barrier.
+        return
+    torch.npu.synchronize()
+
+
+class _AscendStreamFuncWrapper(object):
+    """Wraps a libdgl C function pointer to bridge the stream before each call.
+
+    Attribute access (e.g. ``restype``) is forwarded to the underlying
+    function pointer.
+    """
+
+    __slots__ = ("_func",)
+
+    def __init__(self, func):
+        object.__setattr__(self, "_func", func)
+
+    def __call__(self, *args, **kwargs):
+        _bridge_ascend_stream()
+        return self._func(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._func, name)
+
+    def __setattr__(self, name, value):
+        setattr(self._func, name, value)
+
+
+class _SyncedCDLL(ctypes.CDLL):
+    """CDLL whose function calls first bridge the torch_npu stream."""
+
+    def __getattr__(self, name):
+        func = super(_SyncedCDLL, self).__getattr__(name)
+        wrapped = _AscendStreamFuncWrapper(func)
+        self.__dict__[name] = wrapped
+        return wrapped
+
+
 def _load_lib():
     """Load libary by searching possible path."""
     lib_path = libinfo.find_lib_path()
-    lib = ctypes.CDLL(lib_path[0])
+    lib = _SyncedCDLL(lib_path[0])
     dirname = os.path.dirname(lib_path[0])
     basename = os.path.basename(lib_path[0])
     # DMatrix functions
