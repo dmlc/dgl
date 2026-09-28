@@ -128,15 +128,23 @@ ASCEND_L_KERNEL(int64_t, NE)
   }
 
 // Generate operators with only lhs being NDArray.
-#define UNARY_ELEMENT_OP(name, op)                             \
-  IdArray name(IdArray lhs) {                                  \
-    IdArray ret;                                               \
-    ATEN_XPU_SWITCH_CUDA(lhs->ctx.device_type, XPU, #name, {   \
-      ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                \
-        ret = impl::UnaryElewise<XPU, IdType, arith::op>(lhs); \
-      });                                                      \
-    });                                                        \
-    return ret;                                                \
+#define UNARY_ELEMENT_OP(name, op)                                 \
+  IdArray name(IdArray lhs) {                                      \
+    IdArray ret;                                                   \
+    if (lhs->ctx.device_type == kDGLAscend) {                      \
+      ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                    \
+        ret = impl::UnaryElewise<kDGLAscend, IdType, arith::op>(   \
+            lhs);                                                  \
+      });                                                          \
+      return ret;                                                  \
+    } else {                                                       \
+      ATEN_XPU_SWITCH_CUDA(lhs->ctx.device_type, XPU, #name, {     \
+        ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                  \
+          ret = impl::UnaryElewise<XPU, IdType, arith::op>(lhs);   \
+        });                                                        \
+      });                                                          \
+    }                                                              \
+    return ret;                                                    \
   }
 
 BINARY_ELEMENT_OP(Add, Add)
