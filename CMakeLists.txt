@@ -568,11 +568,21 @@ endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
 target_include_directories(dgl PRIVATE ${Python3_INCLUDE_DIRS})
 
-find_library(GFORTRAN_LIB NAMES gfortran REQUIRED)
-find_library(GOMP_LIB NAMES gomp REQUIRED)
+find_library(GFORTRAN_LIB NAMES gfortran)
+find_library(GOMP_LIB NAMES gomp)
 
-message(STATUS "Found gfortran: ${GFORTRAN_LIB}")
-message(STATUS "Found gomp: ${GOMP_LIB}")
+if(GFORTRAN_LIB)
+  message(STATUS "Found gfortran: ${GFORTRAN_LIB}")
+else()
+  message(STATUS "gfortran not found — skipping (not required for Ascend builds)")
+  set(GFORTRAN_LIB "")
+endif()
+if(GOMP_LIB)
+  message(STATUS "Found gomp: ${GOMP_LIB}")
+else()
+  message(STATUS "gomp not found — skipping")
+  set(GOMP_LIB "")
+endif()
 
 target_link_libraries(dgl PRIVATE
   ${DGL_LINKER_LIBS}
