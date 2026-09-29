@@ -20,6 +20,7 @@
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
 #include <acl/acl_op.h>
+#include "acl_attr_compat.h"
 #define ASCEND_CALL(func)                                                \
   {                                                                      \
     aclError e = (func);                                                 \

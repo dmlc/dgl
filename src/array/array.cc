@@ -1549,7 +1549,7 @@ Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
       << "Graph and source should in the same dtype";
   CHECK_EQ(csr.num_rows, csr.num_cols)
       << "Graph traversal can only work on square-shaped CSR.";
-  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSNodesFrontiers", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(source->ctx.device_type, XPU, "BFSNodesFrontiers", {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
       ret = impl::BFSNodesFrontiers<XPU, IdType>(csr, source);
     });
@@ -1565,7 +1565,7 @@ Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
       << "Graph and source should in the same dtype";
   CHECK_EQ(csr.num_rows, csr.num_cols)
       << "Graph traversal can only work on square-shaped CSR.";
-  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSEdgesFrontiers", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(source->ctx.device_type, XPU, "BFSEdgesFrontiers", {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
       ret = impl::BFSEdgesFrontiers<XPU, IdType>(csr, source);
     });
