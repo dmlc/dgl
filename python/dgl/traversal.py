@@ -1,7 +1,7 @@
 """Module for graph traversal methods."""
 from __future__ import absolute_import
 
-from . import backend as F, utils
+from . import backend as F, ndarray as nd, utils
 from ._ffi.function import _init_api
 from .heterograph import DGLGraph
 
@@ -51,13 +51,33 @@ def bfs_nodes_generator(graph, source, reverse=False):
         len(graph.canonical_etypes) == 1
     ), "bfs_nodes_generator only support homogeneous graph"
     # Workaround before support for GPU graph
-    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
+    # NPU 集成改造：NPU 图保持原位走 Ascend kernel（copy_to 同 ctx 为 no-op）；
+    # 其余设备维持上游 CPU 回退行为不变
+    if graph.device.type == "npu":
+        gidx = graph._graph
+    else:
+        gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
-    ret = _CAPI_DGLBFSNodes_v2(gidx, source.todgltensor(), reverse)
+    if graph.device.type == "npu":
+        # source 保持 NPU 原位：Index.todgltensor() 默认 ctx=cpu 会把 NPU tensor
+        # 搬运回 CPU（导致 aten 层 device 不一致），这里经 tousertensor(ctx=npu)
+        # + DLPack 直转 NPU NDArray（零拷贝）
+        src_nd = nd.from_dlpack(
+            F.zerocopy_to_dlpack(source.tousertensor(ctx=graph.device))
+        )
+        ret = _CAPI_DGLBFSNodes_v2(gidx, src_nd, reverse)
+    else:
+        ret = _CAPI_DGLBFSNodes_v2(gidx, source.todgltensor(), reverse)
     all_nodes = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
-    node_frontiers = F.split(all_nodes, sections, dim=0)
+    if graph.device.type == "npu":
+        # torch_npu 2.8.0 的 split 对 DLPack 视图 tensor 与 Python list 参数存在
+        # 转换 bug（unknown format type）：clone 为独立存储 + tuple 参数规避；
+        # 输出元素与 CPU 路径逐位一致
+        node_frontiers = F.split(all_nodes.clone(), tuple(sections), dim=0)
+    else:
+        node_frontiers = F.split(all_nodes, sections, dim=0)
     return node_frontiers
 
 
@@ -99,13 +119,32 @@ def bfs_edges_generator(graph, source, reverse=False):
         len(graph.canonical_etypes) == 1
     ), "bfs_edges_generator only support homogeneous graph"
     # Workaround before support for GPU graph
-    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
+    # NPU 集成改造：NPU 图保持原位走 Ascend kernel（copy_to 同 ctx 为 no-op）；
+    # 其余设备维持上游 CPU 回退行为不变
+    if graph.device.type == "npu":
+        gidx = graph._graph
+    else:
+        gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
-    ret = _CAPI_DGLBFSEdges_v2(gidx, source.todgltensor(), reverse)
+    if graph.device.type == "npu":
+        # source 保持 NPU 原位（同 bfs_nodes_generator：todgltensor 默认 ctx=cpu
+        # 会搬运回 CPU，经 tousertensor(ctx=npu) + DLPack 直转 NPU NDArray）
+        src_nd = nd.from_dlpack(
+            F.zerocopy_to_dlpack(source.tousertensor(ctx=graph.device))
+        )
+        ret = _CAPI_DGLBFSEdges_v2(gidx, src_nd, reverse)
+    else:
+        ret = _CAPI_DGLBFSEdges_v2(gidx, source.todgltensor(), reverse)
     all_edges = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
-    edge_frontiers = F.split(all_edges, sections, dim=0)
+    if graph.device.type == "npu":
+        # torch_npu 2.8.0 的 split 对 DLPack 视图 tensor 与 Python list 参数存在
+        # 转换 bug（unknown format type）：clone 为独立存储 + tuple 参数规避；
+        # 输出元素与 CPU 路径逐位一致
+        edge_frontiers = F.split(all_edges.clone(), tuple(sections), dim=0)
+    else:
+        edge_frontiers = F.split(all_edges, sections, dim=0)
     return edge_frontiers
 
 

@@ -50,6 +50,7 @@ extern template CSRMatrix COOToCSR<kDGLCPU, int64_t>(COOMatrix coo);
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
+#include "acl_attr_compat.h"
 
 #include "coo2csr_tiling.h"
 

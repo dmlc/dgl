@@ -14,6 +14,7 @@
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
+#include "acl_attr_compat.h"
 #define ASCEND_CALL(func)                                   \
   {                                                         \
     aclError e = (func);                                    \
