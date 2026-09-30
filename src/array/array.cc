@@ -76,18 +76,13 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx) {
 
 #ifdef DGL_USE_ASCEND
   if (ctx.device_type == kDGLAscend) {
-    DGLDataType dtype;
-    dtype.code = kDGLInt;
-    dtype.bits = nbits;
-    dtype.lanes = 1;
-    ret = NDArray::Empty({length}, dtype, ctx);
-    void* data_ptr = ret->data;
-    auto torch_device = c10::Device(c10::DeviceType::PrivateUse1, ctx.device_id);
-    auto options = torch::TensorOptions()
-                       .dtype(nbits == 32 ? torch::kInt32 : torch::kInt64)
-                       .device(torch_device);
-    auto torch_tensor = torch::from_blob(data_ptr, {length}, options);
-    torch_tensor.fill_(val);
+    if (nbits == 32) {
+      ret = impl::Full<kDGLAscend, int32_t>(static_cast<int32_t>(val), length, ctx);
+    } else if (nbits == 64) {
+      ret = impl::Full<kDGLAscend, int64_t>(val, length, ctx);
+    } else {
+      LOG(FATAL) << "Only int32 or int64 is supported.";
+    }
     return ret;
   }
 #endif
@@ -110,34 +105,7 @@ NDArray Full(DType val, int64_t length, DGLContext ctx) {
 
 #ifdef DGL_USE_ASCEND
   if (ctx.device_type == kDGLAscend) {
-    DGLDataType dtype;
-    dtype.lanes = 1;
-    if (std::is_same<DType, float>::value) {
-      dtype.code = kDGLFloat; dtype.bits = 32;
-    } else if (std::is_same<DType, double>::value) {
-      dtype.code = kDGLFloat; dtype.bits = 64;
-    } else if (std::is_same<DType, int32_t>::value) {
-      dtype.code = kDGLInt; dtype.bits = 32;
-    } else if (std::is_same<DType, int64_t>::value) {
-      dtype.code = kDGLInt; dtype.bits = 64;
-    } else {
-      LOG(FATAL) << "Unsupported DType for Full on NPU";
-    }
-    ret = NDArray::Empty({length}, dtype, ctx);
-    void* data_ptr = ret->data;
-    auto torch_device = c10::Device(c10::DeviceType::PrivateUse1, ctx.device_id);
-
-    c10::ScalarType torch_dtype;
-    if (std::is_same<DType, float>::value) torch_dtype = torch::kFloat32;
-    else if (std::is_same<DType, double>::value) torch_dtype = torch::kFloat64;
-    else if (std::is_same<DType, int32_t>::value) torch_dtype = torch::kInt32;
-    else if (std::is_same<DType, int64_t>::value) torch_dtype = torch::kInt64;
-    else torch_dtype = torch::kInt64;
-
-    auto options = torch::TensorOptions().dtype(torch_dtype).device(torch_device);
-    auto torch_tensor = torch::from_blob(data_ptr, {length}, options);
-    torch_tensor.fill_(static_cast<double>(val));
-    return ret;
+    return impl::Full<kDGLAscend, DType>(val, length, ctx);
   }
 #endif
 
