@@ -289,7 +289,22 @@ fi
 
 TORCH_NPU_LIB_PATH=$(python3 -c "import torch_npu; import os; print(os.path.join(os.path.dirname(torch_npu.__file__), 'lib'))" 2>/dev/null) || true
 if [[ -n "${TORCH_NPU_LIB_PATH}" ]] && [[ -d "${TORCH_NPU_LIB_PATH}" ]]; then
-    CMAKE_ARGS+=(-DCMAKE_LIBRARY_PATH="${TORCH_NPU_LIB_PATH}")
+    # libgfortran.so / libgomp.so live in the GCC-private directory which is
+    # not on the default find_library search path; merge it into
+    # CMAKE_LIBRARY_PATH so the dgl link can resolve them.
+    GCC_LIB_DIR=""
+    for d in /usr/lib/gcc/aarch64-linux-gnu/* /usr/lib/gcc/aarch64-linux-gnu/*/*; do
+        if [[ -f "${d}/libgfortran.so" ]]; then GCC_LIB_DIR="${d}"; break; fi
+    done
+    if [[ -z "${GCC_LIB_DIR}" ]] && [[ -d "/usr/lib/gcc/aarch64-linux-gnu/10.3.1" ]]; then
+        GCC_LIB_DIR="/usr/lib/gcc/aarch64-linux-gnu/10.3.1"
+    fi
+    if [[ -n "${GCC_LIB_DIR}" ]] && [[ -d "${GCC_LIB_DIR}" ]]; then
+        echo_info "Adding GCC lib dir to CMAKE_LIBRARY_PATH: ${GCC_LIB_DIR}"
+        CMAKE_ARGS+=(-DCMAKE_LIBRARY_PATH="${TORCH_NPU_LIB_PATH};${GCC_LIB_DIR}")
+    else
+        CMAKE_ARGS+=(-DCMAKE_LIBRARY_PATH="${TORCH_NPU_LIB_PATH}")
+    fi
     export LIBRARY_PATH="${LIBRARY_PATH:+${LIBRARY_PATH}:}${TORCH_NPU_LIB_PATH}"
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}${TORCH_NPU_LIB_PATH}"
     echo_info "torch_npu lib path: ${TORCH_NPU_LIB_PATH}"

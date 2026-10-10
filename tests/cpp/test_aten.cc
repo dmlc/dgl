@@ -248,19 +248,48 @@ TEST(ArrayTest, TestRelabel_) {
 template <typename IDX>
 void _TestConcat(DGLContext ctx) {
   IdArray a =
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX) * 8, CTX);
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX) * 8, ctx);
   IdArray b =
-      aten::VecToIdArray(std::vector<IDX>({4, 5, 6}), sizeof(IDX) * 8, CTX);
+      aten::VecToIdArray(std::vector<IDX>({4, 5, 6}), sizeof(IDX) * 8, ctx);
   IdArray tc = aten::VecToIdArray(
-      std::vector<IDX>({1, 2, 3, 4, 5, 6}), sizeof(IDX) * 8, CTX);
+      std::vector<IDX>({1, 2, 3, 4, 5, 6}), sizeof(IDX) * 8, ctx);
   IdArray c = aten::Concat(std::vector<IdArray>{a, b});
   ASSERT_TRUE(ArrayEQ<IDX>(c, tc));
   IdArray d = aten::Concat(std::vector<IdArray>{a, b, c});
   IdArray td = aten::VecToIdArray(
       std::vector<IDX>({1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6}), sizeof(IDX) * 8,
-      CTX);
+      ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(d, td));
 }
+
+TEST(ArrayTest, TestConcat) {
+  _TestConcat<int32_t>(CPU);
+  _TestConcat<int64_t>(CPU);
+#ifdef DGL_USE_ASCEND
+  _TestConcat<int32_t>(NPU);
+  _TestConcat<int64_t>(NPU);
+#endif
+}
+
+#ifdef DGL_USE_ASCEND
+// 大输入：多块 launch（100k 元素 × 3 输入），验证 1D IdArray 拼接走 Ascend kernel。
+TEST(ArrayTest, TestConcatLargeAscend) {
+  const int64_t n = 100000;
+  std::vector<int64_t> v0(n), v1(n), v2(n);
+  for (int64_t i = 0; i < n; ++i) {
+    v0[i] = i;
+    v1[i] = n + i;
+    v2[i] = 2 * n + i;
+  }
+  IdArray a = aten::VecToIdArray(v0, 64, NPU);
+  IdArray b = aten::VecToIdArray(v1, 64, NPU);
+  IdArray c = aten::VecToIdArray(v2, 64, NPU);
+  IdArray cc = aten::Concat(std::vector<IdArray>{a, b, c});
+  IdArray ccc = cc.CopyTo(CPU);
+  ASSERT_EQ(Len(ccc), 3 * n);
+  for (int64_t i = 0; i < 3 * n; ++i) ASSERT_EQ(Ptr<int64_t>(ccc)[i], i);
+}
+#endif
 
 template <typename IdType>
 void _TestToSimpleCsr(DGLContext ctx) {

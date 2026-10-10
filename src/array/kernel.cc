@@ -349,6 +349,7 @@ void Edge_softmax_forward(
                 op, bcast, graph->GetCSCMatrix(0), ufeat, efeat, out);
           });
     });
+#ifdef DGL_USE_ASCEND
   } else if (dev_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       if (out->dtype.code == kDGLFloat && out->dtype.bits == 32) {
@@ -362,6 +363,7 @@ void Edge_softmax_forward(
                    << out->dtype.code << " bits=" << out->dtype.bits;
       }
     });
+#endif
   } else {
     LOG(FATAL) << "edge_softmax forward: unsupported device type: " << dev_type;
   }
@@ -383,6 +385,7 @@ void Edge_softmax_backward(
                 op, bcast, graph->GetCSCMatrix(0), out, sds, back_out);
           });
     });
+#ifdef DGL_USE_ASCEND
   } else if (dev_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       if (out->dtype.code == kDGLFloat && out->dtype.bits == 32) {
@@ -396,6 +399,7 @@ void Edge_softmax_backward(
                    << out->dtype.code << " bits=" << out->dtype.bits;
       }
     });
+#endif
   } else {
     LOG(FATAL) << "edge_softmax backward: unsupported device type: " << dev_type;
   }

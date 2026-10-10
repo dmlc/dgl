@@ -34,6 +34,7 @@ IdArray BinaryElewiseAscendL(IdArray lhs, int64_t rhs) {
   return ascend_ret;
 }
 
+#ifdef DGL_USE_ASCEND
 #define ASCEND_L_KERNEL(type, op)                                            \
   template <>                                                                \
   IdArray BinaryElewiseAscendL<type, arith::op>(IdArray lhs, int64_t rhs) { \
@@ -53,6 +54,7 @@ ASCEND_L_KERNEL(int32_t, EQ)
 ASCEND_L_KERNEL(int64_t, EQ)
 ASCEND_L_KERNEL(int32_t, NE)
 ASCEND_L_KERNEL(int64_t, NE)
+#endif
 
 }  // anonymous namespace
 

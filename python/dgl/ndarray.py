@@ -12,7 +12,11 @@ import operator
 
 import numpy as _np
 import torch
-import torch_npu
+
+try:
+    import torch_npu
+except ImportError:
+    torch_npu = None
 
 from . import backend as F
 from ._ffi.function import _init_api
