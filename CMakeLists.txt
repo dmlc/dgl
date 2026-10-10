@@ -374,6 +374,10 @@ file(GLOB_RECURSE DGL_SRC_1
   src/scheduler/*.cc
 )
 
+if(NOT USE_ASCEND)
+  list(FILTER DGL_SRC_1 EXCLUDE REGEX "/ascend/.*\\.cc$")
+endif()
+
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
 if(USE_ASCEND)
@@ -419,6 +423,34 @@ if(USE_CUDA)
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
+
+# CANN 8.3.RC1 (25.5.x) acl_rt.h lacks the CUBE_CORE_NUM /
+# LOCAL_MEM_PER_VECTOR_CORE enum values added in CANN 8.5.0; provide them
+# via a force-included compat header (values verified at runtime on 910B3:
+# 102 and 202).  See include/dgl/ascend_attr_compat.h.
+#
+# NB: On CANN >= 8.5.0 the acl_rt.h enum already defines these identifiers.
+# Force-injecting the compat header there would expand the macro inside the
+# enum declaration and break the build, so only inject when the enum is absent.
+if(USE_ASCEND)
+  set(_acl_rt_h "${ASCEND_PATH}/include/acl/acl_rt.h")
+  set(_need_attr_compat TRUE)
+  if(EXISTS "${_acl_rt_h}")
+    file(READ "${_acl_rt_h}" _acl_rt_content)
+    string(FIND "${_acl_rt_content}" "ACL_DEV_ATTR_CUBE_CORE_NUM" _attr_pos)
+    if(NOT _attr_pos EQUAL -1)
+      set(_need_attr_compat FALSE)
+    endif()
+  endif()
+  if(_need_attr_compat)
+    message(STATUS "acl_rt.h lacks ACL_DEV_ATTR_CUBE_CORE_NUM, injecting ascend_attr_compat.h")
+    target_compile_options(dgl PRIVATE "-include${CMAKE_CURRENT_SOURCE_DIR}/include/dgl/ascend_attr_compat.h")
+  endif()
+  unset(_acl_rt_h)
+  unset(_acl_rt_content)
+  unset(_attr_pos)
+  unset(_need_attr_compat)
+endif()
 
 if ((NOT MSVC) AND USE_EPOLL)
   INCLUDE(CheckIncludeFile)
@@ -589,7 +621,7 @@ target_link_libraries(dgl PRIVATE
   ${DGL_RUNTIME_LINKER_LIBS}
   ${TORCH_LIBRARIES}
   ${Python3_LIBRARIES}
-  c10
+  $<$<BOOL:${USE_ASCEND}>:c10>
   ${GFORTRAN_LIB}
   ${GOMP_LIB}
 )
@@ -673,18 +705,38 @@ if(BUILD_CPP_TEST)
   # runUnitTests target, hence the explicit find_library path.
   find_library(TORCH_PYTHON_LIBRARY torch_python HINTS ${TORCH_LIB_DIR} NO_DEFAULT_PATH)
 
+  # runUnitTests is an executable that links libtorch_python.so, which in
+  # turn requires the CPython symbols.  find_package(Python3 ...) above uses
+  # the Development.Module component (no libpython), so resolve libpython
+  # explicitly for the test binary.
+  find_library(PYTHON_LIB python3.11 HINTS ${CONDA_LIB_DIR} ${Python3_ROOT_DIR}/lib NO_DEFAULT_PATH)
+  if(NOT PYTHON_LIB)
+    find_library(PYTHON_LIB python3.11)
+  endif()
+  if(PYTHON_LIB)
+    message(STATUS "Found libpython for runUnitTests: ${PYTHON_LIB}")
+  else()
+    message(WARNING "libpython3.11 not found; runUnitTests link may fail")
+  endif()
+
+  # CANN runtime libs (libruntime.so / libascend_dump.so) depend on the
+  # driver's libascend_hal.so / drv/hdc symbols; add the driver lib dirs so
+  # the runUnitTests link resolves them.
+  link_directories(/usr/local/Ascend/driver/lib64/driver /usr/local/Ascend/driver/lib64/common)
+
   link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR} ${TORCH_LIBS_DIR})
 
   message(STATUS "DBG dirs: [${CONDA_LIB_DIR}] [${TORCH_NPU_LIB_DIR}] [${TORCH_LIB_DIR}] [${TORCH_LIBS_DIR}]")
   set_target_properties(runUnitTests PROPERTIES
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR};${TORCH_LIBS_DIR}"
-    LINK_FLAGS "-Wl,-rpath,${CONDA_LIB_DIR}:${TORCH_NPU_LIB_DIR}:${TORCH_LIB_DIR}:${TORCH_LIBS_DIR} -Wl,-rpath-link,${TORCH_LIBS_DIR}"
+    LINK_FLAGS "-Wl,-rpath,${CONDA_LIB_DIR}:${TORCH_NPU_LIB_DIR}:${TORCH_LIB_DIR}:${TORCH_LIBS_DIR} -Wl,-rpath-link,${TORCH_LIBS_DIR} -L/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub -L/usr/local/Ascend/driver/lib64/driver -L/usr/local/Ascend/driver/lib64/common"
   )
   target_link_libraries(runUnitTests PRIVATE gtest gtest_main
     ${Python3_LIBRARIES}
     ${TORCH_LIBRARIES}
     ${TORCH_PYTHON_LIBRARY}
+    ${PYTHON_LIB}
     c10
     ${GFORTRAN_LIB}
     ${GOMP_LIB}
@@ -693,6 +745,7 @@ if(BUILD_CPP_TEST)
     ${Python3_LIBRARIES}
     ${TORCH_LIBRARIES}
     ${TORCH_PYTHON_LIBRARY}
+    ${PYTHON_LIB}
     c10
     ${GFORTRAN_LIB}
     ${GOMP_LIB}

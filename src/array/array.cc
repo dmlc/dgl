@@ -1,6 +1,9 @@
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
+#include <torch/extension.h>
+
+#include "ascend/concat_tiling.h"
 #endif
 /**
  *  Copyright (c) 2019-2022 by Contributors
@@ -14,8 +17,6 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/shared_mem.h>
-
-#include <torch/extension.h>
 
 #include <sstream>
 
@@ -127,15 +128,17 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
   if (arr->dtype.bits == bits) return arr;
   if (arr.NumElements() == 0) return NewIdArray(arr->shape[0], arr->ctx, bits);
   IdArray ret;
+#ifdef DGL_USE_ASCEND
   if (arr->ctx.device_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(
         arr->dtype, IdType, { ret = impl::AsNumBits<kDGLAscend, IdType>(arr, bits); });
-  } else {
-    ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
-      ATEN_ID_TYPE_SWITCH(
-          arr->dtype, IdType, { ret = impl::AsNumBits<XPU, IdType>(arr, bits); });
-    });
+    return ret;
   }
+#endif
+  ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
+    ATEN_ID_TYPE_SWITCH(
+        arr->dtype, IdType, { ret = impl::AsNumBits<XPU, IdType>(arr, bits); });
+  });
   return ret;
 }
 
@@ -312,18 +315,30 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 }
 
 NDArray Concat(const std::vector<IdArray>& arrays) {
-  IdArray ret;
-
-  int64_t len = 0, offset = 0;
+  int64_t len = 0;
   for (size_t i = 0; i < arrays.size(); ++i) {
     len += arrays[i]->shape[0];
     CHECK_SAME_DTYPE(arrays[0], arrays[i]);
     CHECK_SAME_CONTEXT(arrays[0], arrays[i]);
   }
 
+#ifdef DGL_USE_ASCEND
+  // 1D IdArray 拼接等价于 ConcatND(arrays, dim=0)。对齐检查与 dtype 分发由
+  // ConcatND 内部完成，非对齐输入或超过 kernel 2^32 元素上限时自动回退通用路径，
+  // 保证与旧通用路径（逐段 CopyDataFromTo）行为一致。
+  if (arrays[0]->ctx.device_type == kDGLAscend &&
+      arrays[0]->dtype.code == kDGLInt &&
+      (arrays[0]->dtype.bits == 32 || arrays[0]->dtype.bits == 64) &&
+      len < (static_cast<int64_t>(1) << 32)) {
+    std::vector<NDArray> nds(arrays.begin(), arrays.end());
+    return ConcatND(nds, 0);
+  }
+#endif
+
   NDArray ret_arr = NDArray::Empty({len}, arrays[0]->dtype, arrays[0]->ctx);
 
   auto device = runtime::DeviceAPI::Get(arrays[0]->ctx);
+  int64_t offset = 0;
   for (size_t i = 0; i < arrays.size(); ++i) {
     ATEN_DTYPE_SWITCH(arrays[i]->dtype, DType, "array", {
       device->CopyDataFromTo(
@@ -337,6 +352,109 @@ NDArray Concat(const std::vector<IdArray>& arrays) {
   }
 
   return ret_arr;
+}
+
+#ifdef DGL_USE_ASCEND
+namespace {
+
+// The AscendC kernel moves data with DataCopyPad, which requires 32-byte-aligned
+// GM addresses. Freshly allocated buffers are 512-byte aligned on Ascend, but a
+// DLPack tensor may be a slice of a larger allocation and hence start anywhere,
+// so misaligned inputs must fall back to the byte-wise copy path.
+bool AscendDataCopyAligned(
+    const std::vector<NDArray>& arrays, const NDArray& out) {
+  auto aligned = [](const void* p) {
+    return (reinterpret_cast<uintptr_t>(p) & (CONCAT_ALIGN_BYTES - 1)) == 0;
+  };
+  if (!aligned(out->data)) return false;
+  for (const NDArray& a : arrays) {
+    if (!aligned(a->data)) return false;
+  }
+  return true;
+}
+
+}  // namespace
+#endif  // DGL_USE_ASCEND
+
+NDArray ConcatND(const std::vector<NDArray>& arrays, int64_t dim) {
+  CHECK(!arrays.empty()) << "ConcatND requires at least one array.";
+  const NDArray& first = arrays[0];
+  const int64_t ndim = first->ndim;
+  CHECK_GE(ndim, 1) << "ConcatND requires ndim >= 1, got " << ndim << ".";
+  const int64_t axis = dim < 0 ? dim + ndim : dim;
+  CHECK_GE(axis, 0) << "ConcatND: dim " << dim << " is out of range for ndim "
+                    << ndim << ".";
+  CHECK_LT(axis, ndim) << "ConcatND: dim " << dim << " is out of range for ndim "
+                       << ndim << ".";
+
+  std::vector<int64_t> out_shape(first->shape, first->shape + ndim);
+  out_shape[axis] = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    CHECK_SAME_DTYPE(first, arrays[i]);
+    CHECK_SAME_CONTEXT(first, arrays[i]);
+    CHECK_NDIM(arrays[i], ndim, "arrays[i]");
+    for (int64_t d = 0; d < ndim; ++d) {
+      if (d == axis) {
+        out_shape[d] += arrays[i]->shape[d];
+      } else {
+        CHECK_EQ(first->shape[d], arrays[i]->shape[d])
+            << "ConcatND: all shapes must match except on dim " << axis
+            << ", but arrays[0] and arrays[" << i << "] differ on axis " << d
+            << " (" << first->shape[d] << " vs " << arrays[i]->shape[d] << ").";
+      }
+    }
+  }
+
+  NDArray ret = NDArray::Empty(out_shape, first->dtype, first->ctx);
+  if (out_shape[axis] == 0) return ret;
+
+#ifdef DGL_USE_ASCEND
+  if (first->ctx.device_type == kDGLAscend &&
+      AscendDataCopyAligned(arrays, ret)) {
+    if (IS_FLOAT32(first)) {
+      impl::ConcatND<kDGLAscend, float>(arrays, ret, axis);
+      return ret;
+    }
+    if (first->dtype.code == kDGLFloat && first->dtype.bits == 16) {
+      // fp16 travels as uint16_t on Ascend; the kernel only moves bytes.
+      impl::ConcatND<kDGLAscend, uint16_t>(arrays, ret, axis);
+      return ret;
+    }
+    // int32/int64: 同一搬运 kernel 覆盖 1D IdArray 拼接（aten::Concat）与整型特征。
+    if (first->dtype.code == kDGLInt && first->dtype.bits == 32) {
+      impl::ConcatND<kDGLAscend, int32_t>(arrays, ret, axis);
+      return ret;
+    }
+    if (first->dtype.code == kDGLInt && first->dtype.bits == 64) {
+      impl::ConcatND<kDGLAscend, int64_t>(arrays, ret, axis);
+      return ret;
+    }
+  }
+#endif
+
+  // Generic path: one device copy per (input, outer segment). Correct on every
+  // device and dtype; dtypes without an Ascend kernel take this route too.
+  const int64_t elem_bytes = (first->dtype.bits * first->dtype.lanes + 7) / 8;
+  int64_t outer = 1, inner = 1;
+  for (int64_t d = 0; d < axis; ++d) outer *= first->shape[d];
+  for (int64_t d = axis + 1; d < ndim; ++d) inner *= first->shape[d];
+  const int64_t dst_stride = out_shape[axis] * inner * elem_bytes;
+
+  auto device = runtime::DeviceAPI::Get(first->ctx);
+  int64_t dst_base = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    const int64_t seg_bytes = arrays[i]->shape[axis] * inner * elem_bytes;
+    if (seg_bytes > 0) {
+      for (int64_t s = 0; s < outer; ++s) {
+        device->CopyDataFromTo(
+            arrays[i]->data, s * seg_bytes, ret->data, dst_base + s * dst_stride,
+            seg_bytes, arrays[i]->ctx, ret->ctx, arrays[i]->dtype);
+      }
+    }
+    dst_base += seg_bytes;
+  }
+
+  return ret;
 }
 
 template <typename ValueType>
@@ -1677,6 +1795,13 @@ void COOSDDMM(
 }
 
 ///////////////////////// C APIs /////////////////////////
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLConcatND")
+    .set_body([](DGLArgs args, DGLRetValue* rv) {
+      List<Value> arrays = args[0];
+      const int64_t dim = args[1];
+      *rv = ConcatND(ListValueToVector<NDArray>(arrays), dim);
+    });
+
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
     .set_body([](DGLArgs args, DGLRetValue* rv) {
       SparseMatrixRef spmat = args[0];
