@@ -44,7 +44,7 @@ def ctx():
 
 
 def gpu_ctx():
-    return _default_context_str == "gpu"
+    return _default_context_str in ("gpu", "npu")
 
 
 def zeros(shape, dtype=float32, ctx=_default_context):

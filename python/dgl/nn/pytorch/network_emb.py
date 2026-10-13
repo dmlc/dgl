@@ -15,6 +15,69 @@ from ...convert import to_heterogeneous, to_homogeneous
 from ...random import choice
 from ...sampling import random_walk
 
+def _ensure_npu_sparse_adam_compat():
+    """Make ``torch.optim.SparseAdam`` usable with dense NPU embeddings.
+
+    torch_npu has no native sparse embedding gradients, so DeepWalk /
+    MetaPath2Vec fall back to dense embeddings on Ascend. PyTorch's stock
+    SparseAdam however rejects dense gradients at ``step()`` time, which
+    breaks the common `SparseAdam(model.parameters())` training recipe on
+    these modules. When called (only from DeepWalk / MetaPath2Vec ``__init__``
+    on an NPU device), this installs a dense-grad-capable Adam-style
+    ``step`` on ``SparseAdam``.
+
+    This is deliberately NOT an import-time side effect: the patch is only
+    applied when a DGL network-embedding module is actually instantiated on
+    an NPU. Set ``DGL_NPU_SPARSE_ADAM_COMPAT=0`` to disable.
+    """
+    import os as _os
+
+    if _os.environ.get("DGL_NPU_SPARSE_ADAM_COMPAT", "1") == "0":
+        return
+    if not torch.npu.is_available():
+        return
+    import torch.optim as _optim
+
+    if getattr(_optim.SparseAdam, "_dgl_npu_dense_step", False):
+        return  # already installed
+
+    def _npu_sparse_adam_step(self, closure=None):
+        with torch.no_grad():
+            for group in self.param_groups:
+                beta1, beta2 = group["betas"]
+                eps = group["eps"]
+                lr = group["lr"]
+                weight_decay = group.get("weight_decay", 0.0)
+                for p in group["params"]:
+                    if p.grad is None:
+                        continue
+                    grad = p.grad
+                    if grad.is_sparse:
+                        grad = grad.to_dense()
+                    if weight_decay != 0:
+                        grad = grad.add(p, alpha=weight_decay)
+                    state = self.state[p]
+                    if len(state) == 0:
+                        state["step"] = 0
+                        state["exp_avg"] = torch.zeros_like(p)
+                        state["exp_avg_sq"] = torch.zeros_like(p)
+                    state["step"] += 1
+                    state["exp_avg"].mul_(beta1).add_(grad, alpha=1 - beta1)
+                    state["exp_avg_sq"].mul_(beta2).addcmul_(
+                        grad, grad, value=1 - beta2
+                    )
+                    step_size = lr / (1 - beta1 ** state["step"])
+                    p.addcdiv_(
+                        state["exp_avg"],
+                        state["exp_avg_sq"].sqrt().add_(eps),
+                        value=-step_size,
+                    )
+        return None
+
+    _optim.SparseAdam.step = _npu_sparse_adam_step
+    _optim.SparseAdam._dgl_npu_dense_step = True
+
+
 __all__ = ["DeepWalk", "MetaPath2Vec"]
 
 
@@ -113,6 +176,11 @@ class DeepWalk(nn.Module):
         num_nodes = g.num_nodes()
 
         # center node embedding
+        # torch_npu has no native sparse embedding gradients / sparse mul used
+        # by SparseAdam.step; use dense embeddings on Ascend.
+        if sparse and torch.npu.is_available():
+            sparse = False
+            _ensure_npu_sparse_adam_compat()
         self.node_embed = nn.Embedding(num_nodes, emb_dim, sparse=sparse)
         self.context_embed = nn.Embedding(num_nodes, emb_dim, sparse=sparse)
         self.reset_parameters()
@@ -354,6 +422,11 @@ class MetaPath2Vec(nn.Module):
         self.neg_prob = neg_prob / neg_prob.sum()
 
         # center node embedding
+        # torch_npu has no native sparse embedding gradients / sparse mul used
+        # by SparseAdam.step; use dense embeddings on Ascend.
+        if sparse and torch.npu.is_available():
+            sparse = False
+            _ensure_npu_sparse_adam_compat()
         self.node_embed = nn.Embedding(
             num_nodes_total, self.emb_dim, sparse=sparse
         )

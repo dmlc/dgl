@@ -3249,6 +3249,23 @@ def reorder_graph(
             [4],
             [0]]), '_ID': tensor([1, 2, 3, 4, 0])}
     """
+    # The edge-permute path (custom/src/dst) uses edge_subgraph which on the
+    # Ascend backend does not yet preserve the induced edge order correctly.
+    # Fall back to CPU and move the result back (DGL notes several permutation
+    # algorithms are CPU-only).
+    if g.device.type in ("npu", "ascend"):
+        cfg = dict(permute_config) if permute_config else None
+        if cfg is not None:
+            if "edges_perm" in cfg:
+                cfg = dict(cfg)
+                cfg["edges_perm"] = F.copy_to(cfg["edges_perm"], F.cpu())
+            if "nodes_perm" in cfg:
+                cfg = dict(cfg)
+                cfg["nodes_perm"] = F.copy_to(cfg["nodes_perm"], F.cpu())
+        rg = reorder_graph(
+            g.cpu(), node_permute_algo, edge_permute_algo, store_ids, cfg
+        )
+        return rg.to(g.device)
     # sanity checks
     if not g.is_homogeneous:
         raise DGLError("Only homogeneous graphs are supported.")

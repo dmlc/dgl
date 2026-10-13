@@ -14,6 +14,11 @@
 #include <set>
 
 #include "../c_api_common.h"
+
+#ifdef DGL_USE_ASCEND
+#include <acl/acl.h>
+#include <acl/acl_rt.h>
+#endif
 #include "./heterograph.h"
 #include "unit_graph.h"
 
@@ -327,8 +332,24 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroInEdges_2")
       HeteroGraphRef hg = args[0];
       dgl_type_t etype = args[1];
       IdArray vids = args[2];
+#ifdef DGL_USE_ASCEND
+      if (vids.defined() && vids->ctx.device_type == kDGLAscend) {
+        // Force the lazy COO materialization. Ordering of torch_npu
+        // host-queue writes to `vids` is handled by the python stream
+        // bridge, and DGL kernels serialize on the default ACL stream.
+        hg->GetCOOMatrix(etype);
+      }
+#endif
       const auto& ret = hg->InEdges(etype, vids);
       *rv = ConvertEdgeArrayToPackedFunc(ret);
+#ifdef DGL_USE_ASCEND
+      // Stream-scoped flush (default stream): DGL kernels run there; once the
+      // host has waited for them, PyTorch readers launched later observe
+      // complete results. No device-wide barrier is required.
+      if (vids.defined() && vids->ctx.device_type == kDGLAscend) {
+        aclrtSynchronizeStream(nullptr);
+      }
+#endif
     });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroOutEdges_1")
@@ -347,6 +368,13 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroOutEdges_2")
       IdArray vids = args[2];
       const auto& ret = hg->OutEdges(etype, vids);
       *rv = ConvertEdgeArrayToPackedFunc(ret);
+#ifdef DGL_USE_ASCEND
+      // Stream-scoped flush: DGL kernels run on the default ACL stream; the
+      // host waits here so PyTorch readers launched later see the results.
+      if (vids.defined() && vids->ctx.device_type == kDGLAscend) {
+        aclrtSynchronizeStream(nullptr);
+      }
+#endif
     });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdges")
@@ -372,6 +400,13 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroInDegrees")
       dgl_type_t etype = args[1];
       IdArray vids = args[2];
       *rv = hg->InDegrees(etype, vids);
+#ifdef DGL_USE_ASCEND
+      // Stream-scoped flush so the degree tensor is visible to PyTorch
+      // readers launched later (e.g. `(deg == 0).any()`).
+      if (vids.defined() && vids->ctx.device_type == kDGLAscend) {
+        aclrtSynchronizeStream(nullptr);
+      }
+#endif
     });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroOutDegree")
@@ -388,6 +423,13 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroOutDegrees")
       dgl_type_t etype = args[1];
       IdArray vids = args[2];
       *rv = hg->OutDegrees(etype, vids);
+#ifdef DGL_USE_ASCEND
+      // Stream-scoped flush so the degree tensor is visible to PyTorch
+      // readers launched later.
+      if (vids.defined() && vids->ctx.device_type == kDGLAscend) {
+        aclrtSynchronizeStream(nullptr);
+      }
+#endif
     });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetAdj")

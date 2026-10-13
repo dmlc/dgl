@@ -13,7 +13,13 @@
 #include <utility>
 #include <vector>
 
+#ifdef DGL_USE_ASCEND
+#include <acl/acl.h>
+#include <acl/acl_rt.h>
+#endif
+
 #include "../../../c_api_common.h"
+#include "../../heterograph.h"
 #include "randomwalks_impl.h"
 
 using namespace dgl::runtime;
@@ -68,6 +74,34 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalk(
 
   TypeArray vtypes;
   std::pair<IdArray, IdArray> result;
+#ifdef DGL_USE_ASCEND
+  if (seeds->ctx.device_type == kDGLAscend) {
+    // Ascend: no native RandomWalk kernel. Run on CPU and copy back.
+    // TODO(Ascend): implement a native RandomWalk NPU kernel and call it
+    // directly here, removing this CPU fallback once available.
+    // torch_npu-side ordering of seeds/prob is handled by the python stream
+    // bridge; CopyTo flushes the default ACL stream, so the D2H copies read
+    // up-to-date data.
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    auto hg_cpu = HeteroGraph::CopyTo(hg, cpu_ctx);
+    IdArray seeds_cpu = seeds.CopyTo(cpu_ctx);
+    TypeArray metapath_cpu = metapath.CopyTo(cpu_ctx);
+    std::vector<FloatArray> prob_cpu;
+    for (auto& p : prob)
+      prob_cpu.push_back(IsNullArray(p) ? p : p.CopyTo(cpu_ctx));
+    ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
+      vtypes = impl::GetNodeTypesFromMetapath<kDGLCPU, IdxType>(
+          hg_cpu, metapath_cpu);
+      result = impl::RandomWalk<kDGLCPU, IdxType>(
+          hg_cpu, seeds_cpu, metapath_cpu, prob_cpu);
+    });
+    // Copy-backs use the sync aclrtMemcpy path; no extra sync is needed.
+    result.first = result.first.CopyTo(seeds->ctx);
+    result.second = result.second.CopyTo(seeds->ctx);
+    vtypes = vtypes.CopyTo(seeds->ctx);
+    return std::make_tuple(result.first, result.second, vtypes);
+  }
+#endif
   ATEN_XPU_SWITCH_CUDA(seeds->ctx.device_type, XPU, "RandomWalk", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);

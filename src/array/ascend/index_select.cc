@@ -139,6 +139,11 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   CHECK(ctx.device_type == kDGLAscend) << "Expected Ascend device context";
   ASCEND_CALL(aclrtSetDevice(ctx.device_id));
   auto stream = dgl::runtime::getCurrentAscendStream();
+  // Stream-scoped ordering: DGL/ACL-stream producers of `index` serialize on
+  // the default ACL stream (FIFO) before this kernel, and torch_npu host-queue
+  // writes are ordered by the python-level stream bridge. A device-wide
+  // barrier would additionally block on unrelated torch_npu streams.
+  ASCEND_CALL(aclrtSynchronizeStream(stream));
 
   const int64_t len = index->shape[0];
   NDArray ret = NDArray::Empty({len}, array->dtype, ctx);

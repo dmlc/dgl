@@ -782,6 +782,12 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
         ret = impl::CSRToCOODataAsOrder<kDGLCPU, IdType>(csr_cpu);
       });
+#ifdef DGL_USE_ASCEND
+      // Copy the CPU-computed COO back to the Ascend device so the graph
+      // materialized from it keeps the NPU context. CopyTo uses the sync
+      // aclrtMemcpy path, so no extra sync is needed.
+      ret = ret.CopyTo(csr.indptr->ctx);
+#endif
     } else {
       ATEN_XPU_SWITCH_CUDA(
           csr.indptr->ctx.device_type, XPU, "CSRToCOODataAsOrder", {
@@ -1239,9 +1245,6 @@ std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
   std::vector<NDArray> ret;
   if (coo.row->ctx.device_type == kDGLAscend) {
-#ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
     DGLContext cpu_ctx{kDGLCPU, 0};
     auto coo_row = coo.row.CopyTo(cpu_ctx);
     auto coo_col = coo.col.CopyTo(cpu_ctx);
@@ -1268,9 +1271,6 @@ std::vector<NDArray> COOGetDataAndIndices(
 NDArray COOGetData(COOMatrix coo, NDArray rows, NDArray cols) {
   NDArray ret;
   if (coo.row->ctx.device_type == kDGLAscend) {
-#ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
     DGLContext cpu_ctx{kDGLCPU, 0};
     auto coo_row = coo.row.CopyTo(cpu_ctx);
     auto coo_col = coo.col.CopyTo(cpu_ctx);
@@ -1512,6 +1512,23 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
 
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   COOMatrix ret;
+  if (coos[0].row->ctx.device_type == kDGLAscend) {
+    // Ascend backend: compute on CPU then copy the COO result back to the
+    // Ascend device. DisjointUnionCoo has no native Ascend kernel yet.
+    // TODO(Ascend): implement a native DisjointUnionCoo NPU kernel and drop
+    // this CPU fallback once available.
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    std::vector<COOMatrix> coos_cpu;
+    coos_cpu.reserve(coos.size());
+    for (size_t i = 0; i < coos.size(); ++i) {
+      coos_cpu.push_back(coos[i].CopyTo(cpu_ctx));
+    }
+    ATEN_ID_TYPE_SWITCH(coos_cpu[0].row->dtype, IdType, {
+      ret = impl::DisjointUnionCoo<kDGLCPU, IdType>(coos_cpu);
+      ret = ret.CopyTo(coos[0].row->ctx);
+    });
+    return ret;
+  }
   ATEN_XPU_SWITCH_CUDA(coos[0].row->ctx.device_type, XPU, "DisjointUnionCoo", {
     ATEN_ID_TYPE_SWITCH(coos[0].row->dtype, IdType, {
       ret = impl::DisjointUnionCoo<XPU, IdType>(coos);

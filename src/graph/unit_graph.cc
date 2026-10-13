@@ -13,6 +13,11 @@
 #include "../c_api_common.h"
 #include "./serialize/dglstream.h"
 
+#ifdef DGL_USE_ASCEND
+#include <acl/acl.h>
+#include <acl/acl_rt.h>
+#endif
+
 namespace dgl {
 
 namespace {
@@ -1466,6 +1471,13 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       if (IsPinned()) in_csr_->PinMemory_();
       for (auto stream : recorded_streams) in_csr_->RecordStream(stream);
     }
+#ifdef DGL_USE_ASCEND
+    // Materialization-sync: this lazily generated CSC/CSR is written by DGL
+    // kernels on the default ACL stream. Flushing that stream makes the data
+    // visible to subsequent readers/torch-side copies (kernels serialize in
+    // FIFO order on the default stream, so no device-wide barrier is needed).
+    aclrtSynchronizeStream(nullptr);
+#endif
   }
   return ret;
 }
@@ -1500,6 +1512,12 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       if (IsPinned()) out_csr_->PinMemory_();
       for (auto stream : recorded_streams) out_csr_->RecordStream(stream);
     }
+#ifdef DGL_USE_ASCEND
+    // Materialization-sync: this lazily generated CSR/CSC is written by DGL
+    // kernels on the default ACL stream. Flushing that stream makes the data
+    // visible to subsequent readers/torch-side copies.
+    aclrtSynchronizeStream(nullptr);
+#endif
   }
   return ret;
 }
@@ -1533,6 +1551,11 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
       if (IsPinned()) coo_->PinMemory_();
       for (auto stream : recorded_streams) coo_->RecordStream(stream);
     }
+#ifdef DGL_USE_ASCEND
+    // Materialization-sync, same rationale as GetInCSR/GetOutCSR above:
+    // default-stream flush only.
+    aclrtSynchronizeStream(nullptr);
+#endif
   }
   return ret;
 }
