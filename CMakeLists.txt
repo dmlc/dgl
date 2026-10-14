@@ -447,8 +447,8 @@ if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
 if(USE_HIP)
-  find_library(HIPSPARSE_LIBRARY hipsparse HINTS /opt/rocm-6.4.0/lib)
-  find_library(HIPBLAS_LIBRARY hipblas HINTS /opt/rocm-6.4.0/lib)
+  find_library(HIPSPARSE_LIBRARY hipsparse HINTS $ENV{ROCM_PATH}/lib /opt/rocm/lib)
+  find_library(HIPBLAS_LIBRARY hipblas HINTS $ENV{ROCM_PATH}/lib /opt/rocm/lib)
   target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS} ${HIPSPARSE_LIBRARY} ${HIPBLAS_LIBRARY})
 
 else()
