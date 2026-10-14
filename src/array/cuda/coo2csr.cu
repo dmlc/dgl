@@ -4,7 +4,9 @@
  * @brief COO2CSR
  */
 #include <dgl/array.h>
-
+#if defined(DGL_USE_HIP)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 

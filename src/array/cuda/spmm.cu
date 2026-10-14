@@ -7,6 +7,9 @@
 
 #include <cstdlib>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 #include "./functor.cuh"
 #include "./ge_spmm.cuh"

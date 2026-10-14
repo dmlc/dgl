@@ -9,6 +9,7 @@ from __future__ import absolute_import as _abs
 import ctypes
 import functools
 import operator
+import torch
 
 import numpy as _np
 
@@ -68,7 +69,7 @@ def cpu(dev_id=0):
 
 
 def gpu(dev_id=0):
-    """Construct a CPU device
+    """Construct a GPU device
 
     Parameters
     ----------
@@ -80,7 +81,10 @@ def gpu(dev_id=0):
     ctx : DGLContext
         The created context
     """
-    return DGLContext(2, dev_id)
+    if(hasattr(torch.version, 'hip')): 
+        return DGLContext(10, dev_id)
+    else:
+        return DGLContext(2, dev_id)
 
 
 def array(arr, ctx=cpu(0)):

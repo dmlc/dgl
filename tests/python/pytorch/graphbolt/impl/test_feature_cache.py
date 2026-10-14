@@ -1,9 +1,9 @@
 import backend as F
 
+import dgl.graphbolt as gb
+
 import pytest
 import torch
-
-from dgl import graphbolt as gb
 
 
 def _test_query_and_replace(policy1, policy2, keys, offset):

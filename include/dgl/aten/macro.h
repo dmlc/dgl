@@ -41,7 +41,8 @@
  * We treat pinned memory as normal host memory if we don't want
  * to enable CUDA UVA access for this operator
  */
-#ifdef DGL_USE_CUDA
+
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
 #define ATEN_XPU_SWITCH_CUDA(val, XPU, op, ...)                          \
   do {                                                                   \
     if ((val) == kDGLCPU) {                                              \
@@ -132,7 +133,7 @@
  * Dispatch according to float type, including 16bits
  * (float16/bfloat16/float32/float64).
  */
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
 #if BF16_ENABLED
 #define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...)   \
   do {                                                                      \
@@ -181,7 +182,7 @@
       { __VA_ARGS__ }                                                      \
     } else if (                                                            \
         XPU == kDGLCUDA && (val).bits == 16 && (val).code == kDGLBfloat) { \
-      LOG(FATAL) << "bfloat16 requires CUDA >= 11.0";                      \
+      LOG(FATAL) << "bfloat16 is not supported by HIP";                      \
     } else if (                                                            \
         XPU == kDGLCPU && (val).bits == 16 && (val).code == kDGLFloat) {   \
       LOG(FATAL) << (val_name) << " can't be float16 on CPU";              \
@@ -361,7 +362,7 @@
   } while (0)
 
 // Macro to dispatch according to device context (allowing cuda)
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
 #define ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, op, ...)                \
   ATEN_XPU_SWITCH_CUDA((csr).indptr->ctx.device_type, XPU, op, {       \
     ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {{__VA_ARGS__}}); \

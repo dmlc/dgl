@@ -17,7 +17,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#ifdef __HIPCC__
+#include <condition_variable>
+#else
 #include <cuda/std/semaphore>
+#endif
 #include <memory>
 #include <mutex>
 #include <string>
@@ -46,9 +50,37 @@ struct io_uring_queue_destroyer {
 /**
  * @brief Disk Numpy Fetecher class.
  */
+
+#ifdef __HIPCC__
+template <int MaxCount>
+class counting_semaphore_impl {
+ public:
+  explicit counting_semaphore_impl(int initial) : count_(initial) {}
+  static constexpr int max() { return MaxCount; }
+  void acquire() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    cv_.wait(lock, [this] { return count_ > 0; });
+    --count_;
+  }
+  void release(int n = 1) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    count_ += n;
+    for (int i = 0; i < n; ++i) cv_.notify_one();
+  }
+
+ private:
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  int count_;
+};
+#endif
+
 class OnDiskNpyArray : public torch::CustomClassHolder {
-  // No user will need more than 1024 io_uring queues.
+#ifdef __HIPCC__
+  using counting_semaphore_t = counting_semaphore_impl<1024>;
+#else
   using counting_semaphore_t = ::cuda::std::counting_semaphore<1024>;
+#endif
 
  public:
   static constexpr int kGroupSize = 256;

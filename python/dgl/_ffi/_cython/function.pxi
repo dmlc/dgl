@@ -92,7 +92,7 @@ cdef inline int make_arg(object arg,
         ptr = arg._dgl_handle
         value[0].v_handle = (<void*>ptr)
         tcode[0] = arg.__class__._dgl_tcode
-    elif isinstance(arg, (int, long)):
+    elif isinstance(arg, int):
         value[0].v_int64 = arg
         tcode[0] = kObjectInt
     elif isinstance(arg, float):

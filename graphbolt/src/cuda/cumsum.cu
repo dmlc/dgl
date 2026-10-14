@@ -17,7 +17,11 @@
  * @file cuda/cumsum.cu
  * @brief Cumsum operators implementation on CUDA.
  */
+#ifdef __HIPCC__
+#include <hipcub/hipcub.hpp>
+#else
 #include <cub/cub.cuh>
+#endif
 
 #include "./common.h"
 

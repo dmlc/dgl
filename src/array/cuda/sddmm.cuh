@@ -85,7 +85,11 @@ namespace cuda {
     }                                                                    \
   } while (0)
 
+#if defined __HIPCC__
+constexpr unsigned long long full_mask = 0xffffffffffffffff;
+#else
 constexpr unsigned int full_mask = 0xffffffff;
+#endif
 
 /**
  * @brief CUDA kernel of g-SDDMM on Coo format.

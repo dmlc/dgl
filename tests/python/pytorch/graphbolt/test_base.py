@@ -6,6 +6,7 @@ from collections.abc import Iterable, Mapping
 import backend as F
 
 import dgl.graphbolt as gb
+
 import pytest
 import torch
 from torch.torch_version import TorchVersion

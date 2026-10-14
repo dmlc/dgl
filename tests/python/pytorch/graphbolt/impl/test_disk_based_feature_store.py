@@ -5,11 +5,11 @@ from functools import partial
 
 import backend as F
 
+import dgl.graphbolt as gb
+
 import numpy as np
 import pytest
 import torch
-
-from dgl import graphbolt as gb
 
 
 def to_on_disk_numpy(test_dir, name, t):

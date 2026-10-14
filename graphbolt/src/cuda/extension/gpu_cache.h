@@ -34,7 +34,11 @@ namespace cuda {
 class GpuCache : public torch::CustomClassHolder {
   using key_t = long long;
   constexpr static int set_associativity = 2;
+#ifdef GRAPHBOLT_USE_HIP
+  constexpr static int WARP_SIZE = 64;
+#else
   constexpr static int WARP_SIZE = 32;
+#endif
   constexpr static int bucket_size = WARP_SIZE * set_associativity;
   using gpu_cache_t = ::gpu_cache::gpu_cache<
       key_t, uint64_t, std::numeric_limits<key_t>::max(), set_associativity,

@@ -23,6 +23,10 @@
 #include <tuple>
 #include <vector>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hipsparse/hipsparse.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 

@@ -47,7 +47,7 @@ TORCH_LIBRARY_IMPL(graphbolt, CPU, m) {
   m.impl("expand_indptr", &ExpandIndptr);
 }
 
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
 TORCH_LIBRARY_IMPL(graphbolt, CUDA, m) {
   m.impl("expand_indptr", &ExpandIndptrImpl);
 }
@@ -61,7 +61,7 @@ TORCH_LIBRARY_IMPL(graphbolt, CPU, m) {
   m.impl("indptr_edge_ids", &IndptrEdgeIds);
 }
 
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
 TORCH_LIBRARY_IMPL(graphbolt, CUDA, m) {
   m.impl("indptr_edge_ids", &IndptrEdgeIdsImpl);
 }

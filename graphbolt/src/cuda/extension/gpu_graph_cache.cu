@@ -19,10 +19,17 @@
  */
 #include <graphbolt/cuda_ops.h>
 #include <thrust/gather.h>
+#include <thrust/iterator/discard_iterator.h>
 #include <thrust/transform.h>
 
 #include <cstddef>
+#ifdef GRAPHBOLT_USE_HIP
+#include <hipcub/hipcub.hpp>
+#define GRAPHBOLT_DISCARD_OUTPUT_ITERATOR thrust::discard_iterator<>{}
+#else
 #include <cub/cub.cuh>
+#define GRAPHBOLT_DISCARD_OUTPUT_ITERATOR cub::DiscardOutputIterator{}
+#endif
 #include <cuco/static_map.cuh>
 #include <cuda/std/atomic>
 #include <cuda/stream_ref>
@@ -142,7 +149,7 @@ GpuGraphCache::GpuGraphCache(
             ::cuda::stream_ref{cuda::GetCurrentStream()}};
         map_ = new map_t<index_t>{std::move(map_temp)};
       }));
-  C10_CUDA_KERNEL_LAUNCH_CHECK();  // Check the map constructor's success.
+  GRAPHBOLT_C10_KERNEL_LAUNCH_CHECK();  // Check the map constructor's success.
   const auto options = torch::TensorOptions().device(c10::DeviceType::CUDA);
   TORCH_CHECK(threshold > 0, "Threshold should be a position integer.");
   threshold_ = threshold;
@@ -230,7 +237,7 @@ std::tuple<torch::Tensor, torch::Tensor, int64_t, int64_t> GpuGraphCache::Query(
             output_indices.data_ptr<index_t>());
         CUB_CALL(
             DevicePartition::If, position_and_index, output_position_and_index,
-            cub::DiscardOutputIterator{}, seeds.size(0),
+            GRAPHBOLT_DISCARD_OUTPUT_ITERATOR, seeds.size(0),
             [] __device__(thrust::tuple<index_t, index_t> & x) {
               return thrust::get<0>(x) >= 0;
             });
@@ -340,30 +347,37 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
               const auto missing_edge_ids =
                   edge_id_offsets ? edge_tensors.back().data_ptr<indptr_t>()
                                   : nullptr;
-              CUB_CALL(DeviceFor::Bulk, num_buffers, [=] __device__(int64_t i) {
-                const auto tensor_idx = i / num_nodes;
-                const auto idx = i % num_nodes;
-                const auto pos = positions_ptr[idx];
-                const auto original_idx = indices_ptr[idx];
-                const auto [cache_ptr, missing_ptr, size, cum_size] =
-                    cache_missing_dtype_dev_ptr[tensor_idx];
-                const auto is_cached = pos >= 0;
-                const auto offset = is_cached ? cache_indptr[pos]
-                                              : missing_indptr[idx - num_hit];
-                const auto offset_end = is_cached
-                                            ? cache_indptr[pos + 1]
-                                            : missing_indptr[idx - num_hit + 1];
-                const auto out_idx = tensor_idx * num_nodes + original_idx;
+              CUB_CALL(
+#if HIP_VERSION_MAJOR >= 7
+                  DeviceFor::Bulk,
+#else
+                Bulk,
+#endif
+                  num_buffers, [=] __device__(int64_t i) {
+                    const auto tensor_idx = i / num_nodes;
+                    const auto idx = i % num_nodes;
+                    const auto pos = positions_ptr[idx];
+                    const auto original_idx = indices_ptr[idx];
+                    const auto [cache_ptr, missing_ptr, size, cum_size] =
+                        cache_missing_dtype_dev_ptr[tensor_idx];
+                    const auto is_cached = pos >= 0;
+                    const auto offset = is_cached
+                                            ? cache_indptr[pos]
+                                            : missing_indptr[idx - num_hit];
+                    const auto offset_end =
+                        is_cached ? cache_indptr[pos + 1]
+                                  : missing_indptr[idx - num_hit + 1];
+                    const auto out_idx = tensor_idx * num_nodes + original_idx;
 
-                input_ptr[out_idx] =
-                    (is_cached ? cache_ptr : missing_ptr) + offset * size;
-                input_size_ptr[out_idx] = size * (offset_end - offset);
-                if (edge_id_offsets_ptr && i < num_nodes) {
-                  const auto edge_id =
-                      is_cached ? cache_offset[pos] : missing_edge_ids[offset];
-                  edge_id_offsets_ptr[out_idx] = edge_id;
-                }
-              });
+                    input_ptr[out_idx] =
+                        (is_cached ? cache_ptr : missing_ptr) + offset * size;
+                    input_size_ptr[out_idx] = size * (offset_end - offset);
+                    if (edge_id_offsets_ptr && i < num_nodes) {
+                      const auto edge_id = is_cached ? cache_offset[pos]
+                                                     : missing_edge_ids[offset];
+                      edge_id_offsets_ptr[out_idx] = edge_id;
+                    }
+                  });
               auto output_indptr = torch::empty(
                   num_nodes + 1, seeds.options().dtype(indptr_.scalar_type()));
               auto output_indptr_ptr = output_indptr.data_ptr<indptr_t>();
@@ -395,7 +409,8 @@ std::tuple<torch::Tensor, std::vector<torch::Tensor>> GpuGraphCache::Replace(
                 CUB_CALL(
                     DeviceSelect::Flagged, iota, is_threshold,
                     output_indices.data_ptr<indices_t>(),
-                    cub::DiscardOutputIterator{}, missing_positions.size(0));
+                    GRAPHBOLT_DISCARD_OUTPUT_ITERATOR,
+                    missing_positions.size(0));
                 auto [in_degree, sliced_indptr] =
                     ops::SliceCSCIndptr(indptr, output_indices);
                 while (num_nodes_ + num_threshold >= indptr_.size(0)) {

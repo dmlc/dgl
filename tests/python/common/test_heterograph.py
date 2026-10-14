@@ -2526,6 +2526,7 @@ def test_float_cast():
             assert F.allclose(values, F.tensor(pvalues), 0, 0)
 
 
+@unittest.skipIf(F.is_hip(), reason="Not implemented in ROCm")
 @parametrize_idtype
 def test_format(idtype):
     # single relation

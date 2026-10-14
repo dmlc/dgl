@@ -17,6 +17,9 @@
 #include <cstdlib>
 #include <string>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "runtime_base.h"
 
 namespace dgl {

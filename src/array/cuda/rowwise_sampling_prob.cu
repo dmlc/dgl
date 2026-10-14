@@ -6,11 +6,20 @@
  * sampling code rowwise_sampling.cu.
  * @author pengqirong (OPPO), dlasalle and Xin from Nvidia.
  */
+#if defined(__CUDACC__)
 #include <curand_kernel.h>
+
+#include <cub/cub.cuh>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hiprand/hiprand_kernel.h>
+
+#include <hipcub/hipcub.hpp>
+#endif
+
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
 
-#include <cub/cub.cuh>
 #include <numeric>
 
 #include "../../array/cuda/atomic.cuh"
@@ -18,8 +27,10 @@
 #include "./utils.h"
 
 // require CUB 1.17 to use DeviceSegmentedSort
+#if defined __CUDACC__
 static_assert(
     CUB_VERSION >= 101700, "Require CUB >= 1.17 to use DeviceSegmentedSort");
+#endif
 
 namespace dgl {
 using namespace cuda;

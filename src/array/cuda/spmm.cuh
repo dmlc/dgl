@@ -16,6 +16,9 @@
 #include "bf16.cuh"
 #include "fp16.cuh"
 #include "macro.cuh"
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 
 namespace dgl {
 
@@ -28,12 +31,12 @@ namespace aten {
  */
 template <typename DType, typename IdType>
 inline bool cusparse_available(bool more_nnz_than_matrix_size) {
-#if CUDART_VERSION < 11000
+#if CUDART_VERSION < 11000 && !(DGL_USE_HIP)
   if (std::is_same<IdType, int>::value &&
       (std::is_same<DType, float>::value || std::is_same<DType, double>::value))
     return true;
   return false;
-#else
+#else  // if HIP
   if (std::is_same<DType, __half>::value ||
       std::is_same<DType, __nv_bfloat16>::value)
     return false;  // cusparse's SpMM on fp16 is slow, temporally disabled.
@@ -227,7 +230,7 @@ void CusparseCsrmm2(
         static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
     _Fill(valptr, nnz, static_cast<DType>(1.));
   }
-#if CUDART_VERSION >= 11000
+#if CUDART_VERSION >= 11000 || defined(__HIPCC__)
   cusparseSpMatDescr_t matA;
   cusparseDnMatDescr_t matB, matC;
   constexpr auto dtype = cuda_dtype<DType>::value;
@@ -321,7 +324,7 @@ void CusparseCsrmm2Hetero(
         static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
     _Fill(valptr, nnz, static_cast<DType>(1.));
   }
-#if CUDART_VERSION >= 11000
+#if CUDART_VERSION >= 11000 || defined(__HIPCC__)
   cusparseSpMatDescr_t matA;
   cusparseDnMatDescr_t matB, matC;
   constexpr auto dtype = cuda_dtype<DType>::value;
@@ -376,22 +379,34 @@ void CusparseCsrmm2Hetero(
   do {                                                          \
     if ((op) == "add") {                                        \
       typedef cuda::binary::Add<DType> Op;                      \
-      { __VA_ARGS__ }                                           \
+      {                                                         \
+        __VA_ARGS__                                             \
+      }                                                         \
     } else if ((op) == "sub") {                                 \
       typedef cuda::binary::Sub<DType> Op;                      \
-      { __VA_ARGS__ }                                           \
+      {                                                         \
+        __VA_ARGS__                                             \
+      }                                                         \
     } else if ((op) == "mul") {                                 \
       typedef cuda::binary::Mul<DType> Op;                      \
-      { __VA_ARGS__ }                                           \
+      {                                                         \
+        __VA_ARGS__                                             \
+      }                                                         \
     } else if ((op) == "div") {                                 \
       typedef cuda::binary::Div<DType> Op;                      \
-      { __VA_ARGS__ }                                           \
+      {                                                         \
+        __VA_ARGS__                                             \
+      }                                                         \
     } else if ((op) == "copy_lhs") {                            \
       typedef cuda::binary::CopyLhs<DType> Op;                  \
-      { __VA_ARGS__ }                                           \
+      {                                                         \
+        __VA_ARGS__                                             \
+      }                                                         \
     } else if ((op) == "copy_rhs") {                            \
       typedef cuda::binary::CopyRhs<DType> Op;                  \
-      { __VA_ARGS__ }                                           \
+      {                                                         \
+        __VA_ARGS__                                             \
+      }                                                         \
     } else {                                                    \
       LOG(FATAL) << "Unsupported SpMM binary operator: " << op; \
     }                                                           \

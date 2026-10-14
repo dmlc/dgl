@@ -24,11 +24,25 @@
 #include "gpu_cache_api.hpp"
 #ifdef LIBCUDACXX_VERSION
 #include <cuda/atomic>
+#ifndef DGL_USE_HIP
 #include <cuda/semaphore>
+#endif
 #endif
 
 #define SET_ASSOCIATIVITY 2
+// TODO: Properly for portable HIP code, this should be determined at runtime,
+// but there's a lot of code that assumes this is a compile-time constant, so
+// for now we're hardcoding it. See
+// https://rocm.docs.amd.com/projects/HIP/en/latest/how-to/hip_cpp_language_extensions.html#warpsize
+#ifdef DGL_USE_HIP
+  #if HIP_VERSION_MAJOR >= 7
+	#define SLAB_SIZE 64
+  #else
+	#define SLAB_SIZE warpSize
+  #endif
+#else
 #define SLAB_SIZE 32
+#endif
 #define TASK_PER_WARP_TILE_MACRO 1
 
 namespace gpu_cache {
@@ -82,7 +96,26 @@ class gpu_cache : public gpu_cache_api<key_type> {
   using slabset = slab_set<set_associativity, key_type, warp_size>;
 #ifdef LIBCUDACXX_VERSION
   using atomic_ref_counter_type = cuda::atomic<ref_counter_type, cuda::thread_scope_device>;
+#ifdef DGL_USE_HIP
+  // cuda::binary_semaphore is not supported on HIP. Provide a device-side
+  // spinlock with the same acquire()/release() interface so that the
+  // LIBCUDACXX_VERSION kernel code compiles unchanged.
+  struct mutex {
+    int flag_;
+    __host__ __device__ explicit mutex(int initial = 1) : flag_(initial) {}
+    __device__ void acquire() {
+      while (atomicCAS(&flag_, 1, 0) == 0)
+        ;
+      __threadfence();
+    }
+    __device__ void release() {
+      __threadfence();
+      atomicExch(&flag_, 1);
+    }
+  };
+#else
   using mutex = cuda::binary_semaphore<cuda::thread_scope_device>;
+#endif
 #endif
 
  private:

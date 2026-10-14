@@ -7,11 +7,13 @@ from sys import platform
 import backend as F
 
 import dgl
+
+import dgl.graphbolt as gb
 import pytest
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from dgl import graphbolt as gb
+from utils import rendezvous_port
 
 
 def test_ItemSampler_minibatcher():
@@ -882,7 +884,7 @@ def distributed_item_sampler_subprocess(
     init_method = (
         f"file:///{os.path.join(os.getcwd(), 'dis_tempfile')}"
         if platform == "win32"
-        else "tcp://127.0.0.1:12345"
+        else f"tcp://127.0.0.1:{rendezvous_port()}"
     )
     dist.init_process_group(
         backend="gloo",  # Use Gloo backend for CPU multiprocessing

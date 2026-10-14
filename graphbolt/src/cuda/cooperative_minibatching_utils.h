@@ -21,7 +21,11 @@
 #ifndef GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_H_
 #define GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_H_
 
+#if defined(__HIPCC__)
+#include <ATen/hip/HIPEvent.h>
+#else
 #include <ATen/cuda/CUDAEvent.h>
+#endif
 #include <graphbolt/async.h>
 #include <torch/script.h>
 

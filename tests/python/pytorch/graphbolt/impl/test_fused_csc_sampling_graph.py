@@ -8,12 +8,13 @@ import unittest
 import backend as F
 
 import dgl
+
 import dgl.graphbolt as gb
 import pytest
 import torch
 import torch.multiprocessing as mp
-
 from dgl.graphbolt.base import etype_str_to_tuple
+
 from scipy import sparse as spsp
 
 from .. import gb_test_utils as gbt

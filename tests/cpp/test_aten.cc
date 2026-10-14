@@ -38,7 +38,7 @@ void _TestRange(DGLContext ctx) {
 
 TEST(ArrayTest, TestRange) {
   _TestRange(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestRange(GPU);
 #endif
 };
@@ -78,7 +78,7 @@ void _TestNumBits(DGLContext ctx) {
 
 TEST(ArrayTest, TestAsNumBits) {
   _TestNumBits(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestNumBits(GPU);
 #endif
 };
@@ -170,7 +170,7 @@ void _TestArith(DGLContext ctx) {
 TEST(ArrayTest, Arith) {
   _TestArith<int32_t>(CPU);
   _TestArith<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestArith<int32_t>(GPU);
   _TestArith<int64_t>(GPU);
 #endif
@@ -189,7 +189,7 @@ void _TestHStack(DGLContext ctx) {
 TEST(ArrayTest, HStack) {
   _TestHStack<int32_t>(CPU);
   _TestHStack<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestHStack<int32_t>(GPU);
   _TestHStack<int64_t>(GPU);
 #endif
@@ -210,7 +210,7 @@ void _TestIndexSelect(DGLContext ctx) {
 TEST(ArrayTest, TestIndexSelect) {
   _TestIndexSelect<int32_t>(CPU);
   _TestIndexSelect<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestIndexSelect<int32_t>(GPU);
   _TestIndexSelect<int64_t>(GPU);
 #endif
@@ -239,7 +239,7 @@ void _TestRelabel_(DGLContext ctx) {
 TEST(ArrayTest, TestRelabel_) {
   _TestRelabel_<int32_t>(CPU);
   _TestRelabel_<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestRelabel_<int32_t>(GPU);
   _TestRelabel_<int64_t>(GPU);
 #endif
@@ -556,7 +556,7 @@ void _TestDisjointUnionPartitionCoo(DGLContext ctx) {
 TEST(DisjointUnionTest, TestDisjointUnionPartitionCoo) {
   _TestDisjointUnionPartitionCoo<int32_t>(CPU);
   _TestDisjointUnionPartitionCoo<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestDisjointUnionPartitionCoo<int32_t>(GPU);
   _TestDisjointUnionPartitionCoo<int64_t>(GPU);
 #endif
@@ -682,7 +682,7 @@ void _TestDisjointUnionPartitionCsr(DGLContext ctx) {
 TEST(DisjointUnionTest, TestDisjointUnionPartitionCsr) {
   _TestDisjointUnionPartitionCsr<int32_t>(CPU);
   _TestDisjointUnionPartitionCsr<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestDisjointUnionPartitionCsr<int32_t>(GPU);
   _TestDisjointUnionPartitionCsr<int64_t>(GPU);
 #endif
@@ -750,7 +750,7 @@ void _TestSliceContiguousChunkCoo(DGLContext ctx) {
 TEST(SliceContiguousChunk, TestSliceContiguousChunkCoo) {
   _TestSliceContiguousChunkCoo<int32_t>(CPU);
   _TestSliceContiguousChunkCoo<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestSliceContiguousChunkCoo<int32_t>(GPU);
   _TestSliceContiguousChunkCoo<int64_t>(GPU);
 #endif
@@ -817,7 +817,7 @@ void _TestSliceContiguousChunkCsr(DGLContext ctx) {
 TEST(SliceContiguousChunk, TestSliceContiguousChunkCsr) {
   _TestSliceContiguousChunkCsr<int32_t>(CPU);
   _TestSliceContiguousChunkCsr<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestSliceContiguousChunkCsr<int32_t>(GPU);
   _TestSliceContiguousChunkCsr<int64_t>(GPU);
 #endif
@@ -1224,7 +1224,7 @@ void _TestCumSum(DGLContext ctx) {
 TEST(ArrayTest, CumSum) {
   _TestCumSum<int32_t>(CPU);
   _TestCumSum<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestCumSum<int32_t>(GPU);
   _TestCumSum<int64_t>(GPU);
 #endif
@@ -1249,7 +1249,7 @@ TEST(ArrayTest, Scatter_) {
   _TestScatter_<int64_t, int32_t>(CPU);
   _TestScatter_<int32_t, int64_t>(CPU);
   _TestScatter_<int64_t, int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestScatter_<int32_t, int32_t>(GPU);
   _TestScatter_<int64_t, int32_t>(GPU);
   _TestScatter_<int32_t, int64_t>(GPU);
@@ -1285,7 +1285,7 @@ void _TestNonZero(DGLContext ctx) {
 TEST(ArrayTest, NonZero) {
   _TestNonZero<int32_t>(CPU);
   _TestNonZero<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestNonZero<int32_t>(GPU);
   _TestNonZero<int64_t>(GPU);
 #endif
@@ -1421,7 +1421,7 @@ void _TestSort(DGLContext ctx) {
 TEST(ArrayTest, Sort) {
   _TestSort<int32_t>(CPU);
   _TestSort<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestSort<int32_t>(GPU);
   _TestSort<int64_t>(GPU);
 #endif

@@ -9,6 +9,9 @@
 #include <unordered_set>
 #include <vector>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 #include "./atomic.cuh"
 #include "./utils.h"
@@ -23,6 +26,9 @@ namespace impl {
 
 template <typename IdType>
 __device__ void _warpReduce(volatile IdType* sdata, IdType tid) {
+#if defined(__HIPCC__)
+  if (warpSize > 32) sdata[tid] += sdata[tid + warpSize];
+#endif
   sdata[tid] += sdata[tid + 32];
   sdata[tid] += sdata[tid + 16];
   sdata[tid] += sdata[tid + 8];
@@ -60,7 +66,11 @@ __global__ void _COOGetRowNNZKernel(
       local_cnt[tx] += local_cnt[tx + 64];
       __syncthreads();
     }
+#if defined(__HIPCC__)
+    if (tx < warpSize) {
+#else
     if (tx < 32) {
+#endif
       _warpReduce(local_cnt, tx);
     }
     if (tx == 0) {

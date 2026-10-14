@@ -19,9 +19,11 @@
  */
 #include <graphbolt/cuda_ops.h>
 #include <thrust/binary_search.h>
-
+#ifdef __HIPCC__
+#include <hipcub/hipcub.hpp>
+#else
 #include <cub/cub.cuh>
-
+#endif
 #include "./common.h"
 
 namespace graphbolt {
@@ -45,7 +47,11 @@ torch::Tensor IsIn(torch::Tensor elements, torch::Tensor test_elements) {
 }
 
 torch::Tensor Nonzero(torch::Tensor mask, bool logical_not) {
+#ifdef __HIPCC__
+  rocprim::counting_iterator<int64_t> iota(0);
+#else
   thrust::counting_iterator<int64_t> iota(0);
+#endif
   auto result = torch::empty_like(mask, torch::kInt64);
   auto mask_ptr = mask.data_ptr<bool>();
   auto result_ptr = result.data_ptr<int64_t>();

@@ -5,6 +5,9 @@
  */
 #include <dgl/array.h>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "./sddmm.cuh"
 
 namespace dgl {

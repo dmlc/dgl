@@ -6,13 +6,16 @@ import tempfile
 import unittest
 import warnings
 
+import backend as F
+
+import dgl.graphbolt as gb
+
 import numpy as np
 import pandas as pd
 import pydantic
 import pytest
 import torch
 import yaml
-from dgl import graphbolt as gb
 from dgl.graphbolt import GBWarning
 
 from .. import gb_test_utils as gbt

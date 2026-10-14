@@ -1,0 +1,103 @@
+# Deprecated: use docker/Dockerfile.rocm instead.
+# This filename is kept for older build scripts.
+#
+# "Copyright Advanced Micro Devices, Inc.
+# Licensed under the Apache License Version 2.0"
+
+#############################################################################
+ARG BASE_IMAGE=rocm/pytorch:rocm10.0_ubuntu24.04_py3.12_pytorch_release_2.13.0
+FROM ${BASE_IMAGE} AS dgl_build
+
+# NOTE: This dockerfile **assumes** that BASE_IMAGE comes with the appropriate
+# python executable in the path.
+
+ARG ARG_MAX_JOBS=24
+ENV MAX_JOBS=${ARG_MAX_JOBS:-24}
+
+# Install basic tools
+RUN apt-get update \
+    && apt install -y clang-format-15 git ninja-build patch tree
+
+# Updating to latest version of Cmake for Ubuntu 24.04
+RUN apt-get update && apt-get install -y wget build-essential \
+ && wget -qO- https://cmake.org/files/v3.28/cmake-3.28.3-linux-x86_64.tar.gz \
+ | tar --strip-components=1 -xz -C /usr/local
+
+# Use bash shell for all RUN commands
+SHELL ["/bin/bash", "--login", "-c"]
+
+# ROCm 10.0+ base images ship ROCm via pip (rocm-sdk-core/-libraries/-device-*)
+# under a venv site-packages dir instead of the classic /opt/rocm FHS tree, and
+# they don't include the 'devel' package (headers + cmake config files) needed
+# to build native HIP code. Install the matching devel package and materialize
+# a /opt/rocm symlink so CMakePresets.json and script/install_graphbolt_deps.sh
+# keep working unmodified. No-op on older base images that already ship a real
+# /opt/rocm (e.g. rocm7.0.2) and have no rocm-sdk CLI.
+RUN if command -v rocm-sdk >/dev/null 2>&1 && [ ! -e /opt/rocm ]; then \
+      ROCM_SDK_VER="$(python -c 'import importlib.metadata as m; print(m.version("rocm"))')" && \
+      pip install --index-url https://stable.repo.amd.com/rocm/whl-next/ "rocm[devel]==${ROCM_SDK_VER}" && \
+      rocm-sdk init && \
+      ln -sfn "$(rocm-sdk path --root)" /opt/rocm ; \
+    fi
+
+# Copy Sources
+ENV DGL_SRC_DIR="/src/dgl"
+RUN mkdir -p ${DGL_SRC_DIR}
+COPY . ${DGL_SRC_DIR}
+
+# Set GPU build targets
+ARG ARG_GPU_BUILD_TARGETS="gfx942,gfx950"
+ENV GPU_BUILD_TARGETS=${ARG_GPU_BUILD_TARGETS}
+
+ENV DGL_BUILD_DIR="${DGL_SRC_DIR}/build"
+ARG ARG_DGL_ARTIFACTS_DIR="/artifacts"
+ENV DGL_ARTIFACTS_DIR="${ARG_DGL_ARTIFACTS_DIR}"
+ENV DGL_LIBRARY_PATH="${DGL_BUILD_DIR}"
+ENV PYTHONPATH="${DGL_SRC_DIR}/tests:${DGL_SRC_DIR}/python"
+
+# Install GraphBolt dependencies
+RUN mkdir -p /tmp/deps && cd /tmp/deps && bash ${DGL_SRC_DIR}/script/install_graphbolt_deps.sh
+
+# Configure and build DGL
+WORKDIR ${DGL_SRC_DIR}
+RUN cmake --preset rocm -DCMAKE_HIP_ARCHITECTURES=${ARG_GPU_BUILD_TARGETS} -DGPU_TARGETS=${ARG_GPU_BUILD_TARGETS}
+RUN cmake --build ${DGL_BUILD_DIR} --parallel ${MAX_JOBS}
+
+WORKDIR ${DGL_SRC_DIR}/python
+# Make sure we have wheel and build installed. Cython is needed here (not
+# just at runtime) because setup.py's config_cython() only builds the
+# dgl._ffi._cy3.core extension when Cython is importable at `pip install`
+# time; otherwise it silently falls back to the ctypes-only FFI path.
+RUN python -m pip install build wheel cython
+# Install an editable version of the package so we can make source changes and test them
+RUN python -m pip install -e .
+# Build the wheel file for packaging (won't update automatically with source changes)
+RUN python -m build --wheel
+
+
+# Store the artifacts
+RUN mkdir -p ${DGL_ARTIFACTS_DIR}
+RUN cp dist/*.whl ${DGL_ARTIFACTS_DIR}
+
+# Setup for the user
+RUN cat <<'EOT' >> ~/.bashrc
+echo "
+Welcome to the DGL CI container!
+
+Container manifest:
+/src/dgl
+├── README.md
+├── benchmarks # Benchmark scripts
+├── ...
+├── build      # C/C++ build directory
+├── tests      # Test scripts
+
+Run the tests with:
+    cd /src/dgl/
+    bash tests/scripts/task_unit_test_rocm.sh pytorch gpu
+"
+EOT
+
+# Set the default command to an interactive bash shell.
+WORKDIR ${DGL_SRC_DIR}
+CMD ["/bin/bash"]

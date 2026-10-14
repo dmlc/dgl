@@ -22,8 +22,18 @@
 #include <thrust/scatter.h>
 #include <thrust/transform.h>
 
+#ifdef __HIPCC__
+#include <hipsparse/hipsparse.h>
+
+#include <cuco/static_map.cuh>
+#include <hipcub/hipcub.hpp>
+// Needs to be after hipcub.hpp
+#include <dgl/hip/cuda_to_hip.h>
+#else
 #include <cub/cub.cuh>
 #include <cuda/functional>
+
+#endif
 
 #include "../utils.h"
 #include "./common.h"
@@ -43,6 +53,7 @@ torch::Tensor RankAssignment(
         auto nodes_ptr = nodes.data_ptr<index_t>();
         THRUST_CALL(
             transform, nodes_ptr, nodes_ptr + nodes.numel(), part_ids_ptr,
+
             ::cuda::proclaim_return_type<part_t>(
                 [rank = static_cast<uint32_t>(rank),
                  world_size = static_cast<uint32_t>(
@@ -79,7 +90,12 @@ RankSortImpl(
                                               .dtype(offsets_dev.scalar_type())
                                               .pinned_memory(true));
         CUB_CALL(
-            DeviceFor::Bulk, num_batches * world_size + 1,
+#if HIP_VERSION_MAJOR >= 7
+            DeviceFor::Bulk,
+#else
+            Bulk,
+#endif
+            num_batches * world_size + 1,
             [=, part_ids = part_ids_sorted.data_ptr<cuda::part_t>(),
              offsets = offsets.data_ptr<int64_t>()] __device__(int64_t i) {
               const auto batch_id = i / world_size;

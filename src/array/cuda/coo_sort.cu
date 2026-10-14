@@ -4,7 +4,9 @@
  * @brief Sort COO index
  */
 #include <dgl/array.h>
-
+#if defined(DGL_USE_HIP)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../c_api_common.h"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"

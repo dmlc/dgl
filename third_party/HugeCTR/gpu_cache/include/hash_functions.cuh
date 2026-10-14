@@ -103,6 +103,8 @@ struct MurmurHash3_32 {
         k1 = rotl32(k1, 15);
         k1 *= c2;
         h1 ^= k1;
+      default:
+        break;
     };
     //----------
     // finalization

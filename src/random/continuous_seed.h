@@ -24,8 +24,10 @@
 
 #include <cmath>
 
-#ifdef __NVCC__
+#if defined __NVCC__
 #include <curand_kernel.h>
+#elif defined __HIPCC__
+#include <hiprand/hiprand_kernel.h>
 #else
 #include <random>
 
@@ -58,7 +60,7 @@ class continuous_seed {
     c[1] = std::sin(pi * r / 2);
   }
 
-#ifdef __CUDA_ARCH__
+#if defined __CUDA_ARCH__ || defined(__HIPCC__)
   __device__ inline float uniform(const uint64_t t) const {
     const uint64_t kCurandSeed = 999961;  // Could be any random number.
     curandStatePhilox4_32_10_t rng;

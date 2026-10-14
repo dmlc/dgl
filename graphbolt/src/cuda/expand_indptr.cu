@@ -21,7 +21,11 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 
+#ifdef __HIPCC__
+#include <hipcub/hipcub.hpp>
+#else
 #include <cub/cub.cuh>
+#endif
 #include <limits>
 
 #include "./common.h"

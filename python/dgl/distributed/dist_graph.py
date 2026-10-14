@@ -9,7 +9,9 @@ from collections.abc import Mapping, MutableMapping
 import numpy as np
 import torch
 
-from .. import backend as F, graphbolt as gb, heterograph_index
+from .. import backend as F, heterograph_index
+
+# from .. import graphbolt as gb
 from .._ffi.ndarray import empty_shared_mem
 from ..base import ALL, DGLError, EID, ETYPE, is_all, NID
 from ..convert import graph as dgl_graph, heterograph as dgl_heterograph
@@ -320,7 +322,12 @@ def _get_graph_from_shared_mem(graph_name, use_graphbolt):
     through shared memory to reduce the overhead of data access.
     """
     if use_graphbolt:
-        return gb.load_from_shared_memory(graph_name)
+        try:
+            return gb.load_from_shared_memory(graph_name)
+        except Exception:
+            print("GraphBolt not Supported")
+            pass
+
     g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(
         graph_name
     )
@@ -463,8 +470,12 @@ class EdgeDataView(MutableMapping):
 
 def _format_partition(graph, graph_format):
     """Format the partition to the specified format."""
-    if isinstance(graph, gb.FusedCSCSamplingGraph):
-        return graph
+    try:
+        if isinstance(graph, gb.FusedCSCSamplingGraph):
+            return graph
+    except Exception:
+        print("GraphBolt not Supported")
+        pass
     # formatting dtype
     # TODO(Rui) Formatting forcely is not a perfect solution.
     #   We'd better store all dtypes when mapping to shared memory

@@ -1954,7 +1954,6 @@ if __name__ == "__main__":
     test_data_hash()
     test_tudataset_regression()
     test_fraud()
-    test_fakenews()
     test_csvdataset()
     test_as_nodepred1()
     test_as_nodepred2()

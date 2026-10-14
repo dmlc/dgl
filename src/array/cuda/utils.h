@@ -11,7 +11,11 @@
 #include <dgl/runtime/ndarray.h>
 #include <dmlc/logging.h>
 
+#if defined(__CUDACC__)
 #include <cub/cub.cuh>
+#elif defined(__HIPCC__)
+#include <hipcub/hipcub.hpp>
+#endif
 #include <type_traits>
 
 #include "../../runtime/cuda/cuda_common.h"
@@ -90,7 +94,7 @@ inline int FindNumBlocks(int nblks, int max_nblks = -1) {
 
 template <typename T>
 __device__ __forceinline__ T _ldg(T* addr) {
-#if __CUDA_ARCH__ >= 350
+#if __CUDA_ARCH__ >= 350 || defined(__HIPCC__)
   return __ldg(addr);
 #else
   return *addr;

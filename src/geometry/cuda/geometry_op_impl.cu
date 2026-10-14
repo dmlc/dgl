@@ -6,6 +6,9 @@
 #include <dgl/array.h>
 
 #include "../../c_api_common.h"
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 #include "../geometry_op.h"
 

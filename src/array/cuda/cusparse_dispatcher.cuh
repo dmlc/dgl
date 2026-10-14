@@ -7,7 +7,12 @@
 #ifndef DGL_ARRAY_CUDA_CUSPARSE_DISPATCHER_CUH_
 #define DGL_ARRAY_CUDA_CUSPARSE_DISPATCHER_CUH_
 
+#if defined(__CUDACC__)
 #include <cusparse.h>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hipsparse/hipsparse.h>
+#endif
 #include <dgl/runtime/c_runtime_api.h>
 
 #include "bf16.cuh"

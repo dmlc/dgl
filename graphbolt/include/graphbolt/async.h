@@ -37,11 +37,30 @@
 #include <type_traits>
 #endif
 
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA)
 #include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <torch/csrc/api/include/torch/cuda.h>
+#elif defined(GRAPHBOLT_USE_HIP)
+#include <ATen/hip/HIPContext.h>
+#include <ATen/hip/HIPEvent.h>
+#include <ATen/hip/impl/HIPGuardImplMasqueradingAsCUDA.h>
+#include <ATen/hip/impl/HIPStreamMasqueradingAsCUDA.h>
+#include <c10/hip/HIPGuard.h>
+#include <torch/csrc/api/include/torch/cuda.h>
+
+// NOTE: c10::cuda::CUDAStream, c10::cuda::CUDAStreamGuard, and
+// c10::cuda::getCurrentCUDAStream(DeviceIndex device_index = -1) used to not
+// exist for HIP builds on older PyTorch/ROCm ports, so this file used to
+// reopen namespace c10::cuda here to alias/define them from their
+// c10::hip::*MasqueradingAsCUDA equivalents. This PyTorch/ROCm version's own
+// (hipified) <c10/hip/HIPStream.h> and <c10/hip/HIPGuard.h> now declare
+// c10::cuda::CUDAStream, c10::cuda::CUDAStreamGuard, and
+// c10::cuda::getCurrentCUDAStream directly, so the shims here would conflict
+// (typedef redefinition / ambiguous overload) with those real declarations.
+// Removed; all call sites below resolve to PyTorch's real declarations.
+
 #endif
 
 namespace graphbolt {
@@ -94,7 +113,7 @@ inline int get_num_interop_threads() {
 
 template <typename T>
 class Future : public torch::CustomClassHolder {
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
   using T_no_event = std::conditional_t<std::is_void_v<T>, std::monostate, T>;
   using T_with_event = std::conditional_t<
       std::is_void_v<T>, at::cuda::CUDAEvent,
@@ -105,7 +124,7 @@ class Future : public torch::CustomClassHolder {
 #endif
 
  public:
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
   using return_type = std::variant<T_no_event, T_with_event>;
 #else
   using return_type = T;
@@ -116,7 +135,7 @@ class Future : public torch::CustomClassHolder {
   Future() = default;
 
   T Wait() {
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
     auto result = future_.get();
     if constexpr (std::is_void_v<T>) {
       if (std::holds_alternative<T_with_event>(result)) {
@@ -148,7 +167,7 @@ class Future : public torch::CustomClassHolder {
 template <typename F>
 inline auto async(F&& function, bool is_cuda = false) {
   using T = decltype(function());
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
   struct c10::StreamData3 stream_data;
   if (is_cuda) {
     stream_data = c10::cuda::getCurrentCUDAStream().pack3();
@@ -156,7 +175,7 @@ inline auto async(F&& function, bool is_cuda = false) {
 #endif
   using return_type = typename Future<T>::return_type;
   auto fn = [=, func = std::move(function)]() -> return_type {
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
     // We make sure to use the same CUDA stream as the thread launching the
     // async operation.
     if (is_cuda) {

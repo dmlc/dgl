@@ -30,14 +30,16 @@
 
 #include <stddef.h>
 #include <tensoradapter.h>
+
 #if defined(WIN32) || defined(_WIN32)
 #include <windows.h>
 #endif  // WIN32
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA)
 #include <cuda_runtime.h>
-#endif  // DGL_USE_CUDA
+#elif defined(DGL_USE_HIP)
+#include "../hip/cuda_to_hip.h"
+#endif  // DGL_USE_HIP or DGL_USE_CUDA
 #include "ndarray.h"
-
 /**
  * @brief Casts a pointer \c entry to a function pointer with signature of \c
  * func.
@@ -90,7 +92,7 @@ class TensorDispatcher {
     FUNCCAST(tensoradapter::CPURawDelete, entry)(ptr);
   }
 
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   /**
    * @brief Allocate a piece of GPU memory via
    * PyTorch's THCCachingAllocator.
@@ -209,7 +211,7 @@ class TensorDispatcher {
    * @param device_id Device of the tensor.
    */
   inline void RecordStream(void* ptr, DGLStreamHandle stream, int device_id) {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
     auto entry = entrypoints_[Op::kRecordStream];
     FUNCCAST(tensoradapter::RecordStream, entry)
     (ptr, static_cast<cudaStream_t>(stream), device_id);
@@ -229,7 +231,7 @@ class TensorDispatcher {
    */
   static constexpr const char* names_[] = {
       "CPURawAlloc",         "CPURawDelete",
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
       "CUDARawAlloc",        "CUDARawDelete",
       "CUDACurrentStream",   "RecordStream",
       "CUDARawHostAlloc",    "CUDARawHostDelete",
@@ -242,7 +244,7 @@ class TensorDispatcher {
    public:
     static constexpr int kCPURawAlloc = 0;
     static constexpr int kCPURawDelete = 1;
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
     static constexpr int kCUDARawAlloc = 2;
     static constexpr int kCUDARawDelete = 3;
     static constexpr int kCUDACurrentStream = 4;
@@ -260,7 +262,7 @@ class TensorDispatcher {
   /** @brief Entrypoints of each function */
   void* entrypoints_[num_entries_] = {
       nullptr, nullptr,
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 #endif  // DGL_USE_CUDA
   };

@@ -12,6 +12,10 @@
 
 #ifdef DGL_USE_CUDA
 #include <cuda_runtime.h>
+#elif defined DGL_USE_HIP
+#include <hip/hip_runtime.h>
+typedef hipStream_t cudaStream_t;
+#include <dgl/hip/cuda_to_hip.h>
 #endif  // DGL_USE_CUDA
 
 namespace tensoradapter {
@@ -34,7 +38,7 @@ void* CPURawAlloc(size_t nbytes);
  */
 void CPURawDelete(void* ptr);
 
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
 /**
  * @brief Allocate a piece of GPU memory via
  * PyTorch's THCCachingAllocator.

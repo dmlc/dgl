@@ -24,7 +24,11 @@
 #include <thrust/iterator/zip_iterator.h>
 
 #include <cstdint>
+#ifdef __HIPCC__
+#include <hipcub/hipcub.hpp>
+#else
 #include <cub/cub.cuh>
+#endif
 #include <numeric>
 
 #include "./common.h"

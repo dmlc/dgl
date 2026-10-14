@@ -7,12 +7,23 @@
 
 #include <algorithm>  // std::swap
 
+#if defined __HIPCC__
+#include <dgl/hip/cuda_to_hip.h>
+#include <hip/hip_fp16.h>
+#include <hipblas/hipblas.h>
+
+#include "../../../include/dgl/hip/hip_extensions/amd_warp_primitives.h"
+#endif
+
 #include "./atomic.cuh"
 #include "./functor.cuh"
 #include "./utils.h"
 
 namespace dgl {
 using namespace cuda;
+#ifdef __HIPCC__
+using namespace hip_warp_primitives;
+#endif
 namespace aten {
 
 namespace {
@@ -304,7 +315,15 @@ void GatherMM(
   int64_t in_len = A->shape[1];   // cols of A
   const int64_t tot_num_rows = A->shape[0];
   const int ntx = 128;
+#if defined(__HIPCC__)
+  #if HIP_VERSION_MAJOR >= 7
+  const int warp_size = 64;  // AMD wavefront size
+  #else
+  const int warp_size = warpSize;  // Pre-7.0, still constexpr
+  #endif
+#else
   const int warp_size = 32;
+#endif
   const int nbx = ((tot_num_rows * warp_size + ntx - 1) / ntx);
   const dim3 nblks(nbx);
   const dim3 nthrs(ntx);
@@ -338,7 +357,15 @@ void GatherMMScatter(
   int64_t in_len = A->shape[1];                                  // cols of A
   int64_t tot_num_rows = A->shape[0];
   const int ntx = 128;
+#if defined(__HIPCC__)
+  #if HIP_VERSION_MAJOR >= 7
+  const int warp_size = 64;  // AMD wavefront size
+  #else
+  const int warp_size = warpSize;  // Pre-7.0, still constexpr
+  #endif
+#else
   const int warp_size = 32;
+#endif
   const int nbx = ((tot_num_rows * warp_size + ntx - 1) / ntx);
   const dim3 nblks(nbx);
   const dim3 nthrs(ntx);

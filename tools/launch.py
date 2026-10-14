@@ -1,3 +1,6 @@
+# Revisions Copyright Advanced Micro Devices, Inc.
+# Licensed under the Apache License Version 2.0
+
 """Launching tool for DGL distributed training"""
 import argparse
 import json

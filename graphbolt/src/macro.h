@@ -12,7 +12,7 @@
 namespace graphbolt {
 
 // Dispatch operator implementation function to CUDA device only.
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
 #define GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(device_type, name, ...) \
   if (device_type == c10::DeviceType::CUDA) {                       \
     [[maybe_unused]] auto XPU = c10::DeviceType::CUDA;              \

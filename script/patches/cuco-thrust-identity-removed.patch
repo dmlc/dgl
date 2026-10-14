@@ -1,0 +1,59 @@
+Replace thrust::identity with cuda::std::identity.
+
+rocThrust 5.0 (ROCm 10) removed thrust::identity, which cuco 25.10 still uses
+as a pass-through predicate and as the base of identity_hash. cuda::std::identity
+is the CCCL replacement and is available from libhipcxx in ROCm 10. Note it is
+not a class template, so identity_hash inherits from it unparameterized and
+relies on its templated call operator.
+
+--- a/include/cuco/detail/open_addressing/open_addressing_impl.cuh
++++ b/include/cuco/detail/open_addressing/open_addressing_impl.cuh
+@@ -56,4 +56,5 @@
+ #include <cuda/atomic>
++#include <cuda/std/functional>
+ #include <thrust/iterator/constant_iterator.h>
+ #include <thrust/iterator/counting_iterator.h>
+ #include <thrust/iterator/transform_iterator.h>
+@@ -299,1 +299,1 @@
+-    return this->insert_if(first, last, always_true, thrust::identity{}, container_ref, stream);
++    return this->insert_if(first, last, always_true, cuda::std::identity{}, container_ref, stream);
+@@ -322,1 +322,1 @@
+-    this->insert_if_async(first, last, always_true, thrust::identity{}, container_ref, stream);
++    this->insert_if_async(first, last, always_true, cuda::std::identity{}, container_ref, stream);
+@@ -520,1 +520,1 @@
+-      first, last, always_true, thrust::identity{}, output_begin, container_ref, stream);
++      first, last, always_true, cuda::std::identity{}, output_begin, container_ref, stream);
+@@ -595,1 +595,1 @@
+-      first, last, always_true, thrust::identity{}, output_begin, container_ref, stream);
++      first, last, always_true, cuda::std::identity{}, output_begin, container_ref, stream);
+--- a/include/cuco/detail/open_addressing/open_addressing_ref_impl.cuh
++++ b/include/cuco/detail/open_addressing/open_addressing_ref_impl.cuh
+@@ -44,1 +44,2 @@
+ #include <cuda/std/type_traits>
++#include <cuda/std/functional>
+@@ -1271,1 +1271,1 @@
+-            if (thrust::any_of(thrust::seq, exists, exists + bucket_size, thrust::identity{})) {
++            if (thrust::any_of(thrust::seq, exists, exists + bucket_size, cuda::std::identity{})) {
+--- a/include/cuco/detail/hash_functions/identity_hash.cuh
++++ b/include/cuco/detail/hash_functions/identity_hash.cuh
+@@ -19,2 +19,3 @@
+ #include <cuda/std/type_traits>
++#include <cuda/std/functional>
+ #include <thrust/functional.h>
+@@ -36,1 +36,1 @@
+-struct identity_hash : private thrust::identity<Key> {
++struct identity_hash : private cuda::std::identity {
+@@ -52,1 +52,1 @@
+-    return static_cast<result_type>(thrust::identity<Key>::operator()(x));
++    return static_cast<result_type>(cuda::std::identity::operator()(x));
+--- a/include/cuco/detail/bloom_filter/bloom_filter_impl.cuh
++++ b/include/cuco/detail/bloom_filter/bloom_filter_impl.cuh
+@@ -56,1 +56,2 @@
+ #include <cuda/std/type_traits>
++#include <cuda/std/functional>
+@@ -208,1 +208,1 @@
+-      this->add_if_async(first, last, always_true, thrust::identity{}, stream);
++      this->add_if_async(first, last, always_true, cuda::std::identity{}, stream);
+@@ -309,1 +309,1 @@
+-    this->contains_if_async(first, last, always_true, thrust::identity{}, output_begin, stream);
++    this->contains_if_async(first, last, always_true, cuda::std::identity{}, output_begin, stream);

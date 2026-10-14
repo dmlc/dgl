@@ -3,8 +3,13 @@
  * @file graph/sampling/get_node_types_gpu.cu
  * @brief DGL sampler
  */
-
+#if defined(__CUDACC__)
 #include <cuda_runtime.h>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hip/hip_runtime.h>
+#endif
+
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/runtime/device_api.h>

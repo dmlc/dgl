@@ -8,9 +8,14 @@
 #define DGL_RUNTIME_CUDA_CUDA_HASHTABLE_CUH_
 
 #include <dgl/runtime/c_runtime_api.h>
-
+#if defined(__CUDACC__)
+#include <cuda_runtime.h>
+#elif defined(__HIPCC__)
+#include <hip/hip_runtime.h>
+#endif
 #include "cuda_common.h"
-#include "cuda_runtime.h"
+// TODO VTSANG: remove line
+// #include "cuda_runtime.h"
 
 namespace dgl {
 namespace runtime {

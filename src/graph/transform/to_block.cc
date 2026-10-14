@@ -314,7 +314,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int64_t>(
   return ToBlockCPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
-#ifdef DGL_USE_CUDA
+#if defined DGL_USE_CUDA || defined DGL_USE_HIP
 
 // Forward declaration of GPU ToBlock implementations - actual implementation is
 // in

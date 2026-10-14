@@ -35,7 +35,14 @@
 #include <thrust/zip_function.h>
 
 #include <algorithm>
+#if defined(__CUDACC__)
 #include <cub/cub.cuh>  // NOLINT
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+
+#include <hipcub/hipcub.hpp>
+#endif
+
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -521,8 +528,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   runtime::CUDAWorkspaceAllocator allocator(ctx);
 
   const auto stream = runtime::getCurrentCUDAStream();
-  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
-
+  const auto exec_policy =
+#ifdef __HIPCC__
+      thrust::hip_rocprim::par_nosync(allocator).on(stream);
+#else
+      thrust::cuda::par_nosync(allocator).on(stream);
+#endif
   auto device = runtime::DeviceAPI::Get(ctx);
 
   const IdType num_rows = rows_arr->shape[0];

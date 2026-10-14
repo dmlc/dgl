@@ -3,7 +3,12 @@
  * @file cuda_device_api.cc
  * @brief GPU specific API
  */
+#if defined(__CUDACC__)
 #include <cuda_runtime.h>
+#elif defined(__HIPCC__)
+#include <hip/hip_runtime.h>
+#endif
+
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/tensordispatch.h>

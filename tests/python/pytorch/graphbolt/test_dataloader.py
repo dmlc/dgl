@@ -5,13 +5,15 @@ from sys import platform
 import backend as F
 
 import dgl
+
 import dgl.graphbolt
 import dgl.graphbolt as gb
+
 import pytest
 import torch
 import torch.distributed as thd
-
 from dgl.graphbolt.datapipes import find_dps, traverse_dps
+from utils import rendezvous_port
 
 from . import gb_test_utils
 
@@ -81,12 +83,14 @@ def test_gpu_sampling_DataLoader(
     num_gpu_cached_edges,
     gpu_cache_threshold,
 ):
+    if cooperative and F.is_hip():
+        pytest.skip("Cooperative fetching is not supported on ROCm.")
     if cooperative and not thd.is_initialized():
         # On Windows, the init method can only be file.
         init_method = (
             f"file:///{os.path.join(os.getcwd(), 'dis_tempfile')}"
             if platform == "win32"
-            else "tcp://127.0.0.1:12345"
+            else f"tcp://127.0.0.1:{rendezvous_port()}"
         )
         thd.init_process_group(
             init_method=init_method,

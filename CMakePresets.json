@@ -1,0 +1,55 @@
+{
+    "version": 8,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 18,
+        "patch": 0
+      },
+  "configurePresets": [
+    {
+      "name": "rocm",
+      "description": "Build with ROCm",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "BUILD_TYPE": "Release",
+        "CMAKE_BUILD_TYPE": "Release",
+        "USE_HIP": "ON",
+        "GPU_TARGETS": "gfx942,gfx950",
+        "CMAKE_HIP_ARCHITECTURES": "gfx942,gfx950",
+        "CMAKE_INSTALL_PREFIX": "/opt/rocm",
+        "USE_LIBXSMM": "OFF",
+        "BUILD_CPP_TEST": "ON",
+        "CMAKE_C_FLAGS": "-fdiagnostics-color=always",
+        "CMAKE_CXX_FLAGS": "-fdiagnostics-color=always",
+        "CMAKE_HIP_FLAGS": "-ftime-trace -fdiagnostics-color=always",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_PREFIX_PATH": "/opt/rocm/lib/cmake:/opt/rocm/lib/rapids/cmake",
+        "CMAKE_COLOR_DIAGNOSTICS": "ON"
+      }
+    },
+    {
+      "name": "rocm-llvm",
+      "description": "Build with ROCm and LLVM for host compiler",
+      "inherits": ["rocm"],
+      "cacheVariables": {
+        "CMAKE_C_COMPILER":"clang",
+        "CMAKE_CXX_COMPILER":"clang++",
+        "CMAKE_C_FLAGS": "-ftime-trace",
+        "CMAKE_CXX_FLAGS": "-ftime-trace"
+      }
+    },  
+    {
+      "name": "rocm-cov",
+      "description": "Build with ROCm and llvm-cov for code coverage",
+      "inherits": ["rocm-llvm"],
+      "cacheVariables": {
+        "BUILD_TYPE": "Debug",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS":   "-O0 -g3 -ggdb -fprofile-instr-generate -fcoverage-mapping -Wl,--allow-multiple-definition",
+        "CMAKE_CXX_FLAGS": "-O0 -g3 -ggdb -fprofile-instr-generate -fcoverage-mapping -Wl,--allow-multiple-definition",
+        "CMAKE_HIP_FLAGS": "-O0 -g3 -ggdb -fprofile-instr-generate -fcoverage-mapping -Wl,--allow-multiple-definition"
+      }
+    }
+  ]
+}

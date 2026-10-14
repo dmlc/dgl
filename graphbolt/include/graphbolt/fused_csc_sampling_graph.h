@@ -552,7 +552,7 @@ void NumPick(
     int64_t num_neighbors, PickedNumType* num_picked_ptr);
 
 int64_t TemporalNumPick(
-    torch::Tensor seed_timestamp, torch::Tensor csc_indics, int64_t fanout,
+    const torch::Tensor seed_timestamp, torch::Tensor csc_indics, int64_t fanout,
     bool replace, const torch::optional<torch::Tensor>& seed_pre_time_window,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::optional<torch::Tensor>& node_timestamp,
@@ -568,7 +568,7 @@ void NumPickByEtype(
     const std::vector<int64_t>& etype_id_to_num_picked_offset);
 
 int64_t TemporalNumPickByEtype(
-    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+    const torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& seed_pre_time_window,
@@ -627,7 +627,7 @@ std::enable_if_t<is_labor(S), int64_t> Pick(
 
 template <typename PickedType>
 int64_t TemporalPick(
-    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+    const torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     int64_t seed_offset, int64_t offset, int64_t num_neighbors, int64_t fanout,
     bool replace, const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& seed_pre_time_window,
@@ -681,7 +681,7 @@ int64_t PickByEtype(
 
 template <typename PickedType>
 int64_t TemporalPickByEtype(
-    torch::Tensor seed_timestamp, torch::Tensor csc_indices,
+    const torch::Tensor seed_timestamp, torch::Tensor csc_indices,
     int64_t seed_offset, int64_t offset, int64_t num_neighbors,
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::TensorOptions& options, const torch::Tensor& type_per_edge,

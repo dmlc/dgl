@@ -77,7 +77,11 @@ __global__ void UpdateGradMinMaxHeteroKernel(
   unsigned int laneId = tId & 31;
   unsigned int gId = blockIdx.x * blockDim.x + threadIdx.x;
   unsigned int warpId = gId >> 5;
+#if defined(__HIPCC__)
+  unsigned int warp_size = warpSize;
+#else
   unsigned int warp_size = 32;
+#endif
   unsigned int row = warpId;
 
   while (row < n) {

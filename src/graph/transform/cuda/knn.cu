@@ -4,13 +4,21 @@
  * @brief k-nearest-neighbor (KNN) implementation (cuda)
  */
 
+#if defined(__CUDACC__)
 #include <curand_kernel.h>
+
+#include <cub/cub.cuh>  // NOLINT
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hiprand/hiprand_kernel.h>
+
+#include <hipcub/hipcub.hpp>
+#endif
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
 
 #include <algorithm>
-#include <cub/cub.cuh>  // NOLINT
 #include <limits>
 #include <string>
 #include <type_traits>

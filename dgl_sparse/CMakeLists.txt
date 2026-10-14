@@ -25,6 +25,9 @@ set(SPARSE_LINKER_LIBS "")
 if(USE_CUDA)
   add_definitions(-DDGL_USE_CUDA)
   enable_language(CUDA)
+elseif (USE_HIP)
+  add_definitions(-DDGL_USE_HIP)
+  enable_language(HIP)
 endif()
 
 # For windows, define NOMINMAX to avoid conflict with std::min/max
@@ -56,7 +59,17 @@ if(USE_CUDA)
   list(APPEND SPARSE_SRC ${SPARSE_CUDA_SRC})
 endif()
 
-add_library(${LIB_DGL_SPARSE_NAME} SHARED ${SPARSE_SRC} ${SPARSE_HEADERS})
+if(USE_HIP)
+  file(GLOB SPARSE_HIP_SRC
+    ${SPARSE_DIR}/cuda/*.cu
+  )
+  list(APPEND SPARSE_SRC ${SPARSE_HIP_SRC})
+  add_library(${LIB_DGL_SPARSE_NAME} SHARED ${SPARSE_SRC})
+  target_compile_definitions(${LIB_DGL_SPARSE_NAME} PRIVATE -DDGL_USE_HIP=1)
+  set_property(TARGET ${LIB_DGL_SPARSE_NAME} PROPERTY HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
+else(USE_HIP)
+  add_library(${LIB_DGL_SPARSE_NAME} SHARED ${SPARSE_SRC} ${SPARSE_HEADERS})
+endif(USE_HIP)
 target_include_directories(
   ${LIB_DGL_SPARSE_NAME} PRIVATE ${SPARSE_DIR} ${SPARSE_HEADERS})
 target_link_libraries(${LIB_DGL_SPARSE_NAME} ${SPARSE_LINKER_LIBS})

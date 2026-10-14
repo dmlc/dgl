@@ -20,16 +20,62 @@
 #ifndef GRAPHBOLT_CUDA_COMMON_H_
 #define GRAPHBOLT_CUDA_COMMON_H_
 
+#ifdef DGL_USE_HIP
+
+// hipCollections defines this with 0, but Torch sometimes
+// checks if this is defined rather than checking the value.
+#undef CUDART_VERSION
+
+#include <ATen/hip/HIPContext.h>
+#include <ATen/hip/HIPEvent.h>
+#include <ATen/hip/impl/HIPCachingAllocatorMasqueradingAsCUDA.h>
+#include <ATen/hip/impl/HIPStreamMasqueradingAsCUDA.h>
+#include <c10/hip/HIPException.h>
+#include <hip/hip_runtime.h>
+#include <dgl/hip/cuda_to_hip.h>
+
+using namespace c10::hip;
+using GPUStream_t = at::hip::HIPStreamMasqueradingAsCUDA;
+#define THRUST_BACKEND thrust::hip
+#define GET_CURRENT_GPU_STREAM getCurrentHIPStreamMasqueradingAsCUDA
+// NOTE: unlike GET_CURRENT_GPU_STREAM (getCurrentHIPStreamMasqueradingAsCUDA,
+// a real ATen-level "masquerading" symbol), this PyTorch version does not
+// provide a c10::hip::HIPCachingAllocator alias at all - only
+// c10::cuda::CUDACachingAllocator is defined (used directly by both the CUDA
+// and HIP builds internally, same "unified CUDA naming" pattern as
+// C10_CUDA_KERNEL_LAUNCH_CHECK above).
+#define GRAPHBOLT_CACHING_ALLOCATOR c10::cuda::CUDACachingAllocator
+#define GRAPHBOLT_C10_CHECK C10_HIP_CHECK
+// NOTE: unlike C10_HIP_CHECK (aliased to C10_CUDA_CHECK by PyTorch's own
+// <c10/hip/HIPException.h>), this PyTorch version does not provide a
+// C10_HIP_KERNEL_LAUNCH_CHECK alias - only C10_CUDA_KERNEL_LAUNCH_CHECK is
+// defined (used directly by both the CUDA and HIP builds internally).
+#define GRAPHBOLT_C10_KERNEL_LAUNCH_CHECK C10_CUDA_KERNEL_LAUNCH_CHECK
+
+#else // we're using CUDA
+
 #include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAStream.h>
 #include <cuda_runtime.h>
+
+using namespace c10::cuda;
+using GPUStream_t = at::cuda::CUDAStream;
+#define THRUST_BACKEND thrust::cuda
+#define GET_CURRENT_GPU_STREAM getCurrentCUDAStream
+#define GRAPHBOLT_CACHING_ALLOCATOR c10::cuda::CUDACachingAllocator
+#define GRAPHBOLT_C10_CHECK C10_CUDA_CHECK
+#define GRAPHBOLT_C10_KERNEL_LAUNCH_CHECK C10_CUDA_KERNEL_LAUNCH_CHECK
+
+#endif // DGL_USE_HIP
+
 #include <thrust/execution_policy.h>
 #include <torch/script.h>
 
 #include <memory>
 #include <unordered_map>
+
 
 namespace graphbolt {
 namespace cuda {
@@ -67,14 +113,20 @@ struct CUDAWorkspaceAllocator {
 
   CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
 
-  void operator()(void* ptr) const {
-    c10::cuda::CUDACachingAllocator::raw_delete(ptr);
+  // Templated (rather than a single void* overload) so that
+  // std::unique_ptr<T, CUDAWorkspaceAllocator>'s destructor - which requires
+  // std::is_invocable<deleter_type&, pointer>, i.e. an EXACT-type call, not
+  // relying on the (otherwise always-legal) implicit T*->void* conversion -
+  // finds a directly matching overload for every T used with AllocateStorage.
+  template <typename T>
+  void operator()(T* ptr) const {
+   GRAPHBOLT_CACHING_ALLOCATOR::raw_delete(static_cast<void*>(ptr));
   }
 
   // Required by thrust to satisfy allocator requirements.
   value_type* allocate(std::ptrdiff_t size) const {
     return reinterpret_cast<value_type*>(
-        c10::cuda::CUDACachingAllocator::raw_alloc(size * sizeof(value_type)));
+       GRAPHBOLT_CACHING_ALLOCATOR::raw_alloc(size * sizeof(value_type)));
   }
 
   // Required by thrust to satisfy allocator requirements.
@@ -85,14 +137,14 @@ struct CUDAWorkspaceAllocator {
       std::size_t size) const {
     return std::unique_ptr<T, CUDAWorkspaceAllocator>(
         reinterpret_cast<T*>(
-            c10::cuda::CUDACachingAllocator::raw_alloc(sizeof(T) * size)),
+           GRAPHBOLT_CACHING_ALLOCATOR::raw_alloc(sizeof(T) * size)),
         *this);
   }
 };
 
 inline auto GetAllocator() { return CUDAWorkspaceAllocator{}; }
 
-inline auto GetCurrentStream() { return c10::cuda::getCurrentCUDAStream(); }
+inline auto GetCurrentStream() { return GET_CURRENT_GPU_STREAM(); }
 
 template <typename T>
 inline bool is_zero(T size) {
@@ -113,7 +165,7 @@ inline bool is_zero<dim3>(dim3 size) {
     }                                                      \
   } while (0)
 
-#define CUDA_CALL(func) C10_CUDA_CHECK((func))
+#define CUDA_CALL(func) GRAPHBOLT_C10_CHECK((func))
 
 #define CUDA_KERNEL_CALL(kernel, nblks, nthrs, shmem, ...)          \
   {                                                                 \
@@ -121,7 +173,7 @@ inline bool is_zero<dim3>(dim3 size) {
         !graphbolt::cuda::is_zero((nthrs))) {                       \
       auto stream = graphbolt::cuda::GetCurrentStream();            \
       (kernel)<<<(nblks), (nthrs), (shmem), stream>>>(__VA_ARGS__); \
-      C10_CUDA_KERNEL_LAUNCH_CHECK();                               \
+      GRAPHBOLT_C10_KERNEL_LAUNCH_CHECK();                          \
     }                                                               \
   }
 
@@ -139,7 +191,7 @@ inline bool is_zero<dim3>(dim3 size) {
   [&] {                                                                      \
     auto allocator = graphbolt::cuda::GetAllocator();                        \
     auto stream = graphbolt::cuda::GetCurrentStream();                       \
-    const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream); \
+    const auto exec_policy = THRUST_BACKEND::par_nosync(allocator).on(stream); \
     return thrust::fn(exec_policy, __VA_ARGS__);                             \
   }()
 
@@ -158,7 +210,7 @@ template <typename scalar_t>
 struct CopyScalar {
   CopyScalar() : is_ready_(true) { init_pinned_storage(); }
 
-  void record(at::cuda::CUDAStream stream = GetCurrentStream()) {
+  void record(GPUStream_t stream = GPUStream_t(GetCurrentStream())) {
     copy_event_.record(stream);
     is_ready_ = false;
   }
@@ -169,7 +221,7 @@ struct CopyScalar {
 
   CopyScalar(const scalar_t* device_ptr) {
     init_pinned_storage();
-    auto stream = GetCurrentStream();
+    GPUStream_t stream = GPUStream_t(GetCurrentStream());
     CUDA_CALL(cudaMemcpyAsync(
         reinterpret_cast<scalar_t*>(pinned_scalar_.data_ptr()), device_ptr,
         sizeof(scalar_t), cudaMemcpyDeviceToHost, stream));

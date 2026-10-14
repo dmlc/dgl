@@ -1,0 +1,229 @@
+/**
+  Copyright Advanced Micro Devices, Inc.
+  Licensed under the Apache License Version 2.0
+ */
+#pragma once
+
+#if defined(__HIPCC__)
+
+#include <hip/hip_bf16.h>
+#include <hip/hip_common.h>
+#include <hip/hip_fp16.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime_api.h>
+#include <hipblas/hipblas.h>
+#include <hiprand/hiprand.h>
+#include <hiprand/hiprand_kernel.h>
+#include <hiprand/hiprand_kernel_rocm.h>
+#include <hipsparse/hipsparse.h>
+
+using cudaStream_t = hipStream_t;
+
+#define CUBLAS_COMPUTE_32F HIPBLAS_COMPUTE_32F
+#define CUBLAS_OP_N HIPBLAS_OP_N
+#define CUBLAS_OP_T HIPBLAS_OP_T
+#define CUBLAS_GEMM_DEFAULT_TENSOR_OP HIPBLAS_GEMM_DEFAULT
+#define CUBLAS_STATUS_EXECUTION_FAILED HIPBLAS_STATUS_EXECUTION_FAILED
+#define CUBLAS_STATUS_SUCCESS HIPBLAS_STATUS_SUCCESS
+
+#define CUDAContext HIPContext
+#define CUDA_ERROR_DEINITIALIZED hipErrorDeinitialized
+#define CUDA_R_16BF HIP_R_16BF
+#define CUDA_R_16F HIP_R_16F
+#define CUDA_R_32F HIP_R_32F
+#define CUDA_R_64F HIP_R_64F
+#define CUDA_SUCCESS hipSuccess
+
+#define CURAND_STATUS_ALLOCATION_FAILED HIPRAND_STATUS_ALLOCATION_FAILED
+#define CURAND_STATUS_ARCH_MISMATCH HIPRAND_STATUS_ARCH_MISMATCH
+#define CURAND_STATUS_DOUBLE_PRECISION_REQUIRED \
+  HIPRAND_STATUS_DOUBLE_PRECISION_REQUIRED
+#define CURAND_STATUS_INITIALIZATION_FAILED HIPRAND_STATUS_INITIALIZATION_FAILED
+#define CURAND_STATUS_INTERNAL_ERROR HIPRAND_STATUS_INTERNAL_ERROR
+#define CURAND_STATUS_LAUNCH_FAILURE HIPRAND_STATUS_LAUNCH_FAILURE
+#define CURAND_STATUS_LENGTH_NOT_MULTIPLE HIPRAND_STATUS_LENGTH_NOT_MULTIPLE
+#define CURAND_STATUS_NOT_INITIALIZED HIPRAND_STATUS_NOT_INITIALIZED
+#define CURAND_STATUS_OUT_OF_RANGE HIPRAND_STATUS_OUT_OF_RANGE
+#define CURAND_STATUS_PREEXISTING_FAILURE HIPRAND_STATUS_PREEXISTING_FAILURE
+#define CURAND_STATUS_SUCCESS HIPRAND_STATUS_SUCCESS
+#define CURAND_STATUS_TYPE_ERROR HIPRAND_STATUS_TYPE_ERROR
+#define CURAND_STATUS_VERSION_MISMATCH HIPRAND_STATUS_VERSION_MISMATCH
+
+#define CUSPARSE_ACTION_NUMERIC HIPSPARSE_ACTION_NUMERIC
+#define CUSPARSE_CSR2CSC_ALG1 HIPSPARSE_CSR2CSC_ALG1
+#define CUSPARSE_INDEX_32I HIPSPARSE_INDEX_32I
+#define CUSPARSE_INDEX_64I HIPSPARSE_INDEX_64I
+#define CUSPARSE_INDEX_BASE_ZERO HIPSPARSE_INDEX_BASE_ZERO
+#define CUSPARSE_MATRIX_TYPE_GENERAL HIPSPARSE_MATRIX_TYPE_GENERAL
+#define CUSPARSE_OPERATION_NON_TRANSPOSE HIPSPARSE_OPERATION_NON_TRANSPOSE
+#define CUSPARSE_OPERATION_TRANSPOSE HIPSPARSE_OPERATION_TRANSPOSE
+#define CUSPARSE_ORDER_ROW HIPSPARSE_ORDER_ROW
+#define CUSPARSE_POINTER_MODE_HOST HIPSPARSE_POINTER_MODE_HOST
+#define CUSPARSE_SPGEMM_ALG2 HIPSPARSE_SPGEMM_ALG2
+#define CUSPARSE_SPGEMM_ALG3 HIPSPARSE_SPGEMM_ALG3
+#define CUSPARSE_SPGEMM_DEFAULT HIPSPARSE_SPGEMM_DEFAULT
+#define CUSPARSE_SPMM_CSR_ALG2 HIPSPARSE_SPMM_CSR_ALG2
+#define CUSPARSE_SPMM_CSR_ALG3 HIPSPARSE_SPMM_CSR_ALG3
+#define CUSPARSE_STATUS_EXECUTION_FAILED HIPSPARSE_STATUS_EXECUTION_FAILED
+#define CUSPARSE_STATUS_INSUFFICIENT_RESOURCES \
+  HIPSPARSE_STATUS_INSUFFICIENT_RESOURCES
+#define CUSPARSE_STATUS_SUCCESS HIPSPARSE_STATUS_SUCCESS
+#define CUresult hipError_t
+
+#define __nv_bfloat16 __hip_bfloat16
+#define nv_bfloat16 hip_bfloat16
+#define __nv_fp8_e4m3 __hip_fp8_e4m3
+#define __nv_fp8_e5m2 __hip_fp8_e5m2
+#define __float2bfloat16_rn __float2bfloat16
+
+#define csrgemm2Info_t csrgemm2Info_t
+#define cuGetErrorName hipDrvGetErrorName
+#define cub hipcub
+#define cublasCreate hipblasCreate
+#define cublasDgeam hipblasDgeam
+#define cublasDgemm hipblasDgemm
+#if HIP_VERSION_MAJOR >= 7
+#define cublasGemmEx hipblasGemmEx_64
+#else
+#define cublasGemmEx hipblasGemmEx_v2
+#endif
+#define cublasHandle_t hipblasHandle_t
+#define cublasHgemm hipblasHgemm
+#define cublasOperation_t hipblasOperation_t
+#define cublasSetStream hipblasSetStream
+#define cublasSgeam hipblasSgeam
+#define cublasSgemm hipblasSgemm
+#define cublasStatus_t hipblasStatus_t
+
+#define cudaDataType_t hipDataType
+#define cudaDevAttrClockRate hipDeviceAttributeClockRate
+#define cudaDevAttrComputeCapabilityMajor \
+  hipDeviceAttributeComputeCapabilityMajor
+#define cudaDevAttrComputeCapabilityMinor \
+  hipDeviceAttributeComputeCapabilityMinor
+#define cudaDevAttrMaxBlockDimX hipDeviceAttributeMaxBlockDimX
+#define cudaDevAttrMaxBlockDimY hipDeviceAttributeMaxBlockDimY
+#define cudaDevAttrMaxBlockDimZ hipDeviceAttributeMaxBlockDimZ
+#define cudaDevAttrMaxSharedMemoryPerBlock \
+  hipDeviceAttributeMaxSharedMemoryPerBlock
+#define cudaDevAttrMaxThreadsPerBlock hipDeviceAttributeMaxThreadsPerBlock
+#define cudaDevAttrMultiProcessorCount hipDeviceAttributeMultiprocessorCount
+#define cudaDevAttrWarpSize hipDeviceAttributeWarpSize
+#define cudaDeviceGetAttribute hipDeviceGetAttribute
+#define cudaDeviceProp hipDeviceProp_t
+
+#define cudaErrorCudartUnloading hipErrorDeinitialized
+#define cudaErrorInitializationError hipErrorNotInitialized
+#define cudaErrorInsufficientDriver hipErrorInsufficientDriver
+#define cudaErrorInvalidDevice hipErrorInvalidDevice
+#define cudaErrorInvalidValue hipErrorInvalidValue
+#define cudaErrorNoDevice hipErrorNoDevice
+#define cudaError_t hipError_t
+#define cudaEventCreate hipEventCreate
+#define cudaEventDestroy hipEventDestroy
+#define cudaEventRecord hipEventRecord
+#define cudaEventSynchronize hipEventSynchronize
+#define cudaEvent_t hipEvent_t
+#define cudaFree hipFree
+#define cudaFreeHost hipHostFree
+#define cudaGetDevice hipGetDevice
+#define cudaGetDeviceCount hipGetDeviceCount
+#define cudaGetDeviceProperties hipGetDeviceProperties
+#define cudaGetErrorString hipGetErrorString
+#define cudaGetLastError hipGetLastError
+#define cudaHostAlloc hipHostAlloc
+#define cudaHostGetDevicePointer hipHostGetDevicePointer
+#define cudaHostRegister hipHostRegister
+#define cudaHostRegisterDefault hipHostRegisterDefault
+#define cudaHostUnregister hipHostUnregister
+#define cudaMalloc hipMalloc
+#define cudaMemcpy hipMemcpy
+#define cudaMemcpyAsync hipMemcpyAsync
+#define cudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
+#define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define cudaMemcpyFromSymbol hipMemcpyFromSymbol
+#define cudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define cudaMemcpyKind hipMemcpyKind
+#define cudaMemcpyPeerAsync hipMemcpyPeerAsync
+#define cudaMemoryTypeDevice hipMemoryTypeDevice
+#define cudaMemoryTypeHost hipMemoryTypeHost
+#define cudaMemset hipMemset
+#define cudaMemsetAsync hipMemsetAsync
+#define cudaPointerAttributes hipPointerAttribute_t
+#define cudaPointerGetAttributes hipPointerGetAttributes
+#define cudaSetDevice hipSetDevice
+#define cudaStreamCreateWithFlags hipStreamCreateWithFlags
+#define cudaStreamDestroy hipStreamDestroy
+#define cudaStreamNonBlocking hipStreamNonBlocking
+#define cudaStreamSynchronize hipStreamSynchronize
+#define cudaStreamWaitEvent hipStreamWaitEvent
+#define cudaSuccess hipSuccess
+
+#define curand hiprand
+#define curand4 hiprand4
+#define curandState hiprandState
+#define curandStatePhilox4_32_10_t hiprandStatePhilox4_32_10_t
+#define curandStatus_t hiprandStatus_t
+#define curand_init hiprand_init
+#define curand_normal hiprand_normal
+#define curand_uniform hiprand_uniform
+
+#define cusparseCreate hipsparseCreate
+#define cusparseCreateCsr hipsparseCreateCsr
+#define cusparseCreateCsrgemm2Info hipsparseCreateCsrgemm2Info
+#define cusparseCreateDnMat hipsparseCreateDnMat
+#define cusparseCreateMatDescr hipsparseCreateMatDescr
+#define cusparseCsr2cscEx2 hipsparseCsr2cscEx2
+#define cusparseCsr2cscEx2_bufferSize hipsparseCsr2cscEx2_bufferSize
+#define cusparseCsrSetPointers hipsparseCsrSetPointers
+#define cusparseDcsrgeam2 hipsparseDcsrgeam2
+#define cusparseDcsrgeam2_bufferSizeExt hipsparseDcsrgeam2_bufferSizeExt
+#define cusparseDcsrgemm2 hipsparseDcsrgemm2
+#define cusparseDcsrgemm2_bufferSizeExt hipsparseDcsrgemm2_bufferSizeExt
+#define cusparseDcsrmm2 hipsparseDcsrmm2
+#define cusparseDestroyCsrgemm2Info hipsparseDestroyCsrgemm2Info
+#define cusparseDestroyDnMat hipsparseDestroyDnMat
+#define cusparseDestroyMatDescr hipsparseDestroyMatDescr
+#define cusparseDestroySpMat hipsparseDestroySpMat
+#define cusparseDnMatDescr_t hipsparseDnMatDescr_t
+#define cusparseHandle_t hipsparseHandle_t
+#define cusparseIndexType_t hipsparseIndexType_t
+#define cusparseMatDescr_t hipsparseMatDescr_t
+#define cusparseOperation_t hipsparseOperation_t
+#define cusparseScsr2csc hipsparseScsr2csc
+#define cusparseScsrgeam2 hipsparseScsrgeam2
+#define cusparseScsrgeam2_bufferSizeExt hipsparseScsrgeam2_bufferSizeExt
+#define cusparseScsrgemm2 hipsparseScsrgemm2
+#define cusparseScsrgemm2_bufferSizeExt hipsparseScsrgemm2_bufferSizeExt
+#define cusparseScsrmm2 hipsparseScsrmm2
+#define cusparseSetMatIndexBase hipsparseSetMatIndexBase
+#define cusparseSetMatType hipsparseSetMatType
+#define cusparseSetPointerMode hipsparseSetPointerMode
+#define cusparseSetStream hipsparseSetStream
+#define cusparseSpGEMMAlg_t hipsparseSpGEMMAlg_t
+#define cusparseSpGEMMDescr_t hipsparseSpGEMMDescr_t
+#define cusparseSpGEMM_compute hipsparseSpGEMM_compute
+#define cusparseSpGEMM_copy hipsparseSpGEMM_copy
+#define cusparseSpGEMM_createDescr hipsparseSpGEMM_createDescr
+#define cusparseSpGEMM_destroyDescr hipsparseSpGEMM_destroyDescr
+#define cusparseSpGEMM_workEstimation hipsparseSpGEMM_workEstimation
+#define cusparseSpMM hipsparseSpMM
+#define cusparseSpMMAlg_t hipsparseSpMMAlg_t
+#define cusparseSpMM_bufferSize hipsparseSpMM_bufferSize
+#define cusparseSpMatDescr_t hipsparseSpMatDescr_t
+#define cusparseSpMatGetSize hipsparseSpMatGetSize
+#define cusparseStatus_t hipsparseStatus_t
+#define cusparseXcoo2csr hipsparseXcoo2csr
+#define cusparseXcoosortByRow hipsparseXcoosortByRow
+#define cusparseXcoosort_bufferSizeExt hipsparseXcoosort_bufferSizeExt
+#define cusparseXcsr2coo hipsparseXcsr2coo
+#define cusparseXcsrgeam2Nnz hipsparseXcsrgeam2Nnz
+#define cusparseXcsrgemm2Nnz hipsparseXcsrgemm2Nnz
+#define cusparseXcsrsort hipsparseXcsrsort
+#define cusparseXcsrsort_bufferSizeExt hipsparseXcsrsort_bufferSizeExt
+
+// Torch's hipified c10/ATen headers already declare the CUDA-named stream,
+// event, allocator and error-check APIs inside c10::cuda / at::cuda, so
+// redirecting them here would alias them onto HIP names that do not exist.
+
+#endif

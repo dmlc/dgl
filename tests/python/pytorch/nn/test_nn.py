@@ -2713,38 +2713,63 @@ def test_conv_with_zero_nodes_bugfix_7894(residual):
     node_features = {
         "user": torch.randn(num_nodes_dict["user"], feat_dim),
         "item": torch.randn(num_nodes_dict["item"], feat_dim),
-        "tag": torch.randn(num_nodes_dict["tag"], feat_dim), 
+        "tag": torch.randn(num_nodes_dict["tag"], feat_dim),
     }
     edge_features = {
-        ("user", "buys", "item"): torch.randn(g.num_edges(("user", "buys", "item")), feat_dim),
-        ("user", "likes", "tag"): torch.randn(g.num_edges(("user", "likes", "tag")), feat_dim),
+        ("user", "buys", "item"): torch.randn(
+            g.num_edges(("user", "buys", "item")), feat_dim
+        ),
+        ("user", "likes", "tag"): torch.randn(
+            g.num_edges(("user", "likes", "tag")), feat_dim
+        ),
     }
 
     # Test GATConv with zero nodes in "tag" type
-    conv = nn.HeteroGraphConv({
-        ("user", "buys", "item"): nn.GATConv(16, 2, num_heads=2, residual=residual),
-        ("user", "likes", "tag"): nn.GATConv(16, 2, num_heads=2, residual=residual),
-    }, aggregate="sum")
+    conv = nn.HeteroGraphConv(
+        {
+            ("user", "buys", "item"): nn.GATConv(
+                16, 2, num_heads=2, residual=residual
+            ),
+            ("user", "likes", "tag"): nn.GATConv(
+                16, 2, num_heads=2, residual=residual
+            ),
+        },
+        aggregate="sum",
+    )
     out = conv(g, node_features)
     assert out["item"].shape == (10, 2, 2)
     assert out["tag"].shape == (0, 2, 2)
     assert "user" not in out
 
     # Test GATv2Conv with zero nodes in "tag" type
-    conv_v2 = nn.HeteroGraphConv({
-        ("user", "buys", "item"): nn.GATv2Conv(16, 2, num_heads=2, residual=residual),
-        ("user", "likes", "tag"): nn.GATv2Conv(16, 2, num_heads=2, residual=residual),
-    }, aggregate="sum")
+    conv_v2 = nn.HeteroGraphConv(
+        {
+            ("user", "buys", "item"): nn.GATv2Conv(
+                16, 2, num_heads=2, residual=residual
+            ),
+            ("user", "likes", "tag"): nn.GATv2Conv(
+                16, 2, num_heads=2, residual=residual
+            ),
+        },
+        aggregate="sum",
+    )
     out_v2 = conv_v2(g, node_features)
     assert out_v2["item"].shape == (10, 2, 2)
     assert out_v2["tag"].shape == (0, 2, 2)
     assert "user" not in out_v2
 
     # Test EdgeGATConv with zero nodes in "tag" type
-    edge_conv = nn.HeteroGraphConv({
-        ("user", "buys", "item"): nn.EdgeGATConv(16, 16, 2, num_heads=2, residual=residual),
-        ("user", "likes", "tag"): nn.EdgeGATConv(16, 16, 2, num_heads=2, residual=residual),
-    }, aggregate="sum")
+    edge_conv = nn.HeteroGraphConv(
+        {
+            ("user", "buys", "item"): nn.EdgeGATConv(
+                16, 16, 2, num_heads=2, residual=residual
+            ),
+            ("user", "likes", "tag"): nn.EdgeGATConv(
+                16, 16, 2, num_heads=2, residual=residual
+            ),
+        },
+        aggregate="sum",
+    )
     mod_kwargs = {
         "buys": {"edge_feat": edge_features[("user", "buys", "item")]},
         "likes": {"edge_feat": edge_features[("user", "likes", "tag")]},

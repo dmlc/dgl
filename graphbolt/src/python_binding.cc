@@ -9,7 +9,7 @@
 #include <graphbolt/serialize.h>
 #include <graphbolt/unique_and_compact.h>
 
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
 #include "./cuda/cooperative_minibatching_utils.h"
 #include "./cuda/max_uva_threads.h"
 #endif
@@ -21,7 +21,7 @@
 #include "./random.h"
 #include "./utils.h"
 
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
 #include "./cuda/extension/gpu_cache.h"
 #include "./cuda/extension/gpu_graph_cache.h"
 #endif
@@ -125,7 +125,7 @@ TORCH_LIBRARY(graphbolt, m) {
             g->SetState(state);
             return g;
           });
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
   m.class_<cuda::GpuCache>("GpuCache")
       .def("query", &cuda::GpuCache::Query)
       .def("query_async", &cuda::GpuCache::QueryAsync)
@@ -202,7 +202,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("set_num_io_uring_threads", &io_uring::SetNumThreads);
   m.def("set_worker_id", &utils::SetWorkerId);
   m.def("set_seed", &RandomEngine::SetManualSeed);
-#ifdef GRAPHBOLT_USE_CUDA
+#if defined(GRAPHBOLT_USE_CUDA) || defined(GRAPHBOLT_USE_HIP)
   m.def("set_max_uva_threads", &cuda::set_max_uva_threads);
   m.def("rank_sort", &cuda::RankSort);
   m.def("rank_sort_async", &cuda::RankSortAsync);

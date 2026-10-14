@@ -687,7 +687,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFormat")
         }
       };
 
-#if !(defined(DGL_USE_CUDA))
+#if !(defined(DGL_USE_CUDA) || defined(DGL_USE_HIP))
       runtime::parallel_for(0, hg->NumEdgeTypes(), get_format_f);
 #else
       get_format_f(0, hg->NumEdgeTypes());

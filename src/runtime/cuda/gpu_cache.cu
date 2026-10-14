@@ -20,7 +20,12 @@
 #ifndef DGL_RUNTIME_CUDA_GPU_CACHE_H_
 #define DGL_RUNTIME_CUDA_GPU_CACHE_H_
 
+#if defined(__CUDACC__)
 #include <cuda_runtime.h>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hip/hip_runtime.h>
+#endif
 #include <dgl/array.h>
 #include <dgl/aten/array_ops.h>
 #include <dgl/packed_func_ext.h>
@@ -40,7 +45,16 @@ namespace cuda {
 template <typename key_t>
 class GpuCache : public runtime::Object {
   constexpr static int set_associativity = 2;
+  // WARP_SIZE Changes for __HIPCC__ result in errors. [TODO]
+#ifdef __HIPCC__
+#if HIP_VERSION_MAJOR >= 7
+  constexpr static int WARP_SIZE = 64;
+#else
+  constexpr static int WARP_SIZE = warpSize;
+#endif
+#else
   constexpr static int WARP_SIZE = 32;
+#endif
   constexpr static int bucket_size = WARP_SIZE * set_associativity;
   using gpu_cache_t = gpu_cache::gpu_cache<
       key_t, uint64_t, std::numeric_limits<key_t>::max(), set_associativity,

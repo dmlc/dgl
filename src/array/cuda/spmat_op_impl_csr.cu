@@ -4,10 +4,21 @@
  * @brief CSR operator CPU implementation
  */
 #include <dgl/array.h>
+#if defined(__HIPCC__)
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/system/hip/execution_policy.h>
+#else
 #include <thrust/execution_policy.h>
+#endif
 #include <thrust/for_each.h>
 
+#if defined(__CUDACC__)
 #include <cub/cub.cuh>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+
+#include <hipcub/hipcub.hpp>
+#endif
 #include <numeric>
 #include <unordered_set>
 #include <vector>
@@ -532,7 +543,11 @@ __global__ void _SegmentMaskColKernel(
           static_cast<IdType>(num_rows));
 
   NodeQueryHashmap<IdType> hashmap(hashmap_buffer, buffer_size);
+#if defined(__HIPCC__)
+  using WarpReduce = hipcub::WarpReduce<IdType>;
+#else
   typedef cub::WarpReduce<IdType> WarpReduce;
+#endif
   __shared__ typename WarpReduce::TempStorage temp_storage[BLOCK_WARPS];
 
   while (out_row < last_row) {
@@ -593,7 +608,12 @@ CSRMatrix CSRSliceMatrix(
 
   using it = thrust::counting_iterator<int64_t>;
   runtime::CUDAWorkspaceAllocator allocator(ctx);
-  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
+  const auto exec_policy =
+#ifdef __HIPCC__
+      thrust::hip_rocprim::par_nosync(allocator).on(stream);
+#else
+      thrust::cuda::par_nosync(allocator).on(stream);
+#endif
   thrust::for_each(
       exec_policy, it(0), it(new_ncols),
       [key = cols.Ptr<IdType>(), buffer = hashmap_buffer.Ptr<IdType>(),
@@ -609,7 +629,15 @@ CSRMatrix CSRSliceMatrix(
 
   // Execute SegmentMaskColKernel
   const int64_t num_rows = csr.num_rows;
+#if defined(__HIPCC__)
+#if HIP_VERSION_MAJOR >= 7
+  constexpr int WARP_SIZE = 64;
+#else
+  constexpr int WARP_SIZE = warpSize;
+#endif
+#else
   constexpr int WARP_SIZE = 32;
+#endif
   // With a simple fine-tuning, TILE_SIZE=16 gives a good performance.
   constexpr int TILE_SIZE = 16;
   constexpr int BLOCK_WARPS = CUDA_MAX_NUM_THREADS / WARP_SIZE;

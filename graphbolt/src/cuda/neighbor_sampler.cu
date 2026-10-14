@@ -18,7 +18,14 @@
  * @brief Index select operator implementation on CUDA.
  */
 #include <c10/core/ScalarType.h>
+#ifdef GRAPHBOLT_USE_HIP
+#include <dgl/hip/cuda_to_hip.h>
+#include <hiprand/hiprand_kernel.h>
+// TODO this is a bad way to do this, but for ROCM < 7.0 we have to use a hacky
+// hipCUB
+#else
 #include <curand_kernel.h>
+#endif
 #include <graphbolt/continuous_seed.h>
 #include <graphbolt/cuda_ops.h>
 #include <graphbolt/cuda_sampling_ops.h>
@@ -30,10 +37,28 @@
 
 #include <algorithm>
 #include <array>
+#ifdef GRAPHBOLT_USE_HIP
+#include <hipcub/hipcub.hpp>
+#else
 #include <cub/cub.cuh>
-#if __CUDA_ARCH__ >= 700
+#endif
+
+// Atomics
+#if defined(GRAPHBOLT_USE_HIP) && __HIP_ARCH_HAS_GLOBAL_INT32_ATOMICS__ && \
+    __HIP_ARCH_HAS_SHARED_INT32_ATOMICS__ &&                               \
+    __HIP_ARCH_HAS_GLOBAL_INT64_ATOMICS__ &&                               \
+    __HIP_ARCH_HAS_SHARED_INT64_ATOMICS__
+#define __ATOMICS__ 1
+#elif __CUDA_ARCH__ >= 700
+#define __ATOMICS__ 1
+#else
+#define __ATOMICS__ 0
+#endif
+
+#if __ATOMICS__
 #include <cuda/atomic>
-#endif  // __CUDA_ARCH__ >= 700
+#endif
+
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -94,13 +119,13 @@ __global__ void _ComputeRandomsNS(
     if (rnd < fanout) {
       const indptr_t edge_id =
           row_offset + (sliced_indptr ? sliced_indptr[row_position] : 0);
-#if __CUDA_ARCH__ >= 700
+#if __ATOMICS__
       ::cuda::atomic_ref<indptr_t, ::cuda::thread_scope_device> a(
           edge_ids[output_offset + rnd]);
       a.fetch_max(edge_id, ::cuda::std::memory_order_relaxed);
 #else
       AtomicMax(edge_ids + output_offset + rnd, edge_id);
-#endif  // __CUDA_ARCH__
+#endif  // __ATOMICS__
     }
 
     i += stride;
@@ -344,8 +369,12 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                       const auto sub_indptr_data =
                           homo_sub_indptr.data_ptr<index_t>();
                       CUB_CALL(
-                          DeviceFor::Bulk, *num_edges,
-                          [=] __device__(int64_t i) {
+#if HIP_VERSION_MAJOR >= 7
+                          DeviceFor::Bulk,
+#else
+                      Bulk,
+#endif
+                          *num_edges, [=] __device__(int64_t i) {
                             const auto row = coo_rows_ptr[i];
                             const auto seed_timestamp =
                                 seeds_timestamp_ptr[row];
@@ -463,11 +492,10 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                     "Selected edge_id_t must be capable of storing edge_ids.");
                 // Using bfloat16 for random numbers works just as reliably as
                 // float32 and provides around 30% speedup.
-                using rnd_t = nv_bfloat16;
                 auto randoms =
-                    allocator.AllocateStorage<rnd_t>(num_edges.value());
+                    allocator.AllocateStorage<nv_bfloat16>(num_edges.value());
                 auto randoms_sorted =
-                    allocator.AllocateStorage<rnd_t>(num_edges.value());
+                    allocator.AllocateStorage<nv_bfloat16>(num_edges.value());
                 auto edge_id_segments =
                     allocator.AllocateStorage<edge_id_t>(num_edges.value());
                 auto sorted_edge_id_segments =
@@ -532,11 +560,23 @@ c10::intrusive_ptr<sampling::FusedSampledSubgraph> SampleNeighbors(
                       iota,
                       SegmentEndFunc<indptr_t, decltype(sampled_degree)>{
                           sub_indptr.data_ptr<indptr_t>(), sampled_degree});
+#ifdef GRAPHBOLT_USE_HIP
+                  // rocThrust does not support different types among its
+                  // iterators, forcing us to copy the data into a new buffer of
+                  // contiguous memory.
+                  auto sampled_segment_end_data =
+                      torch::empty_like(sub_indptr).data_ptr<indptr_t>();
+                  THRUST_CALL(
+                      copy_n, sampled_segment_end_it, sub_indptr.size(0) - 1,
+                      sampled_segment_end_data);
+#else
+                  auto sampled_segment_end_data = sampled_segment_end_it;
+#endif
                   CUB_CALL(
                       DeviceSegmentedSort::SortKeys, edge_id_segments.get(),
                       sorted_edge_id_segments.get(), picked_eids.size(0),
                       num_rows, sub_indptr.data_ptr<indptr_t>(),
-                      sampled_segment_end_it);
+                      sampled_segment_end_data);
                 }
 
                 auto input_buffer_it = thrust::make_transform_iterator(

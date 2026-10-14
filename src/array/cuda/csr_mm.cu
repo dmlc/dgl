@@ -8,6 +8,9 @@
 
 #include <limits>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 #include "./cusparse_dispatcher.cuh"
 #include "./functor.cuh"
@@ -188,7 +191,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       dC_weights};
 }
 
-#else  // CUDART_VERSION < 12000
+#else  // CUDART_VERSION < 12000 || defined (__HIPCC__)
 
 /** @brief Cusparse implementation of SpGEMM on Csr format for older CUDA
  * versions */

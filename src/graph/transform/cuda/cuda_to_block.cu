@@ -20,7 +20,12 @@
  * Tested via python wrapper: python/dgl/path/to/to_block.py
  */
 
+#if defined(__CUDACC__)
 #include <cuda_runtime.h>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hip/hip_runtime.h>
+#endif
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/tensordispatch.h>

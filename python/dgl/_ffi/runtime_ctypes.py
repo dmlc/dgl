@@ -1,4 +1,5 @@
 """Common runtime ctypes."""
+
 # pylint: disable=invalid-name, super-init-not-called
 from __future__ import absolute_import
 
@@ -6,9 +7,11 @@ import ctypes
 import json
 
 import numpy as np
+import torch
 
 from .. import _api_internal
 from .base import _LIB, check_call
+
 
 dgl_shape_index_t = ctypes.c_int64
 
@@ -114,38 +117,10 @@ class DGLContext(ctypes.Structure):
     """DGL context strucure."""
 
     _fields_ = [("device_type", ctypes.c_int), ("device_id", ctypes.c_int)]
-    MASK2STR = {
-        1: "cpu",
-        2: "gpu",
-        4: "opencl",
-        5: "aocl",
-        6: "sdaccel",
-        7: "vulkan",
-        8: "metal",
-        9: "vpi",
-        10: "rocm",
-        11: "opengl",
-        12: "ext_dev",
-    }
-    STR2MASK = {
-        "llvm": 1,
-        "stackvm": 1,
-        "cpu": 1,
-        "gpu": 2,
-        "cuda": 2,
-        "nvptx": 2,
-        "cl": 4,
-        "opencl": 4,
-        "aocl": 5,
-        "aocl_sw_emu": 5,
-        "sdaccel": 6,
-        "vulkan": 7,
-        "metal": 8,
-        "vpi": 9,
-        "rocm": 10,
-        "opengl": 11,
-        "ext_dev": 12,
-    }
+
+    MASK2STR = {}
+    STR2MASK = {}
+
     _cache = {}
 
     def __new__(cls, device_type, device_id):
@@ -161,7 +136,10 @@ class DGLContext(ctypes.Structure):
         return inst
 
     def __init__(self, device_type, device_id):
-        pass
+
+        self.set_dicts_default()
+        if torch.version.hip is not None:
+            self.set_dicts_rocm()
 
     @property
     def exist(self):
@@ -226,6 +204,44 @@ class DGLContext(ctypes.Structure):
         return json.loads(
             _api_internal._GetDeviceAttr(self.device_type, self.device_id, 8)
         )
+
+    def set_dicts_default(self):
+        DGLContext.MASK2STR = {
+            1: "cpu",
+            2: "gpu",
+            4: "opencl",
+            5: "aocl",
+            6: "sdaccel",
+            7: "vulkan",
+            8: "metal",
+            9: "vpi",
+            10: "rocm",
+            11: "opengl",
+            12: "ext_dev",
+        }
+        DGLContext.STR2MASK = {
+            "llvm": 1,
+            "stackvm": 1,
+            "cpu": 1,
+            "gpu": 2,
+            "cuda": 2,
+            "nvptx": 2,
+            "cl": 4,
+            "opencl": 4,
+            "aocl": 5,
+            "aocl_sw_emu": 5,
+            "sdaccel": 6,
+            "vulkan": 7,
+            "metal": 8,
+            "vpi": 9,
+            "rocm": 10,
+            "opengl": 11,
+            "ext_dev": 12,
+        }
+
+    def set_dicts_rocm(self):
+        DGLContext.MASK2STR[10] = "cuda"
+        DGLContext.STR2MASK["cuda"] = 10
 
     def sync(self):
         """Synchronize until jobs finished at the context."""

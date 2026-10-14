@@ -4,9 +4,11 @@ import re
 import tempfile
 from functools import partial
 
-import dgl.graphbolt as gb
+import backend as F
 
+import dgl.graphbolt as gb
 import dgl.graphbolt.internal as internal
+
 import numpy as np
 import pandas as pd
 import pytest

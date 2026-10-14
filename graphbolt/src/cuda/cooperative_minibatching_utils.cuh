@@ -21,7 +21,12 @@
 #ifndef GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_CUH_
 #define GRAPHBOLT_CUDA_COOPERATIVE_MINIBATCHING_UTILS_CUH_
 
+#ifdef __HIPCC__
+#include <hiprand/hiprand_kernel.h>
+#include <dgl/hip/cuda_to_hip.h>
+#else
 #include <curand_kernel.h>
+#endif
 
 namespace graphbolt {
 namespace cuda {

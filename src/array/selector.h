@@ -12,7 +12,7 @@ namespace dgl {
 
 namespace {
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define DGLDEVICE __device__
 #define DGLINLINE __forceinline__
 #else
@@ -31,10 +31,15 @@ template <int target>
 struct Selector {
   template <typename T>
   static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
+#ifdef __HIPCC__
+    // workaround, need to reimplement to write to LOG
+    printf("Target %d not recognized.\n");
+#else
     LOG(INFO) << "Target " << target << " not recognized.";
+#endif
     return src;
   }
-};
+};  // namespace dgl
 
 template <>
 template <typename T>

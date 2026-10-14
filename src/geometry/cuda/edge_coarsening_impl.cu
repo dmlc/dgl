@@ -3,7 +3,12 @@
  * @file geometry/cuda/edge_coarsening_impl.cu
  * @brief Edge coarsening CUDA implementation
  */
+#if defined(__CUDACC__)
 #include <curand_kernel.h>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hiprand/hiprand_kernel.h>
+#endif
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dmlc/thread_local.h>

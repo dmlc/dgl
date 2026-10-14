@@ -20,9 +20,13 @@
 #ifndef DGL_GRAPH_TRANSFORM_CUDA_CUDA_MAP_EDGES_CUH_
 #define DGL_GRAPH_TRANSFORM_CUDA_CUDA_MAP_EDGES_CUH_
 
-#include <dgl/runtime/c_runtime_api.h>
 #include <dgl/base_heterograph.h>
+#include <dgl/runtime/c_runtime_api.h>
+#if defined(__CUDACC__)
 #include <cuda_runtime.h>
+#elif defined(__HIPCC__)
+#include <hip/hip_runtime.h>
+#endif
 #include <dgl/runtime/c_runtime_api.h>
 
 #include <algorithm>

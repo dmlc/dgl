@@ -21,12 +21,15 @@
 #ifndef DGL_ARRAY_CUDA_FP16_CUH_
 #define DGL_ARRAY_CUDA_FP16_CUH_
 
+#if defined(__CUDACC__)
 #include <cuda_fp16.h>
-
+#elif defined(__HIPCC__)
+#include <hip/hip_fp16.h>
+#endif
 #include <algorithm>
 
 static __device__ __forceinline__ half max(half a, half b) {
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 530
+#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 530) || defined(__HIPCC__)
   return __hgt(__half(a), __half(b)) ? a : b;
 #else
   return __half(max(float(a), float(b)));  // NOLINT
@@ -34,19 +37,21 @@ static __device__ __forceinline__ half max(half a, half b) {
 }
 
 static __device__ __forceinline__ half min(half a, half b) {
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 530
+#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 530) || defined(__HIPCC__)
   return __hlt(__half(a), __half(b)) ? a : b;
 #else
   return __half(min(float(a), float(b)));  // NOLINT
 #endif
 }
 
-#ifdef __CUDACC__
+#if defined __CUDACC__ || defined __HIPCC__
 // Arithmetic FP16 operations for architecture >= 5.3 are already defined in
 // cuda_fp16.h
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 530)
+#if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 530)) || defined __HIPCC__
 // CUDA 12.2 adds "emulated" support for older architectures.
-#if defined(CUDART_VERSION) && (CUDART_VERSION < 12020)
+#if (defined(CUDART_VERSION) && (CUDART_VERSION < 12020)) || defined(__HIPCC__)
+#ifndef __HIPCC__
+// Operations already defined in hip/hip_fp16.h
 __device__ __forceinline__ __half
 operator+(const __half& lh, const __half& rh) {
   return __half(float(lh) + float(rh));  // NOLINT
@@ -84,6 +89,7 @@ __device__ __forceinline__ __half& operator/=(
   lh = __half(float(lh) / float(rh));  // NOLINT
   return lh;
 }
+#endif
 
 __device__ __forceinline__ __half& operator++(__half& h) {  // NOLINT
   h = __half(float(h) + 1.0f);                              // NOLINT
@@ -104,6 +110,8 @@ __device__ __forceinline__ __half operator--(__half& h, int) {  // NOLINT
   return ret;
 }
 
+#ifndef __HIPCC__
+// Operations already defined in hip/hip_fp16.h
 __device__ __forceinline__ __half operator+(const __half& h) { return h; }
 __device__ __forceinline__ __half operator-(const __half& h) {
   return __half(-float(h));  // NOLINT
@@ -127,6 +135,7 @@ __device__ __forceinline__ bool operator>=(const __half& lh, const __half& rh) {
 __device__ __forceinline__ bool operator<=(const __half& lh, const __half& rh) {
   return float(lh) <= float(rh);  // NOLINT
 }
+#endif
 #endif  // defined(CUDART_VERSION) && (CUDART_VERSION < 12020)
 #endif  // defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 530)
 #endif  // __CUDACC__

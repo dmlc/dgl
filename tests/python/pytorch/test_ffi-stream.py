@@ -160,6 +160,11 @@ def test_record_stream_graph_positive():
 @unittest.skipIf(
     F._default_context_str == "cpu", reason="stream only runs on GPU."
 )
+@unittest.skipIf(
+    F.is_hip(),
+    reason="The HIP allocator does not hand g2's block back to g3, so the "
+    "use-after-free this test provokes does not corrupt the result.",
+)
 def test_record_stream_graph_negative():
     cycles_per_ms = _get_cycles_per_ms()
 

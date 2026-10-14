@@ -28,6 +28,19 @@
 #endif  // BF16_ENABLED
 #endif  // DGL_USE_CUDA
 
+#ifdef DGL_USE_HIP
+#include <hip/hip_runtime.h>
+
+#include "../hip/cuda_to_hip.h"
+
+#define BF16_ENABLED (defined(__HIPCC__))
+
+#include <hip/hip_fp16.h>
+#if BF16_ENABLED
+#include <hip/hip_bf16.h>
+#endif  // BF16_ENABLED
+#endif  // DGL_USE_HIP
+
 // forward declaration
 inline std::ostream& operator<<(std::ostream& os, DGLDataType t);
 
@@ -57,7 +70,7 @@ GEN_DGLDATATYPETRAITS_FOR(int64_t, kDGLInt, 64);
 // arrays, so I'm just converting uints to signed DTypes.
 GEN_DGLDATATYPETRAITS_FOR(uint32_t, kDGLInt, 32);
 GEN_DGLDATATYPETRAITS_FOR(uint64_t, kDGLInt, 64);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
 GEN_DGLDATATYPETRAITS_FOR(__half, kDGLFloat, 16);
 #if BF16_ENABLED
 GEN_DGLDATATYPETRAITS_FOR(__nv_bfloat16, kDGLBfloat, 16);

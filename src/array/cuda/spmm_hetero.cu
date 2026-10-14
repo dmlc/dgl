@@ -7,6 +7,9 @@
 
 #include <cstdlib>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 #include "./functor.cuh"
 #include "./ge_spmm.cuh"
@@ -42,11 +45,15 @@ void SpMMCsrHetero(
     use_deterministic_alg_only = true;
 
   bool use_legacy_cusparsemm =
+#ifdef __HIPCC__
+      false;
+#else
       (CUDART_VERSION < 11000) && (reduce == "sum") &&
       // legacy cuSPARSE does not care about NNZ, hence the argument "false".
       ((op == "copy_lhs" && cusparse_available<DType, IdType>(false)) ||
        (op == "mul" && is_scalar_efeat &&
         cusparse_available<DType, IdType>(false)));
+#endif
   // Create temporary output buffer to store non-transposed output
   if (use_legacy_cusparsemm) {
     for (dgl_type_t ntype = 0; ntype < (*vec_out).size(); ++ntype) {
@@ -128,12 +135,21 @@ void SpMMCsrHetero(
           cusparse_available<DType, IdType>(more_nnz)) {  // cusparse
         /* If CUDA is less than 11.0, put the output in trans_out for later
          * transposition */
-        DType* out = (CUDART_VERSION < 11000)
-                         ? trans_out[dst_id]
-                         : static_cast<DType*>((*vec_out)[dst_id]->data);
+        DType* out =
+#ifdef __HIPCC__
+            static_cast<DType*>((*vec_out)[dst_id]->data);
         CusparseCsrmm2Hetero<DType, IdType>(
             csr.indptr->ctx, csr, static_cast<DType*>(vec_ufeat[src_id]->data),
             nullptr, out, x_length, stream, use_deterministic_alg_only);
+
+#else
+            (CUDART_VERSION < 11000)
+                ? trans_out[dst_id]
+                : static_cast<DType*>((*vec_out)[dst_id]->data);
+        CusparseCsrmm2Hetero<DType, IdType>(
+            csr.indptr->ctx, csr, static_cast<DType*>(vec_ufeat[src_id]->data),
+            nullptr, out, x_length, stream, use_deterministic_alg_only);
+#endif
       } else if (
           op == "mul" && is_scalar_efeat &&
           cusparse_available<DType, IdType>(more_nnz)) {  // cusparse

@@ -5,6 +5,7 @@ import unittest
 import backend as F
 import pytest
 import torch as th
+from utils import rendezvous_port
 
 from dgl.nn import NodeEmbedding
 from dgl.optim import SparseAdam
@@ -46,7 +47,7 @@ def check_all_set_all_get_optm_state(
 def start_sparse_worker(rank, world_size, test, args):
     print("start sparse worker {}".format(rank))
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
-        master_ip="127.0.0.1", master_port="12345"
+        master_ip="127.0.0.1", master_port=rendezvous_port()
     )
     backend = "gloo"
     device = F.ctx()
@@ -65,6 +66,7 @@ def start_sparse_worker(rank, world_size, test, args):
     th.distributed.destroy_process_group()
 
 
+@unittest.skipIf(F.is_hip(), reason="Not implemented in ROCm")
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
 @pytest.mark.parametrize("num_workers", [1, 2, 3])
 def test_multiprocess_sparse_emb_get_set(num_workers):
@@ -90,6 +92,7 @@ def test_multiprocess_sparse_emb_get_set(num_workers):
         assert p.exitcode == 0
 
 
+@unittest.skipIf(F.is_hip(), reason="Not implemented in ROCm")
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
 @pytest.mark.parametrize("num_workers", [1, 2, 3])
 def test_multiprocess_sparse_emb_get_set_optm_state(num_workers):

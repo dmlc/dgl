@@ -5,6 +5,7 @@ import backend as F
 import pytest
 import torch as th
 import torch.multiprocessing as mp
+from utils import rendezvous_port
 
 from dgl.nn import NodeEmbedding
 from dgl.optim import SparseAdagrad, SparseAdam
@@ -59,7 +60,9 @@ def test_sparse_adam_uva(use_uva, emb_dim):
 
     num_embs = 10
     device = F.ctx()
-    dgl_emb = NodeEmbedding(num_embs, emb_dim, "test_uva{}".format(use_uva))
+    dgl_emb = NodeEmbedding(
+        num_embs, emb_dim, "test_uva{}_emb_dim{}".format(use_uva, emb_dim)
+    )
     torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
     th.manual_seed(0)
     th.nn.init.uniform_(torch_emb.weight, 0, 1.0)
@@ -189,7 +192,7 @@ def start_sparse_adam_worker(
 ):
     print("start sparse worker for adam {}".format(rank))
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
-        master_ip="127.0.0.1", master_port="12345"
+        master_ip="127.0.0.1", master_port=rendezvous_port()
     )
 
     if device.type == "cuda":
@@ -253,7 +256,7 @@ def start_torch_adam_worker(
 ):
     print("start sparse worker for adam {}".format(rank))
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
-        master_ip="127.0.0.1", master_port="12345"
+        master_ip="127.0.0.1", master_port=rendezvous_port()
     )
     backend = "gloo"
 
@@ -599,7 +602,7 @@ def start_sparse_adam_state_dict_worker(
 ):
     print("start sparse worker for adam {}".format(rank))
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
-        master_ip="127.0.0.1", master_port="12345"
+        master_ip="127.0.0.1", master_port=rendezvous_port()
     )
 
     device = th.device(f"cuda:{rank}")

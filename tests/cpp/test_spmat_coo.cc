@@ -331,7 +331,7 @@ void _TestCOOToCSR(DGLContext ctx) {
 TEST(SpmatTest, COOToCSR) {
   _TestCOOToCSR<int32_t>(CPU);
   _TestCOOToCSR<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestCOOToCSR<int32_t>(GPU);
   _TestCOOToCSR<int64_t>(GPU);
 #endif
@@ -417,7 +417,7 @@ void _TestCOOSort(DGLContext ctx) {
 TEST(SpmatTest, COOSort) {
   _TestCOOSort<int32_t>(CPU);
   _TestCOOSort<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestCOOSort<int32_t>(GPU);
   _TestCOOSort<int64_t>(GPU);
 #endif

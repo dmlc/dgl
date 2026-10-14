@@ -6,6 +6,9 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "./functor.cuh"
 #include "./segment_reduce.cuh"
 #include "./utils.h"

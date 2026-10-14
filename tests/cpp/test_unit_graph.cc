@@ -369,7 +369,7 @@ void _TestUnitGraph_CopyTo(
 TEST(UniGraphTest, TestUnitGraph_CopyTo) {
   _TestUnitGraph_CopyTo<int32_t>(CPU, CPU);
   _TestUnitGraph_CopyTo<int64_t>(CPU, CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestUnitGraph_CopyTo<int32_t>(CPU, GPU);
   _TestUnitGraph_CopyTo<int32_t>(GPU, GPU);
   _TestUnitGraph_CopyTo<int32_t>(GPU, CPU);
@@ -382,7 +382,7 @@ TEST(UniGraphTest, TestUnitGraph_CopyTo) {
 TEST(UniGraphTest, TestUnitGraph_InOutDegrees) {
   _TestUnitGraph_InOutDegrees<int32_t>(CPU);
   _TestUnitGraph_InOutDegrees<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestUnitGraph_InOutDegrees<int32_t>(GPU);
   _TestUnitGraph_InOutDegrees<int64_t>(GPU);
 #endif
@@ -391,7 +391,7 @@ TEST(UniGraphTest, TestUnitGraph_InOutDegrees) {
 TEST(UniGraphTest, TestUnitGraph_Create) {
   _TestUnitGraph<int32_t>(CPU);
   _TestUnitGraph<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestUnitGraph<int32_t>(GPU);
   _TestUnitGraph<int64_t>(GPU);
 #endif
@@ -400,7 +400,7 @@ TEST(UniGraphTest, TestUnitGraph_Create) {
 TEST(UniGraphTest, TestUnitGraph_GetInCSR) {
   _TestUnitGraph_GetInCSR<int32_t>(CPU);
   _TestUnitGraph_GetInCSR<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestUnitGraph_GetInCSR<int32_t>(GPU);
   _TestUnitGraph_GetInCSR<int64_t>(GPU);
 #endif
@@ -409,7 +409,7 @@ TEST(UniGraphTest, TestUnitGraph_GetInCSR) {
 TEST(UniGraphTest, TestUnitGraph_GetOutCSR) {
   _TestUnitGraph_GetOutCSR<int32_t>(CPU);
   _TestUnitGraph_GetOutCSR<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestUnitGraph_GetOutCSR<int32_t>(GPU);
   _TestUnitGraph_GetOutCSR<int64_t>(GPU);
 #endif
@@ -418,7 +418,7 @@ TEST(UniGraphTest, TestUnitGraph_GetOutCSR) {
 TEST(UniGraphTest, TestUnitGraph_GetCOO) {
   _TestUnitGraph_GetCOO<int32_t>(CPU);
   _TestUnitGraph_GetCOO<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestUnitGraph_GetCOO<int32_t>(GPU);
   _TestUnitGraph_GetCOO<int64_t>(GPU);
 #endif
@@ -427,7 +427,7 @@ TEST(UniGraphTest, TestUnitGraph_GetCOO) {
 TEST(UniGraphTest, TestUnitGraph_Reserve) {
   _TestUnitGraph_Reserve<int32_t>(CPU);
   _TestUnitGraph_Reserve<int64_t>(CPU);
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestUnitGraph_Reserve<int32_t>(GPU);
   _TestUnitGraph_Reserve<int64_t>(GPU);
 #endif

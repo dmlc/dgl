@@ -1,3 +1,5 @@
+# "Copyright Advanced Micro Devices, Inc.
+# Licensed under the Apache License Version 2.0"
 """
 This is the global script that set the version information of DGL.
 This script runs and update all the locations that related to versions
@@ -9,14 +11,12 @@ List of affected files:
 import os
 import re
 
-# current version
-# We use the version of the incoming release for code
-# that is under development
+# current version of upstream is tracked by the ROCM version
 # The environment variable DGL_PRERELEASE is the prerelase suffix
 # (usually "aYYMMDD")
 # The environment variable DGL_VERSION_SUFFIX is the local version label
 # suffix for indicating CPU and CUDA versions as in PEP 440 (e.g. "+cu102")
-__version__ = "2.5" + os.getenv("DGL_PRERELEASE", "")
+__version__ = os.getenv("DGL_RELEASE_VERSION", "") + os.getenv("DGL_PRERELEASE", "")
 __version__ += os.getenv("DGL_VERSION_SUFFIX", "")
 print(__version__)
 

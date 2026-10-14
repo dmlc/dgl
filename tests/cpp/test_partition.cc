@@ -77,7 +77,7 @@ void _TestRemainder_MapToX() {
 }
 
 TEST(PartitionTest, TestRemainderPartition) {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestRemainder_GeneratePermutation<kDGLCUDA, int32_t>();
   _TestRemainder_GeneratePermutation<kDGLCUDA, int64_t>();
 
@@ -185,7 +185,7 @@ void _TestRange_MapToX() {
 }
 
 TEST(PartitionTest, TestRangePartition) {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   _TestRange_GeneratePermutation<kDGLCUDA, int32_t>();
   _TestRange_GeneratePermutation<kDGLCUDA, int64_t>();
 

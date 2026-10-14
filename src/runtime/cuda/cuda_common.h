@@ -6,10 +6,14 @@
 #ifndef DGL_RUNTIME_CUDA_CUDA_COMMON_H_
 #define DGL_RUNTIME_CUDA_CUDA_COMMON_H_
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#else
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <cusparse.h>
+#endif
 #include <dgl/runtime/packed_func.h>
 
 #include <memory>
@@ -217,7 +221,7 @@ struct accum_dtype<double> {
   typedef double type;
 };
 
-#if CUDART_VERSION >= 11000
+#if CUDART_VERSION >= 11000 || defined(__HIPCC__)
 /**
  * @brief Cast index data type to cusparseIndexType_t.
  */

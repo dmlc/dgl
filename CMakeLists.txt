@@ -11,7 +11,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # cmake utils
 include(cmake/util/Util.cmake)
 include(cmake/util/MshadowUtil.cmake)
-include(cmake/util/FindCUDA.cmake)
+if (USE_CUDA)
+  include(cmake/util/FindCUDA.cmake)
+elseif (USE_HIP)
+  # Enforce that GPU_TARGETS and CMAKE_HIP_ARCHITECTURES match
+  # we'll just use CMAKE_HIP_ARCHITECTURES from now on
+  # see https://rocm.docs.amd.com/en/latest/conceptual/cmake-packages.html#compiling-device-code-in-c-language-mode
+  if (NOT GPU_TARGETS STREQUAL CMAKE_HIP_ARCHITECTURES)
+    message(FATAL_ERROR "GPU_TARGETS and CMAKE_HIP_ARCHITECTURES must match")
+  endif()
+endif (USE_CUDA)
 
 # Options for building DGL.
 # NOTE: Please avoid editing this file to change build type. Instead, using
@@ -109,7 +118,7 @@ dgl_feature_option(
 if (EXTERNAL_DLPACK_PATH OR EXTERNAL_DMLC_PATH OR EXTERNAL_NANOFLANN_PATH OR EXTERNAL_NANOFLANN_PATH OR EXTERNAL_METIS_PATH OR EXTERNAL_GKLIB_PATH)
   message(STATUS "Using at least one external library")
   set(USE_EXTERNAL_LIBS ON)
-  
+
   if (BUILD_CPP_TEST)
     message(FATAL_ERROR "Cannot build cpp unittests with external libraries")
   endif(BUILD_CPP_TEST)
@@ -125,6 +134,9 @@ if (${BUILD_TYPE} STREQUAL "dev")
   else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g3 -ggdb")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -ggdb")
+    if(USE_HIP)
+      set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -O0 -g3 -ggdb")
+    endif()
   endif()
 else()
   if (MSVC)
@@ -144,6 +156,10 @@ if(USE_CUDA)
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/thrust")
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/cub")
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cccl/libcudacxx/include")
+elseif(USE_HIP)
+  message(STATUS "Build with HIP support")
+  project(dgl C CXX HIP)
+  include(cmake/modules/HIP.cmake)
 endif(USE_CUDA)
 
 # initial variables
@@ -218,11 +234,13 @@ else()
 endif()
 list(APPEND DGL_SRC ${DGL_RPC_SRC})
 
-if(USE_OPENMP)
-  find_package(OpenMP REQUIRED)
-  list(APPEND DGL_LINKER_LIBS OpenMP::OpenMP_CXX)
-  message(STATUS "Build with OpenMP.")
-endif(USE_OPENMP)
+if (NOT USE_HIP)
+  if(USE_OPENMP)
+    find_package(OpenMP REQUIRED)
+    list(APPEND DGL_LINKER_LIBS OpenMP::OpenMP_CXX)
+    message(STATUS "Build with OpenMP.")
+  endif(USE_OPENMP)
+endif(NOT USE_HIP)
 
 # Configure cuda
 if(USE_CUDA)
@@ -243,6 +261,27 @@ if(USE_CUDA)
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
   dgl_config_cuda(DGL_LINKER_LIBS)
   cuda_add_library(dgl SHARED ${DGL_SRC})
+elseif(USE_HIP)
+  file(GLOB_RECURSE DGL_HIP_SRC
+    src/array/cuda/*.cc
+    src/array/cuda/*.cu
+    src/array/cuda/uvm/*.cc
+    src/array/cuda/uvm/*.cu
+    src/kernel/cuda/*.cc
+    src/kernel/cuda/*.cu
+    src/partition/cuda/*.cu
+    src/runtime/cuda/*.cc
+    src/runtime/cuda/*.cu
+    src/geometry/cuda/*.cu
+    src/graph/transform/cuda/*.cu
+    src/graph/sampling/randomwalks/*.cu
+  )
+  list(APPEND DGL_SRC ${DGL_HIP_SRC})
+  dgl_config_hip(DGL_LINKER_LIBS)
+  set_source_files_properties(${DGL_HIP_SRC} PROPERTIES LANGUAGE HIP)
+  add_library(dgl SHARED ${DGL_SRC})
+  target_compile_definitions(dgl PUBLIC -DDGL_USE_HIP=1)
+  set_property(TARGET dgl PROPERTY HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
@@ -293,7 +332,7 @@ if(EXTERNAL_DMLC_PATH)
   endif()
   message(STATUS "looking for dmlc headers in ${EXTERNAL_DMLC_PATH}")
   include_directories(SYSTEM ${EXTERNAL_DMLC_PATH})
-  
+
   if (NOT EXTERNAL_DMLC_LIB_PATH)
     message(FATAL_ERROR "EXTERNAL_DMLC_LIB_PATH must be set if EXTERNAL_DMLC_PATH is set")
   endif()
@@ -386,6 +425,20 @@ if(USE_CUDA)
   target_include_directories(dgl PRIVATE "third_party/HugeCTR/gpu_cache/include")
   list(APPEND DGL_LINKER_LIBS gpu_cache)
   message(STATUS "Build with HugeCTR GPU embedding cache.")
+elseif (USE_HIP)
+  file(GLOB gpu_cache_src
+    third_party/HugeCTR/gpu_cache/src/nv_gpu_cache.cu
+  )
+  set_source_files_properties(${gpu_cache_src} PROPERTIES LANGUAGE HIP)
+  add_library(gpu_cache STATIC ${gpu_cache_src})
+  set_property(TARGET gpu_cache PROPERTY HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
+  target_include_directories(gpu_cache PRIVATE "third_party/HugeCTR/gpu_cache/include" "include")
+  target_include_directories(dgl PRIVATE "third_party/HugeCTR/gpu_cache/include")
+  target_compile_options(gpu_cache PUBLIC "-fPIC")
+  target_compile_definitions(gpu_cache PUBLIC -DDGL_USE_HIP=1)
+  list(APPEND DGL_LINKER_LIBS gpu_cache)
+  message(STATUS "Build with HugeCTR GPU embedding cache.")
+  message(STATUS "DGL_LINKER_LIBS" ${DGL_LINKER_LIBS})
 endif(USE_CUDA)
 
 # support PARALLEL_ALGORITHMS
@@ -393,7 +446,15 @@ if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
   target_compile_definitions(dgl PRIVATE PARALLEL_ALGORITHMS)
 endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
-target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
+if(USE_HIP)
+  find_library(HIPSPARSE_LIBRARY hipsparse HINTS $ENV{ROCM_PATH}/lib /opt/rocm/lib)
+  find_library(HIPBLAS_LIBRARY hipblas HINTS $ENV{ROCM_PATH}/lib /opt/rocm/lib)
+  target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS} ${HIPSPARSE_LIBRARY} ${HIPBLAS_LIBRARY})
+
+else()
+  target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
+endif()
+
 if(MSVC)
   add_custom_command(
     TARGET dgl POST_BUILD COMMAND
@@ -423,18 +484,35 @@ if(BUILD_TORCH)
       DEPENDS ${BUILD_SCRIPT}
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
   else(MSVC)
-    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tensoradapter/pytorch/build.sh BUILD_SCRIPT)
-    add_custom_target(
-      tensoradapter_pytorch
-      ${CMAKE_COMMAND} -E env
-      CMAKE_COMMAND=${CMAKE_CMD}
-      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
-      USE_CUDA=${USE_CUDA}
-      EXTERNAL_DMLC_LIB_PATH=${EXTERNAL_DMLC_LIB_PATH}
-      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
-      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
-      DEPENDS ${BUILD_SCRIPT}
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
+    if(USE_HIP)
+      file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tensoradapter/pytorch/build_rocm.sh BUILD_SCRIPT)
+      add_custom_target(
+        tensoradapter_pytorch
+        ${CMAKE_COMMAND} -E env
+        CMAKE_COMMAND=${CMAKE_CMD}
+        PYTORCH_ROCM_ARCH=${CMAKE_HIP_ARCHITECTURES}
+        GPU_TARGETS=${CMAKE_HIP_ARCHITECTURES}
+        CMAKE_HIP_ARCHITECTURES=${CMAKE_HIP_ARCHITECTURES}
+        USE_HIP=${USE_HIP}
+        EXTERNAL_DMLC_LIB_PATH=${EXTERNAL_DMLC_LIB_PATH}
+        BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+        bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+        DEPENDS ${BUILD_SCRIPT}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
+    else(USE_HIP)
+      file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tensoradapter/pytorch/build.sh BUILD_SCRIPT)
+      add_custom_target(
+        tensoradapter_pytorch
+        ${CMAKE_COMMAND} -E env
+        CMAKE_COMMAND=${CMAKE_CMD}
+        CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+        USE_CUDA=${USE_CUDA}
+        EXTERNAL_DMLC_LIB_PATH=${EXTERNAL_DMLC_LIB_PATH}
+        BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+        bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+        DEPENDS ${BUILD_SCRIPT}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
+    endif(USE_HIP)
   endif(MSVC)
   add_dependencies(dgl tensoradapter_pytorch)
 endif(BUILD_TORCH)
@@ -457,11 +535,11 @@ if(BUILD_CPP_TEST)
   file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/cpp/*.cc)
   add_executable(runUnitTests ${TEST_SRC_FILES})
   target_link_libraries(runUnitTests gtest gtest_main)
-  target_link_libraries(runUnitTests dgl)
+  target_link_libraries(runUnitTests dgl )
   add_test(UnitTests runUnitTests)
 endif(BUILD_CPP_TEST)
 
-if(BUILD_SPARSE)
+if (BUILD_SPARSE)
   message(STATUS "Configuring DGL sparse library")
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
   file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
@@ -487,26 +565,49 @@ if(BUILD_SPARSE)
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
   else(MSVC)
     file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.sh BUILD_SCRIPT)
-    add_custom_target(
-      dgl_sparse
-      ALL
-      ${CMAKE_COMMAND} -E env
-      CMAKE_COMMAND=${CMAKE_CMD}
-      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
-      USE_CUDA=${USE_CUDA}
-      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
-      INCLUDEDIR="${DGL_INCLUDE_DIRS}"
-      CFLAGS=${CMAKE_C_FLAGS}
-      CXXFLAGS=${CMAKE_CXX_FLAGS}
-      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
-      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
-      DEPENDS ${BUILD_SCRIPT}
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+    if(USE_HIP)
+      add_custom_target(
+        dgl_sparse
+        ALL
+        ${CMAKE_COMMAND} -E env
+        CMAKE_COMMAND=${CMAKE_CMD}
+        USE_HIP=${USE_HIP}
+        PYTORCH_ROCM_ARCH=${CMAKE_HIP_ARCHITECTURES}
+        GPU_TARGETS=${CMAKE_HIP_ARCHITECTURES}
+        CMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        CMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+        CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+        CMAKE_HIP_ARCHITECTURES=${CMAKE_HIP_ARCHITECTURES}
+        BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+        INCLUDEDIR="${DGL_INCLUDE_DIRS}"
+        CFLAGS=${CMAKE_C_FLAGS}
+        CXXFLAGS=${CMAKE_CXX_FLAGS}
+        LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+        bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+        DEPENDS ${BUILD_SCRIPT}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+    else(USE_HIP)
+      add_custom_target(
+        dgl_sparse
+        ALL
+        ${CMAKE_COMMAND} -E env
+        CMAKE_COMMAND=${CMAKE_CMD}
+        CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+        USE_CUDA=${USE_CUDA}
+        BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+        INCLUDEDIR="${DGL_INCLUDE_DIRS}"
+        CFLAGS=${CMAKE_C_FLAGS}
+        CXXFLAGS=${CMAKE_CXX_FLAGS}
+        LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+        bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+        DEPENDS ${BUILD_SCRIPT}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+     endif(USE_HIP)
   endif(MSVC)
   add_dependencies(dgl_sparse dgl)
 endif(BUILD_SPARSE)
 
-if(BUILD_GRAPHBOLT)
+if (BUILD_GRAPHBOLT)
   message(STATUS "Configuring graphbolt library")
   string(REPLACE ";" "\\;" CUDA_ARCHITECTURES_ESCAPED "${CUDA_ARCHITECTURES}")
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
@@ -529,22 +630,47 @@ if(BUILD_GRAPHBOLT)
       DEPENDS ${BUILD_SCRIPT}
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
   else(MSVC)
-    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.sh BUILD_SCRIPT)
-    add_custom_target(
-      graphbolt
-      ALL
-      ${CMAKE_COMMAND} -E env
-      CMAKE_COMMAND=${CMAKE_CMD}
-      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
-      USE_CUDA=${USE_CUDA}
-      USE_LIBURING=${USE_LIBURING}
-      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
-      CFLAGS=${CMAKE_C_FLAGS}
-      CXXFLAGS=${CMAKE_CXX_FLAGS}
-      CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
-      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
-      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
-      DEPENDS ${BUILD_SCRIPT}
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
+    if(USE_HIP)
+        file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build_rocm.sh BUILD_SCRIPT)
+        add_custom_target(
+        graphbolt
+        ALL
+        ${CMAKE_COMMAND} -E env
+        CMAKE_COMMAND=${CMAKE_CMD}
+        CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+        PYTORCH_ROCM_ARCH=${CMAKE_HIP_ARCHITECTURES}
+        CMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        CMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+        GPU_TARGETS=${CMAKE_HIP_ARCHITECTURES}
+        CMAKE_HIP_ARCHITECTURES=${CMAKE_HIP_ARCHITECTURES}
+        USE_HIP=${USE_HIP}
+        USE_LIBURING=${USE_LIBURING}
+        BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+        CFLAGS=${CMAKE_C_FLAGS}
+        CXXFLAGS=${CMAKE_CXX_FLAGS}
+        CMAKE_HIP_ARCHITECTURES=${CMAKE_HIP_ARCHITECTURES}
+        LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+        bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+        DEPENDS ${BUILD_SCRIPT}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
+    else(USE_HIP)
+        file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.sh BUILD_SCRIPT)
+        add_custom_target(
+        graphbolt
+        ALL
+        ${CMAKE_COMMAND} -E env
+        CMAKE_COMMAND=${CMAKE_CMD}
+        CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+        USE_CUDA=${USE_CUDA}
+        USE_LIBURING=${USE_LIBURING}
+        BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+        CFLAGS=${CMAKE_C_FLAGS}
+        CXXFLAGS=${CMAKE_CXX_FLAGS}
+        CUDAARCHS="${CUDA_ARCHITECTURES_ESCAPED}"
+        LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+        bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+        DEPENDS ${BUILD_SCRIPT}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
+    endif(USE_HIP)
   endif(MSVC)
 endif(BUILD_GRAPHBOLT)

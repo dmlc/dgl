@@ -4,12 +4,20 @@
  * @brief rowwise sampling
  */
 
-#include <curand_kernel.h>
 #include <dgl/array.h>
 #include <dgl/array_iterator.h>
 #include <dgl/random.h>
 
+#if defined(__CUDACC__)
+#include <curand_kernel.h>
+
 #include <cub/cub.cuh>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hiprand/hiprand_kernel.h>
+
+#include <hipcub/hipcub.hpp>
+#endif
 
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"

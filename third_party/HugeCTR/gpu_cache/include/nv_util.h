@@ -15,9 +15,19 @@
  */
 #pragma once
 
+#ifdef DGL_USE_HIP
+#include <hip/hip_runtime.h>
+#include <hip/hip_fp16.h>
+#include <hip/hip_fp8.h>
+#include <hip/hip_runtime_api.h>
+#include <dgl/hip/cuda_to_hip.h>
+#else
 #include <cuda_fp16.h>
 #include <cuda_fp8.h>
 #include <cuda_runtime_api.h>
+#endif
+
+
 
 #include <stdexcept>
 #include <string>
@@ -69,7 +79,7 @@ inline int get_dev(const void* ptr) {
   CUDA_CHECK(cudaPointerGetAttributes(&attr, ptr));
   int dev = -1;
 
-#if CUDART_VERSION >= 10000
+#if not defined(CUDART_VERSION) || CUDART_VERSION >= 10000
   if (attr.type == cudaMemoryTypeDevice)
 #else
   if (attr.memoryType == cudaMemoryTypeDevice)

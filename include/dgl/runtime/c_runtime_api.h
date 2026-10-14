@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "2.5"
+#define DGL_VERSION "2.4"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,12 +52,21 @@ typedef enum : int32_t {
 #else
 typedef enum {
 #endif
+#if defined(__HIPCC__) || defined(DGL_USE_HIP)
+  /** @brief CPU device */
+  kDGLCPU = 1,
+  /** @brief AMD GPU device type derived from dlpack*/
+  kDGLCUDA = 10,
+  // add more devices once supported
+} DGLDeviceType;
+#else
   /** @brief CPU device */
   kDGLCPU = 1,
   /** @brief CUDA GPU device */
   kDGLCUDA = 2,
   // add more devices once supported
 } DGLDeviceType;
+#endif
 
 /**
  * @brief The object type code is used in DGL FFI to indicate the types of

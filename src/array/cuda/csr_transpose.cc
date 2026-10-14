@@ -5,6 +5,9 @@
  */
 #include <dgl/array.h>
 
+#if defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
@@ -22,7 +25,7 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 
 template <>
 CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
-#if CUDART_VERSION < 12000
+#if CUDART_VERSION < 12000 || defined(__HIPCC__)
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
@@ -49,7 +52,7 @@ CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
   int32_t* t_indices_ptr = static_cast<int32_t*>(t_indices->data);
   void* t_data_ptr = t_data->data;
 
-#if CUDART_VERSION >= 10010
+#if CUDART_VERSION >= 10010 || defined(__HIPCC__)
   auto device = runtime::DeviceAPI::Get(csr.indptr->ctx);
   // workspace
   size_t workspace_size;

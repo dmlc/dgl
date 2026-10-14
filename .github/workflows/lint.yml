@@ -11,9 +11,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Checkout master and HEAD
+      - name: Checkout base and HEAD
         run: |
-          git checkout -t origin/master
+          git checkout -t origin/${{ github.base_ref }}
           git checkout ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Python
@@ -32,7 +32,7 @@ jobs:
       - name: Run lintrunner on all changed files
         run: |
           set +e
-          if ! lintrunner --force-color -m master --tee-json=lint.json; then
+          if ! lintrunner --force-color -m ${{ github.base_ref }} --tee-json=lint.json; then
               echo ""
               echo -e "\e[1m\e[36mYou can reproduce these results locally by using \`lintrunner\`.\e[0m"
               echo -e "\e[1m\e[36mSee https://github.com/pytorch/pytorch/wiki/lintrunner for setup instructions.\e[0m"

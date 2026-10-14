@@ -8,7 +8,13 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 
+#if defined(__CUDACC__)
 #include <cub/cub.cuh>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+
+#include <hipcub/hipcub.hpp>
+#endif
 
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"

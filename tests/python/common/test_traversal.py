@@ -20,6 +20,9 @@ def toset(x):
     return set(F.zerocopy_to_numpy(x).tolist())
 
 
+@unittest.skipIf(
+    F.is_hip() and F.get_rocm_version() < 7.0, f"Requires ROCm >= 7.0"
+)
 @parametrize_idtype
 def test_bfs(idtype, n=100):
     def _bfs_nx(g_nx, src):

@@ -12,19 +12,53 @@ import torch
 from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
 
+def _array_align_modules():
+    """Return the module object(s) whose ARRAY_ALIGN attribute actually
+    controls .npy header padding.
+
+    Before NumPy 2.1 (NEP 52's API cleanup), numpy.lib.format implemented
+    .npy header writing directly and read its own module-level ARRAY_ALIGN
+    global, so patching numpy.lib.format.ARRAY_ALIGN worked. Since then, that
+    implementation moved to the private numpy.lib._format_impl module, and
+    numpy.lib.format merely re-exports the name via
+    `from ._format_impl import ARRAY_ALIGN`. That import binds a *separate*
+    reference in numpy.lib.format's namespace, so reassigning
+    numpy.lib.format.ARRAY_ALIGN no longer affects what the real
+    header-writing code (in _format_impl, which reads its own global) sees.
+    Patch whichever module(s) are actually present and used.
+    """
+    modules = []
+    try:
+        import numpy.lib._format_impl as _format_impl
+
+        if hasattr(_format_impl, "ARRAY_ALIGN"):
+            modules.append(_format_impl)
+    except ImportError:
+        pass
+    # Also patch numpy.lib.format itself: on NumPy versions without
+    # _format_impl, this *is* the real implementation module. On newer
+    # versions it's just a re-exporting alias, so patching it too is
+    # harmless (nothing reads ARRAY_ALIGN from numpy.lib.format directly).
+    if hasattr(np.lib.format, "ARRAY_ALIGN"):
+        modules.append(np.lib.format)
+    return modules
+
+
 def numpy_save_aligned(*args, **kwargs):
     """A wrapper for numpy.save(), ensures the array is stored 4KiB aligned."""
     # https://github.com/numpy/numpy/blob/2093a6d5b933f812d15a3de0eafeeb23c61f948a/numpy/lib/format.py#L179
-    has_array_align = hasattr(np.lib.format, "ARRAY_ALIGN")
-    if has_array_align:
-        default_alignment = np.lib.format.ARRAY_ALIGN
-        # The maximum allowed alignment by the numpy code linked above is 4K.
-        # Most filesystems work with block sizes of 4K so in practice, the file
-        # size on the disk won't be larger.
-        np.lib.format.ARRAY_ALIGN = 4096
-    np.save(*args, **kwargs)
-    if has_array_align:
-        np.lib.format.ARRAY_ALIGN = default_alignment
+    modules = _array_align_modules()
+    # The maximum allowed alignment by the numpy code linked above is 4K.
+    # Most filesystems work with block sizes of 4K so in practice, the file
+    # size on the disk won't be larger.
+    defaults = [module.ARRAY_ALIGN for module in modules]
+    for module in modules:
+        module.ARRAY_ALIGN = 4096
+    try:
+        np.save(*args, **kwargs)
+    finally:
+        for module, default_alignment in zip(modules, defaults):
+            module.ARRAY_ALIGN = default_alignment
 
 
 def _read_torch_data(path):
@@ -164,7 +198,10 @@ def read_edges(dataset_dir, edge_fmt, edge_path):
             os.path.join(dataset_dir, edge_path),
             names=["src", "dst"],
         )
-        src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
+        src, dst = (
+            edge_data["src"].to_numpy(copy=True),
+            edge_data["dst"].to_numpy(copy=True),
+        )
     return (src, dst)
 
 

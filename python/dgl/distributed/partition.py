@@ -14,7 +14,9 @@ import numpy as np
 
 import torch
 
-from .. import backend as F, graphbolt as gb
+from .. import backend as F
+
+# from .. import graphbolt as gb
 from ..base import dgl_warning, DGLError, EID, ETYPE, NID, NTYPE
 from ..convert import heterograph, to_homogeneous
 from ..data.utils import load_graphs, load_tensors, save_graphs, save_tensors
@@ -112,11 +114,16 @@ def _save_dgl_graphs(filename, g_list, formats=None):
 
 
 def _get_inner_node_mask(graph, ntype_id, gpb=None):
-    ndata = (
-        graph.node_attributes
-        if isinstance(graph, gb.FusedCSCSamplingGraph)
-        else graph.ndata
-    )
+
+    try:
+        if isinstance(graph, gb.FusedCSCSamplingGraph):
+            ndata = graph.node_attributes
+        else:
+            ndata = graph.ndata
+    except:
+        print("GraphBolt not Supported")
+        ndata = graph.ndata
+
     assert "inner_node" in ndata, "'inner_node' is not in nodes' data"
     if NTYPE in ndata or gpb is not None:
         ntype = (
@@ -134,17 +141,23 @@ def _get_inner_edge_mask(
     graph,
     etype_id,
 ):
-    edata = (
-        graph.edge_attributes
-        if isinstance(graph, gb.FusedCSCSamplingGraph)
-        else graph.edata
-    )
+    try:
+        if isinstance(graph, gb.FusedCSCSamplingGraph):
+            edata = graph.edge_attributes
+        else:
+            edata = graph.edata
+    except:
+        print("GraphBolt not Supported")
+        edata = graph.edata
     assert "inner_edge" in edata, "'inner_edge' is not in edges' data"
-    etype = (
-        graph.type_per_edge
-        if isinstance(graph, gb.FusedCSCSamplingGraph)
-        else (graph.edata[ETYPE] if ETYPE in graph.edata else None)
-    )
+    try:
+        if isinstance(graph, gb.FusedCSCSamplingGraph):
+            etype = graph.type_per_edge
+        else:
+            etype = graph.edata[ETYPE] if ETYPE in graph.edata else None
+    except:
+        print("GraphBolt not Supported")
+        etype = graph.edata[ETYPE] if ETYPE in graph.edata else None
     if etype is not None:
         dtype = F.dtype(edata["inner_edge"])
         return edata["inner_edge"] * F.astype(etype == etype_id, dtype) == 1

@@ -18,7 +18,6 @@ from .citation_graph import (
 )
 from .csv_dataset import CSVDataset
 from .dgl_dataset import DGLBuiltinDataset, DGLDataset
-from .fakenews import FakeNewsDataset
 from .flickr import FlickrDataset
 from .fraud import FraudAmazonDataset, FraudDataset, FraudYelpDataset
 from .gdelt import GDELT, GDELTDataset

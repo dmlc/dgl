@@ -37,7 +37,7 @@ class RemainderPartition : public NDArrayPartition {
 
   std::pair<IdArray, NDArray> GeneratePermutation(
       IdArray in_idx) const override {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
     auto ctx = in_idx->ctx;
     if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
@@ -54,7 +54,7 @@ class RemainderPartition : public NDArrayPartition {
   }
 
   IdArray MapToLocal(IdArray in_idx) const override {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
     auto ctx = in_idx->ctx;
     if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
@@ -71,7 +71,7 @@ class RemainderPartition : public NDArrayPartition {
   }
 
   IdArray MapToGlobal(IdArray in_idx, const int part_id) const override {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
     auto ctx = in_idx->ctx;
     if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
@@ -116,7 +116,7 @@ class RangePartition : public NDArrayPartition {
 
   std::pair<IdArray, NDArray> GeneratePermutation(
       IdArray in_idx) const override {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
     auto ctx = in_idx->ctx;
     if (ctx.device_type == kDGLCUDA) {
       if (ctx.device_type != range_->ctx.device_type ||
@@ -142,7 +142,7 @@ class RangePartition : public NDArrayPartition {
   }
 
   IdArray MapToLocal(IdArray in_idx) const override {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
     auto ctx = in_idx->ctx;
     if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
@@ -161,7 +161,7 @@ class RangePartition : public NDArrayPartition {
   }
 
   IdArray MapToGlobal(IdArray in_idx, const int part_id) const override {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
     auto ctx = in_idx->ctx;
     if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {

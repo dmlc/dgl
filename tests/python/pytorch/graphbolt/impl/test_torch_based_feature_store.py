@@ -4,12 +4,13 @@ import unittest
 
 import backend as F
 
+import dgl.graphbolt as gb
+
 import numpy as np
 import pydantic
 import pytest
 import torch
-
-from dgl import graphbolt as gb
+from dgl.graphbolt.impl.sampled_subgraph_impl import SampledSubgraphImpl
 
 
 def to_on_disk_tensor(test_dir, name, t):

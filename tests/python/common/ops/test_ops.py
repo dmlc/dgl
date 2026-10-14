@@ -181,6 +181,7 @@ def test_spmm(idtype, dtype, g, shp, msg, reducer):
         g.dstdata.pop("v")
 
 
+@unittest.skipIf(F.is_hip(), reason="Not implemented in ROCm")
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch",
     reason="Only support PyTorch for now.",
@@ -333,6 +334,7 @@ def test_segment_reduce(reducer):
         print("backward passed")
 
 
+@unittest.skipIf(F.is_hip(), reason="Not implemented in ROCm")
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch", reason="Only support PyTorch for now"
 )
@@ -391,6 +393,7 @@ def test_segment_mm(idtype, feat_size, dtype, tol):
     assert torch.allclose(db, db_t, atol=tol, rtol=tol)
 
 
+@unittest.skipIf(F.is_hip(), reason="Not implemented in ROCm")
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch", reason="Only support PyTorch for now"
 )

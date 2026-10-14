@@ -3,6 +3,7 @@ import unittest
 import backend as F
 import torch
 import torch.distributed as dist
+from utils import rendezvous_port
 
 from dgl.cuda import nccl
 from dgl.partition import NDArrayPartition
@@ -15,7 +16,7 @@ def test_nccl_sparse_push_single_remainder():
     torch.cuda.set_device("cuda:0")
     dist.init_process_group(
         backend="nccl",
-        init_method="tcp://127.0.0.1:12345",
+        init_method=f"tcp://127.0.0.1:{rendezvous_port()}",
         world_size=1,
         rank=0,
     )
@@ -39,7 +40,7 @@ def test_nccl_sparse_pull_single_remainder():
     torch.cuda.set_device("cuda:0")
     dist.init_process_group(
         backend="nccl",
-        init_method="tcp://127.0.0.1:12345",
+        init_method=f"tcp://127.0.0.1:{rendezvous_port()}",
         world_size=1,
         rank=0,
     )
@@ -63,7 +64,7 @@ def test_nccl_sparse_push_single_range():
     torch.cuda.set_device("cuda:0")
     dist.init_process_group(
         backend="nccl",
-        init_method="tcp://127.0.0.1:12345",
+        init_method=f"tcp://127.0.0.1:{rendezvous_port()}",
         world_size=1,
         rank=0,
     )
@@ -90,7 +91,7 @@ def test_nccl_sparse_pull_single_range():
     torch.cuda.set_device("cuda:0")
     dist.init_process_group(
         backend="nccl",
-        init_method="tcp://127.0.0.1:12345",
+        init_method=f"tcp://127.0.0.1:{rendezvous_port()}",
         world_size=1,
         rank=0,
     )

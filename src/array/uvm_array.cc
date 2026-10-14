@@ -16,7 +16,7 @@ namespace dgl {
 namespace aten {
 
 NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   CHECK(array.IsPinned()) << "Input array must be in pinned memory.";
   CHECK_EQ(index->ctx.device_type, kDGLCUDA) << "Index must be on the GPU.";
   CHECK_GE(array->ndim, 1) << "Input array must have at least 1 dimension.";
@@ -34,7 +34,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
 }
 
 void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
   CHECK(dest.IsPinned()) << "Destination array must be in pinned memory.";
   CHECK_EQ(index->ctx.device_type, kDGLCUDA) << "Index must be on the GPU.";
   CHECK_EQ(source->ctx.device_type, kDGLCUDA)

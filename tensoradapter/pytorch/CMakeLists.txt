@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 project(tensoradapter_pytorch C CXX)
 
+if (USE_HIP)
+  include(../../cmake/modules/dgl_hipify.cmake)
+  hipify(CUDA_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+endif(USE_HIP)
+
 # Find PyTorch cmake files and PyTorch versions with the python interpreter $PYTHON_INTERP
 # ("python3" or "python" if empty)
 if(NOT PYTHON_INTERP)
@@ -18,7 +23,9 @@ list(GET TORCH_PREFIX_VER 1 TORCH_VER)
 message(STATUS "Configuring for PyTorch ${TORCH_VER}")
 
 if(USE_CUDA)
-  add_definitions(-DDGL_USE_CUDA)
+add_definitions(-DDGL_USE_CUDA)
+elseif (USE_HIP) 
+add_definitions(-DDGL_USE_HIP)
 endif()
 
 set(Torch_DIR "${TORCH_PREFIX}/Torch")
@@ -28,7 +35,11 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${TORCH_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 set(TORCH_TARGET_NAME "tensoradapter_pytorch_${TORCH_VER}")
-file(GLOB TA_TORCH_SRC *.cpp)
+if (USE_HIP)
+  file(GLOB TA_TORCH_SRC *_hip.cpp)
+else(USE_HIP)
+  file(GLOB TA_TORCH_SRC *.cpp)
+endif(USE_HIP)
 add_library(${TORCH_TARGET_NAME} SHARED "${TA_TORCH_SRC}")
 
 # use the library name rather than the path

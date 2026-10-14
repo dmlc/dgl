@@ -6,7 +6,7 @@
 #ifndef DGL_ARRAY_ARITH_H_
 #define DGL_ARRAY_ARITH_H_
 
-#ifdef __CUDACC__
+#if defined __CUDACC__ || defined __HIPCC__
 #define DGLDEVICE __device__
 #define DGLINLINE __forceinline__
 #else

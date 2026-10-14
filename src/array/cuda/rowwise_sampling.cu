@@ -4,12 +4,21 @@
  * @brief uniform rowwise sampling
  */
 
+#if defined(__CUDACC__)
 #include <curand_kernel.h>
+
+#include <cub/cub.cuh>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hiprand/hiprand_kernel.h>
+
+#include <hipcub/hipcub.hpp>
+#endif
+
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/tensordispatch.h>
 
-#include <cub/cub.cuh>
 #include <numeric>
 
 #include "../../array/cuda/atomic.cuh"

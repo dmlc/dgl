@@ -13,6 +13,10 @@
 #include <string.h>
 
 #include "runtime_base.h"
+#ifdef DGL_USE_HIP
+#include <dgl/hip/cuda_to_hip.h>
+#include <hip/hip_fp16.h>
+#endif
 
 namespace dgl {
 
@@ -23,7 +27,7 @@ constexpr DGLDataType DGLDataTypeTraits<int32_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<int64_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<uint32_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<uint64_t>::dtype;
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
 constexpr DGLDataType DGLDataTypeTraits<__half>::dtype;
 #if BF16_ENABLED
 constexpr DGLDataType DGLDataTypeTraits<__nv_bfloat16>::dtype;

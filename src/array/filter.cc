@@ -24,7 +24,7 @@ DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterCreateFromSet")
       auto ctx = array->ctx;
       // TODO(nv-dlasalle): Implement CPU version.
       if (ctx.device_type == kDGLCUDA) {
-#ifdef DGL_USE_CUDA
+#if defined(DGL_USE_CUDA) || defined(DGL_USE_HIP)
         ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
           *rv = CreateSetFilter<kDGLCUDA, IdType>(array);
         });

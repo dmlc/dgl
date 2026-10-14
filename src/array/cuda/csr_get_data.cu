@@ -8,7 +8,9 @@
 #include <numeric>
 #include <unordered_set>
 #include <vector>
-
+#if defined(DGL_USE_HIP)
+#include <dgl/hip/cuda_to_hip.h>
+#endif
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 

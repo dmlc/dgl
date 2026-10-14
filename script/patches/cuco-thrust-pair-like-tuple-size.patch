@@ -1,0 +1,25 @@
+Make cuco's is_thrust_pair_like_impl detection SFINAE-safe.
+
+The partial specialization only constrained thrust::get<0>/get<1>, then
+evaluated thrust::tuple_size<T>::value in its base-clause. Under ROCm 10's
+libhipcxx, cuda::std::tuple_size has an undefined primary template, so for a
+non-tuple T (e.g. the double desired_load_factor argument considered during
+overload resolution for cuco::pair's converting constructor) this is a hard
+error instead of a substitution failure.
+
+Constrain tuple_size in the void_t as well, matching the existing
+is_cuda_std_pair_like_impl specialization directly above it.
+
+--- a/include/cuco/detail/pair/traits.hpp
++++ b/include/cuco/detail/pair/traits.hpp
+@@ -74,8 +74,9 @@
+ template <typename T>
+ struct is_thrust_pair_like_impl<
+   T,
+   cuda::std::void_t<decltype(thrust::get<0>(cuda::std::declval<T>())),
+-                    decltype(thrust::get<1>(cuda::std::declval<T>()))>>
++                    decltype(thrust::get<1>(cuda::std::declval<T>())),
++                    decltype(thrust::tuple_size<T>::value)>>
+   : cuda::std::conditional_t<thrust::tuple_size<T>::value == 2,
+                               cuda::std::true_type,
+                               cuda::std::false_type> {};

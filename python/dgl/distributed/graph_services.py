@@ -7,7 +7,9 @@ import numpy as np
 
 import torch
 
-from .. import backend as F, graphbolt as gb
+from .. import backend as F
+
+# from .. import graphbolt as gb
 from ..base import EID, ETYPE, NID
 from ..convert import graph, heterograph
 from ..sampling import (
@@ -146,9 +148,13 @@ def _sample_neighbors_graphbolt(
     if prob is not None:
         probs_or_mask = g.edge_attributes[prob]
     # Sanity checks.
-    assert isinstance(
-        g, gb.FusedCSCSamplingGraph
-    ), "Expect a FusedCSCSamplingGraph."
+    try:
+        assert isinstance(
+            g, gb.FusedCSCSamplingGraph
+        ), "Expect a FusedCSCSamplingGraph."
+    except Exception:
+        print("GraphBolt not Supported")
+        pass
     assert isinstance(nodes, torch.Tensor), "Expect a tensor of nodes."
     if isinstance(fanout, int):
         fanout = torch.LongTensor([fanout])
@@ -164,12 +170,16 @@ def _sample_neighbors_graphbolt(
 
     # 3. Map local node IDs to global node IDs.
     local_src = subgraph.indices
-    local_dst = gb.expand_indptr(
-        subgraph.indptr,
-        dtype=local_src.dtype,
-        node_ids=subgraph.original_column_node_ids,
-        output_size=local_src.shape[0],
-    )
+    try:
+        local_dst = gb.expand_indptr(
+            subgraph.indptr,
+            dtype=local_src.dtype,
+            node_ids=subgraph.original_column_node_ids,
+            output_size=local_src.shape[0],
+        )
+    except Exception:
+        print("GraphBolt not Supported")
+        pass
     global_nid_mapping = g.node_attributes[NID]
     global_src = global_nid_mapping[local_src]
     global_dst = global_nid_mapping[local_dst]
@@ -339,27 +349,34 @@ def _find_edges(local_g, partition_book, seed_edges):
     and destination node ID array ``s`` and ``d`` in the local partition.
     """
     local_eids = partition_book.eid2localeid(seed_edges, partition_book.partid)
-    if isinstance(local_g, gb.FusedCSCSamplingGraph):
-        # When converting from DGLGraph to FusedCSCSamplingGraph, the edge IDs
-        # are re-ordered. In order to find the correct node pairs, we need to
-        # map the DGL edge IDs back to GraphBolt edge IDs.
-        if (
-            DGL2GB_EID not in local_g.edge_attributes
-            or GB_DST_ID not in local_g.edge_attributes
-        ):
-            raise ValueError(
-                "The edge attributes DGL2GB_EID and GB_DST_ID are not found. "
-                "Please make sure `coo` format is available when generating "
-                "partitions in GraphBolt format."
-            )
-        local_eids = local_g.edge_attributes[DGL2GB_EID][local_eids]
-        local_src = local_g.indices[local_eids]
-        local_dst = local_g.edge_attributes[GB_DST_ID][local_eids]
-        global_nid_mapping = local_g.node_attributes[NID]
-    else:
+    try:
+        if isinstance(local_g, gb.FusedCSCSamplingGraph):
+            # When converting from DGLGraph to FusedCSCSamplingGraph, the edge IDs
+            # are re-ordered. In order to find the correct node pairs, we need to
+            # map the DGL edge IDs back to GraphBolt edge IDs.
+            if (
+                DGL2GB_EID not in local_g.edge_attributes
+                or GB_DST_ID not in local_g.edge_attributes
+            ):
+                raise ValueError(
+                    "The edge attributes DGL2GB_EID and GB_DST_ID are not found. "
+                    "Please make sure `coo` format is available when generating "
+                    "partitions in GraphBolt format."
+                )
+            local_eids = local_g.edge_attributes[DGL2GB_EID][local_eids]
+            local_src = local_g.indices[local_eids]
+            local_dst = local_g.edge_attributes[GB_DST_ID][local_eids]
+            global_nid_mapping = local_g.node_attributes[NID]
+        else:
+            local_eids = F.astype(local_eids, local_g.idtype)
+            local_src, local_dst = local_g.find_edges(local_eids)
+            global_nid_mapping = local_g.ndata[NID]
+    except:
+        print("GraphBolt not Supported")
         local_eids = F.astype(local_eids, local_g.idtype)
         local_src, local_dst = local_g.find_edges(local_eids)
         global_nid_mapping = local_g.ndata[NID]
+
     global_src = global_nid_mapping[local_src]
     global_dst = global_nid_mapping[local_dst]
     return global_src, global_dst

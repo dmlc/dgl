@@ -4,7 +4,13 @@
  * @brief Utilities for CUDA kernels.
  */
 
+#if defined(__CUDACC__)
 #include <cub/cub.cuh>
+#elif defined(__HIPCC__)
+#include <dgl/hip/cuda_to_hip.h>
+
+#include <hipcub/hipcub.hpp>
+#endif
 
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"

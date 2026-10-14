@@ -22,8 +22,11 @@
 #include <thrust/functional.h>
 #include <thrust/gather.h>
 #include <thrust/logical.h>
-
+#ifdef GRAPHBOLT_USE_HIP
+#include <hipcub/hipcub.hpp>
+#else
 #include <cub/cub.cuh>
+#endif
 #include <mutex>
 #include <type_traits>
 #include <unordered_map>

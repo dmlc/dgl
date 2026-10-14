@@ -20,7 +20,12 @@
 #define DGL_ARRAY_CUDA_BF16_CUH_
 
 #if BF16_ENABLED
+#if defined(DGL_USE_CUDA)
 #include <cuda_bf16.h>
+#elif defined(DGL_USE_HIP)
+#include <dgl/hip/cuda_to_hip.h>
+#include <hip/hip_bf16.h>
+#endif
 
 #include <algorithm>
 

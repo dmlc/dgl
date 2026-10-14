@@ -19,7 +19,11 @@
  */
 #include <c10/core/ScalarType.h>
 
+#ifdef __HIPCC__
+#include <hipcub/hipcub.hpp>
+#else
 #include <cub/cub.cuh>
+#endif
 
 #include "./common.h"
 #include "./utils.h"
