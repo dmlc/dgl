@@ -221,6 +221,9 @@ if(USE_ASCEND)
       # Can be set via CMake -DSOC_VERSION or environment variable SOC_VERSION
       # All A2/A3 sub-models share DAV_2201 architecture (BUILD_MODE=c220).
       # Default: ascend910b4 (A2). Binary compiled with this SOC also runs on A3.
+      # A5 (Ascend 950PR, DAV_3510) requires its own SOC_VERSION, e.g.
+      # Ascend950PR_9579 (auto-detected by script/build_dgl_ascend.sh via
+      # aclrtGetSocName).
       # The build script auto-detects from hardware via npu-smi.
       if(NOT DEFINED SOC_VERSION)
         if(DEFINED ENV{SOC_VERSION})
@@ -708,15 +711,16 @@ if(BUILD_CPP_TEST)
   # runUnitTests is an executable that links libtorch_python.so, which in
   # turn requires the CPython symbols.  find_package(Python3 ...) above uses
   # the Development.Module component (no libpython), so resolve libpython
-  # explicitly for the test binary.
-  find_library(PYTHON_LIB python3.11 HINTS ${CONDA_LIB_DIR} ${Python3_ROOT_DIR}/lib NO_DEFAULT_PATH)
+  # explicitly for the test binary.  Try python3.11 (original) first, then
+  # python3.10 (AscendInstallation.md uses python=3.10).
+  find_library(PYTHON_LIB python3.11 python3.10 HINTS ${CONDA_LIB_DIR} ${Python3_ROOT_DIR}/lib NO_DEFAULT_PATH)
   if(NOT PYTHON_LIB)
-    find_library(PYTHON_LIB python3.11)
+    find_library(PYTHON_LIB python3.11 python3.10)
   endif()
   if(PYTHON_LIB)
     message(STATUS "Found libpython for runUnitTests: ${PYTHON_LIB}")
   else()
-    message(WARNING "libpython3.11 not found; runUnitTests link may fail")
+    message(WARNING "libpython not found; runUnitTests link may fail")
   endif()
 
   # CANN runtime libs (libruntime.so / libascend_dump.so) depend on the

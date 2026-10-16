@@ -17,18 +17,20 @@
 #   DGL_HOME: Path to DGL source directory (optional, auto-detected)
 #   SOC_VERSION: Override SoC version (same as -s)
 #
-# Supported SoC versions (all DAV_2201 architecture, kernel code identical):
+# Supported SoC versions:
 #   A2 series:  Ascend910B1, Ascend910B2, Ascend910B2C, Ascend910B3, Ascend910B4
 #   A3 series:  ascend910_9362, ascend910_9372, ascend910_9381, ascend910_9382,
 #               ascend910_9391, ascend910_9392
-#
+#   A5 series:  ascend950pr_9579
 # Note: A2 and A3 share the same DAV_2201 architecture (same instruction set,
 #   same buffer sizes). The only differences are core count (20/40 vs 24/48),
 #   frequency, L2 and HBM size. Core count is queried at runtime via
 #   aclrtGetDeviceInfo, so one build runs on all sub-models. SOC_VERSION only
 #   affects the compiled kernel microcode binary.
 #
-
+# A5 (Ascend 950PR, DAV_3510) is a separate architecture: build with the
+#   auto-detected SOC_VERSION (kernels are source-compatible; UB is larger,
+#   248KB vs 192KB, and core counts are queried at runtime).
 set -e
 set -o pipefail
 
@@ -56,12 +58,24 @@ echo_info "Working directory: $(pwd)"
 # ---------------------------------------------------------------------------
 A2_SOC_LIST="ascend910b1 ascend910b2 ascend910b2c ascend910b3 ascend910b4 ascend910b4-1"
 A3_SOC_LIST="ascend910_9362 ascend910_9372 ascend910_9381 ascend910_9382 ascend910_9391 ascend910_9392"
-ALL_SOC_LIST="${A2_SOC_LIST} ${A3_SOC_LIST}"
+# A5 (Ascend 950PR, DAV_3510): only explicitly verified models; the model suffix
+# comes from aclrtGetSocName / npu-smi "NPU Name" (e.g. 9579 -> Ascend950PR_9579)
+A5_SOC_LIST="ascend950pr_9579"
+ALL_SOC_LIST="${A2_SOC_LIST} ${A3_SOC_LIST} ${A5_SOC_LIST}"
 
 is_valid_soc() {
     local soc_lower
     soc_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
     for s in ${ALL_SOC_LIST}; do
+        [[ "${soc_lower}" == "${s}" ]] && return 0
+    done
+    return 1
+}
+
+is_a5_soc() {
+    local soc_lower
+    soc_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    for s in ${A5_SOC_LIST}; do
         [[ "${soc_lower}" == "${s}" ]] && return 0
     done
     return 1
@@ -82,15 +96,40 @@ is_a2_soc() {
 #   Fallback: ascend910b4 (A2, also runs on A3; DAV_2201)
 # ---------------------------------------------------------------------------
 detect_soc_version() {
+    # Strategy 1: exact SoC string from the driver via aclrtGetSocName.
+    # Works on all series (incl. Ascend 950PR, e.g. "Ascend950PR_9579") and the
+    # returned string is accepted by the AscendC compiler verbatim.
+    # NOTE: needs CANN env, so detect_ascend_toolkit + setup_ascend_env run
+    # before SoC resolution (see main flow below).
+    local soc_name
+    soc_name=$(python3 -c "
+import ctypes
+try:
+    lib = ctypes.CDLL('libascendcl.so')
+    lib.aclrtGetSocName.restype = ctypes.c_char_p
+    print((lib.aclrtGetSocName() or b'').decode())
+except Exception:
+    pass
+" 2>/dev/null || true)
+    if [[ -n "${soc_name}" ]]; then
+        echo_info "Detected SoC via aclrtGetSocName: ${soc_name}"
+        echo "${soc_name}"
+        return
+    fi
+
     if ! command -v npu-smi &>/dev/null; then
         echo_warn "npu-smi not found, cannot auto-detect SoC version"
         echo "ascend910b4"
         return
     fi
 
+    # Strategy 2: npu-smi board info. Some boards (e.g. A310-50) do not
+    # support "-c 0", so retry without it.
     local npu_name
-    # npu-smi info -t board -i 0 -c 0 → "NPU Name : 9382"
     npu_name=$(npu-smi info -t board -i 0 -c 0 2>/dev/null | grep "NPU Name" | awk -F':' '{print $2}' | tr -d ' \t' || true)
+    if [[ -z "${npu_name}" ]]; then
+        npu_name=$(npu-smi info -t board -i 0 2>/dev/null | grep "NPU Name" | awk -F':' '{print $2}' | tr -d ' \t' || true)
+    fi
 
     if [[ -z "${npu_name}" ]]; then
         echo_warn "Cannot read NPU Name from npu-smi, using default ascend910b4"
@@ -113,6 +152,7 @@ detect_soc_version() {
         9382)              echo "ascend910_9382" ;;
         9391)              echo "ascend910_9391" ;;
         9392)              echo "ascend910_9392" ;;
+        9579)              echo "Ascend950PR_9579" ;;
         *)
             echo_warn "Unknown NPU Name '${npu_name}', using default ascend910b4"
             echo "ascend910b4"
@@ -181,7 +221,8 @@ while getopts "hs:t:cj:" opt; do
             echo "Options:"
             echo "  -s SOC     Ascend SoC version (auto-detected by default)"
             echo "             A2: $(echo ${A2_SOC_LIST} | sed 's/ /, /g')"
-            echo "             A3: $(echo ${A3_SOC_LIST} | sed 's/ /, /g')"
+            echo "             A3: $(echo ${A3_SOC_LIST} | sed 's/ /, /g')
+             A5: $(echo ${A5_SOC_LIST} | sed 's/ /, /g') (auto-detected via aclrtGetSocName)"
             echo "  -t TYPE    Build type: dev, dogfood, release (default: dev)"
             echo "  -c         Clean build (remove existing build directory)"
             echo "  -j JOBS    Number of parallel jobs (default: $(nproc))"
@@ -212,6 +253,11 @@ while getopts "hs:t:cj:" opt; do
     esac
 done
 
+# Detect and setup Ascend environment first: SoC auto-detection via
+# aclrtGetSocName needs libascendcl.so on the library path.
+detect_ascend_toolkit || true
+setup_ascend_env
+
 # Resolve SoC version: CLI -s > env SOC_VERSION > auto-detect
 if [[ -z "${SOC_VERSION}" ]]; then
     SOC_VERSION=$(detect_soc_version)
@@ -227,7 +273,9 @@ if ! is_valid_soc "${SOC_VERSION}"; then
     exit 1
 fi
 
-if is_a2_soc "${SOC_VERSION}"; then
+if is_a5_soc "${SOC_VERSION}"; then
+    echo_info "SoC: ${SOC_VERSION} (Atlas A5 series, DAV_3510)"
+elif is_a2_soc "${SOC_VERSION}"; then
     echo_info "SoC: ${SOC_VERSION} (Atlas A2 series, DAV_2201)"
 else
     echo_info "SoC: ${SOC_VERSION} (Atlas A3 series, DAV_2201)"
@@ -239,10 +287,6 @@ echo_info "=========================================="
 echo_info "Build type: ${BUILD_TYPE}"
 echo_info "SoC version: ${SOC_VERSION}"
 echo_info "Parallel jobs: ${JOBS}"
-
-# Detect and setup Ascend environment
-detect_ascend_toolkit || true
-setup_ascend_env
 
 # Clean build if requested
 if [[ "${CLEAN_BUILD}" == true ]]; then
