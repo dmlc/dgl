@@ -150,6 +150,18 @@ private:
             uint32_t dstOffset = kBlockIndex * CUBE_BLOCK_SIZE + kInnerIndex * CUBE_BLOCK_LENGTH;
             AscendC::DataCopy(b1Nz[dstOffset], featureGm[srcOffset], copyParams);
         }
+
+        // MMAD consumes K rounded up to a 16-element Cube block.  The sparse
+        // A operand is zero-padded, so the corresponding B rows must also be
+        // initialized: 0 * an uninitialized NaN still propagates NaN.
+        if (rows < k) {
+            AscendC::InitConstValueParams<half> zeroParams;
+            zeroParams.repeatTimes = static_cast<uint16_t>(nBlocksCols);
+            zeroParams.blockNum = static_cast<uint16_t>(k - rows);
+            zeroParams.dstGap = static_cast<uint16_t>(rows);
+            zeroParams.initValue = half(0.0f);
+            AscendC::Fill(b1Nz[rows * CUBE_BLOCK_LENGTH], zeroParams);
+        }
         
         b1Queue.EnQue<half>(b1Nz);
     }

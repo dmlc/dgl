@@ -226,6 +226,19 @@ private:
             }
         }
 
+        // Each K row occupies 16 values in B1.  MMAD consumes the padded K,
+        // therefore the rows beyond the real K size must contain zeros.
+        if (rows < k) {
+            constexpr uint32_t blocksPerKRow =
+                CUBE_BLOCK_LENGTH * sizeof(DType) / ALIGN_BYTES;
+            AscendC::InitConstValueParams<DType> zeroParams;
+            zeroParams.repeatTimes = static_cast<uint16_t>(nBlocksCols);
+            zeroParams.blockNum = static_cast<uint16_t>((k - rows) * blocksPerKRow);
+            zeroParams.dstGap = static_cast<uint16_t>(rows * blocksPerKRow);
+            zeroParams.initValue = DType(0);
+            AscendC::Fill(b1Nz[rows * CUBE_BLOCK_LENGTH], zeroParams);
+        }
+
         b1Queue.EnQue<DType>(b1Nz);
     }
 

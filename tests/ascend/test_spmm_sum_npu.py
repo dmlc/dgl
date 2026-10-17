@@ -130,9 +130,15 @@ def compare_outputs(cpu_output: torch.Tensor, npu_output: torch.Tensor) -> Tuple
     cpu_output = cpu_output.float()
     npu_output = npu_output.float()
     diff = torch.abs(cpu_output - npu_output)
-    max_abs_diff = float(diff.max().item()) if diff.numel() > 0 else 0.0
-    mean_abs_diff = float(diff.mean().item()) if diff.numel() > 0 else 0.0
-    mismatch_count = int(torch.count_nonzero(diff > 1e-2).item())
+    finite = torch.isfinite(diff)
+    all_finite = bool(finite.all().item())
+    max_abs_diff = (
+        float(diff.max().item()) if diff.numel() > 0 and all_finite else float("inf")
+    )
+    mean_abs_diff = (
+        float(diff.mean().item()) if diff.numel() > 0 and all_finite else float("inf")
+    )
+    mismatch_count = int(torch.count_nonzero((diff > 1e-2) | ~finite).item())
     return max_abs_diff, mean_abs_diff, mismatch_count
 
 
@@ -200,7 +206,7 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=100, help="单次测量内部的连续执行次数")
     parser.add_argument("--measurements", type=int, default=50, help="总共进行多少次独立测量")
     parser.add_argument("--warmup", type=int, default=100, help="预热执行次数")
-    parser.add_argument("--device-id", type=int, default=6, help="NPU 设备编号")
+    parser.add_argument("--device-id", type=int, default=0, help="NPU 设备编号")
     parser.add_argument(
         "--reduces",
         nargs="+",
