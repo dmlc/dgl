@@ -31,6 +31,13 @@ cd dgl-ascend
 git submodule update --init --recursive
 ```
 
+Set the SoC version for the AscendC kernel compilation before building. If it is not set, the build defaults to `Ascend910B4`, and the kernels will not match other SoCs.
+
+- Ascend 910B series: no need to set it (default `Ascend910B4`).
+- Ascend 950PR (Atlas 950PR, model 9579): `export SOC_VERSION=Ascend950PR_9579`
+
+The value must match the SoC name accepted by your CANN toolkit (check with `npu-smi info`; it can also be passed to CMake via `-DSOC_VERSION=<value>`).
+
 Build and compile DGL-Ascend
 ```bash
 bash ./script/build_dgl_ascend.sh

@@ -286,7 +286,13 @@ DGL_REGISTER_GLOBAL("device_api.ascend")
 static thread_local aclrtStream current_ascend_stream = nullptr;
 
 aclrtStream getCurrentAscendStream() {
-  return current_ascend_stream;
+  if (current_ascend_stream != nullptr) return current_ascend_stream;
+  // Fall back to the device-wide stream (settable via the DGLSetStream C
+  // API).  By default it is nullptr, i.e. the ACL default stream, on which
+  // the array kernels serialize through their own trailing
+  // aclrtSynchronizeStream.  Ordering against torch_npu ops is established
+  // on the python side before FFI calls (see python/dgl/_ffi/base.py).
+  return static_cast<aclrtStream>(AscendDeviceAPI::Global()->GetStream());
 }
 
 void setCurrentAscendStream(aclrtStream stream) {
