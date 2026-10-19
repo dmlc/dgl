@@ -23,6 +23,7 @@ public:
         uint32_t nonZeroCount,
         AscendC::TPipe *pipe)
     {
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
         this->M = numDstRows;
         this->K = numSrcRows;
         this->featureDim = featureDim;
