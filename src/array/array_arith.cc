@@ -34,6 +34,7 @@ IdArray BinaryElewiseAscendL(IdArray lhs, int64_t rhs) {
   return ascend_ret;
 }
 
+#ifdef DGL_USE_ASCEND
 #define ASCEND_L_KERNEL(type, op)                                            \
   template <>                                                                \
   IdArray BinaryElewiseAscendL<type, arith::op>(IdArray lhs, int64_t rhs) { \
@@ -53,6 +54,7 @@ ASCEND_L_KERNEL(int32_t, EQ)
 ASCEND_L_KERNEL(int64_t, EQ)
 ASCEND_L_KERNEL(int32_t, NE)
 ASCEND_L_KERNEL(int64_t, NE)
+#endif
 
 }  // anonymous namespace
 
@@ -128,15 +130,23 @@ ASCEND_L_KERNEL(int64_t, NE)
   }
 
 // Generate operators with only lhs being NDArray.
-#define UNARY_ELEMENT_OP(name, op)                             \
-  IdArray name(IdArray lhs) {                                  \
-    IdArray ret;                                               \
-    ATEN_XPU_SWITCH_CUDA(lhs->ctx.device_type, XPU, #name, {   \
-      ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                \
-        ret = impl::UnaryElewise<XPU, IdType, arith::op>(lhs); \
-      });                                                      \
-    });                                                        \
-    return ret;                                                \
+#define UNARY_ELEMENT_OP(name, op)                                 \
+  IdArray name(IdArray lhs) {                                      \
+    IdArray ret;                                                   \
+    if (lhs->ctx.device_type == kDGLAscend) {                      \
+      ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                    \
+        ret = impl::UnaryElewise<kDGLAscend, IdType, arith::op>(   \
+            lhs);                                                  \
+      });                                                          \
+      return ret;                                                  \
+    } else {                                                       \
+      ATEN_XPU_SWITCH_CUDA(lhs->ctx.device_type, XPU, #name, {     \
+        ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {                  \
+          ret = impl::UnaryElewise<XPU, IdType, arith::op>(lhs);   \
+        });                                                        \
+      });                                                          \
+    }                                                              \
+    return ret;                                                    \
   }
 
 BINARY_ELEMENT_OP(Add, Add)

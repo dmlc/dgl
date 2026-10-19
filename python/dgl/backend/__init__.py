@@ -36,6 +36,16 @@ def load_backend(mod_name):
     if mod_name == "pytorch":
         import torch
 
+        # Import torch_npu before loading the DGL C library.  libdgl.so is
+        # linked against libtorch_npu.so; if the C library loads it first,
+        # npu gets registered as the accelerator and a later `import
+        # torch_npu` fails with "Two accelerators cannot be used at the
+        # same time".
+        try:
+            import torch_npu  # noqa: F401
+        except ImportError:
+            pass
+
         mod = torch
     elif mod_name == "mxnet":
         import mxnet

@@ -209,10 +209,10 @@ class KernelCooToCsrScatter {
     // budget; clamp defensively against unsigned underflow anyway.
     if (cursor_bytes + sizeof(IdT) > ub_available) return;
     uint32_t rest = ub_available - cursor_bytes;
-    // Staging gets a quarter of what is left, capped at one chunk's
-    // worth of picks; streams share the rest.
+    // Staging (col + eid = two buffers) gets a quarter of what is left,
+    // capped at one chunk's worth of picks; streams share the rest.
     const uint32_t stage_bytes = rest / 4 & ~static_cast<uint32_t>(3);
-    rest -= stage_bytes;
+    rest -= stage_bytes * 2;
     uint32_t chunk_bytes = rest / 6 & ~static_cast<uint32_t>(sizeof(IdT) - 1);
     chunk_elems_ = chunk_bytes / sizeof(IdT);
     if (chunk_elems_ == 0) chunk_elems_ = 1;

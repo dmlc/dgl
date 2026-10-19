@@ -21,6 +21,7 @@
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
+#include "acl_attr_compat.h"
 #define ASCEND_CALL(func)                                   \
   {                                                         \
     aclError e = (func);                                    \
@@ -100,7 +101,7 @@ uint32_t QueryVectorCoreCount(int device_id) {
 uint32_t QueryUbAvailableBytes(int device_id) {
   int64_t ub_bytes = 0;
   aclError err = aclrtGetDeviceInfo(
-      device_id, ACL_DEV_ATTR_UBUF_PER_VECTOR_CORE, &ub_bytes);
+      device_id, ACL_DEV_ATTR_LOCAL_MEM_PER_VECTOR_CORE, &ub_bytes);
   if (err != ACL_SUCCESS ||
       ub_bytes <= static_cast<int64_t>(kUbReservedBytes) ||
       ub_bytes > (1 << 30)) {
@@ -368,12 +369,17 @@ std::tuple<IdArray, IdArray, IdArray> AllocZeroedOutputs(
   IdArray picked_col = aten::NewIdArray(max_output, ctx, nbits);
   IdArray picked_idx = aten::NewIdArray(max_output, ctx, nbits);
   const int64_t out_bytes = max_output * (nbits / 8);
-  ASCEND_CALL(
-      aclrtMemsetAsync(picked_row->data, out_bytes, 0, out_bytes, stream));
-  ASCEND_CALL(
-      aclrtMemsetAsync(picked_col->data, out_bytes, 0, out_bytes, stream));
-  ASCEND_CALL(
-      aclrtMemsetAsync(picked_idx->data, out_bytes, 0, out_bytes, stream));
+  // CANN 9.0 rejects aclrtMemsetAsync with size 0; the all-zero-bias case
+  // reaches here with max_output == 0 and the early-exit path below returns
+  // empty views anyway, so the memset is only needed for non-empty outputs.
+  if (max_output > 0) {
+    ASCEND_CALL(
+        aclrtMemsetAsync(picked_row->data, out_bytes, 0, out_bytes, stream));
+    ASCEND_CALL(
+        aclrtMemsetAsync(picked_col->data, out_bytes, 0, out_bytes, stream));
+    ASCEND_CALL(
+        aclrtMemsetAsync(picked_idx->data, out_bytes, 0, out_bytes, stream));
+  }
   return {picked_row, picked_col, picked_idx};
 }
 

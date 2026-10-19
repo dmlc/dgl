@@ -1,6 +1,9 @@
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
+#include <torch/extension.h>
+
+#include "ascend/concat_tiling.h"
 #endif
 /**
  *  Copyright (c) 2019-2022 by Contributors
@@ -14,8 +17,6 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/shared_mem.h>
-
-#include <torch/extension.h>
 
 #include <sstream>
 
@@ -127,15 +128,17 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
   if (arr->dtype.bits == bits) return arr;
   if (arr.NumElements() == 0) return NewIdArray(arr->shape[0], arr->ctx, bits);
   IdArray ret;
+#ifdef DGL_USE_ASCEND
   if (arr->ctx.device_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(
         arr->dtype, IdType, { ret = impl::AsNumBits<kDGLAscend, IdType>(arr, bits); });
-  } else {
-    ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
-      ATEN_ID_TYPE_SWITCH(
-          arr->dtype, IdType, { ret = impl::AsNumBits<XPU, IdType>(arr, bits); });
-    });
+    return ret;
   }
+#endif
+  ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
+    ATEN_ID_TYPE_SWITCH(
+        arr->dtype, IdType, { ret = impl::AsNumBits<XPU, IdType>(arr, bits); });
+  });
   return ret;
 }
 
@@ -312,18 +315,30 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 }
 
 NDArray Concat(const std::vector<IdArray>& arrays) {
-  IdArray ret;
-
-  int64_t len = 0, offset = 0;
+  int64_t len = 0;
   for (size_t i = 0; i < arrays.size(); ++i) {
     len += arrays[i]->shape[0];
     CHECK_SAME_DTYPE(arrays[0], arrays[i]);
     CHECK_SAME_CONTEXT(arrays[0], arrays[i]);
   }
 
+#ifdef DGL_USE_ASCEND
+  // 1D IdArray 拼接等价于 ConcatND(arrays, dim=0)。对齐检查与 dtype 分发由
+  // ConcatND 内部完成，非对齐输入或超过 kernel 2^32 元素上限时自动回退通用路径，
+  // 保证与旧通用路径（逐段 CopyDataFromTo）行为一致。
+  if (arrays[0]->ctx.device_type == kDGLAscend &&
+      arrays[0]->dtype.code == kDGLInt &&
+      (arrays[0]->dtype.bits == 32 || arrays[0]->dtype.bits == 64) &&
+      len < (static_cast<int64_t>(1) << 32)) {
+    std::vector<NDArray> nds(arrays.begin(), arrays.end());
+    return ConcatND(nds, 0);
+  }
+#endif
+
   NDArray ret_arr = NDArray::Empty({len}, arrays[0]->dtype, arrays[0]->ctx);
 
   auto device = runtime::DeviceAPI::Get(arrays[0]->ctx);
+  int64_t offset = 0;
   for (size_t i = 0; i < arrays.size(); ++i) {
     ATEN_DTYPE_SWITCH(arrays[i]->dtype, DType, "array", {
       device->CopyDataFromTo(
@@ -337,6 +352,109 @@ NDArray Concat(const std::vector<IdArray>& arrays) {
   }
 
   return ret_arr;
+}
+
+#ifdef DGL_USE_ASCEND
+namespace {
+
+// The AscendC kernel moves data with DataCopyPad, which requires 32-byte-aligned
+// GM addresses. Freshly allocated buffers are 512-byte aligned on Ascend, but a
+// DLPack tensor may be a slice of a larger allocation and hence start anywhere,
+// so misaligned inputs must fall back to the byte-wise copy path.
+bool AscendDataCopyAligned(
+    const std::vector<NDArray>& arrays, const NDArray& out) {
+  auto aligned = [](const void* p) {
+    return (reinterpret_cast<uintptr_t>(p) & (CONCAT_ALIGN_BYTES - 1)) == 0;
+  };
+  if (!aligned(out->data)) return false;
+  for (const NDArray& a : arrays) {
+    if (!aligned(a->data)) return false;
+  }
+  return true;
+}
+
+}  // namespace
+#endif  // DGL_USE_ASCEND
+
+NDArray ConcatND(const std::vector<NDArray>& arrays, int64_t dim) {
+  CHECK(!arrays.empty()) << "ConcatND requires at least one array.";
+  const NDArray& first = arrays[0];
+  const int64_t ndim = first->ndim;
+  CHECK_GE(ndim, 1) << "ConcatND requires ndim >= 1, got " << ndim << ".";
+  const int64_t axis = dim < 0 ? dim + ndim : dim;
+  CHECK_GE(axis, 0) << "ConcatND: dim " << dim << " is out of range for ndim "
+                    << ndim << ".";
+  CHECK_LT(axis, ndim) << "ConcatND: dim " << dim << " is out of range for ndim "
+                       << ndim << ".";
+
+  std::vector<int64_t> out_shape(first->shape, first->shape + ndim);
+  out_shape[axis] = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    CHECK_SAME_DTYPE(first, arrays[i]);
+    CHECK_SAME_CONTEXT(first, arrays[i]);
+    CHECK_NDIM(arrays[i], ndim, "arrays[i]");
+    for (int64_t d = 0; d < ndim; ++d) {
+      if (d == axis) {
+        out_shape[d] += arrays[i]->shape[d];
+      } else {
+        CHECK_EQ(first->shape[d], arrays[i]->shape[d])
+            << "ConcatND: all shapes must match except on dim " << axis
+            << ", but arrays[0] and arrays[" << i << "] differ on axis " << d
+            << " (" << first->shape[d] << " vs " << arrays[i]->shape[d] << ").";
+      }
+    }
+  }
+
+  NDArray ret = NDArray::Empty(out_shape, first->dtype, first->ctx);
+  if (out_shape[axis] == 0) return ret;
+
+#ifdef DGL_USE_ASCEND
+  if (first->ctx.device_type == kDGLAscend &&
+      AscendDataCopyAligned(arrays, ret)) {
+    if (IS_FLOAT32(first)) {
+      impl::ConcatND<kDGLAscend, float>(arrays, ret, axis);
+      return ret;
+    }
+    if (first->dtype.code == kDGLFloat && first->dtype.bits == 16) {
+      // fp16 travels as uint16_t on Ascend; the kernel only moves bytes.
+      impl::ConcatND<kDGLAscend, uint16_t>(arrays, ret, axis);
+      return ret;
+    }
+    // int32/int64: 同一搬运 kernel 覆盖 1D IdArray 拼接（aten::Concat）与整型特征。
+    if (first->dtype.code == kDGLInt && first->dtype.bits == 32) {
+      impl::ConcatND<kDGLAscend, int32_t>(arrays, ret, axis);
+      return ret;
+    }
+    if (first->dtype.code == kDGLInt && first->dtype.bits == 64) {
+      impl::ConcatND<kDGLAscend, int64_t>(arrays, ret, axis);
+      return ret;
+    }
+  }
+#endif
+
+  // Generic path: one device copy per (input, outer segment). Correct on every
+  // device and dtype; dtypes without an Ascend kernel take this route too.
+  const int64_t elem_bytes = (first->dtype.bits * first->dtype.lanes + 7) / 8;
+  int64_t outer = 1, inner = 1;
+  for (int64_t d = 0; d < axis; ++d) outer *= first->shape[d];
+  for (int64_t d = axis + 1; d < ndim; ++d) inner *= first->shape[d];
+  const int64_t dst_stride = out_shape[axis] * inner * elem_bytes;
+
+  auto device = runtime::DeviceAPI::Get(first->ctx);
+  int64_t dst_base = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    const int64_t seg_bytes = arrays[i]->shape[axis] * inner * elem_bytes;
+    if (seg_bytes > 0) {
+      for (int64_t s = 0; s < outer; ++s) {
+        device->CopyDataFromTo(
+            arrays[i]->data, s * seg_bytes, ret->data, dst_base + s * dst_stride,
+            seg_bytes, arrays[i]->ctx, ret->ctx, arrays[i]->dtype);
+      }
+    }
+    dst_base += seg_bytes;
+  }
+
+  return ret;
 }
 
 template <typename ValueType>
@@ -664,6 +782,12 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
         ret = impl::CSRToCOODataAsOrder<kDGLCPU, IdType>(csr_cpu);
       });
+#ifdef DGL_USE_ASCEND
+      // Copy the CPU-computed COO back to the Ascend device so the graph
+      // materialized from it keeps the NPU context. CopyTo uses the sync
+      // aclrtMemcpy path, so no extra sync is needed.
+      ret = ret.CopyTo(csr.indptr->ctx);
+#endif
     } else {
       ATEN_XPU_SWITCH_CUDA(
           csr.indptr->ctx.device_type, XPU, "CSRToCOODataAsOrder", {
@@ -830,11 +954,21 @@ COOMatrix CSRRowWiseSampling(
   } else
 #endif  // DGL_USE_ASCEND
   if (IsNullArray(prob_or_mask)) {
-    ATEN_CSR_SWITCH_CUDA_UVA(
-        mat, rows, XPU, IdType, "CSRRowWiseSamplingUniform", {
-          ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(
-              mat, rows, num_samples, replace);
-        });
+#ifdef DGL_USE_ASCEND
+    if (rows->ctx.device_type == kDGLAscend) {
+      ATEN_ID_TYPE_SWITCH(rows->dtype, IdType, {
+        ret = impl::CSRRowWiseSamplingUniform<kDGLAscend, IdType>(
+            mat, rows, num_samples, replace);
+      });
+    } else
+#endif
+    {
+      ATEN_CSR_SWITCH_CUDA_UVA(
+          mat, rows, XPU, IdType, "CSRRowWiseSamplingUniform", {
+            ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(
+                mat, rows, num_samples, replace);
+          });
+    }
   } else {
     // prob_or_mask is pinned and rows on GPU is valid
     CHECK_VALID_CONTEXT(prob_or_mask, rows);
@@ -1054,20 +1188,15 @@ bool COOHasDuplicate(COOMatrix coo) {
 
 int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   int64_t ret = 0;
-  if (coo.row->ctx.device_type == kDGLAscend) {
 #ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
-    DGLContext cpu_ctx{kDGLCPU, 0};
-    auto coo_row = coo.row.CopyTo(cpu_ctx);
-    auto coo_col = coo.col.CopyTo(cpu_ctx);
-    auto coo_data = coo.data.CopyTo(cpu_ctx);
-    COOMatrix coo_cpu{coo.num_rows, coo.num_cols, coo_row, coo_col, coo_data,
-                       coo.row_sorted, coo.col_sorted};
+  if (coo.row->ctx.device_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
-      ret = impl::COOGetRowNNZ<kDGLCPU, IdType>(coo_cpu, row);
+      ret = impl::COOGetRowNNZ<kDGLAscend, IdType>(coo, row);
     });
-  } else {
+    return ret;
+  }
+#endif
+  {
     ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
       ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
     });
@@ -1077,22 +1206,15 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
 
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray row) {
   NDArray ret;
-  if (coo.row->ctx.device_type == kDGLAscend) {
 #ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
-    DGLContext cpu_ctx{kDGLCPU, 0};
-    auto coo_row = coo.row.CopyTo(cpu_ctx);
-    auto coo_col = coo.col.CopyTo(cpu_ctx);
-    auto coo_data = coo.data.CopyTo(cpu_ctx);
-    auto row_cpu = row.CopyTo(cpu_ctx);
-    COOMatrix coo_cpu{coo.num_rows, coo.num_cols, coo_row, coo_col, coo_data,
-                       coo.row_sorted, coo.col_sorted};
+  if (coo.row->ctx.device_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
-      ret = impl::COOGetRowNNZ<kDGLCPU, IdType>(coo_cpu, row_cpu);
+      ret = impl::COOGetRowNNZ<kDGLAscend, IdType>(coo, row);
     });
-    ret = ret.CopyTo(row->ctx);
-  } else {
+    return ret;
+  }
+#endif
+  {
     ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
       ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
     });
@@ -1103,22 +1225,15 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray row) {
 std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
     COOMatrix coo, int64_t row) {
   std::pair<NDArray, NDArray> ret;
-  if (coo.row->ctx.device_type == kDGLAscend) {
 #ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
-    DGLContext cpu_ctx{kDGLCPU, 0};
-    auto coo_row = coo.row.CopyTo(cpu_ctx);
-    auto coo_col = coo.col.CopyTo(cpu_ctx);
-    auto coo_data = coo.data.CopyTo(cpu_ctx);
-    COOMatrix coo_cpu{coo.num_rows, coo.num_cols, coo_row, coo_col, coo_data,
-                       coo.row_sorted, coo.col_sorted};
+  if (coo.row->ctx.device_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
-      ret = impl::COOGetRowDataAndIndices<kDGLCPU, IdType>(coo_cpu, row);
+      ret = impl::COOGetRowDataAndIndices<kDGLAscend, IdType>(coo, row);
     });
-    ret.first = ret.first.CopyTo(coo.row->ctx);
-    ret.second = ret.second.CopyTo(coo.row->ctx);
-  } else {
+    return ret;
+  }
+#endif
+  {
     ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowDataAndIndices", {
       ret = impl::COOGetRowDataAndIndices<XPU, IdType>(coo, row);
     });
@@ -1130,9 +1245,6 @@ std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
   std::vector<NDArray> ret;
   if (coo.row->ctx.device_type == kDGLAscend) {
-#ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
     DGLContext cpu_ctx{kDGLCPU, 0};
     auto coo_row = coo.row.CopyTo(cpu_ctx);
     auto coo_col = coo.col.CopyTo(cpu_ctx);
@@ -1159,9 +1271,6 @@ std::vector<NDArray> COOGetDataAndIndices(
 NDArray COOGetData(COOMatrix coo, NDArray rows, NDArray cols) {
   NDArray ret;
   if (coo.row->ctx.device_type == kDGLAscend) {
-#ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
     DGLContext cpu_ctx{kDGLCPU, 0};
     auto coo_row = coo.row.CopyTo(cpu_ctx);
     auto coo_col = coo.col.CopyTo(cpu_ctx);
@@ -1204,6 +1313,14 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
 COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOSliceRows<kDGLAscend, IdType>(coo, start, end);
+    });
+    return ret;
+  }
+#endif
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceRows", {
     ret = impl::COOSliceRows<XPU, IdType>(coo, start, end);
   });
@@ -1212,24 +1329,15 @@ COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
 
 COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
   COOMatrix ret;
-  if (coo.row->ctx.device_type == kDGLAscend) {
 #ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
-    DGLContext cpu_ctx{kDGLCPU, 0};
-    auto coo_row = coo.row.CopyTo(cpu_ctx);
-    auto coo_col = coo.col.CopyTo(cpu_ctx);
-    auto coo_data = coo.data.CopyTo(cpu_ctx);
-    auto rows_cpu = rows.CopyTo(cpu_ctx);
-    COOMatrix coo_cpu{coo.num_rows, coo.num_cols, coo_row, coo_col, coo_data,
-                       coo.row_sorted, coo.col_sorted};
+  if (coo.row->ctx.device_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
-      ret = impl::COOSliceRows<kDGLCPU, IdType>(coo_cpu, rows_cpu);
+      ret = impl::COOSliceRows<kDGLAscend, IdType>(coo, rows);
     });
-    ret.row = ret.row.CopyTo(coo.row->ctx);
-    ret.col = ret.col.CopyTo(coo.row->ctx);
-    ret.data = ret.data.CopyTo(coo.row->ctx);
-  } else {
+    return ret;
+  }
+#endif
+  {
     ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceRows", {
       ret = impl::COOSliceRows<XPU, IdType>(coo, rows);
     });
@@ -1239,6 +1347,14 @@ COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
 
 COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOSliceMatrix<kDGLAscend, IdType>(coo, rows, cols);
+    });
+    return ret;
+  }
+#endif
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceMatrix", {
     ret = impl::COOSliceMatrix<XPU, IdType>(coo, rows, cols);
   });
@@ -1247,25 +1363,15 @@ COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
 
 void COOSort_(COOMatrix* mat, bool sort_column) {
   if ((mat->row_sorted && !sort_column) || mat->col_sorted) return;
-  if (mat->row->ctx.device_type == kDGLAscend) {
 #ifdef DGL_USE_ASCEND
-    aclrtSynchronizeDevice();  // Ensure PyTorch NPU ops complete before D2H copy
-#endif
-    DGLContext cpu_ctx{kDGLCPU, 0};
-    auto row_cpu = mat->row.CopyTo(cpu_ctx);
-    auto col_cpu = mat->col.CopyTo(cpu_ctx);
-    auto data_cpu = mat->data.CopyTo(cpu_ctx);
-    COOMatrix mat_cpu{mat->num_rows, mat->num_cols, row_cpu, col_cpu, data_cpu,
-                       mat->row_sorted, mat->col_sorted};
+  if (mat->row->ctx.device_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(mat->row->dtype, IdType, {
-      impl::COOSort_<kDGLCPU, IdType>(&mat_cpu, sort_column);
+      impl::COOSort_<kDGLAscend, IdType>(mat, sort_column);
     });
-    mat->row = mat_cpu.row.CopyTo(mat->row->ctx);
-    mat->col = mat_cpu.col.CopyTo(mat->row->ctx);
-    mat->data = mat_cpu.data.CopyTo(mat->row->ctx);
-    mat->row_sorted = mat_cpu.row_sorted;
-    mat->col_sorted = mat_cpu.col_sorted;
-  } else {
+    return;
+  }
+#endif
+  {
     ATEN_XPU_SWITCH_CUDA(mat->row->ctx.device_type, XPU, "COOSort_", {
       ATEN_ID_TYPE_SWITCH(mat->row->dtype, IdType, {
         impl::COOSort_<XPU, IdType>(mat, sort_column);
@@ -1406,6 +1512,23 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
 
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   COOMatrix ret;
+  if (coos[0].row->ctx.device_type == kDGLAscend) {
+    // Ascend backend: compute on CPU then copy the COO result back to the
+    // Ascend device. DisjointUnionCoo has no native Ascend kernel yet.
+    // TODO(Ascend): implement a native DisjointUnionCoo NPU kernel and drop
+    // this CPU fallback once available.
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    std::vector<COOMatrix> coos_cpu;
+    coos_cpu.reserve(coos.size());
+    for (size_t i = 0; i < coos.size(); ++i) {
+      coos_cpu.push_back(coos[i].CopyTo(cpu_ctx));
+    }
+    ATEN_ID_TYPE_SWITCH(coos_cpu[0].row->dtype, IdType, {
+      ret = impl::DisjointUnionCoo<kDGLCPU, IdType>(coos_cpu);
+      ret = ret.CopyTo(coos[0].row->ctx);
+    });
+    return ret;
+  }
   ATEN_XPU_SWITCH_CUDA(coos[0].row->ctx.device_type, XPU, "DisjointUnionCoo", {
     ATEN_ID_TYPE_SWITCH(coos[0].row->dtype, IdType, {
       ret = impl::DisjointUnionCoo<XPU, IdType>(coos);
@@ -1529,7 +1652,7 @@ Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
       << "Graph and source should in the same dtype";
   CHECK_EQ(csr.num_rows, csr.num_cols)
       << "Graph traversal can only work on square-shaped CSR.";
-  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSNodesFrontiers", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(source->ctx.device_type, XPU, "BFSNodesFrontiers", {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
       ret = impl::BFSNodesFrontiers<XPU, IdType>(csr, source);
     });
@@ -1545,7 +1668,7 @@ Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
       << "Graph and source should in the same dtype";
   CHECK_EQ(csr.num_rows, csr.num_cols)
       << "Graph traversal can only work on square-shaped CSR.";
-  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSEdgesFrontiers", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(source->ctx.device_type, XPU, "BFSEdgesFrontiers", {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
       ret = impl::BFSEdgesFrontiers<XPU, IdType>(csr, source);
     });
@@ -1689,6 +1812,13 @@ void COOSDDMM(
 }
 
 ///////////////////////// C APIs /////////////////////////
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLConcatND")
+    .set_body([](DGLArgs args, DGLRetValue* rv) {
+      List<Value> arrays = args[0];
+      const int64_t dim = args[1];
+      *rv = ConcatND(ListValueToVector<NDArray>(arrays), dim);
+    });
+
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
     .set_body([](DGLArgs args, DGLRetValue* rv) {
       SparseMatrixRef spmat = args[0];

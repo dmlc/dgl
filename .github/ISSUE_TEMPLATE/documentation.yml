@@ -1,0 +1,52 @@
+name: Documentation|文档反馈
+description: 如果您需要反馈文档问题，请使用此模板。
+title: "[Documentation|文档反馈]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈文档问题！请填写以下信息帮助我们改进文档。
+        Thanks for sending a documentation issue!
+  - type: input
+    attributes:
+      label: 文档链接 / Document Link (Mandatory / 必填)
+      description: 请给出有问题的文档链接
+      placeholder: "https://gitcode.com/AI4Science/dgl-ascend/docs/..."
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: 问题文档片段 / Document Section (Mandatory / 必填)
+      description: 请引用或截图显示有问题的文档内容
+      placeholder: 请复制粘贴文档中的问题内容或上传截图
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: 问题描述 / Issue Description (Mandatory / 必填)
+      description: 请描述文档存在的具体问题
+      placeholder: |
+        - 描述不准确
+        - 内容缺失
+        - 示例代码有误
+        - 链接失效
+        - 其它
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: 改进建议 / Suggested Improvement (Optional / 选填)
+      description: 如果您有改进建议，请在此描述
+      placeholder: 请提供您认为更准确或更合适的表述
+  - type: dropdown
+    attributes:
+      label: 文档类型 / Document Type (Optional / 选填)
+      description: 问题文档属于哪种类型
+      options:
+        - "API 文档 / API Reference"
+        - "开发指南 / Development Guide"
+        - "安装指南 / Installation Guide"
+        - "版本说明 / Release Notes"
+        - "教程 / Tutorial"
+        - "其它 / Other"

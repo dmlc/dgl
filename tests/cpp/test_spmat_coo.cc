@@ -371,7 +371,9 @@ void _TestCOOToCSRAscend(DGLContext ctx) {
   ASSERT_TRUE(null_coo_npu.row_sorted);
   ASSERT_EQ(ref_csr.num_rows, tcsr.num_rows);
   ASSERT_EQ(ref_csr.num_cols, tcsr.num_cols);
-  ASSERT_TRUE(ArrayEQ<IDX>(ref_csr.indptr, tcsr.indptr));
+  // ArrayEQ requires both arrays on the same context; the CPU reference
+  // must be compared against the NPU result copied back to CPU.
+  ASSERT_TRUE(ArrayEQ<IDX>(ref_csr.indptr, tcsr.indptr.CopyTo(cpu_ctx)));
   // Null data → auto Range, so data should differ from CPU ref
   ASSERT_FALSE(ArrayEQ<IDX>(null_coo_npu.data, tcsr.data));
 }

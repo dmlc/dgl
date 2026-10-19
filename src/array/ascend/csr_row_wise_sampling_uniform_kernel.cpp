@@ -296,26 +296,23 @@ class KernelCsrRowWiseSamplingUniform {
   uint32_t block_idx_ = 0;
 };
 
-extern "C" __global__ __aicore__ void csr_row_wise_sampling_uniform_int32(
+extern "C" __global__ __aicore__ void csr_row_wise_sampling_uniform(
     GM_ADDR indptr, GM_ADDR indices, GM_ADDR data, GM_ADDR rows,
     GM_ADDR out_ptr, GM_ADDR out_rows, GM_ADDR out_cols, GM_ADDR out_idxs,
     GM_ADDR row_split, GM_ADDR out_starts, GM_ADDR tiling_ptr) {
-  KernelCsrRowWiseSamplingUniform<int32_t> op;
-  TPipe pipe;
-  op.Init(
-      indptr, indices, data, rows, out_ptr, out_rows, out_cols, out_idxs,
-      row_split, out_starts, tiling_ptr, &pipe);
-  op.Process();
-}
-
-extern "C" __global__ __aicore__ void csr_row_wise_sampling_uniform_int64(
-    GM_ADDR indptr, GM_ADDR indices, GM_ADDR data, GM_ADDR rows,
-    GM_ADDR out_ptr, GM_ADDR out_rows, GM_ADDR out_cols, GM_ADDR out_idxs,
-    GM_ADDR row_split, GM_ADDR out_starts, GM_ADDR tiling_ptr) {
-  KernelCsrRowWiseSamplingUniform<int64_t> op;
-  TPipe pipe;
-  op.Init(
-      indptr, indices, data, rows, out_ptr, out_rows, out_cols, out_idxs,
-      row_split, out_starts, tiling_ptr, &pipe);
-  op.Process();
+  const __gm__ CsrRowWiseSamplingUniformTiling* tiling =
+      (const __gm__ CsrRowWiseSamplingUniformTiling*)tiling_ptr;
+  if (tiling->dtype_bytes == 4) {
+    KernelCsrRowWiseSamplingUniform<int32_t> op;
+    TPipe pipe;
+    op.Init(indptr, indices, data, rows, out_ptr, out_rows, out_cols, out_idxs,
+            row_split, out_starts, tiling_ptr, &pipe);
+    op.Process();
+  } else {
+    KernelCsrRowWiseSamplingUniform<int64_t> op;
+    TPipe pipe;
+    op.Init(indptr, indices, data, rows, out_ptr, out_rows, out_cols, out_idxs,
+            row_split, out_starts, tiling_ptr, &pipe);
+    op.Process();
+  }
 }

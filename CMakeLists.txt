@@ -1,10 +1,4 @@
 cmake_minimum_required(VERSION 3.18)
-# CMake >= 3.27 dropped compatibility with cmake_minimum_required < 3.5.
-# Bundled third_party (e.g. dmlc-core) still declares 3.2; allow it to configure.
-if(POLICY CMP0148)
-  cmake_policy(SET CMP0148 NEW)
-endif()
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
@@ -224,12 +218,18 @@ if(USE_ASCEND)
       message(STATUS "Using ASCEND_CANN_PACKAGE_PATH: ${ASCEND_CANN_PACKAGE_PATH}")
 
       # Set SOC_VERSION for AscendC kernel compilation
-      # Can be set via CMake -DSOC_VERSION or environment variable
+      # Can be set via CMake -DSOC_VERSION or environment variable SOC_VERSION
+      # All A2/A3 sub-models share DAV_2201 architecture (BUILD_MODE=c220).
+      # Default: ascend910b4 (A2). Binary compiled with this SOC also runs on A3.
+      # A5 (Ascend 950PR, DAV_3510) requires its own SOC_VERSION, e.g.
+      # Ascend950PR_9579 (auto-detected by script/build_dgl_ascend.sh via
+      # aclrtGetSocName).
+      # The build script auto-detects from hardware via npu-smi.
       if(NOT DEFINED SOC_VERSION)
         if(DEFINED ENV{SOC_VERSION})
           set(SOC_VERSION $ENV{SOC_VERSION} CACHE STRING "Ascend SoC version")
         else()
-          set(SOC_VERSION "Ascend950PR_9579" CACHE STRING "Ascend SoC version (e.g., Ascend910B, Ascend910B4)")
+          set(SOC_VERSION "Ascend910b4" CACHE STRING "Ascend SoC version (e.g., ascend910b4 for A2, ascend910_9382 for A3)")
         endif()
       endif()
       message(STATUS "Using SOC_VERSION: ${SOC_VERSION}")
@@ -288,7 +288,10 @@ if(USE_ASCEND)
   execute_process(COMMAND python3 -c "import sys; print(sys.prefix)"
                   OUTPUT_VARIABLE Python3_ROOT_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+  # Development.Module (not Development/Embed): libdgl.so is loaded by the Python
+  # interpreter via ctypes, so it must NOT link libpython — wheels then carry no
+  # libpython dependency and work on any cpython build.
+  find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
 
   find_package(Torch REQUIRED PATHS ${LIBTORCH_PATH})
 
@@ -302,7 +305,15 @@ if(USE_ASCEND)
     add_definitions(-DDGL_USE_PYTORCH_NPU_STREAM)
     message(STATUS "Found c10_npu: ${C10_NPU_LIB} — enabling PyTorch NPU stream support")
   else()
-    message(STATUS "c10_npu not found — using legacy stream management")
+    # c10_npu symbols are inside libtorch_npu.so on some installations
+    find_library(LIBTORCH_NPU NAMES torch_npu HINTS ${LIBTORCH_NPU_PATH}/lib)
+    if(LIBTORCH_NPU)
+      list(APPEND DGL_LINKER_LIBS ${LIBTORCH_NPU})
+      add_definitions(-DDGL_USE_PYTORCH_NPU_STREAM)
+      message(STATUS "Found libtorch_npu: ${LIBTORCH_NPU} — enabling PyTorch NPU stream support (c10_npu embedded)")
+    else()
+      message(STATUS "c10_npu not found — using legacy stream management")
+    endif()
   endif()
 
 endif(USE_ASCEND)
@@ -366,6 +377,10 @@ file(GLOB_RECURSE DGL_SRC_1
   src/scheduler/*.cc
 )
 
+if(NOT USE_ASCEND)
+  list(FILTER DGL_SRC_1 EXCLUDE REGEX "/ascend/.*\\.cc$")
+endif()
+
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
 if(USE_ASCEND)
@@ -411,6 +426,34 @@ if(USE_CUDA)
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
+
+# CANN 8.3.RC1 (25.5.x) acl_rt.h lacks the CUBE_CORE_NUM /
+# LOCAL_MEM_PER_VECTOR_CORE enum values added in CANN 8.5.0; provide them
+# via a force-included compat header (values verified at runtime on 910B3:
+# 102 and 202).  See include/dgl/ascend_attr_compat.h.
+#
+# NB: On CANN >= 8.5.0 the acl_rt.h enum already defines these identifiers.
+# Force-injecting the compat header there would expand the macro inside the
+# enum declaration and break the build, so only inject when the enum is absent.
+if(USE_ASCEND)
+  set(_acl_rt_h "${ASCEND_PATH}/include/acl/acl_rt.h")
+  set(_need_attr_compat TRUE)
+  if(EXISTS "${_acl_rt_h}")
+    file(READ "${_acl_rt_h}" _acl_rt_content)
+    string(FIND "${_acl_rt_content}" "ACL_DEV_ATTR_CUBE_CORE_NUM" _attr_pos)
+    if(NOT _attr_pos EQUAL -1)
+      set(_need_attr_compat FALSE)
+    endif()
+  endif()
+  if(_need_attr_compat)
+    message(STATUS "acl_rt.h lacks ACL_DEV_ATTR_CUBE_CORE_NUM, injecting ascend_attr_compat.h")
+    target_compile_options(dgl PRIVATE "-include${CMAKE_CURRENT_SOURCE_DIR}/include/dgl/ascend_attr_compat.h")
+  endif()
+  unset(_acl_rt_h)
+  unset(_acl_rt_content)
+  unset(_attr_pos)
+  unset(_need_attr_compat)
+endif()
 
 if ((NOT MSVC) AND USE_EPOLL)
   INCLUDE(CheckIncludeFile)
@@ -581,7 +624,7 @@ target_link_libraries(dgl PRIVATE
   ${DGL_RUNTIME_LINKER_LIBS}
   ${TORCH_LIBRARIES}
   ${Python3_LIBRARIES}
-  c10
+  $<$<BOOL:${USE_ASCEND}>:c10>
   ${GFORTRAN_LIB}
   ${GOMP_LIB}
 )
@@ -655,23 +698,58 @@ if(BUILD_CPP_TEST)
                   OUTPUT_VARIABLE TORCH_NPU_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND python3 -c "import torch; import os; print(f'{os.path.dirname(torch.__file__)}/lib')"
                   OUTPUT_VARIABLE TORCH_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND python3 -c "import torch, os; print(os.path.normpath(os.path.join(os.path.dirname(torch.__file__), '..', 'torch.libs')))"
+                  OUTPUT_VARIABLE TORCH_LIBS_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR})
+  # libtorch_npu.so references Python-binding symbols (THPVariableClass,
+  # pybind11 type casters, ...) that are defined in libtorch_python.so, so
+  # any executable linking the dgl target must also link torch_python.
+  # Note: link_directories() below has no effect on the already-declared
+  # runUnitTests target, hence the explicit find_library path.
+  find_library(TORCH_PYTHON_LIBRARY torch_python HINTS ${TORCH_LIB_DIR} NO_DEFAULT_PATH)
 
+  # runUnitTests is an executable that links libtorch_python.so, which in
+  # turn requires the CPython symbols.  find_package(Python3 ...) above uses
+  # the Development.Module component (no libpython), so resolve libpython
+  # explicitly for the test binary.  Try python3.11 (original) first, then
+  # python3.10 (AscendInstallation.md uses python=3.10).
+  find_library(PYTHON_LIB python3.11 python3.10 HINTS ${CONDA_LIB_DIR} ${Python3_ROOT_DIR}/lib NO_DEFAULT_PATH)
+  if(NOT PYTHON_LIB)
+    find_library(PYTHON_LIB python3.11 python3.10)
+  endif()
+  if(PYTHON_LIB)
+    message(STATUS "Found libpython for runUnitTests: ${PYTHON_LIB}")
+  else()
+    message(WARNING "libpython not found; runUnitTests link may fail")
+  endif()
+
+  # CANN runtime libs (libruntime.so / libascend_dump.so) depend on the
+  # driver's libascend_hal.so / drv/hdc symbols; add the driver lib dirs so
+  # the runUnitTests link resolves them.
+  link_directories(/usr/local/Ascend/driver/lib64/driver /usr/local/Ascend/driver/lib64/common)
+
+  link_directories(${CONDA_LIB_DIR} ${TORCH_NPU_LIB_DIR} ${TORCH_LIB_DIR} ${TORCH_LIBS_DIR})
+
+  message(STATUS "DBG dirs: [${CONDA_LIB_DIR}] [${TORCH_NPU_LIB_DIR}] [${TORCH_LIB_DIR}] [${TORCH_LIBS_DIR}]")
   set_target_properties(runUnitTests PROPERTIES
     BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR}"
+    INSTALL_RPATH "${CONDA_LIB_DIR};${TORCH_NPU_LIB_DIR};${TORCH_LIB_DIR};${TORCH_LIBS_DIR}"
+    LINK_FLAGS "-Wl,-rpath,${CONDA_LIB_DIR}:${TORCH_NPU_LIB_DIR}:${TORCH_LIB_DIR}:${TORCH_LIBS_DIR} -Wl,-rpath-link,${TORCH_LIBS_DIR} -L/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub -L/usr/local/Ascend/driver/lib64/driver -L/usr/local/Ascend/driver/lib64/common"
   )
-  target_link_libraries(runUnitTests PRIVATE gtest gtest_main 
+  target_link_libraries(runUnitTests PRIVATE gtest gtest_main
     ${Python3_LIBRARIES}
     ${TORCH_LIBRARIES}
+    ${TORCH_PYTHON_LIBRARY}
+    ${PYTHON_LIB}
     c10
     ${GFORTRAN_LIB}
     ${GOMP_LIB}
   )
-  target_link_libraries(runUnitTests PRIVATE dgl 
+  target_link_libraries(runUnitTests PRIVATE dgl
     ${Python3_LIBRARIES}
     ${TORCH_LIBRARIES}
+    ${TORCH_PYTHON_LIBRARY}
+    ${PYTHON_LIB}
     c10
     ${GFORTRAN_LIB}
     ${GOMP_LIB}

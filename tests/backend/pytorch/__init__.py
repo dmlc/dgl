@@ -7,6 +7,14 @@ def cuda():
     return th.device("cuda:0")
 
 
+def npu():
+    return th.device("npu:0")
+
+
+def is_npu_available():
+    return hasattr(th, "npu") and th.npu.is_available()
+
+
 def is_cuda_available():
     return th.cuda.is_available()
 

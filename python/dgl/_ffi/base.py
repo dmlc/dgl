@@ -34,16 +34,16 @@ class DGLError(Exception):
 
 
 # Latch state for the torch_npu <-> DGL Ascend stream bridge.
-_ascend_bridge = {"ok": False}
+_ascend_bridge = {"ok": False, "pid": None}
 
 torch = None
 
 
 def _bridge_ascend_stream():
-    """Synchronize torch_npu's current stream before entering libdgl.
+    """Synchronize the NPU device before entering libdgl.
 
     torch_npu submits kernels asynchronously on its own (non-default) ACL
-    stream, while DGL Ascend kernels run on the ACL default stream and block
+    streams, while DGL Ascend kernels run on the ACL default stream and block
     on it until completion.  Without a barrier, a torch_npu write (e.g. a
     feature tensor copied to NPU) may still be in flight when a DGL kernel
     reads it, producing nondeterministic results or device-side faults.
@@ -53,10 +53,14 @@ def _bridge_ascend_stream():
     thread, while DGL would submit from the caller thread - concurrent
     submissions on one stream corrupt the driver state.
 
-    The simplest correct barrier is therefore to drain torch_npu's current
-    stream on the host before each DGL C API call.  DGL ops themselves
-    synchronize at the end, so the reverse (DGL -> torch) direction is
-    already ordered.  When the torch stream is idle this call is cheap.
+    The simplest correct barrier is therefore to synchronize the whole
+    device on the host before each DGL C API call.  This drains every stream,
+    not just the calling thread's current stream: a producer may have issued
+    the write on an arbitrary stream (its own current stream, the default
+    stream, or a user-created stream), and synchronizing only
+    ``current_stream()`` would leave those in-flight writes unordered.  DGL
+    ops themselves synchronize at the end, so the reverse (DGL -> torch)
+    direction is already ordered.  When the device is idle this call is cheap.
 
     Set DGL_ASCEND_STREAM_BRIDGE=0 to disable (for debugging only).
     """
@@ -79,9 +83,15 @@ def _bridge_ascend_stream():
             if not torch.npu.is_available():
                 return
             st["ok"] = True
+            st["pid"] = os.getpid()
         except Exception:  # pylint: disable=broad-except
             return
-    torch.npu.current_stream().synchronize()
+    if os.getpid() != st["pid"]:
+        # Forked subprocess (e.g. a DataLoader worker): torch_npu cannot be
+        # re-initialized here, and workers only issue CPU-side DGL calls,
+        # so there is no NPU stream to order against.  Skip the barrier.
+        return
+    torch.npu.synchronize()
 
 
 class _AscendStreamFuncWrapper(object):

@@ -69,6 +69,10 @@ template <DGLDeviceType XPU, typename IdType>
 NDArray Concat(const std::vector<IdArray>& arrays);
 
 template <DGLDeviceType XPU, typename DType>
+void ConcatND(
+    const std::vector<NDArray>& arrays, NDArray out, int64_t dim);
+
+template <DGLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value);
 
 template <DGLDeviceType XPU, typename DType, typename IdType>

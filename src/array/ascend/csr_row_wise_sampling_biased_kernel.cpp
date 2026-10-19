@@ -172,7 +172,6 @@ class KernelCsrRowWiseSamplingBiased {
       GM_ADDR tag_offset, GM_ADDR bias, GM_ADDR out_rows, GM_ADDR out_cols,
       GM_ADDR out_idxs, GM_ADDR row_split, GM_ADDR out_starts,
       GM_ADDR tiling_ptr, TPipe* pipe) {
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 
     const __gm__ CsrRowWiseSamplingBiasedTiling* tiling =
         (const __gm__ CsrRowWiseSamplingBiasedTiling*)tiling_ptr;

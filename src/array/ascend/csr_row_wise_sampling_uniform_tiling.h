@@ -7,7 +7,8 @@
 // The device block is: header (kTilingHeaderWords words, field order below)
 // followed by one output-start word per launched block (block prefix sums).
 // Field order must match KernelCsrRowWiseSamplingUniform::Init.
-constexpr uint32_t kTilingHeaderWords = 8;
+// Header word count: was 8 before adding dtype_bytes; now 9.
+constexpr uint32_t kTilingHeaderWords = 9;
 
 struct CsrRowWiseSamplingUniformTiling {
   uint32_t num_rows;        // number of seed rows to sample
@@ -18,6 +19,7 @@ struct CsrRowWiseSamplingUniformTiling {
   uint32_t select_all;      // 1 = num_samples == -1 (pick every edge)
   uint32_t num_total_rows;  // total rows of the CSR matrix (bounds check)
   uint32_t ub_available;    // per-core UB budget in bytes (runtime query)
+  uint32_t dtype_bytes;     // sizeof(IdType): 4 for int32, 8 for int64
 };
 
 // Hardware parameters are queried at runtime via aclrtGetDeviceInfo and
@@ -25,7 +27,7 @@ struct CsrRowWiseSamplingUniformTiling {
 //   - vector-core count (ACL_DEV_ATTR_VECTOR_CORE_NUM): AIV counts differ
 //     across SoCs (910B family: 40; other families and trimmed vNPU
 //     instances differ)
-//   - unified-buffer size (ACL_DEV_ATTR_UBUF_PER_VECTOR_CORE): 192KB on
+//   - unified-buffer size (ACL_DEV_ATTR_LOCAL_MEM_PER_VECTOR_CORE): 192KB on
 //     910B, 248KB on 950PR
 // The values below are only fallbacks for when the query fails.
 constexpr uint32_t kDefaultVectorCoreCount = 40;  // fallback, 910B family

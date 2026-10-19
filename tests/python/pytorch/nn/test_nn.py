@@ -37,8 +37,12 @@ F.seed(SEED)
 tmp_buffer = io.BytesIO()
 
 
+
 def _AXWb(A, X, W, b):
     X = th.matmul(X, W)
+    # NPU: sparse matmul (addmm) not supported, densify first
+    if A.is_sparse and A.device.type == 'npu':
+        A = A.to_dense()
     Y = th.matmul(A, X.view(X.shape[0], -1)).view_as(X)
     return Y + b
 

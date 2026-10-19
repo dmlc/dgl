@@ -33,7 +33,6 @@ class KernelCsrRowWiseTopk {
       GM_ADDR indptr, GM_ADDR indices, GM_ADDR data, GM_ADDR rows,
       GM_ADDR weight, GM_ADDR out_rows, GM_ADDR out_cols, GM_ADDR out_idxs,
       GM_ADDR row_split, GM_ADDR out_starts, GM_ADDR tiling_ptr, TPipe* pipe) {
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 
     const __gm__ CsrRowWiseTopkTiling* tiling =
         (const __gm__ CsrRowWiseTopkTiling*)tiling_ptr;

@@ -14,6 +14,7 @@
 #ifdef DGL_USE_ASCEND
 #include <acl/acl.h>
 #include <acl/acl_rt.h>
+#include "acl_attr_compat.h"
 #define ASCEND_CALL(func)                                   \
   {                                                         \
     aclError e = (func);                                    \
@@ -24,12 +25,7 @@
 #define ACLRT_LAUNCH_KERNEL(kernel_func) aclrtlaunch_##kernel_func
 #endif
 
-extern "C" uint32_t aclrtlaunch_csr_row_wise_sampling_uniform_int32(
-    uint32_t blockDim, aclrtStream stream, void* indptr, void* indices,
-    void* data, void* rows, void* out_ptr, void* out_rows, void* out_cols,
-    void* out_idxs, void* row_split, void* out_starts, void* tiling);
-
-extern "C" uint32_t aclrtlaunch_csr_row_wise_sampling_uniform_int64(
+extern "C" uint32_t aclrtlaunch_csr_row_wise_sampling_uniform(
     uint32_t blockDim, aclrtStream stream, void* indptr, void* indices,
     void* data, void* rows, void* out_ptr, void* out_rows, void* out_cols,
     void* out_idxs, void* row_split, void* out_starts, void* tiling);
@@ -81,7 +77,7 @@ uint32_t QueryVectorCoreCount(int device_id) {
 uint32_t QueryUbAvailableBytes(int device_id) {
   int64_t ub_bytes = 0;
   aclError err = aclrtGetDeviceInfo(
-      device_id, ACL_DEV_ATTR_UBUF_PER_VECTOR_CORE, &ub_bytes);
+      device_id, ACL_DEV_ATTR_LOCAL_MEM_PER_VECTOR_CORE, &ub_bytes);
   if (err != ACL_SUCCESS ||
       ub_bytes <= static_cast<int64_t>(kUbReservedBytes) ||
       ub_bytes > (1 << 30)) {
@@ -234,6 +230,7 @@ COOMatrix CSRRowWiseSamplingUniform(
       static_cast<uint32_t>(select_all ? 1 : 0),
       static_cast<uint32_t>(mat.num_rows),
       QueryUbAvailableBytes(ctx.device_id),
+      sizeof(IdType),
   };
 
   IdArray picked_row = aten::NewIdArray(max_output, ctx, nbits);
@@ -273,21 +270,12 @@ COOMatrix CSRRowWiseSamplingUniform(
   void* row_split_dev = UploadHostUInt32(row_split, stream);
   void* out_starts_dev = UploadHostUInt32(out_starts, stream);
 
-  if (std::is_same<IdType, int32_t>::value) {
-    aclError err = aclrtlaunch_csr_row_wise_sampling_uniform_int32(
-        block_dim, stream, mat.indptr->data, mat.indices->data, data_ptr,
-        rows->data, out_ptr->data, picked_row->data, picked_col->data,
-        picked_idx->data, row_split_dev, out_starts_dev, tiling_dev);
-    CHECK(err == ACL_SUCCESS)
-        << "csr_row_wise_sampling_uniform_int32 launch failed: " << err;
-  } else {
-    aclError err = aclrtlaunch_csr_row_wise_sampling_uniform_int64(
-        block_dim, stream, mat.indptr->data, mat.indices->data, data_ptr,
-        rows->data, out_ptr->data, picked_row->data, picked_col->data,
-        picked_idx->data, row_split_dev, out_starts_dev, tiling_dev);
-    CHECK(err == ACL_SUCCESS)
-        << "csr_row_wise_sampling_uniform_int64 launch failed: " << err;
-  }
+  aclError err = aclrtlaunch_csr_row_wise_sampling_uniform(
+      block_dim, stream, mat.indptr->data, mat.indices->data, data_ptr,
+      rows->data, out_ptr->data, picked_row->data, picked_col->data,
+      picked_idx->data, row_split_dev, out_starts_dev, tiling_dev);
+  CHECK(err == ACL_SUCCESS)
+      << "csr_row_wise_sampling_uniform launch failed: " << err;
 
   ASCEND_CALL(aclrtSynchronizeStream(stream));
   ASCEND_CALL(aclrtFree(tiling_dev));

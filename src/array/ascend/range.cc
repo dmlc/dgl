@@ -11,9 +11,8 @@
 #define ACLRT_LAUNCH_KERNEL(kernel_func) aclrtlaunch_##kernel_func
 #endif
 
-extern "C" uint32_t aclrtlaunch_range_i32(
-    uint32_t blockDim, aclrtStream stream, void* dst, void* tiling);
-extern "C" uint32_t aclrtlaunch_range_i64(
+// 单入口：kernel 按 tiling->dtype_bytes 分支 int32/int64。
+extern "C" uint32_t aclrtlaunch_range(
     uint32_t blockDim, aclrtStream stream, void* dst, void* tiling);
 
 namespace dgl {
@@ -40,6 +39,7 @@ struct TilingData {
   uint32_t n;
   uint32_t low_hi;
   uint32_t low_lo;
+  uint32_t dtype_bytes;  // sizeof(IdType)
 };
 
 static thread_local void* tiling_dev_buf = nullptr;
@@ -87,12 +87,16 @@ IdArray Range<kDGLAscend, int32_t>(int32_t low, int32_t high, DGLContext ctx) {
   int64_t low_val = static_cast<int64_t>(low);
   tiling.low_hi = static_cast<uint32_t>(static_cast<uint64_t>(low_val) >> 32);
   tiling.low_lo = static_cast<uint32_t>(static_cast<uint64_t>(low_val));
-
+  // dtype_bytes MUST be set before the struct is copied to device: the kernel
+  // branches on it to select the int32/int64 code path.
+  tiling.dtype_bytes = 4;
   void* tiling_dev = GetTilingDev(tiling);
 
   auto stream = dgl::runtime::getCurrentAscendStream();
   uint32_t block_dim = CalcBlockDim(ctx.device_id, length);
-  aclrtlaunch_range_i32(block_dim, stream, ret->data, tiling_dev);
+  aclError err =
+      aclrtlaunch_range(block_dim, stream, ret->data, tiling_dev);
+  CHECK(err == ACL_SUCCESS) << "range launch failed: " << err;
 
   return ret;
 }
@@ -111,12 +115,16 @@ IdArray Range<kDGLAscend, int64_t>(int64_t low, int64_t high, DGLContext ctx) {
   tiling.n = static_cast<uint32_t>(length);
   tiling.low_hi = static_cast<uint32_t>(static_cast<uint64_t>(low) >> 32);
   tiling.low_lo = static_cast<uint32_t>(static_cast<uint64_t>(low));
-
+  // dtype_bytes MUST be set before the struct is copied to device (see int32
+  // specialization above).
+  tiling.dtype_bytes = 8;
   void* tiling_dev = GetTilingDev(tiling);
 
   auto stream = dgl::runtime::getCurrentAscendStream();
   uint32_t block_dim = CalcBlockDim(ctx.device_id, length);
-  aclrtlaunch_range_i64(block_dim, stream, ret->data, tiling_dev);
+  aclError err =
+      aclrtlaunch_range(block_dim, stream, ret->data, tiling_dev);
+  CHECK(err == ACL_SUCCESS) << "range launch failed: " << err;
 
   return ret;
 }

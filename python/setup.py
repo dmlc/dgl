@@ -10,13 +10,21 @@ from setuptools import find_packages, setup
 from setuptools.dist import Distribution
 from setuptools.extension import Extension
 
+CURRENT_DIR = os.path.dirname(__file__)
+
+
+def _read_long_description():
+    for path in ["PKG-README.md", "../README.md", "README.md"]:
+        full = os.path.join(CURRENT_DIR, path)
+        if os.path.exists(full):
+            with open(full, encoding="utf-8") as f:
+                return f.read()
+    return ""
+
 
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
         return True
-
-
-CURRENT_DIR = os.path.dirname(__file__)
 
 
 def get_lib_path():
@@ -220,6 +228,8 @@ if include_libs:
 
 # Configure dependencies.
 install_requires = [
+    "torch==2.8.0",
+    "torch_npu==2.8.0.post2",
     "networkx>=2.1",
     "numpy>=1.14.0",
     "packaging",
@@ -235,13 +245,16 @@ install_requires = [
 setup(
     name="dgl" + os.getenv("DGL_PACKAGE_SUFFIX", ""),
     version=VERSION,
-    description="Deep Graph Library",
+    description="Deep Graph Library with Ascend NPU support",
+    long_description=_read_long_description(),
+    long_description_content_type="text/markdown",
+    author="dgl-ascend-team",
+    author_email="lihepeng1@huawei.com",
     zip_safe=False,
-    maintainer="DGL Team",
-    maintainer_email="wmjlyjemaine@gmail.com",
+    maintainer="dgl-ascend Team",
     packages=find_packages(),
     install_requires=install_requires,
-    url="https://github.com/dmlc/dgl",
+    url="https://gitcode.com/AI4Science/dgl-ascend",
     distclass=BinaryDistribution,
     ext_modules=config_cython(),
     classifiers=[

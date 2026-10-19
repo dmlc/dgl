@@ -55,12 +55,6 @@ private:
     int32_t low;
 };
 
-extern "C" __global__ __aicore__ void range_i32(
-    GM_ADDR dst, GM_ADDR tiling_ptr) {
-    KernelRangeI32 op;
-    op.Init(dst, tiling_ptr);
-    op.Process();
-}
 
 // =============== int64 版本 ===============
 class KernelRangeI64 {
@@ -114,9 +108,24 @@ private:
     int64_t low;
 };
 
-extern "C" __global__ __aicore__ void range_i64(
+
+
+
+extern "C" __global__ __aicore__ void range(
     GM_ADDR dst, GM_ADDR tiling_ptr) {
+  // Single entry + dtype_bytes branch: avoids the K_TYPE_AIV multi-function
+  // meta-section numbering bug (CANN 9.0.0: 2nd function's meta section _0
+  // vs symbol _1 mismatch -> registration 107000).
+  GlobalTensor<uint32_t> tilingGm;
+  tilingGm.SetGlobalBuffer((__gm__ uint32_t*)tiling_ptr, 4);
+  uint32_t dtype_bytes = tilingGm.GetValue(3);
+  if (dtype_bytes == 4) {
+    KernelRangeI32 op;
+    op.Init(dst, tiling_ptr);
+    op.Process();
+  } else {
     KernelRangeI64 op;
     op.Init(dst, tiling_ptr);
     op.Process();
+  }
 }
