@@ -13,6 +13,11 @@
 #include "../c_api_common.h"
 #include "./serialize/dglstream.h"
 
+#ifdef DGL_USE_ASCEND
+#include <acl/acl.h>
+#include <acl/acl_rt.h>
+#endif
+
 namespace dgl {
 
 namespace {
@@ -965,6 +970,18 @@ EdgeArray UnitGraph::FindEdges(dgl_type_t etype, IdArray eids) const {
 }
 
 EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid) const {
+#ifdef DGL_USE_ASCEND
+  // Workaround: prefer COO for Ascend to avoid CSR/CSC kernel stream sync
+  // issues.  COO InEdges falls back to CPU which is more reliable.
+  // TODO: fix CSC kernel stream sync at root cause and remove this bypass.
+  // NOTE: only applies when COO format is already materialized; graphs with
+  // only CSR/CSC still go through the native Ascend CSC path.
+  auto created = GetCreatedFormats();
+  if (created & COO_CODE) {
+    const auto ptr = GetFormat(SparseFormat::kCOO);
+    return ptr->InEdges(etype, vid);
+  }
+#endif
   const SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
@@ -976,6 +993,16 @@ EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid) const {
 }
 
 EdgeArray UnitGraph::InEdges(dgl_type_t etype, IdArray vids) const {
+#ifdef DGL_USE_ASCEND
+  // Workaround: prefer COO for Ascend to avoid CSR/CSC kernel stream sync
+  // issues.  COO InEdges falls back to CPU which is more reliable.
+  // TODO: fix CSC kernel stream sync at root cause and remove this bypass.
+  auto created = GetCreatedFormats();
+  if (created & COO_CODE) {
+    const auto ptr = GetFormat(SparseFormat::kCOO);
+    return ptr->InEdges(etype, vids);
+  }
+#endif
   const SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
@@ -1444,6 +1471,13 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       if (IsPinned()) in_csr_->PinMemory_();
       for (auto stream : recorded_streams) in_csr_->RecordStream(stream);
     }
+#ifdef DGL_USE_ASCEND
+    // Materialization-sync: this lazily generated CSC/CSR is written by DGL
+    // kernels on the default ACL stream. Flushing that stream makes the data
+    // visible to subsequent readers/torch-side copies (kernels serialize in
+    // FIFO order on the default stream, so no device-wide barrier is needed).
+    aclrtSynchronizeStream(nullptr);
+#endif
   }
   return ret;
 }
@@ -1478,6 +1512,12 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       if (IsPinned()) out_csr_->PinMemory_();
       for (auto stream : recorded_streams) out_csr_->RecordStream(stream);
     }
+#ifdef DGL_USE_ASCEND
+    // Materialization-sync: this lazily generated CSR/CSC is written by DGL
+    // kernels on the default ACL stream. Flushing that stream makes the data
+    // visible to subsequent readers/torch-side copies.
+    aclrtSynchronizeStream(nullptr);
+#endif
   }
   return ret;
 }
@@ -1511,6 +1551,11 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
       if (IsPinned()) coo_->PinMemory_();
       for (auto stream : recorded_streams) coo_->RecordStream(stream);
     }
+#ifdef DGL_USE_ASCEND
+    // Materialization-sync, same rationale as GetInCSR/GetOutCSR above:
+    // default-stream flush only.
+    aclrtSynchronizeStream(nullptr);
+#endif
   }
   return ret;
 }

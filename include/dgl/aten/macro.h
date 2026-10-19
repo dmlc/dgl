@@ -60,6 +60,44 @@
 #endif  // DGL_USE_CUDA
 
 /**
+ * Dispatch including Ascend support.
+ */
+#if defined(DGL_USE_CUDA) && defined(DGL_USE_ASCEND)
+#define ATEN_XPU_SWITCH_CUDA_ASCEND(val, XPU, op, ...)                   \
+  do {                                                                   \
+    if ((val) == kDGLCPU) {                                              \
+      constexpr auto XPU = kDGLCPU;                                      \
+      { __VA_ARGS__ }                                                    \
+    } else if ((val) == kDGLCUDA) {                                      \
+      constexpr auto XPU = kDGLCUDA;                                     \
+      { __VA_ARGS__ }                                                    \
+    } else if ((val) == kDGLAscend) {                                    \
+      constexpr auto XPU = kDGLAscend;                                   \
+      { __VA_ARGS__ }                                                    \
+    } else {                                                             \
+      LOG(FATAL) << "Operator " << (op) << " does not support "          \
+                 << dgl::runtime::DeviceTypeCode2Str(val) << " device."; \
+    }                                                                    \
+  } while (0)
+#elif defined(DGL_USE_ASCEND)
+#define ATEN_XPU_SWITCH_CUDA_ASCEND(val, XPU, op, ...)                   \
+  do {                                                                   \
+    if ((val) == kDGLCPU) {                                              \
+      constexpr auto XPU = kDGLCPU;                                      \
+      { __VA_ARGS__ }                                                    \
+    } else if ((val) == kDGLAscend) {                                    \
+      constexpr auto XPU = kDGLAscend;                                   \
+      { __VA_ARGS__ }                                                    \
+    } else {                                                             \
+      LOG(FATAL) << "Operator " << (op) << " does not support "          \
+                 << dgl::runtime::DeviceTypeCode2Str(val) << " device."; \
+    }                                                                    \
+  } while (0)
+#else
+#define ATEN_XPU_SWITCH_CUDA_ASCEND ATEN_XPU_SWITCH_CUDA
+#endif
+
+/**
  * Dispatch according to integral type (either int32 or int64):
  *
  * ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
@@ -196,24 +234,28 @@
   } while (0)
 #endif  // BF16_ENABLED
 #else   // DGL_USE_CUDA
-#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...) \
-  do {                                                                    \
-    CHECK((val).code == kDGLFloat || (val.code == kDGLBfloat))            \
-        << (val_name) << " must be float type";                           \
-    if ((val).bits == 32) {                                               \
-      typedef float FloatType;                                            \
-      { __VA_ARGS__ }                                                     \
-    } else if ((val).bits == 64) {                                        \
-      typedef double FloatType;                                           \
-      { __VA_ARGS__ }                                                     \
-    } else if (                                                           \
-        XPU == kDGLCPU && (val).bits == 16 && (val).code == kDGLBfloat) { \
-      typedef BFloat16 FloatType;                                         \
-      { __VA_ARGS__ }                                                     \
-    } else {                                                              \
-      LOG(FATAL) << (val_name)                                            \
-                 << " can only be bfloat16/float32/float64 on CPU";       \
-    }                                                                     \
+#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...)  \
+  do {                                                                     \
+    CHECK((val).code == kDGLFloat || (val.code == kDGLBfloat))             \
+        << (val_name) << " must be float type";                            \
+    if ((val).bits == 32) {                                                \
+      typedef float FloatType;                                             \
+      { __VA_ARGS__ }                                                      \
+    } else if ((val).bits == 64) {                                         \
+      typedef double FloatType;                                            \
+      { __VA_ARGS__ }                                                      \
+    } else if (                                                            \
+        XPU == kDGLAscend && (val).bits == 16 && (val).code == kDGLFloat) { \
+      typedef uint16_t FloatType;                                          \
+      { __VA_ARGS__ }                                                      \
+    } else if (                                                            \
+        XPU == kDGLCPU && (val).bits == 16 && (val).code == kDGLBfloat) {  \
+      typedef BFloat16 FloatType;                                          \
+      { __VA_ARGS__ }                                                      \
+    } else {                                                               \
+      LOG(FATAL) << (val_name)                                             \
+                 << " can only be float16 on Ascend or bfloat16/float32/float64 on CPU"; \
+    }                                                                      \
   } while (0)
 #endif  // DGL_USE_CUDA
 

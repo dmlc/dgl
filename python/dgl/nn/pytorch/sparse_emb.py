@@ -5,6 +5,8 @@ import torch as th
 
 from ...backend import pytorch as F
 from ...cuda import nccl
+from ...ascend import hccl
+from ...ascend.hccl import AscendNDArrayPartitionWrapper
 from ...partition import NDArrayPartition
 from ...utils import create_shared_mem_array, get_shared_mem_array
 
@@ -134,11 +136,19 @@ class NodeEmbedding:  # NodeEmbedding
 
             if not self._partition:
                 # for communication we need a partition
-                self._partition = NDArrayPartition(
-                    num_embeddings,
-                    self._world_size if self._world_size > 0 else 1,
-                    mode="remainder",
-                )
+                backend = th.distributed.get_backend() if th.distributed.is_initialized() else ""
+                if backend == "hccl":
+                    self._partition = AscendNDArrayPartitionWrapper(
+                        num_embeddings,
+                        self._world_size if self._world_size > 0 else 1,
+                        mode="remainder",
+                    )
+                else:
+                    self._partition = NDArrayPartition(
+                        num_embeddings,
+                        self._world_size if self._world_size > 0 else 1,
+                        mode="remainder",
+                    )
 
             # create local tensors for the weights
             local_size = self._partition.local_size(max(self._rank, 0))
@@ -176,12 +186,24 @@ class NodeEmbedding:  # NodeEmbedding
             # across multiple GPUs and can handle situations where only one GPU
             # is present gracefully, a.k.a. self._world_size == 1 or
             # 0 (when th.distributed.is_initialized() is false).
-            emb = nccl.sparse_all_to_all_pull(
-                node_ids, self._tensor, self._partition
-            )
+            # Use hccl for Ascend devices, nccl for NVIDIA devices
+            backend = th.distributed.get_backend() if th.distributed.is_initialized() else ""
+            if backend == "hccl":
+                emb = hccl.sparse_all_to_all_pull(
+                    node_ids, self._tensor, self._partition
+                )
+            elif backend == "nccl":
+                emb = nccl.sparse_all_to_all_pull(
+                    node_ids, self._tensor, self._partition
+                )
             emb = emb.to(device)
         if F.is_recording():
             emb = F.attach_grad(emb)
+            # NPU autograd may put gradient on CPU; hook forces it back to NPU
+            if emb.device.type == "npu":
+                emb.register_hook(
+                    lambda g, dev=emb.device: g.to(dev) if g.device != dev else g
+                )
             self._trace.append((node_ids.to(device), emb))
 
         return emb

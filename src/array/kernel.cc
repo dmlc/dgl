@@ -6,6 +6,11 @@
 #include <dgl/base_heterograph.h>
 #include <dgl/packed_func_ext.h>
 
+#ifdef DGL_USE_ASCEND
+#include <acl/acl.h>
+#include <acl/acl_rt.h>
+#endif
+
 #include "../c_api_common.h"
 #include "./check.h"
 #include "kernel_decl.h"
@@ -24,7 +29,7 @@ void SpMM(
   SparseFormat format = graph->SelectFormat(0, CSC_CODE);
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
-  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(out->dtype, Dtype, XPU, "Feature data", {
         if (format == SparseFormat::kCSC) {
@@ -64,7 +69,7 @@ void SegmentMM(
       << "segment_mm expects seglen_A to be on CPU.";
   CHECK(A->ctx == B->ctx)
       << "segment_mm expects A and B to be of the same device";
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMM", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(A->ctx.device_type, XPU, "SegmentMM", {
     ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(A->dtype, Dtype, XPU, "Feature data", {
         SegmentMM<XPU, IdType, Dtype>(A, B, C, seglen_A, A_trans, B_trans);
@@ -81,7 +86,10 @@ void SegmentMMBackwardB(
                            "for the second input.";
   CHECK_EQ(seglen->ctx.device_type, kDGLCPU)
       << "segment_mm expects seglen to be on CPU.";
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
+  CHECK_EQ(A->shape[0], dC->shape[0])
+      << "segment_mm_backward expects A.shape[0] == dC.shape[0] "
+         "(K_sum consistency)";
+  ATEN_XPU_SWITCH_CUDA_ASCEND(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
     ATEN_ID_TYPE_SWITCH(seglen->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(A->dtype, Dtype, XPU, "Feature data", {
         SegmentMMBackwardB<XPU, IdType, Dtype>(A, dC, dB, seglen);
@@ -101,7 +109,16 @@ void GatherMM(
       << "gather_mm operator expects a 3D tensor for the second input.";
   CHECK(A->ctx == B->ctx)
       << "gather_mm expects all arguments to be on the same device.";
-  if (aten::IsNullArray(idx_a)) {
+  if (aten::IsNullArray(idx_a) && aten::IsNullArray(idx_b)) {
+    // Both None: C[r] = A[r] @ B[r] (math definition: idx None -> arange(m)).
+    // Requires A.shape[0] == B.shape[0] (m == R) when m > 0; for m == 0 the
+    // output is empty ([0, n]) regardless of R, so no constraint is needed.
+    if (A->shape[0] > 0) {
+      CHECK_EQ(A->shape[0], B->shape[0])
+          << "gather_mm expects A.shape[0] == B.shape[0] when both idx_a and "
+             "idx_b are None and m > 0.";
+    }
+  } else if (aten::IsNullArray(idx_a)) {
     CHECK_EQ(A->shape[0], idx_b->shape[0])
         << "gather_mm expects len(idx_b) == A.shape[0] when idx_a is None.";
     CHECK(A->ctx == idx_b->ctx)
@@ -118,8 +135,14 @@ void GatherMM(
     CHECK(A->ctx == idx_a->ctx && A->ctx == idx_b->ctx)
         << "gather_mm expects all arguments to be on the same device.";
   }
-  const auto idtype = aten::IsNullArray(idx_a) ? idx_b->dtype : idx_a->dtype;
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
+  // idtype: prefer idx_a, then idx_b; both None -> default int32 (host generates
+  // arange internally, IdType is not read).
+  const auto idtype = aten::IsNullArray(idx_a)
+                          ? (aten::IsNullArray(idx_b)
+                                 ? DGLDataType{kDGLInt, 32, 1}
+                                 : idx_b->dtype)
+                          : idx_a->dtype;
+  ATEN_XPU_SWITCH_CUDA_ASCEND(A->ctx.device_type, XPU, "GatherMM", {
     ATEN_ID_TYPE_SWITCH(idtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(A->dtype, Dtype, XPU, "Feature data", {
         GatherMM<XPU, IdType, Dtype>(A, B, C, idx_a, idx_b);
@@ -159,8 +182,12 @@ void GatherMMScatter(
     CHECK(A->ctx == idx_a->ctx && A->ctx == idx_b->ctx)
         << "gather_mm_scatter expects all arguments to be on the same device.";
   }
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
-    ATEN_ID_TYPE_SWITCH(idx_c->dtype, IdType, {
+  // idx_c may be Null; derive IdType from a non-Null idx to avoid dereference crash.
+  const auto idtype_scatter = !aten::IsNullArray(idx_c)
+      ? idx_c->dtype
+      : (!aten::IsNullArray(idx_a) ? idx_a->dtype : idx_b->dtype);
+  ATEN_XPU_SWITCH_CUDA_ASCEND(A->ctx.device_type, XPU, "GatherMMScatter", {
+    ATEN_ID_TYPE_SWITCH(idtype_scatter, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(A->dtype, Dtype, XPU, "Feature data", {
         GatherMMScatter<XPU, IdType, Dtype>(A, B, C, idx_a, idx_b, idx_c);
       });
@@ -228,7 +255,7 @@ void SDDMM(
   SparseFormat format = graph->SelectFormat(0, COO_CODE);
   const auto& bcast = CalcBcastOff(op, lhs, rhs);
 
-  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(out->dtype, Dtype, XPU, "Feature data", {
         if (format == SparseFormat::kCSR) {
@@ -276,7 +303,7 @@ void SDDMMHetero(
   }
   const auto& bcast = CalcBcastOff(op, lhs[lhs_eid[0]], rhs[rhs_eid[0]]);
 
-  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(
           out[rhs_eid[0]]->dtype, Dtype, XPU, "Feature data", {
@@ -310,36 +337,72 @@ void SDDMMHetero(
 void Edge_softmax_forward(
     const std::string& op, HeteroGraphPtr graph, NDArray ufeat, NDArray efeat,
     NDArray out) {
-  // TODO(zhejiang): add gpu op for edge_softmax
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+  // Dispatch by output tensor device (graph may stay on CPU while data is on NPU)
+  int dev_type = efeat->ctx.device_type;
 
-  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax", {
+  if (dev_type == kDGLCPU) {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(
-          out->dtype, Dtype, XPU, "edge_softmax out data", {
-            Edge_softmax_csr_forward<XPU, IdType, Dtype>(
+          out->dtype, Dtype, kDGLCPU, "edge_softmax out data", {
+            Edge_softmax_csr_forward<kDGLCPU, IdType, Dtype>(
                 op, bcast, graph->GetCSCMatrix(0), ufeat, efeat, out);
           });
     });
-  });
+#ifdef DGL_USE_ASCEND
+  } else if (dev_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      if (out->dtype.code == kDGLFloat && out->dtype.bits == 32) {
+        Edge_softmax_csr_forward<kDGLAscend, IdType, float>(
+            op, bcast, graph->GetCSCMatrix(0), ufeat, efeat, out);
+      } else if (out->dtype.code == kDGLFloat && out->dtype.bits == 16) {
+        Edge_softmax_csr_forward<kDGLAscend, IdType, uint16_t>(
+            op, bcast, graph->GetCSCMatrix(0), ufeat, efeat, out);
+      } else {
+        LOG(FATAL) << "edge_softmax forward: unsupported dtype on Ascend: code="
+                   << out->dtype.code << " bits=" << out->dtype.bits;
+      }
+    });
+#endif
+  } else {
+    LOG(FATAL) << "edge_softmax forward: unsupported device type: " << dev_type;
+  }
 }
 
 /** @brief Generalized Edge_softmax op for backward */
 void Edge_softmax_backward(
     const std::string& op, HeteroGraphPtr graph, NDArray out, NDArray sds,
     NDArray back_out, NDArray ufeat) {
-  // TODO(zhejiang): add gpu op for edge_softmax
   const auto& bcast = CalcBcastOff(op, ufeat, sds);
+  // Dispatch by output tensor device (graph may stay on CPU while data is on NPU)
+  int dev_type = out->ctx.device_type;
 
-  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax_back", {
+  if (dev_type == kDGLCPU) {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(
-          out->dtype, Dtype, XPU, "edge_softmax out data_back", {
-            Edge_softmax_csr_backward<XPU, IdType, Dtype>(
+          out->dtype, Dtype, kDGLCPU, "edge_softmax out data_back", {
+            Edge_softmax_csr_backward<kDGLCPU, IdType, Dtype>(
                 op, bcast, graph->GetCSCMatrix(0), out, sds, back_out);
           });
     });
-  });
+#ifdef DGL_USE_ASCEND
+  } else if (dev_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      if (out->dtype.code == kDGLFloat && out->dtype.bits == 32) {
+        Edge_softmax_csr_backward<kDGLAscend, IdType, float>(
+            op, bcast, graph->GetCSCMatrix(0), out, sds, back_out);
+      } else if (out->dtype.code == kDGLFloat && out->dtype.bits == 16) {
+        Edge_softmax_csr_backward<kDGLAscend, IdType, uint16_t>(
+            op, bcast, graph->GetCSCMatrix(0), out, sds, back_out);
+      } else {
+        LOG(FATAL) << "edge_softmax backward: unsupported dtype on Ascend: code="
+                   << out->dtype.code << " bits=" << out->dtype.bits;
+      }
+    });
+#endif
+  } else {
+    LOG(FATAL) << "edge_softmax backward: unsupported device type: " << dev_type;
+  }
 }
 
 NDArray GetEdgeMapping(HeteroGraphRef graph) {
@@ -355,7 +418,7 @@ NDArray GetEdgeMapping(HeteroGraphRef graph) {
 void SegmentReduceDispatch(
     const std::string& op, NDArray feat, NDArray offsets, NDArray out,
     NDArray arg) {
-  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "SegmentReduce", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(feat->ctx.device_type, XPU, "SegmentReduce", {
     ATEN_ID_TYPE_SWITCH(offsets->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(feat->dtype, Dtype, XPU, "Feature data", {
         SegmentReduce<XPU, IdType, Dtype>(op, feat, offsets, out, arg);
@@ -364,9 +427,12 @@ void SegmentReduceDispatch(
   });
 }
 
-/** @brief Scatter Add (on first dimension) dispatch function. */
+/** @brief Scatter Add (on first dimension) dispatch function.
+ *
+ * Native NPU kernel for Ascend; replaces former CPU fallback path.
+ */
 void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
-  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "ScatterAdd", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(feat->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(feat->dtype, Dtype, XPU, "Feature data", {
         ScatterAdd<XPU, IdType, Dtype>(feat, idx, out);
@@ -383,7 +449,7 @@ void UpdateGradMinMaxDispatchHetero(
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out) {
   auto pair = graph->meta_graph()->FindEdge(0);  // checking the first etype
   auto src_id = pair.first;
-  ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(
           feat[src_id]->dtype, Dtype, XPU, "Feature data", {
@@ -396,7 +462,7 @@ void UpdateGradMinMaxDispatchHetero(
 
 /** @brief Backward segment cmp dispatch function.*/
 void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
-  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
     ATEN_ID_TYPE_SWITCH(arg->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(feat->dtype, Dtype, XPU, "Feature data", {
         BackwardSegmentCmp<XPU, IdType, Dtype>(feat, arg, out);

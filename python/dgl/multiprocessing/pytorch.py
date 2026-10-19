@@ -5,6 +5,7 @@ from _thread import start_new_thread
 from functools import wraps
 
 import torch
+import torch_npu
 import torch.multiprocessing as mp
 
 from ..utils import create_shared_mem_array, get_shared_mem_array
@@ -78,11 +79,16 @@ def call_once_and_share(func, shape, dtype, rank=0):
     current_rank = torch.distributed.get_rank()
     dist_buf = torch.LongTensor([1])
 
-    if torch.distributed.get_backend() == "nccl":
-        # Use .cuda() to transfer it to the correct device.  Should be OK since
-        # PyTorch recommends the users to call set_device() after getting inside
-        # torch.multiprocessing.spawn()
-        dist_buf = dist_buf.cuda()
+    backend = torch.distributed.get_backend()
+
+    if backend == "nccl":
+        device = torch.cuda.current_device()
+    elif backend == "hccl":
+        device = torch.npu.current_device()
+    else:
+        device = torch.device("cpu")
+
+    dist_buf = dist_buf.to(device)
 
     # Process with the given rank creates and populates the shared memory array.
     if current_rank == rank:

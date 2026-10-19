@@ -32,7 +32,7 @@ class PyTorchTensorStorage(BaseTensorStorage):
         device = torch.device(device)
         storage_device_type = self.storage.device.type
         indices_device_type = indices.device.type
-        if storage_device_type != "cuda":
+        if storage_device_type not in ("cuda", "npu"):
             if indices_device_type == "cuda":
                 if self.storage.is_pinned():
                     return gather_pinned_tensor_rows(self.storage, indices)

@@ -226,6 +226,14 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
         # use an empty list to signal we need to generate it
         src_node_ids_nd = []
 
+    # The DGL kernels run on the default ACL stream while PyTorch uses its own
+    # NPU stream; sync the PyTorch stream (lightweight) before handing our
+    # tensors to ToBlock so it reads up-to-date data on Ascend.
+    if g.device.type in ("npu", "ascend"):
+        import torch
+
+        torch.npu.current_stream().synchronize()
+
     new_graph_index, src_nodes_ids_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_node_ids_nd, include_dst_in_src, src_node_ids_nd
     )

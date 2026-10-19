@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "2.5"
+#define DGL_VERSION "0.0.2"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,6 +56,8 @@ typedef enum {
   kDGLCPU = 1,
   /** @brief CUDA GPU device */
   kDGLCUDA = 2,
+  /** @brief Huawei Ascend NPU device */
+  kDGLAscend = 12,
   // add more devices once supported
 } DGLDeviceType;
 

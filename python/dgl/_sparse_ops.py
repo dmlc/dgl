@@ -152,7 +152,6 @@ def _edge_softmax_forward(gidx, e, op):
     myout = F.squeeze(myout, -1) if expand else myout
     return myout
 
-
 def _gspmm(gidx, op, reduce_op, u, e):
     r"""Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
@@ -224,6 +223,18 @@ def _gspmm(gidx, op, reduce_op, u, e):
     v_shp = (gidx.num_nodes(dsttype),) + infer_broadcast_shape(
         op, u_shp[1:], e_shp[1:]
     )
+    _is_npu = hasattr(F, "device_type") and F.device_type(ctx) == "npu"
+    if _is_npu:
+        # torch_npu may tag tensors produced by broadcast ops (e.g. `feat *
+        # norm`, then matmul) with a non-standard memory format even when
+        # `is_contiguous()` reports True. DGL kernels read raw data pointers
+        # and would see garbage (all-zero output). `.to(contiguous_format)`
+        # reliably clears the hidden memory-format tag.
+        import torch
+        if use_u and u is not None:
+            u = u.to(memory_format=torch.contiguous_format)
+        if use_e and e is not None:
+            e = e.to(memory_format=torch.contiguous_format)
     v = F.zeros(v_shp, dtype, ctx)
     use_cmp = reduce_op in ["max", "min"]
     arg_u, arg_e = None, None
@@ -236,6 +247,16 @@ def _gspmm(gidx, op, reduce_op, u, e):
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
     if gidx.num_edges(0) > 0:
+        if _is_npu:
+            # u/e are produced on the torch_npu stream (e.g. by a preceding
+            # matmul) and aclrtSynchronizeDevice inside the C++ path does NOT
+            # wait for torch_npu streams — sync here so the SpMM kernel reads
+            # up-to-date inputs.
+            import torch as _th
+            try:
+                _th.npu.synchronize()
+            except Exception:
+                pass
         _CAPI_DGLKernelSpMM(
             gidx,
             op,
@@ -246,6 +267,15 @@ def _gspmm(gidx, op, reduce_op, u, e):
             arg_u_nd,
             arg_e_nd,
         )
+        if _is_npu:
+            # The SpMM kernel runs on the default ACL stream; a stream sync
+            # alone does not give cross-stream memory visibility to PyTorch
+            # readers (L2), so do a device-level barrier here.
+            import torch as _th
+            try:
+                _th.npu.synchronize()
+            except Exception:
+                pass
     # NOTE(zihao): actually we can avoid the following step, because arg_*_nd
     # refers to the data that stores arg_*. After we call _CAPI_DGLKernelSpMM,
     # arg_* should have already been changed. But we found this doesn't work
@@ -546,11 +576,33 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target="u", rhs_target="v"):
     dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
     lhs_shp = F.shape(lhs) if use_lhs else (0,)
     rhs_shp = F.shape(rhs) if use_rhs else (0,)
+    _is_npu_sddmm = str(ctx).startswith("npu") or (
+        hasattr(F, "device_type") and F.device_type(ctx) == "npu"
+    )
+    if _is_npu_sddmm:
+        # Clear hidden torch_npu memory-format tags (see _gspmm note) so the
+        # DGL SDDMM kernels read valid data. Unlike clone, this is a no-op for
+        # tensors that are genuinely plain; note `.contiguous()` is NOT
+        # sufficient because torch_npu may report is_contiguous() == True
+        # while a hidden tag is still set.
+        import torch as _th
+        if use_lhs and lhs is not None:
+            lhs = lhs.to(memory_format=_th.contiguous_format)
+        if use_rhs and rhs is not None:
+            rhs = rhs.to(memory_format=_th.contiguous_format)
     out_shp = (gidx.num_edges(0),) + infer_broadcast_shape(
         op, lhs_shp[1:], rhs_shp[1:]
     )
     out = F.empty(out_shp, dtype, ctx)
     if gidx.num_edges(0) > 0:
+        # lhs/rhs were (re)produced on the PyTorch NPU stream (e.g. by the
+        # clone above) and the C++ SDDMM path has no input sync; do a light
+        # current-stream sync before the DGL kernel reads them.
+        try:
+            import torch
+            torch.npu.current_stream().synchronize()
+        except Exception:
+            pass
         _CAPI_DGLKernelSDDMM(
             gidx,
             op,
@@ -677,8 +729,44 @@ def _segment_reduce(op, feat, offsets):
     idtype = F.dtype(offsets)
     out = F.zeros(out_shp, dtype, ctx)
     arg = None
-    if op in ["min", "max"]:
-        arg = F.zeros(out_shp, idtype, ctx)
+    if ctx.type in ("npu", "ascend"):
+        # Ascend segment_reduce kernel is buggy for some shapes (507035 vector
+        # core crash). Fall back to a safe per-segment torch computation.
+        import torch as _th
+        offsets_host = F.asnumpy(offsets).tolist()
+        results = []
+        for i in range(n):
+            lo = int(offsets_host[i])
+            hi = int(offsets_host[i + 1])
+            c = feat[lo:hi]
+            if hi > lo:
+                if op == "sum":
+                    results.append(c.sum(0))
+                elif op == "max":
+                    results.append(c.max(0)[0])
+                elif op == "min":
+                    results.append(c.min(0)[0])
+                else:
+                    raise DGLError("Unsupported reduce op: " + op)
+            else:
+                if op == "sum":
+                    results.append(_th.zeros(
+                        tuple(c.shape[1:]), dtype=dtype, device=ctx))
+                elif op == "max":
+                    results.append(_th.full(
+                        tuple(c.shape[1:]),
+                        -1e30 if dtype == _th.float32 else -1e18,
+                        dtype=dtype, device=ctx))
+                elif op == "min":
+                    results.append(_th.full(
+                        tuple(c.shape[1:]),
+                        1e30 if dtype == _th.float32 else 1e18,
+                        dtype=dtype, device=ctx))
+                else:
+                    raise DGLError("Unsupported reduce op: " + op)
+        out = _th.stack(results, 0) if results else _th.zeros(
+            out_shp, dtype=dtype, device=ctx)
+        return out, arg
     arg_nd = to_dgl_nd_for_write(arg)
     _CAPI_DGLKernelSegmentReduce(
         op,

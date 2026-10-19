@@ -419,8 +419,61 @@ SampleNeighborsFused(
   }
 
   if (!exclude_edges.empty()) {
-    ExcludeCertainEdgesFused<IdType>(
-        &sampled_graphs, &induced_edges, &sampled_coo_rows, exclude_edges);
+    // NPU hybrid: ExcludeCertainEdgesFused works on host pointers
+    // (std::sort + binary_search), so round-trip the sampled outputs to
+    // the CPU when the graph lives on NPU (spmm fallback precedent).
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    const bool exclude_on_npu =
+        !sampled_graphs.empty() &&
+        sampled_graphs[0].indptr.defined() &&
+        sampled_graphs[0].indptr->ctx.device_type == kDGLAscend;
+    if (exclude_on_npu) {
+      std::vector<CSRMatrix> cpu_graphs;
+      std::vector<IdArray> cpu_edges, cpu_coo_rows;
+      std::vector<IdArray> cpu_exclude(exclude_edges.size());
+      cpu_graphs.reserve(sampled_graphs.size());
+      cpu_edges.reserve(induced_edges.size());
+      cpu_coo_rows.reserve(sampled_coo_rows.size());
+      for (size_t i = 0; i < sampled_graphs.size(); ++i) {
+        if (sampled_graphs[i].indptr.defined()) {
+          cpu_graphs.push_back(sampled_graphs[i].CopyTo(cpu_ctx));
+        } else {
+          cpu_graphs.push_back(sampled_graphs[i]);
+        }
+        cpu_edges.push_back(
+            induced_edges[i].defined() ? induced_edges[i].CopyTo(cpu_ctx)
+                                       : induced_edges[i]);
+        cpu_coo_rows.push_back(
+            sampled_coo_rows[i].defined()
+                ? sampled_coo_rows[i].CopyTo(cpu_ctx)
+                : sampled_coo_rows[i]);
+      }
+      for (size_t i = 0; i < exclude_edges.size(); ++i) {
+        cpu_exclude[i] = exclude_edges[i].defined()
+                             ? exclude_edges[i].CopyTo(cpu_ctx)
+                             : exclude_edges[i];
+      }
+      ExcludeCertainEdgesFused<IdType>(
+          &cpu_graphs, &cpu_edges, &cpu_coo_rows, cpu_exclude);
+      for (size_t i = 0; i < sampled_graphs.size(); ++i) {
+        if (cpu_graphs[i].indptr.defined()) {
+          sampled_graphs[i] = cpu_graphs[i].CopyTo(ctx);
+        }
+        if (sampled_graphs[i].data.defined()) {
+          induced_edges[i] = sampled_graphs[i].data;
+        } else {
+          induced_edges[i] = aten::NullArray(
+              DGLDataType{kDGLInt, sizeof(IdType) * 8, 1}, ctx);
+        }
+        if (cpu_coo_rows[i].defined() &&
+            cpu_coo_rows[i]->shape[0] >= 0) {
+          sampled_coo_rows[i] = cpu_coo_rows[i].CopyTo(ctx);
+        }
+      }
+    } else {
+      ExcludeCertainEdgesFused<IdType>(
+          &sampled_graphs, &induced_edges, &sampled_coo_rows, exclude_edges);
+    }
     for (size_t i = 0; i < hg->NumEdgeTypes(); i++) {
       if (sampled_graphs[i].data.defined())
         induced_edges[i] = std::move(sampled_graphs[i].data);
@@ -442,8 +495,29 @@ SampleNeighborsFused(
       int num_threads_col = runtime::compute_num_threads(0, num_cols, 1);
       std::vector<IdType> global_prefix_col(num_threads_col + 1, 0);
       std::vector<std::vector<IdType>> src_nodes_local(num_threads_col);
-      IdType* mapping_data_dst = mapping[lhs_node_type].Ptr<IdType>();
-      IdType* cdata = sampled_graphs[etype].indices.Ptr<IdType>();
+      // NPU hybrid (D2H -> CPU map-indices -> H2D): the map-indices step
+      // uses host atomics (BoolCompareAndSwap) over the mapping and the
+      // sampled indices, both device arrays on NPU inputs. Round-trip
+      // only these two sampling-output-sized arrays; the expensive CSR
+      // traversal already ran on the NPU kernel.
+      DGLContext cpu_ctx{kDGLCPU, 0};
+      const bool on_npu =
+          mapping[lhs_node_type]->ctx.device_type == kDGLAscend;
+      IdArray mapping_host, indices_host;
+      if (on_npu) {
+        mapping_host = mapping[lhs_node_type].CopyTo(cpu_ctx);
+        indices_host = sampled_graphs[etype].indices.CopyTo(cpu_ctx);
+      }
+      // Pointer indirection: `mapping` is const, so on the CPU path the
+      // element binds to a const NDArray — only the NPU host copies are
+      // mutable (they are written back after the parallel section).
+      IdArray* mapping_ref =
+          on_npu ? &mapping_host
+                 : const_cast<IdArray*>(&mapping[lhs_node_type]);
+      IdArray* indices_ref =
+          on_npu ? &indices_host : &sampled_graphs[etype].indices;
+      IdType* mapping_data_dst = mapping_ref->Ptr<IdType>();
+      IdType* cdata = indices_ref->Ptr<IdType>();
 #pragma omp parallel num_threads(num_threads_col)
       {
         const int thread_id = omp_get_thread_num();
@@ -496,6 +570,13 @@ SampleNeighborsFused(
             src_nodes_local[thread_id].size() * sizeof(IdType));
         offset += src_nodes_local[thread_id].size();
       }
+      // H2D writeback of the remapped arrays (NPU hybrid epilogue).
+      if (on_npu) {
+        mapping_host.CopyTo(mapping[lhs_node_type]);
+        indices_host.CopyTo(sampled_graphs[etype].indices);
+      }
+      (void)mapping_ref;
+      (void)indices_ref;
     }
   }
 
@@ -762,7 +843,8 @@ HeteroSubgraph SampleNeighborsBiased(
         hg->GetRelationGraph(etype)->NumVertexTypes(),
         hg->NumVertices(src_vtype), hg->NumVertices(dst_vtype), hg->DataType(),
         hg->Context());
-    induced_edges = aten::NullArray();
+    induced_edges =
+        aten::NullArray(hg->DataType(), hg->Context());
   } else {
     // sample from one relation graph
     const auto req_fmt = (dir == EdgeDir::kOut) ? CSR_CODE : CSC_CODE;

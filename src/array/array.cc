@@ -1,3 +1,10 @@
+#ifdef DGL_USE_ASCEND
+#include <acl/acl.h>
+#include <acl/acl_rt.h>
+#include <torch/extension.h>
+
+#include "ascend/concat_tiling.h"
+#endif
 /**
  *  Copyright (c) 2019-2022 by Contributors
  * @file array/array.cc
@@ -39,6 +46,20 @@ IdArray Clone(IdArray arr) {
 
 IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx) {
   IdArray ret;
+#ifdef DGL_USE_ASCEND
+  if (ctx.device_type == kDGLAscend) {
+    if (nbits == 32) {
+      ret = impl::Range<kDGLAscend, int32_t>(
+          static_cast<int32_t>(low), static_cast<int32_t>(high), ctx);
+    } else if (nbits == 64) {
+      ret = impl::Range<kDGLAscend, int64_t>(
+          static_cast<int64_t>(low), static_cast<int64_t>(high), ctx);
+    } else {
+      LOG(FATAL) << "Only int32 or int64 is supported.";
+    }
+    return ret;
+  }
+#endif
   ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Range", {
     if (nbits == 32) {
       ret = impl::Range<XPU, int32_t>(low, high, ctx);
@@ -53,6 +74,20 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx) {
 
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx) {
   IdArray ret;
+
+#ifdef DGL_USE_ASCEND
+  if (ctx.device_type == kDGLAscend) {
+    if (nbits == 32) {
+      ret = impl::Full<kDGLAscend, int32_t>(static_cast<int32_t>(val), length, ctx);
+    } else if (nbits == 64) {
+      ret = impl::Full<kDGLAscend, int64_t>(val, length, ctx);
+    } else {
+      LOG(FATAL) << "Only int32 or int64 is supported.";
+    }
+    return ret;
+  }
+#endif
+
   ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Full", {
     if (nbits == 32) {
       ret = impl::Full<XPU, int32_t>(val, length, ctx);
@@ -68,6 +103,13 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx) {
 template <typename DType>
 NDArray Full(DType val, int64_t length, DGLContext ctx) {
   NDArray ret;
+
+#ifdef DGL_USE_ASCEND
+  if (ctx.device_type == kDGLAscend) {
+    return impl::Full<kDGLAscend, DType>(val, length, ctx);
+  }
+#endif
+
   ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Full", {
     ret = impl::Full<XPU, DType>(val, length, ctx);
   });
@@ -86,6 +128,13 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
   if (arr->dtype.bits == bits) return arr;
   if (arr.NumElements() == 0) return NewIdArray(arr->shape[0], arr->ctx, bits);
   IdArray ret;
+#ifdef DGL_USE_ASCEND
+  if (arr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(
+        arr->dtype, IdType, { ret = impl::AsNumBits<kDGLAscend, IdType>(arr, bits); });
+    return ret;
+  }
+#endif
   ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
     ATEN_ID_TYPE_SWITCH(
         arr->dtype, IdType, { ret = impl::AsNumBits<XPU, IdType>(arr, bits); });
@@ -120,13 +169,26 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   // if array is not pinned, index has the same context as array
   // if array is pinned, op dispatching depends on the context of index
   CHECK_VALID_CONTEXT(array, index);
-  ATEN_XPU_SWITCH_CUDA(index->ctx.device_type, XPU, "IndexSelect", {
+#ifdef DGL_USE_ASCEND
+  if (index->ctx.device_type == kDGLAscend ||
+      array->ctx.device_type == kDGLAscend) {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
-        ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
+        ret = impl::IndexSelect<kDGLAscend, DType, IdType>(
+            array, index);
       });
     });
-  });
+  } else
+#endif
+  {
+    ATEN_XPU_SWITCH_CUDA(index->ctx.device_type, XPU, "IndexSelect", {
+      ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+        ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
+          ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
+        });
+      });
+    });
+  }
   return ret;
 }
 
@@ -136,11 +198,20 @@ ValueType IndexSelect(NDArray array, int64_t index) {
   CHECK(index >= 0 && index < array.NumElements())
       << "Index " << index << " is out of bound.";
   ValueType ret = 0;
-  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
+#ifdef DGL_USE_ASCEND
+  if (array->ctx.device_type == kDGLAscend) {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
-      ret = impl::IndexSelect<XPU, DType>(array, index);
+      ret = impl::IndexSelect<kDGLAscend, DType>(array, index);
     });
-  });
+  } else
+#endif
+  {
+    ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
+      ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+        ret = impl::IndexSelect<XPU, DType>(array, index);
+      });
+    });
+  }
   return ret;
 }
 template int32_t IndexSelect<int32_t>(NDArray array, int64_t index);
@@ -186,13 +257,26 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
   CHECK_SAME_CONTEXT(index, out);
   CHECK_EQ(value->shape[0], index->shape[0]);
   if (index->shape[0] == 0) return;
-  ATEN_XPU_SWITCH_CUDA(value->ctx.device_type, XPU, "Scatter_", {
+  if (value->ctx.device_type == kDGLAscend) {
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    auto index_cpu = index.CopyTo(cpu_ctx);
+    auto value_cpu = value.CopyTo(cpu_ctx);
+    auto out_cpu = out.CopyTo(cpu_ctx);
     ATEN_DTYPE_SWITCH(value->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
-        impl::Scatter_<XPU, DType, IdType>(index, value, out);
+        impl::Scatter_<kDGLCPU, DType, IdType>(index_cpu, value_cpu, out_cpu);
       });
     });
-  });
+    out.CopyFrom(out_cpu);
+  } else {
+    ATEN_XPU_SWITCH_CUDA(value->ctx.device_type, XPU, "Scatter_", {
+      ATEN_DTYPE_SWITCH(value->dtype, DType, "values", {
+        ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
+          impl::Scatter_<XPU, DType, IdType>(index, value, out);
+        });
+      });
+    });
+  }
 }
 
 NDArray Repeat(NDArray array, IdArray repeats) {
@@ -209,27 +293,52 @@ NDArray Repeat(NDArray array, IdArray repeats) {
 
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray ret;
-  ATEN_XPU_SWITCH_CUDA(arrays[0]->ctx.device_type, XPU, "Relabel_", {
+  if (arrays[0]->ctx.device_type == kDGLAscend) {
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    std::vector<IdArray> arrays_cpu;
+    arrays_cpu.reserve(arrays.size());
+    for (const auto& arr : arrays) {
+      arrays_cpu.push_back(arr.CopyTo(cpu_ctx));
+    }
     ATEN_ID_TYPE_SWITCH(arrays[0]->dtype, IdType, {
-      ret = impl::Relabel_<XPU, IdType>(arrays);
+      ret = impl::Relabel_<kDGLCPU, IdType>(arrays_cpu);
     });
-  });
+    ret = ret.CopyTo(arrays[0]->ctx);
+  } else {
+    ATEN_XPU_SWITCH_CUDA(arrays[0]->ctx.device_type, XPU, "Relabel_", {
+      ATEN_ID_TYPE_SWITCH(arrays[0]->dtype, IdType, {
+        ret = impl::Relabel_<XPU, IdType>(arrays);
+      });
+    });
+  }
   return ret;
 }
 
 NDArray Concat(const std::vector<IdArray>& arrays) {
-  IdArray ret;
-
-  int64_t len = 0, offset = 0;
+  int64_t len = 0;
   for (size_t i = 0; i < arrays.size(); ++i) {
     len += arrays[i]->shape[0];
     CHECK_SAME_DTYPE(arrays[0], arrays[i]);
     CHECK_SAME_CONTEXT(arrays[0], arrays[i]);
   }
 
+#ifdef DGL_USE_ASCEND
+  // 1D IdArray 拼接等价于 ConcatND(arrays, dim=0)。对齐检查与 dtype 分发由
+  // ConcatND 内部完成，非对齐输入或超过 kernel 2^32 元素上限时自动回退通用路径，
+  // 保证与旧通用路径（逐段 CopyDataFromTo）行为一致。
+  if (arrays[0]->ctx.device_type == kDGLAscend &&
+      arrays[0]->dtype.code == kDGLInt &&
+      (arrays[0]->dtype.bits == 32 || arrays[0]->dtype.bits == 64) &&
+      len < (static_cast<int64_t>(1) << 32)) {
+    std::vector<NDArray> nds(arrays.begin(), arrays.end());
+    return ConcatND(nds, 0);
+  }
+#endif
+
   NDArray ret_arr = NDArray::Empty({len}, arrays[0]->dtype, arrays[0]->ctx);
 
   auto device = runtime::DeviceAPI::Get(arrays[0]->ctx);
+  int64_t offset = 0;
   for (size_t i = 0; i < arrays.size(); ++i) {
     ATEN_DTYPE_SWITCH(arrays[i]->dtype, DType, "array", {
       device->CopyDataFromTo(
@@ -243,6 +352,109 @@ NDArray Concat(const std::vector<IdArray>& arrays) {
   }
 
   return ret_arr;
+}
+
+#ifdef DGL_USE_ASCEND
+namespace {
+
+// The AscendC kernel moves data with DataCopyPad, which requires 32-byte-aligned
+// GM addresses. Freshly allocated buffers are 512-byte aligned on Ascend, but a
+// DLPack tensor may be a slice of a larger allocation and hence start anywhere,
+// so misaligned inputs must fall back to the byte-wise copy path.
+bool AscendDataCopyAligned(
+    const std::vector<NDArray>& arrays, const NDArray& out) {
+  auto aligned = [](const void* p) {
+    return (reinterpret_cast<uintptr_t>(p) & (CONCAT_ALIGN_BYTES - 1)) == 0;
+  };
+  if (!aligned(out->data)) return false;
+  for (const NDArray& a : arrays) {
+    if (!aligned(a->data)) return false;
+  }
+  return true;
+}
+
+}  // namespace
+#endif  // DGL_USE_ASCEND
+
+NDArray ConcatND(const std::vector<NDArray>& arrays, int64_t dim) {
+  CHECK(!arrays.empty()) << "ConcatND requires at least one array.";
+  const NDArray& first = arrays[0];
+  const int64_t ndim = first->ndim;
+  CHECK_GE(ndim, 1) << "ConcatND requires ndim >= 1, got " << ndim << ".";
+  const int64_t axis = dim < 0 ? dim + ndim : dim;
+  CHECK_GE(axis, 0) << "ConcatND: dim " << dim << " is out of range for ndim "
+                    << ndim << ".";
+  CHECK_LT(axis, ndim) << "ConcatND: dim " << dim << " is out of range for ndim "
+                       << ndim << ".";
+
+  std::vector<int64_t> out_shape(first->shape, first->shape + ndim);
+  out_shape[axis] = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    CHECK_SAME_DTYPE(first, arrays[i]);
+    CHECK_SAME_CONTEXT(first, arrays[i]);
+    CHECK_NDIM(arrays[i], ndim, "arrays[i]");
+    for (int64_t d = 0; d < ndim; ++d) {
+      if (d == axis) {
+        out_shape[d] += arrays[i]->shape[d];
+      } else {
+        CHECK_EQ(first->shape[d], arrays[i]->shape[d])
+            << "ConcatND: all shapes must match except on dim " << axis
+            << ", but arrays[0] and arrays[" << i << "] differ on axis " << d
+            << " (" << first->shape[d] << " vs " << arrays[i]->shape[d] << ").";
+      }
+    }
+  }
+
+  NDArray ret = NDArray::Empty(out_shape, first->dtype, first->ctx);
+  if (out_shape[axis] == 0) return ret;
+
+#ifdef DGL_USE_ASCEND
+  if (first->ctx.device_type == kDGLAscend &&
+      AscendDataCopyAligned(arrays, ret)) {
+    if (IS_FLOAT32(first)) {
+      impl::ConcatND<kDGLAscend, float>(arrays, ret, axis);
+      return ret;
+    }
+    if (first->dtype.code == kDGLFloat && first->dtype.bits == 16) {
+      // fp16 travels as uint16_t on Ascend; the kernel only moves bytes.
+      impl::ConcatND<kDGLAscend, uint16_t>(arrays, ret, axis);
+      return ret;
+    }
+    // int32/int64: 同一搬运 kernel 覆盖 1D IdArray 拼接（aten::Concat）与整型特征。
+    if (first->dtype.code == kDGLInt && first->dtype.bits == 32) {
+      impl::ConcatND<kDGLAscend, int32_t>(arrays, ret, axis);
+      return ret;
+    }
+    if (first->dtype.code == kDGLInt && first->dtype.bits == 64) {
+      impl::ConcatND<kDGLAscend, int64_t>(arrays, ret, axis);
+      return ret;
+    }
+  }
+#endif
+
+  // Generic path: one device copy per (input, outer segment). Correct on every
+  // device and dtype; dtypes without an Ascend kernel take this route too.
+  const int64_t elem_bytes = (first->dtype.bits * first->dtype.lanes + 7) / 8;
+  int64_t outer = 1, inner = 1;
+  for (int64_t d = 0; d < axis; ++d) outer *= first->shape[d];
+  for (int64_t d = axis + 1; d < ndim; ++d) inner *= first->shape[d];
+  const int64_t dst_stride = out_shape[axis] * inner * elem_bytes;
+
+  auto device = runtime::DeviceAPI::Get(first->ctx);
+  int64_t dst_base = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    const int64_t seg_bytes = arrays[i]->shape[axis] * inner * elem_bytes;
+    if (seg_bytes > 0) {
+      for (int64_t s = 0; s < outer; ++s) {
+        device->CopyDataFromTo(
+            arrays[i]->data, s * seg_bytes, ret->data, dst_base + s * dst_stride,
+            seg_bytes, arrays[i]->ctx, ret->ctx, arrays[i]->dtype);
+      }
+    }
+    dst_base += seg_bytes;
+  }
+
+  return ret;
 }
 
 template <typename ValueType>
@@ -302,11 +514,21 @@ std::pair<IdArray, IdArray> Sort(IdArray array, const int num_bits) {
     return std::make_pair(array, idx);
   }
   std::pair<IdArray, IdArray> ret;
-  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "Sort", {
+  if (array->ctx.device_type == kDGLAscend) {
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    auto array_cpu = array.CopyTo(cpu_ctx);
     ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::Sort<XPU, IdType>(array, num_bits);
+      ret = impl::Sort<kDGLCPU, IdType>(array_cpu, num_bits);
     });
-  });
+    ret.first = ret.first.CopyTo(array->ctx);
+    ret.second = ret.second.CopyTo(array->ctx);
+  } else {
+    ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "Sort", {
+      ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+        ret = impl::Sort<XPU, IdType>(array, num_bits);
+      });
+    });
+  }
   return ret;
 }
 
@@ -358,36 +580,72 @@ bool CSRHasDuplicate(CSRMatrix csr) {
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   int64_t ret = 0;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowNNZ", {
-    ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
-  });
+#ifdef DGL_USE_ASCEND
+  if (csr.indptr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRGetRowNNZ<kDGLAscend, IdType>(csr, row);
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowNNZ", {
+      ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
+    });
+  }
   return ret;
 }
 
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, row);
-  ATEN_CSR_SWITCH_CUDA_UVA(csr, row, XPU, IdType, "CSRGetRowNNZ", {
-    ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
-  });
+#ifdef DGL_USE_ASCEND
+  if (csr.indptr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRGetRowNNZ<kDGLAscend, IdType>(csr, row);
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA_UVA(csr, row, XPU, IdType, "CSRGetRowNNZ", {
+      ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
+    });
+  }
   return ret;
 }
 
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   NDArray ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowColumnIndices", {
-    ret = impl::CSRGetRowColumnIndices<XPU, IdType>(csr, row);
-  });
+#ifdef DGL_USE_ASCEND
+  if (csr.indptr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRGetRowColumnIndices<kDGLAscend, IdType>(csr, row);
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowColumnIndices", {
+      ret = impl::CSRGetRowColumnIndices<XPU, IdType>(csr, row);
+    });
+  }
   return ret;
 }
 
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   NDArray ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowData", {
-    ret = impl::CSRGetRowData<XPU, IdType>(csr, row);
-  });
+#ifdef DGL_USE_ASCEND
+  if (csr.indptr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRGetRowData<kDGLAscend, IdType>(csr, row);
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowData", {
+      ret = impl::CSRGetRowData<XPU, IdType>(csr, row);
+    });
+  }
   return ret;
 }
 
@@ -405,9 +663,19 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
   CHECK_SAME_CONTEXT(rows, cols);
-  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetData", {
-    ret = impl::CSRGetData<XPU, IdType>(csr, rows, cols);
-  });
+#ifdef DGL_USE_ASCEND
+  if (rows->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRGetData<kDGLAscend, IdType, IdType>(
+          csr, rows, cols, true, NDArray(), IdType(0));
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetData", {
+      ret = impl::CSRGetData<XPU, IdType>(csr, rows, cols);
+    });
+  }
   return ret;
 }
 
@@ -419,10 +687,20 @@ NDArray CSRGetData(
   CHECK_SAME_DTYPE(csr.indices, cols);
   CHECK_SAME_CONTEXT(rows, cols);
   CHECK_SAME_CONTEXT(rows, weights);
-  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetData", {
-    ret =
-        impl::CSRGetData<XPU, IdType, DType>(csr, rows, cols, weights, filler);
-  });
+#ifdef DGL_USE_ASCEND
+  if (rows->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRGetData<kDGLAscend, IdType, DType>(
+          csr, rows, cols, false, weights, filler);
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetData", {
+      ret = impl::CSRGetData<XPU, IdType, DType>(
+          csr, rows, cols, weights, filler);
+    });
+  }
   return ret;
 }
 
@@ -449,14 +727,40 @@ std::vector<NDArray> CSRGetDataAndIndices(
   CHECK_SAME_DTYPE(csr.indices, cols);
   CHECK_SAME_CONTEXT(rows, cols);
   std::vector<NDArray> ret;
-  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetDataAndIndices", {
-    ret = impl::CSRGetDataAndIndices<XPU, IdType>(csr, rows, cols);
-  });
+  if (rows->ctx.device_type == kDGLAscend) {
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    auto csr_indptr = csr.indptr.CopyTo(cpu_ctx);
+    auto csr_indices = csr.indices.CopyTo(cpu_ctx);
+    auto csr_data = csr.data.CopyTo(cpu_ctx);
+    auto rows_cpu = rows.CopyTo(cpu_ctx);
+    auto cols_cpu = cols.CopyTo(cpu_ctx);
+    CSRMatrix csr_cpu{csr.num_rows, csr.num_cols,
+                       csr_indptr, csr_indices, csr_data};
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRGetDataAndIndices<kDGLCPU, IdType>(
+          csr_cpu, rows_cpu, cols_cpu);
+    });
+    for (auto& arr : ret) {
+      arr = arr.CopyTo(rows->ctx);
+    }
+  } else {
+    ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetDataAndIndices", {
+      ret = impl::CSRGetDataAndIndices<XPU, IdType>(csr, rows, cols);
+    });
+  }
   return ret;
 }
 
 CSRMatrix CSRTranspose(CSRMatrix csr) {
   CSRMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (csr.indptr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRTranspose<kDGLAscend, IdType>(csr);
+    });
+    return ret;
+  }
+#endif
   ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "CSRTranspose", {
     ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
       ret = impl::CSRTranspose<XPU, IdType>(csr);
@@ -468,18 +772,45 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
   COOMatrix ret;
   if (data_as_order) {
-    ATEN_XPU_SWITCH_CUDA(
-        csr.indptr->ctx.device_type, XPU, "CSRToCOODataAsOrder", {
-          ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
-            ret = impl::CSRToCOODataAsOrder<XPU, IdType>(csr);
-          });
-        });
-  } else {
-    ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "CSRToCOO", {
+    if (csr.indptr->ctx.device_type == kDGLAscend) {
+      DGLContext cpu_ctx{kDGLCPU, 0};
+      auto indptr_cpu = csr.indptr.CopyTo(cpu_ctx);
+      auto indices_cpu = csr.indices.CopyTo(cpu_ctx);
+      auto data_cpu = csr.data.CopyTo(cpu_ctx);
+      CSRMatrix csr_cpu{csr.num_rows, csr.num_cols,
+                         indptr_cpu, indices_cpu, data_cpu};
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
-        ret = impl::CSRToCOO<XPU, IdType>(csr);
+        ret = impl::CSRToCOODataAsOrder<kDGLCPU, IdType>(csr_cpu);
       });
-    });
+#ifdef DGL_USE_ASCEND
+      // Copy the CPU-computed COO back to the Ascend device so the graph
+      // materialized from it keeps the NPU context. CopyTo uses the sync
+      // aclrtMemcpy path, so no extra sync is needed.
+      ret = ret.CopyTo(csr.indptr->ctx);
+#endif
+    } else {
+      ATEN_XPU_SWITCH_CUDA(
+          csr.indptr->ctx.device_type, XPU, "CSRToCOODataAsOrder", {
+            ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+              ret = impl::CSRToCOODataAsOrder<XPU, IdType>(csr);
+            });
+          });
+    }
+  } else {
+#ifdef DGL_USE_ASCEND
+    if (csr.indptr->ctx.device_type == kDGLAscend) {
+      ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+        ret = impl::CSRToCOO<kDGLAscend, IdType>(csr);
+      });
+    } else
+#endif
+    {
+      ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "CSRToCOO", {
+        ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+          ret = impl::CSRToCOO<XPU, IdType>(csr);
+        });
+      });
+    }
   }
   return ret;
 }
@@ -489,18 +820,36 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   CHECK(end >= 0 && end <= csr.num_rows) << "Invalid end index: " << end;
   CHECK_GE(end, start);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceRows", {
-    ret = impl::CSRSliceRows<XPU, IdType>(csr, start, end);
-  });
+#ifdef DGL_USE_ASCEND
+  if (csr.indptr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRSliceRows<kDGLAscend, IdType>(csr, start, end);
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceRows", {
+      ret = impl::CSRSliceRows<XPU, IdType>(csr, start, end);
+    });
+  }
   return ret;
 }
 
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceRows", {
-    ret = impl::CSRSliceRows<XPU, IdType>(csr, rows);
-  });
+#ifdef DGL_USE_ASCEND
+  if (csr.indptr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRSliceRows<kDGLAscend, IdType>(csr, rows);
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceRows", {
+      ret = impl::CSRSliceRows<XPU, IdType>(csr, rows);
+    });
+  }
   return ret;
 }
 
@@ -509,9 +858,18 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, cols);
   CHECK_SAME_CONTEXT(rows, cols);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceMatrix", {
-    ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
-  });
+#ifdef DGL_USE_ASCEND
+  if (csr.indptr->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRSliceMatrix<kDGLAscend, IdType>(csr, rows, cols);
+    });
+  } else
+#endif
+  {
+    ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceMatrix", {
+      ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
+    });
+  }
   return ret;
 }
 
@@ -575,12 +933,42 @@ COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask,
     bool replace) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.indptr->ctx.device_type == kDGLAscend) {
+    if (IsNullArray(prob_or_mask)) {
+      ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+        ret = impl::CSRRowWiseSamplingUniform<kDGLAscend, IdType>(
+            mat, rows, num_samples, replace);
+      });
+    } else {
+      CHECK_VALID_CONTEXT(prob_or_mask, rows);
+      // The AscendC weighted kernel operates in float32 (double is forbidden
+      // in __aicore__). The launcher normalizes float64 / int8 / uint8
+      // probability or mask to float32 on the host side; the sampling itself
+      // runs natively on the NPU kernel.
+      ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+        ret = impl::CSRRowWiseSampling<kDGLAscend, IdType, float>(
+            mat, rows, num_samples, prob_or_mask, replace);
+      });
+    }
+  } else
+#endif  // DGL_USE_ASCEND
   if (IsNullArray(prob_or_mask)) {
-    ATEN_CSR_SWITCH_CUDA_UVA(
-        mat, rows, XPU, IdType, "CSRRowWiseSamplingUniform", {
-          ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(
-              mat, rows, num_samples, replace);
-        });
+#ifdef DGL_USE_ASCEND
+    if (rows->ctx.device_type == kDGLAscend) {
+      ATEN_ID_TYPE_SWITCH(rows->dtype, IdType, {
+        ret = impl::CSRRowWiseSamplingUniform<kDGLAscend, IdType>(
+            mat, rows, num_samples, replace);
+      });
+    } else
+#endif
+    {
+      ATEN_CSR_SWITCH_CUDA_UVA(
+          mat, rows, XPU, IdType, "CSRRowWiseSamplingUniform", {
+            ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(
+                mat, rows, num_samples, replace);
+          });
+    }
   } else {
     // prob_or_mask is pinned and rows on GPU is valid
     CHECK_VALID_CONTEXT(prob_or_mask, rows);
@@ -603,6 +991,23 @@ std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused(
     std::vector<IdType>* new_seed_nodes, int64_t num_samples,
     NDArray prob_or_mask, bool replace) {
   std::pair<CSRMatrix, IdArray> ret;
+#ifdef DGL_USE_ASCEND
+  if (rows->ctx.device_type == kDGLAscend) {
+    if (IsNullArray(prob_or_mask)) {
+      ret = impl::CSRRowWiseSamplingUniformFused<
+          kDGLAscend, IdType, map_seed_nodes>(
+          mat, rows, seed_mapping, new_seed_nodes, num_samples, replace);
+    } else {
+      CHECK_VALID_CONTEXT(prob_or_mask, rows);
+      // Weighted fused sampling has no CUDA reference either; explicit
+      // named gap on NPU (see the fused operator docs in the process
+      // repository). CHECK raises a catchable DGL error; LOG(FATAL)
+      // would abort the process out from under Python.
+      CHECK(false) << "Weighted fused sampling (prob/mask) is not supported "
+                      "on NPU yet";
+    }
+  } else
+#endif  // DGL_USE_ASCEND
   if (IsNullArray(prob_or_mask)) {
     ATEN_XPU_SWITCH(
         rows->ctx.device_type, XPU, "CSRRowWiseSamplingUniformFused", {
@@ -665,6 +1070,19 @@ COOMatrix CSRRowWisePerEtypeSampling(
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.indptr->ctx.device_type == kDGLAscend) {
+    CHECK_VALID_CONTEXT(weight, rows);
+    // The AscendC sort network is float-only; the launcher normalizes
+    // int32/int64/float64 weights to float32 (min-offset shift) before
+    // launching the kernel.
+    ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+      ret = impl::CSRRowWiseTopk<kDGLAscend, IdType, float>(
+          mat, rows, k, weight, ascending);
+    });
+    return ret;
+  }
+#endif  // DGL_USE_ASCEND
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseTopk", {
     ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
       ret = impl::CSRRowWiseTopk<XPU, IdType, DType>(
@@ -678,6 +1096,18 @@ COOMatrix CSRRowWiseSamplingBiased(
     CSRMatrix mat, IdArray rows, int64_t num_samples, NDArray tag_offset,
     FloatArray bias, bool replace) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.indptr->ctx.device_type == kDGLAscend) {
+    // The AscendC biased kernel operates in float32 (double is forbidden
+    // in __aicore__). The launcher normalizes float64 bias to float32 on
+    // the host side; the sampling itself runs natively on the NPU kernel.
+    ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+      ret = impl::CSRRowWiseSamplingBiased<kDGLAscend, IdType, float>(
+          mat, rows, num_samples, tag_offset, bias, replace);
+    });
+    return ret;
+  }
+#endif  // DGL_USE_ASCEND
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSamplingBiased", {
     ATEN_FLOAT_TYPE_SWITCH(bias->dtype, FloatType, "bias", {
       ret = impl::CSRRowWiseSamplingBiased<XPU, IdType, FloatType>(
@@ -758,43 +1188,106 @@ bool COOHasDuplicate(COOMatrix coo) {
 
 int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   int64_t ret = 0;
-  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
-    ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
-  });
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOGetRowNNZ<kDGLAscend, IdType>(coo, row);
+    });
+    return ret;
+  }
+#endif
+  {
+    ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
+      ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
+    });
+  }
   return ret;
 }
 
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray row) {
   NDArray ret;
-  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
-    ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
-  });
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOGetRowNNZ<kDGLAscend, IdType>(coo, row);
+    });
+    return ret;
+  }
+#endif
+  {
+    ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
+      ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
+    });
+  }
   return ret;
 }
 
 std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
     COOMatrix coo, int64_t row) {
   std::pair<NDArray, NDArray> ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowDataAndIndices", {
-    ret = impl::COOGetRowDataAndIndices<XPU, IdType>(coo, row);
-  });
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOGetRowDataAndIndices<kDGLAscend, IdType>(coo, row);
+    });
+    return ret;
+  }
+#endif
+  {
+    ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowDataAndIndices", {
+      ret = impl::COOGetRowDataAndIndices<XPU, IdType>(coo, row);
+    });
+  }
   return ret;
 }
 
 std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
   std::vector<NDArray> ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetDataAndIndices", {
-    ret = impl::COOGetDataAndIndices<XPU, IdType>(coo, rows, cols);
-  });
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    auto coo_row = coo.row.CopyTo(cpu_ctx);
+    auto coo_col = coo.col.CopyTo(cpu_ctx);
+    auto coo_data = coo.data.CopyTo(cpu_ctx);
+    auto rows_cpu = rows.CopyTo(cpu_ctx);
+    auto cols_cpu = cols.CopyTo(cpu_ctx);
+    COOMatrix coo_cpu{coo.num_rows, coo.num_cols,
+                       coo_row, coo_col, coo_data};
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOGetDataAndIndices<kDGLCPU, IdType>(
+          coo_cpu, rows_cpu, cols_cpu);
+    });
+    for (auto& arr : ret) {
+      arr = arr.CopyTo(rows->ctx);
+    }
+  } else {
+    ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetDataAndIndices", {
+      ret = impl::COOGetDataAndIndices<XPU, IdType>(coo, rows, cols);
+    });
+  }
   return ret;
 }
 
 NDArray COOGetData(COOMatrix coo, NDArray rows, NDArray cols) {
   NDArray ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetData", {
-    ret = impl::COOGetData<XPU, IdType>(coo, rows, cols);
-  });
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    auto coo_row = coo.row.CopyTo(cpu_ctx);
+    auto coo_col = coo.col.CopyTo(cpu_ctx);
+    auto coo_data = coo.data.CopyTo(cpu_ctx);
+    auto rows_cpu = rows.CopyTo(cpu_ctx);
+    auto cols_cpu = cols.CopyTo(cpu_ctx);
+    COOMatrix coo_cpu{coo.num_rows, coo.num_cols,
+                       coo_row, coo_col, coo_data};
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOGetData<kDGLCPU, IdType>(coo_cpu, rows_cpu, cols_cpu);
+    });
+    ret = ret.CopyTo(rows->ctx);
+  } else {
+    ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetData", {
+      ret = impl::COOGetData<XPU, IdType>(coo, rows, cols);
+    });
+  }
   return ret;
 }
 
@@ -804,6 +1297,13 @@ COOMatrix COOTranspose(COOMatrix coo) {
 
 CSRMatrix COOToCSR(COOMatrix coo) {
   CSRMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(
+        coo.row->dtype, IdType, { ret = impl::COOToCSR<kDGLAscend, IdType>(coo); });
+    return ret;
+  }
+#endif
   ATEN_XPU_SWITCH_CUDA(coo.row->ctx.device_type, XPU, "COOToCSR", {
     ATEN_ID_TYPE_SWITCH(
         coo.row->dtype, IdType, { ret = impl::COOToCSR<XPU, IdType>(coo); });
@@ -813,6 +1313,14 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
 COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOSliceRows<kDGLAscend, IdType>(coo, start, end);
+    });
+    return ret;
+  }
+#endif
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceRows", {
     ret = impl::COOSliceRows<XPU, IdType>(coo, start, end);
   });
@@ -821,14 +1329,32 @@ COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
 
 COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceRows", {
-    ret = impl::COOSliceRows<XPU, IdType>(coo, rows);
-  });
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOSliceRows<kDGLAscend, IdType>(coo, rows);
+    });
+    return ret;
+  }
+#endif
+  {
+    ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceRows", {
+      ret = impl::COOSliceRows<XPU, IdType>(coo, rows);
+    });
+  }
   return ret;
 }
 
 COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (coo.row->ctx.device_type == kDGLAscend) {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOSliceMatrix<kDGLAscend, IdType>(coo, rows, cols);
+    });
+    return ret;
+  }
+#endif
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceMatrix", {
     ret = impl::COOSliceMatrix<XPU, IdType>(coo, rows, cols);
   });
@@ -837,11 +1363,21 @@ COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
 
 void COOSort_(COOMatrix* mat, bool sort_column) {
   if ((mat->row_sorted && !sort_column) || mat->col_sorted) return;
-  ATEN_XPU_SWITCH_CUDA(mat->row->ctx.device_type, XPU, "COOSort_", {
+#ifdef DGL_USE_ASCEND
+  if (mat->row->ctx.device_type == kDGLAscend) {
     ATEN_ID_TYPE_SWITCH(mat->row->dtype, IdType, {
-      impl::COOSort_<XPU, IdType>(mat, sort_column);
+      impl::COOSort_<kDGLAscend, IdType>(mat, sort_column);
     });
-  });
+    return;
+  }
+#endif
+  {
+    ATEN_XPU_SWITCH_CUDA(mat->row->ctx.device_type, XPU, "COOSort_", {
+      ATEN_ID_TYPE_SWITCH(mat->row->dtype, IdType, {
+        impl::COOSort_<XPU, IdType>(mat, sort_column);
+      });
+    });
+  }
 }
 
 std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
@@ -891,6 +1427,19 @@ COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask,
     bool replace) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.row->ctx.device_type == kDGLAscend) {
+    // Only the uniform path (no probability/mask) has an Ascend
+    // implementation so far; reject the weighted path explicitly.
+    CHECK(IsNullArray(prob_or_mask))
+        << "COO weighted row-wise sampling on Ascend is not supported yet";
+    ATEN_ID_TYPE_SWITCH(mat.row->dtype, IdType, {
+      ret = impl::COORowWiseSamplingUniform<kDGLAscend, IdType>(
+          mat, rows, num_samples, replace);
+    });
+    return ret;
+  }
+#endif  // DGL_USE_ASCEND
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWiseSampling", {
     if (IsNullArray(prob_or_mask)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(
@@ -931,6 +1480,19 @@ COOMatrix COORowWisePerEtypeSampling(
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending) {
   COOMatrix ret;
+#ifdef DGL_USE_ASCEND
+  if (mat.row->ctx.device_type == kDGLAscend) {
+    CHECK_VALID_CONTEXT(weight, rows);
+    // Assembly route (ADR-0001 pattern): the Ascend launcher converts the
+    // full graph to CSR and runs the native CSR topk kernel; the weight
+    // dtype normalization to f32 happens inside that kernel's launcher.
+    ATEN_ID_TYPE_SWITCH(mat.row->dtype, IdType, {
+      ret = impl::COORowWiseTopk<kDGLAscend, IdType, float>(
+          mat, rows, k, weight, ascending);
+    });
+    return ret;
+  }
+#endif  // DGL_USE_ASCEND
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWiseTopk", {
     ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
       ret = impl::COORowWiseTopk<XPU, IdType, DType>(
@@ -950,6 +1512,23 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
 
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   COOMatrix ret;
+  if (coos[0].row->ctx.device_type == kDGLAscend) {
+    // Ascend backend: compute on CPU then copy the COO result back to the
+    // Ascend device. DisjointUnionCoo has no native Ascend kernel yet.
+    // TODO(Ascend): implement a native DisjointUnionCoo NPU kernel and drop
+    // this CPU fallback once available.
+    DGLContext cpu_ctx{kDGLCPU, 0};
+    std::vector<COOMatrix> coos_cpu;
+    coos_cpu.reserve(coos.size());
+    for (size_t i = 0; i < coos.size(); ++i) {
+      coos_cpu.push_back(coos[i].CopyTo(cpu_ctx));
+    }
+    ATEN_ID_TYPE_SWITCH(coos_cpu[0].row->dtype, IdType, {
+      ret = impl::DisjointUnionCoo<kDGLCPU, IdType>(coos_cpu);
+      ret = ret.CopyTo(coos[0].row->ctx);
+    });
+    return ret;
+  }
   ATEN_XPU_SWITCH_CUDA(coos[0].row->ctx.device_type, XPU, "DisjointUnionCoo", {
     ATEN_ID_TYPE_SWITCH(coos[0].row->dtype, IdType, {
       ret = impl::DisjointUnionCoo<XPU, IdType>(coos);
@@ -1073,7 +1652,7 @@ Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
       << "Graph and source should in the same dtype";
   CHECK_EQ(csr.num_rows, csr.num_cols)
       << "Graph traversal can only work on square-shaped CSR.";
-  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSNodesFrontiers", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(source->ctx.device_type, XPU, "BFSNodesFrontiers", {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
       ret = impl::BFSNodesFrontiers<XPU, IdType>(csr, source);
     });
@@ -1089,7 +1668,7 @@ Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
       << "Graph and source should in the same dtype";
   CHECK_EQ(csr.num_rows, csr.num_cols)
       << "Graph traversal can only work on square-shaped CSR.";
-  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSEdgesFrontiers", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(source->ctx.device_type, XPU, "BFSEdgesFrontiers", {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
       ret = impl::BFSEdgesFrontiers<XPU, IdType>(csr, source);
     });
@@ -1172,7 +1751,7 @@ void CSRSDDMM(
     NDArray out, int lhs_target, int rhs_target) {
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
-  ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "SDDMM", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(csr.indptr->ctx.device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(out->dtype, Dtype, XPU, "Feature data", {
         SDDMMCsr<XPU, IdType, Dtype>(
@@ -1216,7 +1795,7 @@ void COOSDDMM(
     NDArray out, int lhs_target, int rhs_target) {
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
-  ATEN_XPU_SWITCH_CUDA(coo.row->ctx.device_type, XPU, "SDDMM", {
+  ATEN_XPU_SWITCH_CUDA_ASCEND(coo.row->ctx.device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH_16BITS(out->dtype, Dtype, XPU, "Feature data", {
         SDDMMCoo<XPU, IdType, Dtype>(
@@ -1233,6 +1812,13 @@ void COOSDDMM(
 }
 
 ///////////////////////// C APIs /////////////////////////
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLConcatND")
+    .set_body([](DGLArgs args, DGLRetValue* rv) {
+      List<Value> arrays = args[0];
+      const int64_t dim = args[1];
+      *rv = ConcatND(ListValueToVector<NDArray>(arrays), dim);
+    });
+
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
     .set_body([](DGLArgs args, DGLRetValue* rv) {
       SparseMatrixRef spmat = args[0];
@@ -1307,3 +1893,4 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLArrayCastToSigned")
 std::ostream& operator<<(std::ostream& os, dgl::runtime::NDArray array) {
   return os << dgl::aten::ToDebugString(array);
 }
+

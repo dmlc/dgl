@@ -1,0 +1,50 @@
+name: Experience Request|体验需求
+description: 当您在 DGL-Ascend 开发体验过程中发现可改进的问题时，请使用此模板。
+title: "[Experience Request|体验需求]: "
+labels: ["requirement"]
+type: "需求"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sending an issue! Please fill in the following template to help quickly solve your problem.
+  - type: dropdown
+    attributes:
+      label: 体验活动所处阶段
+      description: 请选择发现体验问题时所处的开发阶段。
+      options:
+        - 感知学习（了解基础概念、查阅开发资料等）
+        - 图算子设计与实现
+        - 图算子编译
+        - 精度调试
+        - 性能调优
+        - 其他（可以再下方的改进建议中详细补充）
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: 体验改进触点（问题出现在哪类内容或环节）
+      description: 请选择体验问题对应的触点。
+      options:
+        - 开发资料
+        - API
+        - 源码/示例代码
+        - 工具
+        - 运行时反馈（日志、报错信息等）
+        - 其他（可以再下方的改进建议中详细补充）
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 详细描述
+      description: 说明具体体验场景和未达到预期的体验维度（如易学性、易用性、反馈清晰度），并描述实际遇到的问题。
+      placeholder: 针对您遇到的问题，请尽可能提供相关的资料链接、API 名称、代码片段、操作步骤、日志或截图等信息。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 改进建议
+      description: 请描述您期望的改进方式或理想体验。
+      placeholder: 例如期望补充哪些说明、简化哪些操作，或优化成什么样。
+    validations:
+      required: false

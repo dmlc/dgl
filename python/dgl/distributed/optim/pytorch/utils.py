@@ -62,6 +62,12 @@ def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     th.distributed.barrier()
 
 
+def is_nccl_or_hccl_backend():
+    """Check if the backend is GPU-based (NCCL or HCCL)."""
+    backend = th.distributed.get_backend()
+    return backend in ("nccl", "hccl")
+
+
 def alltoall(rank, world_size, output_tensor_list, input_tensor_list):
     """Each process scatters list of input tensors to all processes in a cluster
     and return gathered list of tensors in output list. The tensors should have the same shape.
@@ -77,7 +83,7 @@ def alltoall(rank, world_size, output_tensor_list, input_tensor_list):
     input_tensor_list : List of tensor
         The tensors to exchange
     """
-    if th.distributed.get_backend() == "nccl":
+    if is_nccl_or_hccl_backend():
         th.distributed.all_to_all(output_tensor_list, input_tensor_list)
     else:
         alltoall_cpu(
@@ -103,7 +109,7 @@ def alltoallv(rank, world_size, output_tensor_list, input_tensor_list):
     input_tensor_list : List of tensor
         The tensors to exchange
     """
-    if th.distributed.get_backend() == "nccl":
+    if is_nccl_or_hccl_backend():
         th.distributed.all_to_all(output_tensor_list, input_tensor_list)
     else:
         alltoallv_cpu(

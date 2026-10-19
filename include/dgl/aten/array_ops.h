@@ -236,6 +236,27 @@ IdArray Relabel_(const std::vector<IdArray>& arrays);
  */
 NDArray Concat(const std::vector<IdArray>& arrays);
 
+/**
+ * @brief Concatenate the given arrays along an arbitrary dimension.
+ *
+ * Equivalent to \c torch.cat(arrays, dim). All inputs must share the same
+ * dtype, context and ndim, and their shapes must match on every axis other
+ * than \p dim.
+ *
+ * Named \c ConcatND rather than overloading \ref Concat because \c IdArray is
+ * a typedef of \c NDArray, which would make the two signatures identical.
+ *
+ * Example:
+ *
+ * Given two (2, 3) float arrays and dim = 0, the result has shape (4, 3).
+ * Given dim = 1, the result has shape (2, 6).
+ *
+ * @param arrays The arrays to concatenate; must not be empty.
+ * @param dim The axis to concatenate along. Negative values count from the end.
+ * @return The concatenated array.
+ */
+NDArray ConcatND(const std::vector<NDArray>& arrays, int64_t dim);
+
 /** @brief Return whether the array is a valid 1D int array*/
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
   return arr->ndim == 1 && arr->dtype.code == kDGLInt;

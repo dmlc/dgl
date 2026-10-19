@@ -165,6 +165,9 @@ def node_subgraph(
     induced_edges = sgi.induced_edges
     if not relabel_nodes:
         sgi = graph._graph.edge_subgraph(induced_edges, True)
+    import torch as _th_npu_sync
+    if getattr(_th_npu_sync, 'npu', None) and graph.device.type == 'npu':
+        _th_npu_sync.npu.synchronize()
     # (BarclayII) should not write induced_nodes = sgi.induced_nodes due to the same
     # bug in #1453.
     induced_nodes_or_device = induced_nodes if relabel_nodes else device
@@ -329,6 +332,9 @@ def edge_subgraph(
     ]
 
     sgi = graph._graph.edge_subgraph(induced_edges, not relabel_nodes)
+    import torch as _th_npu_sync
+    if getattr(_th_npu_sync, 'npu', None) and graph.device.type == 'npu':
+        _th_npu_sync.npu.synchronize()
     induced_nodes_or_device = sgi.induced_nodes if relabel_nodes else device
     subg = _create_hetero_subgraph(
         graph, sgi, induced_nodes_or_device, induced_edges, store_ids=store_ids

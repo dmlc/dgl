@@ -101,13 +101,27 @@ def context(input):
 
 
 def device_type(ctx):
-    return th.device(ctx).type
+    ctx = th.device(ctx)
+    # Map npu to ascend for DGL internal use
+    if ctx.type == "npu":
+        return "npu"
+    return ctx.type
 
 
 def device_id(ctx):
     ctx = th.device(ctx)
     if ctx.index is None:
-        return 0 if ctx.type == "cpu" else th.cuda.current_device()
+        if ctx.type == "cpu":
+            return 0
+        elif ctx.type == "cuda":
+            return th.cuda.current_device()
+        elif ctx.type == "npu":
+            # torch_npu >= 2.5.1 auto-registers with torch, no explicit import needed
+            if hasattr(th, 'npu'):
+                return th.npu.current_device()
+            return 0
+        else:
+            return 0
     else:
         return ctx.index
 
@@ -118,6 +132,8 @@ def to_backend_ctx(dglctx):
         return th.device("cpu")
     elif dev_type == 2:
         return th.device("cuda", dglctx.device_id)
+    elif dev_type == 12:
+        return th.device("npu", dglctx.device_id)
     else:
         raise ValueError("Unsupported DGL device context:", dglctx)
 
@@ -141,6 +157,15 @@ def copy_to(input, ctx, **kwargs):
         if ctx.index is not None:
             th.cuda.set_device(ctx.index)
         return input.cuda(**kwargs)
+    elif ctx.type == "npu":
+        # torch_npu >= 2.5.1 auto-registers with torch, no explicit import needed
+        if not hasattr(th, 'npu'):
+            raise RuntimeError(
+                "NPU support not available. Please install torch_npu to use NPU devices."
+            )
+        if ctx.index is not None:
+            th.npu.set_device(ctx.index)
+        return input.npu(**kwargs)
     else:
         raise RuntimeError("Invalid context", ctx)
 
@@ -175,6 +200,9 @@ def reduce_mean(input):
 
 def max(input, dim):
     # NOTE: the second argmax array is not returned
+    # NPU: torch.max does not support int32, cast to int64 first
+    if getattr(input, 'is_npu', False) and input.dtype == th.int32:
+        return th.max(input.to(th.int64), dim=dim)[0].to(th.int32)
     return th.max(input, dim=dim)[0]
 
 
@@ -184,6 +212,9 @@ def reduce_max(input):
 
 def min(input, dim):
     # NOTE: the second argmin array is not returned
+    # NPU: torch.min does not support int32, cast to int64 first
+    if getattr(input, 'is_npu', False) and input.dtype == th.int32:
+        return th.min(input.to(th.int64), dim=dim)[0].to(th.int32)
     return th.min(input, dim=dim)[0]
 
 

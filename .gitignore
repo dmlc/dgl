@@ -12,6 +12,13 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+build_backup/
+build_backup_*/
+build_backup_root/
+build_host_backup_*/
+dgl_sparse/build_backup/
+graphbolt/build_backup/
+tensoradapter/pytorch/build_backup/
 dataset/
 datasets/
 develop-eggs/
@@ -168,3 +175,9 @@ cscope.*
 
 # model file
 *.pth
+###
+tests/ascend/results/
+tests/python/common/transforms/extra-info/
+tests/python/pytorch/nn/extra-info/
+
+.opencode

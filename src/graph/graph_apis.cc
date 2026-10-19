@@ -12,6 +12,11 @@
 
 #include "../c_api_common.h"
 
+#ifdef DGL_USE_ASCEND
+#include <acl/acl.h>
+#include <acl/acl_rt.h>
+#endif
+
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
 using dgl::runtime::DGLRetValue;

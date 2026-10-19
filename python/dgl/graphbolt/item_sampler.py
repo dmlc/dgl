@@ -544,11 +544,13 @@ class DistributedItemSampler(ItemSampler):
             The seed value to synchronize. If None, a random seed will be
             generated. Defaults to None.
         """
-        device = (
-            torch.cuda.current_device()
-            if torch.cuda.is_available() and dist.get_backend() == "nccl"
-            else "cpu"
-        )
+        backend = dist.get_backend()
+        if backend == "hccl" and torch.npu.is_available():
+            device = torch.npu.current_device()
+        elif backend == "nccl" and torch.cuda.is_available():
+            device = torch.cuda.current_device()
+        else:
+            device = "cpu"
         if seed is None:
             seed = np.random.randint(0, np.iinfo(np.int32).max)
         if self._rank == src:

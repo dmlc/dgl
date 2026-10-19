@@ -141,22 +141,39 @@ class empty_context:
         return
 
 
-# Disable CUDA autocast since we have casted args manually,
+# Disable CUDA/NPU autocast since we have casted args manually,
 # and do it only in a nested autocast context.
+def _is_autocast_enabled():
+    if th.is_autocast_enabled():
+        return True
+    if hasattr(th, "npu") and hasattr(th.npu, "is_autocast_enabled") and th.npu.is_autocast_enabled():
+        return True
+    return False
+
+
 def _disable_autocast_if_enabled():
     if th.is_autocast_enabled():
-        return th.cuda.amp.autocast(enabled=False)
-    else:
+        if hasattr(th, "cuda") and hasattr(th.cuda, "amp"):
+            return th.cuda.amp.autocast(enabled=False)
         return empty_context()
+    if hasattr(th, "npu") and hasattr(th.npu, "is_autocast_enabled") and th.npu.is_autocast_enabled():
+        return th.npu.amp.autocast(enabled=False)
+    return empty_context()
 
 
 def _cast_if_autocast_enabled(*args):
-    if not th.is_autocast_enabled():
+    if not _is_autocast_enabled():
         return args
-    else:
-        return th.cuda.amp.autocast_mode._cast(
-            args, th.get_autocast_gpu_dtype()
-        )
+    if th.is_autocast_enabled():
+        if hasattr(th, "cuda") and hasattr(th.cuda, "amp"):
+            return th.cuda.amp.autocast_mode._cast(
+                args, th.get_autocast_gpu_dtype()
+            )
+        return args
+    if hasattr(th, "npu") and hasattr(th.npu, "is_autocast_enabled") and th.npu.is_autocast_enabled():
+        dtype = th.npu.get_autocast_dtype() if hasattr(th.npu, "get_autocast_dtype") else th.float16
+        return th.npu.amp.autocast_mode._cast(args, dtype)
+    return args
 
 
 class GSpMM(th.autograd.Function):
@@ -1029,6 +1046,10 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
         rhs_data = 1.0 / rhs_data
     args = _cast_if_autocast_enabled(gidx, op, reduce_op, lhs_data, rhs_data)
     with _disable_autocast_if_enabled():
+        # Ascend note: input sync (against torch_npu-produced tensors) is
+        # done in _sparse_ops._gspmm via torch.npu.synchronize() — the C++
+        # aclrtSynchronizeDevice there does not order against torch_npu host
+        # queue submissions, so no sync is added at this layer.
         return GSpMM.apply(*args)
 
 
@@ -1171,12 +1192,25 @@ def csrmask(gidxA, A_weights, gidxB):
 
 
 def segment_mm(A, B, seglen_A):
+    # The Ascend C++ SegmentMM dispatch is not implemented (LOG(FATAL)); fall
+    # back to a pure-torch implementation that is valid on both CPU and NPU.
     if A.device.type == "cpu":
         C = []
         off = 0
         for i in range(B.shape[0]):
             C.append(A[off : off + seglen_A[i]] @ B[i])
             off += seglen_A[i]
+        return th.cat(C)
+    elif A.device.type in ("npu", "ascend"):
+        C = []
+        off = 0
+        # Copy to host once (avoid per-element implicit D2H syncs in the
+        # loop below); keep CPU tensors as-is.
+        seglen_host = seglen_A.cpu() if seglen_A.device.type in ("npu", "cuda") else seglen_A
+        for i in range(B.shape[0]):
+            n = int(seglen_host[i])
+            C.append(A[off : off + n] @ B[i])
+            off += n
         return th.cat(C)
     else:
         args = _cast_if_autocast_enabled(A, B, seglen_A)
@@ -1185,7 +1219,13 @@ def segment_mm(A, B, seglen_A):
 
 
 def gather_mm(A, B, idx_A=None, idx_B=None):
+    # The Ascend C++ GatherMM dispatch is not implemented (LOG(FATAL)); fall
+    # back to a pure-torch implementation that is valid on both CPU and NPU.
     if A.device.type == "cpu":
+        A = A[idx_A] if idx_A is not None else A
+        B = B[idx_B] if idx_B is not None else B
+        return th.bmm(A.unsqueeze(1), B).squeeze(1)
+    elif A.device.type in ("npu", "ascend"):
         A = A[idx_A] if idx_A is not None else A
         B = B[idx_B] if idx_B is not None else B
         return th.bmm(A.unsqueeze(1), B).squeeze(1)

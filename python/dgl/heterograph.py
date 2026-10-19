@@ -37,6 +37,10 @@ from .view import (
 __all__ = ["DGLGraph", "combine_names"]
 
 
+# Max element count for adj_external()'s forced dense conversion on Ascend
+# (torch_npu has no native sparse matmul). ~2^24 elements ≈ 64 MB fp32.
+_ADJ_EXTERNAL_DENSE_MAX_ELEMS = 1 << 24
+
 class DGLGraph(object):
     """Class for storing graph structure and node/edge feature data.
 
@@ -3671,6 +3675,15 @@ class DGLGraph(object):
             v = self.dstnodes(dsttype)
         v_tensor = utils.prepare_tensor(self, v, "v")
         deg = self._graph.in_degrees(etid, v_tensor)
+        if str(deg.device).startswith("npu"):
+            # On Ascend the first in_degrees call on a freshly materialized
+            # graph (e.g. after LapPE/reconstruction) can return corrupt
+            # values (all-zeros or a wrong degree sum); the second call is
+            # always correct. Retry defensively. Use this etype's edge count
+            # (not the whole graph) so multi-etype graphs don't always retry.
+            if self._graph.num_edges(etid) > 0 and deg.numel() > 0:
+                if bool((deg == 0).all()) or int(deg.sum()) != self._graph.num_edges(etid):
+                    deg = self._graph.in_degrees(etid, v_tensor)
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)
         else:
@@ -3901,7 +3914,31 @@ class DGLGraph(object):
         """
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
-            return self._graph.adjacency_matrix(etid, transpose, ctx)[0]
+            ret = self._graph.adjacency_matrix(etid, transpose, ctx)[0]
+            # torch_npu has no native sparse matmul; expose a dense matrix on
+            # Ascend so downstream torch ops (e.g. `th.matmul(A, X)` reference
+            # checks) work.
+            # NOTE: only returns dense on Ascend. This is O(N^2) memory, which
+            # is fine for small reference graphs but may be prohibitive for
+            # large graphs; prefer `adjacency_matrix_scipy` in that case.
+            if str(getattr(ret, "device", "")).startswith("npu") and getattr(
+                ret, "is_sparse", False
+            ):
+                # Size guard: dense conversion is O(N^2) memory. Only do it
+                # for graphs small enough to materialize a dense adjacency;
+                # otherwise raise a clear error instead of OOM-ing the NPU.
+                n_src, n_dst = ret.shape
+                dense_elems = int(n_src) * int(n_dst)
+                if dense_elems > _ADJ_EXTERNAL_DENSE_MAX_ELEMS:
+                    raise ValueError(
+                        f"adj_external() would materialize a dense {n_src}x{n_dst}"
+                        f" adjacency ({dense_elems} elements) on Ascend. torch_npu"
+                        " has no native sparse matmul so sparse output cannot be"
+                        " consumed here; use adj_external(scipy_fmt='coo') or"
+                        " adj_tensors() instead."
+                    )
+                ret = ret.to_dense()
+            return ret
         else:
             return self._graph.adjacency_matrix_scipy(
                 etid, transpose, scipy_fmt, False
@@ -5739,6 +5776,21 @@ class DGLGraph(object):
             }
             ret._batch_num_edges = new_bne
 
+        # 3. Record the PyTorch NPU stream on the graph so DGL's memory
+        # management can track it.  DGL-Ascend runs its kernels on the default
+        # ACL stream (nullptr) which is decoupled from PyTorch's NPU stream;
+        # recording the stream lets DGL's caching allocator coordinate
+        # lifetimes with PyTorch.  Stream synchronization for correctness is
+        # handled in the C++ layer (aclrtSynchronizeDevice in array.cc /
+        # segment_reduce.cc), not here.
+        if F.device_type(ret.device) == "npu":
+            try:
+                import torch
+                cur_stream = torch.npu.current_stream()
+                ret.record_stream(cur_stream)
+            except Exception:
+                pass
+
         return ret
 
     def cpu(self):
@@ -5887,7 +5939,7 @@ class DGLGraph(object):
         """
         if F.get_preferred_backend() != "pytorch":
             raise DGLError("record_stream only support the PyTorch backend.")
-        if F.device_type(self.device) != "cuda":
+        if F.device_type(self.device) not in ("cuda", "npu"):
             raise DGLError("The graph must be on GPU to be recorded.")
         self._graph.record_stream(stream)
         for frame in itertools.chain(self._node_frames, self._edge_frames):
